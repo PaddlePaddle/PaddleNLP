@@ -18,6 +18,12 @@ unset CUDA_VISIBLE_DEVICES
 rm -rf log
 rm -rf output
 
+unset PADDLE_ELASTIC_JOB_ID
+unset PADDLE_TRAINER_ENDPOINTS
+unset DISTRIBUTED_TRAINER_ENDPOINTS
+unset FLAGS_START_PORT
+unset PADDLE_ELASTIC_TIMEOUT
+
 export FLAGS_embedding_deterministic=1
 export FLAGS_cudnn_deterministic=1
 export FLAGS_flash_attn_version=v1
@@ -49,10 +55,23 @@ if [[ $# > 3 ]]; then
   gpu_num=$4
 fi
 
-echo "mode:$mode, max_seq_length:$max_seq_length, gpus:$gpus, gpu_num:$gpu_num"
+nnodes=1
+if [[ $# > 3 ]]; then
+  nnodes=$5
+fi
+
+echo "mode:$mode, max_seq_length:$max_seq_length, gpus:$gpus, gpu_num:$gpu_num, nnodes:$nnodes"
+
+rank=${PADDLE_TRAINER_ID-0}
+if [[ $nnodes -gt 1 ]]; then
+  master=`cat /root/paddlejob/workspace/hostfile | head -n 1 | awk '{print $1}'`
+else
+  master=127.0.0.1
+fi
+port=36677
 
 max_steps=10
-log_dir=${mode}_log_seq_${max_seq_length}_gpus_${gpu_num}
+log_dir=${mode}_log_seq_${max_seq_length}_gpus_${gpu_num}_nodes_${nnodes}
 echo "log_dir:${log_dir}"
 # log_dir=tp_log_tmp
 
@@ -62,6 +81,9 @@ rm -rf dp_input_data/*
 # rm -rf tp_log
 # nsys profile --stats true -w true -t cuda,nvtx,osrt,cudnn,cublas --capture-range=cudaProfilerApi -x true --force-overwrite true -o test_paddle \
 python -u  -m paddle.distributed.launch \
+    --master $master:$port \
+    --nnodes $nnodes \
+    --rank $rank \
     --gpus $gpus \
     --log_dir "./$log_dir" \
     run_pretrain.py \
@@ -115,6 +137,9 @@ elif [[ $mode == "sep" ]]; then
 # rm -rf sep_log
 # nsys profile --stats true -w true -t cuda,nvtx,osrt,cudnn,cublas --capture-range=cudaProfilerApi -x true --force-overwrite true -o test_paddle \
 python -u  -m paddle.distributed.launch \
+    --master $master:$port \
+    --nnodes $nnodes \
+    --rank $rank \
     --gpus $gpus \
     --log_dir "./$log_dir" \
     run_pretrain.py \
