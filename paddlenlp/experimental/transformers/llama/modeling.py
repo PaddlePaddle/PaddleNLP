@@ -569,10 +569,15 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
+        default_dtype = paddle.get_default_dtype()
+
         if "lm_head.weight" in state_dict:
-            self.lm_head.weight.set_value(state_dict["lm_head.weight"])
+            self.lm_head.weight.set_value(paddle.cast(state_dict["lm_head.weight"], default_dtype))
         self.llama.set_state_dict(
-            {k: paddle.cast(state_dict[k], paddle.get_default_dtype()) for k in state_dict.keys()}
+            {
+                k: paddle.cast(state_dict[k], default_dtype if "layernorm" not in k else "float32")
+                for k in state_dict.keys()
+            }
         )
 
 
