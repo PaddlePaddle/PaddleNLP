@@ -482,6 +482,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
 
     def to_static(self, output_path: str, config: dict):
         dtype = config.get("dtype", paddle.get_default_dtype())
+        cachekv_dtype = dtype
 
         cache_kvs_shapes = self.get_cache_kvs_shape(
             self.config, max_batch_size=config.get("max_batch_size", -1), max_length=config.get("max_length", None)
@@ -494,14 +495,61 @@ class GenerationBlockInferenceModel(GenerationMixin):
         #     ]
         # else:
         #     precache_input_spec = None
+
+        use_cachekv_int8 = config.get("use_cachekv_int8", False)
+
+        if use_cachekv_int8:
+            cachekv_dtype = "uint8"
+            cache_k_quant_scales = [
+                paddle.static.InputSpec(
+                    shape=[self.config.num_attention_heads],
+                    dtype="float32",
+                    name="k_quant_scales_{}".format(i),
+                )
+                for i in range(int(len(cache_kvs_shapes) / 2))
+            ]
+
+            cache_v_quant_scales = [
+                paddle.static.InputSpec(
+                    shape=[self.config.num_attention_heads],
+                    dtype="float32",
+                    name="v_quant_scales_{}".format(i),
+                )
+                for i in range(int(len(cache_kvs_shapes) / 2))
+            ]
+
+            cache_k_dequant_scales = [
+                paddle.static.InputSpec(
+                    shape=[self.config.num_attention_heads],
+                    dtype="float32",
+                    name="k_dequant_scales_{}".format(i),
+                )
+                for i in range(int(len(cache_kvs_shapes) / 2))
+            ]
+            cache_v_dequant_scales = [
+                paddle.static.InputSpec(
+                    shape=[self.config.num_attention_heads],
+                    dtype="float32",
+                    name="v_dequant_scales_{}".format(i),
+                )
+                for i in range(int(len(cache_kvs_shapes) / 2))
+            ]
+        else:
+            cache_k_quant_scales = None
+            cache_v_quant_scales = None
+            cache_k_dequant_scales = None
+            cache_v_dequant_scales = None
+
         caches = []
         for i in range(len(cache_kvs_shapes) // 2):
             caches.append(
-                paddle.static.InputSpec(shape=cache_kvs_shapes[2 * i], dtype=dtype, name="key_caches_{}".format(i))
+                paddle.static.InputSpec(
+                    shape=cache_kvs_shapes[2 * i], dtype=cachekv_dtype, name="key_caches_{}".format(i)
+                )
             )
             caches.append(
                 paddle.static.InputSpec(
-                    shape=cache_kvs_shapes[2 * i + 1], dtype=dtype, name="value_caches_{}".format(i)
+                    shape=cache_kvs_shapes[2 * i + 1], dtype=cachekv_dtype, name="value_caches_{}".format(i)
                 )
             )
 
@@ -536,6 +584,10 @@ class GenerationBlockInferenceModel(GenerationMixin):
             # None,  # inputs_embeds
             # config.get("logits_processors", None),
             # precache_input_spec,
+            cache_k_quant_scales,
+            cache_v_quant_scales,
+            cache_k_dequant_scales,
+            cache_v_dequant_scales,
         ]
         # if self.config["model_type"] and "chatglm" in self.config.model_type:
         #     input_spec[2] = paddle.static.InputSpec(
@@ -578,6 +630,10 @@ class GenerationBlockInferenceModel(GenerationMixin):
         not_need_stop=None,
         block_tables=None,
         cache_kvs=[],
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
         **model_kwargs,
     ):
 
@@ -594,6 +650,10 @@ class GenerationBlockInferenceModel(GenerationMixin):
         model_kwargs["block_tables"] = block_tables
         model_kwargs["not_need_stop"] = not_need_stop
         model_kwargs["caches"] = cache_kvs
+        model_kwargs["k_quant_scales"] = k_quant_scales
+        model_kwargs["v_quant_scales"] = v_quant_scales
+        model_kwargs["k_dequant_scales"] = k_dequant_scales
+        model_kwargs["v_dequant_scales"] = v_dequant_scales
 
         ret = self.sample(
             eos_token_id,

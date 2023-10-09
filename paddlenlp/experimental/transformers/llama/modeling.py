@@ -606,6 +606,10 @@ class LlamaBlockInferenceModel(LlamaPretrainedModel):
         seq_lens_encoder=None,
         seq_lens_decoder=None,
         seq_lens_this_time=None,
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
     ):
         ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
             input_ids, seq_lens_this_time
@@ -628,6 +632,10 @@ class LlamaBlockInferenceModel(LlamaPretrainedModel):
                 seq_lens_this_time=seq_lens_this_time,
                 cu_seqlens_q=cu_seqlens_q,
                 cu_seqlens_k=cu_seqlens_k,
+                k_quant_scales=k_quant_scales,
+                v_quant_scales=v_quant_scales,
+                k_dequant_scales=k_dequant_scales,
+                v_dequant_scales=v_dequant_scales,
                 block_tables=block_tables,
                 max_input_length=self.max_input_length,
                 block_size=self.block_size,
@@ -975,6 +983,10 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         seq_lens_this_time = kwargs["seq_lens_this_time"]
         seq_lens_encoder = kwargs["seq_lens_encoder"]
         seq_lens_decoder = kwargs["seq_lens_decoder"]
+        k_quant_scales = kwargs.get("k_quant_scales", None)
+        v_quant_scales = kwargs.get("v_quant_scales", None)
+        k_dequant_scales = kwargs.get("k_dequant_scales", None)
+        v_dequant_scales = kwargs.get("v_dequant_scales", None)
         model_inputs = {
             "input_ids": input_ids,
             "src_mask": src_mask,
@@ -984,6 +996,10 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             "seq_lens_encoder": seq_lens_encoder,
             "seq_lens_decoder": seq_lens_decoder,
             "block_tables": block_tables,
+            "k_quant_scales": k_quant_scales,
+            "v_quant_scales": v_quant_scales,
+            "k_dequant_scales": k_dequant_scales,
+            "v_dequant_scales": v_dequant_scales,
         }
         return model_inputs
 
@@ -998,6 +1014,10 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         seq_lens_decoder=None,
         rope_emb=None,
         block_tables=None,
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
     ):
         outputs = self.llama(
             input_ids,
@@ -1009,6 +1029,10 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             seq_lens_this_time=seq_lens_this_time,
             seq_lens_encoder=seq_lens_encoder,
             seq_lens_decoder=seq_lens_decoder,
+            k_quant_scales=k_quant_scales,
+            v_quant_scales=v_quant_scales,
+            k_dequant_scales=k_dequant_scales,
+            v_dequant_scales=v_dequant_scales,
         )
 
         hidden_states = outputs[0]

@@ -1103,6 +1103,10 @@ class FusedBlockMultiTransformer(Layer):
         cu_seqlens_q=None,
         cu_seqlens_k=None,
         block_tables=None,
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
         max_input_length=-1,
         block_size=64,
         use_neox_rotary_style=False,
@@ -1181,11 +1185,16 @@ class FusedBlockMultiTransformer(Layer):
                 cu_seqlens_q,
                 cu_seqlens_k,
                 block_tables,
+                k_quant_scales[i] if k_quant_scales is not None else None,
+                v_quant_scales[i] if v_quant_scales is not None else None,
+                k_dequant_scales[i] if k_dequant_scales is not None else None,
+                v_dequant_scales[i] if v_dequant_scales is not None else None,
                 rotary_embs,
                 attn_mask,
                 max_input_length,
                 block_size,
                 use_neox_rotary_style,
+                True,
             )[0]
 
             # out_linear

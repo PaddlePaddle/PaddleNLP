@@ -660,15 +660,39 @@ class DygraphBlockInferencePredictor(BasePredictor):
         self.architectures = self.model_config.architectures[0].lower()
 
         self.dtype = config.dtype or self.model_config
-        self.cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.cache_kvs_shape]
+        if config.use_cachekv_int8:
+            self.cache_kvs = [paddle.zeros(shape, dtype="uint8") for shape in self.cache_kvs_shape]
+        else:
+            self.cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.cache_kvs_shape]
         self.num_attention_heads, self.head_dim = (
             self.cache_kvs[0].shape[-3],
             self.cache_kvs[0].shape[-1],
         )
 
+        if config.use_cachekv_int8:
+            self.k_quant_scales = [
+                paddle.zeros([self.num_attention_heads], dtype="float32") for _ in range(self.num_layers)
+            ]
+            self.v_quant_scales = [
+                paddle.zeros([self.num_attention_heads], dtype="float32") for _ in range(self.num_layers)
+            ]
+            self.k_dequant_scales = [
+                paddle.zeros([self.num_attention_heads], dtype="float32") for _ in range(self.num_layers)
+            ]
+            self.v_dequant_scales = [
+                paddle.zeros([self.num_attention_heads], dtype="float32") for _ in range(self.num_layers)
+            ]
+
         self.inputs = {}
         # not update
         self.inputs["cache_kvs"] = self.cache_kvs
+
+        if config.use_cachekv_int8:
+            self.inputs["k_quant_scales"] = self.k_quant_scales
+            self.inputs["v_quant_scales"] = self.v_quant_scales
+            self.inputs["k_dequant_scales"] = self.k_dequant_scales
+            self.inputs["v_dequant_scales"] = self.v_dequant_scales
+
         self.inputs["min_length"] = paddle.full(shape=[config.batch_size, 1], fill_value=2, dtype="int64")
         self.inputs["max_length"] = paddle.full(
             shape=[config.batch_size, 1], fill_value=config.max_length, dtype="int64"
@@ -780,18 +804,43 @@ class StaticBlockInferencePredictor(BasePredictor):
         BasePredictor.__init__(self, config, tokenizer)
 
         self.inputs = {}
+        self.num_attention_heads = self.cache_kvs_shape[0][-3]
         self.head_dim = self.cache_kvs_shape[0][-1]
         self.max_block_nums = self.cache_kvs_shape[0][0]
         self.block_size = config.block_size
         self.total_max_length = config.src_length + config.max_length
+        self.num_layers = len(self.cache_kvs_shape) // 2
         pre_max_block_num = (self.total_max_length + config.block_size - 1) // config.block_size
         # not update
         self.cache_kvs = {}
-        for i in range(len(self.cache_kvs_shape) // 2):
-            self.cache_kvs["key_caches_{}".format(i)] = paddle.zeros(self.cache_kvs_shape[2 * i], dtype=config.dtype)
-            self.cache_kvs["value_caches_{}".format(i)] = paddle.zeros(
-                self.cache_kvs_shape[2 * i + 1], dtype=config.dtype
-            )
+        if not config.use_cachekv_int8:
+            for i in range(len(self.cache_kvs_shape) // 2):
+                self.cache_kvs["key_caches_{}".format(i)] = paddle.zeros(
+                    self.cache_kvs_shape[2 * i], dtype=config.dtype
+                )
+                self.cache_kvs["value_caches_{}".format(i)] = paddle.zeros(
+                    self.cache_kvs_shape[2 * i + 1], dtype=config.dtype
+                )
+        else:
+            for i in range(len(self.cache_kvs_shape) // 2):
+                self.cache_kvs["key_caches_{}".format(i)] = paddle.zeros(self.cache_kvs_shape[2 * i], dtype="uint8")
+                self.cache_kvs["value_caches_{}".format(i)] = paddle.zeros(
+                    self.cache_kvs_shape[2 * i + 1], dtype="uint8"
+                )
+
+        if config.use_cachekv_int8:
+            self.k_quant_scales = [
+                paddle.zeros([self.num_attention_heads], dtype="float32") for _ in range(self.num_layers)
+            ]
+            self.v_quant_scales = [
+                paddle.zeros([self.num_attention_heads], dtype="float32") for _ in range(self.num_layers)
+            ]
+            self.k_dequant_scales = [
+                paddle.zeros([self.num_attention_heads], dtype="float32") for _ in range(self.num_layers)
+            ]
+            self.v_dequant_scales = [
+                paddle.zeros([self.num_attention_heads], dtype="float32") for _ in range(self.num_layers)
+            ]
         self.inputs["min_length"] = paddle.full(shape=[config.batch_size, 1], fill_value=2, dtype="int64")
         self.inputs["max_length"] = paddle.full(
             shape=[config.batch_size, 1], fill_value=config.max_length, dtype="int64"
@@ -821,11 +870,19 @@ class StaticBlockInferencePredictor(BasePredictor):
         self.inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=False, dtype="bool").cpu()
         self.inputs["stop_flags"] = paddle.full(shape=[config.batch_size, 1], fill_value=True, dtype="bool")
 
+        for i in range(self.num_layers):
+            if self.config.use_cachekv_int8:
+                self.inputs["k_quant_scales_" + str(i)] = self.k_quant_scales[i]
+                self.inputs["v_quant_scales_" + str(i)] = self.v_quant_scales[i]
+                self.inputs["k_dequant_scales_" + str(i)] = self.k_dequant_scales[i]
+                self.inputs["v_dequant_scales_" + str(i)] = self.v_dequant_scales[i]
+
         self.free_list = [i for i in range(self.max_block_nums)][::-1]
         self.used_list = [[] for _ in range(config.batch_size)]
 
         self._create_predictor(config)
         self.input_names = self.predictor.get_input_names()
+
         self._share_data()
         self.seq_lens_handle = self.predictor.get_input_handle("seq_lens_this_time")
 
