@@ -388,6 +388,7 @@ class InferencePredictorMixin:
                 self.architectures,
                 top_p=self.config.top_p,
                 temperature=self.config.temperature,
+                pre_caches_length=pre_caches_length,
                 benchmark=self.config.benchmark,
             )
             for i in range(inputs["input_ids"].shape[0]):
@@ -395,9 +396,27 @@ class InferencePredictorMixin:
                 self.attention_mask[i, :, :length, :length] = paddle.tril(
                     paddle.ones(shape=(length, length), dtype=self.config.dtype)
                 )
-                self.arange_tensor_encoder[i, :, :length] = paddle.arange(length).astype(self.config.dtype)
+                if pre_caches_length > 0:
+                    if self.config.prefix_path is None:
+                        prefix_attention_mask = paddle.zeros([1, length, pre_caches_length], dtype=self.config.dtype)
+                    else:
+                        prefix_attention_mask = paddle.ones([1, length, pre_caches_length], dtype=self.config.dtype)
+                    post_attention_mask = paddle.tril(
+                        paddle.ones(shape=(length, length), dtype=self.config.dtype)
+                    ).unsqueeze_(axis=0)
 
-                self.tgt_generation_mask[i, :, 0, :length] = paddle.ones(shape=[1, length], dtype=self.config.dtype)
+                    self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
+                        [prefix_attention_mask, post_attention_mask], axis=2
+                    )
+                self.arange_tensor_encoder[i, :, : length + pre_caches_length] = paddle.arange(
+                    length + pre_caches_length
+                ).astype(self.config.dtype)
+
+                self.tgt_generation_mask[i, :, 0, : length + pre_caches_length] = paddle.ones(
+                    shape=[1, length + pre_caches_length], dtype=self.config.dtype
+                )
+
+            inputs["tgt_pos"] = inputs["tgt_pos"] + pre_caches_length
             # alibi encoder
             alibi_slopes = get_alibi_slopes(self.model_config.n_head)
             inputs["position_ids"] = paddle.to_tensor(alibi_slopes, dtype="float32")
