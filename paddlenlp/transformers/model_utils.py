@@ -39,7 +39,6 @@ from huggingface_hub import (
 from huggingface_hub.utils import EntryNotFoundError
 from paddle import Tensor
 from paddle.nn import Embedding, Layer
-from paddle.distributed import fleet
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddle.utils.download import is_url
@@ -80,6 +79,7 @@ __all__ = [
     "register_base_model",
 ]
 
+
 def unwrap_optimizer(optimizer, optimizer_instances=()):
     if optimizer is None:
         return None
@@ -89,9 +89,11 @@ def unwrap_optimizer(optimizer, optimizer_instances=()):
         return optimizer
     return None
 
+
 def filter_sharded_params(state_dict, optimizer, sharding_rank):
-    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer \
-        import DygraphShardingOptimizer
+    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
+        DygraphShardingOptimizer,
+    )
 
     logger.info(f"filter sharded_params not placed in sharding_rank {sharding_rank} .")
 
@@ -107,11 +109,20 @@ def filter_sharded_params(state_dict, optimizer, sharding_rank):
         filtered_state_dict[k] = v
     return filtered_state_dict
 
-def exlclude_paramters_in_state_dict(model_state_dict, param_names_in_master_weights, sharding_group, save_sharding_stage1_model=True):
+
+def exlclude_paramters_in_state_dict(
+    model_state_dict, param_names_in_master_weights, sharding_group, save_sharding_stage1_model=True
+):
     assert sharding_group is not None
-    assert isinstance(model_state_dict, dict) and isinstance(param_names_in_master_weights, (list, set)), "param_names_in_master_weights type:{}".format(type(param_names_in_master_weights))
-    state_param_names = [v.name for k,v in model_state_dict.items()]
-    logger.debug("param_names_in_master_weights:{}, state_param_names:{}".format(param_names_in_master_weights, state_param_names))
+    assert isinstance(model_state_dict, dict) and isinstance(
+        param_names_in_master_weights, (list, set)
+    ), "param_names_in_master_weights type:{}".format(type(param_names_in_master_weights))
+    state_param_names = [v.name for k, v in model_state_dict.items()]
+    logger.debug(
+        "param_names_in_master_weights:{}, state_param_names:{}".format(
+            param_names_in_master_weights, state_param_names
+        )
+    )
     if not save_sharding_stage1_model:
         # allgather parameter names in sharding group
         tmp = []
@@ -124,6 +135,7 @@ def exlclude_paramters_in_state_dict(model_state_dict, param_names_in_master_wei
             non_parameters_state_dict.pop(k)
 
     return non_parameters_state_dict
+
 
 def prune_linear_layer(layer: nn.Linear, index: paddle.Tensor, dim: int = 0) -> nn.Linear:
     """
@@ -327,6 +339,7 @@ def _find_weight_file_path(
     cache_dir: str,
     model_class: Type[PretrainedModel],
     resource_uri: Optional[str] = None,
+    config: Optional[PretrainedConfig] = None,
 ) -> str | None:
     """find the target weight file under the cache dir, because there are some conflicts about weight file names.
 
@@ -351,7 +364,7 @@ def _find_weight_file_path(
     # 3. find the target weight file name for splited tensor parallel
     # fix for load hybrid parallel
     hybrid_parallel_weight_file_path = os.path.join(
-        cache_dir, _add_variant(resource_weight_file_name, weight_name_suffix())
+        cache_dir, _add_variant(resource_weight_file_name, weight_name_suffix(config))
     )
     if os.path.isfile(hybrid_parallel_weight_file_path):
         return hybrid_parallel_weight_file_path
@@ -1000,7 +1013,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             # find the weight file with the above two branch: `bert-base-uncased.pdparams`, `model_state.pdparams`
             weight_file_path = _find_weight_file_path(
-                cache_dir=cache_dir, model_class=cls, resource_uri=pretrained_model_name_or_path
+                cache_dir=cache_dir,
+                model_class=cls,
+                resource_uri=pretrained_model_name_or_path,
+                config=config,
             )
 
             return weight_file_path
@@ -1010,7 +1026,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # in-order to compatible with old style:
             # file name in pretrained_resouce_file_maps is https://path/to/bert-base-uncased.pdparams, but the registered model-state file name in `resouce_file_maps` is `model_state.pdparams`
 
-            return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls)
+            return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls, config=config)
 
         # 4. download from community or hf-hub
         else:
@@ -1233,6 +1249,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         import paddlenlp.ops.fast_transformer.transformer.decoding as ft_decoding
 
         state_to_load = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_dict)
+
         if paddle.in_dynamic_mode():
             model_to_load.set_state_dict(state_to_load)
 
@@ -1498,8 +1515,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 # WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, variant)
 
         if is_bf16 and save_sharding_stage1_model:
-            state_dict_to_save = exlclude_paramters_in_state_dict(state_dict_to_save, param_names_in_master_weights, sharding_group)
-            logger.info("param_names_in_master_weights len:{}, bf16 state_dict_to_save len:{}, :{}".format(len(param_names_in_master_weights), len(state_dict_to_save), state_dict_to_save))
+            state_dict_to_save = exlclude_paramters_in_state_dict(
+                state_dict_to_save, param_names_in_master_weights, sharding_group
+            )
+            logger.info(
+                "param_names_in_master_weights len:{}, bf16 state_dict_to_save len:{}, :{}".format(
+                    len(param_names_in_master_weights), len(state_dict_to_save), state_dict_to_save
+                )
+            )
 
         if is_main_process:
             # Attach architecture to the config
