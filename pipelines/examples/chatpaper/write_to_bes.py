@@ -16,7 +16,7 @@ import argparse
 import glob
 import os
 
-import pandas as pd
+import jsonlines
 from tqdm import tqdm
 
 from pipelines.document_stores import (
@@ -57,11 +57,10 @@ args = parser.parse_args()
 
 
 def read_data(file_path):
-    data = pd.read_json(path_or_buf=file_path, lines=True)
     list_data = []
-    for index, row in data.iterrows():
-        doc = row.to_dict()
-        list_data.append(doc)
+    with jsonlines.open(file_path) as reader:
+        for index, obj in tqdm(enumerate(reader)):
+            list_data.append(obj)
     return list_data
 
 
@@ -101,6 +100,7 @@ if __name__ == "__main__":
         docs = read_data(file_path)
         try:
             # Manually write
+            # RequestError(400, 'search_phase_execution_exception', 'Result window is too large, from + size must be less than or equal to: [10000] but was [1596034]. See the scroll api for a more efficient way to request large data sets. This limit can be set by changing the [index.max_result_window] index level setting.')
             document_store.write_documents(docs)
         except Exception as e:
             print("Indexing failed, please try again.")
