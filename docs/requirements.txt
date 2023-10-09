@@ -10,6 +10,7 @@ sphinx
 sphinx_book_theme
 readthedocs-sphinx-search
 sphinx-rtd-theme
+recommonmark
 
 Markdown
 sphinx-copybutton
