@@ -20,3 +20,4 @@ typer
 rich
 safetensors
 tool_helpers
+aistudio-sdk
