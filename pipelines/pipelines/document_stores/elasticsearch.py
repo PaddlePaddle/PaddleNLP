@@ -309,6 +309,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                 verify_certs=verify_certs,
                 timeout=timeout,
                 connection_class=connection_class,
+                max_retries=5,
+                retry_on_timeout=True,
             )
         elif aws4auth:
             # aws elasticsearch with IAM
@@ -320,6 +322,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                 use_ssl=True,
                 verify_certs=True,
                 timeout=timeout,
+                max_retries=5,
+                retry_on_timeout=True,
             )
         elif username:
             # standard http_auth
@@ -331,6 +335,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                 verify_certs=verify_certs,
                 timeout=timeout,
                 connection_class=connection_class,
+                max_retries=5,
+                retry_on_timeout=True,
             )
         else:
             # there is no authentication for this elasticsearch instance
@@ -341,6 +347,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                 verify_certs=verify_certs,
                 timeout=timeout,
                 connection_class=connection_class,
+                max_retries=5,
+                retry_on_timeout=True,
             )
 
         # Test connection
