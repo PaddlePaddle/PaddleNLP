@@ -193,13 +193,13 @@ def indexing_abstract(csv_name):
     text_splitter = SpacyTextSplitter(separator="\n", chunk_size=320, chunk_overlap=10, filters=["\n"])
     datasets = []
     for document in dataset:
-        text = document["abstracts"]
+        text = document["abstract"]
         text_splits = text_splitter.split_text(text)
         for txt in text_splits:
             meta_data = {}
             meta_data.update(document)
             meta_data.pop("content")
-            meta_data.pop("abstracts")
+            meta_data.pop("abstract")
             datasets.append({"content": txt, "meta": meta_data})
     # Add abstract into one index
     offline_ann(index_name=args.root_index_name, docs=datasets)
