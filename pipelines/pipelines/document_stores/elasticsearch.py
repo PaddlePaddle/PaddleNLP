@@ -531,7 +531,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         for i in range(0, len(ids), batch_size):
             ids_for_batch = ids[i : i + batch_size]
             query = {"size": len(ids_for_batch), "query": {"ids": {"values": ids_for_batch}}}
-            result = self.client.search(index=index, body=query, headers=headers)["hits"]["hits"]
+            result = self.client.search(index=index, body=query, request_timeout=600, headers=headers)["hits"]["hits"]
             # documents = [self._convert_es_hit_to_document(hit, return_embedding=self.return_embedding) for hit in result]
             documents.extend(
                 [self._convert_es_hit_to_document(hit, return_embedding=self.return_embedding) for hit in result]
@@ -1210,7 +1210,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
 
         logger.debug(f"Retriever query: {body}")
         logging.getLogger("elasticsearch").setLevel(logging.CRITICAL)
-        result = self.client.search(index=index, body=body, headers=headers)["hits"]["hits"]
+        result = self.client.search(index=index, body=body, request_timeout=600, headers=headers)["hits"]["hits"]
 
         documents = [self._convert_es_hit_to_document(hit, return_embedding=self.return_embedding) for hit in result]
         return documents
@@ -1333,7 +1333,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
 
         logger.debug(f"Retriever query: {body}")
         try:
-            result = self.client.search(index=index, body=body, request_timeout=300, headers=headers)["hits"]["hits"]
+            result = self.client.search(index=index, body=body, request_timeout=600, headers=headers)["hits"]["hits"]
             if len(result) == 0:
                 count_embeddings = self.get_embedding_count(index=index, headers=headers)
                 if count_embeddings == 0:

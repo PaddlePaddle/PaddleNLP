@@ -101,7 +101,9 @@ if __name__ == "__main__":
         try:
             # Manually write
             # RequestError(400, 'search_phase_execution_exception', 'Result window is too large, from + size must be less than or equal to: [10000] but was [1596034]. See the scroll api for a more efficient way to request large data sets. This limit can be set by changing the [index.max_result_window] index level setting.')
-            document_store.write_documents(docs)
+            # urllib3.exceptions.ReadTimeoutError: HTTPConnectionPool(host='10.41.101.215', port='8718'): Read timed out. (read timeout=30)
+            for i in range(0, len(docs), 10_0000):
+                document_store.write_documents(docs[i : i + 10_0000])
         except Exception as e:
             print("Indexing failed, please try again.")
             log_file.write(file_path + "\t" + str(e) + "\n")
