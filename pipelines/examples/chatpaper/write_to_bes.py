@@ -94,11 +94,12 @@ if __name__ == "__main__":
     file_paths = glob.glob(os.path.join(args.file_paths, "*.jsonl"))
     file_paths.sort()
     file_paths = file_paths[args.start_idx : args.end_idx]
-    document_store = get_doc_store()
+
     log_file = open("log_writer.txt", "w")
     for file_path in tqdm(file_paths):
         print(f"Processing file: {file_path}")
         docs = read_data(file_path)
+        document_store = get_doc_store()
         try:
             # Manually write
             # RequestError(400, 'search_phase_execution_exception', 'Result window is too large, from + size must be less than or equal to: [10000] but was [1596034]. See the scroll api for a more efficient way to request large data sets. This limit can be set by changing the [index.max_result_window] index level setting.')
