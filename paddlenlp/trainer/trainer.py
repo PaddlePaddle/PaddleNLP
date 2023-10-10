@@ -493,7 +493,9 @@ class Trainer:
 
         if resume_from_checkpoint is not None and self.args.unify_hybrid_parallel_checkpoint:
             self.sharded_ckpt_io.load_sharded_checkpoint(
-                self.model, resume_from_checkpoint, safe_serialization=self.args.safe_ckpt
+                self.model,
+                resume_from_checkpoint,
+                safe_serialization=False,
             )
             return
 

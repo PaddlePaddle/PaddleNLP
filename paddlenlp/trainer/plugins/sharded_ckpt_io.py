@@ -193,7 +193,7 @@ class ShardedCkptIO:
                 state_dict, config_to_save = self.manipulate_state_dict_and_config(
                     unwrap_model(model),
                     self.args.weight_name_suffix,
-                    safe_serialization=self.args.safe_ckpt,
+                    safe_serialization=False,
                 )
                 unwrap_model(model).save_pretrained(
                     output_dir,
@@ -201,7 +201,7 @@ class ShardedCkptIO:
                     config_to_save=config_to_save,
                     variant=self.args.weight_name_suffix,
                     is_main_process=self.args.should_save,
-                    safe_serialization=self.args.safe_ckpt,
+                    safe_serialization=False,
                 )
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
@@ -217,7 +217,7 @@ class ShardedCkptIO:
                 state_dict, config_to_save = self.manipulate_state_dict_and_config(
                     model,
                     self.args.weight_name_suffix,
-                    safe_serialization=self.args.safe_ckpt,
+                    safe_serialization=False,
                 )
                 model.save_pretrained(
                     output_dir,
@@ -225,9 +225,9 @@ class ShardedCkptIO:
                     config_to_save=config_to_save,
                     variant=self.args.weight_name_suffix,
                     is_main_process=self.args.should_save,
-                    safe_serialization=self.args.safe_ckpt,
+                    safe_serialization=False,
                 )
-        self.save_sharded_index(output_dir, safe_serialization=self.args.safe_ckpt)
+        self.save_sharded_index(output_dir, safe_serialization=False)
 
     def load_sharded_checkpoint(self, model, resume_from_checkpoint=None, safe_serialization=False):
         # Load potential model checkpoint

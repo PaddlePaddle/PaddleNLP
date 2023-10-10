@@ -699,10 +699,6 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Whether to unify hybrid parallel checkpoint."},
     )
-    safe_ckpt: Optional[bool] = field(
-        default=True,
-        metadata={"help": "Whether use safetensors when saving and loading checkpoint."},
-    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
