@@ -49,7 +49,7 @@ from paddlenlp.utils.log import logger
 local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 
 
-class ShardedCkptIO:
+class UnifiedCkptIO:
     def __init__(self, args, hcg=None):
         self.args = args
         self.tp_group = None
@@ -186,7 +186,7 @@ class ShardedCkptIO:
 
         return state_dict_to_save
 
-    def save_sharded_checkpoint(self, model, output_dir, state_dict=None):
+    def save_unified_checkpoint(self, model, output_dir, state_dict=None):
         if not isinstance(model, PretrainedModel):
             if isinstance(unwrap_model(model), PretrainedModel):
                 config_to_save = None
@@ -229,7 +229,7 @@ class ShardedCkptIO:
                 )
         self.save_sharded_index(output_dir, safe_serialization=False)
 
-    def load_sharded_checkpoint(self, model, resume_from_checkpoint=None, safe_serialization=False):
+    def load_unified_checkpoint(self, model, resume_from_checkpoint=None, safe_serialization=False):
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
             resume_from_checkpoint = get_last_checkpoint(self.args.output_dir)

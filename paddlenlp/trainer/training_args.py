@@ -695,7 +695,7 @@ class TrainingArguments:
     distributed_dataloader: Optional[bool] = field(
         default=False, metadata={"help": "Whether to use distributed dataloader."}
     )
-    unify_hybrid_parallel_checkpoint: Optional[bool] = field(
+    unified_checkpoint: Optional[bool] = field(
         default=False,
         metadata={"help": "Whether to unify hybrid parallel checkpoint."},
     )
@@ -1177,7 +1177,7 @@ class TrainingArguments:
     def weight_name_suffix(self):
         if self.use_hybrid_parallel:
             name = []
-            if not self.unify_hybrid_parallel_checkpoint:
+            if not self.unified_checkpoint:
                 if self.tensor_parallel_degree > 1:
                     name.append(f"tp{self.tensor_parallel_rank:0>2d}")
                 if self.pipeline_parallel_degree > 1:

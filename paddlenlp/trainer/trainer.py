@@ -94,8 +94,8 @@ from ..utils.env import (
 from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
-from .plugins.sharded_ckpt_io import ShardedCkptIO
 from .plugins.timer import get_timers, set_timers
+from .plugins.unified_checkpoint_io import UnifiedCkptIO
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -303,7 +303,7 @@ class Trainer:
         self._signature_columns = None
         self.optimizer_grouped_parameters = None
         self.sharding_io = None
-        self.sharded_ckpt_io = ShardedCkptIO(self.args)
+        self.unified_ckpt_io = UnifiedCkptIO(self.args)
         if self.args.should_save_sharding_stage1_model or self.args.should_load_sharding_stage1_model:
             self.sharding_io = ShardingIO(self.args, self.model, self.optimizer)
 
@@ -491,8 +491,8 @@ class Trainer:
         """
         resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
 
-        if resume_from_checkpoint is not None and self.args.unify_hybrid_parallel_checkpoint:
-            self.sharded_ckpt_io.load_sharded_checkpoint(
+        if resume_from_checkpoint is not None and self.args.unified_checkpoint:
+            self.unified_ckpt_io.load_unified_checkpoint(
                 self.model,
                 resume_from_checkpoint,
                 safe_serialization=False,
@@ -2062,8 +2062,8 @@ class Trainer:
             # Good practice: save your training arguments together with the trained model
             paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
 
-        if self.args.unify_hybrid_parallel_checkpoint:
-            self.sharded_ckpt_io.save_sharded_checkpoint(self.model, output_dir, state_dict)
+        if self.args.unified_checkpoint:
+            self.unified_ckpt_io.save_unified_checkpoint(self.model, output_dir, state_dict)
             return
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
