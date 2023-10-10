@@ -303,10 +303,6 @@ class InferencePredictorMixin:
                 shape=(config.batch_size, 1, config.total_max_length, config.total_max_length),
                 dtype=self.dtype,
             )
-            self.tgt_pos = paddle.ones(
-                shape=[config.batch_size, 2, 1],
-                dtype="int64",
-            )
         else:
             self.attention_mask = paddle.zeros(
                 shape=(config.batch_size, 1, config.total_max_length, config.total_max_length),
@@ -371,14 +367,18 @@ class InferencePredictorMixin:
                 temperature=self.config.temperature,
                 benchmark=self.config.benchmark,
             )
+            tgt_pos = paddle.ones(
+                shape=[inputs["input_ids"].shape[0], 2, 1],
+                dtype="int64",
+            )
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = 0
                 self.attention_mask[i, 0, : length - 1, length - 1] = 1
                 self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype=self.config.dtype)
-                self.tgt_pos[i, 0, 0] = paddle.to_tensor([length], dtype="int64")
+                tgt_pos[i, 0, 0] = paddle.to_tensor([length], dtype="int64")
 
-            inputs["tgt_pos"] = self.tgt_pos
+            inputs["tgt_pos"] = tgt_pos
         elif "bloom" in self.architectures:
             inputs = dybatch_preprocess(
                 self.tokenizer,
