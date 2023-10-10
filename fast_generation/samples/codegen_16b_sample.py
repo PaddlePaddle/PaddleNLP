@@ -21,7 +21,7 @@ paddle.set_default_dtype("float16")
 model_name = "Salesforce/codegen-16B-mono"
 
 tokenizer = CodeGenTokenizer.from_pretrained(model_name)
-model = CodeGenForCausalLM.from_pretrained(model_name, load_state_as_np=True)
+model = CodeGenForCausalLM.from_pretrained(model_name)
 model.eval()
 
 inputs = "def hello"

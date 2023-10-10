@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 import tempfile
@@ -37,25 +38,28 @@ class PretrainTest(LLMTest, unittest.TestCase):
     model_dir: str = None
 
     def setUp(self) -> None:
-        self.model_dir = "./llm/llama"
-        self.data_dir = tempfile.mkdtemp()
-        sys.path.insert(0, self.model_dir)
         LLMTest.setUp(self)
 
+        self.dataset_dir = tempfile.mkdtemp()
+        self.model_codes_dir = os.path.join(self.root_path, self.model_dir)
+        sys.path.insert(0, self.model_codes_dir)
+
     def tearDown(self) -> None:
-        sys.path.remove(self.model_dir)
-        shutil.rmtree(self.data_dir)
         LLMTest.tearDown(self)
+
+        sys.path.remove(self.model_codes_dir)
+        shutil.rmtree(self.dataset_dir)
 
     def test_pretrain(self):
         # Run pretrain
         URL = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy"
         URL2 = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz"
-        get_path_from_url(URL, root_dir=self.data_dir)
-        get_path_from_url(URL2, root_dir=self.data_dir)
+        get_path_from_url(URL, root_dir=self.dataset_dir)
+        get_path_from_url(URL2, root_dir=self.dataset_dir)
 
-        pretrain_config = load_test_config(self.config_path, "pretrain")
-        pretrain_config["input_dir"] = self.data_dir
+        pretrain_config = load_test_config(self.config_path, "pretrain", self.model_dir)
+
+        pretrain_config["input_dir"] = self.dataset_dir
         pretrain_config["output_dir"] = self.output_dir
 
         with argv_context_guard(pretrain_config):
@@ -63,11 +67,5 @@ class PretrainTest(LLMTest, unittest.TestCase):
 
             main()
 
-        self._test_inference_predictor()
-        self._test_predictor()
-
-    def _test_inference_predictor(self):
-        self.run_predictor({"inference_model": "true"})
-
-    def _test_predictor(self):
-        self.run_predictor({"inference_model": "false"})
+        self.run_predictor({"inference_model": True})
+        self.run_predictor({"inference_model": False})

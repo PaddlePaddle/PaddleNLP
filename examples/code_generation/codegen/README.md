@@ -119,7 +119,6 @@ python codegen_server.py
 - `min_length`：生成的最小长度，默认为0
 - `max_length`：生成的最大长度，默认为16
 - `decode_strategy`：解码策略，默认为"greedy_search"
-- `load_state_as_np`：以numpy格式加载模型参数，可节省显存，默认为True
 - `use_fast`：是否使用FastGeneration，可加速推理，默认为True
 - `use_fp16_decoding`：是否使用fp16推理，可节省显存和加速推理，默认为True
 
