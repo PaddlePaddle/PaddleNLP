@@ -585,8 +585,10 @@ class Trainer:
 
         def get_name_suffix(i):
             name = []
-            name.append(f"tp{self.args.tensor_parallel_rank:0>2d}")
-            name.append(f"pp{self.args.pipeline_parallel_rank:0>2d}")
+            if self.args.tensor_parallel_degree > 1:
+                name.append(f"tp{self.args.tensor_parallel_rank:0>2d}")
+            if self.args.pipeline_parallel_degree > 1:
+                name.append(f"pp{self.args.pipeline_parallel_rank:0>2d}")
             name.append(f"shard{i:0>2d}")
             return "_".join(name)
 
@@ -2192,8 +2194,9 @@ class Trainer:
         sharding_metas = {k: v for e in sharding_metas_list for (k, v) in e.items()}
         if self.args.tensor_parallel_rank != 0:
             return None
-        sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_pipe_parallel_group())
-        sharding_metas = {k: v for e in sharding_metas_list for (k, v) in e.items()}
+        if self.args.pipeline_parallel_degree > 1:
+            sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_pipe_parallel_group())
+            sharding_metas = {k: v for e in sharding_metas_list for (k, v) in e.items()}
         return sharding_metas
 
     def _load_sharding_meta(self, dir):
@@ -2359,8 +2362,10 @@ class Trainer:
 
         def get_name_suffix(i):
             name = []
-            name.append(f"tp{self.args.tensor_parallel_rank:0>2d}")
-            name.append(f"pp{self.args.pipeline_parallel_rank:0>2d}")
+            if self.args.tensor_parallel_degree > 1:
+                name.append(f"tp{self.args.tensor_parallel_rank:0>2d}")
+            if self.args.pipeline_parallel_degree > 1:
+                name.append(f"pp{self.args.pipeline_parallel_rank:0>2d}")
             name.append(f"shard{i:0>2d}")
             return "_".join(name)
 
