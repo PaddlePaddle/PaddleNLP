@@ -1318,6 +1318,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         cls: Type[PretrainedModel],
         pretrained_model_name_or_path: str,
         from_hf_hub: bool = False,
+        from_aistudio: bool = False,
         cache_dir: str | None = None,
         subfolder: str = "",
         config: PretrainedConfig = None,
@@ -1471,6 +1472,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     cached_file_kwargs = dict(
                         cache_dir=cache_dir,
                         subfolder=subfolder,
+                        from_aistudio=from_aistudio,
                         _raise_exceptions_for_missing_entries=False,
                     )
                     resolved_archive_file = None
@@ -1487,6 +1489,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         resolved_archive_file = cached_file(
                             pretrained_model_name_or_path, filename, **cached_file_kwargs
                         )
+
                     else:
                         # xxx.pdparams in pretrained_resource_files_map renamed model_state.pdparams
                         filename = _add_variant(PADDLE_WEIGHTS_NAME, variant)
@@ -1547,10 +1550,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # We'll need to download and cache each checkpoint shard if the checkpoint is sharded.
         if is_sharded:
-            # rsolved_archive_file becomes a list of files that point to the different checkpoint shards in this case.
+            # resolved_archive_file becomes a list of files that point to the different checkpoint shards in this case.
             resolved_archive_file, sharded_metadata = get_checkpoint_shard_files(
                 pretrained_model_name_or_path,
                 resolved_archive_file,
+                from_aistudio=from_aistudio,
                 cache_dir=cache_dir,
                 subfolder=subfolder,
             )
@@ -1863,9 +1867,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         return model, missing_keys, unexpected_keys, mismatched_keys
 
     @classmethod
-    def from_pretrained(
-        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
-    ):
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
         by specifying name of a built-in pretrained model, a pretrained model from HF Hub, a community contributed model,
@@ -1922,10 +1924,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config = kwargs.pop("config", None)
         state_dict = kwargs.pop("state_dict", None)
         cache_dir = kwargs.pop("cache_dir", None)
-        force_download = kwargs.pop("force_download", False)
+        force_download = kwargs.get("force_download", False)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", False)
         dtype = kwargs.pop("dtype", None)
-        subfolder = kwargs.pop("subfolder", "")
+        from_hf_hub = kwargs.get("from_hf_hub", False)
+        from_aistudio = kwargs.get("from_aistudio", False)
+        subfolder = kwargs.get("subfolder", "")
         variant = kwargs.pop("variant", None)
         use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
 
@@ -1956,9 +1960,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 config_path,
                 cache_dir=cache_dir,
                 return_unused_kwargs=True,
-                force_download=force_download,
-                from_hf_hub=from_hf_hub,
-                subfolder=subfolder,
                 **kwargs,
             )
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
@@ -2008,6 +2009,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             cache_dir=cache_dir,
             subfolder=subfolder,
             from_hf_hub=from_hf_hub,
+            from_aistudio=from_aistudio,
             config=config,
             convert_from_torch=convert_from_torch,
             use_safetensors=use_safetensors,
