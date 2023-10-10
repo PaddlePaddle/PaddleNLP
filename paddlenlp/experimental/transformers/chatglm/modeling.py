@@ -270,15 +270,15 @@ class ChatGLMStackDyBatch(nn.Layer):
         coses = []
         sines = []
         if self.position_encoding_2d:
-            block_position_ids = position_ids[:, 1, :].transpose([1, 0])
-            position_ids = position_ids[:, 0, :].transpose([1, 0])
+            block_position_ids = position_ids[:batch_size, 1, :].transpose([1, 0])
+            position_ids = position_ids[:batch_size, 0, :].transpose([1, 0])
             coses.append(cos.squeeze(1)[position_ids].unsqueeze(2))
             sines.append(sin.squeeze(1)[position_ids].unsqueeze(2))
 
             coses.append(cos.squeeze(1)[block_position_ids].unsqueeze(2))
             sines.append(sin.squeeze(1)[block_position_ids].unsqueeze(2))
         else:
-            position_ids = position_ids.transpose([1, 0])
+            position_ids = position_ids[:batch_size].transpose([1, 0])
             coses.append(cos.squeeze(1)[position_ids].unsqueeze(2))
             sines.append(sin.squeeze(1)[position_ids].unsqueeze(2))
 
