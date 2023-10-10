@@ -429,8 +429,6 @@ class InferencePredictorMixin:
 
             inputs["tgt_pos"] = self.tgt_pos
         elif "bloom" in self.architectures:
-            if inputs["input_ids"].shape[0] < self.config.batch_size:
-                self.arange_tensor_encoder = self.arange_tensor_encoder[: inputs["input_ids"].shape[0]]
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, :, :length, :length] = paddle.tril(
