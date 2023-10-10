@@ -71,7 +71,8 @@ public:
   typedef paddle::float16 data_t;
 };
 
-#ifndef DISABLE_BF16
+// #ifndef DISABLE_BF16
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 11000
 template <>
 class PDTraits<paddle::DataType::BFLOAT16> {
 public:
