@@ -162,6 +162,8 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
             fi
         elif [[ ${dir2} =~ "taskflow" ]] ;then
             APIcase_list[${#APIcase_list[*]}]=${dir2}
+        elif [[ ${dir2} =~ "llm" ]] ;then
+            P0case_list[${#P0case_list[*]}]=${dir2}
         fi
     elif [[ ${dir1} =~ "pipelines" ]];then # 影响编包
         Build_list[${dir1}]=${dir1}

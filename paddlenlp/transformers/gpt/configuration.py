@@ -325,11 +325,12 @@ class GPTConfig(PretrainedConfig):
         output_attentions: bool = False,
         ignore_index: int = 0,
         use_flash_attention: bool = False,
+        use_fused_dropout_add: bool = False,
         fused_linear: bool = False,
         fuse_attention_qkv=False,
         enable_fuse_transformer: bool = False,
-        use_fused_dropout_add: bool = False,
         fused_softmax_with_triangular: bool = False,
+        virtual_pp_degree: int = 1,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -366,3 +367,4 @@ class GPTConfig(PretrainedConfig):
         self.enable_fuse_transformer = enable_fuse_transformer
         self.use_fused_dropout_add = use_fused_dropout_add
         self.fused_softmax_with_triangular = fused_softmax_with_triangular
+        self.virtual_pp_degree = virtual_pp_degree

@@ -325,7 +325,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         head_size = self.hidden_size // self.num_attention_heads
 
         self.embed_tokens.weight.set_value(paddle.to_tensor(state_dict["llama.embed_tokens.weight"]))
-        self.norm.weight.set_value(paddle.to_tensor(state_dict["llama.norm.weight"]))
+        self.norm.weight.set_value(paddle.to_tensor(state_dict["llama.norm.weight"], dtype=self.norm.weight.dtype))
 
         for idx in range(self.config.num_hidden_layers):
             unfused_state_dict = {}

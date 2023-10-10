@@ -23,7 +23,7 @@ class Demo:
     def __init__(self, model_name_or_path, max_predict_len=128):
         self.tokenizer = GPTTokenizer.from_pretrained(model_name_or_path)
         logger.info("Loading the model parameters, please wait...")
-        self.model = OPTForCausalLM.from_pretrained(model_name_or_path, load_state_as_np=True)
+        self.model = OPTForCausalLM.from_pretrained(model_name_or_path)
         self.model.eval()
         self.max_predict_len = max_predict_len
         logger.info("Model loaded.")
