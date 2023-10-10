@@ -49,11 +49,13 @@ python ./trans_to_json.py  \
 下面是针对训练任务的数据集应用。
 
 * llama为例
+
 注：若使用llama模型，则不需要提前进行分词，请将WuDaoCorpus2.0_base_200G中的json文件预处理为如下格式的jsonl文件：
 ```
 {"text": "飞桨是功能完备、开源开放的产业级深度学习平台。飞桨拥有..."}
 {"text": "PaddleNLP是自然语言..."}
 ```
+
 之后利用如下脚本将对应的jsonl文件转化为.bin & .idx文件。
 ```shell
 python -u  create_pretraining_data.py \
