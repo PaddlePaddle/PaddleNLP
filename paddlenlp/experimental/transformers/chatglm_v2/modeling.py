@@ -19,6 +19,7 @@ from typing import Optional
 
 import paddle
 import paddle.distributed.fleet as fleet
+from paddle.nn.quant import weight_quantize
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.distributed.fleet.utils import recompute
@@ -83,13 +84,26 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         self.head_size = self.hidden_size // self.num_heads
         self.multi_query_group_num = config.multi_query_group_num
 
+        self.use_weight_only = False
+        self.quant_bits = config.quant_bits
+        self.quant_algo = "weight_only_int" + str(self.quant_bits)
+        if self.quant_bits != -1:
+            self.use_weight_only = True
+
+        if self.use_weight_only:
+            assert (
+                self.quant_algo == "weight_only_int8" or self.quant_algo == "weight_only_int4"
+            ), "Expected quant_algo equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
+                self.quant_algo
+            )
+
         ln_scale_attrs = [
             paddle.ParamAttr(name="encoder.layers.{}.input_layernorm.weight".format(i))
             for i in range(config.num_hidden_layers)
         ]
 
         qkv_weight_attrs = [
-            paddle.ParamAttr(name="encoder.layers.{}.qkv_weight".format(i))
+            paddle.ParamAttr(name="encoder.layers.{}.qkv_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0))
             for i in range(config.num_hidden_layers)
         ]
         qkv_bias_attrs = [
@@ -97,7 +111,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         ]
 
         out_proj_weight_attrs = [
-            paddle.ParamAttr(name="encoder.layers.{}.self_attention.dense.weight".format(i))
+            paddle.ParamAttr(name="encoder.layers.{}.self_attention.dense.weight".format(i), initializer=paddle.nn.initializer.Constant(value=0))
             for i in range(config.num_hidden_layers)
         ]
 
@@ -107,20 +121,40 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         ]
 
         ffn1_weight_attrs = [
-            paddle.ParamAttr(name="encoder.layers.{}.mlp.dense_h_to_4h.weight".format(i))
+            paddle.ParamAttr(name="encoder.layers.{}.mlp.dense_h_to_4h.weight".format(i), initializer=paddle.nn.initializer.Constant(value=0))
             for i in range(config.num_hidden_layers)
         ]
 
         ffn2_weight_attrs = [
-            paddle.ParamAttr(name="encoder.layers.{}.mlp.dense_4h_to_h.weight".format(i))
+            paddle.ParamAttr(name="encoder.layers.{}.mlp.dense_4h_to_h.weight".format(i), initializer=paddle.nn.initializer.Constant(value=0))
             for i in range(config.num_hidden_layers)
         ]
+
+        qkv_weight_scale_attrs = None
+        out_proj_weight_scale_attrs = None
+        ffn1_weight_scale_attrs = None
+        ffn2_weight_scale_attrs = None
+        if self.use_weight_only:
+            qkv_weight_scale_attrs = [
+                paddle.ParamAttr(name="encoder.layers.{}.qkv_weight_scale".format(i)) for i in range(self.num_layers)
+            ]
+            out_proj_weight_scale_attrs = [
+                paddle.ParamAttr(name="encoder.layers.{}.self_attention.dense.weight_scale".format(i)) for i in range(self.num_layers)
+            ]
+            ffn1_weight_scale_attrs = [
+                paddle.ParamAttr(name="encoder.layers.{}.mlp.dense_h_to_4h.weight_scale".format(i)) for i in range(self.num_layers)
+            ]
+            ffn2_weight_scale_attrs = [
+                paddle.ParamAttr(name="encoder.layers.{}.mlp.dense_4h_to_h.weight_scale".format(i)) for i in range(self.num_layers)
+            ]
+
 
         self.transformer_block = FusedMultiTransformer(
             config.hidden_size,
             config.num_attention_heads,
             config.ffn_hidden_size,
             dropout_rate=0.0,
+            quant_bits=self.quant_bits,
             activation="swiglu",
             normalize_before=True,
             num_layers=config.num_hidden_layers,
@@ -128,11 +162,15 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             ring_id=-1,
             ln_scale_attrs=ln_scale_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
+            qkv_weight_scale_attrs=qkv_weight_scale_attrs,
             qkv_bias_attrs=qkv_bias_attrs,
             linear_weight_attrs=out_proj_weight_attrs,
+            linear_weight_scale_attrs=out_proj_weight_scale_attrs,
             ffn_ln_scale_attrs=ffn_ln_scale_attrs,
             ffn1_weight_attrs=ffn1_weight_attrs,
+            ffn1_weight_scale_attrs=ffn1_weight_scale_attrs,
             ffn2_weight_attrs=ffn2_weight_attrs,
+            ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
             epsilon=config.layernorm_epsilon,
             norm_type="rmsnorm",
         )
@@ -267,7 +305,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             k_bias = k_bias.reshape([2, 1, 128])
             v_weight = v_weight.reshape([4096, 2, 1, 128])
             v_bias = v_bias.reshape([2, 1, 128])
-
+            
             k_weight = np.tile(k_weight, [1, 1, self.num_heads // self.multi_query_group_num, 1])
             v_weight = np.tile(v_weight, [1, 1, self.num_heads // self.multi_query_group_num, 1])
             k_bias = np.tile(k_bias, [1, self.num_heads // self.multi_query_group_num, 1])
@@ -298,15 +336,47 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
 
             self.transformer_block.ln_scales[i].set_value(ln_scale)
 
-            self.transformer_block.qkv_weights[i].set_value(concated_qkv_weight)
+            if self.use_weight_only:
+                qkv_weight_tensor = paddle.to_tensor(concated_qkv_weight)
+                qkv_weight_tensor = paddle.transpose(qkv_weight_tensor, perm=[1, 0])
+                qkv_quanted_weight_tensor, qkv_weight_scale_tensor = weight_quantize(
+                    qkv_weight_tensor, algo=self.quant_algo
+                )
+                self.transformer_block.qkv_weights[i].set_value(qkv_quanted_weight_tensor)
+                self.transformer_block.qkv_weights_scale[i].set_value(qkv_weight_scale_tensor)
+            else:
+                self.transformer_block.qkv_weights[i].set_value(concated_qkv_weight)
+
             self.transformer_block.qkv_biases[i].set_value(concated_qkv_bias)
 
-            self.transformer_block.linear_weights[i].set_value(out_proj_weight)
+            if self.use_weight_only:
+                linear_quanted_weight_tensor, linear_weight_scale_tensor = weight_quantize(
+                    out_proj_weight, algo=self.quant_algo
+                )
+                self.transformer_block.linear_weights[i].set_value(linear_quanted_weight_tensor)
+                self.transformer_block.linear_weights_scale[i].set_value(linear_weight_scale_tensor)
+            else:
+                self.transformer_block.linear_weights[i].set_value(out_proj_weight)
 
             self.transformer_block.ffn_ln_scales[i].set_value(ffn_ln_scale)
 
-            self.transformer_block.ffn1_weights[i].set_value(ffn1_weight)
-            self.transformer_block.ffn2_weights[i].set_value(ffn2_weight)
+            if self.use_weight_only:
+                ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
+                    ffn1_weight, algo=self.quant_algo
+                )
+                self.transformer_block.ffn1_weights[i].set_value(ffn1_quanted_weight_tensor)
+                self.transformer_block.ffn1_weights_scale[i].set_value(ffn1_weight_scale_tensor)
+            else:
+                self.transformer_block.ffn1_weights[i].set_value(ffn1_weight)
+
+            if self.use_weight_only:
+                ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(
+                    ffn2_weight, algo=self.quant_algo
+                )
+                self.transformer_block.ffn2_weights[i].set_value(ffn2_quanted_weight_tensor)
+                self.transformer_block.ffn2_weights_scale[i].set_value(ffn2_weight_scale_tensor)
+            else:
+                self.transformer_block.ffn2_weights[i].set_value(ffn2_weight)
 
 class ChatGLMv2ForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMv2PretrainedModel):
     def __init__(self, config: ChatGLMv2Config):

@@ -360,7 +360,8 @@ class InferencePredictorMixin:
 
     def _postprocess(self, predictions):
         if paddle.distributed.get_rank() == 0:
-            tokens: np.ndarray = load_real_time_tokens()
+            #tokens: np.ndarray = load_real_time_tokens()
+            tokens = predictions.numpy()
             decoded_predictions = self.tokenizer.batch_decode(
                 tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
             )
@@ -616,10 +617,10 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
                 inputs[key] = paddle.to_tensor(inputs[key])
 
         inputs["cache_kvs"] = self.cache_kvs
-        self.model.generate(
+        a = self.model.generate(
             **inputs,
         )
-        return None
+        return a[0]
 
 
 def create_predictor(
@@ -724,6 +725,11 @@ def create_predictor(
                 from paddlenlp.experimental.transformers import (
                     ChatGLMv2ForCausalLMInferenceModel as Model,
                 )
+                config.quant_bits = -1
+
+                if predictor_args.quant_type.startswith("weight_only_int"):
+                    quant_bits = int(predictor_args.quant_type[-1])
+                    config.quant_bits = quant_bits
                 model = Model.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
