@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
 from paddle.utils.cpp_extension import CUDAExtension, setup
-
-cuda_version = int(paddle.version.cuda_version.split(".")[0])
-disable_bfloat16 = cuda_version < 11
 
 setup(
     name="paddlenlp_ops",
@@ -36,7 +32,7 @@ setup(
             "./generation/encode_rotary_qk.cu",
             "./generation/top_p_sampling.cu",
             "./generation/set_alibi_mask_value.cu",
-        ],
+        ]
     ),
 )
 
