@@ -222,12 +222,11 @@ class GenerationInferenceModel(GenerationMixin):
                 tgt_pos = model_kwargs["tgt_pos"]
                 new_position_id = tgt_pos[:, 0, :].clone()
                 new_block_id = tgt_pos[:, 1, :].clone()
-                new_block_id = new_block_id + 1
+                new_block_id = paddle.where(just_decoder, new_block_id, new_block_id + 1)
 
                 model_kwargs["tgt_pos"] = paddle.concat(
                     [new_position_id.unsqueeze(1), new_block_id.unsqueeze(1)], axis=1
                 )
-                model_kwargs["tgt_pos"] = paddle.where(just_decoder, tgt_pos, model_kwargs["tgt_pos"])
             else:
                 model_kwargs["tgt_pos"] = paddle.where(
                     just_decoder, model_kwargs["tgt_pos"], model_kwargs["tgt_pos"] + 1
@@ -252,15 +251,10 @@ class GenerationInferenceModel(GenerationMixin):
                 tgt_pos = model_kwargs["tgt_pos"]
                 new_position_id = tgt_pos[:, 0, :].clone()
                 new_block_id = tgt_pos[:, 1, :].clone()
-                new_block_id = new_block_id + 1
+                new_block_id = paddle.where(model_kwargs["stop_flags"], new_block_id, new_block_id + 1)
 
                 model_kwargs["tgt_pos"] = paddle.concat(
                     [new_position_id.unsqueeze(1), new_block_id.unsqueeze(1)], axis=1
-                )
-                model_kwargs["tgt_pos"] = paddle.where(
-                    model_kwargs["stop_flags"],
-                    tgt_pos,
-                    model_kwargs["tgt_pos"],
                 )
             else:
                 model_kwargs["tgt_pos"] = paddle.where(
