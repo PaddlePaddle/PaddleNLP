@@ -395,7 +395,6 @@ class Trainer:
                         )
 
                         self.scaler = GroupShardedScaler(self.scaler)
-
                 else:
                     self.do_grad_scaling = False
                     self.use_cuda_amp = False
@@ -423,6 +422,7 @@ class Trainer:
 
         self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
         self.print_config()
+
         # very last
         self._memory_tracker.stop_and_update_metrics()
 
@@ -475,12 +475,12 @@ class Trainer:
             return
 
         state_dict = None
-        if self.args.load_sharded_model:
+        if self.args.load_sharding_stage1_model:
             state_dict = self.load_state_dict_from_checkpoint_with_reshard(resume_from_checkpoint)
             if self.args.bf16:
                 state_dict = self.recover_params_from_master_weights(state_dict)
         else:
-            if self.args.dataset_rank == 0 or self.args.use_moe:
+            if self.args.dataset_rank == 0:
                 state_dict = self.load_one_state_dict_from_checkpoint(
                     resume_from_checkpoint, self.args.old_weight_name_suffix
                 )
@@ -494,25 +494,24 @@ class Trainer:
         del state_dict
 
     def recover_params_from_master_weights(self, state_dict):
+        assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
+        param2rank = self.optimizer._inner_opt._param2rank
         opt_state_dict = self.optimizer.state_dict()
         assert "master_weights" in opt_state_dict
         master_weigths = opt_state_dict["master_weights"]
-        if self.args.load_sharding_stage1_model:
-            assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
-            param2rank = self.optimizer._inner_opt._param2rank
-            param_names_in_master_weights = list(master_weigths.keys())
-            tmp = []
-            logger.info("param_names_in_master_weights:{}".format(param_names_in_master_weights))
-            paddle.distributed.all_gather_object(tmp, param_names_in_master_weights, group=self.sharding_group)
-            sharding_group_param_names = [v for item in tmp for v in item]
-            logger.info("sharding_group_param_names:{}".format(sharding_group_param_names))
+        param_names_in_master_weights = list(master_weigths.keys())
+        tmp = []
+        logger.info("param_names_in_master_weights:{}".format(param_names_in_master_weights))
+        paddle.distributed.all_gather_object(tmp, param_names_in_master_weights, group=self.sharding_group)
+        sharding_group_param_names = [v for item in tmp for v in item]
+        logger.info("sharding_group_param_names:{}".format(sharding_group_param_names))
         model_state_dict = self.model.state_dict()
         logger.info("before recover, model_state_dict number: {}".format(len(model_state_dict)))
         for key, param in model_state_dict.items():
             if param.name in master_weigths:
                 assert param.shape == master_weigths[param.name].shape
                 paddle.assign(paddle.cast(master_weigths[param.name].cuda(), paddle.bfloat16), model_state_dict[key])
-            if self.args.load_sharding_stage1_model and param.name in sharding_group_param_names:
+            if param.name in sharding_group_param_names:
                 paddle.distributed.broadcast(
                     model_state_dict[key],
                     src=self.sharding_group.ranks[param2rank[param.name]],
@@ -585,8 +584,10 @@ class Trainer:
 
         def get_name_suffix(i):
             name = []
-            name.append(f"tp{self.args.tensor_parallel_rank:0>2d}")
-            name.append(f"pp{self.args.pipeline_parallel_rank:0>2d}")
+            if self.args.tensor_parallel_degree > 1:
+                name.append(f"tp{self.args.tensor_parallel_rank:0>2d}")
+            if self.args.pipeline_parallel_degree > 1:
+                name.append(f"pp{self.args.pipeline_parallel_rank:0>2d}")
             name.append(f"shard{i:0>2d}")
             return "_".join(name)
 
@@ -599,8 +600,7 @@ class Trainer:
         def filter_func(name):
             return True
 
-        if self.args.load_sharding_stage1_model:
-            state_dict = self._all_gather_state_dict(state_dict, filter_func)
+        state_dict = self._all_gather_state_dict(state_dict, filter_func)
 
         return state_dict
 
@@ -733,7 +733,7 @@ class Trainer:
 
         self.state = TrainerState()
 
-        if self.args.load_sharded_model:
+        if self.args.load_sharding_stage1_model:
             model = self._load_sharded_check_point(resume_from_checkpoint, delay_optimizer_creation, max_steps)
         else:
             model = self._load_check_point(resume_from_checkpoint, delay_optimizer_creation, max_steps)
@@ -891,8 +891,7 @@ class Trainer:
                     self.args.tensor_parallel_degree > 1 or self.args.pipeline_parallel_degree > 1
                 ):
                     forbidden_no_sync = True
-                if self.args.use_moe:
-                    forbidden_no_sync = True
+
                 availiable_no_sync = dp_enabled and not forbidden_no_sync
 
                 is_no_sync = (
@@ -911,19 +910,12 @@ class Trainer:
                 if is_no_sync:
                     # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
                     with model.no_sync():
-                        tr_loss_step, outputs = self.training_step(model, inputs)
+                        tr_loss_step = self.training_step(model, inputs)
                 else:
-                    tr_loss_step, outputs = self.training_step(model, inputs)
-
-                def fused_allreduce_gradients_no_sync(paramlist, hcg):
-                    paramlist = list(paramlist)
-                    nonmoe_list = [p for p in paramlist if not getattr(p, "no_sync", False)]
-                    moelist = [p for p in paramlist if getattr(p, "no_sync", False)]
-                    if moelist and not self.args.use_moe:
-                        logger.warning("found `no sync` param when `use_moe=False`")
-                    fused_allreduce_gradients(nonmoe_list, hcg)
+                    tr_loss_step = self.training_step(model, inputs)
 
                 tr_loss += tr_loss_step
+
                 if (step + 1) % args.gradient_accumulation_steps == 0:
                     self.timers and self.timers("forward-backward").stop()
                     # Maunally collect gradients when group_sharded_parallel can't accept dp_group
@@ -934,7 +926,7 @@ class Trainer:
 
                     if self.sharding and ShardingOption.SHARD_OP not in self.args.sharding:
                         if self.args.data_parallel_degree > 1 and not is_dp_group_support_in_group_sharded_parallel():
-                            fused_allreduce_gradients_no_sync(model.parameters(), fleet.get_hybrid_communicate_group())
+                            fused_allreduce_gradients(model.parameters(), fleet.get_hybrid_communicate_group())
                             if ShardingOption.FULL_SHARD in self.args.sharding:
                                 # Why need sync on parm again ?
                                 # TODO: fix this.
@@ -947,12 +939,7 @@ class Trainer:
                     # Case 2: Use recompute and dp / sharding stage1,
                     # manualy collect gradient for dp.
                     elif args.recompute and availiable_no_sync:
-                        assert not self.args.use_moe, "moe must `no_sync`"
-                        fused_allreduce_gradients_no_sync(list(model.parameters()), None)
-
-                    # Case 2.1: # 纯dp + moe 才在这里手动执行 梯度聚合。
-                    elif args.use_moe and not args.use_hybrid_parallel:
-                        fused_allreduce_gradients_no_sync(list(model.parameters()), None)
+                        fused_allreduce_gradients(list(model.parameters()), None)
 
                     pipeline_parallel_config = set(args.pipeline_parallel_config.split(" "))
                     enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
@@ -967,16 +954,14 @@ class Trainer:
                                 self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
                             if self.optimizer._dp_enable:
-                                fused_allreduce_gradients_no_sync(list(parameters_list), self.optimizer._hcg)
-                        else:
-                            assert self.args.use_moe, "moe should not `enable_dp_comm_overlap`"
+                                fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
 
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
 
                     # Case 3: hack dp with master_grad
                     if hack_dp_master_grad and not (args.recompute and availiable_no_sync):
-                        fused_allreduce_gradients_no_sync(list(model.parameters()), None)
+                        fused_allreduce_gradients(list(model.parameters()), None)
 
                     # pipeline parallel mode,  handle gradient merge here
                     if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
@@ -994,8 +979,6 @@ class Trainer:
                     )
                     optimizer_was_run = True
                     if self.do_grad_scaling:
-                        if args.pipeline_parallel_degree > 1:
-                            assert not self.args.use_moe, "pipline moe not work under fp16"
                         scale_before = self.scaler._scale.numpy()
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
@@ -1023,11 +1006,8 @@ class Trainer:
                     self.state.global_step += 1
                     self.state.epoch = epoch + self.state.global_step / global_steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
-                    self._maybe_log_save_evaluate(
-                        tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs, outputs=outputs
-                    )
+                    self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
                     self._print_timer()
-
                     step = 0
                 else:
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
@@ -1631,9 +1611,7 @@ class Trainer:
                 self.optimizer = fleet.distributed_optimizer(self.optimizer)
             else:
                 # sync params (broadcast) buffers in dp group
-                if (
-                    not is_dp_group_support_in_group_sharded_parallel() or self.args.use_moe
-                ) and self.args.data_parallel_degree > 1:
+                if not is_dp_group_support_in_group_sharded_parallel() and self.args.data_parallel_degree > 1:
                     try:
                         from paddle.fluid.dygraph.parallel import sync_params_buffers
                     except ImportError:
@@ -1657,7 +1635,7 @@ class Trainer:
                 # add dp_group and exclude_layer params
                 # https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/distributed/sharding/group_sharded_parallel_cn.html#group-sharded-parallel
                 extra_kwargs = {}
-                if is_dp_group_support_in_group_sharded_parallel() and not self.args.use_moe:
+                if is_dp_group_support_in_group_sharded_parallel():
                     extra_kwargs["dp_group"] = self.dp_group
                     extra_kwargs["exclude_layer"] = ["GroupNorm"]
 
@@ -1774,12 +1752,7 @@ class Trainer:
             self._past = outputs[self.args.past_index]
 
         # We don't use .loss here since the model may return tuples instead of ModelOutput.
-        if isinstance(outputs, dict):
-            loss = outputs.pop("loss")
-            outputs = {k: nested_detach(v) for k, v in outputs.items()}
-        else:
-            loss = outputs[0]
-            outputs = nested_detach(outputs[1:])
+        loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
 
         return (loss, outputs) if return_outputs else loss
 
@@ -1806,8 +1779,10 @@ class Trainer:
 
         model.train()
         inputs = self._prepare_inputs(inputs)
+
         with self.autocast_smart_context_manager():
-            loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
+            loss = self.compute_loss(model, inputs)
+
         if self.args.gradient_accumulation_steps > 1:
             loss = loss / self.args.gradient_accumulation_steps
 
@@ -1816,10 +1791,7 @@ class Trainer:
         else:
             loss.backward()
 
-        if isinstance(outputs, dict) and "loss" in outputs:
-            loss = outputs.pop("loss") / self.args.gradient_accumulation_steps
-
-        return loss.detach(), outputs
+        return loss.detach()
 
     def training_pipeline_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         """
@@ -1844,7 +1816,7 @@ class Trainer:
             self._pp_data_buffer = []
         self._pp_data_buffer.append(inputs)
         if len(self._pp_data_buffer) != self.args.gradient_accumulation_steps:
-            return paddle.zeros([]), {}
+            return paddle.zeros([])
 
         # for v in self._pp_data_buffer[0].values():
         #     assert isinstance(v, paddle.Tensor), f"Only support tensor as pipeline mode input, got type {type(v)}"
@@ -1878,30 +1850,8 @@ class Trainer:
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
 
         model.micro_batch_size, model.accumulate_steps = config_backup
-        if not hasattr(model._layers._loss_fn, "info"):
-            return loss.detach(), {}
 
-        if model.is_pipeline_last_stage():
-            buf = [
-                {
-                    k: (v.item() if isinstance(v, paddle.Tensor) else v) / self.args.gradient_accumulation_steps
-                    for k, v in model._layers._loss_fn.info.items()
-                }
-            ]
-        else:
-            buf = [None]
-        hcg = fleet.get_hybrid_communicate_group()
-        dist.broadcast_object_list(buf, src=hcg._pp_comm_group.ranks[-1], group=hcg.get_pipe_parallel_group())
-        info = buf[0]
-
-        # 当 pipenline 模型需要返回并打印多个 loss 时，需要在组网 `model._layers._loss_fn` 中插入 dict `info`.
-        # `info` 中持有需要被打印的 name-tensor 对。
-        model._layers._loss_fn.info = {}
-        assert isinstance(info, dict), f"expect info to dict, got {type(info)}"
-        info = {k: v.detach() if isinstance(v, paddle.Tensor) else v for k, v in info.items()}
-        if "loss" in info:
-            loss = paddle.to_tensor(info.pop("loss"))
-        return loss.detach(), info
+        return loss.detach()
 
     def save_model(
         self,
@@ -1919,17 +1869,6 @@ class Trainer:
 
         if self.args.should_save_model_state:
             self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
-
-    def _save_moe_weights(self, output_dir):
-        # save moe optimizer and model state # TODO 默认为冗余存储
-        self.save_func(
-            self.model.state_dict(),
-            os.path.join(output_dir, _add_variant(PADDLE_WEIGHT_FILE_NAME, self.args.weight_name_suffix)),
-        )
-        self.save_func(
-            self.optimizer.state_dict(),
-            os.path.join(output_dir, _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)),
-        )
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
@@ -1954,13 +1893,14 @@ class Trainer:
 
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
-                self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, optimizer_name))
+                self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
             # FIXME: manybe only save one copy
             self.save_func(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
 
             if self.do_grad_scaling:
                 self.save_func(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
+
         # Determine the new best metric / best model checkpoint
         if metrics is not None and self.args.metric_for_best_model is not None:
             metric_to_check = self.args.metric_for_best_model
@@ -2009,21 +1949,16 @@ class Trainer:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
                 if self.args.use_async_save:
-                    assert not self.args.use_moe, "moe no support async save"
                     async_save_optimizer(
                         self.optimizer.state_dict(),
                         os.path.join(output_dir, optimizer_name),
                         saved_signal_path=saved_signal_path,
                         sync_other_task=True,
                     )
-
                 else:
                     self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, optimizer_name))
                     with open(saved_signal_path, mode="w+") as f:
                         f.write("1")
-
-        if self.args.use_moe and self.args.data_parallel_rank > 0:
-            self._save_moe_weights(output_dir)
 
         # Maybe delete some older checkpoints.
         if self.args.should_save and (True if not self.args.use_hybrid_parallel else self.args.local_rank == 0):
@@ -2192,8 +2127,9 @@ class Trainer:
         sharding_metas = {k: v for e in sharding_metas_list for (k, v) in e.items()}
         if self.args.tensor_parallel_rank != 0:
             return None
-        sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_pipe_parallel_group())
-        sharding_metas = {k: v for e in sharding_metas_list for (k, v) in e.items()}
+        if self.args.pipeline_parallel_degree > 1:
+            sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_pipe_parallel_group())
+            sharding_metas = {k: v for e in sharding_metas_list for (k, v) in e.items()}
         return sharding_metas
 
     def _load_sharding_meta(self, dir):
@@ -2359,8 +2295,10 @@ class Trainer:
 
         def get_name_suffix(i):
             name = []
-            name.append(f"tp{self.args.tensor_parallel_rank:0>2d}")
-            name.append(f"pp{self.args.pipeline_parallel_rank:0>2d}")
+            if self.args.tensor_parallel_degree > 1:
+                name.append(f"tp{self.args.tensor_parallel_rank:0>2d}")
+            if self.args.pipeline_parallel_degree > 1:
+                name.append(f"pp{self.args.pipeline_parallel_rank:0>2d}")
             name.append(f"shard{i:0>2d}")
             return "_".join(name)
 
@@ -2382,64 +2320,62 @@ class Trainer:
 
             del tmp
 
-        if self.args.load_sharding_stage1_model:
             # gather all opt names
-            # list of list
-            opt_names_list = self._all_gather_simple_object(list(state_dict.keys()))
-            opt_names = []
-            for e in opt_names_list:
-                opt_names.extend(e)
+        # list of list
+        opt_names_list = self._all_gather_simple_object(list(state_dict.keys()))
+        opt_names = []
+        for e in opt_names_list:
+            opt_names.extend(e)
 
-            # opt name to param name
-            opt_to_p = self._map_optimizer_state_to_param(opt_names)
+        # opt name to param name
+        opt_to_p = self._map_optimizer_state_to_param(opt_names)
 
-            optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
-            param2rank = optimizer._param2rank
+        optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
+        param2rank = optimizer._param2rank
 
-            def all_gather_state_dict(state_dict, filter_func):
-                remote_state_dict_keys = [k for k in state_dict.keys() if not filter_func(k)]
-                tmp_state_dict = OrderedDict()
-                for k in remote_state_dict_keys:
-                    tmp_state_dict[k] = state_dict[k]
-                    state_dict.pop(k)
-                tmp_state_dict = self._all_gather_state_dict(tmp_state_dict, filter_func)
-                for (k, v) in tmp_state_dict.items():
-                    state_dict[k] = v
-                return state_dict
+        def all_gather_state_dict(state_dict, filter_func):
+            remote_state_dict_keys = [k for k in state_dict.keys() if not filter_func(k)]
+            tmp_state_dict = OrderedDict()
+            for k in remote_state_dict_keys:
+                tmp_state_dict[k] = state_dict[k]
+                state_dict.pop(k)
+            tmp_state_dict = self._all_gather_state_dict(tmp_state_dict, filter_func)
+            for (k, v) in tmp_state_dict.items():
+                state_dict[k] = v
+            return state_dict
 
-            def opt_filter_func(name):
-                assert name in opt_to_p, f"name {name} not in opt_to_p"
-                param_name = opt_to_p[name]
-                assert param_name in param2rank, f"param_name {param_name} not in param2rank param2"
-                return param2rank[param_name] == self.args.sharding_parallel_rank
+        def opt_filter_func(name):
+            assert name in opt_to_p, f"name {name} not in opt_to_p"
+            param_name = opt_to_p[name]
+            assert param_name in param2rank, f"param_name {param_name} not in param2rank param2"
+            return param2rank[param_name] == self.args.sharding_parallel_rank
 
-            state_dict = all_gather_state_dict(state_dict, opt_filter_func)
+        state_dict = all_gather_state_dict(state_dict, opt_filter_func)
 
-            def master_weights_filter_func(name):
-                assert (name in param2rank) or (name in opt_to_p), f"name {name} not in param2rank or opt_to_p"
-                if name in opt_to_p:
-                    name = opt_to_p[name]
-                return param2rank[name] == self.args.sharding_parallel_rank
+        def master_weights_filter_func(name):
+            assert (name in param2rank) or (name in opt_to_p), f"name {name} not in param2rank or opt_to_p"
+            if name in opt_to_p:
+                name = opt_to_p[name]
+            return param2rank[name] == self.args.sharding_parallel_rank
 
-            # master weights
-            master_weights = all_gather_state_dict(master_weights, master_weights_filter_func)
-
-            # lr scheduler
-            print(lr_scheduler)
-            lr_schedulers = self._all_gather_simple_object(lr_scheduler)
-            lr_scheduler = {}
-            for e in lr_schedulers:
-                for (k, v) in e.items():
-                    lr_scheduler[k] = v
-
+        # master weights
+        master_weights = all_gather_state_dict(master_weights, master_weights_filter_func)
         state_dict["master_weights"] = master_weights
+
+        # lr scheduler
+        print(lr_scheduler)
+        lr_schedulers = self._all_gather_simple_object(lr_scheduler)
+        lr_scheduler = {}
+        for e in lr_schedulers:
+            for (k, v) in e.items():
+                lr_scheduler[k] = v
         if lr_scheduler:
             state_dict["LR_Scheduler"] = lr_scheduler[0]
 
         return state_dict
 
     def _load_optimizer_state(self, checkpoint):
-        if self.args.load_sharded_model:
+        if self.args.load_sharding_stage1_model:
             return self._load_optimizer_state_with_reshard(checkpoint)
         else:
             return self._load_optimizer_state_of_one_shard(checkpoint, self.args.optimizer_name_suffix)
