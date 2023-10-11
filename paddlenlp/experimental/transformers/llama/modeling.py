@@ -167,6 +167,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             self.num_attention_heads,
             self.intermediate_size,
             quant_bits=self.quant_bits,
+            arch=self.arch, 
             activation="swiglu",
             num_layers=config.num_hidden_layers,
             nranks=config.tensor_parallel_degree,
