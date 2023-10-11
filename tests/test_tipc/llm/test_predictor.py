@@ -23,16 +23,22 @@ import unittest
 import paddle
 import yaml
 
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
+
 
 class InfereneTest(unittest.TestCase):
     config_path: str = "./test_tipc/llm/fixtures/predictor.yaml"
+    predictor_shell_name = "inference/run_predictor.sh"
+
+    ce_testing_base_url = "https://paddlenlp.bj.bcebos.com/tests/ce"
+    predict_file_name = "predict.json"
 
     def setUp(self) -> None:
         paddle.set_default_dtype("float32")
         self.output_path = tempfile.mkdtemp()
         sys.path.insert(0, "../llm")
         self.model_name = os.getenv("MODEL_NAME")
-        self.run_predictor_shell_path = os.path.join(os.path.dirname(__file__), "inference/run_predictor.sh")
+        self.run_predictor_shell_path = os.path.join(os.path.dirname(__file__), self.predictor_shell_name)
 
     def tearDown(self) -> None:
         sys.path.remove("../llm")
@@ -51,8 +57,31 @@ class InfereneTest(unittest.TestCase):
                 result.append(data["output"])
         return result
 
+    def compare_result(self, result_1, result_2):
+        """
+        compare two result from predictor
+        """
+        result_1_result = self._read_result(os.path.join(self.output_path, result_1))
+        result_2_result = self._read_result(os.path.join(self.output_path, result_2))
+
+        assert len(result_1_result) == len(result_2_result)
+        count, full_match = 0, 0
+        for item_1, item_2 in zip(result_1_result, result_2_result):
+            min_length = min(len(item_1), len(item_2))
+            count += int(item_1[min_length // 2] == item_2[min_length // 2])
+            full_match += int(item_1[:min_length] == item_2[:min_length])
+
+        return full_match / len(result_1_result), count / len(result_1_result)
+
     def test_predictor(self):
         config = self._load_config(self.model_name)
+
+        # 0. download the ground-truth file for comparing
+        get_path_from_url_with_filelock(
+            os.path.join(self.ce_testing_base_url, config["model_name_or_path"], self.predict_file_name),
+            root_dir=self.output_path,
+        )
+
         config["output_path"] = self.output_path
         command_prefix = " ".join([f"{key}={value}" for key, value in config.items()])
 
@@ -61,9 +90,12 @@ class InfereneTest(unittest.TestCase):
             command_prefix + " bash " + self.run_predictor_shell_path, stdout=sys.stdout, stderr=sys.stderr, shell=True
         )
 
-        dynamic = self._read_result(os.path.join(self.output_path, "dynamic.json"))
-        static = self._read_result(os.path.join(self.output_path, "static.json"))
-        self.assertListEqual(dynamic, static)
+        full_match_acc, _ = self.compare_result("dynamic.json", "static.json")
+        self.assertEqual(full_match_acc, 1.0)
+
+        full_match_acc, half_match_acc = self.compare_result(self.predict_file_name, "static.json")
+        self.assertGreater(full_match_acc, 0.6)
+        self.assertGreater(half_match_acc, 0.8)
 
         # 2.run fused-mt model
         subprocess.run(
@@ -73,27 +105,12 @@ class InfereneTest(unittest.TestCase):
             shell=True,
         )
 
-        fused_dynamic = self._read_result(os.path.join(self.output_path, "dynamic.json"))
-        fused_static = self._read_result(os.path.join(self.output_path, "static.json"))
-        self.assertListEqual(fused_dynamic, fused_static)
+        full_match_acc, half_match_acc = self.compare_result("dynamic.json", "static.json")
+        self.assertEqual(full_match_acc, 1.0)
+        full_match_acc, half_match_acc = self.compare_result(self.predict_file_name, "static.json")
+        self.assertEqual(full_match_acc, 1.0)
 
-        # 3. compare the generation text of dynamic & inference model
-        assert len(fused_static) == len(static)
-        count, full_match = 0, 0
-        for inference_item, no_inference_item in zip(fused_static, static):
-            min_length = min(len(inference_item), len(no_inference_item))
-            count += int(inference_item[min_length // 2] == no_inference_item[min_length // 2])
-            full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
-
-        print("full_match", full_match)
-        print(full_match / len(static))
-        print("precision:", count)
-        print(count / len(static))
-
-        self.assertGreater(full_match / len(static), 0.6)
-        self.assertGreater(count / len(static), 0.8)
-
-        # 4. run sample decoding on fused-mt model
+        # 3. run sample decoding on fused-mt model
         subprocess.run(
             command_prefix
             + " decode_strategy=sampling inference_model=true bash tests/test_tipc/llm/inference/run_predictor.sh",
@@ -102,8 +119,31 @@ class InfereneTest(unittest.TestCase):
             shell=True,
         )
 
-        sample_fused_dynamic = self._read_result(os.path.join(self.output_path, "dynamic.json"))
-        sample_fused_static = self._read_result(os.path.join(self.output_path, "static.json"))
-        for i in range(len(sample_fused_dynamic)):
-            self.assertNotEqual(sample_fused_dynamic[i], sample_fused_static[i])
-            self.assertNotEqual(sample_fused_dynamic[i], fused_dynamic[i])
+        full_match_acc, half_match_acc = self.compare_result("dynamic.json", "static.json")
+        self.assertLessEqual(full_match_acc, 0.1)
+        self.assertLessEqual(half_match_acc, 0.2)
+
+        full_match_acc, half_match_acc = self.compare_result(self.predict_file_name, "static.json")
+        self.assertLessEqual(full_match_acc, 0.1)
+        self.assertLessEqual(half_match_acc, 0.2)
+
+
+class PTuningInfereneTest(InfereneTest):
+    config_path: str = "./test_tipc/llm/fixtures/predictor-ptuning.yaml"
+    predictor_shell_name = "inference/run_predictor_precaches.sh"
+
+    predict_file_name = "predict-ptuning.json"
+
+    def setUp(self) -> None:
+        super().setUp()
+
+    def _load_config(self, key):
+        config = super()._load_config(key)
+
+        for file in ["pre_caches.npy", "prefix_config.json", "prefix_model_state.pdparams"]:
+            get_path_from_url_with_filelock(
+                os.path.join(self.ce_testing_base_url, config["model_name_or_path"], file), root_dir=self.output_path
+            )
+
+        config["prefix_path"] = self.output_path
+        return config
