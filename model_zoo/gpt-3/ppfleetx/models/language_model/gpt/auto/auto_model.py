@@ -292,6 +292,7 @@ class TransformerDecoder(nn.Layer):
         for i, mod in enumerate(self.layers):
             ipp = mod.ipp
             mod = auto.shard_op(mod, auto_env.get_mesh()[ipp])
+            auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().dp_dim, None, None])
 
             if cache is None:
                 if use_cache:
@@ -305,8 +306,6 @@ class TransformerDecoder(nn.Layer):
             else:
                 output, new_cache = mod(output, memory, tgt_mask=tgt_mask, use_cache=use_cache, cache=cache[i])
                 new_caches.append(new_cache)
-
-            auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().dp_dim, None, None])
 
         if self.norm is not None:
             output = self.norm(output)
@@ -478,9 +477,16 @@ class GPTEmbeddings(nn.Layer):
             weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=initializer_range)),
         )
 
+        # self.output_word_embeddings = nn.Embedding(
+        #     vocab_size,
+        #     hidden_size,
+        #     weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=initializer_range)),
+        # )
+
         if freeze_embedding:
             self.word_embeddings.weight.learning_rate = 0.0
             self.position_embeddings.weight.learning_rate = 0.0
+            # self.output_word_embeddings.weight.learning_rate = 0.0
 
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
@@ -491,6 +497,7 @@ class GPTEmbeddings(nn.Layer):
             position_ids = seq_length - ones
 
         auto.shard_tensor(self.word_embeddings.weight, auto_env.get_mesh()[0], [auto_env.get_mesh().mp_dim, None])
+        # auto.shard_tensor(self.output_word_embeddings.weight, auto_env.get_mesh()[0], [auto_env.get_mesh().mp_dim, None])
 
         input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
@@ -498,6 +505,35 @@ class GPTEmbeddings(nn.Layer):
         embeddings = self.dropout(embeddings)
         return embeddings
 
+
+class GPTOutputEmbeddings(nn.Layer):
+    """
+    Embedding to calculate logits when we don't share the weight with input embedding.
+    """
+
+    def __init__(
+        self,
+        vocab_size,
+        hidden_size=768,
+        initializer_range=0.02,
+        freeze_embedding=False,
+    ):
+        super(GPTOutputEmbeddings, self).__init__()
+
+        self.output_word_embeddings = nn.Embedding(
+            vocab_size,
+            hidden_size,
+            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=initializer_range)),
+        )
+
+        if freeze_embedding:
+            self.output_word_embeddings.weight.learning_rate = 0.0
+
+
+    def forward(self, encoder_outputs=None):
+        auto.shard_tensor(self.output_word_embeddings.weight, auto_env.get_mesh()[-1], [auto_env.get_mesh().mp_dim, None])
+        logits = paddle.matmul(encoder_outputs, get_attr(self.output_word_embeddings, "weight"), transpose_y=True)
+        return logits
 
 class GPTModelAuto(nn.Layer):
     def __init__(
@@ -584,6 +620,13 @@ class GPTModelAuto(nn.Layer):
             recompute_granularity=recompute_granularity,
         )
 
+        self.output_embeddings = GPTOutputEmbeddings(
+            vocab_size,
+            hidden_size,
+            self.initializer_range,
+            freeze_embedding,
+        )
+
     def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None):
 
         if position_ids is None:
@@ -628,7 +671,9 @@ class GPTModelAuto(nn.Layer):
             cache=cache,
         )
 
-        return encoder_outputs
+        logits = self.output_embeddings(encoder_outputs)
+
+        return encoder_outputs, logits
 
 
 class GPTForPretrainingAuto(nn.Layer):
@@ -649,18 +694,19 @@ class GPTForPretrainingAuto(nn.Layer):
         self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
     ):
 
-        outputs = self.gpt(
+        outputs, logits = self.gpt(
             input_ids, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
         )
         if use_cache:
-            encoder_outputs, cached_kvs = outputs[:2]
-        else:
-            encoder_outputs = outputs
+            _, cached_kvs = outputs[:2]
+        # else:
+        #     encoder_outputs = outputs
 
-        x_dims_mapping = [auto_env.get_mesh().dp_dim] + [None] * (len(encoder_outputs.shape) - 1)
-        w_dims_mapping = [auto_env.get_mesh().mp_dim, None]
-        matmul = auto.shard_op(paddle.matmul, auto_env.get_mesh()[-1], [x_dims_mapping, w_dims_mapping, None])
-        logits = matmul(encoder_outputs, get_attr(self.gpt.embeddings.word_embeddings, "weight"), transpose_y=True)
+        # x_dims_mapping = [auto_env.get_mesh().dp_dim] + [None] * (len(encoder_outputs.shape) - 1)
+        # w_dims_mapping = [auto_env.get_mesh().mp_dim, None]
+        # matmul = auto.shard_op(paddle.matmul, auto_env.get_mesh()[-1], [x_dims_mapping, w_dims_mapping, None])
+        # logits = matmul(encoder_outputs, get_attr(self.gpt.embeddings.word_embeddings, "weight"), transpose_y=True)
+        # logits = paddle.matmul(encoder_outputs, get_attr(self.gpt.embeddings.output_word_embeddings, "weight"), transpose_y=True)
 
         if use_cache:
             return logits, cached_kvs
