@@ -21,7 +21,6 @@
     "disable_tqdm": true,
     "load_best_model_at_end": true,
     "eval_with_do_generation": false,
-    "metric_for_best_model": "accuracy",
     "recompute": true,
     "save_total_limit": 1,
     "tensor_parallel_degree": 2,
