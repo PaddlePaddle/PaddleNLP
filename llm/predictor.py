@@ -397,13 +397,9 @@ class InferencePredictorMixin:
             pre_caches_length=pre_caches_length,
         )
 
-        bsz = inputs["input_ids"].shape[0]
-        self.attention_mask = self.attention_mask[:bsz]
-        self.tgt_generation_mask = self.tgt_generation_mask[:bsz]
-
         if "chatglm" in self.architectures:
-            if bsz < self.config.batch_size:
-                self.tgt_pos = self.tgt_pos[:bsz]
+            if inputs["input_ids"].shape[0] < self.config.batch_size:
+                self.tgt_pos = self.tgt_pos[: inputs["input_ids"].shape[0]]
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = 1
@@ -433,8 +429,6 @@ class InferencePredictorMixin:
 
             inputs["tgt_pos"] = self.tgt_pos
         elif "bloom" in self.architectures:
-            if bsz < self.config.batch_size:
-                self.arange_tensor_encoder = self.arange_tensor_encoder[:bsz]
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, :, :length, :length] = paddle.tril(
@@ -458,7 +452,7 @@ class InferencePredictorMixin:
                     * block_size : (self.model_config.tensor_parallel_rank + 1)
                     * block_size,
                 ]
-                alibi = alibi.reshape([inputs["input_ids"].shape[0], block_size, 1, self.config.max_length])
+                alibi = alibi.reshape([self.config.batch_size, block_size, 1, self.config.max_length])
                 inputs["position_ids"] = inputs["position_ids"][
                     self.model_config.tensor_parallel_rank
                     * block_size : (self.model.config.tensor_parallel_rank + 1)
@@ -467,7 +461,7 @@ class InferencePredictorMixin:
 
             alibi_encoder = alibi.expand(
                 [
-                    inputs["input_ids"].shape[0],
+                    self.config.batch_size,
                     self.model_config.n_head // self.model_config.tensor_parallel_degree,
                     self.config.total_max_length,
                     self.config.total_max_length,
@@ -475,7 +469,7 @@ class InferencePredictorMixin:
             )
             alibi_decoder = alibi.expand(
                 [
-                    inputs["input_ids"].shape[0],
+                    self.config.batch_size,
                     self.model_config.n_head // self.model_config.tensor_parallel_degree,
                     1,
                     self.config.total_max_length,
