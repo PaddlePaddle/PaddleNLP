@@ -312,6 +312,17 @@ outputs, _ = model.generate(
 
 更多关于千亿级AI模型的分布式训练使用说明可参考[GPT-3](./examples/language_model/gpt-3)。
 
+#### 模型转化
+
+PaddleNLP 提供了可自动将 Pytorch 相关的权重转化为 Paddle 权重的接口，代码如下：
+
+```python
+from paddlenlp.transformers import AutoModelForCausalLM
+AutoModelForCausalLM.from_pretrained("/path/to/pytorch/model", convert_from_torch=True)
+```
+
+以上代码可自动加载 pytorch 权重并转化为对应 paddle 权重保存在 `/path/to/pytorch/model` 目录下。
+
 ## 社区交流
 
 - 微信扫描二维码并填写问卷，回复小助手关键词（NLP）之后，即可加入交流群领取福利
