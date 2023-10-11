@@ -22,6 +22,7 @@
 | ziqingyang/chinese-alpaca-13b     |
 | idea-ccnl/ziya-llama-13b-v1       |
 | linly-ai/chinese-llama-2-7b       |
+| linly-ai/chinese-llama-2-13b      |
 | baichuan-inc/Baichuan-7B          |
 | baichuan-inc/Baichuan-13B-Base    |
 | baichuan-inc/Baichuan-13B-Chat    |
