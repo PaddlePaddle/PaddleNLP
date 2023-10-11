@@ -317,8 +317,6 @@ class TrainingArguments:
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
         skip_profile_timer (`bool`, *optional*):
             Whether skip profile timer, timer will record time usage of forward/ backward/ step, etc.
-        max_shard_size (`str`, *optional*):
-            The max shard size for saving model state dict param files. Default is `"10GB"`.
         distributed_dataloader (`bool`, *optional*):
             Whether to use distributed dataloader. Default is `False`.
     """
@@ -696,10 +694,6 @@ class TrainingArguments:
     )
     distributed_dataloader: Optional[bool] = field(
         default=False, metadata={"help": "Whether to use distributed dataloader."}
-    )
-    max_shard_size: Optional[str] = field(
-        default="10GB",
-        metadata={"help": "The max shard size for saving model state dict param files."},
     )
 
     def __post_init__(self):
