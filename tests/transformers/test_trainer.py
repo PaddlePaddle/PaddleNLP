@@ -184,12 +184,10 @@ if is_paddle_available():
     class RegressionModel(nn.Layer):
         def __init__(self, a=0, b=0, double_output=False):
             super().__init__()
-            self.a = paddle.create_parameter(shape=[], dtype=paddle.float32).set_value(
-                paddle.to_tensor(a, paddle.float32)
-            )
-            self.b = paddle.create_parameter(shape=[], dtype=paddle.float32).set_value(
-                paddle.to_tensor(b, paddle.float32)
-            )
+            self.a = paddle.create_parameter(shape=[], dtype=paddle.float32)
+            self.b = paddle.create_parameter(shape=[], dtype=paddle.float32)
+            self.a.set_value(paddle.to_tensor(a, paddle.float32))
+            self.b.set_value(paddle.to_tensor(b, paddle.float32))
             self.double_output = double_output
             self.config = None
 
@@ -203,12 +201,10 @@ if is_paddle_available():
     class RegressionDictModel(nn.Layer):
         def __init__(self, a=0, b=0):
             super().__init__()
-            self.a = paddle.create_parameter(shape=[], dtype=paddle.float32).set_value(
-                paddle.to_tensor(a, paddle.float32)
-            )
-            self.b = paddle.create_parameter(shape=[], dtype=paddle.float32).set_value(
-                paddle.to_tensor(b, paddle.float32)
-            )
+            self.a = paddle.create_parameter(shape=[], dtype=paddle.float32)
+            self.b = paddle.create_parameter(shape=[], dtype=paddle.float32)
+            self.a.set_value(paddle.to_tensor(a, paddle.float32))
+            self.b.set_value(paddle.to_tensor(b, paddle.float32))
             self.config = None
 
         def forward(self, input_x, labels=None, **kwargs):
@@ -224,12 +220,10 @@ if is_paddle_available():
 
         def __init__(self, config):
             super().__init__(config)
-            self.a = paddle.create_parameter(shape=[], dtype=paddle.float32).set_value(
-                paddle.to_tensor(config.a, paddle.float32)
-            )
-            self.b = paddle.create_parameter(shape=[], dtype=paddle.float32).set_value(
-                paddle.to_tensor(config.b, paddle.float32)
-            )
+            self.a = paddle.create_parameter(shape=[], dtype=paddle.float32)
+            self.b = paddle.create_parameter(shape=[], dtype=paddle.float32)
+            self.a.set_value(paddle.to_tensor(config.a, paddle.float32))
+            self.b.set_value(paddle.to_tensor(config.b, paddle.float32))
             self.double_output = config.double_output
 
         def forward(self, input_x, labels=None, **kwargs):
@@ -245,12 +239,10 @@ if is_paddle_available():
 
         def __init__(self, config):
             super().__init__(config)
-            self.a = paddle.create_parameter(shape=[], dtype=paddle.float32).set_value(
-                paddle.to_tensor(config.a, paddle.float32)
-            )
-            self.b = paddle.create_parameter(shape=[], dtype=paddle.float32).set_value(
-                paddle.to_tensor(config.b, paddle.float32)
-            )
+            self.a = paddle.create_parameter(shape=[], dtype=paddle.float32)
+            self.b = paddle.create_parameter(shape=[], dtype=paddle.float32)
+            self.a.set_value(paddle.to_tensor(config.a, paddle.float32))
+            self.b.set_value(paddle.to_tensor(config.b, paddle.float32))
             self.random_paddle = config.random_paddle
 
         def forward(self, input_x, labels=None, **kwargs):
@@ -276,7 +268,8 @@ if is_paddle_available():
             self.ln1 = nn.LayerNorm(hidden_size)
             self.linear2 = nn.Linear(hidden_size, hidden_size)
             self.ln2 = nn.LayerNorm(hidden_size)
-            self.bias = paddle.create_parameter(shape=hidden_size.shape).set_value(paddle.zeros(hidden_size))
+            self.bias = paddle.create_parameter(shape=hidden_size.shape)
+            self.bias.set_value(paddle.zeros(hidden_size))
 
         def forward(self, x):
             h = self.ln1(nn.functional.relu(self.linear1(x)))
@@ -288,15 +281,11 @@ if is_paddle_available():
         train_dataset = RegressionDataset(length=train_len, label_names=label_names)
         eval_dataset = RegressionDataset(length=eval_len, label_names=label_names)
 
-        model_init = kwargs.pop("model_init", None)
-        if model_init is not None:
-            model = None
+        if pretrained:
+            config = RegressionModelConfig(a=a, b=b, double_output=double_output)
+            model = RegressionPretrainedModel(config)
         else:
-            if pretrained:
-                config = RegressionModelConfig(a=a, b=b, double_output=double_output)
-                model = RegressionPretrainedModel(config)
-            else:
-                model = RegressionModel(a=a, b=b, double_output=double_output)
+            model = RegressionModel(a=a, b=b, double_output=double_output)
 
         compute_metrics = kwargs.pop("compute_metrics", None)
         data_collator = kwargs.pop("data_collator", None)
@@ -314,7 +303,6 @@ if is_paddle_available():
             eval_dataset=eval_dataset,
             compute_metrics=compute_metrics,
             optimizers=optimizers,
-            # model_init=model_init,
             preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         )
 
@@ -458,23 +446,6 @@ class TrainerIntegrationPrerunTest(TestCasePlus, TrainerIntegrationCommon):
         trainer = Trainer(model, args=args, train_dataset=train_dataset)
         trainer.train()
         self.check_trained_model(trainer.model)
-
-    def test_model_init(self):
-        # TODO 此处需要测试模型从ckpt加载后训练结构是否相同， 此处需要后续修改
-        train_dataset = RegressionDataset()
-        args = TrainingArguments("./regression", learning_rate=0.1)
-        trainer = Trainer(args=args, train_dataset=train_dataset, model_init=lambda: RegressionModel())
-        trainer.train()
-        self.check_trained_model(trainer.model)
-
-        # Re-training should restart from scratch, thus lead the same results.
-        trainer.train()
-        self.check_trained_model(trainer.model)
-
-        # Re-training should restart from scratch, thus lead the same results and new seed should be used.
-        trainer.args.seed = 314
-        trainer.train()
-        self.check_trained_model(trainer.model, alternate_seed=True)
 
     def test_gradient_accumulation(self):
         # Training with half the batch size but accumulation steps as 2 should give the same results.

@@ -623,6 +623,7 @@ class Trainer:
                 A list of keys in the output of your model (if it is a dictionary) that should be ignored when
                 gathering predictions for evaluation during the training.
         """
+        set_seed(self.args.seed, self.args)
         args = self.args
         self.is_in_train = True
 
