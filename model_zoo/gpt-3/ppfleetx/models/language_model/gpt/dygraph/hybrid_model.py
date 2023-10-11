@@ -713,9 +713,10 @@ class GPTOutputEmbeddings(nn.Layer):
     ):
         super(GPTOutputEmbeddings, self).__init__()
 
-        self.output_word_embeddings = nn.Embedding(
+        self.output_word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
             vocab_size,
             hidden_size,
+            mp_group=env.get_hcg().get_model_parallel_group(),
             weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=initializer_range)),
         )
 
