@@ -242,6 +242,9 @@ def main():
             )
 
     if model_args.prefix_tuning:
+        if training_args.pipeline_parallel_degree > 1:
+            raise NotImplementedError("Prefix tuning is not implemented for pipeline parallelism.")
+
         prefix_tuning_params = get_prefix_tuning_params(model)
         prefix_config = PrefixConfig(
             num_prefix_tokens=model_args.num_prefix_tokens,

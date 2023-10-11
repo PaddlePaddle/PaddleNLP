@@ -450,12 +450,10 @@ class Trainer:
         tp_merge = True
         if isinstance(self.model, LoRAModel):
             weight_name = LORA_WEIGHTS_NAME
-            if self.model.quantized:
+            if self.model.quantized or self.args.pipeline_parallel_degree > 1:
                 tp_merge = False
         elif isinstance(self.model, PrefixModelForCausalLM):
             weight_name = PREFIX_WEIGHTS_NAME
-        if self.args.pipeline_parallel_degree > 1:
-            tp_merge = False
 
         if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
             if tp_merge:
@@ -1005,13 +1003,10 @@ class Trainer:
         tp_merge = True
         if isinstance(self.model, LoRAModel):
             weight_name = LORA_WEIGHTS_NAME
-            if self.model.quantized:
+            if self.model.quantized or self.args.pipeline_parallel_degree > 1:
                 tp_merge = False
         elif isinstance(self.model, PrefixModelForCausalLM):
             weight_name = PREFIX_WEIGHTS_NAME
-
-        if self.args.pipeline_parallel_degree > 1:
-            tp_merge = False
         if tp_merge:
             best_model_path = os.path.join(self.state.best_model_checkpoint, weight_name)
         else:
@@ -1906,13 +1901,10 @@ class Trainer:
 
         output_dir = os.path.join(run_dir, checkpoint_folder)
 
-        if isinstance(self.model, LoRAModel) and self.model.quantized:
+        if isinstance(self.model, LoRAModel) and (self.model.quantized or self.args.pipeline_parallel_degree > 1):
             self.save_model(output_dir)
         elif isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
-            if self.args.pipeline_parallel_degree > 1:
-                self.save_model(output_dir)
-            else:
-                self.save_model(output_dir, True)
+            self.save_model(output_dir, True)
         else:
             self.save_model(output_dir)
 
@@ -2062,12 +2054,6 @@ class Trainer:
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
 
         if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
-            # lugimzzz: Force merge_tensor_parallel to True for LoRA & Prefix Model until there is an option to merge params during training.
-            if self.args.pipeline_parallel_degree > 1 and merge_tensor_parallel:
-                merge_tensor_parallel = False
-                logger.warning(
-                    "Pipeline parallelism does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
-                )
             self.model.save_pretrained(
                 output_dir,
                 variant=self.args.weight_name_suffix,
