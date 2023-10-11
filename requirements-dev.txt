@@ -6,6 +6,7 @@ parameterized
 pytest-cov
 regex
 pytest-xdist
+pytest-timeout
 fast_tokenizer_python
 emoji
 ftfy

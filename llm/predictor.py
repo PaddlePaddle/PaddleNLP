@@ -19,6 +19,7 @@ import sys
 import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
+from threading import Thread
 
 import numpy as np
 import paddle
@@ -32,6 +33,7 @@ from utils import (
     load_real_time_tokens,
 )
 
+from paddlenlp.generation import TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.trainer import PdArgumentParser
@@ -149,6 +151,7 @@ class BasePredictor:
             tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path, padding_side="left")
 
         self.tokenizer = tokenizer
+
         self.return_tensors = "pd"
         self.tensor_parallel_rank, self.tensor_parallel_degree = init_dist_env()
         self.model_config.tensor_parallel_rank, self.model_config.tensor_parallel_degree = init_dist_env()
@@ -237,6 +240,29 @@ class DygraphPredictor(BasePredictor):
         )
         result = result[0]
         return result
+
+    def stream_predict(self, inputs: dict[str, paddle.Tensor]):
+        text_streamer = TextIteratorStreamer(self.tokenizer)
+        input_features = self._preprocess(inputs)
+        generation_kwargs = dict(
+            **input_features,
+            streamer=text_streamer,
+            max_new_tokens=self.config.max_length,
+            bos_token_id=self.tokenizer.bos_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
+            pad_token_id=self.tokenizer.pad_token_id,
+            decode_strategy="greedy_search"
+            if self.config.top_k == 1 and self.config.top_p == 1.0
+            else self.config.decode_strategy,
+            temperature=self.config.temperature,
+            top_k=self.config.top_k,
+            top_p=self.config.top_p,
+            repetition_penalty=self.config.repetition_penalty,
+        )
+        thread = Thread(target=self.model.generate, kwargs=generation_kwargs)
+        thread.start()
+
+        return text_streamer
 
 
 class StaticGraphPredictor(BasePredictor):
@@ -359,19 +385,25 @@ class InferencePredictorMixin:
         self.attention_mask[:] = 0
         self.tgt_generation_mask[:] = 0
         pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
+        inputs = dybatch_preprocess(
+            self.tokenizer,
+            source,
+            self.config.src_length,
+            self.config.max_length,
+            self.architectures,
+            top_p=self.config.top_p,
+            temperature=self.config.temperature,
+            benchmark=self.config.benchmark,
+            pre_caches_length=pre_caches_length,
+        )
+
+        bsz = inputs["input_ids"].shape[0]
+        self.attention_mask = self.attention_mask[:bsz]
+        self.tgt_generation_mask = self.tgt_generation_mask[:bsz]
 
         if "chatglm" in self.architectures:
-            inputs = dybatch_preprocess(
-                self.tokenizer,
-                source,
-                self.config.src_length,
-                self.config.max_length,
-                self.architectures,
-                top_p=self.config.top_p,
-                temperature=self.config.temperature,
-                benchmark=self.config.benchmark,
-                pre_caches_length=pre_caches_length,
-            )
+            if bsz < self.config.batch_size:
+                self.tgt_pos = self.tgt_pos[:bsz]
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = 1
@@ -401,16 +433,8 @@ class InferencePredictorMixin:
 
             inputs["tgt_pos"] = self.tgt_pos
         elif "bloom" in self.architectures:
-            inputs = dybatch_preprocess(
-                self.tokenizer,
-                source,
-                self.config.src_length,
-                self.config.max_length,
-                self.architectures,
-                top_p=self.config.top_p,
-                temperature=self.config.temperature,
-                benchmark=self.config.benchmark,
-            )
+            if bsz < self.config.batch_size:
+                self.arange_tensor_encoder = self.arange_tensor_encoder[:bsz]
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, :, :length, :length] = paddle.tril(
@@ -465,18 +489,6 @@ class InferencePredictorMixin:
             )
 
         else:
-            inputs = dybatch_preprocess(
-                self.tokenizer,
-                source,
-                self.config.src_length,
-                self.config.max_length,
-                self.architectures,
-                top_p=self.config.top_p,
-                temperature=self.config.temperature,
-                pre_caches_length=pre_caches_length,
-                benchmark=self.config.benchmark,
-            )
-
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = paddle.tril(
@@ -592,7 +604,6 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         for i in range(len(self.cache_kvs_shape)):
             input_tensor = self.predictor.get_input_handle("cache_kvs_" + str(i))
             input_tensor.share_external_data(self.cache_kvs[i])
-
         input_tensor = self.predictor.get_input_handle("pre_ids")
         input_tensor.share_external_data(self.pre_ids)
 
@@ -891,7 +902,7 @@ def benchmark(predictor, predictor_args, model_args):
     print("Avg Elapse time is: ", (end - start) / test_time)
     print("Output tokens is: ", output_tokens)
     print(
-        "Input length is: {}, Output length is: {}, bs is: {}, Generate speed is: {:.3f} tokens/s(ips), QPS: {:.3f} requests/s. ".format(
+        "Input length is: {}, Output length is: {}, bs is: {}, IPS: {:.3f} tokens/s, QPS: {:.3f} requests/s. ".format(
             predictor_args.src_length,
             predictor_args.max_length,
             predictor_args.batch_size,

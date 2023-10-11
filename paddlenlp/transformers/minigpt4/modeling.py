@@ -157,7 +157,7 @@ class MiniGPT4PretrainedModel(PretrainedModel):
 
     @classmethod
     def from_pretrained(
-        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str = None, *args, **kwargs
+        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str = "", *args, **kwargs
     ):
         vit_dtype = kwargs.pop("vit_dtype", "float16")
         qformer_dtype = kwargs.pop("qformer_dtype", "float32")
