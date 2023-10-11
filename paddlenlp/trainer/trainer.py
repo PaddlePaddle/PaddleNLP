@@ -313,7 +313,7 @@ class Trainer:
         if self.args.pipeline_parallel_degree > 1:
             from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
-            assert isinstance(
+            assert (isinstance(model, LoRAModel) and isinstance(model.model, PipelineLayer)) or isinstance(
                 model, PipelineLayer
             ), "Only support pipeline parallel mode when model is PipelineLayer!!!"
 
@@ -454,6 +454,8 @@ class Trainer:
                 tp_merge = False
         elif isinstance(self.model, PrefixModelForCausalLM):
             weight_name = PREFIX_WEIGHTS_NAME
+        if self.args.pipeline_parallel_degree > 1:
+            tp_merge = False
 
         if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
             if tp_merge:
@@ -1001,16 +1003,21 @@ class Trainer:
 
     def _load_best_model_from_peft_checkpoint(self):
         tp_merge = True
-
-        if isinstance(self.model, LoRAModel) and self.model.quantized:
-            best_model_path = os.path.join(
-                self.state.best_model_checkpoint, _add_variant(LORA_WEIGHTS_NAME, self.args.weight_name_suffix)
-            )
-            tp_merge = False
-        elif isinstance(self.model, LoRAModel) and not self.model.quantized:
-            best_model_path = os.path.join(self.state.best_model_checkpoint, LORA_WEIGHTS_NAME)
+        if isinstance(self.model, LoRAModel):
+            weight_name = LORA_WEIGHTS_NAME
+            if self.model.quantized:
+                tp_merge = False
         elif isinstance(self.model, PrefixModelForCausalLM):
-            best_model_path = os.path.join(self.state.best_model_checkpoint, PREFIX_WEIGHTS_NAME)
+            weight_name = PREFIX_WEIGHTS_NAME
+
+        if self.args.pipeline_parallel_degree > 1:
+            tp_merge = False
+        if tp_merge:
+            best_model_path = os.path.join(self.state.best_model_checkpoint, weight_name)
+        else:
+            best_model_path = os.path.join(
+                self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
+            )
 
         if os.path.exists(best_model_path):
             # We load the model state dict on the CPU to avoid an OOM error.
@@ -1553,6 +1560,8 @@ class Trainer:
             prepare_pipeline_inputs_func = (
                 model._prepare_pipeline_inputs_func if hasattr(model, "_prepare_pipeline_inputs_func") else None
             )
+            if isinstance(model, LoRAModel):
+                model = model.model
             model = fleet.distributed_model(model)
             if prepare_pipeline_inputs_func is not None:
                 model._prepare_pipeline_inputs_func = prepare_pipeline_inputs_func
@@ -1900,7 +1909,10 @@ class Trainer:
         if isinstance(self.model, LoRAModel) and self.model.quantized:
             self.save_model(output_dir)
         elif isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
-            self.save_model(output_dir, True)
+            if self.args.pipeline_parallel_degree > 1:
+                self.save_model(output_dir)
+            else:
+                self.save_model(output_dir, True)
         else:
             self.save_model(output_dir)
 
@@ -2051,6 +2063,11 @@ class Trainer:
 
         if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
             # lugimzzz: Force merge_tensor_parallel to True for LoRA & Prefix Model until there is an option to merge params during training.
+            if self.args.pipeline_parallel_degree > 1 and merge_tensor_parallel:
+                merge_tensor_parallel = False
+                logger.warning(
+                    "Pipeline parallelism does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
+                )
             self.model.save_pretrained(
                 output_dir,
                 variant=self.args.weight_name_suffix,
