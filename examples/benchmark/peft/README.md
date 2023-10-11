@@ -4,7 +4,7 @@
 
 - 硬件: A100-80G with NVLink, 具体卡数见表
 - Torch环境: 见torch/requirements.txt
-- FP16配置: torch 使用 cuda amp fp16, paddle 使用 fp16 O2 opt level, intokens 设置为 1024, dataloader_num_workers 设置为 4
+- FP16配置: torch 使用 cuda amp fp16, paddle 使用 fp16 O2 opt level, intokens 设置为 1024, 并开启了flash attention
 
 ### Bloom
 
@@ -12,9 +12,9 @@
 
 | Model         | Method   | Num GPUs | Batch Size | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | **Speedup** |
 |---------------|----------|----------|------------|--------------|---------------------------|-------------|--------------------------|---------|
-| Bloomz-7b1-mt | LoRA     | 1        | 4          |              | 3344.15                   |             | 1980.32                  | **69%**    |
-| Bloomz-7b1-mt | Finetune | 4        | 8          | MP 4         | 7421.09                   | ZeRO 3      | 1702.00                  | **336%**    |
-| Bloomz-7b1-mt | Finetune | 4        | 16         | MP 4         | 8214.55                   | ZeRO 3      | 2849.90                  | **188%**     |
+| Bloomz-7b1-mt | LoRA     | 1        | 4          |              | 4097.03                   |             | 1980.32                  | **107%**    |
+| Bloomz-7b1-mt | Finetune | 4        | 8          | MP 4         | 4136.69                   | ZeRO 3      | 1702.00                  | **143%**    |
+| Bloomz-7b1-mt | Finetune | 4        | 16         | MP 4         | 4359.72                   | ZeRO 3      | 2849.90                  | **53%**     |
 
 ###### 多卡分布式实验记录
 
@@ -36,13 +36,14 @@
 
 | Model     | Method   | Num GPUs | Batch Size  | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
 |-----------|----------|----------|-------------|--------------|---------------------------|-------------|--------------------------|---------|
-| Llama-7b  | LoRA     | 1        | 4           |              |  3566.04                  |             | 1895.90                  |  **88%**  |
-| Llama-13b | LoRA     | 1        | 8           | recompute    |  1511.58                  | gradient ckpt |    768.26              |  **97%**  |
-| Llama-7b  | Finetune | 4        | 8           | MP4          |  3841.61                  | ZeRO 2      | 1621.52                  |  **124%**  |
-| Llama-7b  | Finetune | 4        | 16          | sharding 2   |  4602.34                  | ZeRO 2      | 2465.55                  |  **127%**  |
-| Llama-13b | Finetune | 4        | 8           | MP4 recompute|  1667.90                  | ZeRO 3      | 736.19                   |  **124%**  |
-| Llama-65b | LoRA     | 4        | 8           | MP4 recompute|  888.60                   | gradient ckpt, bits 4, max_memory_MB 50000, qlora        | 327.75          |  **171%** |
-| Llama-65b | LoRA     | 4        | 16          | MP4 recompute|  900.78                   | gradient ckpt, bits 4, max_memory_MB 50000, qlora        | 405.90          |  **122%** |
+| Llama-7b  | LoRA     | 1        | 4           |              |  4406.23                  |             | 1895.90                  |  **132%**  |
+| Llama-13b | LoRA     | 1        | 4           |              |  1975.94                  |             |    1101.85              |  **79%**  |
+| Llama-13b | LoRA     | 1        | 8           | recompute    |  1869.60                  | gradient ckpt |    768.26              |  **143%**  |
+| Llama-7b  | Finetune | 4        | 8           | MP4          |  3275.90                  | ZeRO 2      | 1621.52                  |  **102%**  |
+| Llama-7b  | Finetune | 4        | 16          | sharding 2   |  6798.72                 | ZeRO 2      | 2465.55                  |  **176%**  |
+| Llama-13b | Finetune | 4        | 8           | MP4 recompute|  1938.19                  | ZeRO 3      | 736.19                   |  **127%**  |
+| Llama-65b | LoRA     | 4        | 8           | MP4 recompute|  840.57                   | gradient ckpt, bits 4, max_memory_MB 50000, qlora        | 327.75          |  **156%** |
+| Llama-65b | LoRA     | 4        | 16          | MP4 recompute|  993.38                   | gradient ckpt, bits 4, max_memory_MB 50000, qlora        | 405.90          |  **122%** |
 
 
 ###### 多卡分布式实验记录
@@ -66,9 +67,9 @@
 
 | Model         | Method   | Num GPUs | Batch Size | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
 |---------------|----------|----------|------------|--------------|---------------------------|-------------|--------------------------|---------|
-| chatglm-6b    | LoRA     | 1        | 4          |              |        3472.79            |             |       1866.48            | **86%**    |
-| chatglm-6b    | Finetune | 4        | 8          |   MP 4       |        4564.94            |   ZeRO 2    |       2124.17            | **115%**    |
-| chatglm-6b    | Finetune | 4        | 16         |   MP 4       |        4972.21            |   ZeRO 3    |       3191.35            | **56%**    |
+| chatglm-6b    | LoRA     | 1        | 4          |              |        4216.76            |             |       1866.48            | **126%**    |
+| chatglm-6b    | Finetune | 4        | 8          |   MP 4       |        3799.78            |   ZeRO 2    |       2124.17            | **79%**    |
+| chatglm-6b    | Finetune | 4        | 16         |   MP 4       |        5720.21            |   ZeRO 3    |       3191.35            | **79%**    |
 
 
 ###### 多卡分布式实验记录
@@ -84,6 +85,13 @@
 | chatglm-6b  | bsz 16 ZeRO 3 |    5282.28                 |         3184.26            |   66%     |
 | chatglm-6b  | bsz 16 ZeRO 2 |    5751.00                 |         3151.07            |   83%     |
 
-### TODOs
 
-- Enable Flash Attention
+### GPT 3
+
+| Model         | Method   | Num GPUs | Batch Size | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
+|---------------|----------|----------|------------|--------------|---------------------------|-------------|--------------------------|---------|
+| gpt3-6.7b     | LoRA     | 1        | 4          |              |        3450.06            |             |       1186.74            | **191%**|
+| gpt3-13b      | LoRA     | 1        | 4          |              |        2008.40            |             |       969.60             | **107%**|
+| gpt3-6.7b     | Finetune | 4        | 8          |   MP 4       |        3301.49            |   ZeRO 2    |       1441.65            | **129%**|
+| gpt3-13b      | Finetune | 4        | 8          |   MP 4       |        1890.38            |   ZeRO 2    |       783.26             | **141%**|
+| gpt3-6.7b     | Finetune | 4        | 16         |   MP 4       |        4666.19            |   ZeRO 3    |       1756.42            | **166%**|

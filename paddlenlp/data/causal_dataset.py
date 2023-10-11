@@ -100,8 +100,10 @@ def build_train_valid_test_datasets(
     valid_data_prefix=None,
     test_data_prefix=None,
     return_doc_ids=False,
+    share_folder=False,
     *,
-    data_cache_path=None
+    data_cache_path=None,
+    need_data=True,
 ):
     """Build train, valid, and test datasets."""
 
@@ -115,7 +117,9 @@ def build_train_valid_test_datasets(
             seq_length,
             seed,
             skip_warmup,
+            share_folder=share_folder,
             data_cache_path=data_cache_path,
+            need_data=need_data,
         )
 
     # Blending dataset.
@@ -138,7 +142,9 @@ def build_train_valid_test_datasets(
             seed,
             skip_warmup,
             return_doc_ids,
+            share_folder=share_folder,
             data_cache_path=data_cache_path,
+            need_data=need_data,
         )
         if train_ds:
             train_datasets.append(train_ds)
@@ -150,17 +156,21 @@ def build_train_valid_test_datasets(
     blending_train_dataset = None
     if train_datasets:
         blending_train_dataset = BlendableDataset(
-            train_datasets, weights, train_num_samples, data_cache_path=data_cache_path
+            train_datasets, weights, train_num_samples, share_folder, data_cache_path=data_cache_path
         )
     blending_valid_dataset = None
     if valid_datasets:
         blending_valid_dataset = BlendableDataset(
-            valid_datasets, weights, valid_num_samples, data_cache_path=data_cache_path
+            valid_datasets, weights, valid_num_samples, share_folder, data_cache_path=data_cache_path
         )
     blending_test_dataset = None
     if test_datasets:
         blending_test_dataset = BlendableDataset(
-            test_datasets, weights, test_num_samples, data_cache_path=data_cache_path
+            test_datasets,
+            weights,
+            test_num_samples,
+            share_folder,
+            data_cache_path=data_cache_path,
         )
 
     return (blending_train_dataset, blending_valid_dataset, blending_test_dataset)
@@ -175,48 +185,57 @@ def _build_train_valid_test_datasets(
     seed,
     skip_warmup,
     return_doc_ids=False,
+    share_folder=False,
     *,
-    data_cache_path=None
+    data_cache_path=None,
+    need_data=True,
 ):
     """Build train, valid, and test datasets."""
 
     # Indexed dataset.
-    indexed_dataset = get_indexed_dataset_(data_prefix, data_impl, skip_warmup)
+    if need_data:
+        indexed_dataset = get_indexed_dataset_(data_prefix, data_impl, skip_warmup)
 
-    total_num_of_documents = indexed_dataset.sizes.shape[0]
-    splits = get_train_valid_test_split_(splits_string, total_num_of_documents)
+        total_num_of_documents = indexed_dataset.sizes.shape[0]
+        splits = get_train_valid_test_split_(splits_string, total_num_of_documents)
 
-    # Print stats about the splits.
-    print_rank_0(" > dataset split:")
+        # Print stats about the splits.
+        print_rank_0(" > dataset split:")
 
-    def print_split_stats(name, index):
-        print_rank_0("    {}:".format(name))
-        print_rank_0(
-            "     document indices in [{}, {}) total of {} "
-            "documents".format(splits[index], splits[index + 1], splits[index + 1] - splits[index])
-        )
+        def print_split_stats(name, index):
+            print_rank_0("    {}:".format(name))
+            print_rank_0(
+                "     document indices in [{}, {}) total of {} "
+                "documents".format(splits[index], splits[index + 1], splits[index + 1] - splits[index])
+            )
 
-    print_split_stats("train", 0)
-    print_split_stats("validation", 1)
-    print_split_stats("test", 2)
+        print_split_stats("train", 0)
+        print_split_stats("validation", 1)
+        print_split_stats("test", 2)
+
+    if paddle.distributed.get_world_size() > 1:
+        paddle.distributed.barrier()
 
     def build_dataset(index, name):
-        dataset = None
-        if splits[index + 1] > splits[index]:
-            documents = np.arange(start=splits[index], stop=splits[index + 1], step=1, dtype=np.int32)
-            dataset = GPTDataset(
-                name,
-                data_prefix,
-                documents,
-                indexed_dataset,
-                splits_string,
-                train_val_test_num_samples[index],
-                seq_length,
-                seed,
-                return_doc_ids,
-                data_cache_path=data_cache_path,
-            )
-        return dataset
+        documents = np.arange(splits[index], splits[index + 1], 1, np.int32) if need_data else None
+        dataset = GPTDataset(
+            name,
+            data_prefix,
+            documents,
+            indexed_dataset if need_data else None,
+            splits_string,
+            train_val_test_num_samples[index],
+            seq_length,
+            seed,
+            return_doc_ids,
+            share_folder,
+            data_cache_path=data_cache_path,
+            need_data=need_data,
+        )
+        if need_data:
+            return dataset if splits[index + 1] > splits[index] else None
+        else:
+            return None
 
     train_dataset = build_dataset(0, "train")
     valid_dataset = build_dataset(1, "valid")
@@ -249,30 +268,63 @@ class GPTDataset(paddle.io.Dataset):
         seq_length,
         seed,
         return_doc_ids=False,
+        share_folder=False,
         *,
-        data_cache_path=None
+        data_cache_path=None,
+        need_data=True,
     ):
 
         self.name = name
         self.indexed_dataset = indexed_dataset
         self.return_doc_ids = return_doc_ids
 
-        # Checks
-        assert np.min(documents) >= 0
-        assert np.max(documents) < indexed_dataset.sizes.shape[0]
-
         # Build index mappings.
-        self.doc_idx, self.sample_idx, self.shuffle_idx, self.desc, self.desc_hash = _build_index_mappings(
-            self.name,
-            data_prefix,
-            documents,
-            self.indexed_dataset.sizes,
-            splits_string,
-            num_samples,
-            seq_length,
-            seed,
-            data_cache_path=data_cache_path,
-        )
+        if need_data:
+            # Checks
+            assert np.min(documents) >= 0
+            assert np.max(documents) < indexed_dataset.sizes.shape[0]
+
+            (
+                doc_idx_filename,
+                sample_idx_filename,
+                shuffle_idx_filename,
+                self.desc,
+                self.desc_hash,
+                num_epochs,
+            ) = _build_index_mappings(
+                self.name,
+                data_prefix,
+                documents,
+                self.indexed_dataset.sizes,
+                splits_string,
+                num_samples,
+                seq_length,
+                seed,
+                share_folder,
+                data_cache_path=data_cache_path,
+            )
+
+        if paddle.distributed.get_world_size() > 1:
+            paddle.distributed.barrier()
+
+        # Load mappings.
+        if need_data:
+            start_time = time.time()
+            print_rank_0(f" > loading doc-idx mapping from {doc_idx_filename}")
+            self.doc_idx = np.load(doc_idx_filename, allow_pickle=True, mmap_mode="r")
+
+            print_rank_0(f" > loading sample-idx mapping from {sample_idx_filename}")
+            self.sample_idx = np.load(sample_idx_filename, allow_pickle=True, mmap_mode="r")
+
+            print_rank_0(f" > loading shuffle-idx mapping from {shuffle_idx_filename}")
+            self.shuffle_idx = np.load(shuffle_idx_filename, allow_pickle=True, mmap_mode="r")
+
+            print_rank_0("    loaded indexed file in {:3.3f} seconds".format(time.time() - start_time))
+            print_rank_0("    total number of samples: {}".format(self.sample_idx.shape[0]))
+            print_rank_0("    total number of epochs: {}".format(num_epochs))
+
+        if paddle.distributed.get_world_size() > 1:
+            paddle.distributed.barrier()
 
     def __len__(self):
         # -1 is due to data structure used to retieve the index:
@@ -315,7 +367,7 @@ class GPTDataset(paddle.io.Dataset):
 
 
 def _build_index_mappings(
-    name, data_prefix, documents, sizes, splits_string, num_samples, seq_length, seed, *, data_cache_path
+    name, data_prefix, documents, sizes, splits_string, num_samples, seq_length, seed, share_folder, *, data_cache_path
 ):
     """Build doc-idx, sample-idx, and shuffle-idx.
     doc-idx: is an array (ordered) of documents to be used in training.
@@ -368,11 +420,16 @@ def _build_index_mappings(
     data_cache_dir = os.path.dirname(idx_path["desc"])
     # data_cache_success = True
     # Build the indexed mapping if not exist.
-    if data_cache_path is not None:
-        check_rank_flag = build_indices and local_rank == 0
-    else:
+    check_rank_flag = build_indices and local_rank == 0
+    if share_folder:
         check_rank_flag = build_indices and paddle.distributed.get_rank() == 0
+
     # if build_indices and paddle.distributed.get_rank() == 0:
+
+    print(
+        f"searching for causual dataset, build_indices={build_indices}, share_folder {share_folder}, check_rank_flag {check_rank_flag}",
+        flush=True,
+    )
     if check_rank_flag:
         print_rank_0(" > WARNING: could not find index map files, building " "the indices on rank 0 ...")
 
@@ -464,12 +521,23 @@ def _build_index_mappings(
             print("ensure you have write access to this directory or specify one that you do have")
             print("write access to.")
             # data_cache_success = False
-
-    # add 7-18
-    if paddle.distributed.get_world_size() > 1:
-        if paddle.in_dynamic_mode():
-            paddle.distributed.barrier()
-
+    else:
+        while True:
+            if (
+                (not os.path.isfile(idx_path["doc"]))
+                or (not os.path.isfile(idx_path["sample"]))
+                or (not os.path.isfile(idx_path["shuffle"]))
+            ):
+                print("building indices on rank 0 ...", flush=True)
+                time.sleep(3)
+            else:
+                try:
+                    np.load(idx_path["shuffle"], allow_pickle=True, mmap_mode="r")
+                    print("build success", flush=True)
+                    break
+                except Exception:
+                    print("%s file is still writing or damaged, please wait for a moment." % idx_path["shuffle"])
+                    time.sleep(3)
     # try:
     #     hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
     # except:
@@ -485,21 +553,7 @@ def _build_index_mappings(
     #     exit()
     # paddle.distributed.barrier()
 
-    # Load mappings.
-    start_time = time.time()
-    print_rank_0(f" > loading doc-idx mapping from {idx_path['doc']}")
-    doc_idx = np.load(idx_path["doc"], allow_pickle=True, mmap_mode="r")
-
-    print_rank_0(f" > loading sample-idx mapping from {idx_path['sample']}")
-    sample_idx = np.load(idx_path["sample"], allow_pickle=True, mmap_mode="r")
-
-    print_rank_0(f" > loading shuffle-idx mapping from {idx_path['shuffle']}")
-    shuffle_idx = np.load(idx_path["shuffle"], allow_pickle=True, mmap_mode="r")
-
-    print_rank_0("    loaded indexed file in {:3.3f} seconds".format(time.time() - start_time))
-    print_rank_0("    total number of samples: {}".format(sample_idx.shape[0]))
-    print_rank_0("    total number of epochs: {}".format(num_epochs))
-    return doc_idx, sample_idx, shuffle_idx, desc, desc_hash
+    return idx_path["doc"], idx_path["sample"], idx_path["shuffle"], desc, desc_hash, num_epochs
 
 
 def _num_tokens(documents, sizes):

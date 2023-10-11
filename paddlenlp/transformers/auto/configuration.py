@@ -22,17 +22,17 @@ from typing import Dict, List, Type
 
 from huggingface_hub import hf_hub_download
 
-from paddlenlp import __version__
-from paddlenlp.transformers.configuration_utils import PretrainedConfig
-from paddlenlp.transformers.model_utils import PretrainedModel
-from paddlenlp.utils.downloader import (
+from ... import __version__
+from ...utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     get_path_from_url_with_filelock,
     url_file_exists,
 )
-from paddlenlp.utils.import_utils import import_module
-from paddlenlp.utils.log import logger
-
+from ...utils.import_utils import import_module
+from ...utils.log import logger
+from ..aistudio_utils import aistudio_download
+from ..configuration_utils import PretrainedConfig
+from ..model_utils import PretrainedModel
 from ..utils import resolve_cache_dir
 
 __all__ = [
@@ -129,7 +129,7 @@ class AutoConfig(PretrainedConfig):
         return cls(**config)
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: str, *model_args, from_hf_hub=False, **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path: str, *model_args, **kwargs):
         """
         Creates an instance of `AutoConfig`. Related resources are loaded by
         specifying name of a built-in pretrained model, or a community-contributed
@@ -159,7 +159,9 @@ class AutoConfig(PretrainedConfig):
             config = AutoConfig.from_pretrained("bert-base-uncased")
             config.save_pretrained('./bert-base-uncased')
         """
-        subfolder = kwargs.pop("subfolder", None)
+        subfolder = kwargs.get("subfolder", None)
+        from_aistudio = kwargs.get("from_aistudio", False)
+        from_hf_hub = kwargs.get("from_hf_hub", False)
         cache_dir = resolve_cache_dir(
             pretrained_model_name_or_path, from_hf_hub=from_hf_hub, cache_dir=kwargs.pop("cache_dir", None)
         )
@@ -197,7 +199,12 @@ class AutoConfig(PretrainedConfig):
             if config_class is cls:
                 return cls.from_file(config_file)
             return config_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-
+        elif from_aistudio:
+            file = aistudio_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=cls.config_file,
+            )
+            return cls.from_pretrained(os.path.dirname(file))
         elif from_hf_hub:
             file = hf_hub_download(
                 repo_id=pretrained_model_name_or_path,

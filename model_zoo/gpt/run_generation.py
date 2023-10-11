@@ -18,7 +18,12 @@ import random
 import numpy as np
 import paddle
 
-from paddlenlp.transformers import GPTChineseTokenizer, GPTLMHeadModel, GPTTokenizer
+from paddlenlp.transformers import (
+    GPTChineseTokenizer,
+    GPTConfig,
+    GPTLMHeadModel,
+    GPTTokenizer,
+)
 
 MODEL_CLASSES = {
     "gpt2": (GPTLMHeadModel, GPTTokenizer),
@@ -112,8 +117,8 @@ def main(args, input_text):
                 MODEL_CLASSES.keys(), args.model_type
             )
         )
-
-    model = model_class.from_pretrained(args.model_name_or_path, from_hf_hub=args.from_hf_hub)
+    config = GPTConfig.from_pretrained(args.model_name_or_path)
+    model = model_class.from_pretrained(args.model_name_or_path, config=config, from_hf_hub=args.from_hf_hub)
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path, from_hf_hub=args.from_hf_hub)
     model.eval()
 

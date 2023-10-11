@@ -32,7 +32,7 @@ all_P0case_dic=(["waybill_ie"]=3 ["msra_ner"]=15 ["glue"]=2 ["bert"]=2 ["skep"]=
 ["ofa"]=2 ["albert"]=2   ["SQuAD"]=20 ["lexical_analysis"]=5 ["seq2seq"]=5 ["word_embedding"]=5 \
 ["ernie-ctm"]=5 ["distilbert"]=5  ["transformer"]=5 ["pet"]=5 ["efl"]=5 ["p-tuning"]=5 ["ernie-doc"]=20 ["transformer-xl"]=5 \
 ["question_matching"]=5 ["ernie-csc"]=5 ["nptag"]=5 ["ernie-m"]=5 ["taskflow"]=5 ["clue"]=5 ["textcnn"]=5 \
-["fast_generation"]=10 ["ernie-3.0"]=5 ["ernie-layout"]=5 ["uie"]=5 ["ernie-health"]=5 \
+["fast_generation"]=10 ["ernie-3.0"]=5 ["ernie-layout"]=5 ["uie"]=5 ["ernie-health"]=5 ["llm"]=5 \
 ["ernie"]=2 ["ernie_m"]=5 ["ernie_layout"]=5 ["ernie_csc"]=5 ["ernie_ctm"]=5 ["ernie_doc"]=20 ["ernie_health"]=5 ["gpt-3"]=5)
 ####################################
 # Insatll paddlepaddle-gpu
@@ -118,12 +118,14 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
         elif [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
             P0case_list[${#P0case_list[*]}]=${dir2}
         elif [[ ${dir2} =~ "transformers" ]];then
-            # P0case_list[${#P0case_list[*]}]=transformers
+            P0case_list[${#P0case_list[*]}]=llm
             if [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
                 P0case_list[${#P0case_list[*]}]=${dir3}
             fi
         elif [[ ${dir2} =~ "taskflow" ]];then
             P0case_list[${#P0case_list[*]}]=taskflow
+        elif [[ ${dir3} =~ "transformers" ]];then
+            P0case_list[${#P0case_list[*]}]=llm
         elif [[ ${dir3} =~ "fast_transformer" ]] || [[ ${dir4} =~ "FasterTransformer" ]] ;then
              P0case_list[${#P0case_list[*]}]=fast_generation
         fi
@@ -147,6 +149,8 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
         #     P0case_list[${#P0case_list[*]}]=${dir2}
         #     Normal_dic[${dir2}]="${dir1}/${dir2}/"
         fi
+    elif [[ ${dir1} =~ "llm" ]];then # 模型升级
+        P0case_list[${#P0case_list[*]}]=llm
     elif [[ ${dir1} =~ "tests" ]];then # 新增单测
         if [[ ${dir2} =~ "transformers" ]] ;then
             if [[ ${dir3##*.} == "py" ]];then
@@ -158,6 +162,8 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
             fi
         elif [[ ${dir2} =~ "taskflow" ]] ;then
             APIcase_list[${#APIcase_list[*]}]=${dir2}
+        elif [[ ${dir2} =~ "llm" ]] ;then
+            P0case_list[${#P0case_list[*]}]=${dir2}
         fi
     elif [[ ${dir1} =~ "pipelines" ]];then # 影响编包
         Build_list[${dir1}]=${dir1}

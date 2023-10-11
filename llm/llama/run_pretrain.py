@@ -38,6 +38,7 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     LlamaConfig,
     LlamaForCausalLM,
+    LlamaForCausalLMPipe,
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
@@ -50,8 +51,6 @@ MODEL_CLASSES = {
     ),
 }
 
-from fused_layers import mock_layers
-from modeling_pp import LlamaForCausalLMPipe
 
 from paddlenlp.data.causal_dataset import build_train_valid_test_datasets, print_rank_0
 
@@ -109,7 +108,6 @@ class DataArguments:
         default=False,
         metadata={"help": "Use share folder for data dir and output dir on multi machine."},
     )
-    train_data_size: int = field(default=-1, metadata={"help": "Number of dataset for training"})
 
     data_impl: str = field(default="mmap", metadata={"help": "The format of the preprocessed data."})
     skip_warmup: bool = field(
@@ -179,24 +177,23 @@ class ModelArguments:
         default=False,
         metadata={"help": "whether to use fuse sequence parallel allreduce"},
     )
-    rope_fusion_level: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "The level of fusion of rope embedding. Can be chosen from:\n"
-            "(1) 'full': fuse sin cos compute and rope embedding\n"
-            "(2) 'core': only fuse rope embedding, will compute the sin and cos\n"
-            "(3) None: don't fuse any part of the rope embedding"
-        },
+    use_fused_rope: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable rope fusion or not."},
     )
     no_recompute_layers: Optional[List[int]] = field(
         default=None,
         metadata={"help": "Specify the full transformer layers that should not be recomputed."},
     )
     pp_recompute_interval: int = field(
-        default=0,
+        default=1,
         metadata={
             "help": "The interval for the number of layers at which recomputation occurs. A value of 0 indicates no recomputation. Default is 0."
         },
+    )
+    recompute_use_reentrant: bool = field(
+        default=False,
+        metadata={"help": "recompute_use_reentrant"},
     )
 
 
@@ -205,8 +202,8 @@ def create_pretrained_dataset(
     training_args,
     data_file,
     tokenizer,
+    need_data=True,
 ):
-
     train_val_test_num_samples = [
         training_args.per_device_train_batch_size
         * training_args.dataset_world_size
@@ -233,11 +230,13 @@ def create_pretrained_dataset(
         seq_length=data_args.max_seq_length,
         seed=training_args.seed,
         skip_warmup=data_args.skip_warmup,
+        share_folder=data_args.share_folder,
         data_cache_path=data_args.data_cache,
+        need_data=need_data,
     )
 
     def print_dataset(data, mode="train"):
-        logger.info(f"Sample data for {mode} mode")
+        logger.info(f"Sample data for {mode} mode.")
         # input_ids, loss_mask, attention_mask, position_ids, labels = data
         input_ids = data["text"]
 
@@ -246,7 +245,7 @@ def create_pretrained_dataset(
     from paddlenlp.data import Stack
 
     def _collate_data(data, stack_fn=Stack()):
-        tokens_ = stack_fn(x["text"] for x in data)
+        tokens_ = stack_fn([x["text"] for x in data])
 
         labels = tokens_[:, 1:]
         tokens = tokens_[:, :-1]
@@ -256,9 +255,10 @@ def create_pretrained_dataset(
             "labels": labels,
         }
 
-    print_dataset(train_dataset[0], "train")
-    print_dataset(valid_dataset[0], "valid")
-    print_dataset(test_dataset[0], "test")
+    if need_data:
+        print_dataset(train_dataset[0], "train")
+        print_dataset(valid_dataset[0], "valid")
+        print_dataset(test_dataset[0], "test")
 
     return train_dataset, valid_dataset, test_dataset, _collate_data
 
@@ -371,6 +371,8 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     if training_args.enable_linear_fused_grad_add:
+        from fused_layers import mock_layers
+
         mock_layers()
 
     if model_args.tokenizer_name_or_path is None:
@@ -438,9 +440,10 @@ def main():
     config.virtual_pp_degree = model_args.virtual_pp_degree
     config.sequence_parallel = model_args.sequence_parallel
     config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
-    config.rope_fusion_level = model_args.rope_fusion_level
+    config.use_fused_rope = model_args.use_fused_rope
     config.no_recompute_layers = model_args.no_recompute_layers
     config.pp_recompute_interval = model_args.pp_recompute_interval
+    config.recompute_use_reentrant = model_args.recompute_use_reentrant
 
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
@@ -464,7 +467,6 @@ def main():
             model_args.model_name_or_path,
             config=config,
             dtype=dtype,
-            load_state_as_np=True,
         )
     else:
         model = model_class._from_config(config, dtype=dtype)
@@ -502,18 +504,20 @@ def main():
 
     data_file = get_train_data_file(data_args)
     train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(
-        data_args, training_args, data_file, tokenizer
+        data_args,
+        training_args,
+        data_file,
+        tokenizer,
+        need_data=training_args.should_load_dataset,
     )
 
-    if data_args.train_data_size > 0:
-        # GPTDataset is the type of `paddle.io.Dataset`, which dosen't contains `select` method
-        # modify the `__len__` function to change the length of dataset in current python process
-        GPTDataset.__len__ = lambda *_: data_args.train_data_size
-        total_effective_tokens = (
-            sum([len(train_dataset[i][0]) for i in range(data_args.train_data_size)]) * training_args.num_train_epochs
-        )
-    else:
-        total_effective_tokens = sum([len(i[0]) for i in train_dataset]) * training_args.num_train_epochs
+    total_effective_tokens = (
+        training_args.per_device_train_batch_size
+        * training_args.dataset_world_size
+        * training_args.max_steps
+        * training_args.gradient_accumulation_steps
+        * data_args.max_seq_length
+    )
 
     trainer = PretrainingTrainer(
         model=model,
@@ -544,9 +548,10 @@ def main():
         test_ret = trainer.predict(test_dataset)
         trainer.log_metrics("test", test_ret.metrics)
 
-    effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
-    print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
-    print(f"ips: {effective_tokens_per_second:.2f} tokens/s")
+    if training_args.should_load_dataset:
+        effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
+        print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
+        print(f"ips: {effective_tokens_per_second:.2f} tokens/s")
 
 
 if __name__ == "__main__":

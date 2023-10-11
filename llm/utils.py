@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import glob
+import math
 import os
 import struct
 from typing import Dict, Optional
@@ -25,14 +26,9 @@ from paddle.distributed import fleet
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from sklearn.metrics import accuracy_score
 
-from paddlenlp.peft.prefix import (
-    bloom_postprocess_past_key_value,
-    chatglm_postprocess_past_key_value,
-    llama_postprocess_past_key_value,
-    qwen_postprocess_past_key_value,
-)
-from paddlenlp.trainer import Trainer
-from paddlenlp.trainer.trainer_utils import has_length
+from paddlenlp.datasets import InTokensIterableDataset
+from paddlenlp.trainer import Trainer, TrainerCallback
+from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
 from paddlenlp.utils.log import logger
 
 
@@ -50,30 +46,40 @@ def compute_metrics(eval_preds):
 
 def get_prefix_tuning_params(model):
     if model.base_model_prefix == "chatglm":
+        from paddlenlp.peft.prefix import chatglm_postprocess_past_key_value
+
         num_attention_heads = model.config.num_attention_heads
         num_hidden_layers = model.config.num_hidden_layers
         hidden_size = model.config.hidden_size
         postprocess_past_key_value = chatglm_postprocess_past_key_value
         multi_query_group_num = None
     elif model.base_model_prefix == "chatglm_v2":
+        from paddlenlp.peft.prefix import chatglm_postprocess_past_key_value
+
         num_attention_heads = model.config.num_attention_heads
         num_hidden_layers = model.config.num_layers
         hidden_size = model.config.hidden_size
         postprocess_past_key_value = chatglm_postprocess_past_key_value
         multi_query_group_num = model.config.multi_query_group_num
     elif model.base_model_prefix == "bloom":
+        from paddlenlp.peft.prefix import bloom_postprocess_past_key_value
+
         num_attention_heads = model.config.num_attention_heads
         num_hidden_layers = model.config.n_layer
         hidden_size = model.config.n_embed
         postprocess_past_key_value = bloom_postprocess_past_key_value
         multi_query_group_num = None
     elif model.base_model_prefix == "llama":
+        from paddlenlp.peft.prefix import llama_postprocess_past_key_value
+
         num_attention_heads = model.config.n_head
         num_hidden_layers = model.config.n_layer
         hidden_size = model.config.hidden_size
         postprocess_past_key_value = llama_postprocess_past_key_value
         multi_query_group_num = None
     elif model.base_model_prefix == "qwen":
+        from paddlenlp.peft.prefix import qwen_postprocess_past_key_value
+
         num_attention_heads = model.config.num_attention_heads
         num_hidden_layers = model.config.num_hidden_layers
         hidden_size = model.config.hidden_size
@@ -140,6 +146,29 @@ def get_lora_target_modules(model):
     return target_modules
 
 
+class InTokensIterDatasetCallback(TrainerCallback):
+    """
+    A [`TrainerCallback`] that handles early stopping.
+
+    """
+
+    def on_step_end(self, args, state, control, **kwargs):
+        train_dataloader = kwargs["train_dataloader"]
+        if isinstance(train_dataloader.dataset, InTokensIterableDataset):
+            dataset = train_dataloader.dataset
+        elif isinstance(train_dataloader.dataset, IterableDatasetShard) and isinstance(
+            train_dataloader.dataset.dataset, InTokensIterableDataset
+        ):
+            dataset = train_dataloader.dataset.dataset
+        else:
+            raise ValueError(
+                "Unexpected dataset format: InTokensIterDatasetCallback expectes `paddlenlp.datasets.InTokensIterableDataset`"
+            )
+        if state.trial_params is None:
+            state.trial_params = {}
+        state.trial_params["intokens_global_step"] = dataset.intokens_global_step
+
+
 class CausalLMTrainer(Trainer):
     def __init__(self, do_generation: bool, gen_args, data_args, **kwargs):
         super().__init__(**kwargs)
@@ -172,7 +201,7 @@ class CausalLMTrainer(Trainer):
                 input_ids=inputs["input_ids"],
                 attention_mask=inputs["attention_mask"] if "attention_mask" in inputs else None,
                 position_ids=inputs["position_ids"] if "position_ids" in inputs else None,
-                max_length=self.data_args.tgt_length,
+                max_length=max(self.data_args.max_length - inputs["input_ids"].shape[-1], 1),
                 decode_strategy="sampling",
                 top_k=self.gen_args.top_k,
                 top_p=self.gen_args.top_p,
@@ -255,10 +284,11 @@ class CausalLMTrainer(Trainer):
         logger.info(f"  Pre device batch size = {batch_size}")
         logger.info(f"  Total Batch size = {batch_size * self.args.dataset_world_size}")
         self.model.eval()
-        for step, inputs in enumerate(dataloader):
-            self.prediction_step(model=self.model, inputs=inputs, prediction_loss_only=True, ignore_keys=None)
-            if max_eval_iters > 0 and step >= max_eval_iters - 1:
-                break
+        with paddle.no_grad():
+            for step, inputs in enumerate(dataloader):
+                self.prediction_step(model=self.model, inputs=inputs, prediction_loss_only=True, ignore_keys=None)
+                if max_eval_iters > 0 and step >= max_eval_iters - 1:
+                    break
 
 
 def get_infer_model_path(input_dir, model_prefix):
@@ -322,6 +352,21 @@ def deserialize_from_file(fp):
     return data_arr
 
 
+def get_alibi_slopes(num_heads):
+    closest_power_of_2 = 2 ** math.floor(math.log2(num_heads))
+    base = 2 ** (-(2 ** -(math.log2(closest_power_of_2) - 3)))
+    powers = np.arange(1, 1 + closest_power_of_2)
+    slopes = np.power(base, powers)
+
+    if closest_power_of_2 != num_heads:
+        extra_base = 2 ** (-(2 ** -(math.log2(2 * closest_power_of_2) - 3)))
+        num_remaining_heads = min(closest_power_of_2, num_heads - closest_power_of_2)
+        extra_powers = np.arange(1, 1 + 2 * num_remaining_heads, 2)
+        slopes = np.concatante([slopes, np.power(extra_base, extra_powers)], axis=0)
+
+    return slopes.astype("float32")
+
+
 def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
     """Pad sequences to the max sequence length in batch."""
     max_len = max(map(len, insts))
@@ -337,32 +382,90 @@ def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
         return inst_data.astype("int64").reshape([-1, max_len])
 
 
-def dybatch_preprocess(tokenizer, texts: list[str], max_length: int):
+def dybatch_preprocess(
+    tokenizer,
+    texts: list[str],
+    src_length: int,
+    max_length: int,
+    architectures: str,
+    top_p: float,
+    temperature: float,
+    pre_caches_length: int = 0,
+    benchmark: bool = False,
+):
     """Pre-process generation inputs."""
-    input_ids = []
-    if isinstance(texts, str):
-        texts = [texts]
-
-    for text in texts:
-        tokens = tokenizer(
-            text,
-            return_tensors="np",
-            padding=False,
-            return_attention_mask=False,
-            return_token_type_ids=False,
-        )
-        input_ids.append(tokens["input_ids"][0])
-
     inputs = {}
-    pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][-1]
-    inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
-    bs = inputs["input_ids"].shape[0]
-    max_len = max(map(len, input_ids))
+    if "chatglm" in architectures:
+        input_ids = []
+        position_ids = []
 
-    position_ids = paddle.zeros(shape=[bs, max_len], dtype="int64")
-    for i in range(bs):
-        position_ids[i, : seq_len[i]] = paddle.arange(seq_len[i])
-    inputs["position_ids"] = position_ids
+        for text in texts:
+            tokens = tokenizer(text, return_tensors="np", padding=True, max_length=src_length)
+            input_ids.append(tokens["input_ids"][0])
+            position_ids.append(tokens["position_ids"][0])
+
+        pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][0]
+        inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
+        bs = inputs["input_ids"].shape[0]
+        max_len = max(map(len, input_ids))
+
+        inst_data_pos = []
+        for i in range(len(position_ids)):
+            inst_data_pos.append(np.array([list(inst) + [0] * (max_len - len(inst)) for inst in position_ids[i]]))
+        inputs["position_ids"] = paddle.to_tensor(np.array(inst_data_pos))
+    elif "gpt" in architectures:
+        input_ids = []
+        if isinstance(texts, str):
+            texts = [texts]
+
+        for text in texts:
+            tokens = tokenizer(
+                text,
+                return_tensors="np",
+                padding=False,
+                max_length=src_length,
+                return_attention_mask=False,
+                return_token_type_ids=False,
+            )
+            input_ids.append(tokens["input_ids"][0])
+
+        pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][-1]
+        inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
+        bs = inputs["input_ids"].shape[0]
+        max_len = max(map(len, input_ids))
+
+        position_ids = paddle.arange(sum(seq_len), dtype="int64")
+        pre_len = seq_len[0]
+        for length in seq_len[1:]:
+            position_ids[pre_len : length + pre_len] = position_ids[pre_len : length + pre_len] - pre_len
+            pre_len += length
+        inputs["position_ids"] = position_ids
+    else:
+        input_ids = []
+        if isinstance(texts, str):
+            texts = [texts]
+
+        for text in texts:
+            tokens = tokenizer(
+                text,
+                return_tensors="np",
+                padding=False,
+                max_length=src_length,
+                return_attention_mask=False,
+                return_token_type_ids=False,
+            )
+            input_ids.append(tokens["input_ids"][0])
+
+        pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][-1]
+        inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
+        bs = inputs["input_ids"].shape[0]
+        max_len = max(map(len, input_ids))
+
+        position_ids = paddle.zeros(shape=[bs, max_length + src_length], dtype="int64")
+
+        for i in range(bs):
+            position_ids[i, pre_caches_length : pre_caches_length + seq_len[i]] = paddle.arange(seq_len[i])
+        inputs["position_ids"] = position_ids
 
     tgt_ids = [input[-1:] for input in input_ids]
     tgt_pos = []
@@ -386,7 +489,7 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int):
     inputs["top_p"] = (
         np.array(
             [
-                0.0,
+                top_p,
             ]
             * bs
         )
@@ -396,7 +499,7 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int):
     inputs["temperature"] = (
         np.array(
             [
-                1.0,
+                temperature,
             ]
             * bs
         )
@@ -404,15 +507,18 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int):
         .astype("float32")
     )
     inputs["seq_len_encoder"] = seq_len.astype("int32").reshape(-1, 1)
-    inputs["seq_len_decoder"] = seq_len.astype("int32").reshape(-1, 1)
+    inputs["seq_len_decoder"] = (seq_len + pre_caches_length).astype("int32").reshape(-1, 1)
     inputs["step_idx"] = np.array(step_idx).astype("int64").reshape(-1, 1)
     inputs["tgt_ids"] = np.array(tgt_ids).astype("int64").reshape(-1, 1)
     inputs["tgt_pos"] = tgt_pos.reshape(-1, 1)
-    inputs["max_length"] = np.array(max_length - seq_len).astype("int64").reshape((-1, 1))
+    inputs["max_length"] = np.array(max_length - pre_caches_length).astype("int64").reshape((-1, 1))
     inputs["min_length"] = (
         np.array(
             [
-                2,
+                1
+                if not benchmark
+                else max_length
+                - pre_caches_length,  # Note(Zhengzekang): When in benchmark mode, we need to set a fixed decode length.
             ]
             * bs
         )
@@ -466,7 +572,7 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int):
 def load_real_time_tokens():
     tokens = []
     files = glob.glob(os.path.join("./real_time_save.*"))
-    for j in range(1, len(files)):
+    for j in range(1, len(files) + 1):
         filename = "./real_time_save.temp_ids_rank_0_step_{}".format(j)
         if not os.path.exists(filename):
             break

@@ -15,28 +15,27 @@ GPT/Llama pretraining scripts.
 """
 import math
 import os
-import random
 import sys
 import time
 from dataclasses import dataclass, field
 from typing import Optional
 
-import numpy as np
 import paddle
-from configuration import GPTConfig
-from modeling import GPTForCausalLM
-from modeling_pp import GPTForCausalLMPipe
 
 from paddlenlp.trainer import (
     PdArgumentParser,
     Trainer,
     TrainingArguments,
     get_last_checkpoint,
+    set_seed,
     speed_metrics,
 )
 from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
+    GPTConfig,
+    GPTForCausalLM,
+    GPTForCausalLMPipe,
     LinearAnnealingWithWarmupDecay,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
@@ -126,6 +125,16 @@ class ModelArguments:
     )
     output_attentions: bool = field(default=False, metadata={"help": "Whether output attention weights"})
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
+    virtual_pp_degree: int = field(
+        default=1,
+        metadata={"help": "virtual_pp_degree"},
+    )
+    continue_training: bool = field(
+        default=False,
+        metadata={
+            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
+        },
+    )
     fused_linear: bool = field(
         default=False,
         metadata={"help": "gpt, whether to fuse linear projection"},
@@ -140,6 +149,12 @@ class ModelArguments:
     )
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
+    continue_training: bool = field(
+        default=True,
+        metadata={
+            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
+        },
+    )
 
 
 def create_pretrained_dataset(
@@ -188,17 +203,16 @@ def create_pretrained_dataset(
     from paddlenlp.data import Stack
 
     def _collate_data(data, stack_fn=Stack()):
-        tokens_ = stack_fn(x["text"] for x in data)
+        tokens_ = stack_fn([x["text"] for x in data])
 
         labels = tokens_[:, 1:]
         tokens = tokens_[:, :-1]
 
         # Attention mask.
-        attention_mask = paddle.ones(tokens.shape, dtype=paddle.int64)
+        # attention_mask = paddle.ones(tokens.shape, dtype=paddle.int64)
 
         return {
             "input_ids": tokens,
-            "attention_mask": attention_mask,
             "labels": labels,
         }
 
@@ -232,16 +246,6 @@ def get_train_data_file(args):
             return ret
 
     return files
-
-
-def set_seed(args):
-    if args.device == "cpu":
-        idx = 0
-    else:
-        idx = paddle.distributed.get_rank()
-    random.seed(args.seed + idx)
-    np.random.seed(args.seed + idx)
-    paddle.seed(args.seed + idx)
 
 
 class PretrainingTrainer(Trainer):
@@ -321,7 +325,7 @@ def main():
     if data_args.data_cache is not None:
         os.makedirs(data_args.data_cache, exist_ok=True)
 
-    set_seed(training_args)
+    set_seed(seed=training_args.seed, args=training_args)
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
@@ -354,7 +358,16 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
 
     config = config_class.from_pretrained(model_args.model_name_or_path)
+    # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
+    if not model_args.continue_training:
+        config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
+
+    if not model_args.continue_training:
+        config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
+        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
+
     config.output_attentions = model_args.output_attentions
+    config.virtual_pp_degree = model_args.virtual_pp_degree
     config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
     config.hidden_dropout_prob = model_args.hidden_dropout_prob
     config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
@@ -379,12 +392,14 @@ def main():
     if training_args.pipeline_parallel_degree > 1:
         model_class = GPTForCausalLMPipe
 
-    model = model_class.from_pretrained(
-        model_args.model_name_or_path,
-        config=config,
-        dtype=dtype,
-        load_state_as_np=True,
-    )
+    if model_args.continue_training:
+        model = model_class.from_pretrained(
+            model_args.model_name_or_path,
+            config=config,
+            dtype=dtype,
+        )
+    else:
+        model = model_class._from_config(config, dtype=dtype)
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
@@ -429,7 +444,6 @@ def main():
         checkpoint = training_args.resume_from_checkpoint
     elif last_checkpoint is not None:
         checkpoint = last_checkpoint
-    checkpoint = None
 
     # Training
     if training_args.do_train:

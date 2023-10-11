@@ -11,494 +11,470 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import argparse
+
+import json
+import logging
 import os
-import shutil
+import re
 import time
 
 import arxiv
+import erniebot as eb
 import gradio as gr
-from create_index import chat_papers
-from utils import merge_summary, pdf2image, single_paper_abs_sum, translation
-
-from pipelines.document_stores import FAISSDocumentStore
-from pipelines.nodes import (
-    DensePassageRetriever,
-    ErnieBot,
-    ErnieRanker,
-    PromptTemplate,
-    TruncatedConversationHistory,
+from utils import (
+    _apply_token,
+    get_parse_args,
+    merge_summary,
+    pdf2image,
+    retrieval,
+    summarize_abstract,
+    tackle_history,
+    translate_part,
 )
-from pipelines.pipelines import Pipeline
 
-paper_all = []
-from collections import defaultdict
+FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
+logging.basicConfig(level=logging.INFO, format=FORMAT)
+logger = logging.getLogger(__name__)
+# create file handler which logs even debug messages
+fh = logging.FileHandler("logger.log")
+fh.setLevel(logging.DEBUG)
+logger.addHandler(fh)
 
-chat_file_history = defaultdict(list)
-chat_base_history = []
-index_name = "dureader_index"
-import multiprocessing
-from functools import partial
-from multiprocessing import Manager, Pool
-
-manager = Manager()
-all_data_result = manager.dict()
-papers_sum = manager.list()
-
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--device",
-    choices=["cpu", "gpu"],
-    default="gpu",
-    help="Select which device to run dense_qa system, defaults to gpu.",
-)
-parser.add_argument("--index_name", default="dureader_index", type=str, help="The ann index name of ANN.")
-parser.add_argument(
-    "--max_seq_len_query", default=64, type=int, help="The maximum total length of query after tokenization."
-)
-parser.add_argument(
-    "--max_seq_len_passage", default=256, type=int, help="The maximum total length of passage after tokenization."
-)
-parser.add_argument(
-    "--retriever_batch_size",
-    default=16,
-    type=int,
-    help="The batch size of retriever to extract passage embedding for building ANN index.",
-)
-parser.add_argument(
-    "--query_embedding_model", default="moka-ai/m3e-base", type=str, help="The query_embedding_model path"
-)
-parser.add_argument(
-    "--passage_embedding_model", default="moka-ai/m3e-base", type=str, help="The passage_embedding_model path"
-)
-parser.add_argument(
-    "--params_path", default="checkpoints/model_40/model_state.pdparams", type=str, help="The checkpoint path"
-)
-parser.add_argument("--embedding_dim", default=768, type=int, help="The embedding_dim of index")
-parser.add_argument("--chunk_size", default=384, type=int, help="The length of data for indexing by retriever")
-parser.add_argument("--host", type=str, default="localhost", help="host ip of ANN search engine")
-parser.add_argument("--embed_title", default=False, type=bool, help="The title to be  embedded into embedding")
-parser.add_argument(
-    "--model_type",
-    choices=["ernie_search", "ernie", "bert", "neural_search"],
-    default="ernie",
-    help="the ernie model types",
-)
-parser.add_argument("--api_key", default="", type=str, help="The API Key.")
-parser.add_argument("--secret_key", default="", type=str, help="The secret key.")
-parser.add_argument(
-    "--pooling_mode",
-    default="mean_tokens",
-    choices=["max_tokens", "mean_tokens", "mean_sqrt_len_tokens", "cls_token"],
-    type=str,
-    help="The type of sentence embedding.",
-)
-args = parser.parse_args()
+args = get_parse_args()
+PROMPT_SYSTEM = """
+你现在需要一步步执行下面的操作
+你需要先完成关键句抽取任务，从背景信息中抽取与输入问题相关的关键句，
+并输出信关键句抽取任务的结果,关键句需要按照1,2,3,...序号编号，然后你需要基于抽取的内容完成问答任务,回答输出问题。
+请记住你输出的格式是一个json格式的字符串。
+json有两个key值，一个是"关键句抽取任务的结果",对应的value是关键句需要按照1,2,3,...序号编号后的结果，第二个是"问答任务的结果",对应的value是问答任务的结果。
+输出格式如下:
+```
+json{'关键句抽取任务的结果':'1.关键句1 \n2.关键句1\n...','问答任务的结果':''}
+```
+"""
+PROMPT_RETRIVER = """
+现在我给你背景信息和问题：
+背景信息：{documents}
+输入问题：{query}
+根据背景信息，来完成关键句抽取任务和问答任务。
+请记住你需要先执行关键句抽取任务，再执行问答任务。你的输出格式需要是一个json格式的字符串。
+"""
+PROMPT_RETRIVER_MUL = """
+根据背景信息，简洁和专业的来回答问题。如果无法从中得到答案，
+请说 “根据已知信息无法回答该问题”，不允许在答案中添加编造成分，答案请使用中文。
+背景信息：{documents}
+问题：{query}
+"""
+PROMPT_PROBLEM = """
+给你一篇论文的标题和关键词，请你给出一些用户可能针对这篇论文进行问答的问题，问题的数量不要超过3个。
+论文的标题：{title}
+论文的关键词：{key_words}
+问题："""
+eb.api_type = args.api_type
+access_token = _apply_token(args.api_key, args.secret_key)
+eb.access_token = access_token
+model = "ernie-bot-3.5" if args.ernie_model is None or args.ernie_model.strip() == "" else args.ernie_model
 
 
-def clear_session():
-    global all_data_result
-    global paper_all
-    global papers_sum
-    global chat_file_history
-    global chat_base_history
-    all_data_result = manager.dict()
-    papers_sum = manager.list()
-    paper_all = []
-    chat_file_history = defaultdict(list)
-    chat_base_history = []
-    return None, "", "", [], "", [], "", []
-
-
-def clear_base():
-    global chat_base_history
-    chat_base_history = []
-    return "", []
-
-
-def chat_file(
-    query,
-    history=[],
-    index_paper=None,
-    api_key=args.api_key,
-    secret_key=args.secret_key,
-):
-    if index_paper is None:
-        index = "document"
-    else:
-        index = index_paper.split("/")[-1].replace(".pdf", "").replace(".", "_")
-    document_store = FAISSDocumentStore.load(index_name)
-    use_gpu = True if args.device == "gpu" else False
-    retriever = DensePassageRetriever(
-        document_store=document_store,
-        query_embedding_model=args.query_embedding_model,
-        passage_embedding_model=args.passage_embedding_model,
-        output_emb_size=args.embedding_dim if args.model_type in ["ernie_search", "neural_search"] else None,
-        max_seq_len_query=args.max_seq_len_query,
-        max_seq_len_passage=args.max_seq_len_passage,
-        batch_size=args.retriever_batch_size,
-        use_gpu=use_gpu,
-        embed_title=args.embed_title,
-        pooling_mode=args.pooling_mode,
-    )
-    ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
-    query_pipeline = Pipeline()
-    query_pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
-    query_pipeline.add_node(component=ranker, name="Ranker", inputs=["Retriever"])
-    query_pipeline.add_node(component=PromptTemplate("背景：{documents} 问题：{query}"), name="Template", inputs=["Ranker"])
-    query_pipeline.add_node(
-        component=TruncatedConversationHistory(max_length=1000), name="TruncateHistory", inputs=["Template"]
-    )
-    index_history = chat_file_history[index]
-    ernie_bot = ErnieBot(api_key=api_key, secret_key=secret_key)
-    query_pipeline.add_node(component=ernie_bot, name="ErnieBot", inputs=["TruncateHistory"])
-    prediction = query_pipeline.run(
-        query=query,
-        params={
-            "Retriever": {"top_k": 30, "index": str(index)},
-            "Ranker": {"top_k": 3},
-            "TruncateHistory": {"history": index_history},
-        },
-    )
-    chat_file_history[index] = prediction["history"]
-    history.append(["user: {}".format(query), "assistant: {}".format(prediction["result"])])
-    return "", history, history
-
-
-def tackle_paper(root_path, path, api_key, secret_key, lang="简体中文"):
-    pdf_image = pdf2image(path, root_path)
-    if lang == "English":
-        translation_str, translation_file, sum_str, sum_file = translation(
-            root_path, path, api_key=api_key, secret_key=secret_key
-        )
-        all_data_result[path.split("/")[-1].replace(".pdf", "").replace(".", "_")] = [
-            pdf_image,
-            path,
-            translation_str,
-            translation_file,
-            sum_str,
-            sum_file,
-        ]
-        data_split = []
-    else:
-        data_split, sum_str, sum_file = single_paper_abs_sum(root_path, path, api_key=api_key, secret_key=secret_key)
-        all_data_result[path.split("/")[-1].replace(".pdf", "").replace(".", "_")] = [
-            pdf_image,
-            path,
-            "",
-            None,
-            sum_str,
-            sum_file,
-        ]
-    papers_sum.append({"content": sum_str, "meta": {"name": path}})
-    index = path.split("/")[-1].replace(".pdf", "").replace(".", "_")
-    return index, data_split
-
-
-def mul_tackle(
-    p_m,
-    root_path_list,
-    path_list,
-    api_key=" ",
-    secret_key=" ",
-    lang="简体中文",
-):
-    func = partial(tackle_paper, api_key=api_key, secret_key=secret_key, lang=lang)
-    pool = Pool(processes=min(p_m, multiprocessing.cpu_count()))
-    result = pool.starmap(func, [(root_path, path) for root_path, path in zip(root_path_list, path_list)])
-    pool.close()
-    pool.join()
-    return result
-
-
-def predict(file_upload, input1=None, lang="简体中文", api_key=args.api_key, secret_key=args.secret_key, p_m=3):
-    if os.path.exists("faiss_document_store.db"):
-        os.remove("faiss_document_store.db")
-    if os.path.exists(index_name):
-        shutil.rmtree(index_name)
-    if lang == "English":
-        if file_upload:
-            path_list = [path.name for path in file_upload]
-            root_path_list = [os.path.dirname(path) for path in path_list]
-        else:
-            paths = input1.split(";")
-            path_list = paths
-            root_path_list = ["./" for i in range(len(path_list))]
-            root_path = root_path_list[0]
-            for index, path_item in enumerate(paths):
-                paper = next(arxiv.Search(id_list=[path_item.split("/")[-1]]).results())
-                path_name = "{}.pdf".format(path_item.split("/")[-1])
-                paper.download_pdf(dirpath=root_path, filename=path_name)
-                path = os.path.join(root_path, path_name)
-                path_list.append(path)
-    else:
-        path_list = [path.name for path in file_upload]
-        root_path_list = [os.path.dirname(path) for path in path_list]
-        document_store = FAISSDocumentStore(
-            embedding_dim=768, faiss_index_factory_str="Flat", duplicate_documents="skip"
-        )
-        use_gpu = True if args.device == "gpu" else False
-        retriever = DensePassageRetriever(
-            document_store=document_store,
-            query_embedding_model=args.query_embedding_model,
-            passage_embedding_model=args.passage_embedding_model,
-            output_emb_size=args.embedding_dim if args.model_type in ["ernie_search", "neural_search"] else None,
-            max_seq_len_query=args.max_seq_len_query,
-            max_seq_len_passage=args.max_seq_len_passage,
-            batch_size=args.retriever_batch_size,
-            use_gpu=use_gpu,
-            embed_title=args.embed_title,
-            pooling_mode=args.pooling_mode,
-        )
-    multi_result = mul_tackle(
-        p_m=p_m, root_path_list=root_path_list, path_list=path_list, api_key=api_key, secret_key=secret_key, lang=lang
-    )
-    if lang == "English":
-        return (
-            gr.Textbox.update(value="所有pdf解析完成"),
-            gr.Textbox.update(value="暂时不能chatfile功能"),
-            gr.Textbox.update(value="暂时不能chatfile功能"),
-            gr.Textbox.update(value="暂时不能chatfile功能"),
-            None,
-            None,
-        )
-    for index, split_text in multi_result:
-        split_text = retriever.run_indexing(split_text)[0]["documents"]
-        document_store.write_documents(split_text, index=str(index))
-        document_store.write_documents(split_text)
-    document_store.save(index_name)
-    mul_sum = merge_summary(papers_sum, api_key=api_key, secret_key=secret_key)
-    file_name_sum = root_path_list[0] + "/" + "mul_papers_sum.txt"
-    with open(file_name_sum, "w", encoding="utf-8") as f:
-        f.write(mul_sum)
-    return (
-        gr.Textbox.update(value="所有pdf解析完成"),
-        gr.Textbox.update(value="可以开始chatfile功能"),
-        gr.Textbox.update(value="可以开始chatfile功能"),
-        gr.Textbox.update(value="可以开始chatfile功能"),
-        mul_sum,
-        file_name_sum,
-    )
-
-
-def tr_result(file_name):
-    global all_data_result
-    file_name = file_name.split("/")[-1].replace(".pdf", "").replace(".", "_")
-    while True:
-        if file_name in all_data_result.keys():
-            tr_result = all_data_result[file_name]
-            break
-        else:
-            # Further optimization is needed
-            time.sleep(30)
-    return tr_result[:4]
-
-
-def sum_result(file_name):
-    global all_data_result
-    file_name = file_name.split("/")[-1].replace(".pdf", "").replace(".", "_")
-    while True:
-        if file_name in all_data_result.keys():
-            sum_result = all_data_result[file_name]
-            break
-        else:
-            # Further optimization is needed
-            time.sleep(60)
-    return sum_result[:2] + sum_result[4:]
-
-
-def retriever_papers(
-    query,
-    history=[],
-    api_key=args.api_key,
-    secret_key=args.secret_key,
-    retriever_top=30,
-    ranker_top=3,
-):
-    global chat_base_history
-    message = chat_papers(
-        query,
-        api_key=api_key,
-        secret_key=secret_key,
-        retriever_top=retriever_top,
-        ranker_top=ranker_top,
-        history=chat_base_history,
-    )
-    chat_base_history = message["history"]
-    history.append(["user: {}".format(query), "assistant: {}".format(message["result"])])
-    return "", history, history
-
-
-def Dropdown_list(papers, inputs):
-    global paper_all
-    if papers is not None:
-        paper_list = [paper.name.split("/")[-1] for paper in papers]
-    else:
-        paper_list = inputs.split(";")
-    paper_all += [i for i in paper_list if i not in paper_all and i != "" and i is not None]
-    if len(paper_all) > 0:
-        value = paper_all[0]
-    else:
-        value = None
-    return gr.Dropdown.update(choices=paper_all, value=value), gr.Dropdown.update(choices=paper_all, value=value)
-
-
-def Button_display():
-    return gr.Button.update("结果展示", scale=1, variant="primary", size="sm", visible=True)
-
-
-with gr.Blocks() as demo:
-    with gr.Tab("论文翻译总结"):
-        with gr.Accordion("论文翻译精读：输入区", open=True, elem_id="input-panel") as area_input_primary:
-            with gr.Row():
-                file_upload = gr.inputs.File(label="(输入方式1) 请上传论文PDF(仅支持PDF，支持多篇文章翻译)", file_count="multiple")
-                with gr.Accordion("(输入方式2) 输入论文的arxiv链接（支持多篇文章翻译，链接直接用英文;隔开）"):
-                    input1 = gr.Textbox(
-                        label="", value="https://arxiv.org/abs/2303.08774", placeholder="", interactive=True
+def retrieval_papers(history=[]):
+    """
+    Retrieve papers
+    """
+    query = history.pop()[0]
+    query = query.strip().replace("<br>", "\n")
+    context = tackle_history(history)
+    if query:
+        if len(history) == 1:
+            paper_id_list = []
+            context.append({"role": "user", "content": query})
+            prediction = retrieval(
+                query=query,
+                es_host=args.es_host,
+                es_port=args.es_port,
+                es_username=args.es_username,
+                es_password=args.es_password,
+                es_index=args.es_index_abstract,
+                es_chunk_size=args.es_chunk_size,
+                es_thread_count=args.es_thread_count,
+                es_queue_size=args.es_queue_size,
+                retriever_batch_size=args.retriever_batch_size,
+                retriever_api_key=args.retriever_api_key,
+                retriever_secret_key=args.retriever_secret_key,
+                retriever_embed_title=args.retriever_embed_title,
+                retriever_topk=30,
+                rank_topk=3,
+            )
+            documents = prediction["documents"]
+            all_content = ""
+            papers_absatract = []
+            for i in range(len(documents)):
+                if documents[i].meta["id"] not in paper_id_list:
+                    paper_id_list.append(documents[i].meta["id"])
+                    key_words = documents[i].meta.get("key_words", "")
+                    title = documents[i].meta.get("title", "")
+                    abstract = documents[i].meta.get("abstracts", "")
+                    abstract = summarize_abstract(
+                        abstract,
+                        api_key=args.api_key,
+                        secret_key=args.secret_key,
+                        chunk_size=500,
+                        max_token=args.max_token,
                     )
-                    output1 = gr.Dropdown(choices=["简体中文", "English"], label="输出语言")
-                    output2 = gr.Dropdown(choices=["简体中文", "English"], label="输入论文类别", value="简体中文")
+                    papers_absatract.append({"content": abstract, "meta": {}})
+                    paper_content = (
+                        "**" + str(len(paper_id_list)) + "." + title + "**" + "\n" + key_words + "\n" + abstract
+                    )
+                    all_content += paper_content + "\n\n"
+            history.append(["下面请基于这几篇论文进行问答，单篇文档问答请使用单篇问答精读翻译", ",".join(paper_id_list)])
+            confine_summary = merge_summary(papers_absatract, api_key=args.api_key, secret_key=args.secret_key)
+            confine_summary = "**下面是对上面几篇文档进行的总结**" + "\n" + confine_summary
+            confine_summary = confine_summary.replace("\n\n", "\n")
+            history.append([query, all_content + confine_summary])
+        else:
+            # history = [[user_msg(None),system_msg],[user_hint(None),paper_id]]
+            paper_id_list = history[1][1].split(",")
+            content = ""
+            for id in paper_id_list:
+                prediction = retrieval(
+                    query=query,
+                    file_id=id,
+                    es_host=args.es_host,
+                    es_port=args.es_port,
+                    es_username=args.es_username,
+                    es_password=args.es_password,
+                    es_index=args.es_index_full_text,
+                    es_chunk_size=args.es_chunk_size,
+                    es_thread_count=args.es_thread_count,
+                    es_queue_size=args.es_queue_size,
+                    retriever_batch_size=args.retriever_batch_size,
+                    retriever_api_key=args.retriever_api_key,
+                    retriever_secret_key=args.retriever_secret_key,
+                    retriever_embed_title=args.retriever_embed_title,
+                    retriever_topk=30,
+                    rank_topk=2,
+                )
+                content += "\n".join([item.content for item in prediction["documents"]])
+            content = PROMPT_RETRIVER_MUL.format(documents=content, query=query)
+            content = content[: args.max_token]
+            context.append({"role": "user", "content": content})
+            eb.api_type = args.api_type
+            access_token = _apply_token(args.api_key, args.secret_key)
+            eb.access_token = access_token
+            model = "ernie-bot-3.5" if args.ernie_model is None or args.ernie_model.strip() == "" else args.ernie_model
+            response = eb.ChatCompletion.create(model=model, messages=context, stream=False)
+            bot_response = response.result
+            history.append([query, bot_response])
+    return history
+
+
+def retrieval_title(title):
+    """
+    Retrieve the paper_id  of  the title
+    """
+    prediction = retrieval(
+        title,
+        es_host=args.es_host,
+        es_port=args.es_port,
+        es_username=args.es_username,
+        es_password=args.es_password,
+        es_index=args.es_index_abstract,
+        es_chunk_size=args.es_chunk_size,
+        es_thread_count=args.es_thread_count,
+        es_queue_size=args.es_queue_size,
+        retriever_batch_size=args.retriever_batch_size,
+        retriever_api_key=args.retriever_api_key,
+        retriever_secret_key=args.retriever_secret_key,
+        retriever_embed_title=args.retriever_embed_title,
+        retriever_topk=30,
+        rank_topk=1,
+    )
+    if prediction["documents"][0].rank_score > args.retriever_threshold:
+        return prediction["documents"][0], prediction["documents"][0].meta["id"]
+    return None
+
+
+def infer(history=[]):
+    """Model inference."""
+    query = history.pop()[0]
+    query = query.strip().replace("<br>", "\n")
+    context = tackle_history(history)
+    single_paper_id = history[1][1]
+    if query:
+        if single_paper_id:
+            prediction = retrieval(
+                query=query,
+                file_id=single_paper_id,
+                es_host=args.es_host,
+                es_port=args.es_port,
+                es_username=args.es_username,
+                es_password=args.es_password,
+                es_index=args.es_index_full_text,
+                es_chunk_size=args.es_chunk_size,
+                es_thread_count=args.es_thread_count,
+                es_queue_size=args.es_queue_size,
+                retriever_batch_size=args.retriever_batch_size,
+                retriever_api_key=args.retriever_api_key,
+                retriever_secret_key=args.retriever_secret_key,
+                retriever_embed_title=args.retriever_embed_title,
+                retriever_topk=30,
+                rank_topk=2,
+            )
+            content = "\n".join([item.content for item in prediction["documents"]])
+            content = PROMPT_SYSTEM + PROMPT_RETRIVER.format(documents=content, query=query)
+            content = content[: args.max_token]
+            context.append({"role": "user", "content": content})
+            response = eb.ChatCompletion.create(model=model, messages=context, stream=False)
+            bot_response = response.result
+            try:
+                bot_response = bot_response[bot_response.find("{") :]
+                bot_response = bot_response[: bot_response.find("}") + 1]
+                bot_response = json.loads(bot_response)
+                if type(bot_response["关键句抽取任务的结果"]) == list:
+                    bot_response["关键句抽取任务的结果"] = "\n".join(bot_response["关键句抽取任务的结果"])
+                bot_response = (
+                    "以下是我的分析内容：\n"
+                    + str(bot_response["关键句抽取任务的结果"])
+                    + "\n\n"
+                    + "以下是我的总结："
+                    + str(bot_response["问答任务的结果"])
+                )
+            except:
+                bot_response = (
+                    str(bot_response).replace("'关键句抽取任务的结果':", "以下是我的分析内容").replace("'问答任务的结果':", "\n以下是我的总结\n")
+                )
+            bot_response = re.sub(r"\[|\]|{|}", "", bot_response)
+            bot_response = bot_response.replace("\\n", "\n")
+            history.append([query, bot_response])
+        else:
+            context.append({"role": "user", "content": query})
+            response = eb.ChatFile.create(messages=context, stream=False)
+            bot_response = response.result
+            history.append([query, bot_response])
+    return history
+
+
+def upload_file(file_name, file_url, file_upload, history=[]):
+    """
+    Upload the file to bos or retrieve the json_file of the paper
+    """
+    if file_name:
+        try:
+            json_content, file_id = retrieval_title(file_name)
+            content = (
+                "**"
+                + json_content.meta["title"]
+                + "**"
+                + "\n\n"
+                + json_content.meta["key_words"]
+                + "\n\n"
+                + json_content.meta["abstracts"]
+            )
+            title = json_content.meta["title"]
+            key_words = json_content.meta["key_words"]
+            response = eb.ChatCompletion.create(
+                model=model,
+                messages=[{"role": "user", "content": PROMPT_PROBLEM.format(title=title, key_words=key_words)}],
+                stream=False,
+            )
+            response = response.result
+            history.append([None, file_id])
+            history.append(["你可以参考以下问题，对论文进行提问", response])
+        except:
+            content = "这篇论文目前尚未加入到论文库中,请你自行上传论文的pdf或者url链接."
+            file_id = None
+            history.append([None, file_id])
+        return (
+            gr.Gallery.update(visible=False),
+            gr.File.update(visible=False),
+            history,
+            gr.Chatbot.update(
+                [[None, content]],
+                visible=True,
+                scale=30,
+                height=600,
+            ),
+        )
+    elif file_url:
+        # temp image save dir
+        root_path = "./images"
+        os.makedirs(root_path, exist_ok=True)
+        paper = next(arxiv.Search(id_list=[file_url.split("/")[-1]]).results())
+        real_filename = "{}.pdf".format(file_url.split("/")[-1])
+        logger.info(real_filename)
+        paper.download_pdf(dirpath=root_path, filename=real_filename)
+        file_name = os.path.join(root_path, real_filename)
+        tim = time.time()
+        image_path = os.path.join(root_path, str(tim))
+        os.makedirs(image_path, exist_ok=True)
+        imgs = pdf2image(pdfPath=file_name, imgPath=image_path, number_process_page=args.number_process_page)
+    elif file_upload:
+        file_name = file_upload.name
+        real_filename = os.path.split(file_name)[-1]
+        root_path = os.path.dirname(file_name)
+        tim = time.time()
+        image_path = os.path.join(root_path, str(tim))
+        os.makedirs(image_path, exist_ok=True)
+        imgs = pdf2image(pdfPath=file_name, imgPath=image_path, number_process_page=args.number_process_page)
+    # 上传到bos后到文件是否需要删除
+    filename_in_bos = real_filename
+    url = eb.utils.upload_file_to_bos(
+        file_name, filename_in_bos, access_key_id=args.bos_ak, secret_access_key=args.bos_sk
+    )
+    history.append([None, None])
+    content = "<file>{}</file><url>{}</url>".format(real_filename, url)
+    content = content.strip().replace("<br>", "\n")
+    context = tackle_history(history)
+    context.append({"role": "user", "content": content})
+    response = eb.ChatFile.create(messages=context, stream=False)
+    bot_response = response.result
+    history.append([content, bot_response])
+    return (
+        gr.Gallery.update(imgs, visible=True),
+        gr.File.update(file_name, label="原文下载链接", visible=True),
+        history,
+        gr.Chatbot.update(visible=False),
+    )
+
+
+def add_messaget_chatbot(messages, history):
+    history.append([messages, None])
+    return None, history
+
+
+def translation_txt(history=[], lang=""):
+    if not lang:
+        lang = "中文"
+    message = history.pop()[0]
+    if message:
+        translation_content = translate_part(
+            text=message,
+            api_key=args.api_key,
+            secret_key=args.secret_key,
+            task="翻译",
+            max_length=args.translation_max_token,
+            lang=lang,
+            chunk_size=args.translation_chunk_size,
+            cycle_num=args.translation_cycle_num,
+        )
+        history.append([message, translation_content])
+    return history
+
+
+with gr.Blocks(title="维普小助手", theme=gr.themes.Base()) as demo:
+    gr.HTML("""<h1 align="center">ChatPaper维普小助手</h1>""")
+    with gr.Row(variant="panel"):
+        with gr.Column(scale=1):
+            cheetah = os.path.join(os.path.dirname(__file__), "weipu.jpg")
+            gr.Image(cheetah, elem_id="banner-image", show_label=False, show_download_button=False)
+        with gr.Column(scale=9):
+            gr.HTML(
+                """
+                <p>【文章检索摘要】
+                <p> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.适合从大量文章中，粗力度获取需要的信息。返回包含 : 文章题目+作者+关键词+术语+摘要.</p>
+                <p> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.适合基于某个技术领域，生成对应的技术综述.</p>
+                <p>【单篇精读翻译】：
+                <p> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.适合针对具体一篇文章，详细了解细节内容.</p>
+                <p> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.适合针对具体一篇文章，详细翻译摘要术语.</p>
+            """
+            )
+    with gr.Tab("文章检索摘要"):
+        retrieval_chatbot = gr.Chatbot(
+            height=600, value=[[None, "你好, 我是维普ChatPaper小助手, 我这里收录了100w篇论文,可以提供您专业的学术咨询.请问有什么可以帮您的吗?"]]
+        )  # height聊天框高度, value 默认语句
+        retrieval_textbox = gr.Textbox(placeholder="最近自监督学习论文有哪些?")
         with gr.Row():
-            clear = gr.Button(value="清空输入区", scale=2)
-            submit = gr.Button(value="开始翻译精读", scale=2)
-            pdf_parse = gr.Textbox(value="pdf解析", label="pdf解析", scale=1)
-
-        with gr.Accordion("论文翻译总结：输出区", open=True, elem_id="input-panel") as area_input_primary:
-
-            with gr.Tab("单文翻译"):  # 包含下载功能
-                with gr.Row():
-                    file_tr = gr.Dropdown(choices=[""], max_choices=1, scale=4, label="选择展示论文")
-                    tr_display = gr.Button("翻译结果展示", scale=1, variant="primary", size="sm", visible=False)
+            retrieval_submit_btn = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
+            retrieval_clear_btn = gr.Button("清除", variant="primary", scale=2, min_width=0)
+    retrieval_submit_btn.click(
+        add_messaget_chatbot,
+        inputs=[retrieval_textbox, retrieval_chatbot],
+        outputs=[retrieval_textbox, retrieval_chatbot],
+    ).then(retrieval_papers, retrieval_chatbot, retrieval_chatbot)
+    retrieval_clear_btn.click(
+        lambda _: ([[None, "你好, 我是维普ChatPaper文章精读翻译小助手,可以提供您专业的学术咨询.请问有什么可以帮您的吗?"]]),
+        inputs=[retrieval_clear_btn],
+        outputs=[retrieval_chatbot],
+    )
+    with gr.Tab("单篇精读"):  # 封装chatFile的能力
+        with gr.Accordion("文章精读：输入区（输入方式三选一，三种输入方式优先级依次降低）", open=True, elem_id="input-panel") as area_input_primary:
+            with gr.Row():
+                with gr.Group():
+                    file_name = gr.Textbox(
+                        label="(输入方式1) 论文/期刊标题（仅支持单篇文章精读）",
+                        value="",
+                        placeholder="Human-level control through deep reinforcement learning",
+                        interactive=True,
+                        scale=1,
+                    )
+                    file_url = gr.Textbox(
+                        label="(输入方式2) 论文 axiv链接（仅支持单篇文章精读）",
+                        value="",
+                        placeholder="https://arxiv.org/abs/2303.08774",
+                        interactive=True,
+                        scale=1,
+                    )
+                file_upload = gr.File(
+                    label="(输入方式3) 上传论文/期刊PDF(仅支持单篇PDF精读)", file_count="single", height=180, min_width=50
+                )
+            with gr.Row():
+                clear = gr.Button(value="清空输入区")
+                submit = gr.Button(value="全文精读")
+        with gr.Accordion("文章精读：输出区", open=True, elem_id="input-panel") as area_input_primary:
+            with gr.Tab("单文解读"):  # 包含下载功能
                 with gr.Row():
                     with gr.Column():
-                        gr.Dropdown(choices=["英文", "中文"], max_choices=1, label="论文原文-PDF插件-支持下载；此处为PDF占位符")
+                        gr.Dropdown(choices=[""], max_choices=1, label="论文原文-PDF插件-支持下载；此处为PDF占位符")
                         ori_paper = gr.Gallery(label="论文原文", show_label=False, elem_id="gallery").style(
-                            columns=[1], rows=[1], object_fit="contain", height="1100px"
+                            columns=[1], rows=[1], object_fit="contain", height="700px"
                         )
+                        ori_json = gr.Chatbot(label="论文原文", visible=False)
                         ori_pdf = gr.File(label="原文下载链接")
                     with gr.Accordion("   "):
-                        gr.Dropdown(choices=["英文", "中文"], max_choices=1, label="整体翻译-PDF插件-支持下载；此处为PDF占位符")
-                        trans_paper = gr.Textbox(label="翻译结果", value="", max_lines=10)
-                        trans_down = gr.File(label="翻译下载链接")
-                        with gr.Group():
-                            start_chatfile_tr = gr.Textbox(value="暂时无法问答", label="问答启动")
-                            chatbot_tr = gr.Chatbot(label="Chatbot")
-                            state_tr = gr.State([])
-                            with gr.Row():
-                                textbox = gr.Textbox(
-                                    container=False,
-                                    show_label=False,
-                                    placeholder="这篇论文最大的贡献是什么?",
-                                    scale=10,
-                                )
-                                submit_button = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
-                                submit_button.click(
-                                    chat_file,
-                                    inputs=[textbox, state_tr, file_tr],
-                                    outputs=[textbox, chatbot_tr, state_tr],
-                                )
-            with gr.Tab("单文总结"):  # 包含下载功能
-                with gr.Row():
-                    file_sum = gr.Dropdown(choices=[""], scale=4, max_choices=1, label="选择论文")
-                    sum_display = gr.Button("精读结果展示", scale=1, variant="primary", size="sm", visible=False)
-                with gr.Row():
-                    with gr.Column():
-                        gr.Dropdown(choices=["英文", "中文"], max_choices=1, label="论文原文-PDF插件-支持下载；此处为PDF占位符")
-                        ori_paper_c = gr.Gallery(label="论文原文", show_label=False, elem_id="gallery").style(
-                            columns=[1], rows=[1], object_fit="contain", height="1100px"
+                        gr.Dropdown(choices=[""], max_choices=1, label="文章摘要等总结-PDF插件-支持下载；此处为PDF占位符")
+                        chatbot = gr.Chatbot(
+                            value=[[None, "你好, 我是维普ChatPaper文章精读翻译小助手,可以提供您专业的学术咨询.请问有什么可以帮您的吗?"]],
+                            scale=30,
+                            height=600,
                         )
-                        ori_pdf_c = gr.File(label="原文下载链接")
-                    with gr.Accordion("   "):
-                        gr.Dropdown(choices=["英文", "中文"], max_choices=1, label="整体翻译-PDF插件-支持下载，此处为PDF占位符")
-                        sum_parper = gr.Markdown(label="精读全文", value="")
-                        sum_down = gr.File(label="全文精度链接 ")
-                        with gr.Group():
-                            start_chatfile_sum = gr.Textbox(value="暂时无法问答", label="问答启动")
-                            chatbot_sum = gr.Chatbot(label="Chatbot")
-                            state_sum = gr.State([])
-                            with gr.Row():
-                                textbox = gr.Textbox(
-                                    container=False,
-                                    show_label=False,
-                                    placeholder="这篇论文最大的贡献是什么?",
-                                    scale=10,
-                                )
-                                submit_button = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
-                                submit_button.click(
-                                    chat_file,
-                                    inputs=[textbox, state_sum, file_sum],
-                                    outputs=[textbox, chatbot_sum, state_sum],
-                                )
-            with gr.Tab("多文总结"):  # 包含下载功能
-                with gr.Accordion("   "):
-                    with gr.Row():
-                        gr.Dropdown(
-                            choices=["英文", "中文"], max_choices=1, label="完整总结插件-支持下载，此处为多文总结占位符，需要支持上下拖动", scale=1
-                        )
-                        sum_mul_papers_down = gr.File(label="全文精度链接 ", scale=1)
-                    sum_mul_papers = gr.Textbox(label="多文档摘要", max_lines=100, scale=20, lines=10)
-                    with gr.Group():
-                        start_chatfile_mul = gr.Textbox(value="暂时无法问答", label="问答启动")
-                        chatbot = gr.Chatbot(label="Chatbot")
-                        state = gr.State([])
+                        message = gr.Textbox(placeholder="请问具体描述这篇文章的方法?", scale=7)
                         with gr.Row():
-                            textbox = gr.Textbox(
-                                container=False,
-                                show_label=False,
-                                placeholder="这篇论文最大的贡献是什么?",
-                                scale=10,
-                            )
-                            submit_button = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
-                            submit_button.click(chat_file, inputs=[textbox, state], outputs=[textbox, chatbot, state])
-            file_upload.change(Dropdown_list, inputs=[file_upload, input1], outputs=[file_tr, file_sum])
-            input1.change(Dropdown_list, inputs=[file_upload, input1], outputs=[file_tr, file_sum])
-            submit.click(
-                predict,
-                inputs=[file_upload, input1, output2],
-                outputs=[
-                    pdf_parse,
-                    start_chatfile_tr,
-                    start_chatfile_sum,
-                    start_chatfile_mul,
-                    sum_mul_papers,
-                    sum_mul_papers_down,
-                ],
-            )
-            clear.click(
-                clear_session,
-                inputs=[],
-                outputs=[file_upload, input1, chatbot_tr, state_tr, chatbot_sum, state_sum, chatbot, state],
-            )
-            file_tr.change(Button_display, inputs=[], outputs=[tr_display])
-            file_sum.change(Button_display, inputs=[], outputs=[sum_display])
-            tr_display.click(tr_result, inputs=file_tr, outputs=[ori_paper, ori_pdf, trans_paper, trans_down])
-            sum_display.click(sum_result, inputs=file_sum, outputs=[ori_paper_c, ori_pdf_c, sum_parper, sum_down])
-
-    with gr.Tab("技术综述"):
-        with gr.Group():
-            chatbot = gr.Chatbot(label="Chatbot")
-            with gr.Row():
-                textbox = gr.Textbox(
-                    container=False,
-                    show_label=False,
-                    placeholder="技术综述输入框口",
-                    scale=10,
+                            submit_btn = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
+                            clear_btn = gr.Button("清除", variant="primary", scale=2, min_width=0)
+                submit.click(
+                    upload_file,
+                    inputs=[file_name, file_url, file_upload, chatbot],
+                    outputs=[ori_paper, ori_pdf, chatbot, ori_json],
                 )
-                submit_button = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
-
-    with gr.Tab("学术检索"):
-        with gr.Group():
-            chatbot = gr.Chatbot(label="Chatbot")
-            state = gr.State([])
-            with gr.Row():
-                textbox = gr.Textbox(
-                    container=False,
-                    show_label=False,
-                    placeholder="检索内容输入框口",
-                    scale=10,
+                clear.click(
+                    lambda _: ("", "", None, [[None, "你好, 我是维普ChatPaper文章精读翻译小助手,可以提供您专业的学术咨询.请问有什么可以帮您的吗?"]]),
+                    inputs=[],
+                    outputs=[file_name, file_url, file_upload, chatbot],
                 )
-                submit_button = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
-                clear_button = gr.Button("清除历史记录", variant="primary", scale=2, min_width=0)
-            submit_button.click(retriever_papers, inputs=[textbox, state], outputs=[textbox, chatbot, state])
-            clear_button.click(clear_base, inputs=[], outputs=[chatbot, state])
-demo.launch(server_name="0.0.0.0", server_port=8085)
+                submit_btn.click(add_messaget_chatbot, inputs=[message, chatbot], outputs=[message, chatbot]).then(
+                    infer, chatbot, chatbot
+                )
+                clear_btn.click(
+                    lambda _: ([[None, "你好, 我是维普ChatPaper文章精读翻译小助手,可以提供您专业的学术咨询.请问有什么可以帮您的吗?"]]),
+                    inputs=clear_btn,
+                    outputs=[chatbot],
+                    api_name="clear",
+                    show_progress=False,
+                )
+    with gr.Tab("翻译"):
+        with gr.Column():
+            chatbot_translation = gr.Chatbot(value=[[None, "你好, 我是翻译小助手"]], scale=35, height=500)
+            message_translation = gr.Textbox(placeholder="请输出需要翻译的内容", lines=5, max_lines=20)
+            with gr.Row():
+                lang = gr.Radio(choices=["中文", "英文"], max_choices=1, scale=1, value="中文", label="输入语言")
+                submit_translation = gr.Button("🚀 提交", variant="primary", scale=1)
+                clear_translation = gr.Button("清除", variant="primary", scale=1)
+        submit_translation.click(
+            add_messaget_chatbot,
+            inputs=[message_translation, chatbot_translation],
+            outputs=[message_translation, chatbot_translation],
+        ).then(translation_txt, inputs=[chatbot_translation, lang], outputs=[chatbot_translation])
+        clear_translation.click(
+            lambda _: ([[None, "你好, 你好, 我是翻译小助手"]]), inputs=[clear_translation], outputs=[chatbot_translation]
+        )
+demo.queue(concurrency_count=40, max_size=40)
+demo.launch(server_name=args.serving_name, server_port=args.serving_port)

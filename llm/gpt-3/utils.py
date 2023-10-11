@@ -129,10 +129,23 @@ def init_dist_env(
 ):
 
     strategy = fleet.DistributedStrategy()
+
+    def is_segment_parallel_supported():
+        import inspect
+
+        members = [name for (name, date) in inspect.getmembers(fleet.HybridCommunicateGroup)]
+        return "get_sep_parallel_world_size" in members
+
     if tensor_parallel_degree == 1 and sharding_parallel_degree == 1:
-        order = ["pp", "dp", "sharding", "mp"]
+        if is_segment_parallel_supported():
+            order = ["pp", "dp", "sharding", "sep", "mp"]
+        else:
+            order = ["pp", "dp", "sharding", "mp"]
     else:
-        order = ["dp", "pp", "sharding", "mp"]
+        if is_segment_parallel_supported():
+            order = ["dp", "pp", "sharding", "sep", "mp"]
+        else:
+            order = ["dp", "pp", "sharding", "mp"]
 
     strategy.hybrid_configs = {
         "dp_degree": data_parallel_degree,
@@ -172,6 +185,7 @@ def convert_example(
     tokenizer,
     max_source_length,
     max_target_length,
+    is_test=False,
 ):
     """
     Convert an example into necessary features.
@@ -217,6 +231,8 @@ def convert_example(
         final[k] = inputs[k] + outputs[k]
         if k == "input_ids":
             final["labels"] = [tokenizer.pad_token_id] * len(inputs["input_ids"]) + outputs[k]
+    if is_test:
+        return dict(input_ids=inputs["input_ids"], labels=outputs["input_ids"])
 
     # shift inputs and labels
     final["input_ids"] = final["input_ids"][:-1]

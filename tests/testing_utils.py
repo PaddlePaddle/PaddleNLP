@@ -16,7 +16,9 @@ from __future__ import annotations
 import copy
 import gc
 import inspect
+import json
 import os
+import subprocess
 import sys
 import unittest
 from collections.abc import Mapping
@@ -298,7 +300,7 @@ def is_slow_test() -> bool:
     return os.getenv("RUN_SLOW_TEST") is not None
 
 
-def load_test_config(config_file: str, key: str) -> dict | None:
+def load_test_config(config_file: str, key: str, sub_key: str = None) -> dict | None:
     """parse config file to argv
 
     Args:
@@ -312,12 +314,26 @@ def load_test_config(config_file: str, key: str) -> dict | None:
     assert key in config, f"<{key}> should be the top key in configuration file"
     config = config[key]
 
-    sub_key = "slow" if is_slow_test() else "default"
+    mode_key = "slow" if is_slow_test() else "default"
 
-    if sub_key not in config:
+    if mode_key not in config:
         return None
 
-    config = config[sub_key]
+    # 2. load base common config
+    base_config = config.get("base", {})
+
+    config = config.get(mode_key, {})
+    config.update(base_config)
+
+    # 3. load sub key config
+    sub_config = config.get(sub_key, {})
+    config.update(sub_config)
+
+    # remove dict value
+    for key in list(config.keys()):
+        if isinstance(config[key], dict):
+            config.pop(key)
+
     return config
 
 
@@ -356,3 +372,38 @@ def argv_context_guard(config: dict):
     sys.argv = argv
     yield
     sys.argv = old_argv
+
+
+def update_params(json_file: str, params: dict):
+    """update params in json file
+
+    Args:
+        json_file (str): the path of json file
+        params (dict): the parameters need to update
+    """
+    with open(json_file, "r") as f:
+        data = json.load(f)
+        data.update(params)
+    with open(json_file, "w") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+class SubprocessCallException(Exception):
+    pass
+
+
+def run_command(command: list[str], return_stdout=False):
+    """
+    Runs `command` with `subprocess.check_output` and will potentially return the `stdout`. Will also properly capture
+    if an error occured while running `command`
+    """
+    try:
+        output = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
+        if return_stdout:
+            if hasattr(output, "decode"):
+                output = output.decode("utf-8")
+            return output
+    except subprocess.CalledProcessError as e:
+        raise SubprocessCallException(
+            f"Command `{' '.join(command)}` failed with the following error:\n\n{e.output.decode()}"
+        ) from e

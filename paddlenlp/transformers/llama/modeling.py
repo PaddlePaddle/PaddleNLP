@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import math
+import warnings
 from functools import partial
 from typing import Optional, Tuple
 
@@ -30,20 +31,14 @@ try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
 except ImportError:
     fused_rotary_position_embedding = None
+
+
 from paddle.utils import try_import
 
 from paddlenlp.transformers.conversion_utils import (
     StateDictNameMapping,
     init_name_mappings,
 )
-
-try:
-    from paddle.nn.functional.flash_attention import flash_attention
-except:
-    flash_attention = None
-
-import warnings
-
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
@@ -63,6 +58,11 @@ from .configuration import (
     LLAMA_PRETRAINED_RESOURCE_FILES_MAP,
     LlamaConfig,
 )
+
+try:
+    from paddle.nn.functional.flash_attention import flash_attention
+except:
+    flash_attention = None
 
 __all__ = [
     "LlamaModel",
@@ -92,7 +92,7 @@ def build_alibi_tensor(
     bool_attention_mask: Tensor, num_heads: int, dtype: paddle.dtype, tensor_parallel_degree=1
 ) -> Tensor:
     attention_mask = bool_attention_mask.astype("float32")
-    batch_size, seq_length = attention_mask.shape
+    batch_size, seq_length = attention_mask.shape[0], attention_mask.shape[-1]
     slopes = paddle.to_tensor(_get_interleave(num_heads), dtype="float32")
     alibi = slopes.unsqueeze(axis=[1, 2]) * paddle.arange(seq_length, dtype="float32").unsqueeze(axis=[0, 1]).expand(
         [num_heads, -1, -1]
@@ -188,13 +188,13 @@ def scaled_dot_product_attention(
     _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention:
-        if alibi is not None:
-            raise ValueError("Flash Attention does not support ALiBi yet")
-
         # Flash Attention now ignore attention mask
         # Current Flash Attention doesn't support attn maskt
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
+        if alibi is not None:
+            raise ValueError("Flash Attention does not support ALiBi yet")
+
         attn_output, attn_weights = flash_attention(
             query_states,
             key_states,
@@ -208,6 +208,7 @@ def scaled_dot_product_attention(
             attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
         return (attn_output, attn_weights) if output_attentions else attn_output
     else:
+        #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
         query_states = paddle.transpose(query_states, [0, 2, 1, 3])
         # merge with the next tranpose
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
@@ -345,7 +346,6 @@ class LlamaRotaryEmbedding(nn.Layer):
         self.dim = dim
         self.max_position_embeddings = max_position_embeddings
         self.base = base
-        self.dtype = paddle.get_default_dtype()
         # [dim / 2]
         self.inv_freq = 1.0 / (self.base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype="float32") / self.dim))
         self._set_cos_sin_cache(seq_len=max_position_embeddings)
@@ -360,23 +360,21 @@ class LlamaRotaryEmbedding(nn.Layer):
         # [seq_len, dim]
         emb = paddle.concat([freqs, freqs], axis=-1)
         # [1, seqlen, 1, dim]
-        self.cos_cached = emb.cos()[None, :, None, :].cast(self.dtype)
-        self.sin_cached = emb.sin()[None, :, None, :].cast(self.dtype)
+        self.cos_cached = emb.cos()[None, :, None, :]
+        self.sin_cached = emb.sin()[None, :, None, :]
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
-        if seq_len > self.max_seq_len_cached:
-            self._set_cos_sin_cache(seq_len)
         return (
             self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
             self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
         )
 
 
-class LlamaLinearScalingRotaryEmbedding(nn.Layer):
+class LlamaLinearScalingRotaryEmbedding(LlamaRotaryEmbedding):
     def __init__(self, dim, max_position_embeddings=2048, base=10000, scaling_factor=1.0):
         self.scaling_factor = scaling_factor
-        super().__init__(dim, max_position_embeddings, base)
+        super().__init__(dim, max_position_embeddings * scaling_factor, base)
 
     def _set_cos_sin_cache(self, seq_len):
         self.max_seq_len_cached = seq_len
@@ -389,17 +387,8 @@ class LlamaLinearScalingRotaryEmbedding(nn.Layer):
         # [seq_len, dim]
         emb = paddle.concat([freqs, freqs], axis=-1)
         # [1, seqlen, 1, dim]
-        self.cos_cached = emb.cos()[None, :, None, :].cast(self.dtype)
-        self.sin_cached = emb.sin()[None, :, None, :].cast(self.dtype)
-
-    def forward(self, x, seq_len=None):
-        # x: [bs, num_attention_heads, seq_len, head_size]
-        if seq_len > self.max_seq_len_cached:
-            self._set_cos_sin_cache(seq_len)
-        return (
-            self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
-            self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
-        )
+        self.cos_cached = emb.cos()[None, :, None, :]
+        self.sin_cached = emb.sin()[None, :, None, :]
 
 
 class LlamaNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
@@ -408,7 +397,7 @@ class LlamaNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
     def __init__(self, dim, max_position_embeddings=2048, base=10000, scaling_factor=1.0):
         base = base * scaling_factor ** (dim / (dim - 2))
         self.scaling_factor = scaling_factor
-        super().__init__(dim, max_position_embeddings, base)
+        super().__init__(dim, max_position_embeddings * scaling_factor, base)
 
 
 class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
@@ -430,8 +419,8 @@ class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
         # [seq_len, dim]
         emb = paddle.concat([freqs, freqs], axis=-1)
         # [1, seqlen, 1, dim]
-        scale_cos = emb.cos()[None, :, None, :].cast(self.dtype)
-        scale_sin = emb.sin()[None, :, None, :].cast(self.dtype)
+        scale_cos = emb.cos()[None, :, None, :]
+        scale_sin = emb.sin()[None, :, None, :]
         return scale_cos, scale_sin
 
     def forward(self, x, seq_len=None):
@@ -457,10 +446,16 @@ def rotate_half(x):
 
 
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
-    cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
-    sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
-    cos = cos[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
-    sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
+
+    if position_ids is None:
+        # Note: Only for LlamaForCausalLMPipe model pretraining
+        cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+        sin = sin[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+    else:
+        cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
+        sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
+        cos = cos[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
+        sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
@@ -576,14 +571,14 @@ class LlamaAttention(nn.Layer):
                     ]
                 )
 
-        self.rope_fusion_level = config.rope_fusion_level
-        if self.rope_fusion_level is not None:
+        self.use_fused_rope = config.use_fused_rope
+        if self.use_fused_rope:
             if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
                     "Will disable fuse rope. Try using latest gpu version of Paddle."
                 )
-                self.rope_fusion_level = None
+                self.use_fused_rope = False
 
         if config.sequence_parallel:
             ColumnParallelLinear = ColumnSequenceParallelLinear
@@ -670,7 +665,7 @@ class LlamaAttention(nn.Layer):
                 bias_attr=False,
             )
 
-        if config.rope and self.rope_fusion_level != "full":
+        if config.rope:
             self._init_rope()
 
         self.config = config
@@ -742,21 +737,23 @@ class LlamaAttention(nn.Layer):
             kv_seq_len += past_key_value[0].shape[-3]
 
         if self.config.rope:
-            if self.rope_fusion_level is not None:
+            if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
-
-            if self.rope_fusion_level == "full":
-                query_states, key_states, _ = fused_rotary_position_embedding(query_states, key_states, v=None)
-            elif self.rope_fusion_level == "core":
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states, _ = fused_rotary_position_embedding(
-                    query_states, key_states, v=None, sin=sin, cos=cos
+                    query_states,
+                    key_states,
+                    v=None,
+                    sin=sin,
+                    cos=cos,
+                    position_ids=position_ids,
+                    use_neox_rotary_style=False,
                 )
             else:
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
-        # [bsz, nh, t, hd]
+        # [bs, seq_len, num_head, head_dim]
         if past_key_value is not None:
             # reuse k, v, self_attention
             key_states = paddle.concat([past_key_value[0], key_states], axis=1)
@@ -790,7 +787,7 @@ class LlamaAttention(nn.Layer):
                 output_attentions,
                 alibi,
                 self.sequence_parallel,
-                use_reentrant=False,
+                use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
             outputs = scaled_dot_product_attention(
@@ -832,6 +829,7 @@ class LlamaAttention(nn.Layer):
 class LlamaDecoderLayer(nn.Layer):
     def __init__(self, config, layerwise_recompute: bool = False):
         super().__init__()
+        self.config = config
         self.hidden_size = config.hidden_size
         self.self_attn = LlamaAttention(config, layerwise_recompute)
         self.mlp = LlamaMLP(config)
@@ -889,7 +887,7 @@ class LlamaDecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
-                use_reentrant=False,
+                use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
             outputs = self.self_attn(
@@ -1162,7 +1160,7 @@ class LlamaModel(LlamaPretrainedModel):
             past_key_value,
             use_cache,
             alibi,
-            use_reentrant=False,
+            use_reentrant=self.config.recompute_use_reentrant,
         )
 
         return hidden_states
@@ -1435,6 +1433,13 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             }
         )
         return model_inputs
+
+    def _get_model_inputs_spec(self, dtype: str):
+        return {
+            "input_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            "attention_mask": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            "position_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+        }
 
     @staticmethod
     def update_model_kwargs_for_generation(outputs, model_kwargs, is_encoder_decoder=False):
