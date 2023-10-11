@@ -2056,7 +2056,6 @@ class Trainer:
                 variant=self.args.weight_name_suffix,
                 merge_tensor_parallel=merge_tensor_parallel,
                 is_main_process=self.args.should_save,
-                max_shard_size="1024GB",
             )
         elif not isinstance(self.model, PretrainedModel):
             if isinstance(unwrap_model(self.model), PretrainedModel):
@@ -2072,7 +2071,6 @@ class Trainer:
                         merge_tensor_parallel=merge_tensor_parallel,
                         variant=weight_name_suffix,
                         is_main_process=self.args.should_save,
-                        max_shard_size="1024GB",
                     )
                 else:
                     unwrap_model(self.model).save_pretrained(
@@ -2080,7 +2078,6 @@ class Trainer:
                         merge_tensor_parallel=merge_tensor_parallel,
                         variant=self.args.weight_name_suffix,
                         is_main_process=self.args.should_save,
-                        max_shard_size="1024GB",
                     )
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
@@ -2105,7 +2102,6 @@ class Trainer:
                     merge_tensor_parallel=merge_tensor_parallel,
                     variant=weight_name_suffix,
                     is_main_process=self.args.should_save,
-                    max_shard_size="1024GB",
                 )
             else:
                 self.model.save_pretrained(
@@ -2113,7 +2109,6 @@ class Trainer:
                     merge_tensor_parallel=merge_tensor_parallel,
                     variant=self.args.weight_name_suffix,
                     is_main_process=self.args.should_save,
-                    max_shard_size="1024GB",
                 )
         if self.args.should_save_sharding_stage1_model:
             self.sharding_io.save_distributed_model_meta(output_dir)

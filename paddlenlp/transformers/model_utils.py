@@ -456,7 +456,7 @@ def _partion_for_pipeline_mode(keys):
 
 def shard_checkpoint(
     state_dict: Dict[str, paddle.Tensor],
-    max_shard_size: Union[int, str] = "10GB",
+    max_shard_size: Union[int, str] = "1024GB",
     weights_name: str = PADDLE_WEIGHTS_NAME,
     shard_format="naive",
 ):
@@ -466,8 +466,8 @@ def shard_checkpoint(
 
     The sub-checkpoints are determined by iterating through the `state_dict` in the order of its keys, so there is no
     optimization made to make each sub-checkpoint as close as possible to the maximum size passed. For example, if the
-    limit is 10GB and we have weights of sizes [6GB, 6GB, 2GB, 6GB, 2GB, 2GB] they will get sharded as [6GB], [6+2GB],
-    [6+2+2GB] and not [6+2+2GB], [6+2GB], [6GB].
+    limit is 1024GB and we have weights of sizes [600GB, 600GB, 200GB, 600GB, 200GB, 200GB] they will get sharded as [600GB], [600+200GB],
+    [600+200+200GB] and not [600+200+200GB], [600+200GB], [600GB].
 
     <Tip warning={true}>
 
@@ -478,7 +478,7 @@ def shard_checkpoint(
 
     Args:
         state_dict (`Dict[str, paddle.Tensor]`): The state dictionary of a model to save.
-        max_shard_size (`int` or `str`, *optional*, defaults to `"10GB"`):
+        max_shard_size (`int` or `str`, *optional*, defaults to `"1024GB"`):
             The maximum size of each sub-checkpoint. If expressed as a string, needs to be digits followed by a unit
             (like `"5MB"`).
         weights_name (`str`, *optional*, defaults to `"model_state.pdparams"`):
@@ -2122,7 +2122,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         is_main_process: bool = True,
         state_dict: Optional[dict] = None,
         save_function: Callable = paddle.save,
-        max_shard_size: Union[int, str] = "10GB",
+        max_shard_size: Union[int, str] = "1024GB",
         safe_serialization: bool = False,
         variant: Optional[str] = None,
         *args,
