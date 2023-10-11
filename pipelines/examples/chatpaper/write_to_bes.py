@@ -84,7 +84,7 @@ def get_doc_store():
             queue_size=args.es_queue_size,
             index_type="hnsw",
             duplicate_documents=args.duplicate_documents,
-            timeout=300,
+            timeout=60,
         )
 
         return document_store
