@@ -1113,7 +1113,7 @@ class Trainer:
         metrics = None
         if self.control.should_evaluate:
             if isinstance(self.optimizer, GroupShardedOptimizerStage2) and self.optimizer._broadcast_overlap:
-                paddle.device.cuda.synchronize()
+                paddle.device.synchronize()
 
             if isinstance(self.eval_dataset, dict):
                 for eval_dataset_name, eval_dataset in self.eval_dataset.items():
@@ -1127,7 +1127,7 @@ class Trainer:
 
         if self.control.should_save:
             if isinstance(self.optimizer, GroupShardedOptimizerStage2) and self.optimizer._broadcast_overlap:
-                paddle.device.cuda.synchronize()
+                paddle.device.synchronize()
 
             self._save_checkpoint(model, metrics=metrics)
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
