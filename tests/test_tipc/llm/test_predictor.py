@@ -92,3 +92,18 @@ class InfereneTest(unittest.TestCase):
 
         self.assertGreater(full_match / len(static), 0.6)
         self.assertGreater(count / len(static), 0.8)
+
+        # 4. run sample decoding on fused-mt model
+        subprocess.run(
+            command_prefix
+            + " decode_strategy=sampling inference_model=true bash tests/test_tipc/llm/inference/run_predictor.sh",
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            shell=True,
+        )
+
+        sample_fused_dynamic = self._read_result(os.path.join(self.output_path, "dynamic.json"))
+        sample_fused_static = self._read_result(os.path.join(self.output_path, "static.json"))
+        for i in range(len(sample_fused_dynamic)):
+            self.assertNotEqual(sample_fused_dynamic[i], sample_fused_static[i])
+            self.assertNotEqual(sample_fused_dynamic[i], fused_dynamic[i])
