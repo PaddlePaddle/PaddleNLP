@@ -90,7 +90,7 @@ def main():
     generate_rank_mapping(os.path.join(export_args.output_path, "rank_mapping.csv"))
 
     if tensor_parallel_degree > 1:
-        export_args.output_path = os.path.join(export_args.output_path, f"rank_{tensor_parallel_rank + 1}")
+        export_args.output_path = os.path.join(export_args.output_path, f"rank_{tensor_parallel_rank}")
     validate_pdmodel(export_args.output_path, predictor_args.model_prefix)
 
 

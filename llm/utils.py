@@ -293,7 +293,7 @@ class CausalLMTrainer(Trainer):
 
 def get_infer_model_path(input_dir, model_prefix):
     if dist.get_world_size() > 1:
-        local_rank = dist.ParallelEnv().dev_id
+        local_rank = dist.get_rank()
         return os.path.join(input_dir, "rank_{}".format(local_rank), model_prefix)
     else:
         return os.path.join(input_dir, model_prefix)
