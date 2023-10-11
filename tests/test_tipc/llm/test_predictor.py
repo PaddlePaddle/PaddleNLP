@@ -67,7 +67,7 @@ class InfereneTest(unittest.TestCase):
 
         # 2.run fused-mt model
         subprocess.run(
-            command_prefix + " inference_model true bash tests/test_tipc/llm/inference/run_predictor.sh",
+            command_prefix + " inference_model=true bash tests/test_tipc/llm/inference/run_predictor.sh",
             stdout=sys.stdout,
             stderr=sys.stderr,
             shell=True,
