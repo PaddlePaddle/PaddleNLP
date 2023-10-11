@@ -80,6 +80,7 @@ class PredictorArgument:
         default="None",
         metadata={"help": "The quant type of inference model, support `weight_only_int8`, `weight_only_int4`."},
     )
+    arch: int = field(default=80, metadata={"help": "The SM arch of export model, only support 70, 80."})
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     benchmark: bool = field(
         default=False,
@@ -695,6 +696,14 @@ def create_predictor(
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
             config.tensor_parallel_degree = tensor_parallel_degree
             config.tensor_parallel_rank = tensor_parallel_rank
+            config.quant_bits = -1
+
+            if predictor_args.quant_type.startswith("weight_only_int"):
+                quant_bits = int(predictor_args.quant_type[-1])
+                config.quant_bits = quant_bits
+
+            config.arch = predictor_args.arch
+            print("Config is: ", config)
 
             if "llama" in config.architectures[0].lower():
                 if model_args.model_type == "llama-img2txt":
@@ -706,12 +715,6 @@ def create_predictor(
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMInferenceModel as LlamaInferenceModel,
                     )
-
-                    config.quant_bits = -1
-
-                    if predictor_args.quant_type.startswith("weight_only_int"):
-                        quant_bits = int(predictor_args.quant_type[-1])
-                        config.quant_bits = quant_bits
 
                 model = LlamaInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype

@@ -139,6 +139,7 @@ class FusedMultiTransformer(Layer):
         num_heads,
         dim_feedforward,
         quant_bits=-1,  # -1 means use Half precision.
+        arch=80, # SM_arch
         dropout_rate=0.0,
         activation="gelu",
         norm_type="layernorm",
@@ -222,6 +223,9 @@ class FusedMultiTransformer(Layer):
                 "int8"  # If use weightonly int4, params dtype is int8, and one of the dimension will be half.
             )
             self.weight_dtype = "int" + str(self.quant_bits)
+
+        self.arch = arch 
+        assert ((self.arch == 70) or (self.arch == 80)), "Only accept arch == 70 or 80. "
 
         self.ln_scales, self.ln_biases = [], []
         self.qkv_weights, self.qkv_weights_scale, self.qkv_biases = [], [], []
@@ -550,6 +554,7 @@ class FusedMultiTransformer(Layer):
                     bias=self.qkv_biases[i],
                     weight_scale=self.qkv_weights_scale[i],
                     weight_dtype=self.weight_dtype,
+                    arch=self.arch
                 )
             else:
                 qkv_out = self.linear(ln_out, self.qkv_weights[i], self.qkv_biases[i], transpose_weight=True)
@@ -614,6 +619,7 @@ class FusedMultiTransformer(Layer):
                     weight=self.linear_weights[i],
                     weight_scale=self.linear_weights_scale[i],
                     weight_dtype=self.weight_dtype,
+                    arch=self.arch
                 )
             else:
                 out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i])
@@ -653,6 +659,7 @@ class FusedMultiTransformer(Layer):
                     weight=self.ffn1_weights[i],
                     weight_scale=self.ffn1_weights_scale[i],
                     weight_dtype=self.weight_dtype,
+                    arch=self.arch
                 )
             else:
                 ffn1_out = paddle.matmul(tmp_out, self.ffn1_weights[i])
@@ -665,6 +672,7 @@ class FusedMultiTransformer(Layer):
                     weight=self.ffn2_weights[i],
                     weight_scale=self.ffn2_weights_scale[i],
                     weight_dtype=self.weight_dtype,
+                    arch=self.arch
                 )
             else:
                 ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i])
