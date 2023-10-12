@@ -115,7 +115,6 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
         # Transformer blocks
         ln_scale_attrs = [paddle.ParamAttr(name="fusemt.{}.ln_scale".format(i)) for i in range(config.n_layer)]
         ln_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ln_bias".format(i)) for i in range(config.n_layer)]
-
         qkv_weight_attrs = [
             paddle.ParamAttr(
                 name="fusemt.{}.qkv_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
@@ -146,12 +145,10 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
             for i in range(config.n_layer)
         ]
         ffn2_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn2_bias".format(i)) for i in range(config.n_layer)]
-
         qkv_weight_scale_attrs = None
         linear_weight_scale_attrs = None
         ffn1_weight_scale_attrs = None
         ffn2_weight_scale_attrs = None
-
         if self.use_weight_only:
             qkv_weight_scale_attrs = [
                 paddle.ParamAttr(name="fusemt.{}.qkv_weight_scale".format(i)) for i in range(config.n_layer)
