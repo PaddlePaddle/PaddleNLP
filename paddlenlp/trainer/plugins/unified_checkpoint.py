@@ -240,7 +240,6 @@ def unified_checkpoint_into_shards(
         paddle.distributed.all_gather_object(index_file_list, index_weight_file, group=data_group)
         paddle.distributed.all_gather(total_size_list, total_size, group=data_group)
 
-    print("index_file_list:\n", index_file_list)
     sharded_index = get_sharded_index(
         index_file_list,
         total_size_list,
@@ -257,17 +256,15 @@ def get_sharded_index(
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
     if local_rank == 0:
         sharded_index_json = {}
-        final_dict = index_file_list[0]
+        weight_map = {}
 
         total_size_list = [i.item() for i in total_size_list]
         sharded_index_json["metadata"] = {"total_size": sum(total_size_list)}
 
         for i, index_file in enumerate(index_file_list):
-            if i == 0:
-                continue
-            final_dict.update(index_file_list[i])
+            weight_map.update(index_file_list[i])
 
-        sharded_index_json["weight_map"] = dict(sorted(final_dict.items()))
+        sharded_index_json["weight_map"] = weight_map  # dict(sorted(weight_map.items()))
         return sharded_index_json
 
     return None
@@ -302,16 +299,31 @@ def filter_params(model_to_save, state_dict):
                     not hasattr(v, "is_distributed") or v.is_distributed is False
                 ), f"Tensor {k} shape: {v.shape}, has no action for tensor merge"
 
-        # TODO(ZHUI): Need better partion ways while keep the tensor order
-        # Sort by tensor storage.
-        tensor_bytes_dict = sorted(tensor_bytes_dict.items(), key=lambda x: x[1])
-        keys_list = [key for key, byte in tensor_bytes_dict]
+        filter_tensor_list = []
+        current_block = []
+        current_block_size = 0
+        total_size = 0
 
-        # [0, 1, 2, 3, 4, 5, 6, 7, 7, 6, 5, 4, 3, 2, 1, 0]
-        tensor_cnt = 0
-        while tensor_cnt < len(state_dict):
-            filter_tensor_list[tensor_cnt % tp_size].append(keys_list[tensor_cnt])
-            tensor_cnt += 1
+        max_shard_size = (sum(tensor_bytes_dict.values()) + tp_size - 1) // tp_size
+
+        for index, (key, weight_size) in enumerate(tensor_bytes_dict.items()):
+            # If this weight is going to tip up over the maximal size, we split.
+            # if current_block_size + weight_size > max_shard_size:
+            if total_size + weight_size > max_shard_size * (len(filter_tensor_list) + 1) or (
+                len(tensor_bytes_dict) - index < (tp_size - len(filter_tensor_list))
+            ):
+                # fix if the first param is large than max_shard_size
+                if len(current_block) > 0:
+                    filter_tensor_list.append(current_block)
+                current_block = []
+                current_block_size = 0
+
+            current_block.append(key)
+            current_block_size += weight_size
+            total_size += weight_size
+
+        filter_tensor_list.append(current_block)
+        assert len(filter_tensor_list) == tp_size, "Error, partion failed!"
 
     paddle.distributed.broadcast_object_list(
         filter_tensor_list,
