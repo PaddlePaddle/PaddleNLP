@@ -69,6 +69,23 @@ class PredictorTest(LLMTest, unittest.TestCase):
         self.assertGreaterEqual(full_match / len(result_0), 0.25)
         self.assertGreaterEqual(count / len(result_0), 0.4)
 
+    def test_wint8(self):
+        self.run_predictor({"inference_model": True, "quant_type": "weight_only_int8"})
+        result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
+        self.run_predictor({"inference_model": False})
+        result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))
+
+        assert len(result_0) == len(result_1)
+
+        count, full_match = 0, 0
+        for inference_item, no_inference_item in zip(result_0, result_1):
+            min_length = min(len(inference_item), len(no_inference_item))
+            count += int(inference_item[min_length // 2] == no_inference_item[min_length // 2])
+            full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
+
+        self.assertGreaterEqual(full_match / len(result_0), 0.15)
+        self.assertGreater(count / len(result_0), 0.4)
+
 
 @parameterized_class(
     ["model_name_or_path", "model_class"],

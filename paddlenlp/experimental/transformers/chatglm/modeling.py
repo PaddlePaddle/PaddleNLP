@@ -20,7 +20,8 @@ from paddle.distributed import fleet
 from paddlenlp_ops import get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
-    FusedMultiTransformer,
+    FusedMultiTransformerBase,
+    FusedMultiTransformerConfig,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
@@ -183,7 +184,8 @@ class ChatGLMStackDyBatch(nn.Layer):
         ]
         ffn2_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn2_bias".format(i)) for i in range(config.num_layers)]
         alpha = (2 * self.config.num_hidden_layers) ** 0.5
-        self.transformer_block = FusedMultiTransformer(
+
+        transformer_config = FusedMultiTransformerConfig(
             config.hidden_size,
             config.num_attention_heads,
             4 * config.hidden_size,
@@ -209,6 +211,7 @@ class ChatGLMStackDyBatch(nn.Layer):
             norm_type="layernorm",
             use_neox_rotary_style=True,
         )
+        self.transformer_block = FusedMultiTransformerBase(transformer_config)
 
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
