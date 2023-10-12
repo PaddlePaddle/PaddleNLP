@@ -42,6 +42,8 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         pad_attention_mask: Optional[Callable] = None,
     ) -> None:
         super().__init__()
+        if isinstance(model, fleet.meta_parallel.PipelineLayer):
+            raise NotImplementedError("Prefix tuning is not implemented for pipeline parallelism.")
         self.prefix_config = prefix_config
         self.model = model
         self.forward_keys = signature(self.model.forward)

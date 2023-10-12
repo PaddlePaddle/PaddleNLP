@@ -24,6 +24,7 @@ import unicodedata
 from collections import OrderedDict
 from typing import Dict, List, Optional, Tuple, Union
 
+import numpy as np
 import six
 from paddle.utils import try_import
 
@@ -1440,6 +1441,8 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         spaces_between_special_tokens: bool = True,
         **kwargs
     ) -> str:
+        if isinstance(token_ids, np.ndarray):
+            token_ids = token_ids.tolist()
         self._decode_use_source_tokenizer = kwargs.pop("use_source_tokenizer", False)
         filtered_tokens = self.convert_ids_to_tokens(token_ids, skip_special_tokens=skip_special_tokens)
 

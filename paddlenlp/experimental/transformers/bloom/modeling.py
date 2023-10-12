@@ -21,7 +21,8 @@ from paddle.distributed import fleet
 from paddlenlp_ops import get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
-    FusedMultiTransformer,
+    FusedMultiTransformerBase,
+    FusedMultiTransformerConfig,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
@@ -112,7 +113,8 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
         ffn1_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn1_bias".format(i)) for i in range(config.n_layer)]
         ffn2_weight_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn2_weight".format(i)) for i in range(config.n_layer)]
         ffn2_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn2_bias".format(i)) for i in range(config.n_layer)]
-        self.transformer_block = FusedMultiTransformer(
+
+        transformer_config = FusedMultiTransformerConfig(
             self.embed_dim,
             self.n_head,
             4 * self.embed_dim,
@@ -133,6 +135,8 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
             ffn2_weight_attrs=ffn2_weight_attrs,
             ffn2_bias_attrs=ffn2_bias_attrs,
         )
+
+        self.transformer_block = FusedMultiTransformerBase(transformer_config)
         self.cache_kvs = []
 
         # Final Layer Norm
