@@ -2,4 +2,5 @@ llama:
   model_name: linly-ai/chinese-llama-2-7b
   fused_model: true
   dtype: float16
+  batch_size: 3
   data_file: tests/fixtures/llm/zh_query.json
