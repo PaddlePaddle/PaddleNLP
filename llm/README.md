@@ -271,7 +271,7 @@ python predictor.py \
 
 #A8W8 动态图量化推理
 python predictor.py \
-    --model_name_or_path "checkpoints/llama_ptq_ckpts" \
+    --model_name_or_path "/root/paddlejob/workspace/env_run/wufeisheng/paddlenlp_ckpt/checkpoints/llama_ptq_ckpts" \
     --dtype float16 \
     --max_length 1024 \
     --mode "dynamic" \

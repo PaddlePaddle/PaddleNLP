@@ -447,6 +447,7 @@ class InferencePredictorMixin:
                 top_p=self.config.top_p,
                 temperature=self.config.temperature,
                 pre_caches_length=pre_caches_length,
+                benchmark=self.config.benchmark,
             )
 
             for i in range(inputs["input_ids"].shape[0]):
@@ -811,8 +812,8 @@ def benchmark(predictor, predictor_args, model_args):
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
-    warmup_time = 10
-    test_time = 100
+    warmup_time = 3
+    test_time = 10
 
     print("***********Start Warmup**********")
     for _ in range(warmup_time):
@@ -821,22 +822,26 @@ def benchmark(predictor, predictor_args, model_args):
 
     print("***********Start Speed Test**********")
     start = time.perf_counter()
-    for _ in range(test_time):
+    for i in range(test_time):
+        print(i)
         for bs, batch_source_text in enumerate(batch_benchmark_texts):
             outputs = predictor.predict(batch_source_text)
     end = time.perf_counter()
 
     output_tokens = sum([len(output) for output in outputs])
     print(
-        "Input length is: {}, Output length is: {}, bs is: {}, Generate speed is: {:.3f} tokens/s(ips), QPS: {:.3f} requests/s. ".format(
+        "Input length is: {}, Output length is: {}, bs is: {}, Generate speed is: {:.3f} tokens/s(ips), time: {}, QPS: {:.3f} requests/s. ".format(
             predictor_args.src_length,
             predictor_args.max_length,
             predictor_args.batch_size,
             (output_tokens / (end - start) / test_time),
+            (end - start) / test_time,
             (predictor_args.batch_size / (end - start) / test_time),
         )
     )
 
 
 if __name__ == "__main__":
+    paddle.base.core.enable_autotune()
+    paddle.base.core.update_autotune_status()
     predict()

@@ -19,13 +19,37 @@ export FLAGS_new_executor_serial_run=1
 export FLAGS_allocator_strategy=naive_best_fit
 export FLAGS_fraction_of_gpu_memory_to_use=0.92
 
+export FLAGS_use_autotune=1
+export FLAGS_cublaslt_exhaustive_search_times=10
+
+export CUDA_VISIBLE_DEVICES=1
+
+# dygraph
+
+for bsz in 1 2;do
 python predictor.py \
-    --model_name_or_path ./llama7b-inference_model_fp16 \
+    --model_name_or_path "/root/paddlejob/workspace/env_run/wufeisheng/paddlenlp_ckpt/checkpoints/llama_ptq_ckpts" \
     --dtype float16 \
     --src_length 300 \
     --max_length 100 \
-    --output_file "infer.json" \
-    --mode "static" \
-    --batch_size 1 \
-    --benchmark \
-    --inference_model
+    --mode "dynamic" \
+    --quant_type "A8W8" \
+    --inference_model \
+    --shift_smooth 1 \
+    --batch_size ${bsz} \
+    --benchmark
+done
+
+# inference statc=ic graph
+# for bsz in 1 2 4 8 16;do
+# python predictor.py \
+#     --model_name_or_path ./inference_ptq \
+#     --dtype float16 \
+#     --src_length 300 \
+#     --max_length 100 \
+#     --output_file "infer.json" \
+#     --mode "static" \
+#     --batch_size ${bsz} \
+#     --benchmark \
+#     --inference_model 
+# done
