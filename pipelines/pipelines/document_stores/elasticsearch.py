@@ -88,6 +88,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         chunk_size: int = 500,
         thread_count: int = 32,
         queue_size: int = 32,
+        **kwargs,
     ):
         """
         A DocumentStore using Elasticsearch to store and query the documents for our search.
@@ -239,6 +240,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         self.scroll = scroll
         self.skip_missing_embeddings: bool = skip_missing_embeddings
         self.vector_type = vector_type
+        self.number_of_shards = kwargs.get("number_of_shards", 1)
+        self.number_of_replicas = kwargs.get("number_of_replicas", 2)
 
         self.similarity_check(similarity)
         if index_type in ["flat", "hnsw"]:
@@ -459,8 +462,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                     mapping["mappings"]["properties"].update({field: {"type": "text"}})
 
             if self.embedding_field:
-                mapping["settings"]["number_of_shards"] = 1
-                mapping["settings"]["number_of_replicas"] = 2
+                mapping["settings"]["number_of_shards"] = self.number_of_shards
+                mapping["settings"]["number_of_replicas"] = self.number_of_replicas
                 mapping["mappings"]["properties"][self.embedding_field] = {
                     "type": self.vector_type,
                     "dims": self.embedding_dim,
@@ -496,7 +499,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                     # TODO add pipeline_hash and pipeline_name once we migrated the REST API to pipelines
                 }
             },
-            "settings": {"number_of_shards": 1, "number_of_replicas": 2},
+            "settings": {"number_of_shards": self.number_of_shards, "number_of_replicas": self.number_of_replicas},
         }
         try:
             self.client.indices.create(index=index_name, body=mapping, headers=headers)
@@ -2383,8 +2386,8 @@ class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
                     mapping["mappings"]["properties"].update({field: {"type": "text"}})
 
             if self.embedding_field:
-                mapping["settings"]["number_of_shards"] = 1
-                mapping["settings"]["number_of_replicas"] = 2
+                mapping["settings"]["number_of_shards"] = self.number_of_shards
+                mapping["settings"]["number_of_replicas"] = self.number_of_replicas
                 if self.index_type == "hnsw":
                     mapping["mappings"]["properties"][self.embedding_field] = {
                         "type": self.vector_type,
