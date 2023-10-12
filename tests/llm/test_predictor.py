@@ -57,13 +57,6 @@ class PredictorTest(LLMTest, unittest.TestCase):
 
         count, full_match = 0, 0
         for inference_item, no_inference_item in zip(result_0, result_1):
-            # random model may return all special tokens prediction,
-            # and will be filtered in .decode() cause empty result, just let pass.
-            if len(inference_item) == 0 and len(no_inference_item) == 0:
-                count += 1
-                full_match += 1
-                continue
-
             min_length = min(len(inference_item), len(no_inference_item))
             count += int(inference_item[min_length // 2] == no_inference_item[min_length // 2])
             full_match += int(inference_item[:min_length] == no_inference_item[:min_length])

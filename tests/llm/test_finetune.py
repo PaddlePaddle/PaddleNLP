@@ -45,7 +45,6 @@ class FinetuneTest(LLMTest, unittest.TestCase):
         finetune_config["dataset_name_or_path"] = self.data_dir
         finetune_config["output_dir"] = self.output_dir
 
-        print(finetune_config)
         with argv_context_guard(finetune_config):
             from finetune_generation import main
 
