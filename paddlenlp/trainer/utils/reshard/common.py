@@ -17,7 +17,48 @@ from collections import OrderedDict
 
 import numpy as np
 import paddle
+from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
+    DygraphShardingOptimizer,
+)
 from paddle.distributed.fleet.utils.log_util import logger
+
+try:
+    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
+        DygraphShardingOptimizerV2,
+    )
+except:
+    DygraphShardingOptimizerV2 = None
+
+
+from ....transformers.model_utils import unwrap_optimizer
+
+SHARDING_STRATEGY_V1 = "ShardingV1"
+SHARDING_STRATEGY_V2 = "ShardingV2"
+
+
+def is_sharding_opt(optimizer):
+    def check(cls):
+        tmp = unwrap_optimizer(optimizer, DygraphShardingOptimizerV2)
+        if tmp is not None:
+            return True
+        return False
+
+    if check(DygraphShardingOptimizer):
+        return True
+
+    if DygraphShardingOptimizerV2 is not None:
+        if check(DygraphShardingOptimizerV2):
+            return True
+
+    return False
+
+
+def get_sharding_strategy(optimizer):
+    if DygraphShardingOptimizerV2 is not None:
+        tmp = unwrap_optimizer(optimizer, DygraphShardingOptimizerV2)
+        if tmp is not None:
+            return SHARDING_STRATEGY_V2
+    return SHARDING_STRATEGY_V1
 
 
 class NodeModelState:

@@ -45,6 +45,14 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
     DygraphShardingOptimizer,
 )
+
+try:
+    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
+        DygraphShardingOptimizerV2,
+    )
+except:
+    DygraphShardingOptimizerV2 = None
+
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
     HybridParallelOptimizer,
 )
@@ -127,8 +135,7 @@ SCHEDULER_NAME = "scheduler.pdparams"
 SCALER_NAME = "scaler.pdparams"
 MODEL_META_NAME = "model_meta.json"
 SHARDING_META_NAME = "shard_meta.json"
-SHARDING_STRATEGY_V1 = "ShardingV1"
-SHARDING_STRATEGY_V2 = "ShardingV2"
+
 
 if is_datasets_available():
     import datasets
@@ -968,7 +975,7 @@ class Trainer:
 
                         if not enable_dp_comm_overlap:
                             if self.optimizer._sharding_enable:
-                                assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
+                                assert reshard_util.is_sharding_opt(self.optimizer)
                                 self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
                             if self.optimizer._dp_enable:
@@ -2176,12 +2183,15 @@ class Trainer:
             return None
         if self.args.data_parallel_rank != 0:
             return None
-
-        optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
-        if not optimizer:
+        if not reshard_util.is_sharding_opt(self.optimizer):
             return None
 
-        param2rank = {k: v for (k, v) in optimizer._param2rank.items()}
+        sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
+        param2rank = {}
+
+        if sharding_strategy == reshard_util.SHARDING_STRATEGY_V1:
+            optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
+            param2rank = {k: v for (k, v) in optimizer._param2rank.items()}
 
         model = self.model
         structure_name_mapping = {k: v.name for (k, v) in model.state_dict().items()}
@@ -2334,14 +2344,14 @@ class Trainer:
     def _need_reshard(self, checkpoint):
         parallel_config = self._load_distributed_strategy(checkpoint)
         sharding_degree = parallel_config["sharding_degree"]
-        sharding_strategy = SHARDING_STRATEGY_V1
+        sharding_strategy = reshard_util.SHARDING_STRATEGY_V1
         if "sharding_strategy" in parallel_config:
             sharding_strategy = parallel_config["sharding_strategy"]
         cur_sharding_degree = self.args.sharding_parallel_degree
-        cur_sharding_strategy = SHARDING_STRATEGY_V2
+        cur_sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
         if sharding_degree != cur_sharding_degree or sharding_strategy != cur_sharding_strategy:
             return True
-        if sharding_strategy == SHARDING_STRATEGY_V1:
+        if sharding_strategy == reshard_util.SHARDING_STRATEGY_V1:
             sharding_meta = self._load_sharding_meta(checkpoint)
             param2rank = sharding_meta["param2rank"]
             optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
@@ -2359,7 +2369,7 @@ class Trainer:
         pp_degree = parallel_config["pp_degree"]
         mp_degree = parallel_config["mp_degree"]
         sharding_degree = parallel_config["sharding_degree"]
-        sharding_strategy = SHARDING_STRATEGY_V1
+        sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
         if "sharding_strategy" in parallel_config:
             sharding_strategy = parallel_config["sharding_strategy"]
         assert self.args.pipeline_parallel_degree == pp_degree
@@ -2395,12 +2405,12 @@ class Trainer:
         if self.args.load_sharding_stage1_model:
             restore_func = (
                 reshard_util.sharding_v1.restore
-                if sharding_strategy == SHARDING_STRATEGY_V1
+                if sharding_strategy == reshard_util.SHARDING_STRATEGY_V1
                 else reshard_util.sharding_v2.restore
             )
             shard_func = (
                 reshard_util.sharding_v1.shard
-                if sharding_strategy == SHARDING_STRATEGY_V1
+                if sharding_strategy == reshard_util.SHARDING_STRATEGY_V1
                 else reshard_util.sharding_v2.shard
             )
             node_model_state = restore_func(node_model_state, self.model, self.optimizer, self.hcg)
