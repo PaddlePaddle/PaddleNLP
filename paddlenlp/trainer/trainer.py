@@ -95,7 +95,7 @@ from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
-from .plugins.unified_checkpoint_io import UnifiedCkptIO
+from .plugins.unified_checkpoint import load_unified_checkpoint, save_unified_checkpoint
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -303,7 +303,6 @@ class Trainer:
         self._signature_columns = None
         self.optimizer_grouped_parameters = None
         self.sharding_io = None
-        self.unified_ckpt_io = UnifiedCkptIO(self.args)
         if self.args.should_save_sharding_stage1_model or self.args.should_load_sharding_stage1_model:
             self.sharding_io = ShardingIO(self.args, self.model, self.optimizer)
 
@@ -491,19 +490,21 @@ class Trainer:
         """
         resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
 
-        if resume_from_checkpoint is not None and self.args.unified_checkpoint:
-            self.unified_ckpt_io.load_unified_checkpoint(
-                self.model,
-                resume_from_checkpoint,
-                safe_serialization=False,
-            )
-            return
-
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
             resume_from_checkpoint = get_last_checkpoint(self.args.output_dir)
             if resume_from_checkpoint is None:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
+
+        if self.args.unified_checkpoint:
+            if resume_from_checkpoint is not None:
+                load_unified_checkpoint(
+                    self.model,
+                    resume_from_checkpoint,
+                    safe_serialization=True,
+                )
+                logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
+                return
 
         if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
             self._load_from_peft_checkpoint(resume_from_checkpoint)
@@ -2063,11 +2064,11 @@ class Trainer:
             paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
 
         if self.args.unified_checkpoint:
-            self.unified_ckpt_io.save_unified_checkpoint(self.model, output_dir, state_dict)
+            save_unified_checkpoint(self.args, self.model, output_dir, safe_serialization=True)
             return
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
-
+        # peft model
         if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
             # lugimzzz: Force merge_tensor_parallel to True for LoRA & Prefix Model until there is an option to merge params during training.
             self.model.save_pretrained(
@@ -2076,15 +2077,12 @@ class Trainer:
                 merge_tensor_parallel=merge_tensor_parallel,
                 is_main_process=self.args.should_save,
             )
+        # TODO: @ZHUI unifiy unwrap_model(self.model) and self.model
         elif not isinstance(self.model, PretrainedModel):
             if isinstance(unwrap_model(self.model), PretrainedModel):
                 if self.args.should_save_sharding_stage1_model:
                     config_to_save = None
-                    (
-                        state_dict,
-                        config_to_save,
-                        weight_name_suffix,
-                    ) = self.sharding_io.manipulate_state_dict_and_config(
+                    state_dict, config_to_save, weight_name_suffix = self.sharding_io.manipulate_state_dict_and_config(
                         unwrap_model(self.model), merge_tensor_parallel=merge_tensor_parallel
                     )
                     unwrap_model(self.model).save_pretrained(
