@@ -649,5 +649,7 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
-        self.lm_head.weight.set_value(state_dict["transformer.word_embeddings.weight"])
+        self.lm_head.weight.set_value(
+            state_dict["transformer.word_embeddings.weight"].astype(self.lm_head.weight.dtype)
+        )
         self.model.transformer.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
