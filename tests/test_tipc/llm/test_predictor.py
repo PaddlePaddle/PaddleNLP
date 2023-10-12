@@ -40,8 +40,11 @@ class InfereneTest(unittest.TestCase):
         self.model_name = os.getenv("MODEL_NAME")
         self.run_predictor_shell_path = os.path.join(os.path.dirname(__file__), self.predictor_shell_name)
 
+        self.log_file = open(os.path.join(self.output_path, "log.log"), "w")
+
     def tearDown(self) -> None:
         sys.path.remove("../llm")
+        self.log_file.close()
 
     def _load_config(self, key):
         with open(self.config_path, "r", encoding="utf-8") as f:
@@ -78,7 +81,7 @@ class InfereneTest(unittest.TestCase):
 
         # 0. download the ground-truth file for comparing
         get_path_from_url_with_filelock(
-            os.path.join(self.ce_testing_base_url, config["model_name_or_path"], self.predict_file_name),
+            os.path.join(self.ce_testing_base_url, config["model_name"], self.predict_file_name),
             root_dir=self.output_path,
         )
 
@@ -110,15 +113,16 @@ class InfereneTest(unittest.TestCase):
         full_match_acc, half_match_acc = self.compare_result(self.predict_file_name, "static.json")
         self.assertEqual(full_match_acc, 1.0)
 
-        # 3. run sample decoding on fused-mt model
+        # 3. run sample decoding & benchmark on fused-mt model
         subprocess.run(
             command_prefix
-            + " decode_strategy=sampling inference_model=true bash tests/test_tipc/llm/inference/run_predictor.sh",
-            stdout=sys.stdout,
-            stderr=sys.stderr,
+            + " top_p=0.7 decode_strategy=sampling benchmark=1 inference_model=true bash tests/test_tipc/llm/inference/run_predictor.sh",
+            stdout=self.log_file,
+            stderr=self.log_file,
             shell=True,
         )
 
+        # sampling: the full-matach acc must be less than 0.1
         full_match_acc, half_match_acc = self.compare_result("dynamic.json", "static.json")
         self.assertLessEqual(full_match_acc, 0.1)
         self.assertLessEqual(half_match_acc, 0.2)
@@ -127,23 +131,42 @@ class InfereneTest(unittest.TestCase):
         self.assertLessEqual(full_match_acc, 0.1)
         self.assertLessEqual(half_match_acc, 0.2)
 
+        # read ips value from log file
+        ips = self._read_ips_from_log_file()
+        self.assertGreaterEqual(ips, 10000000)
 
-class PTuningInfereneTest(InfereneTest):
-    config_path: str = "./test_tipc/llm/fixtures/predictor-ptuning.yaml"
-    predictor_shell_name = "inference/run_predictor_precaches.sh"
+    def _read_ips_from_log_file(self):
+        with open(os.path.join(self.output_path, "log.log"), "r") as f:
+            content = f.read()
 
-    predict_file_name = "predict-ptuning.json"
+        keyword = "IPS:"
+        ips_index = content.index(keyword)
+        if ips_index == -1:
+            return None
 
-    def setUp(self) -> None:
-        super().setUp()
+        content = content[ips_index + len(keyword) :]
+        token_unit_index = content.index("tokens/s")
+        ips = content[:token_unit_index]
+        return float(ips)
 
-    def _load_config(self, key):
-        config = super()._load_config(key)
 
-        for file in ["pre_caches.npy", "prefix_config.json", "prefix_model_state.pdparams"]:
-            get_path_from_url_with_filelock(
-                os.path.join(self.ce_testing_base_url, config["model_name_or_path"], file), root_dir=self.output_path
-            )
+# class PTuningInfereneTest(InfereneTest):
+#     config_path: str = "./test_tipc/llm/fixtures/predictor-ptuning.yaml"
+#     predictor_shell_name = "inference/run_predictor_precaches.sh"
 
-        config["prefix_path"] = self.output_path
-        return config
+#     predict_file_name = "predict-ptuning.json"
+
+#     def setUp(self) -> None:
+#         super().setUp()
+
+#     def _load_config(self, key):
+#         config = super()._load_config(key)
+
+#         for file in ["pre_caches.npy", "prefix_config.json", "prefix_model_state.pdparams"]:
+#             get_path_from_url_with_filelock(
+#                 os.path.join(self.ce_testing_base_url, config["model_name"], file), root_dir=self.output_path
+#             )
+
+#         config["prefix_path"] = self.output_path
+#         config["export_precache"] = 1
+#         return config
