@@ -252,9 +252,10 @@ class FusedMultiTransformerBase(Layer):
         dim_feedforward = config.dim_feedforward // config.nranks
         self._dim_feedforward = dim_feedforward
 
-        if isinstance(config.qkv_weight_attrs, (list, tuple)):
-            self.num_layers = len(config.qkv_weight_attrs)
+        self.num_layers = config.num_layers
         assert self.num_layers > 0
+        if isinstance(config.qkv_weight_attrs, (list, tuple)):
+            assert self.num_layers == len(config.qkv_weight_attrs)
 
         self.weight_dtype = self._dtype
         self.create_params_type = self.get_weight_create_dype()
@@ -297,7 +298,7 @@ class FusedMultiTransformerBase(Layer):
                     dtype=self._norm_weight_dtype,
                 )
 
-            self.get_weight_shape(num_heads, dim_feedforward, config)
+            self.init_weight_shape(num_heads, dim_feedforward, config)
 
             qkv_weight = self.create_parameter(
                 shape=self.qkv_weight_shape,
@@ -437,7 +438,7 @@ class FusedMultiTransformerBase(Layer):
         assert param.name not in self._parameters
         self._parameters[param.name] = param
 
-    def get_weight_shape(self, num_heads, dim_feedforward, config):
+    def init_weight_shape(self, num_heads, dim_feedforward, config):
         self.qkv_weight_shape = (
             [3 * num_heads * self.head_dim, self.embed_dim]
             if config.trans_qkvw
@@ -816,8 +817,8 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
     def get_weight_create_dype(self):
         return "int8"  # If use weightonly int4, params dtype is int8, and one of the dimension will be half.
 
-    def get_weight_shape(self, num_heads, dim_feedforward, config):
-        super().get_weight_shape(num_heads, dim_feedforward, config)
+    def init_weight_shape(self, num_heads, dim_feedforward, config):
+        super().init_weight_shape(num_heads, dim_feedforward, config)
 
         self.linear_weight_shape = [self.embed_dim, num_heads * self.head_dim]
         self.ffn1_weight_shape = (
