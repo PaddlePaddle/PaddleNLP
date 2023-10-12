@@ -1097,7 +1097,7 @@ class Trainer:
                     process_index=self.args.dataset_rank,
                 )
 
-            return DataLoader(
+            return _DataLoader(
                 train_dataset,
                 batch_size=self.args.per_device_train_batch_size,
                 collate_fn=self.data_collator,
@@ -1177,7 +1177,7 @@ class Trainer:
                     process_index=self.args.dataset_rank,
                 )
 
-            return DataLoader(
+            return _DataLoader(
                 eval_dataset,
                 batch_size=self.args.per_device_eval_batch_size,
                 collate_fn=self.data_collator,
@@ -1230,7 +1230,7 @@ class Trainer:
                     process_index=self.args.dataset_rank,
                 )
 
-            return DataLoader(
+            return _DataLoader(
                 test_dataset,
                 batch_size=self.args.per_device_eval_batch_size * self.world_size,
                 collate_fn=self.data_collator,  # _get_collator_with_removed_columns
