@@ -531,6 +531,7 @@ class FusedMultiTransformer(Layer):
         """
         if caches is not None:
             assert len(caches) == len(self.qkv_weights)
+        bsz = input_ids.shape[0]
         bias_residual_input = src
         ln_out = src
         for i in range(len(caches)):
@@ -576,8 +577,8 @@ class FusedMultiTransformer(Layer):
                     )
 
                 if pre_caches is not None:
-                    k_out = paddle.concat([pre_caches[i][0], k_out], axis=2)
-                    v_out = paddle.concat([pre_caches[i][1], v_out], axis=2)
+                    k_out = paddle.concat([pre_caches[i][0, :bsz], k_out], axis=2)
+                    v_out = paddle.concat([pre_caches[i][1, :bsz], v_out], axis=2)
 
                 # write cache kv (inplace)
                 write_cache_kv(k_out, v_out, caches[i], seq_lens + pre_caches_length)

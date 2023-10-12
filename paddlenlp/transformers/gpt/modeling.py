@@ -116,6 +116,36 @@ def seed_guard_context(name=None):
         return contextlib.nullcontext()
 
 
+def _make_causal_mask(input_ids_shape, past_key_values_length):
+    """
+    Make causal mask used for self-attention
+    """
+    batch_size, target_length = input_ids_shape  # target_length: seq_len
+
+    mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
+
+    if past_key_values_length > 0:
+        # [tgt_len, tgt_len + past_len]
+        mask = paddle.concat([paddle.ones([target_length, past_key_values_length], dtype="bool"), mask], axis=-1)
+
+    # [bs, 1, tgt_len, tgt_len + past_len]
+    return mask[None, None, :, :].expand([batch_size, 1, target_length, target_length + past_key_values_length])
+
+
+def _expand_2d_mask(mask, dtype, tgt_length):
+    """
+    Expands attention_mask from `[batch_size, src_length]` to `[batch_size, 1, tgt_length, src_length]`.
+    """
+    batch_size, src_length = mask.shape[0], mask.shape[-1]
+    tgt_length = tgt_length if tgt_length is not None else src_length
+
+    mask = mask[:, None, None, :].astype("bool")
+    mask.stop_gradient = True
+    expanded_mask = mask.expand([batch_size, 1, tgt_length, src_length])
+
+    return expanded_mask
+
+
 class MultiHeadAttention(nn.Layer):
     """
     Attention mapps queries and a set of key-value pairs to outputs, and
@@ -137,8 +167,7 @@ class MultiHeadAttention(nn.Layer):
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
 
-        self.use_flash_attention = config.use_flash_attention if flash_attention else None
-        self.dropout = config.attention_probs_dropout_prob
+        self.use_flash_attention = config.use_flash_attention if flash_attention else False
 
         self.head_dim = config.hidden_size // config.num_attention_heads
         assert (
@@ -202,16 +231,17 @@ class MultiHeadAttention(nn.Layer):
             self.out_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
 
     def _fuse_prepare_qkv(self, query, use_cache=False, past_key_value=None):
+        # bs, seq_len, num_head * 3*head_dim
         mix_layer = self.qkv_proj(query)
-        # bs, seqlen, nhead, headdim
+        # bs, seq_len, num_head, 3*head_dim
         mix_layer = paddle.reshape_(mix_layer, [0, 0, self.num_attention_heads, 3 * self.head_dim])
-        # bs, nhead, seqlen, headdim
-
+        # query_states, key_states, value_states => bs, seq_len, num_head, head_dim
         query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
 
-        # [bsz, nh, t, hd]
+        # [bs, seq_len, num_head, head_dim]
         if past_key_value is not None:
             # reuse k, v, self_attention
+            # concat along seqlen dimension
             key_states = paddle.concat([past_key_value[0], key_states], axis=1)
             value_states = paddle.concat([past_key_value[1], value_states], axis=1)
 
@@ -238,9 +268,10 @@ class MultiHeadAttention(nn.Layer):
         # [bs, seq_len, num_head, head_dim]
         value_states = tensor.reshape(x=value_states, shape=[0, 0, self.num_attention_heads, self.head_dim])
 
-        # [bsz, nh, t, hd]
+        # [bs, seq_len, num_head, head_dim]
         if past_key_value is not None:
             # reuse k, v, self_attention
+            # concat along seqlen dimension
             key_states = paddle.concat([past_key_value[0], key_states], axis=1)
             value_states = paddle.concat([past_key_value[1], value_states], axis=1)
 
@@ -250,14 +281,15 @@ class MultiHeadAttention(nn.Layer):
 
     def _flash_attention(self, q, k, v, attention_mask=None, output_attentions=False):
         out, weights = flash_attention(
-            q,
-            k,
-            v,
-            self.config.hidden_dropout_prob,
-            causal=True,
+            query=q,
+            key=k,
+            value=v,
+            dropout=self.config.attention_probs_dropout_prob,
+            causal=q.shape[1] != 1,
             return_softmax=output_attentions,
             training=self.training,
         )
+        # [bs, seq_len, num_head, head_dim] -> [bs, seq_len, num_head * head_dim]
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
         return (out, weights) if output_attentions else out
 
@@ -268,9 +300,7 @@ class MultiHeadAttention(nn.Layer):
         k = tensor.transpose(x=k, perm=perm)
         v = tensor.transpose(x=v, perm=perm)
         # scale dot product attention
-        scale_qk_coeff = self.config.scale_qk_coeff * self.head_dim**0.5
-        product = paddle.matmul(x=q.scale(1.0 / scale_qk_coeff), y=k, transpose_y=True)
-
+        product = paddle.matmul(x=q * ((self.config.scale_qk_coeff * self.head_dim) ** -0.5), y=k, transpose_y=True)
         if self.config.scale_qk_coeff != 1.0:
             product = product.scale(self.config.scale_qk_coeff)
 
@@ -284,17 +314,17 @@ class MultiHeadAttention(nn.Layer):
         else:
             weights = incubate.softmax_mask_fuse_upper_triangle(product)
 
-        if self.config.hidden_dropout_prob:
+        if self.config.attention_probs_dropout_prob:
             with seed_guard_context("local_seed"):
                 weights = F.dropout(
-                    weights, self.config.hidden_dropout_prob, training=self.training, mode="upscale_in_train"
+                    weights, self.config.attention_probs_dropout_prob, training=self.training, mode="upscale_in_train"
                 )
 
         out = paddle.matmul(weights, v)
 
         # combine heads
-        out = tensor.transpose(out, perm=[0, 2, 1, 3])
-        out = tensor.reshape(x=out, shape=[0, 0, -1])
+        out = tensor.transpose(out, perm=[0, 2, 1, 3])  # bs, seq_len, num_head, head_dim
+        out = tensor.reshape(x=out, shape=[0, 0, -1])  # bs, seq_len, dim
 
         return (out, weights) if output_attentions else out
 
@@ -307,8 +337,8 @@ class MultiHeadAttention(nn.Layer):
         """
         key = query if key is None else key
         value = query if value is None else value
-        # compute q ,k ,v
         if self.config.fuse_attention_qkv:
+            # [bs, seq_len, num_head, head_dim]
             q, k, v, past_key_value = self._fuse_prepare_qkv(query, use_cache, past_key_value)
         else:
             # [bs, seq_len, num_head, head_dim]
@@ -319,13 +349,19 @@ class MultiHeadAttention(nn.Layer):
             # Current Flash Attention doesn't support attn maskt
             # Paddle Flash Attention input [batch_size, seq_len, num_heads, head_dim]
             # Torch Flash Attention input (batch_size, seqlen, nheads, headdim)
-            bsz, q_len, num_heads, head_dim = q.shape
-            # TODO: Suppoty attention mask for flash attention
-            outputs = self._flash_attention(q, k, v, attention_mask=None, output_attentions=output_attentions)
+            # bsz, q_len, num_heads, head_dim = q.shape
+            # TODO: Support attention mask for flash attention
+            attention_func = self._flash_attention
         else:
             # scale dot product attention
             # [bs, seq_len, num_head,]
-            outputs = self._core_attention(q, k, v, attention_mask=attention_mask, output_attentions=output_attentions)
+            attention_func = self._core_attention
+
+        has_gradient = (not q.stop_gradient) or (not k.stop_gradient) or (not v.stop_gradient)
+        if self.enable_recompute and self.config.recompute_granularity == "core_attn" and has_gradient:
+            outputs = recompute(attention_func, q, k, v, attention_mask, output_attentions, use_reentrant=False)
+        else:
+            outputs = attention_func(q, k, v, attention_mask=attention_mask, output_attentions=output_attentions)
 
         if output_attentions:
             out, weights = outputs
@@ -374,6 +410,10 @@ class TransformerDecoder(nn.Layer):
 
             return custom_forward
 
+        # GPTDecoderLayer
+        # def forward(
+        #     self, hidden_states, attention_mask=None, use_cache=False, past_key_value=None, output_attentions=False
+        # ):
         hidden_states = recompute(
             create_custom_forward(layer_module),
             hidden_states,
@@ -400,21 +440,21 @@ class TransformerDecoder(nn.Layer):
         layer.
         """
         output = hidden_states
-        new_caches = [] if use_cache else None
         all_self_attentions = () if output_attentions else None
         all_hidden_states = () if output_hidden_states else None
+        next_decoder_cache = () if use_cache else None
 
         for i, mod in enumerate(self.layers):
             has_gradient = not output.stop_gradient
             # def forward(self, hidden_states, attention_mask=None, use_cache=False, past_key_value=None, output_attentions=False):
             if self.enable_recompute and has_gradient:
                 outputs = self.recompute_training(
-                    mod,
-                    output,
-                    attention_mask,
-                    use_cache,
-                    None,
-                    output_attentions,
+                    layer_module=mod,
+                    hidden_states=output,
+                    attention_mask=attention_mask,
+                    use_cache=use_cache,
+                    past_key_value=None,
+                    output_attentions=output_attentions,
                 )
             else:
                 outputs = mod(
@@ -428,18 +468,16 @@ class TransformerDecoder(nn.Layer):
             # outputs = hidden_states if both use_cache and output_attentions are False
             # Otherwise, outputs = (hidden_states, attention if output_attentions, cache if use_cache)
             output = outputs[0] if (use_cache or output_attentions) else outputs
-            if output_attentions:
-                all_self_attentions = all_self_attentions + (outputs[1],)
-            if use_cache:
-                new_caches.append(outputs[-1])
-            if output_hidden_states:
-                all_hidden_states = all_hidden_states + (output,)
+            all_self_attentions = all_self_attentions + (outputs[1],) if output_attentions else None
+            all_hidden_states = all_hidden_states + (output,) if output_hidden_states else None
+            next_decoder_cache = next_decoder_cache + (outputs[-1],) if use_cache else None
 
         if self.norm is not None:
             output = self.norm(output)
 
+        next_cache = next_decoder_cache if use_cache else None
         if not return_dict:
-            temp_list = [output, new_caches, all_hidden_states, all_self_attentions]
+            temp_list = [output, next_cache, all_hidden_states, all_self_attentions]
 
             if not (use_cache or output_attentions or output_hidden_states):
                 return output
@@ -448,7 +486,7 @@ class TransformerDecoder(nn.Layer):
 
         return BaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=output,
-            past_key_values=new_caches,
+            past_key_values=next_cache,
             hidden_states=all_hidden_states,
             attentions=all_self_attentions,
             cross_attentions=None,
@@ -515,32 +553,31 @@ class GPTDecoderLayer(nn.Layer):
 
         if self.config.normalize_before:
             hidden_states = self.norm1(hidden_states)
+        # self.self_attn:
+        # def forward(
+        #     self, query, key, value, attention_mask=None, use_cache=False, past_key_value=None, output_attentions=False
+        # ):
         # self.self_attn(...) --> hidden_states, weights, (past_key_value)
-        if use_cache is False:
-            has_gradient = not hidden_states.stop_gradient
-            if self.enable_recompute and has_gradient and self.config.recompute_granularity == "full_attn":
-                hidden_states = recompute(
-                    self.self_attn,
-                    hidden_states,
-                    None,
-                    None,
-                    attention_mask,
-                    use_cache,
-                    past_key_value,
-                    output_attentions,
-                    use_reentrant=False,
-                )
-            else:
-                hidden_states = self.self_attn(
-                    hidden_states, None, None, attention_mask, use_cache, past_key_value, output_attentions
-                )
+        has_gradient = not hidden_states.stop_gradient
+        if self.enable_recompute and has_gradient and self.config.recompute_granularity == "full_attn":
+            hidden_states = recompute(
+                self.self_attn,
+                hidden_states,
+                None,
+                None,
+                attention_mask,
+                use_cache,
+                past_key_value,
+                output_attentions,
+                use_reentrant=False,
+            )
         else:
-            hidden_states, incremental_cache = self.self_attn(
+            hidden_states = self.self_attn(
                 hidden_states, None, None, attention_mask, use_cache, past_key_value, output_attentions
             )
-
-        if output_attentions:
-            hidden_states, attention_weights = hidden_states
+        incremental_cache = hidden_states[-1] if use_cache else None
+        attention_weights = hidden_states[1] if output_attentions else None
+        hidden_states = hidden_states[0] if (use_cache or output_attentions) else hidden_states
 
         with seed_guard_context("global_seed"):
             if self.config.use_fused_dropout_add:
@@ -572,8 +609,8 @@ class GPTDecoderLayer(nn.Layer):
 
         temp_list = [
             hidden_states,
-            attention_weights if output_attentions else None,
-            incremental_cache if use_cache else None,
+            attention_weights,
+            incremental_cache,
         ]
 
         return tuple(v for v in temp_list if v is not None)
@@ -895,6 +932,30 @@ class GPTModel(GPTPretrainedModel):
     def set_input_embeddings(self, value):
         self.embeddings.word_embeddings = value
 
+    @staticmethod
+    def _prepare_decoder_attention_mask(attention_mask, input_shape, past_key_values_length, dtype):
+        if attention_mask is not None:
+            # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+            if len(attention_mask.shape) == 2:
+                expanded_attn_mask = _expand_2d_mask(attention_mask, dtype, tgt_length=input_shape[-1])
+                # For decoding phase in generation, seq_length = 1, we don't need to add causal mask
+                if input_shape[-1] > 1:
+                    combined_attention_mask = _make_causal_mask(
+                        input_shape, past_key_values_length=past_key_values_length
+                    )
+                    expanded_attn_mask = expanded_attn_mask & combined_attention_mask
+            # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
+            elif len(attention_mask.shape) == 3:
+                expanded_attn_mask = attention_mask.unsqueeze(1).astype("bool")
+            # if attention_mask is already 4-D, do nothing
+            else:
+                expanded_attn_mask = attention_mask
+        else:
+            expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
+        # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
+        expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
+        return expanded_attn_mask
+
     def forward(
         self,
         input_ids=None,
@@ -984,10 +1045,15 @@ class GPTModel(GPTPretrainedModel):
             input_shape = paddle.shape(inputs_embeds)[:-1]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
+        # input_shape => bs, seq_len
+
+        if past_key_values is None:
+            past_key_values = tuple([None] * len(self.decoder.layers))
 
         if position_ids is None:
             past_length = 0
-            if past_key_values is not None:
+            if past_key_values[0] is not None:
+                # bs, seq_len, num_head, head_dim
                 past_length = paddle.shape(past_key_values[0][0])[1]
             position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype="int64")
             position_ids = position_ids.unsqueeze(0)
@@ -998,13 +1064,13 @@ class GPTModel(GPTPretrainedModel):
 
         # TODO, use registered buffer
         length = input_shape[-1]
-        if past_key_values is not None:
+        if past_key_values[0] is not None:
             cache_length = paddle.shape(past_key_values[0][0])[1]
             length = length + cache_length
         else:
             cache_length = 0
-        causal_mask = self.bias[:, :, cache_length:length, :length]
 
+        causal_mask = self.bias[:, :, cache_length:length, :length]
         if attention_mask is not None:
             if attention_mask.dtype != paddle.int64:
                 attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
@@ -1033,7 +1099,7 @@ class GPTModel(GPTPretrainedModel):
             else:  # outputs is a tuple
                 idx = 2 if use_cache else 1
                 all_hidden_states = (embedding_output,) + outputs[idx]
-                outputs = outputs[:idx] + (all_hidden_states) + outputs[idx + 1 :]
+                outputs[idx] = all_hidden_states
 
         return outputs
 
@@ -1352,9 +1418,7 @@ class GPTForCausalLM(GPTPretrainedModel):
     def prepare_inputs_for_generation(self, input_ids, use_cache=False, past_key_values=None, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
         position_ids = kwargs.get("position_ids", None)
-        attention_mask = kwargs.get("attention_mask", None)
-        if attention_mask is not None and attention_mask.ndim == 4:
-            attention_mask = attention_mask[:, -1:, -1:, :]
+        # attention_mask = kwargs.get("attention_mask", None)
         if past_key_values is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
             if position_ids is not None:
@@ -1362,7 +1426,7 @@ class GPTForCausalLM(GPTPretrainedModel):
         return {
             "input_ids": input_ids,
             "position_ids": position_ids,
-            "attention_mask": attention_mask,
+            "attention_mask": None,
             "use_cache": use_cache,
             "past_key_values": past_key_values,
         }
