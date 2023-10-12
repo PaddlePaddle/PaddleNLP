@@ -2376,7 +2376,7 @@ class Trainer:
         assert self.args.tensor_parallel_degree == mp_degree
         cur_sharding_degree = self.args.sharding_parallel_degree
 
-        if not self.need_reshard(checkpoint):
+        if not self._need_reshard(checkpoint):
             logger.info("do not need reshard")
             return self._load_optimizer_state_of_one_shard(checkpoint, self.args.optimizer_name_suffix)
 
@@ -2415,9 +2415,8 @@ class Trainer:
             )
             node_model_state = restore_func(node_model_state, self.model, self.optimizer, self.hcg)
             node_model_state = shard_func(node_model_state, self.model, self.optimizer, self.hcg)
-
-        # drop rank in the key
-        node_model_state.drop_rank()
+        else:
+            node_model_state.drop_rank()
         # drop structural name in the key
         node_model_state.unpack_keys()
 
