@@ -485,6 +485,7 @@ class FusedMultiTransformerBase(Layer):
         attn_mask,
         i,
     ):
+        bsz = input_ids.shape[0]
         """
         qkv: bsz, seq_len, 3, numhead, headsize ->
         q_out: bsz, numhead, seq_len, headsize
@@ -506,8 +507,8 @@ class FusedMultiTransformerBase(Layer):
             )
 
         if pre_caches is not None:
-            k_out = paddle.concat([pre_caches[i][0], k_out], axis=2)
-            v_out = paddle.concat([pre_caches[i][1], v_out], axis=2)
+            k_out = paddle.concat([pre_caches[i][0, :bsz], k_out], axis=2)
+            v_out = paddle.concat([pre_caches[i][1, :bsz], v_out], axis=2)
 
         # write cache kv (inplace)
         write_cache_kv(k_out, v_out, caches[i], seq_lens + pre_caches_length)

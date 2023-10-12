@@ -385,19 +385,21 @@ class InferencePredictorMixin:
         self.attention_mask[:] = 0
         self.tgt_generation_mask[:] = 0
         pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
+        inputs = dybatch_preprocess(
+            self.tokenizer,
+            source,
+            self.config.src_length,
+            self.config.max_length,
+            self.architectures,
+            top_p=self.config.top_p,
+            temperature=self.config.temperature,
+            benchmark=self.config.benchmark,
+            pre_caches_length=pre_caches_length,
+        )
 
         if "chatglm" in self.architectures:
-            inputs = dybatch_preprocess(
-                self.tokenizer,
-                source,
-                self.config.src_length,
-                self.config.max_length,
-                self.architectures,
-                top_p=self.config.top_p,
-                temperature=self.config.temperature,
-                benchmark=self.config.benchmark,
-                pre_caches_length=pre_caches_length,
-            )
+            if inputs["input_ids"].shape[0] < self.config.batch_size:
+                self.tgt_pos = self.tgt_pos[: inputs["input_ids"].shape[0]]
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = 1
@@ -427,16 +429,6 @@ class InferencePredictorMixin:
 
             inputs["tgt_pos"] = self.tgt_pos
         elif "bloom" in self.architectures:
-            inputs = dybatch_preprocess(
-                self.tokenizer,
-                source,
-                self.config.src_length,
-                self.config.max_length,
-                self.architectures,
-                top_p=self.config.top_p,
-                temperature=self.config.temperature,
-                benchmark=self.config.benchmark,
-            )
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, :, :length, :length] = paddle.tril(
@@ -460,7 +452,7 @@ class InferencePredictorMixin:
                     * block_size : (self.model_config.tensor_parallel_rank + 1)
                     * block_size,
                 ]
-                alibi = alibi.reshape([inputs["input_ids"].shape[0], block_size, 1, self.config.max_length])
+                alibi = alibi.reshape([self.config.batch_size, block_size, 1, self.config.max_length])
                 inputs["position_ids"] = inputs["position_ids"][
                     self.model_config.tensor_parallel_rank
                     * block_size : (self.model.config.tensor_parallel_rank + 1)
@@ -469,7 +461,7 @@ class InferencePredictorMixin:
 
             alibi_encoder = alibi.expand(
                 [
-                    inputs["input_ids"].shape[0],
+                    self.config.batch_size,
                     self.model_config.n_head // self.model_config.tensor_parallel_degree,
                     self.config.total_max_length,
                     self.config.total_max_length,
@@ -477,7 +469,7 @@ class InferencePredictorMixin:
             )
             alibi_decoder = alibi.expand(
                 [
-                    inputs["input_ids"].shape[0],
+                    self.config.batch_size,
                     self.model_config.n_head // self.model_config.tensor_parallel_degree,
                     1,
                     self.config.total_max_length,
@@ -491,18 +483,6 @@ class InferencePredictorMixin:
             )
 
         else:
-            inputs = dybatch_preprocess(
-                self.tokenizer,
-                source,
-                self.config.src_length,
-                self.config.max_length,
-                self.architectures,
-                top_p=self.config.top_p,
-                temperature=self.config.temperature,
-                pre_caches_length=pre_caches_length,
-                benchmark=self.config.benchmark,
-            )
-
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = paddle.tril(
@@ -618,7 +598,6 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         for i in range(len(self.cache_kvs_shape)):
             input_tensor = self.predictor.get_input_handle("cache_kvs_" + str(i))
             input_tensor.share_external_data(self.cache_kvs[i])
-
         input_tensor = self.predictor.get_input_handle("pre_ids")
         input_tensor.share_external_data(self.pre_ids)
 
