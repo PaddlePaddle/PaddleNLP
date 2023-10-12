@@ -456,7 +456,7 @@ def _partion_for_pipeline_mode(keys):
 
 def shard_checkpoint(
     state_dict: Dict[str, paddle.Tensor],
-    max_shard_size: Union[int, str] = "10GB",
+    max_shard_size: Union[int, str] = "1024GB",
     weights_name: str = PADDLE_WEIGHTS_NAME,
     shard_format="naive",
 ):
@@ -466,8 +466,8 @@ def shard_checkpoint(
 
     The sub-checkpoints are determined by iterating through the `state_dict` in the order of its keys, so there is no
     optimization made to make each sub-checkpoint as close as possible to the maximum size passed. For example, if the
-    limit is 10GB and we have weights of sizes [6GB, 6GB, 2GB, 6GB, 2GB, 2GB] they will get sharded as [6GB], [6+2GB],
-    [6+2+2GB] and not [6+2+2GB], [6+2GB], [6GB].
+    limit is 1024GB and we have weights of sizes [600GB, 600GB, 200GB, 600GB, 200GB, 200GB] they will get sharded as [600GB], [600+200GB],
+    [600+200+200GB] and not [600+200+200GB], [600+200GB], [600GB].
 
     <Tip warning={true}>
 
@@ -478,7 +478,7 @@ def shard_checkpoint(
 
     Args:
         state_dict (`Dict[str, paddle.Tensor]`): The state dictionary of a model to save.
-        max_shard_size (`int` or `str`, *optional*, defaults to `"10GB"`):
+        max_shard_size (`int` or `str`, *optional*, defaults to `"1024GB"`):
             The maximum size of each sub-checkpoint. If expressed as a string, needs to be digits followed by a unit
             (like `"5MB"`).
         weights_name (`str`, *optional*, defaults to `"model_state.pdparams"`):
@@ -1318,6 +1318,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         cls: Type[PretrainedModel],
         pretrained_model_name_or_path: str,
         from_hf_hub: bool = False,
+        from_aistudio: bool = False,
         cache_dir: str | None = None,
         subfolder: str = "",
         config: PretrainedConfig = None,
@@ -1471,6 +1472,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     cached_file_kwargs = dict(
                         cache_dir=cache_dir,
                         subfolder=subfolder,
+                        from_aistudio=from_aistudio,
                         _raise_exceptions_for_missing_entries=False,
                     )
                     resolved_archive_file = None
@@ -1487,6 +1489,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         resolved_archive_file = cached_file(
                             pretrained_model_name_or_path, filename, **cached_file_kwargs
                         )
+
                     else:
                         # xxx.pdparams in pretrained_resource_files_map renamed model_state.pdparams
                         filename = _add_variant(PADDLE_WEIGHTS_NAME, variant)
@@ -1547,10 +1550,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # We'll need to download and cache each checkpoint shard if the checkpoint is sharded.
         if is_sharded:
-            # rsolved_archive_file becomes a list of files that point to the different checkpoint shards in this case.
+            # resolved_archive_file becomes a list of files that point to the different checkpoint shards in this case.
             resolved_archive_file, sharded_metadata = get_checkpoint_shard_files(
                 pretrained_model_name_or_path,
                 resolved_archive_file,
+                from_aistudio=from_aistudio,
                 cache_dir=cache_dir,
                 subfolder=subfolder,
             )
@@ -1630,7 +1634,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 raise ImportError("Quantization features require `paddlepaddle >= 2.5.2`")
             if state_dict is not None:
                 state_dict = convert_to_quantize_state_dict(
-                    state_dict, quantization_linear_list, config.quantization_config["quant_algo"], dtype
+                    state_dict,
+                    quantization_linear_list,
+                    config.quantization_config["quant_algo"],
+                    dtype,
                 )
                 loaded_keys = [k for k in state_dict.keys()]
             else:
@@ -1765,7 +1772,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
                 if quantization_config is not None:
                     state_dict = convert_to_quantize_state_dict(
-                        state_dict, quantization_linear_list, quantization_config["quant_algo"], dtype
+                        state_dict,
+                        quantization_linear_list,
+                        quantization_config["quant_algo"],
+                        dtype,
                     )
 
                 # Mistmatched keys contains tuples key/shape1/shape2 of weights in the checkpoint that have a shape not
@@ -1857,9 +1867,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         return model, missing_keys, unexpected_keys, mismatched_keys
 
     @classmethod
-    def from_pretrained(
-        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
-    ):
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
         by specifying name of a built-in pretrained model, a pretrained model from HF Hub, a community contributed model,
@@ -1916,10 +1924,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config = kwargs.pop("config", None)
         state_dict = kwargs.pop("state_dict", None)
         cache_dir = kwargs.pop("cache_dir", None)
-        force_download = kwargs.pop("force_download", False)
+        force_download = kwargs.get("force_download", False)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", False)
         dtype = kwargs.pop("dtype", None)
-        subfolder = kwargs.pop("subfolder", "")
+        from_hf_hub = kwargs.get("from_hf_hub", False)
+        from_aistudio = kwargs.get("from_aistudio", False)
+        subfolder = kwargs.get("subfolder", "")
         variant = kwargs.pop("variant", None)
         use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
 
@@ -1950,9 +1960,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 config_path,
                 cache_dir=cache_dir,
                 return_unused_kwargs=True,
-                force_download=force_download,
-                from_hf_hub=from_hf_hub,
-                subfolder=subfolder,
                 **kwargs,
             )
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
@@ -1967,8 +1974,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 from ..utils.quantization import replace_with_quantization_linear
             except ImportError:
                 raise ImportError("You need to install paddlepaddle >= 2.5.2")
-            if config.tensor_parallel_degree > 1:
-                raise NotImplementedError("Quantization method dosen't support tensor parallelism.")
+
             if dtype != "float16" and dtype != "bfloat16":
                 dtype = "float16"
                 logger.warning(
@@ -2003,6 +2009,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             cache_dir=cache_dir,
             subfolder=subfolder,
             from_hf_hub=from_hf_hub,
+            from_aistudio=from_aistudio,
             config=config,
             convert_from_torch=convert_from_torch,
             use_safetensors=use_safetensors,
@@ -2115,7 +2122,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         is_main_process: bool = True,
         state_dict: Optional[dict] = None,
         save_function: Callable = paddle.save,
-        max_shard_size: Union[int, str] = "10GB",
+        max_shard_size: Union[int, str] = "1024GB",
         safe_serialization: bool = False,
         variant: Optional[str] = None,
         *args,
@@ -2165,7 +2172,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         os.makedirs(save_directory, exist_ok=True)
         # Save model config
 
-        # Only save the model itself if we are using distributed training
+        # Only save the model in distributed training setup
         model_to_save = unwrap_model(self)
 
         # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
@@ -2180,6 +2187,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if state_dict is None:
             state_dict = model_to_save.state_dict()
             if config_to_save.tensor_parallel_degree > 1:
+                if config_to_save.quantization_config is not None and merge_tensor_parallel:
+                    logger.warning(
+                        "Quantization strategy does not support merge tensor parallel, thus we set merge_tensor_parallel to False."
+                    )
+                    merge_tensor_parallel = False
                 if merge_tensor_parallel:
                     state_dict = model_to_save.merge_tensor_parallel(state_dict, config_to_save)
                     config_to_save.tensor_parallel_degree = 1
