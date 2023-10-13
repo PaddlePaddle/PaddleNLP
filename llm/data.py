@@ -40,6 +40,11 @@ def tokenize_example(tokenizer, example, data_args):
     if "src" in example and "tgt" in example:
         source = example["src"][0] if isinstance(example["src"], list) else example["src"]
         target = example["tgt"][0] if isinstance(example["tgt"], list) else example["tgt"]
+    elif "input" in example and "output" in example:
+        source = example["instruction"]
+        target = example["output"]
+        if "input" in example:
+            source += example["input"]
     else:
         raise DataFormatError(
             f"Example format is wrong, please check: {example} or rewrite tokenize_example in data.py "
