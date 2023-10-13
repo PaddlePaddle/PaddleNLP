@@ -58,6 +58,18 @@ def validate_pdmodel(model_path, model_prefix):
                     logger.warning(f"UNEXPECTED OP<{op.type}> which will reduce the performace of the static model")
 
 
+def transformat_weight(model):
+    model_dict = model.state_dict()
+    for k in model_dict.keys():
+        if "out_proj_weight" in k or "ffn1_weight" in k or "ffn2_weight" in k:
+            print(f"[INFO]transformat_weight={k}; shape={model_dict[k].data.shape}")
+            old_shape = model_dict[k].data.shape
+            model_dict[k].data = model_dict[k].data.transpose([1, 0])
+            model_dict[k].data = model_dict[k].data.reshape(old_shape)
+            model_dict[k].data = paddle.incubate._npu_identity(x=model_dict[k].data, format=29)
+            # model_dict[k].data = model_dict[k].data.reshape([1, int(old_shape[1]/16), old_shape[0], 16])
+
+
 def main():
     parser = PdArgumentParser((PredictorArgument, ModelArgument, ExportArgument))
     predictor_args, model_args, export_args = parser.parse_args_into_dataclasses()
@@ -81,6 +93,9 @@ def main():
     predictor = create_predictor(predictor_args, model_args, tensor_parallel_degree, tensor_parallel_rank)
     predictor.model.eval()
 
+    # transformat weight
+    # transformat_weight(predictor.model)
+    
     predictor.model.to_static(
         get_infer_model_path(export_args.output_path, predictor_args.model_prefix),
         {"dtype": predictor_args.dtype, "export_precache": predictor_args.export_precache},
