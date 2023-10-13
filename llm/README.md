@@ -326,7 +326,7 @@ python export_model.py \
 
 # PTQ模型静态图推理
 python predictor.py \
-    --model_name_or_path ./inference \
+    --model_name_or_path ./inference_ptq \
     --dtype float16 \
     --max_length 1024 \
     --output_file "infer.json" \
