@@ -52,7 +52,7 @@ parser.add_argument("--rank_topk", default=10, type=int, help="The number of can
 parser.add_argument("--embedding_api_key", default=None, type=str, help="The Embedding API Key.")
 parser.add_argument("--embedding_secret_key", default=None, type=str, help="The Embedding secret key.")
 parser.add_argument('--embed_title', default=False, type=bool, help="The title to be  embedded into embedding")
-
+parser.add_argument('--index_type', choices=['hnsw', 'flat'], default="flat", help="The index type of ANN search engine")
 args = parser.parse_args()
 # yapf: enable
 
@@ -81,6 +81,7 @@ def get_retrievers(use_gpu):
             vector_type="bpack_vector",
             search_fields=["content", "meta"],
             index=args.root_index_name,
+            index_type=args.index_type,
         )
 
     # 语义索引模型

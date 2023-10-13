@@ -149,6 +149,12 @@ class ModelArguments:
     )
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
+    continue_training: bool = field(
+        default=True,
+        metadata={
+            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
+        },
+    )
 
 
 def create_pretrained_dataset(
@@ -203,11 +209,10 @@ def create_pretrained_dataset(
         tokens = tokens_[:, :-1]
 
         # Attention mask.
-        attention_mask = paddle.ones(tokens.shape, dtype=paddle.int64)
+        # attention_mask = paddle.ones(tokens.shape, dtype=paddle.int64)
 
         return {
             "input_ids": tokens,
-            "attention_mask": attention_mask,
             "labels": labels,
         }
 
