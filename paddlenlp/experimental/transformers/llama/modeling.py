@@ -178,7 +178,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             self.quant_max_bound = config.quant_max_bound
             self.quant_min_bound = config.quant_min_bound
 
-            print("hahahaha", self.num_layers)
             qkv_out_scale_attrs = [
                 paddle.ParamAttr(name="fusellama.{}.qkv_out_scale".format(i)) for i in range(self.num_layers)
             ]
@@ -191,8 +190,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             ffn2_out_scale_attrs = [
                 paddle.ParamAttr(name="fusellama.{}.ffn2_out_scale".format(i)) for i in range(self.num_layers)
             ]
-
-            print("len(layers)", len(qkv_out_scale_attrs))
 
             if self.shift_smooth:
                 linear_shift_attrs = [
@@ -566,10 +563,12 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             )
 
         if self.quant_type == "A8W8":
+
+            current_work_dir = os.path.dirname(__file__)
             scale_map_file = (
-                "../paddlenlp/experimental/transformers/llama/ptq_scales_map.json"
+                f"{current_work_dir}/ptq_scales_map.json"
                 if not self.shift_smooth
-                else "../paddlenlp/experimental/transformers/llama/ptq_scales_map_shift_smooth.json"
+                else f"{current_work_dir}/ptq_scales_map_shift_smooth.json"
             )
 
             with open(scale_map_file) as json_file:
