@@ -45,11 +45,9 @@ from ..utils.downloader import (
     get_path_from_url_with_filelock,
     url_file_exists,
 )
-
-from ..utils.env import TOKENIZER_CONFIG_NAME, CHAT_TEMPLATE_CONFIG_NAME
+from ..utils.env import CHAT_TEMPLATE_CONFIG_NAME, TOKENIZER_CONFIG_NAME
 from ..utils.log import logger
 from .aistudio_utils import aistudio_download
-
 from .utils import resolve_cache_dir
 
 

@@ -28,8 +28,8 @@ from dataclasses import asdict, dataclass
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy
-import paddle
 import numpy as np
+import paddle
 import six
 from paddle.utils import try_import
 
