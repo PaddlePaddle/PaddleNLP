@@ -38,7 +38,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
     def tearDown(self) -> None:
         LLMTest.tearDown(self)
 
-    def test_finetune(self):
+    def test_ptq(self):
         finetune_config = load_test_config(self.config_path, "finetune", self.model_dir)
 
         finetune_config["dataset_name_or_path"] = self.data_dir
