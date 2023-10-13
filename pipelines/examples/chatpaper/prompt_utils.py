@@ -91,11 +91,7 @@ functions = [
         "description": "根据用户查询的综述意图，生成综述文章。",
         "parameters": {
             "type": "object",
-            "description": "用于生成综述文章的用户查询和综述意图。",
-            "properties": {
-                "query": {"type": "string", "description": "用户查询，包含综述意图，用于生成综述文章。"},
-            },
-            "required": ["query"],
+            "properties": {},
         },
         "responses": {
             "type": "object",
@@ -113,8 +109,8 @@ functions = [
                 "content": None,
                 "function_call": {
                     "name": "get_literature_review",
-                    "thoughts": "这是一个生成综述的请求，查询为'聊天信息中提及的文章内容的综述'。",
-                    "arguments": '{"query":"聊天信息中提及的文章内容的综述",}',
+                    "thoughts": "这是一个生成综述的请求，根据聊天信息中提及的文章内容的综述",
+                    "arguments": "{}",
                 },
             },
         ],

@@ -116,7 +116,7 @@ def search_single_paper(query, title):
     return {"documents": documents}
 
 
-def get_literature_review(query, history, messages):
+def get_literature_review(history, messages):
     base_prompt = """
     请根据聊天历史信息提到的几篇文章，生成综述。按照下面的方式进行输出：某某论文提出什么方法，这个方法有什么点，解决了什么问题。
     """
