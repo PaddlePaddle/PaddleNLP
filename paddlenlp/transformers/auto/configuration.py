@@ -219,7 +219,10 @@ class AutoConfig(PretrainedConfig):
 
         # Assuming from community-contributed pretrained models
         else:
-            # add support for legacy config file ...
+            # support subfolder
+            if subfolder is not None:
+                pretrained_model_name_or_path = os.path.join(pretrained_model_name_or_path, subfolder)
+
             community_config_path = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.config_file])
             if not url_file_exists(community_config_path):
                 legacy_community_config_path = "/".join(
@@ -237,7 +240,6 @@ class AutoConfig(PretrainedConfig):
                 community_config_path = legacy_community_config_path
 
             resolved_config_file = get_path_from_url_with_filelock(community_config_path, cache_dir)
-
             config_class = cls._get_config_class_from_config(pretrained_model_name_or_path, resolved_config_file)
             logger.info("We are using %s to load '%s'." % (config_class, pretrained_model_name_or_path))
             if config_class is cls:
