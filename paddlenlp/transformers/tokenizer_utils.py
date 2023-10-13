@@ -525,25 +525,29 @@ class ChatTemplate:
         def raise_exception(message):
             raise TemplateError(message)
 
-        jinja_env = ImmutableSandboxedEnvironment(trim_blocks=True, lstrip_blocks=True)
+        jinja_env = ImmutableSandboxedEnvironment(trim_blocks=True, lstrip_blocks=True, keep_trailing_newline=True)
         jinja_env.globals["raise_exception"] = raise_exception
         return jinja_env.from_string(chat_template)
 
-    def render_conversation(self, conversation_data: list[str]):
+    def render_conversation(self, conversation_data: list[str] | dict[str, str]) -> str:
         """
-
         Args:
             conversation_data (list[str]): _description_
 
         Returns:
             _type_: _description_
         """
+        if isinstance(conversation_data, list):
+            assert len(conversation_data) == 2, "only support two type of conversation, eg: [user-query, bot-query]"
+
+            conversation_data = {"user": conversation_data[0], "bot": conversation_data[1]}
+
         one_turn_conversation = []
-        for index, conversation in conversation_data:
-            template = self._compile_jinja_template(self.conversation[index])
-            result = template.render(conversation)
+        for conversation in self.conversation:
+            template = self._compile_jinja_template(conversation)
+            result = template.render(conversation_data)
             one_turn_conversation.append(result)
-        return one_turn_conversation
+        return "".join(one_turn_conversation)
 
     def render_query(self, query: str):
         template = self._compile_jinja_template(self.query)
@@ -562,7 +566,7 @@ class ChatTemplate:
             conversations = [[conversations]]
 
         # [1 ... n-1] conversation
-        final_query = self.system
+        final_query = self.system or ""
         for conversation in conversations[:-1]:
             final_query += self.render_conversation(conversation)
 
