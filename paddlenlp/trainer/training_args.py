@@ -1177,18 +1177,12 @@ class TrainingArguments:
     def weight_name_suffix(self):
         if self.use_hybrid_parallel:
             name = []
-            if not self.unified_checkpoint:
-                if self.tensor_parallel_degree > 1:
-                    name.append(f"tp{self.tensor_parallel_rank:0>2d}")
-                if self.pipeline_parallel_degree > 1:
-                    name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
-                return "_".join(name)
-            else:
-                # model_00001-of-00072.safetensors
-                name.append(
-                    f"{self.process_index:0>5d}-of-{paddle.distributed.get_world_size()//self.data_parallel_degree:0>5d}"
-                )
-                return "_".join(name)
+            if self.tensor_parallel_degree > 1:
+                name.append(f"tp{self.tensor_parallel_rank:0>2d}")
+            if self.pipeline_parallel_degree > 1:
+                name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
+            return "_".join(name)
+
         else:
             return None
 
