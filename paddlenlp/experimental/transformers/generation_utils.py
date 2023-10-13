@@ -17,7 +17,7 @@ from typing import List, Union
 
 import paddle
 import paddle.nn.functional as F
-from paddlenlp_ops import (
+from paddle_custom_device.npu import (
     get_token_penalty_multi_scores,
     save_with_output,
     set_mask_value,
@@ -30,7 +30,7 @@ from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcess
 try:
     from paddle import top_p_sampling
 except:
-    from paddlenlp_ops import top_p_sampling
+    from paddle_custom_device.npu import top_p_sampling
 
 
 __all__ = ["GenerationInferenceModel"]
