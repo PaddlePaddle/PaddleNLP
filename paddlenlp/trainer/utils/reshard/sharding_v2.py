@@ -26,7 +26,7 @@ except:
     DygraphShardingOptimizerV2 = None
 
 
-def shard(node_model_state, optimizer, model, hcg):
+def shard(node_model_state, model, optimizer, hcg):
     assert DygraphShardingOptimizerV2 is not None
     group = hcg.get_sharding_parallel_group()
     cur_rank = group.rank
@@ -61,7 +61,7 @@ def shard(node_model_state, optimizer, model, hcg):
     return node_model_state
 
 
-def restore(node_model_state, optimizer, model, hcg):
+def restore(node_model_state, model, optimizer, hcg):
     group = hcg.get_sharding_parallel_group()
     # evenly distribute param
     node_model_state.even_distribute(group)

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from . import sharding_v1, sharding_v2
 from .common import (
     SHARDING_STRATEGY_V1,
     SHARDING_STRATEGY_V2,

@@ -529,7 +529,7 @@ class Trainer:
                 if sharding_strategy == SHARDING_STRATEGY_V1
                 else reshard_util.sharding_v2.restore
             )
-            node_model_state = restore_func(node_model_state)
+            node_model_state = restore_func(node_model_state, self.model, self.optimizer, self.hcg)
             node_model_state.unpack_keys()
             master_weights = node_model_state.master_weights
 
