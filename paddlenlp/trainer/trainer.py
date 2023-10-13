@@ -2215,10 +2215,8 @@ class Trainer:
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
 
         sharding_group = None
-        sharding_rank = 0
         if paddle.distributed.get_world_size() > 1 and self.args.use_hybrid_parallel:
             sharding_group = self.sharding_group
-            sharding_rank = sharding_group.rank
         if (
             not isinstance(self.model, PretrainedModel)
             and not isinstance(self.model, LoRAModel)
@@ -2243,7 +2241,7 @@ class Trainer:
                 if state_dict is None:
                     state_dict = self.model.state_dict()
                 if self.args.save_sharding_stage1_model:
-                    state_dict = filter_sharded_params(state_dict, self.optimizer, sharding_rank)
+                    state_dict = filter_sharded_params(state_dict, self.optimizer, sharding_group)
                     if is_bf16:
                         logger.info("before exclude state_dict_to_save len:{}".format(len(state_dict)))
                         state_dict = exlclude_paramters_in_state_dict(

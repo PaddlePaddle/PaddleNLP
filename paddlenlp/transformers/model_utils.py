@@ -90,23 +90,40 @@ def unwrap_optimizer(optimizer, optimizer_instances=()):
     return None
 
 
-def filter_sharded_params(state_dict, optimizer, sharding_rank):
-    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
-        DygraphShardingOptimizer,
-    )
+def filter_sharded_params(state_dict, optimizer, sharding_group):
+    sharding_rank = sharding_group.rank
+    sharding_world_size = sharding_group.nranks
+    from paddlenlp.trainer.utils import reshard as reshard_util
 
     logger.info(f"filter sharded_params not placed in sharding_rank {sharding_rank} .")
-
-    optimizer = unwrap_optimizer(optimizer, DygraphShardingOptimizer)
-    if optimizer is None:
+    if not reshard_util.is_sharding_opt(optimizer):
         return state_dict
     filtered_state_dict = OrderedDict()
-    for (k, v) in state_dict.items():
-        assert v.name in optimizer._param2rank
-        sharded_rank = optimizer._param2rank[v.name]
-        if sharded_rank != sharding_rank:
-            continue
-        filtered_state_dict[k] = v
+    if reshard_util.get_sharding_strategy(optimizer) == reshard_util.SHARDING_STRATEGY_V1:
+        from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
+            DygraphShardingOptimizer,
+        )
+
+        optimizer = unwrap_optimizer(optimizer, DygraphShardingOptimizer)
+        for (k, v) in state_dict.items():
+            assert v.name in optimizer._param2rank
+            sharded_rank = optimizer._param2rank[v.name]
+            if sharded_rank != sharding_rank:
+                continue
+            filtered_state_dict[k] = v
+    else:
+        from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
+            DygraphShardingOptimizerV2,
+        )
+
+        optimizer = unwrap_optimizer(optimizer, DygraphShardingOptimizerV2)
+        parameters = optimizer._parameter_list
+        filtered_parameters = [p.name for (i, p) in enumerate(parameters) if i % sharding_world_size == sharding_rank]
+        filtered_parameters = set(filtered_parameters)
+        for (k, v) in state_dict.items():
+            if v.name in filtered_parameters:
+                filtered_state_dict[k] = v
+
     return filtered_state_dict
 
 
@@ -123,12 +140,11 @@ def exlclude_paramters_in_state_dict(
             param_names_in_master_weights, state_param_names
         )
     )
-    if not save_sharding_stage1_model:
-        # allgather parameter names in sharding group
-        tmp = []
-        paddle.distributed.all_gather_object(tmp, param_names_in_master_weights, group=sharding_group)
-        param_names_in_master_weights = [v for item in tmp for v in item]
-        logger.info("sharding_group_param_names:{}".format(param_names_in_master_weights))
+    # allgather parameter names in sharding group
+    tmp = []
+    paddle.distributed.all_gather_object(tmp, param_names_in_master_weights, group=sharding_group)
+    param_names_in_master_weights = set([v for item in tmp for v in item])
+    logger.info("sharding_group_param_names:{}".format(param_names_in_master_weights))
     non_parameters_state_dict = copy.copy(model_state_dict)
     for k, v in model_state_dict.items():
         if v.name in param_names_in_master_weights:
@@ -1498,8 +1514,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config_to_save = copy.deepcopy(model_to_save.config)
         state_dict_to_save = model_to_save.state_dict()
         if save_sharding_stage1_model:
-            sharding_rank = sharding_group.rank
-            state_dict_to_save = filter_sharded_params(state_dict_to_save, optimizer, sharding_rank)
+            state_dict_to_save = filter_sharded_params(state_dict_to_save, optimizer, sharding_group)
         if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
             state_dict_to_save = model_to_save.merge_tensor_parallel(state_dict_to_save, config_to_save)
             config_to_save.tensor_parallel_degree = 1
