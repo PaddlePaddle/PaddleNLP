@@ -122,6 +122,7 @@ from .utils.helper import (  # nested_truncate,
     nested_numpify,
     nested_truncate,
 )
+from .utils.reshard import SHARDING_STRATEGY_V1
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
 DEFAULT_PROGRESS_CALLBACK = ProgressCallback
@@ -514,7 +515,7 @@ class Trainer:
             master_weights[k] = paddle.cast(v.cuda(), paddle.bfloat16).cpu()
 
         if self.args.load_sharding_stage1_model:
-            structure_name_map = {k: v.name for (k, v) in self.model.state_dict()}
+            structure_name_map = {k: v.name for (k, v) in self.model.state_dict().items()}
             node_model_state = reshard_util.NodeModelState()
             node_model_state_tmp = reshard_util.NodeModelState()
             node_model_state_tmp.add_master_weights(master_weights)
@@ -525,7 +526,7 @@ class Trainer:
             sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
             restore_func = (
                 reshard_util.sharding_v1.restore
-                if sharding_strategy == reshard_util.SHARDING_STRATEGY_V1
+                if sharding_strategy == SHARDING_STRATEGY_V1
                 else reshard_util.sharding_v2.restore
             )
             node_model_state = restore_func(node_model_state)
@@ -2156,7 +2157,7 @@ class Trainer:
         sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
         param2rank = {}
 
-        if sharding_strategy == reshard_util.SHARDING_STRATEGY_V1:
+        if sharding_strategy == SHARDING_STRATEGY_V1:
             optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
             param2rank = {k: v for (k, v) in optimizer._param2rank.items()}
 
@@ -2311,14 +2312,14 @@ class Trainer:
     def _need_reshard(self, checkpoint):
         parallel_config = self._load_distributed_strategy(checkpoint)
         sharding_degree = parallel_config["sharding_degree"]
-        sharding_strategy = reshard_util.SHARDING_STRATEGY_V1
+        sharding_strategy = SHARDING_STRATEGY_V1
         if "sharding_strategy" in parallel_config:
             sharding_strategy = parallel_config["sharding_strategy"]
         cur_sharding_degree = self.args.sharding_parallel_degree
         cur_sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
         if sharding_degree != cur_sharding_degree or sharding_strategy != cur_sharding_strategy:
             return True
-        if sharding_strategy == reshard_util.SHARDING_STRATEGY_V1:
+        if sharding_strategy == SHARDING_STRATEGY_V1:
             sharding_meta = self._load_sharding_meta(checkpoint)
             param2rank = sharding_meta["param2rank"]
             optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
@@ -2336,7 +2337,7 @@ class Trainer:
         pp_degree = parallel_config["pp_degree"]
         mp_degree = parallel_config["mp_degree"]
         sharding_degree = parallel_config["sharding_degree"]
-        sharding_strategy = reshard_util.SHARDING_STRATEGY_V1
+        sharding_strategy = SHARDING_STRATEGY_V1
         if "sharding_strategy" in parallel_config:
             sharding_strategy = parallel_config["sharding_strategy"]
         assert self.args.pipeline_parallel_degree == pp_degree
@@ -2372,7 +2373,7 @@ class Trainer:
 
         restore_func = (
             reshard_util.sharding_v1.restore
-            if sharding_strategy == reshard_util.SHARDING_STRATEGY_V1
+            if sharding_strategy == SHARDING_STRATEGY_V1
             else reshard_util.sharding_v2.restore
         )
         node_model_state = restore_func(node_model_state, self.model, self.optimizer, self.hcg)
@@ -2380,7 +2381,7 @@ class Trainer:
         if self.args.load_sharding_stage1_model:
             shard_func = (
                 reshard_util.sharding_v1.shard
-                if cur_sharding_strategy == reshard_util.SHARDING_STRATEGY_V1
+                if cur_sharding_strategy == SHARDING_STRATEGY_V1
                 else reshard_util.sharding_v2.shard
             )
             node_model_state = shard_func(node_model_state, self.model, self.optimizer, self.hcg)

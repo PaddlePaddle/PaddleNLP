@@ -38,7 +38,7 @@ SHARDING_STRATEGY_V2 = "ShardingV2"
 
 def is_sharding_opt(optimizer):
     def check(cls):
-        tmp = unwrap_optimizer(optimizer, DygraphShardingOptimizerV2)
+        tmp = unwrap_optimizer(optimizer, cls)
         if tmp is not None:
             return True
         return False
