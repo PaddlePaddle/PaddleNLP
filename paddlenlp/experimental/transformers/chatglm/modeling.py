@@ -20,7 +20,8 @@ from paddle.distributed import fleet
 from paddlenlp_ops import get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
-    FusedMultiTransformer,
+    FusedMultiTransformerBase,
+    FusedMultiTransformerConfig,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
@@ -183,7 +184,8 @@ class ChatGLMStackDyBatch(nn.Layer):
         ]
         ffn2_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn2_bias".format(i)) for i in range(config.num_layers)]
         alpha = (2 * self.config.num_hidden_layers) ** 0.5
-        self.transformer_block = FusedMultiTransformer(
+
+        transformer_config = FusedMultiTransformerConfig(
             config.hidden_size,
             config.num_attention_heads,
             4 * config.hidden_size,
@@ -209,6 +211,7 @@ class ChatGLMStackDyBatch(nn.Layer):
             norm_type="layernorm",
             use_neox_rotary_style=True,
         )
+        self.transformer_block = FusedMultiTransformerBase(transformer_config)
 
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
@@ -270,8 +273,8 @@ class ChatGLMStackDyBatch(nn.Layer):
         coses = []
         sines = []
         if self.position_encoding_2d:
-            block_position_ids = position_ids[:, 1, :].transpose([1, 0])
-            position_ids = position_ids[:, 0, :].transpose([1, 0])
+            block_position_ids = position_ids[:batch_size, 1, :].transpose([1, 0])
+            position_ids = position_ids[:batch_size, 0, :].transpose([1, 0])
             coses.append(cos.squeeze(1)[position_ids].unsqueeze(2))
             sines.append(sin.squeeze(1)[position_ids].unsqueeze(2))
 
@@ -649,5 +652,7 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
-        self.lm_head.weight.set_value(state_dict["transformer.word_embeddings.weight"])
+        self.lm_head.weight.set_value(
+            state_dict["transformer.word_embeddings.weight"].astype(self.lm_head.weight.dtype)
+        )
         self.model.transformer.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
