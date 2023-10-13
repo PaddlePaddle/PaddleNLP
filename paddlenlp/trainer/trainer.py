@@ -499,7 +499,7 @@ class Trainer:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
         if self.args.unified_checkpoint:
-            if resume_from_checkpoint is not None:
+            if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
                 load_unified_checkpoint(
                     self.model,
                     resume_from_checkpoint,
