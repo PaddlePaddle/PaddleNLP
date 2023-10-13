@@ -121,11 +121,14 @@ def apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config):
         sample_function=smooth_sampler,
         search_function=search_func,
     )
+    print("ptq_loop")
     trainer.ptq_loop(
         ptq_dataloader,
         description="Smooth",
         max_eval_iters=quant_args.smooth_step,
     )
+
+    print("smooth.update_weight")
 
     smooth.update_weight()
     del smooth, smooth_sampler, search_func

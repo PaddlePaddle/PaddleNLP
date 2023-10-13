@@ -278,6 +278,20 @@ python predictor.py \
     --inference_model
 ```
 
+```shell
+# Inference PTQ Model 动态图推理
+# 这一步依赖6.3小节PTQ校准产出的量化模型
+python predictor.py \
+    --model_name_or_path checkpoints/llama_ptq_ckpts \
+    --dtype float16 \
+    --max_length 1024 \
+    --mode "dynamic" \
+    --inference_model \
+    --quant_type "A8W8" \
+    --shift_smooth
+
+```
+
 ### 4.4 Inference Model 静态图推理
 
 ```shell
@@ -291,6 +305,26 @@ python export_model.py \
     --inference_model
 
 # Inference Model 静态图推理
+python predictor.py \
+    --model_name_or_path ./inference \
+    --dtype float16 \
+    --max_length 1024 \
+    --output_file "infer.json" \
+    --mode "static" \
+    --inference_model
+
+
+# 导出PTQ模型
+# 这一步依赖6.3小节PTQ校准产出的量化模型
+python export_model.py \
+    --model_name_or_path checkpoints/llama_ptq_ckpts \
+    --output_path ./inference_ptq \
+    --dtype float16 \
+    --inference_model \
+    --quant_type "A8W8" \
+    --shift_smooth
+
+# PTQ模型静态图推理
 python predictor.py \
     --model_name_or_path ./inference \
     --dtype float16 \
