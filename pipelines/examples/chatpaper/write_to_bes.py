@@ -85,6 +85,7 @@ def get_doc_store():
             index_type="hnsw",
             duplicate_documents=args.duplicate_documents,
             timeout=60,
+            number_of_shards=3,
         )
 
         return document_store

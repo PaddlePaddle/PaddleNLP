@@ -35,7 +35,6 @@ document_store_with_docs = BaiduElasticsearchDocumentStore(
     embedding_dim=args.embedding_dim,
     similarity="dot_prod",
     vector_type="bpack_vector",
-    search_fields=["content", "meta"],
     index=args.abstract_index_name,
     index_type=args.index_type,
 )
