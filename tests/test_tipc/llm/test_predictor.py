@@ -26,7 +26,7 @@ import yaml
 from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 
 
-class InfereneTest(unittest.TestCase):
+class InferenceTest(unittest.TestCase):
     config_path: str = "./test_tipc/llm/fixtures/predictor.yaml"
     predictor_shell_name = "inference/run_predictor.sh"
 
