@@ -21,7 +21,9 @@ from paddle.nn.quant import weight_quantize
 from paddlenlp_ops import fused_get_rotary_embedding, get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
-    FusedMultiTransformer,
+    FusedMultiTransformerBase,
+    FusedMultiTransformerConfig,
+    FusedMultiTransformerWeightOnly,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
@@ -161,7 +163,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 paddle.ParamAttr(name="fusellama.{}.ffn2_weight_scale".format(i)) for i in range(self.num_layers)
             ]
 
-        self.transformer_block = FusedMultiTransformer(
+        transformer_config = FusedMultiTransformerConfig(
             self.hidden_size,
             self.num_attention_heads,
             self.intermediate_size,
@@ -184,6 +186,12 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             norm_type="rmsnorm",
             use_neox_rotary_style=True,
         )
+
+        if self.use_weight_only:
+            self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
+        else:
+            self.transformer_block = FusedMultiTransformerBase(transformer_config)
+
         self.norm = FusedLlamaRMSNorm(config)
 
         self.cache_kvs = None
@@ -325,7 +333,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         head_size = self.hidden_size // self.num_attention_heads
 
         self.embed_tokens.weight.set_value(paddle.to_tensor(state_dict["llama.embed_tokens.weight"]))
-        self.norm.weight.set_value(paddle.to_tensor(state_dict["llama.norm.weight"]))
+        self.norm.weight.set_value(paddle.to_tensor(state_dict["llama.norm.weight"], dtype=self.norm.weight.dtype))
 
         for idx in range(self.config.num_hidden_layers):
             unfused_state_dict = {}
@@ -405,11 +413,17 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight_tensor)
 
             self.transformer_block.ln_scales[idx].set_value(
-                paddle.to_tensor(state_dict["llama.layers.{}.input_layernorm.weight".format(idx)])
+                paddle.to_tensor(
+                    state_dict["llama.layers.{}.input_layernorm.weight".format(idx)],
+                    dtype=self.transformer_block.ln_scales[idx].dtype,
+                )
             )
 
             self.transformer_block.ffn_ln_scales[idx].set_value(
-                paddle.to_tensor(state_dict["llama.layers.{}.post_attention_layernorm.weight".format(idx)])
+                paddle.to_tensor(
+                    state_dict["llama.layers.{}.post_attention_layernorm.weight".format(idx)],
+                    dtype=self.transformer_block.ffn_ln_scales[idx].dtype,
+                )
             )
 
 

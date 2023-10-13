@@ -20,17 +20,17 @@ from collections import OrderedDict
 
 from huggingface_hub import hf_hub_download
 
-from paddlenlp import __version__
-from paddlenlp.transformers import *  # noqa
-from paddlenlp.transformers.configuration_utils import is_standard_config
-from paddlenlp.utils.downloader import (
+from ... import __version__
+from ...utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     get_path_from_url_with_filelock,
     hf_file_exists,
     url_file_exists,
 )
-from paddlenlp.utils.log import logger
-
+from ...utils.log import logger
+from .. import *  # noqa
+from ..aistudio_utils import aistudio_download
+from ..configuration_utils import is_standard_config
 from ..utils import resolve_cache_dir
 
 __all__ = [
@@ -263,24 +263,31 @@ class _BaseAutoModelClass:
                 )
 
     @classmethod
-    def _from_pretrained(
-        cls, pretrained_model_name_or_path, task=None, from_hf_hub=False, subfolder=None, *model_args, **kwargs
-    ):
+    def _from_pretrained(cls, pretrained_model_name_or_path, task=None, *model_args, **kwargs):
         if task:
             if cls._task_choice:
                 cls._name_mapping = get_name_mapping(task)
             else:
                 print("We only support task choice for AutoModel.")
         cache_dir = kwargs.get("cache_dir", None)
+        from_aistudio = kwargs.get("from_aistudio", False)
+        from_hf_hub = kwargs.get("from_hf_hub", False)
+        subfolder = kwargs.get("subfolder", None)
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
         all_model_names = []
         for pretrained_model_names, model_name in cls._pretrained_model_dict.items():
             for name in pretrained_model_names:
                 all_model_names.append(name)
-
-        # From HF
-        if from_hf_hub:
+        if from_aistudio:
+            config_file = aistudio_download(repo_id=pretrained_model_name_or_path, filename=cls.model_config_file)
+            if os.path.exists(config_file):
+                model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, config_file)
+                logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
+                return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+            else:
+                logger.warning(f"{config_file}  is not a valid path to a model config file")
+        elif from_hf_hub:
             if hf_file_exists(repo_id=pretrained_model_name_or_path, filename=cls.model_config_file):
                 config_file = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
@@ -303,9 +310,7 @@ class _BaseAutoModelClass:
             if os.path.exists(config_file):
                 model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, config_file)
                 logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
-                return model_class.from_pretrained(
-                    pretrained_model_name_or_path, from_hf_hub=from_hf_hub, *model_args, **kwargs
-                )
+                return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
             else:
                 logger.warning(f"{config_file}  is not a valid path to a model config file")
         # From built-in pretrained models
@@ -369,7 +374,7 @@ class _BaseAutoModelClass:
                     logger.info("Standard config do not exist, loading from legacy config")
                     resolved_vocab_file = get_path_from_url_with_filelock(legacy_community_url, cache_dir)
                 else:
-                    raise RuntimeError("Neither 'config.json' nro 'model_config.json' exists")
+                    raise RuntimeError("Neither 'config.json' nor 'model_config.json' exists")
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(

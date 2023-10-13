@@ -24,13 +24,8 @@ from .testing_utils import LLMTest
 
 
 @parameterized_class(
-    ["model_dir", "enable_compare"],
-    [
-        ["llama", False],
-        # ["chatglm"],
-        # ["chatglm2"],
-        # ["bloom"],
-    ],
+    ["model_dir"],
+    [["llama"], ["chatglm"], ["bloom"], ["chatglm2"]],
 )
 class FinetuneTest(LLMTest, unittest.TestCase):
     config_path: str = "./tests/fixtures/llm/finetune.yaml"
@@ -55,7 +50,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
 
             main()
 
-        if self.model_dir != "opt":
+        if self.model_dir != "opt" and self.model_dir != "chatglm2":
             self.run_predictor({"inference_model": True})
 
         self.run_predictor({"inference_model": False})
