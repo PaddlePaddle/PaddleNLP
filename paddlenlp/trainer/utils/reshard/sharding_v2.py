@@ -112,7 +112,7 @@ def merge_tensors(tensor_list, shape):
     padded_size = t._numel()
     assert padded_size >= tensor_size
     t = t._slice(0, tensor_size)
-    t.get_tensor._set_dims(shape)
+    t.get_tensor()._set_dims(shape)
     return t
 
 
