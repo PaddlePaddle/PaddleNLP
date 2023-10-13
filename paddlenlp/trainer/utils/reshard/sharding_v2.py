@@ -33,19 +33,36 @@ def shard(node_model_state, model, optimizer, hcg):
     split_infos = collect_split_info(optimizer, model)
 
     def split_func(k, v):
-        param_name = k[0]
+        param_name = k[1]
+        opt_name = k[-1]
         assert param_name in split_infos
-        index, padded_size, buffer_size = split_infos[param_name]
-        v = pad_tensor(v, padded_size)
+        is_beta = is_bata(opt_name)
+        index, padded_size, buffer_size, has_slice_grad = split_infos[param_name]
+
+        if not is_beta:
+            v = pad_tensor(v, padded_size)
+
+        def get_slice(v, begin, end):
+            if is_beta:
+                return v
+            return slice_tensor(v, begin, end)
+
         assert buffer_size % group.nranks == 0, f"buffer_size {buffer_size} group.nranks {group.nranks}"
         buffer_slice = buffer_size // group.nranks
-        offset = buffer_size - index % buffer_slice
+
+        # has slice grad in cur rank
+        if has_slice_grad:
+            assert index < (cur_rank + 1) * buffer_slice
+            assert index + padded_size > cur_rank * buffer_slice
+
+        offset = buffer_slice - index % buffer_slice
         tensors = []
-        tensors.append((0, slice_tensor(v, 0, offset)))
+        tensors.append((index // buffer_slice, get_slice(v, 0, offset)))
         left_size = padded_size - offset
         for _ in range((left_size + buffer_slice - 1) // buffer_slice):
             end = min(offset + buffer_slice, padded_size)
-            tensors.append((0, slice_tensor(v, offset, end)))
+            assert end <= buffer_size
+            tensors.append(((offset + index) // buffer_slice, get_slice(v, offset, end)))
             offset = end
 
         return tensors
@@ -54,10 +71,12 @@ def shard(node_model_state, model, optimizer, hcg):
 
     def filter_func(k):
         names, rank = k
+        assert rank < group.nranks
         return rank == cur_rank
 
     # reshard
     node_model_state.reshard(group, filter_func)
+    node_model_state.drop_rank()
     return node_model_state
 
 
@@ -69,8 +88,12 @@ def restore(node_model_state, model, optimizer, hcg):
 
     def merge_func(k, v):
         structure_name = k[0]
+        opt_name = k[-1]
         assert structure_name in param_shapes, structure_name
         tensor_list = [e[1] for e in v]
+        # do not merge beta acc
+        if is_bata(opt_name):
+            return tensor_list[0]
         shape = param_shapes[structure_name]
         return merge_tensors(tensor_list, shape)
 
@@ -96,7 +119,7 @@ def merge_tensors(tensor_list, shape):
 def pad_tensor(tensor, padded_size):
     tensor_shape = tensor.shape
     tensor_size = np.prod(tensor_shape)
-    assert tensor_size < padded_size
+    assert tensor_size <= padded_size
     t = paddle.zeros([padded_size], dtype=tensor.dtype)
     tensor.flatten_()
     t[0:tensor_size] = tensor
@@ -115,8 +138,9 @@ def collect_split_info(optimizer, model):
         for (k, v) in comm_buffer._sharding_param_grad_view.items():
             index = v._index
             padded_size = v._padded_size
-            buffer_size = v._grad_buffer._numel()
-            split_infos[k] = (index, padded_size, buffer_size)
+            buffer_size = v._param_buffer._numel()
+            has_slice_grad = v._slice_grad is not None
+            split_infos[k] = (index, padded_size, buffer_size, has_slice_grad)
 
     if isinstance(model, PipelineParallel) and len(model._chunk_2_comm_buffers) > 0:
         for (k, v) in model._chunk_2_comm_buffers.items():
@@ -128,3 +152,11 @@ def collect_split_info(optimizer, model):
             gather_infos(comm_buffer)
     assert len(split_infos)
     return split_infos
+
+
+def is_bata(name):
+    if "_beta1_pow_acc_" in name:
+        return True
+    if "_beta2_pow_acc_" in name:
+        return True
+    return False

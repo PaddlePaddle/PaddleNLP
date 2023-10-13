@@ -2361,7 +2361,7 @@ class Trainer:
             name.append(f"shard{i:0>2d}")
             return "_".join(name)
 
-        structure_name_map = {k: v.name for (k, v) in self.model.state_dict()}
+        structure_name_map = {k: v.name for (k, v) in self.model.state_dict().items()}
         for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
             tmp = self._load_optimizer_state_of_one_shard(checkpoint, get_name_suffix(i))
             node_model_state_tmp = reshard_util.NodeModelState()

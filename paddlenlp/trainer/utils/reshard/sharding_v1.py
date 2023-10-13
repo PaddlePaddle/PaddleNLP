@@ -27,7 +27,7 @@ def shard(node_model_state, model, optimizer, hcg):
     param2rank = optimizer._param2rank
 
     def filter_func(key):
-        names, rank = key
+        names = key
         param_name = names[1]
         assert param_name in param2rank
         dst_rank = param2rank[param_name]
@@ -38,4 +38,5 @@ def shard(node_model_state, model, optimizer, hcg):
 
 
 def restore(node_model_state, model, optimizer, hcg):
+    node_model_state.drop_rank()
     return node_model_state
