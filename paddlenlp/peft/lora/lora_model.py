@@ -55,9 +55,6 @@ try:
         RowParallelQuantizationLoRALinear,
     )
 except:
-    logger.warning(
-        "Quantization strategy is only available for PaddlePaddle >= 2.5.2. Please update your PaddlePaddle version to apply quantization strategy to LoRA."
-    )
     QuantizationLinear = None
     ColumnParallelQuantizationLinear = None
     RowParallelQuantizationLinear = None
