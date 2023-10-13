@@ -624,6 +624,10 @@ class TrainingArguments:
         default=True,
         metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl"},
     )
+    use_moe: Optional[bool] = field(
+        default=False,
+        metadata={"help": "开启moe训练"},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -836,8 +840,9 @@ class TrainingArguments:
 
                 if tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
-
-                if tensor_parallel_degree == 1 and sharding_parallel_degree == 1:
+                if self.use_moe:
+                    order = ["sharding", "pp", "dp", "mp"]
+                elif tensor_parallel_degree == 1 and sharding_parallel_degree == 1:
                     order = ["pp", "dp", "sharding", "mp"]
                 else:
                     order = ["dp", "sharding", "pp", "mp"]
@@ -1006,9 +1011,12 @@ class TrainingArguments:
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
             if self.sharding_parallel_degree > 1:
                 name.append(f"shard{self.sharding_parallel_rank:0>2d}")
-
+            if self.use_moe:
+                name.append(f"moe{self.data_parallel_rank:0>2d}")
             return "_".join(name)
         else:
+            if self.use_moe:
+                return f"moe{self.data_parallel_rank:0>2d}"
             return None
 
     @property
@@ -1019,8 +1027,12 @@ class TrainingArguments:
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
+            if self.use_moe:
+                name.append(f"moe{self.data_parallel_rank:0>2d}")
             return "_".join(name)
         else:
+            if self.use_moe:
+                return f"moe{self.data_parallel_rank:0>2d}"
             return None
 
     @property
@@ -1033,8 +1045,12 @@ class TrainingArguments:
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
             if self.save_sharding_stage1_model:
                 name.append(f"shard{self.sharding_parallel_rank:0>2d}")
+            if self.use_moe:
+                name.append(f"moe{self.data_parallel_rank:0>2d}")
             return "_".join(name)
         else:
+            if self.use_moe:
+                return f"moe{self.data_parallel_rank:0>2d}"
             return None
 
     @property

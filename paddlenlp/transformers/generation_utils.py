@@ -1151,6 +1151,7 @@ class GenerationMixin(object):
             else:
                 next_tokens = paddle.multinomial(probs)
 
+            #  paddle.distributed.broadcast(next_tokens, src=0)
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
