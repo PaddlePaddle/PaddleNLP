@@ -29,6 +29,8 @@ from paddle.nn.quant import weight_only_linear
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
+from paddle_custom_device.npu import qkv_transpose_split, encode_rotary_qk, write_cache_kv, transpose_remove_padding, rebuild_padding
+
 if is_paddlenlp_ops_available():
     from paddlenlp_ops import (
         encode_rotary_qk,

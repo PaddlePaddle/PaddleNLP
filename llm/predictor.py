@@ -533,10 +533,12 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
 
     @paddle.no_grad()
     def _infer(self, inputs):
+        inputs["position_ids"] = inputs["position_ids"].numpy()
         for k, v in inputs.items():
             input_tensor = self.predictor.get_input_handle(k)
 
-            if "mask" in k or "position" in k:
+            # if "mask" in k or "position" in k:
+            if "mask" in k:
                 input_tensor.share_external_data(v)
             else:
                 if paddle.is_tensor(v):
