@@ -2169,6 +2169,7 @@ class Trainer:
 
         sharding_meta["param2rank"] = param2rank
         sharding_meta["structure_name_mapping"] = structure_name_mapping
+        sharding_meta["sharding_strategy"] = sharding_strategy
         suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
         sharding_metas[suffix] = sharding_meta
         sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_model_parallel_group())
@@ -2309,16 +2310,16 @@ class Trainer:
 
     def _need_reshard(self, checkpoint):
         parallel_config = self._load_distributed_strategy(checkpoint)
+        sharding_meta = self._load_sharding_meta(checkpoint)
         sharding_degree = parallel_config["sharding_degree"]
         sharding_strategy = SHARDING_STRATEGY_V1
-        if "sharding_strategy" in parallel_config:
+        if "sharding_strategy" in sharding_meta:
             sharding_strategy = parallel_config["sharding_strategy"]
         cur_sharding_degree = self.args.sharding_parallel_degree
         cur_sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
         if sharding_degree != cur_sharding_degree or sharding_strategy != cur_sharding_strategy:
             return True
         if sharding_strategy == SHARDING_STRATEGY_V1:
-            sharding_meta = self._load_sharding_meta(checkpoint)
             param2rank = sharding_meta["param2rank"]
             optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
             assert optimizer
@@ -2331,21 +2332,23 @@ class Trainer:
 
     def _load_optimizer_state_with_reshard(self, checkpoint):
         """load state_dict of multiple shard from_checkpoint, Only load model state dict."""
-        parallel_config = self._load_distributed_strategy(checkpoint)
-        pp_degree = parallel_config["pp_degree"]
-        mp_degree = parallel_config["mp_degree"]
-        sharding_degree = parallel_config["sharding_degree"]
-        sharding_strategy = SHARDING_STRATEGY_V1
-        if "sharding_strategy" in parallel_config:
-            sharding_strategy = parallel_config["sharding_strategy"]
-        assert self.args.pipeline_parallel_degree == pp_degree
-        assert self.args.tensor_parallel_degree == mp_degree
-        cur_sharding_degree = self.args.sharding_parallel_degree
-        cur_sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
 
         if not self._need_reshard(checkpoint):
             logger.info("do not need reshard")
             return self._load_optimizer_state_of_one_shard(checkpoint, self.args.optimizer_name_suffix)
+
+        parallel_config = self._load_distributed_strategy(checkpoint)
+        sharding_meta = self._load_sharding_meta(checkpoint)
+        pp_degree = parallel_config["pp_degree"]
+        mp_degree = parallel_config["mp_degree"]
+        sharding_degree = parallel_config["sharding_degree"]
+        sharding_strategy = SHARDING_STRATEGY_V1
+        if "sharding_strategy" in sharding_meta:
+            sharding_strategy = sharding_meta["sharding_strategy"]
+        assert self.args.pipeline_parallel_degree == pp_degree
+        assert self.args.tensor_parallel_degree == mp_degree
+        cur_sharding_degree = self.args.sharding_parallel_degree
+        cur_sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
 
         logger.info("reshard optimizer state")
         node_model_state = reshard_util.NodeModelState()
