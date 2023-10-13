@@ -167,11 +167,11 @@ def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol
         if k == "master_weights":
             cpu_optimizer_state_dict[k] = {}
             for kk, vv in v.items():
-                cpu_optimizer_state_dict[k][kk] = vv.pin_memory()
+                cpu_optimizer_state_dict[k][kk] = vv.numpy()
         elif k == "LR_Scheduler":
             cpu_optimizer_state_dict[k] = copy.deepcopy(v)
         else:
-            cpu_optimizer_state_dict[k] = v.pin_memory()
+            cpu_optimizer_state_dict[k] = v.numpy()
         paddle.device.cuda.synchronize()
     if sync_other_task:
         clear_async_save_task_queue()
