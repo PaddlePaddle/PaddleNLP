@@ -61,12 +61,12 @@ def save_unified_checkpoint(args, model, output_dir, safe_serialization=False):
 
     Args:
         args (_type_): _description_
-        model (_type_): _description_
-        output_dir (_type_): _description_
-        safe_serialization (bool, optional): _description_. Defaults to False.
+        model (_type_): model to save
+        output_dir (_type_): save dir
+        safe_serialization (bool, optional): use safetensors. Defaults to False.
 
     Raises:
-        ValueError: _description_
+        ValueError: if model is an instanceof `PretrainedModel` and the model cannot be saved
     """
     if isinstance(model, PretrainedModel):
         model_to_save = model
@@ -110,14 +110,11 @@ def load_unified_checkpoint(model: paddle.nn.Layer, resume_from_checkpoint: str,
     """Load potential model checkpoint
 
     Args:
-        model (nn.Layer): _description_
-        resume_from_checkpoint (str): _description_
-
-    Raises:
-        RuntimeError: _description_
+        model (nn.Layer): Your model to save
+        resume_from_checkpoint (str): path of the checkpoint to load
 
     Returns:
-        _type_: _description_
+        None
     """
 
     index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
@@ -128,8 +125,9 @@ def load_unified_checkpoint(model: paddle.nn.Layer, resume_from_checkpoint: str,
     )
 
     loaded_keys = sharded_metadata["all_checkpoint_keys"]
+
     model_state_dict = model.state_dict()
-    expected_keys = list(model_state_dict.keys())
+    expected_keys = set(list(model_state_dict.keys()))
 
     def _remove_unused_keys(
         state_dict,
@@ -150,15 +148,22 @@ def load_unified_checkpoint(model: paddle.nn.Layer, resume_from_checkpoint: str,
         resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
 
     for shard_file in resolved_archive_file:
+        # TODO: check if  no expected_keys in shard_file, then don't load it
+        if expected_keys.isdisjoint(sharded_metadata["file_map"][os.path.split(shard_file)[-1]]):
+            continue
+
         pre_tensor_parallel_split = False
         if shard_file.endswith(".safetensors") and model.config.tensor_parallel_degree > 1:
             pre_tensor_parallel_split = True
             assert loaded_keys is not None, "loaded_keys is not None."
             tp_actions = model.get_tensor_parallel_convert_actions(model.config, loaded_keys, ignore_error=True)
         # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
-        state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None, set(expected_keys))
+        state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys)
 
-        _ = _remove_unused_keys(state_dict, model_state_dict)
+        if not pre_tensor_parallel_split:
+            # Since we load all keys but we only need one of pipeline stages
+            _ = _remove_unused_keys(state_dict, model_state_dict)
+
         if model.config.tensor_parallel_degree > 1 and not pre_tensor_parallel_split:
             logger.info("Converting state_dict to Tensor Parallel Format")
             # ignore error for multi shard, since only parts of data
@@ -199,6 +204,7 @@ def unified_checkpoint_into_shards(
     state_dict = model_to_save.state_dict()
 
     all_filter_keys = filter_params(model_to_save, state_dict)
+    logger.info("filter_params done")
 
     dtype = get_parameter_dtype(model_to_save)
     model_to_save.config.dtype = str(dtype).split(".")[1]
@@ -206,6 +212,9 @@ def unified_checkpoint_into_shards(
 
     if config_to_save.tensor_parallel_degree > 1:
         state_dict = merge_tensor_parallel_with_shard(model_to_save, state_dict, config_to_save, all_filter_keys)
+        logger.info("merge_tensor_parallel_with_shard done")
+
+    if config_to_save.tensor_parallel_degree > 1:
         # do we need to change?
         config_to_save.tensor_parallel_degree = 1
 
@@ -226,19 +235,35 @@ def unified_checkpoint_into_shards(
 
     for key, weight in state_dict.items():
         index_weight_file[key] = shard_file
-        total_size += weight.numel() * dtype_byte_size(weight.dtype)
+        total_size += weight.numel().item() * dtype_byte_size(weight.dtype)
 
-    total_size = paddle.to_tensor(total_size)
+    # total_size = paddle.to_tensor(total_size)
 
     hcg = fleet.get_hybrid_communicate_group()
-    data_group = hcg.get_data_parallel_group()
+    # data_group = hcg.get_data_parallel_group()
 
-    if data_group.rank == -1:
-        paddle.distributed.all_gather_object(index_file_list, index_weight_file)
-        paddle.distributed.all_gather(total_size_list, total_size)
-    else:
-        paddle.distributed.all_gather_object(index_file_list, index_weight_file, group=data_group)
-        paddle.distributed.all_gather(total_size_list, total_size, group=data_group)
+    tp_group = hcg.get_model_parallel_group()
+    pp_group = hcg.get_pipe_parallel_group()
+
+    logger.info("all_gather_object index_file_list")
+    if tp_group.nranks > 1:
+        paddle.distributed.all_gather_object(index_file_list, index_weight_file, tp_group)
+        paddle.distributed.all_gather_object(total_size_list, total_size, tp_group)
+    if pp_group.nranks > 1:
+        pp_index_file_list = []
+        pp_total_size_list = []
+        paddle.distributed.all_gather_object(
+            pp_index_file_list, index_file_list if len(index_file_list) > 0 else index_weight_file, pp_group
+        )
+        paddle.distributed.all_gather_object(
+            pp_total_size_list, total_size_list if len(total_size_list) > 0 else total_size, pp_group
+        )
+
+        if isinstance(pp_total_size_list[0], list):
+            total_size_list = [y for x in pp_total_size_list for y in x]
+            index_file_list = [y for x in pp_index_file_list for y in x]
+
+    logger.info("done all_gather_object index_file_list")
 
     sharded_index = get_sharded_index(
         index_file_list,
@@ -256,15 +281,14 @@ def get_sharded_index(
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
     if local_rank == 0:
         sharded_index_json = {}
-        weight_map = {}
 
-        total_size_list = [i.item() for i in total_size_list]
         sharded_index_json["metadata"] = {"total_size": sum(total_size_list)}
 
+        weight_map = {}
         for i, index_file in enumerate(index_file_list):
             weight_map.update(index_file_list[i])
 
-        sharded_index_json["weight_map"] = weight_map  # dict(sorted(weight_map.items()))
+        sharded_index_json["weight_map"] = weight_map
         return sharded_index_json
 
     return None
@@ -335,6 +359,7 @@ def filter_params(model_to_save, state_dict):
 
 
 def merge_tensor_parallel_with_shard(model_to_save, state_dict, config, all_filter_keys):
+    logger.info("merge_tensor_parallel_with_shard")
     tp_actions = model_to_save.get_tensor_parallel_convert_actions(
         model_to_save.config, state_dict.keys(), is_split=False, ignore_error=True
     )
@@ -352,7 +377,7 @@ def merge_tensor_parallel_with_shard(model_to_save, state_dict, config, all_filt
             tp_actions.pop(key)
 
     state_dict_to_save = {}
-
+    logger.info("Get tensor to merge")
     for i, filter_keys in enumerate(all_filter_keys):
         is_dst = tp_rank == i
         for key in filter_keys:

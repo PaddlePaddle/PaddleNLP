@@ -126,6 +126,8 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
 from .training_args import TrainingArguments
 from .utils.helper import (  # nested_truncate,
     distributed_concat,
+    distributed_file,
+    distributed_isfile,
     nested_concat,
     nested_detach,
     nested_numpify,
@@ -665,6 +667,7 @@ class Trainer:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
             self._load_optimizer_and_scheduler(resume_from_checkpoint)
         else:
+            # TODO (ZHUI) broadcast files to each node, trainer_state.json scaler.pdparams scheduler.pdparams.
             model = self._wrap_model(self.model_wrapped)
             # for the rest of this function `model` is the outside model, whether it was wrapped or not
             if model is not self.model:
@@ -708,10 +711,12 @@ class Trainer:
         steps_trained_progress_bar = None
 
         # Check if continuing training from a checkpoint
-        if resume_from_checkpoint is not None and os.path.isfile(
+        if resume_from_checkpoint is not None and distributed_isfile(
             os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
         ):
-            self.state = TrainerState.load_from_json(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
+            self.state = TrainerState.load_from_json(
+                distributed_file(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
+            )
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:
                 steps_trained_in_current_epoch = self.state.global_step % (num_update_steps_per_epoch)
@@ -2150,16 +2155,20 @@ class Trainer:
             if os.path.isfile(path):
                 opt_state_dict = paddle.load(path)
 
-        if opt_state_dict is not None and os.path.isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
+        if opt_state_dict is not None:
             # Load in optimizer and scheduler states
             self.optimizer.set_state_dict(opt_state_dict)
-
-            self.lr_scheduler.set_state_dict(paddle.load(os.path.join(checkpoint, SCHEDULER_NAME)))
-            if self.do_grad_scaling and os.path.isfile(os.path.join(checkpoint, SCALER_NAME)):
-                self.scaler.load_state_dict(paddle.load(os.path.join(checkpoint, SCALER_NAME), return_numpy=True))
         else:
-            raise ValueError(
-                f"optimizer-state-dict not found, opt:{os.path.join(checkpoint, optimizer_name)} scheduler:{os.path.join(checkpoint, SCHEDULER_NAME)}"
+            raise ValueError(f"optimizer-state-dict not found, opt:{os.path.join(checkpoint, optimizer_name)}.")
+
+        if distributed_isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
+            self.lr_scheduler.set_state_dict(paddle.load(distributed_file(os.path.join(checkpoint, SCHEDULER_NAME))))
+        else:
+            raise ValueError(f"scheduler-file not found, scheduler:{os.path.join(checkpoint, SCHEDULER_NAME)}")
+
+        if self.do_grad_scaling and distributed_isfile(os.path.join(checkpoint, SCALER_NAME)):
+            self.scaler.load_state_dict(
+                paddle.load(distributed_file(os.path.join(checkpoint, SCALER_NAME)), return_numpy=True)
             )
 
     def log(self, logs: Dict[str, float], **kwargs) -> None:
