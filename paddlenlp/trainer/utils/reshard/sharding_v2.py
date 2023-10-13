@@ -43,7 +43,7 @@ def shard(node_model_state, optimizer, model, hcg):
         tensors = []
         tensors.append((0, slice_tensor(v, 0, offset)))
         left_size = padded_size - offset
-        for i in range((left_size + buffer_slice - 1) // buffer_slice):
+        for _ in range((left_size + buffer_slice - 1) // buffer_slice):
             end = min(offset + buffer_slice, padded_size)
             tensors.append((0, slice_tensor(v, offset, end)))
             offset = end
@@ -112,7 +112,11 @@ def collect_split_info(optimizer, model):
     split_infos = {}
 
     def gather_infos(comm_buffer):
-        pass
+        for (k, v) in comm_buffer._sharding_param_grad_view.items():
+            index = v._index
+            padded_size = v._padded_size
+            buffer_size = v._grad_buffer._numel()
+            split_infos[k] = (index, padded_size, buffer_size)
 
     if isinstance(model, PipelineParallel) and len(model._chunk_2_comm_buffers) > 0:
         for (k, v) in model._chunk_2_comm_buffers.items():

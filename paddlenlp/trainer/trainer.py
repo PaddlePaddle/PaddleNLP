@@ -506,84 +506,51 @@ class Trainer:
     def recover_params_from_master_weights(self, state_dict):
         opt_state_dict = self.optimizer.state_dict()
         assert "master_weights" in opt_state_dict
-        master_weigths = opt_state_dict["master_weights"]
+        master_weights = opt_state_dict["master_weights"]
+        tmp = OrderedDict()
+        (master_weights, tmp) = (tmp, master_weights)
+        # cast to before
+        for (k, v) in tmp.items():
+            master_weights[k] = paddle.cast(v.cuda(), paddle.bfloat16).cpu()
+
         if self.args.load_sharding_stage1_model:
-            assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
-            param2rank = self.optimizer._inner_opt._param2rank
-            param_names_in_master_weights = list(master_weigths.keys())
-            tmp = []
-            logger.info("param_names_in_master_weights:{}".format(param_names_in_master_weights))
-            paddle.distributed.all_gather_object(tmp, param_names_in_master_weights, group=self.sharding_group)
-            sharding_group_param_names = [v for item in tmp for v in item]
-            logger.info("sharding_group_param_names:{}".format(sharding_group_param_names))
+            structure_name_map = {k: v.name for (k, v) in self.model.state_dict()}
+            node_model_state = reshard_util.NodeModelState()
+            node_model_state_tmp = reshard_util.NodeModelState()
+            node_model_state_tmp.add_master_weights(master_weights)
+            node_model_state_tmp.pack_keys(structure_name_map)
+            node_model_state.merge_from(node_model_state_tmp, self.sharding_group.rank)
+            del node_model_state_tmp
+            assert reshard_util.is_sharding_opt(self.optimizer)
+            sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
+            restore_func = (
+                reshard_util.sharding_v1.restore
+                if sharding_strategy == reshard_util.SHARDING_STRATEGY_V1
+                else reshard_util.sharding_v2.restore
+            )
+            node_model_state = restore_func(node_model_state)
+            node_model_state.unpack_keys()
+            master_weights = node_model_state.master_weights
+
+            def filter_func(name):
+                return True
+
+            master_weights = reshard_util.all_gather_state_dict(master_weights, filter_func, self.sharding_group)
+
         model_state_dict = self.model.state_dict()
         logger.info("before recover, model_state_dict number: {}".format(len(model_state_dict)))
         for key, param in model_state_dict.items():
-            if param.name in master_weigths:
-                assert param.shape == master_weigths[param.name].shape
-                paddle.assign(paddle.cast(master_weigths[param.name].cuda(), paddle.bfloat16), model_state_dict[key])
-            if self.args.load_sharding_stage1_model and param.name in sharding_group_param_names:
-                paddle.distributed.broadcast(
-                    model_state_dict[key],
-                    src=self.sharding_group.ranks[param2rank[param.name]],
-                    group=self.sharding_group,
-                    sync_op=True,
-                )
+            if param.name in master_weights:
+                assert param.shape == master_weights[param.name].shape
+                paddle.assign(master_weights[param.name].cuda(), model_state_dict[key])
+
         logger.info("after recover, casted model_state_dict number: {}".format(len(model_state_dict)))
         state_dict.update(model_state_dict)
         return state_dict
 
-    def _all_gather_state_dict(self, state_dict, filter_func, group=None):
-        if group is None:
-            group = self.hcg.get_sharding_parallel_group()
-        res = OrderedDict()
-
-        def map_func(weight):
-            if isinstance(weight, paddle.Tensor):
-                weight = weight.numpy()
-            return weight
-
-        state_dict = {k: map_func(v) for (k, v) in state_dict.items()}
-
-        meta_dict = {}
-        for (k, v) in state_dict.items():
-            # src rank
-            meta_dict[k] = (v.dtype, v.shape, group.rank)
-
-        meta_dict_list = self._all_gather_simple_object(meta_dict, group)
-
-        total_meta_dict = {}
-        for meta_dict in meta_dict_list:
-            for (k, v) in meta_dict.items():
-                assert k not in total_meta_dict
-                total_meta_dict[k] = v
-
-        meta_list = list(total_meta_dict.items())
-        meta_list = sorted(meta_list, key=lambda x: x[0])
-        for (k, meta) in meta_list:
-            dtype, shape, rank = meta
-            if rank == group.rank:
-                assert k in state_dict
-                tensor = paddle.to_tensor(state_dict[k])
-            else:
-                tensor = paddle.to_tensor(np.empty(shape, dtype))
-            logger.info(f"broadcast {k} from {rank}")
-            # broadcast the tensor
-            paddle.distributed.broadcast(
-                tensor,
-                src=group.ranks[rank],
-                group=group,
-                sync_op=True,
-            )
-            if filter_func(k):
-                res[k] = tensor.cpu()
-            del tensor
-        return res
-
     def load_state_dict_from_checkpoint_with_reshard(self, resume_from_checkpoint):
         """load state_dict from_checkpoint with reshard, Only load model state dict."""
         parallel_config = self._load_distributed_strategy(resume_from_checkpoint)
-        pp_degree = parallel_config["pp_degree"]
         pp_degree = parallel_config["pp_degree"]
         mp_degree = parallel_config["mp_degree"]
         sharding_degree = parallel_config["sharding_degree"]
@@ -612,7 +579,7 @@ class Trainer:
             return True
 
         if self.args.load_sharding_stage1_model:
-            state_dict = self._all_gather_state_dict(state_dict, filter_func)
+            state_dict = reshard_util.all_gather_state_dict(state_dict, filter_func, self.sharding_group)
 
         return state_dict
 
@@ -2369,12 +2336,13 @@ class Trainer:
         pp_degree = parallel_config["pp_degree"]
         mp_degree = parallel_config["mp_degree"]
         sharding_degree = parallel_config["sharding_degree"]
-        sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
+        sharding_strategy = reshard_util.SHARDING_STRATEGY_V1
         if "sharding_strategy" in parallel_config:
             sharding_strategy = parallel_config["sharding_strategy"]
         assert self.args.pipeline_parallel_degree == pp_degree
         assert self.args.tensor_parallel_degree == mp_degree
         cur_sharding_degree = self.args.sharding_parallel_degree
+        cur_sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
 
         if not self._need_reshard(checkpoint):
             logger.info("do not need reshard")
@@ -2396,27 +2364,27 @@ class Trainer:
         for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
             tmp = self._load_optimizer_state_of_one_shard(checkpoint, get_name_suffix(i))
             node_model_state_tmp = reshard_util.NodeModelState()
-            node_model_state_tmp.add_opt(tmp)
+            node_model_state_tmp.add_opts(tmp)
             node_model_state_tmp.pack_keys(structure_name_map)
             node_model_state.merge_from(node_model_state_tmp, i)
             del tmp
             del node_model_state_tmp
 
+        restore_func = (
+            reshard_util.sharding_v1.restore
+            if sharding_strategy == reshard_util.SHARDING_STRATEGY_V1
+            else reshard_util.sharding_v2.restore
+        )
+        node_model_state = restore_func(node_model_state, self.model, self.optimizer, self.hcg)
+
         if self.args.load_sharding_stage1_model:
-            restore_func = (
-                reshard_util.sharding_v1.restore
-                if sharding_strategy == reshard_util.SHARDING_STRATEGY_V1
-                else reshard_util.sharding_v2.restore
-            )
             shard_func = (
                 reshard_util.sharding_v1.shard
-                if sharding_strategy == reshard_util.SHARDING_STRATEGY_V1
+                if cur_sharding_strategy == reshard_util.SHARDING_STRATEGY_V1
                 else reshard_util.sharding_v2.shard
             )
-            node_model_state = restore_func(node_model_state, self.model, self.optimizer, self.hcg)
             node_model_state = shard_func(node_model_state, self.model, self.optimizer, self.hcg)
-        else:
-            node_model_state.drop_rank()
+
         # drop structural name in the key
         node_model_state.unpack_keys()
 
