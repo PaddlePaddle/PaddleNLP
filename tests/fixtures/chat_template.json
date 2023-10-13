@@ -1,0 +1,5 @@
+{
+    "system": "你是一个人工智能助手",
+    "history": "Human: {{user}}<sep> Bot: {{bot}}",
+    "prompt": null
+}

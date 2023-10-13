@@ -45,7 +45,7 @@ from paddlenlp.utils.downloader import (
     get_path_from_url_with_filelock,
     url_file_exists,
 )
-from paddlenlp.utils.env import TOKENIZER_CONFIG_NAME
+from paddlenlp.utils.env import CHAT_TEMPLATE_CONFIG_NAME, TOKENIZER_CONFIG_NAME
 from paddlenlp.utils.log import logger
 
 from .utils import resolve_cache_dir
@@ -1458,6 +1458,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             "added_tokens_file": ADDED_TOKENS_FILE,
             "special_tokens_map_file": SPECIAL_TOKENS_MAP_FILE,
             "tokenizer_config_file": TOKENIZER_CONFIG_FILE,
+            "chat_template_file": CHAT_TEMPLATE_CONFIG_NAME,
         }
 
         vocab_files_target = {**cls.resource_files_names, **additional_files_names}
