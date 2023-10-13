@@ -508,8 +508,6 @@ def tokenize_chinese_chars(text):
 
 @dataclass
 class ChatTemplate:
-    """refer to: https://github.com/hiyouga/LLaMA-Efficient-Tuning/blob/de5523449e9568fb52f53c351d271d819f9b5bc2/src/llmtuner/extras/template.py#L15C7-L15C15"""
-
     conversation: list[str] | None = None
     system: str | None = None
     query: str = None
@@ -637,9 +635,26 @@ class ChatTemplateMixin:
         if not os.path.exists(chat_template_file):
             return
 
-        logger.info(f"loading chat-template file<{chat_template_file}>")
-        tokenizer.chat_template = ChatTemplate.from_file(chat_template_file)
+        tokenizer.init_chat_template(chat_template_file)
         return tokenizer
+
+    def init_chat_template(self, chat_template: str | dict):
+        """init chat_tempalte by file_path or template dict data
+
+        Args:
+            chat_template (str | dict): file_path or template dict data
+        """
+        if isinstance(chat_template, str):
+            if not os.path.exists(chat_template):
+                raise FileNotFoundError("the chat-template file does not exist: {}".format(chat_template))
+
+            self.chat_template = ChatTemplate.from_file(chat_template)
+        elif isinstance(chat_template, dict):
+            self.chat_template = ChatTemplate.from_dict(chat_template)
+        elif isinstance(chat_template, ChatTemplate):
+            self.chat_template = chat_template
+        else:
+            raise ValueError("receive error chat_template data: ", chat_template)
 
     def save_resources(self, save_directory):
         super().save_resources(save_directory)
