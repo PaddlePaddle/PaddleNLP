@@ -86,6 +86,39 @@ functions = [
             },
         ],
     },
+    {
+        "name": "get_literature_review",
+        "description": "根据用户查询的综述意图，生成综述文章。",
+        "parameters": {
+            "type": "object",
+            "description": "用于生成综述文章的用户查询和综述意图。",
+            "properties": {
+                "query": {"type": "string", "description": "用户查询，包含综述意图，用于生成综述文章。"},
+            },
+            "required": ["query"],
+        },
+        "responses": {
+            "type": "object",
+            "properties": {
+                "literature": {
+                    "type": "string",
+                    "description": "生成的文章综述。",
+                }
+            },
+        },
+        "examples": [
+            {"role": "user", "content": "生成综述"},
+            {
+                "role": "assistant",
+                "content": None,
+                "function_call": {
+                    "name": "get_literature_review",
+                    "thoughts": "这是一个生成综述的请求，查询为'聊天信息中提及的文章内容的综述'。",
+                    "arguments": '{"query":"聊天信息中提及的文章内容的综述",}',
+                },
+            },
+        ],
+    },
 ]
 
 
@@ -116,6 +149,30 @@ def get_parse_args():
     parser.add_argument("--embed_title", default=False, type=bool, help="The title to be  embedded into embedding")
     parser.add_argument("--serving_name", default="0.0.0.0", help="Serving ip.")
     parser.add_argument("--serving_port", default=8099, type=int, help="Serving port.")
+    parser.add_argument(
+        "--model_type",
+        choices=["ernie_search", "ernie", "bert", "neural_search", "ernie-embedding-v1"],
+        default="bert",
+        help="the ernie model types",
+    )
+    parser.add_argument(
+        "--query_embedding_model", default="BAAI/bge-small-zh-v1.5", type=str, help="The query_embedding_model path"
+    )
+    parser.add_argument(
+        "--passage_embedding_model",
+        default="BAAI/bge-small-zh-v1.5",
+        type=str,
+        help="The passage_embedding_model path",
+    )
+    parser.add_argument(
+        "--max_seq_len_query", default=64, type=int, help="The maximum total length of query after tokenization."
+    )
+    parser.add_argument(
+        "--max_seq_len_passage", default=500, type=int, help="The maximum total length of passage after tokenization."
+    )
+    parser.add_argument(
+        "--index_type", choices=["hnsw", "flat"], default="flat", help="The index type of ANN search engine"
+    )
     args = parser.parse_args()
     # yapf: enable
     return args
