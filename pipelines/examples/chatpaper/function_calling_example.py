@@ -220,23 +220,22 @@ def add_message_chatbot(messages, history):
 
 
 def launch_ui():
-    with gr.Blocks(title="维普小助手", theme=gr.themes.Base()) as demo:
-        gr.HTML("""<h1 align="center">ChatPaper维普小助手</h1>""")
-        with gr.Tab("ChatPaper"):
-            with gr.Column():
-                chatbot = gr.Chatbot(value=[[None, "您好, 我是维普论文小助手"]], scale=35, height=500)
-                message = gr.Textbox(placeholder="你能帮我找一些有关机器学习和强化学习方面的论文吗", lines=1, max_lines=20)
-                with gr.Row():
-                    submit = gr.Button("🚀 提交", variant="primary", scale=1)
-                    clear = gr.Button("清除", variant="primary", scale=1)
-                log = gr.Textbox(value="当前轮次日志")
-            message.submit(add_message_chatbot, inputs=[message, chatbot], outputs=[message, chatbot]).then(
-                prediction, inputs=[chatbot], outputs=[chatbot, log]
-            )
-            submit.click(add_message_chatbot, inputs=[message, chatbot], outputs=[message, chatbot]).then(
-                prediction, inputs=[chatbot], outputs=[chatbot, log]
-            )
-            clear.click(lambda _: ([[None, "您好, 我是维普论文小助手"]]), inputs=[clear], outputs=[chatbot])
+    with gr.Blocks(title="维普论文助手", theme=gr.themes.Base()) as demo:
+        gr.HTML("""<h1 align="center">维普论文助手</h1>""")
+        with gr.Column():
+            chatbot = gr.Chatbot(value=[[None, "您好, 我是维普论文小助手"]], scale=35, height=500)
+            message = gr.Textbox(placeholder="你能帮我找一些有关机器学习和强化学习方面的论文吗", lines=1, max_lines=20)
+            with gr.Row():
+                submit = gr.Button("🚀 提交", variant="primary", scale=1)
+                clear = gr.Button("清除", variant="primary", scale=1)
+            log = gr.Textbox(value="当前轮次日志")
+        message.submit(add_message_chatbot, inputs=[message, chatbot], outputs=[message, chatbot]).then(
+            prediction, inputs=[chatbot], outputs=[chatbot, log]
+        )
+        submit.click(add_message_chatbot, inputs=[message, chatbot], outputs=[message, chatbot]).then(
+            prediction, inputs=[chatbot], outputs=[chatbot, log]
+        )
+        clear.click(lambda _: ([[None, "您好, 我是维普论文小助手"]]), inputs=[clear], outputs=[chatbot])
     demo.queue()
     demo.launch(server_name=args.serving_name, server_port=args.serving_port, debug=True)
 
