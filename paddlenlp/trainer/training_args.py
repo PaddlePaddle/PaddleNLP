@@ -220,6 +220,10 @@ class TrainingArguments:
               disable_partial_send_recv, optmize send speed for tensor parallel.
               enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
               enable_dp_comm_overlap, fuse data parallel gradient communication.
+        sharding_parallel_config (`str`, *optional*)(
+            Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
+            following config is support:
+                split_param, use Sharding stage1 V2
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -512,6 +516,17 @@ class TrainingArguments:
             )
         },
     )
+    sharding_parallel_config: str = field(
+        default="",
+        metadata={
+            "help": (
+                "Some additional config it highly affect the useage of sharding parallel, we provide some option to config it."
+                "following config is support: \n"
+                "split_param, sharding split param\n"
+            )
+        },
+    )
+
     recompute: bool = field(
         default=False,
         metadata={
@@ -813,6 +828,16 @@ class TrainingArguments:
                             "Please set per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
                         )
 
+                if sharding_parallel_degree > 1:
+                    sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
+                    for x in sharding_parallel_config:
+                        if len(x) > 0:
+                            if x not in [
+                                "split_param",
+                            ]:
+                                raise ValueError(f"Found unknown pipeline mode config {x},accpet config split_param.")
+                    sharding_split_param = "split_param" in sharding_parallel_config
+
                 if tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
                 if self.use_moe:
@@ -836,6 +861,11 @@ class TrainingArguments:
 
                 # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
                 strategy.hybrid_configs = hybrid_configs
+
+                if sharding_parallel_degree > 1:
+                    if sharding_split_param:
+                        strategy.hybrid_configs["sharding_configs"].split_param = True
+
                 paddle.device.cuda.synchronize()
                 start_time = time.time()
                 fleet.init(is_collective=True, strategy=strategy)
