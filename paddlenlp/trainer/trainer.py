@@ -2314,7 +2314,7 @@ class Trainer:
         sharding_degree = parallel_config["sharding_degree"]
         sharding_strategy = SHARDING_STRATEGY_V1
         if "sharding_strategy" in sharding_meta:
-            sharding_strategy = parallel_config["sharding_strategy"]
+            sharding_strategy = sharding_meta["sharding_strategy"]
         cur_sharding_degree = self.args.sharding_parallel_degree
         cur_sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
         if sharding_degree != cur_sharding_degree or sharding_strategy != cur_sharding_strategy:
