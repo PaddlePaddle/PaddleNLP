@@ -19,6 +19,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from typing import Optional
+import wandb
 
 import paddle
 
@@ -26,6 +27,7 @@ from paddlenlp.trainer import (
     PdArgumentParser,
     Trainer,
     TrainingArguments,
+    TrainerCallback,
     get_last_checkpoint,
     set_seed,
     speed_metrics,
@@ -41,6 +43,7 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.transformer_engine_utils import TransformerEngineHelper
 
 MODEL_CLASSES = {
     "gpt": (
@@ -76,6 +79,18 @@ class PreTrainingArguments(TrainingArguments):
         metadata={
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
         },
+    )
+    transformer_engine_backend: str = field(
+        default=None,
+        metadata={"help": "gpt, whether to use transformer engine backend, [None, 'paddle', 'transformer_engine']"},
+    )
+    use_fp8: bool = field(
+        default=False,
+        metadata={"help": "gpt, whether to use fp8 training"},
+    )
+    recompute_granularity: str = field(
+        default="full",
+        metadata={"help": "full or core_attn."},
     )
 
 
@@ -162,6 +177,10 @@ class ModelArguments:
             "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. "
             + "If set True, the model_name_or_path argument must exist in the paddlenlp models."
         },
+    )
+    te_init_weight_path: str = field(
+        default=None,
+        metadata={"help": "path to initial weights for TE"},
     )
     sequence_parallel: bool = field(
         default=False,
@@ -336,6 +355,47 @@ class PretrainingTrainer(Trainer):
             drop_last=self.args.dataloader_drop_last,
         )
 
+class WandbCallback(TrainerCallback):
+    def __init__(self):
+        super().__init__()
+
+    def on_log(self,
+               args,
+               state,
+               control,
+               logs=None,
+               inputs=None,
+               timer=None,
+               **kwargs):
+        wandb.log(logs)
+
+class NvtxCallback(TrainerCallback):
+    def __init__(self):
+        super().__init__()
+        self._nodeid = int(os.getenv("SLURM_NODEID", default="0"))
+        self._enable_profile = int(os.environ.get("ENABLE_PROFILE", 0))
+        self._start_step = int(os.environ.get("PROFILE_START_STEP", 0))
+        self._stop_step = int(os.environ.get("PROFILE_STOP_STEP", 0))
+        self._emit_nvtx = int(os.environ.get("PROFILE_EMIT_NVTX", 0))
+        profile_node = int(os.environ.get("PROFILE_NODEID", 0))
+        if self._nodeid != profile_node:
+            self._enable_profile = 0
+        if self._enable_profile and self._emit_nvtx:
+            paddle.fluid.core.nvprof_enable_record_event()
+
+    def on_step_begin(self,
+                    args,
+                    state,
+                    control,
+                    logs=None,
+                    inputs=None,
+                    timer=None,
+                    **kwargs):
+        if self._enable_profile and state.global_step == self._start_step:
+            paddle.fluid.core.nvprof_start()
+        if self._enable_profile and (state.global_step == (self._stop_step + 1)):
+            paddle.fluid.core.nvprof_stop()
+
 
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
@@ -360,11 +420,23 @@ def main():
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
 
+    node_idx = os.getenv("SLURM_NODEID", default="0")
+
     # Log on each process the small summary:
     logger.warning(
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: {training_args.world_size}, "
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
+
+    if training_args.local_rank == 0:
+        wandb.init(
+            project=os.environ['PADDLENLP_WANDB_PROJECT_NAME'],
+            group=os.environ['PADDLENLP_WANDB_EXP_NAME'],
+            name=f"node_{node_idx}_rank_{training_args.local_rank}_device_{training_args.device}_world_size_{training_args.world_size}",
+            config={
+                **vars(model_args), **vars(data_args), **vars(training_args)
+            }
+        )
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -403,8 +475,17 @@ def main():
 
     config.recompute_granularity = model_args.recompute_granularity
     config.use_recompute = training_args.recompute
+
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
+
+    if training_args.transformer_engine_backend is not None:
+        assert training_args.transformer_engine_backend in [
+            "paddle",
+            "transformer_engine",
+        ], "Only support paddle and transformer_engine backend"
+    config.transformer_engine_backend = training_args.transformer_engine_backend
+    config.use_fp8 = training_args.use_fp8
 
     print("Final pre-training config:", config)
 
@@ -464,6 +545,20 @@ def main():
         data_args, training_args, data_file, tokenizer
     )
 
+    checkpoint = None
+    if training_args.resume_from_checkpoint is not None:
+        checkpoint = training_args.resume_from_checkpoint
+    elif last_checkpoint is not None:
+        checkpoint = last_checkpoint
+
+    if checkpoint is None and model_args.te_init_weight_path is None:
+        logger.info("No checkpoint. Initializing model from scratch")
+        model.init_weights()
+
+    callbacks = [NvtxCallback()]
+    if training_args.local_rank == 0:
+        callbacks.append(WandbCallback())
+
     trainer = PretrainingTrainer(
         model=model,
         args=training_args,
@@ -472,13 +567,17 @@ def main():
         eval_dataset=eval_dataset if training_args.do_eval else None,
         optimizers=(None, lr_scheduler),
         tokenizer=tokenizer,
+        callbacks=callbacks,
     )
 
-    checkpoint = None
-    if training_args.resume_from_checkpoint is not None:
-        checkpoint = training_args.resume_from_checkpoint
-    elif last_checkpoint is not None:
-        checkpoint = last_checkpoint
+    if model_args.te_init_weight_path is not None:
+        if checkpoint is not None:
+            raise ValueError(
+                "Please do not provide last_checkpoint and te_init_weight_path at the same time."
+                "To load TE initial weights, please clean up the output_dir and remove --resume_from_checkpoint."
+            )
+        logger.info(f"Loading TE initial weights from {model_args.te_init_weight_path}")
+        TransformerEngineHelper.reset_te_init_weights(trainer, model_args.te_init_weight_path)
 
     # Training
     if training_args.do_train:

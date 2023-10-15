@@ -27,9 +27,11 @@ from paddlenlp.transformers.sequence_parallel_utils import (
     mark_as_sequence_parallel_parameter,
 )
 
+from ...utils.transformer_engine_utils import TransformerEngineHelper
 from .modeling import (
     GPTConfig,
     GPTDecoderLayer,
+    GPTDecoderLayerWithNVTEBackend,
     GPTEmbeddings,
     GPTPretrainedModel,
     GPTPretrainingCriterion,
@@ -117,6 +119,18 @@ class GPTEmbeddingPipe(GPTEmbeddings):
         return return_args(embeddings, attention_mask, position_ids)
 
 
+class GPTDecoderLayerPipeWithNVTEBackend(GPTDecoderLayerWithNVTEBackend):
+    def forward(self, args):
+        hidden_states, attention_mask, position_ids = parse_args(args)
+        if self.config.use_recompute and self.config.recompute_granularity == "full":
+            recompute_func = TransformerEngineHelper.get_te_recompute_func()
+            hidden_states = recompute_func(super().forward, hidden_states, attention_mask)
+        else:
+            hidden_states = super().forward(hidden_states, attention_mask=attention_mask)
+
+        return return_args(hidden_states, attention_mask, position_ids)
+
+
 class GPTDecoderLayerPipe(GPTDecoderLayer):
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
@@ -197,13 +211,20 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         config.tensor_parallel_degree = tensor_parallel_degree
         config.tensor_parallel_rank = tensor_parallel_rank
 
+        self.use_fp8 = config.use_fp8
+        self.fp8_group = TransformerEngineHelper.get_fp8_group()
+
         self.add_sequential_layer(
             SharedLayerDesc("gpt", GPTEmbeddingPipe, shared_weight_attr="embedding_weight", config=config),
             "gpt.embeddings",
         )
+        DecoderLayerPipe = (
+            GPTDecoderLayerPipe if config.transformer_engine_backend is None else GPTDecoderLayerPipeWithNVTEBackend
+        )
+
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
-                LayerDesc(GPTDecoderLayerPipe, config=config),
+                LayerDesc(DecoderLayerPipe, config=config),
                 f"gpt.decoder.layers.{i}",
             )
 
@@ -239,3 +260,7 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             num_virtual_pipeline_stages=virtual_pp_degree,
         )
         self.apply(self._init_weights)
+
+    def forward(self, *args, **kwargs):
+        with TransformerEngineHelper.fp8_autocast(enabled=self.use_fp8, fp8_group=self.fp8_group):
+            return super().forward(*args, **kwargs)

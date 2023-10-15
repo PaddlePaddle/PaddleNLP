@@ -1,0 +1,69 @@
+#!/bin/bash
+
+#SBATCH -A <account>  # change to your account
+#SBATCH -p <partition>  # change to your partition
+#SBATCH -t 04:00:00
+#SBATCH -J "paddle_te_benchmark"
+#SBATCH --exclusive
+#SBATCH --mem=0
+#SBATCH --overcommit
+#SBATCH --parsable
+
+set -x
+
+WORK_DIR="<path/to/my/workspace>"  # change to you workspace
+WORK_DIR_C=/workspace
+DS_DIR="<path/to/my/dataset/llama_openwebtext>"  # change to your dataset
+DS_DIR_C=/workspace/llama_openwebtext
+
+GPT_SCRIPT_PATH="PaddleNLP/llm/gpt-3/scripts"
+SCRIPT_DIR="${WORK_DIR}/${GPT_SCRIPT_PATH}"
+SCRIPT_DIR_C="${WORK_DIR_C}/${GPT_SCRIPT_PATH}"
+
+CONTAINER="<image_name>"  # change to your container with TE and PaddleNLP installed
+CONTAINER_NAME="te_test"
+MOUNTS="--container-mounts=$WORK_DIR:$WORK_DIR_C,$DS_DIR:$DS_DIR_C"
+EXPORTS="--export=ALL"
+
+MBS=${MBS:=2}
+TP_SIZE=${TP_SIZE:=2}
+PP_SIZE=${PP_SIZE:=1}
+FSDP_SIZE=${FSDP_SIZE:=4}
+SHARDING_STAGE=${SHARDING_STAGE:="stage2"}
+BACKEND=${BACKEND:="te"}
+PREC=${PREC:="bf16"}
+RECOMPUTE=${RECOMPUTE:="none"}
+RESUME_STEP=${RESUME_STEP:="none"}
+INIT_WEIGHT=${INIT_WEIGHT:="none"}
+NSYS=${NSYS:="false"}
+
+
+IP_CMD="hostname -i"
+IP_STR=$(srun -pmix --ntasks="$(( SLURM_JOB_NUM_NODES))"  bash -c "${IP_CMD}")
+IP_STR=$(echo $IP_STR | sed 's/ /,/g')
+echo $IP_STR
+
+export GPUS_PER_NODE=${1:-8}
+export BASE_SCRIPT=${2:-"gpt3_single_node_interactive.sh"}
+
+NUM_GPUS=$((GPUS_PER_NODE * SLURM_JOB_NUM_NODES ))
+DP_SIZE=`expr ${NUM_GPUS} / ${TP_SIZE} / ${FSDP_SIZE} / ${PP_SIZE}`
+
+
+read -r -d '' cmd <<EOF
+cd ${SCRIPT_DIR_C}
+IP_STR=${IP_STR} bash $BASE_SCRIPT ${MBS} ${FSDP_SIZE} ${TP_SIZE} ${PP_SIZE} ${SHARDING_STAGE} ${BACKEND} ${PREC} ${RECOMPUTE} ${RESUME_STEP} ${INIT_WEIGHT} ${NSYS}
+EOF
+
+# create run specific output directory for ease of analysis
+FOLDER="${WORK_DIR}/outputs/N${SLURM_JOB_NUM_NODES}_DP${DP_SIZE}_TP${TP_SIZE}_FSDP${FSDP_SIZE}_PP${PP_SIZE}_${RECOMPUTE}_RESUME_AT_${RESUME_STEP}_${BACKEND}_${PREC}_MBS${MBS}_${NSYS}"
+mkdir -p ${FOLDER}
+
+
+# redirect both stdout and stderr in the same file for ease of analysis
+OUTFILE="${FOLDER}/output-%t.txt"
+
+
+echo $cmd
+srun -pmix --ntasks-per-node=1 -o $OUTFILE -e $OUTFILE --container-image="$CONTAINER" $MOUNTS $EXPORTS --container-name=$CONTAINER_NAME bash -c "${cmd}"
+set +x
