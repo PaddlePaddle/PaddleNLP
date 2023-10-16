@@ -633,7 +633,7 @@ class ChatTemplateMixin:
 
         chat_template_file = os.path.join(cache_dir, CHAT_TEMPLATE_CONFIG_NAME)
         if not os.path.exists(chat_template_file):
-            return
+            return tokenizer
 
         tokenizer.init_chat_template(chat_template_file)
         return tokenizer
