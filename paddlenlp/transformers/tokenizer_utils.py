@@ -624,7 +624,7 @@ class ChatTemplateMixin:
     def from_pretrained(cls, pretrained_model_name_or_path, *args, from_hf_hub=False, subfolder=None, **kwargs):
         cache_dir = kwargs.get("cache_dir", None)
         tokenizer = super().from_pretrained(
-            pretrained_model_name_or_path, *args, from_hf_hub=False, subfolder=None, **kwargs
+            pretrained_model_name_or_path, *args, from_hf_hub=from_hf_hub, subfolder=subfolder, **kwargs
         )
 
         # load chat-template
