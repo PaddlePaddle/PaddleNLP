@@ -578,12 +578,15 @@ class FusedMultiTransformer(Layer):
                     # q_out : [batch, head_num, seq_len, head_dim]
                     # batch, head_num, seq_len, head_dim = q_out.shape
                     # # 只旋转前面一半的维度呀！
-                    # rotay_dims = head_dim // 2
+                    # rotay_dims = 128 // 2
+                    # head_num = 32
+                    # batch = q_out.shape[0]
+                    # seq_len = q_out.shape[2]
                     # q_out0, q_out1 = q_out[...,0:rotay_dims], q_out[...,rotay_dims:]
                     # k_out0, k_out1 = k_out[...,0:rotay_dims], k_out[...,rotay_dims:]
                     # q_out0 = q_out0.reshape([batch, head_num, seq_len, rotay_dims // 2, 2])
                     # k_out0 = k_out0.reshape([batch, head_num , seq_len, rotay_dims // 2, 2])
-                    # rotary_embs = rotary_embs.reshape([2, 1, 1, seq_len, rotay_dims // 2])
+                    # rotary_embs = rotary_embs.reshape([2, batch, 1, seq_len, rotay_dims // 2])
                     # q_out0 = paddle.stack(
                     #     [
                     #         q_out0[..., 0] * rotary_embs[0, ...] - q_out0[..., 1] * rotary_embs[1,...],
@@ -593,6 +596,16 @@ class FusedMultiTransformer(Layer):
                     # )
                     # q_out0 = q_out0.reshape(q_out1.shape)
                     # q_out = paddle.concat([q_out0, q_out1], axis=-1)
+
+                    # k_out0 = paddle.stack(
+                    #     [
+                    #         k_out0[..., 0] * rotary_embs[0, ...] - k_out0[..., 1] * rotary_embs[1,...],
+                    #         k_out0[..., 1] * rotary_embs[0, ...] + k_out0[..., 0] * rotary_embs[1,...],
+                    #     ],
+                    #     -1,
+                    # )
+                    # k_out0 = k_out0.reshape(k_out1.shape)
+                    # k_out = paddle.concat([k_out0, k_out1], axis=-1)
 
                 if pre_caches is not None:
                     k_out = paddle.concat([pre_caches[i][0], k_out], axis=2)
