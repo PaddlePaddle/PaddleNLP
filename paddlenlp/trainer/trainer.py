@@ -142,6 +142,7 @@ except:
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
 
 async_save_queue = []
+g_cpu_optimizer_state_dict = {}
 
 
 def _save_func(obj, path, saved_signal_path, protocol):
@@ -158,24 +159,29 @@ def clear_async_save_task_queue():
     while len(async_save_queue) > 0:
         task = async_save_queue.pop()
         if task and task.is_alive():
-            task.join()
+            task.join(timeout=60)
+            if task.is_alive():
+                logger.error("Error: save ckpt process timeout!!!")
+                async_save_queue.append(task)
 
 
-def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol=4, sync_other_task=False):
-    cpu_optimizer_state_dict = {}
+def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol=4):
+    global g_cpu_optimizer_state_dict
+    g_cpu_optimizer_state_dict.clear()
     for k, v in optimizer_state_dict.items():
         if k == "master_weights":
-            cpu_optimizer_state_dict[k] = {}
+            g_cpu_optimizer_state_dict[k] = {}
             for kk, vv in v.items():
-                cpu_optimizer_state_dict[k][kk] = vv.numpy()
+                g_cpu_optimizer_state_dict[k][kk] = vv.pin_memory()
         elif k == "LR_Scheduler":
-            cpu_optimizer_state_dict[k] = copy.deepcopy(v)
+            g_cpu_optimizer_state_dict[k] = copy.deepcopy(v)
         else:
-            cpu_optimizer_state_dict[k] = v.numpy()
+            g_cpu_optimizer_state_dict[k] = v.pin_memory()
         paddle.device.cuda.synchronize()
-    if sync_other_task:
-        clear_async_save_task_queue()
-    p = multiprocessing.Process(target=_save_func, args=(cpu_optimizer_state_dict, path, saved_signal_path, protocol))
+    clear_async_save_task_queue()
+    p = multiprocessing.Process(
+        target=_save_func, args=(g_cpu_optimizer_state_dict, path, saved_signal_path, protocol)
+    )
     p.start()
     async_save_queue.append(p)
 
@@ -2016,7 +2022,6 @@ class Trainer:
                         self.optimizer.state_dict(),
                         os.path.join(output_dir, optimizer_name),
                         saved_signal_path=saved_signal_path,
-                        sync_other_task=True,
                     )
 
                 else:
