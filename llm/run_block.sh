@@ -20,12 +20,12 @@ export GLOG_v=0
 
 export FLAGS_control_flow_use_new_executor=1
 export FLAGS_new_executor_serial_run=1
-# export FLAGS_allocator_strategy=naive_best_fit
-# export FLAGS_fraction_of_gpu_memory_to_use=0.92
-export CUDA_VISIBLE_DEVICES=1
+export FLAGS_allocator_strategy=naive_best_fit
+export FLAGS_fraction_of_gpu_memory_to_use=0.92
+export CUDA_VISIBLE_DEVICES=0
 
 # python predictor.py \
-#     --model_name_or_path /root/paddlejob/workspace/env_run/wufeisheng/paddlenlp_ckpt/checkpoints/llama_sft_ckpts/checkpoint-10 \
+#     --model_name_or_path /root/paddlejob/workspace/env_run/lzy/paddlenlp_all_version/paddlenlp_internal/PaddleNLP/llm/guojihua \
 #     --dtype float16 \
 #     --src_length 1024 \
 #     --max_length 1024 \
@@ -35,14 +35,20 @@ export CUDA_VISIBLE_DEVICES=1
 #     --block_attn \
 #     --inference_model
 
+# linly-ai/chinese-llama-2-7b
+# guojihua
+
 python predictor.py \
-    --model_name_or_path /root/paddlejob/workspace/env_run/wufeisheng/paddlenlp_ckpt/checkpoints/llama_sft_ckpts/checkpoint-10 \
+    --model_name_or_path linly-ai/chinese-llama-2-7b \
     --dtype float16 \
     --src_length 1024 \
     --max_length 1024 \
     --output_file "infer.json" \
     --mode "dynamic" \
-    --batch_size 1 \
-    --block_attn \
+    --batch_size 2 \
     --inference_model \
-    --use_cachekv_int8
+    --block_attn 
+    # --export_precache \
+    # --prefix_path "/root/paddlejob/workspace/env_run/lzy/PaddleNLP/llm/ptuning-embedding/8-test/1/task_prompt_embeddings.npy"
+    # --use_cachekv_int8 \
+    # --quant_type weight_only_int8

@@ -38,11 +38,11 @@ export PYTHONPATH=$(dirname $(pwd)):$PYTHONPATH
 python -m paddle.distributed.launch \
     --gpus "0" \
      export_model.py \
-    --model_name_or_path /root/paddlejob/workspace/env_run/wufeisheng/paddlenlp_ckpt/checkpoints/llama_sft_ckpts/checkpoint-10 \
-    --output_path ./llama13b-inference_model_fp16_mp1_cachekvint8_wint8 \
+    --model_name_or_path linly-ai/chinese-llama-2-7b \
+    --output_path ./llama-7b_inference_model_bf16_mp1_precache \
     --dtype float16 \
     --inference_model \
-    --block_size 16 \
-    --quant_type weight_only_int8 \
-    --block_attn \
-    --use_cachekv_int8
+    --block_size 64 \
+    --block_attn 
+    # --export_precache \
+    # --prefix_path ${1}

@@ -1093,9 +1093,10 @@ class FusedBlockMultiTransformer(Layer):
         cum_offsets=None,
         padding_offsets=None,
         attn_mask=None,
+        tgt_mask=None,
         caches=None,
-        pre_caches=None,
-        pre_caches_length=0,
+        pre_key_caches=None,
+        pre_value_caches=None,
         rotary_embs=None,
         seq_lens_encoder=None,
         seq_lens_decoder=None,
@@ -1171,8 +1172,14 @@ class FusedBlockMultiTransformer(Layer):
                 )
             else:
                 qkv_out = self.linear(ln_out, self.qkv_weights[i], self.qkv_biases[i], transpose_weight=True)
-
+            
             # fmha
+            if pre_key_caches:
+                pre_key_cache = pre_key_caches[i]
+                pre_value_cache = pre_value_caches[i]
+            else:
+                pre_key_cache = None
+                pre_value_cache = None
             fmha_out = paddle.incubate.nn.functional.block_multihead_attention(
                 qkv_out,
                 caches[2 * i],
@@ -1185,12 +1192,15 @@ class FusedBlockMultiTransformer(Layer):
                 cu_seqlens_q,
                 cu_seqlens_k,
                 block_tables,
+                pre_key_cache,
+                pre_value_cache,
                 k_quant_scales[i] if k_quant_scales is not None else None,
                 v_quant_scales[i] if v_quant_scales is not None else None,
                 k_dequant_scales[i] if k_dequant_scales is not None else None,
                 v_dequant_scales[i] if v_dequant_scales is not None else None,
                 rotary_embs,
                 attn_mask,
+                tgt_mask,
                 max_input_length,
                 block_size,
                 use_neox_rotary_style,

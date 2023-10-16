@@ -606,6 +606,8 @@ class LlamaBlockInferenceModel(LlamaPretrainedModel):
         seq_lens_encoder=None,
         seq_lens_decoder=None,
         seq_lens_this_time=None,
+        pre_key_caches=None,
+        pre_value_caches=None,
         k_quant_scales=None,
         v_quant_scales=None,
         k_dequant_scales=None,
@@ -624,8 +626,8 @@ class LlamaBlockInferenceModel(LlamaPretrainedModel):
                 padding_offsets=padding_offset,
                 attn_mask=src_mask,
                 caches=caches,
-                pre_caches=pre_caches,
-                pre_caches_length=-1,
+                pre_key_caches=pre_key_caches,
+                pre_value_caches=pre_value_caches,
                 rotary_embs=rope_emb,
                 seq_lens_encoder=seq_lens_encoder,
                 seq_lens_decoder=seq_lens_decoder,
@@ -977,6 +979,9 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         input_ids = kwargs["input_ids"]
         src_mask = kwargs.get("src_mask", None)
         block_tables = kwargs.get("block_tables", None)
+
+        pre_key_caches = kwargs.get("pre_key_caches", None)
+        pre_value_caches = kwargs.get("pre_value_caches", None)
         caches = kwargs.get("caches", None)
 
         rope_emb = kwargs["rope_emb"]
@@ -991,6 +996,8 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             "input_ids": input_ids,
             "src_mask": src_mask,
             "rope_emb": rope_emb,
+            "pre_key_caches": pre_key_caches,
+            "pre_value_caches": pre_value_caches,
             "caches": caches,
             "seq_lens_this_time": seq_lens_this_time,
             "seq_lens_encoder": seq_lens_encoder,
@@ -1007,8 +1014,9 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         self,
         input_ids,
         src_mask=None,
+        pre_key_caches=None,
+        pre_value_caches=None,
         caches=None,
-        pre_caches=None,
         seq_lens_this_time=None,
         seq_lens_encoder=None,
         seq_lens_decoder=None,
@@ -1025,7 +1033,8 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             caches=caches,
             rope_emb=rope_emb,
             block_tables=block_tables,
-            pre_caches=pre_caches,
+            pre_key_caches=pre_key_caches,
+            pre_value_caches=pre_value_caches,
             seq_lens_this_time=seq_lens_this_time,
             seq_lens_encoder=seq_lens_encoder,
             seq_lens_decoder=seq_lens_decoder,

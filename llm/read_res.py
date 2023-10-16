@@ -5,7 +5,7 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     LlamaTokenizer,
 )
-tokenizer = AutoTokenizer.from_pretrained("facebook/llama-13b")
+tokenizer = AutoTokenizer.from_pretrained("linly-ai/chinese-llama-2-7b")
 if isinstance(tokenizer, LlamaTokenizer) and not tokenizer.pad_token:
     tokenizer.pad_token = tokenizer.unk_token
 rank_id = 0
@@ -27,6 +27,7 @@ while True:
         if (output_tensor[0, 0] == -1): break
     output = np.concatenate(outputs, axis=1).tolist()
     for seq in output:
+        print("seq_len: ", len(seq))
         seq = tokenizer.decode(seq)
         print("output: ", seq)
     print("end")

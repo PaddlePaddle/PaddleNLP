@@ -668,6 +668,23 @@ class DygraphBlockInferencePredictor(BasePredictor):
             self.cache_kvs[0].shape[-3],
             self.cache_kvs[0].shape[-1],
         )
+        
+        self.inputs = {}
+        if config.export_precache:
+            pre_cache_npy = np.load(config.prefix_path)
+            self.pre_cache_length = pre_cache_npy.shape[-2]
+            self.pre_key_cache = [paddle.zeros([config.batch_size, self.num_attention_heads, self.pre_cache_length, self.head_dim], dtype=self.dtype) for _ in range(self.num_layers)]
+            self.pre_value_cache = [paddle.zeros([config.batch_size, self.num_attention_heads, self.pre_cache_length, self.head_dim], dtype=self.dtype) for _ in range(self.num_layers)]
+            print("pre_cache_length: ", self.pre_cache_length)
+            for i in range(self.num_layers):
+                self.pre_key_cache[i][:, :, :, :] = paddle.to_tensor(pre_cache_npy[i][0], dtype=self.dtype).unsqueeze(0)
+                self.pre_value_cache[i][:, :, :, :] = paddle.to_tensor(pre_cache_npy[i][1], dtype=self.dtype).unsqueeze(0)
+            self.inputs["pre_key_caches"] = self.pre_key_cache
+            self.inputs["pre_value_caches"] = self.pre_value_cache
+            pre_cache_mask = paddle.zeros(shape=[config.batch_size, 1, config.src_length, config.src_length + self.pre_cache_length], dtype=self.dtype)
+            pre_cache_mask[:, :, :, :self.pre_cache_length] = 1
+            pre_cache_mask[:, :, :, self.pre_cache_length:] = paddle.tril(paddle.ones(shape=[config.batch_size, 1, config.src_length, config.src_length], dtype=self.dtype))
+            self.inputs["src_mask"] = (pre_cache_mask - 1) * 1e4
 
         if config.use_cachekv_int8:
             self.k_quant_scales = [
@@ -683,9 +700,14 @@ class DygraphBlockInferencePredictor(BasePredictor):
                 paddle.zeros([self.num_attention_heads], dtype="float32") for _ in range(self.num_layers)
             ]
 
-        self.inputs = {}
         # not update
         self.inputs["cache_kvs"] = self.cache_kvs
+
+        self.inputs["pre_ids"] = paddle.full([config.batch_size, self.total_max_length], -1, dtype="int64")
+        self.inputs["bad_tokens"] = paddle.to_tensor([-1, ], dtype="int64")
+        self.inputs["penalty_score"] = paddle.full(shape=[config.batch_size, 1], fill_value=1.0, dtype="float32")
+        self.inputs["frequency_score"] = paddle.full(shape=[config.batch_size, 1], fill_value=0.0, dtype="float32")
+        self.inputs["presence_score"] = paddle.full(shape=[config.batch_size, 1], fill_value=0.0, dtype="float32")
 
         if config.use_cachekv_int8:
             self.inputs["k_quant_scales"] = self.k_quant_scales
@@ -778,8 +800,11 @@ class DygraphBlockInferencePredictor(BasePredictor):
             print("input_ids: ", input_ids)
             print("length: ", length)
             self.inputs["input_ids"][i : i + 1, :length] = input_ids
-            # self.inputs['top_p'][i:i+1] = self.config.top_p
-            # self.inputs['temperature'][i:i+1] = self.config.temperature
+            self.inputs["penalty_score"][i : i + 1] = self.config.repetition_penalty
+            self.inputs["frequency_score"][i : i + 1] = 0.0
+            self.inputs["presence_score"][i : i + 1] = 0.0
+            self.inputs['top_p'][i : i + 1] = self.config.top_p
+            self.inputs['temperature'][i : i + 1] = self.config.temperature
             self.inputs["seq_lens_this_time"][i : i + 1] = length
             self.inputs["seq_lens_encoder"][i : i + 1] = length
             self.inputs["seq_lens_decoder"][i : i + 1] = 0
@@ -812,6 +837,17 @@ class StaticBlockInferencePredictor(BasePredictor):
         self.num_layers = len(self.cache_kvs_shape) // 2
         pre_max_block_num = (self.total_max_length + config.block_size - 1) // config.block_size
         # not update
+        if config.export_precache:
+            pre_cache_npy = np.load(config.prefix_path)
+            self.pre_cache_length = pre_cache_npy.shape[-2]
+            for i in range(self.num_layers):
+                self.inputs["pre_key_caches_{}".format(i)] = paddle.to_tensor(pre_cache_npy[i][0], dtype=config.dtype).unsqueeze(0).broadcast_to([config.batch_size, self.num_attention_heads, self.pre_cache_length, self.head_dim])
+                self.inputs["pre_value_caches_{}".format(i)] = paddle.to_tensor(pre_cache_npy[i][1], dtype=config.dtype).unsqueeze(0).broadcast_to([config.batch_size, self.num_attention_heads, self.pre_cache_length, self.head_dim])
+            pre_cache_mask = paddle.zeros(shape=[config.batch_size, 1, config.src_length, config.src_length + self.pre_cache_length], dtype=config.dtype)
+            pre_cache_mask[:, :, :, :self.pre_cache_length] = 1
+            pre_cache_mask[:, :, :, self.pre_cache_length:] = paddle.tril(paddle.ones(shape=[config.batch_size, 1, config.src_length, config.src_length], dtype=config.dtype))
+            self.inputs["src_mask"] = (pre_cache_mask - 1) * 1e4
+
         self.cache_kvs = {}
         if not config.use_cachekv_int8:
             for i in range(len(self.cache_kvs_shape) // 2):
@@ -845,6 +881,13 @@ class StaticBlockInferencePredictor(BasePredictor):
         self.inputs["max_length"] = paddle.full(
             shape=[config.batch_size, 1], fill_value=config.max_length, dtype="int64"
         )
+
+        self.inputs["pre_ids"] = paddle.full([config.batch_size, self.total_max_length], -1, dtype="int64")
+        self.inputs["bad_tokens"] = paddle.to_tensor([-1, ], dtype="int64")
+        self.inputs["penalty_score"] = paddle.full(shape=[config.batch_size, 1], fill_value=1.0, dtype="float32")
+        self.inputs["frequency_score"] = paddle.full(shape=[config.batch_size, 1], fill_value=0.0, dtype="float32")
+        self.inputs["presence_score"] = paddle.full(shape=[config.batch_size, 1], fill_value=0.0, dtype="float32")
+
         self.inputs["stop_nums"] = paddle.full(shape=[1], fill_value=config.batch_size, dtype="int64")
         tmp_position_ids = paddle.arange(self.total_max_length).reshape((1, -1))
         self.inputs["rope_emb"] = self._get_rotary_position_embedding(tmp_position_ids, self.head_dim)
@@ -946,6 +989,10 @@ class StaticBlockInferencePredictor(BasePredictor):
         分享不拷贝数据
         """
         for name in self.input_names:
+            if "pre_key_" in name or "pre_value_" in name:
+                input_tensor = self.predictor.get_input_handle(name)
+                input_tensor.share_external_data(self.inputs[name])
+                continue
             if "caches" in name:
                 input_tensor = self.predictor.get_input_handle(name)
                 input_tensor.share_external_data(self.cache_kvs[name])
@@ -961,8 +1008,8 @@ class StaticBlockInferencePredictor(BasePredictor):
     def predict(self, input_texts: str | list[str]):
         self._preprocess(input_texts)
         real_bsz = len(input_texts)
+        
         import copy
-
         seq_lens_this_time = copy.deepcopy(self.inputs["seq_lens_this_time"][:real_bsz])
         self.seq_lens_handle.share_external_data(seq_lens_this_time)
         while self.inputs["not_need_stop"]:
@@ -984,8 +1031,11 @@ class StaticBlockInferencePredictor(BasePredictor):
             print("input_ids: ", input_ids)
             print("length: ", length)
             self.inputs["input_ids"][i : i + 1, :length] = input_ids
-            # self.inputs['top_p'][i:i+1] = self.config.top_p
-            # self.inputs['temperature'][i:i+1] = self.config.temperature
+            self.inputs["penalty_score"][i : i + 1] = self.config.repetition_penalty
+            self.inputs["frequency_score"][i : i + 1] = 0.0
+            self.inputs["presence_score"][i : i + 1] = 0.0
+            self.inputs['top_p'][i:i+1] = self.config.top_p
+            self.inputs['temperature'][i:i+1] = self.config.temperature
             self.inputs["seq_lens_this_time"][i : i + 1] = length
             self.inputs["seq_lens_encoder"][i : i + 1] = length
             self.inputs["seq_lens_decoder"][i : i + 1] = 0
@@ -1235,29 +1285,29 @@ def predict():
         # source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
         # target_texts = ["", ""]
 
-        source_texts = ["你好，请问你是谁?"]
-        target_texts = [""]
+        source_texts = ["类型#裙*颜色#蓝色*风格#清新*图案#蝴蝶结", ] * predictor_args.batch_size
+        # target_texts = [""]
 
-    batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
-    batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
+    # batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
+    # batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
     if not predictor_args.benchmark:
         with open(model_args.output_file, "w", encoding="utf-8") as f:
-            for bs, batch_source_text in enumerate(batch_source_texts):
+            # for bs, batch_source_text in enumerate(batch_source_texts):
                 print("start")
-                outputs = predictor.predict(batch_source_text)
+                outputs = predictor.predict(source_texts)
                 print("end")
-                if not predictor_args.block_attn:
-                    if predictor.tensor_parallel_rank > 0:
-                        continue
-                    for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
-                        print("***********Source**********")
-                        print(source)
-                        print("***********Target**********")
-                        print(target)
-                        print("***********Output**********")
-                        print(output)
-                        out = {"src": source, "tgt": target, "output": output}
-                        f.write(json.dumps(out, ensure_ascii=False) + "\n")
+                # if not predictor_args.block_attn:
+                #     if predictor.tensor_parallel_rank > 0:
+                #         continue
+                #     for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
+                #         print("***********Source**********")
+                #         print(source)
+                #         print("***********Target**********")
+                #         print(target)
+                #         print("***********Output**********")
+                #         print(output)
+                #         out = {"src": source, "tgt": target, "output": output}
+                #         f.write(json.dumps(out, ensure_ascii=False) + "\n")
 
     if predictor_args.benchmark:
         benchmark(predictor, predictor_args, model_args)

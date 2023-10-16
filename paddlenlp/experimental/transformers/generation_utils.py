@@ -24,6 +24,8 @@ from paddlenlp_ops import (  # get_token_penalty_multi_scores,; set_value_by_fla
     set_mask_value,
     set_stop_value_multi_ends,
     set_stop_value_multi_ends_v2,
+    set_value_by_flags_and_idx_v2,
+    get_token_penalty_multi_scores,
     update_inputs,
 )
 
@@ -487,14 +489,19 @@ class GenerationBlockInferenceModel(GenerationMixin):
         cache_kvs_shapes = self.get_cache_kvs_shape(
             self.config, max_batch_size=config.get("max_batch_size", -1), max_length=config.get("max_length", None)
         )
-        # export_precache = config.get("export_precache", False)
-        # if export_precache:
-        #     precache_input_spec = [
-        #         paddle.static.InputSpec(shape=[2, None, None, None, None], dtype=dtype, name=f"pre_caches_{i}")
-        #         for i in range(len(cache_kvs_shapes))
-        #     ]
-        # else:
-        #     precache_input_spec = None
+        export_precache = config.get("export_precache", False)
+        if export_precache:
+            precache_key_spec = [
+                paddle.static.InputSpec(shape=[None, None, None, None], dtype=dtype, name=f"pre_key_caches_{i}")
+                for i in range(len(cache_kvs_shapes) // 2)
+            ]
+            precache_value_spec = [
+                paddle.static.InputSpec(shape=[None, None, None, None], dtype=dtype, name=f"pre_value_caches_{i}")
+                for i in range(len(cache_kvs_shapes) // 2)
+            ]
+        else:
+            precache_key_spec = None
+            precache_value_spec = None
 
         use_cachekv_int8 = config.get("use_cachekv_int8", False)
 
@@ -555,14 +562,14 @@ class GenerationBlockInferenceModel(GenerationMixin):
 
         input_spec = [
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),  # input_ids
-            # paddle.static.InputSpec(shape=[None, 1, None, None], dtype=dtype, name="attention_mask"),  # attention_mask
-            # paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),  # position_ids
-            # paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="penalty_score"),  # penalty_score
-            # paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="frequency_score"),  # frequency_score
-            # paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="presence_score"),  # presence_score
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="temperature"),  # temperature
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="top_p"),  # top_p
             paddle.static.InputSpec(shape=[None], dtype="int64", name="eos_token_id"),  # eos_token_id
+            # paddle.static.InputSpec(shape=[None, 1, None, None], dtype=dtype, name="attention_mask"),  # attention_mask
+            # paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),  # position_ids
+            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="penalty_score"),  # penalty_score
+            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="frequency_score"),  # frequency_score
+            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="presence_score"),  # presence_score
             paddle.static.InputSpec(shape=[None, 1], dtype="int32", name="seq_lens_this_time"),  # seq_lens_this_time
             paddle.static.InputSpec(shape=[None, 1], dtype="int32", name="seq_lens_encoder"),  # seq_lens_encoder
             paddle.static.InputSpec(shape=[None, 1], dtype="int32", name="seq_lens_decoder"),  # seq_lens_decoder
@@ -574,12 +581,15 @@ class GenerationBlockInferenceModel(GenerationMixin):
             paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="min_length"),  # min_dec_len
             paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="max_length"),  # max_dec_len
             paddle.static.InputSpec(shape=[1, 1], dtype="int64", name="stop_nums"),  # stop_nums
+            paddle.static.InputSpec(shape=[None], dtype="int64", name="bad_tokens"),  # bad_tokens
             paddle.static.InputSpec(shape=[1, 1], dtype="bool", name="not_need_stop"),  # not_need_stop
             paddle.static.InputSpec(shape=[None, None], dtype="int32", name="block_tables"),  # block_tables
             # paddle.static.InputSpec(
             #     shape=[None, 1, 1, None], dtype=dtype, name="tgt_generation_mask"
             # ),  # tgt_generation_mask
-            # paddle.static.InputSpec(shape=[None, None], dtype="int64", name="pre_ids"),  # pre_ids
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="pre_ids"),  # pre_ids
+            precache_key_spec,
+            precache_value_spec,
             caches,  # cache_kvs
             # None,  # inputs_embeds
             # config.get("logits_processors", None),
@@ -617,6 +627,9 @@ class GenerationBlockInferenceModel(GenerationMixin):
         temperature=None,
         top_p=None,
         eos_token_id=None,
+        penalty_score=None,
+        frequency_score=None,
+        presence_score=None,
         seq_lens_this_time=None,  # update
         seq_lens_encoder=None,  # update
         seq_lens_decoder=None,  # update
@@ -626,9 +639,12 @@ class GenerationBlockInferenceModel(GenerationMixin):
         min_length=None,
         max_length=None,
         stop_nums=None,
-        # bad_tokens=None,
+        bad_tokens=None,
         not_need_stop=None,
         block_tables=None,
+        pre_ids=None,
+        pre_key_caches=None,
+        pre_value_caches=None,
         cache_kvs=[],
         k_quant_scales=None,
         v_quant_scales=None,
@@ -638,6 +654,9 @@ class GenerationBlockInferenceModel(GenerationMixin):
     ):
 
         model_kwargs["input_ids"] = input_ids
+        model_kwargs["penalty_score"] = penalty_score
+        model_kwargs["frequency_score"] = frequency_score
+        model_kwargs["presence_score"] = presence_score
         model_kwargs["seq_lens_this_time"] = seq_lens_this_time
         model_kwargs["seq_lens_encoder"] = seq_lens_encoder
         model_kwargs["seq_lens_decoder"] = seq_lens_decoder
@@ -647,13 +666,17 @@ class GenerationBlockInferenceModel(GenerationMixin):
         model_kwargs["max_dec_len"] = max_length
         model_kwargs["stop_nums"] = stop_nums
         model_kwargs["rope_emb"] = rope_emb
+        model_kwargs["bad_tokens"] = bad_tokens
         model_kwargs["block_tables"] = block_tables
+        model_kwargs["pre_ids"] = pre_ids
         model_kwargs["not_need_stop"] = not_need_stop
         model_kwargs["caches"] = cache_kvs
         model_kwargs["k_quant_scales"] = k_quant_scales
         model_kwargs["v_quant_scales"] = v_quant_scales
         model_kwargs["k_dequant_scales"] = k_dequant_scales
         model_kwargs["v_dequant_scales"] = v_dequant_scales
+        model_kwargs["pre_key_caches"] = pre_key_caches
+        model_kwargs["pre_value_caches"] = pre_value_caches
 
         ret = self.sample(
             eos_token_id,
@@ -669,9 +692,9 @@ class GenerationBlockInferenceModel(GenerationMixin):
         eos_token_id,
         top_k,
         top_p,
-        #    penalty_score,
-        #    frequency_score,
-        #    presence_score,
+        penalty_score,
+        frequency_score,
+        presence_score,
         temperature=None,
         min_tokens_to_keep=1,
         **model_kwargs
@@ -685,42 +708,40 @@ class GenerationBlockInferenceModel(GenerationMixin):
             outputs,
             top_k,
             top_p,
-            #    penalty_score,
-            #    frequency_score,
-            #    presence_score,
+               penalty_score,
+               frequency_score,
+               presence_score,
             temperature,
             model_kwargs,
         ):
-            # step_idx = model_kwargs["step_idx"]
+            step_idx = model_kwargs["step_idx"]
+            set_value_by_flags_and_idx_v2(
+                model_kwargs["pre_ids"],
+                model_kwargs["input_ids"],
+                model_kwargs["seq_lens_this_time"],
+                model_kwargs["seq_lens_encoder"],
+                model_kwargs["seq_lens_decoder"],
+                step_idx,
+                model_kwargs["stop_flags"])
 
-            # set_value_by_flags_and_idx_v2(
-            #     model_kwargs["pre_ids"],
-            #     model_kwargs["input_ids"],
-            #     model_kwargs["seq_lens_this_time"],
-            #     model_kwargs["seq_lens_encoder"],
-            #     model_kwargs["seq_lens_decoder"],
-            #     step_idx,
-            #     model_kwargs["stop_flags"])
-            # print("logits: ", outputs)
             logits = outputs  # if isinstance(outputs, tuple) else outputs
 
             logits = paddle.cast(logits, paddle.float32)
 
             # pre-process distribution
-            # logits = get_token_penalty_multi_scores(
-            #     model_kwargs["pre_ids"],
-            #     logits,
-            #     penalty_score,
-            #     frequency_score,
-            #     presence_score,
-            #     temperature,
-            #     model_kwargs["bad_tokens"],
-            #     step_idx,
-            #     model_kwargs["min_dec_len"],
-            #     eos_token_id)
+            logits = get_token_penalty_multi_scores(
+                model_kwargs["pre_ids"],
+                logits,
+                penalty_score,
+                frequency_score,
+                presence_score,
+                temperature,
+                model_kwargs["bad_tokens"],
+                step_idx,
+                model_kwargs["min_dec_len"],
+                eos_token_id)
 
             # sample
-            logits /= temperature
             probs = F.softmax(logits)
             _, next_tokens = top_p_sampling(probs, top_p, -1)
 
@@ -732,7 +753,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             length_cond = paddle.greater_equal(model_kwargs["step_idx"], model_kwargs["max_dec_len"])
             stop_flags = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
             set_stop_value_multi_ends_v2(
-                next_tokens, model_kwargs["stop_flags"], model_kwargs["seq_lens_this_time"], eos_token_id
+                next_tokens, stop_flags, model_kwargs["seq_lens_this_time"], eos_token_id
             )  # multi ends
             paddle.assign(stop_flags, model_kwargs["stop_flags"])
             # update inputs
@@ -756,9 +777,9 @@ class GenerationBlockInferenceModel(GenerationMixin):
             outputs,
             top_k,
             top_p,
-            # penalty_score,
-            # frequency_score,
-            # presence_score,
+            penalty_score,
+            frequency_score,
+            presence_score,
             temperature,
             model_kwargs,
         )
