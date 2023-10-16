@@ -1520,6 +1520,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     logger.info("Downloading %s and saved to %s" % (file_path, cache_dir))
                     try:
                         if not url_file_exists(file_path):
+                            # skip warning for chat-template config file
+                            if file_path.endswith(CHAT_TEMPLATE_CONFIG_NAME):
+                                continue
+
                             logger.warning(f"file<{file_path}> not exist")
                             resolved_vocab_files[file_id] = None
                             continue
