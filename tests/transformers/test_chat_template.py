@@ -23,8 +23,9 @@ from paddlenlp.transformers.tokenizer_utils import ChatTemplate
 class ChatTemplateTest(unittest.TestCase):
     chat_template_config_file = "./tests/fixtures/chat_template.json"
 
-    def setUp(self) -> None:
-        self.chat_template = ChatTemplate.from_file(self.chat_template_config_file)
+    @property
+    def chat_template(self):
+        return ChatTemplate.from_file(self.chat_template_config_file)
 
     def test_inference_template(self):
         query = "你好"
@@ -37,6 +38,32 @@ class ChatTemplateTest(unittest.TestCase):
         final_query = self.chat_template(conversations)
         expected_query = "你是一个人工智能助手\nHuman: 你好<sep> Bot: 您好，我是个人人工智能助手，请问有什么可以帮您。\nHuman: 今天的天气怎么样？<sep> Bot:"
         self.assertEqual(final_query, expected_query)
+
+    def test_null_chat_template(self):
+        chat_template = ChatTemplate()
+        query = "今天吃啥"
+        final_query = chat_template(query)
+        assert final_query == query
+
+    def test_system_query(self):
+        system = "你是一个人工智能助手:"
+        query_template = "Human: {{query}}"
+        chat_template = ChatTemplate(system=system, query=query_template)
+        query = "今天吃啥"
+        final_query = chat_template(query)
+        assert final_query == system + query_template.replace("{{query}}", query)
+
+    def test_conversation(self):
+        conversation = ["Human: {{user}}<sep>", "Bot: {{bot}}\n\n"]
+        chat_template = ChatTemplate(conversation=conversation)
+
+        query = "今天吃啥"
+        final_query = chat_template(query)
+        assert final_query == query
+
+        second_query = [["你好", "您好，我是个人人工智能助手"], [query]]
+        final_query = chat_template(second_query)
+        assert final_query == "Human: 你好<sep>Bot: 您好，我是个人人工智能助手\n\n" + query
 
 
 class ChatTemplateIntegrationTest(unittest.TestCase):

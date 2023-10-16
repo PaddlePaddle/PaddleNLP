@@ -536,6 +536,11 @@ class ChatTemplate:
         Returns:
             _type_: _description_
         """
+        if self.conversation is None:
+            raise ValueError(
+                "the template for multi-turns is invalid, please check `conversation` filed in your chat-template."
+            )
+
         if isinstance(conversation_data, list):
             assert len(conversation_data) == 2, "only support two type of conversation, eg: [user-query, bot-query]"
 
@@ -549,6 +554,9 @@ class ChatTemplate:
         return "".join(one_turn_conversation)
 
     def render_query(self, query: str):
+        if self.query is None:
+            return query
+
         template = self._compile_jinja_template(self.query)
         return template.render(query=query)
 
