@@ -154,7 +154,6 @@ def distributed_file(filename):
 
         tensor_list = []
         paddle.distributed.all_gather(tensor_list, found_file)
-        print("tensor_list", tensor_list)
         src = paddle.min(paddle.concat(tensor_list)).item()
 
         file_object_list = [None]

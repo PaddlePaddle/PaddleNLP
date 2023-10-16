@@ -204,7 +204,6 @@ def unified_checkpoint_into_shards(
     state_dict = model_to_save.state_dict()
 
     all_filter_keys = filter_params(model_to_save, state_dict)
-    logger.info("filter_params done")
 
     dtype = get_parameter_dtype(model_to_save)
     model_to_save.config.dtype = str(dtype).split(".")[1]
@@ -212,7 +211,6 @@ def unified_checkpoint_into_shards(
 
     if config_to_save.tensor_parallel_degree > 1:
         state_dict = merge_tensor_parallel_with_shard(model_to_save, state_dict, config_to_save, all_filter_keys)
-        logger.info("merge_tensor_parallel_with_shard done")
 
     if config_to_save.tensor_parallel_degree > 1:
         # do we need to change?
@@ -237,15 +235,12 @@ def unified_checkpoint_into_shards(
         index_weight_file[key] = shard_file
         total_size += weight.numel().item() * dtype_byte_size(weight.dtype)
 
-    # total_size = paddle.to_tensor(total_size)
-
     hcg = fleet.get_hybrid_communicate_group()
-    # data_group = hcg.get_data_parallel_group()
 
     tp_group = hcg.get_model_parallel_group()
     pp_group = hcg.get_pipe_parallel_group()
 
-    logger.info("all_gather_object index_file_list")
+    logger.info("Unified checkpoint generating sharded_index json files.")
     if tp_group.nranks > 1:
         paddle.distributed.all_gather_object(index_file_list, index_weight_file, tp_group)
         paddle.distributed.all_gather_object(total_size_list, total_size, tp_group)
@@ -262,8 +257,6 @@ def unified_checkpoint_into_shards(
         if isinstance(pp_total_size_list[0], list):
             total_size_list = [y for x in pp_total_size_list for y in x]
             index_file_list = [y for x in pp_index_file_list for y in x]
-
-    logger.info("done all_gather_object index_file_list")
 
     sharded_index = get_sharded_index(
         index_file_list,
@@ -295,7 +288,6 @@ def get_sharded_index(
 
 
 def filter_params(model_to_save, state_dict):
-    logger.info("filter params for different workers to save.")
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
 
@@ -305,23 +297,13 @@ def filter_params(model_to_save, state_dict):
     filter_tensor_list = [[] for i in range(tp_size)]
 
     if tp_rank == 0:
-        tp_actions = model_to_save.get_tensor_parallel_convert_actions(
-            model_to_save.config,
-            state_dict.keys(),
-            is_split=False,
-            ignore_error=True,
-        )
         tensor_bytes_dict = {}
 
         for (k, v) in state_dict.items():
-            if k in tp_actions:
+            if hasattr(v, "is_distributed") and v.is_distributed:
                 tensor_bytes_dict[k] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
-                assert v.is_distributed, f"Tensor {k} shape: {v.shape} should be distrbuted tensor"
             else:
                 tensor_bytes_dict[k] = v.numel().item() * dtype_byte_size(v.dtype)
-                assert (
-                    not hasattr(v, "is_distributed") or v.is_distributed is False
-                ), f"Tensor {k} shape: {v.shape}, has no action for tensor merge"
 
         filter_tensor_list = []
         current_block = []
@@ -359,7 +341,7 @@ def filter_params(model_to_save, state_dict):
 
 
 def merge_tensor_parallel_with_shard(model_to_save, state_dict, config, all_filter_keys):
-    logger.info("merge_tensor_parallel_with_shard")
+    logger.info("Unified checkpoint merge tensor parallel in shards")
     tp_actions = model_to_save.get_tensor_parallel_convert_actions(
         model_to_save.config, state_dict.keys(), is_split=False, ignore_error=True
     )
@@ -371,13 +353,13 @@ def merge_tensor_parallel_with_shard(model_to_save, state_dict, config, all_filt
     tp_rank = tp_group.rank
 
     # filter actions for pipeline mode
-    filter_keys = set([y for x in all_filter_keys for y in x])
-    for key in list(tp_actions.keys()):
-        if key not in filter_keys:
-            tp_actions.pop(key)
+    if hcg.get_pipe_parallel_group().nranks > 1:
+        filter_keys = set([y for x in all_filter_keys for y in x])
+        for key in list(tp_actions.keys()):
+            if key not in filter_keys:
+                tp_actions.pop(key)
 
     state_dict_to_save = {}
-    logger.info("Get tensor to merge")
     for i, filter_keys in enumerate(all_filter_keys):
         is_dst = tp_rank == i
         for key in filter_keys:

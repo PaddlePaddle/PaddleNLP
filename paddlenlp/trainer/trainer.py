@@ -667,7 +667,6 @@ class Trainer:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
             self._load_optimizer_and_scheduler(resume_from_checkpoint)
         else:
-            # TODO (ZHUI) broadcast files to each node, trainer_state.json scaler.pdparams scheduler.pdparams.
             model = self._wrap_model(self.model_wrapped)
             # for the rest of this function `model` is the outside model, whether it was wrapped or not
             if model is not self.model:
@@ -1925,6 +1924,7 @@ class Trainer:
         if self.args.use_hybrid_parallel:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
+                logger.info("Saving optimizer files.")
                 paddle.save(
                     self.optimizer.state_dict(),
                     os.path.join(output_dir, optimizer_name),
@@ -1932,6 +1932,7 @@ class Trainer:
 
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
+                logger.info("Saving optimizer files.")
                 paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
             # FIXME: manybe only save one copy
@@ -2141,6 +2142,7 @@ class Trainer:
 
     def _load_optimizer_and_scheduler(self, checkpoint):
         """If optimizer and scheduler states exist, load them."""
+        # TODO: Support DP broadcast optimizer.
         if checkpoint is None:
             return
 

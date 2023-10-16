@@ -1038,6 +1038,12 @@ class TrainingArguments:
                 if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized():
                     paddle.distributed.init_parallel_env()
 
+        if self.unified_checkpoint and not self.use_hybrid_parallel:
+            logger.warning(
+                "The unified_checkpoint only avaliable for hybrid_parallel. Set unified_checkpoint to False for not using hybrid_parallel."
+            )
+            self.unified_checkpoint = False
+
         if self.report_to is None:
             logger.info(
                 "The default value for the training argument `--report_to` will change in v5 (from all installed "
