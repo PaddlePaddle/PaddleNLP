@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import os
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "4"
 os.environ["FLAGS_use_cuda_managed_memory"] = "true"
 
@@ -23,6 +24,7 @@ import sys
 import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
+from threading import Thread
 
 import numpy as np
 import paddle
@@ -36,6 +38,7 @@ from utils import (
     load_real_time_tokens,
 )
 
+from paddlenlp.generation import TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.trainer import PdArgumentParser
@@ -153,6 +156,7 @@ class BasePredictor:
             tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path, padding_side="left")
 
         self.tokenizer = tokenizer
+
         self.return_tensors = "pd"
         self.tensor_parallel_rank, self.tensor_parallel_degree = init_dist_env()
         self.model_config.tensor_parallel_rank, self.model_config.tensor_parallel_degree = init_dist_env()
@@ -182,16 +186,17 @@ class BasePredictor:
     def predict(self, input_texts: str | list[str]):
         for i in range(10):
             import datetime
+
             starttime = datetime.datetime.now()
-            
+
             tokenized_source = self._preprocess(input_texts)
             predictions = self._infer(tokenized_source)
             decoded_predictions = self._postprocess(predictions)
 
             endtime = datetime.datetime.now()
             duringtime = endtime - starttime
-            print ("耗时:",duringtime.seconds * 1000 + duringtime.microseconds / 1000.0)
-        
+            print("耗时:", duringtime.seconds * 1000 + duringtime.microseconds / 1000.0)
+
         return decoded_predictions
 
 
@@ -250,6 +255,29 @@ class DygraphPredictor(BasePredictor):
         )
         result = result[0]
         return result
+
+    def stream_predict(self, inputs: dict[str, paddle.Tensor]):
+        text_streamer = TextIteratorStreamer(self.tokenizer)
+        input_features = self._preprocess(inputs)
+        generation_kwargs = dict(
+            **input_features,
+            streamer=text_streamer,
+            max_new_tokens=self.config.max_length,
+            bos_token_id=self.tokenizer.bos_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
+            pad_token_id=self.tokenizer.pad_token_id,
+            decode_strategy="greedy_search"
+            if self.config.top_k == 1 and self.config.top_p == 1.0
+            else self.config.decode_strategy,
+            temperature=self.config.temperature,
+            top_k=self.config.top_k,
+            top_p=self.config.top_p,
+            repetition_penalty=self.config.repetition_penalty,
+        )
+        thread = Thread(target=self.model.generate, kwargs=generation_kwargs)
+        thread.start()
+
+        return text_streamer
 
 
 class StaticGraphPredictor(BasePredictor):
@@ -360,7 +388,7 @@ class InferencePredictorMixin:
 
     def _postprocess(self, predictions):
         if paddle.distributed.get_rank() == 0:
-            #tokens: np.ndarray = load_real_time_tokens()
+            # tokens: np.ndarray = load_real_time_tokens()
             tokens = predictions.numpy()
             decoded_predictions = self.tokenizer.batch_decode(
                 tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
@@ -373,45 +401,75 @@ class InferencePredictorMixin:
         self.attention_mask[:] = 0
         self.tgt_generation_mask[:] = 0
         pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
+        inputs = dybatch_preprocess(
+            self.tokenizer,
+            source,
+            self.config.src_length,
+            self.config.max_length,
+            self.architectures,
+            top_p=self.config.top_p,
+            temperature=self.config.temperature,
+            benchmark=self.config.benchmark,
+            pre_caches_length=pre_caches_length,
+        )
 
         if "chatglmforcausallm" == self.architectures.lower():
-            inputs = dybatch_preprocess(
-                self.tokenizer,
-                source,
-                self.config.src_length,
-                self.config.max_length,
-                self.architectures,
-                top_p=self.config.top_p,
-                temperature=self.config.temperature,
-                benchmark=self.config.benchmark,
-            )
+            if inputs["input_ids"].shape[0] < self.config.batch_size:
+                self.tgt_pos = self.tgt_pos[: inputs["input_ids"].shape[0]]
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
-                self.attention_mask[i, 0, :length, :length] = 0
-                self.attention_mask[i, 0, : length - 1, length - 1] = 1
-                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype=self.config.dtype)
+                self.attention_mask[i, 0, :length, :length] = 1
+                self.attention_mask[i, 0, : length - 1, length - 1] = 0
                 self.tgt_pos[i, 0, 0] = paddle.to_tensor([length], dtype="int64")
+
+                if pre_caches_length > 0:
+                    prefix_attention_mask = paddle.ones(
+                        [1, length, pre_caches_length], dtype=self.attention_mask.dtype
+                    )
+                    post_attention_mask = paddle.ones(
+                        shape=(length, length), dtype=self.attention_mask.dtype
+                    ).unsqueeze_(axis=0)
+                    post_attention_mask[0, : length - 1, length - 1] = 0
+                    self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
+                        [prefix_attention_mask, post_attention_mask], axis=2
+                    )
+
+                if self.config.prefix_path is None:
+                    self.tgt_generation_mask[i, 0, 0, pre_caches_length : length + pre_caches_length] = paddle.ones(
+                        shape=[1, length], dtype=self.config.dtype
+                    )
+                else:
+                    self.tgt_generation_mask[i, 0, 0, : length + pre_caches_length] = paddle.ones(
+                        shape=[1, length + pre_caches_length], dtype=self.config.dtype
+                    )
 
             inputs["tgt_pos"] = self.tgt_pos
         elif "bloom" in self.architectures:
-            inputs = dybatch_preprocess(
-                self.tokenizer,
-                source,
-                self.config.src_length,
-                self.config.max_length,
-                self.architectures,
-                top_p=self.config.top_p,
-                temperature=self.config.temperature,
-                benchmark=self.config.benchmark,
-            )
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, :, :length, :length] = paddle.tril(
                     paddle.ones(shape=(length, length), dtype=self.config.dtype)
                 )
-                self.arange_tensor_encoder[i, :, :length] = paddle.arange(length).astype(self.config.dtype)
+                if pre_caches_length > 0:
+                    if self.config.prefix_path is None:
+                        prefix_attention_mask = paddle.zeros([1, length, pre_caches_length], dtype=self.config.dtype)
+                    else:
+                        prefix_attention_mask = paddle.ones([1, length, pre_caches_length], dtype=self.config.dtype)
+                    post_attention_mask = paddle.tril(
+                        paddle.ones(shape=(length, length), dtype=self.config.dtype)
+                    ).unsqueeze_(axis=0)
 
-                self.tgt_generation_mask[i, :, 0, :length] = paddle.ones(shape=[1, length], dtype=self.config.dtype)
+                    self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
+                        [prefix_attention_mask, post_attention_mask], axis=2
+                    )
+                self.arange_tensor_encoder[i, :, : length + pre_caches_length] = paddle.arange(
+                    length + pre_caches_length
+                ).astype(self.config.dtype)
+
+                self.tgt_generation_mask[i, :, 0, : length + pre_caches_length] = paddle.ones(
+                    shape=[1, length + pre_caches_length], dtype=self.config.dtype
+                )
+            inputs["tgt_pos"] = inputs["tgt_pos"] + pre_caches_length
             # alibi encoder
             alibi_slopes = get_alibi_slopes(self.model_config.n_head)
             inputs["position_ids"] = paddle.to_tensor(alibi_slopes, dtype="float32")
@@ -427,7 +485,7 @@ class InferencePredictorMixin:
                     * block_size : (self.model_config.tensor_parallel_rank + 1)
                     * block_size,
                 ]
-                alibi = alibi.reshape([inputs["input_ids"].shape[0], block_size, 1, self.config.max_length])
+                alibi = alibi.reshape([self.config.batch_size, block_size, 1, self.config.max_length])
                 inputs["position_ids"] = inputs["position_ids"][
                     self.model_config.tensor_parallel_rank
                     * block_size : (self.model.config.tensor_parallel_rank + 1)
@@ -436,7 +494,7 @@ class InferencePredictorMixin:
 
             alibi_encoder = alibi.expand(
                 [
-                    inputs["input_ids"].shape[0],
+                    self.config.batch_size,
                     self.model_config.n_head // self.model_config.tensor_parallel_degree,
                     self.config.total_max_length,
                     self.config.total_max_length,
@@ -444,7 +502,7 @@ class InferencePredictorMixin:
             )
             alibi_decoder = alibi.expand(
                 [
-                    inputs["input_ids"].shape[0],
+                    self.config.batch_size,
                     self.model_config.n_head // self.model_config.tensor_parallel_degree,
                     1,
                     self.config.total_max_length,
@@ -458,18 +516,6 @@ class InferencePredictorMixin:
             )
 
         else:
-            inputs = dybatch_preprocess(
-                self.tokenizer,
-                source,
-                self.config.src_length,
-                self.config.max_length,
-                self.architectures,
-                top_p=self.config.top_p,
-                temperature=self.config.temperature,
-                pre_caches_length=pre_caches_length,
-                benchmark=self.config.benchmark,
-            )
-
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = paddle.tril(
@@ -585,7 +631,6 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         for i in range(len(self.cache_kvs_shape)):
             input_tensor = self.predictor.get_input_handle("cache_kvs_" + str(i))
             input_tensor.share_external_data(self.cache_kvs[i])
-
         input_tensor = self.predictor.get_input_handle("pre_ids")
         input_tensor.share_external_data(self.pre_ids)
 
@@ -725,6 +770,7 @@ def create_predictor(
                 from paddlenlp.experimental.transformers import (
                     ChatGLMv2ForCausalLMInferenceModel as Model,
                 )
+
                 config.quant_bits = -1
 
                 if predictor_args.quant_type.startswith("weight_only_int"):
@@ -845,11 +891,10 @@ def predict():
                 target_texts.append(example["tgt"])
     else:
         source_texts = [
-        #"[Round 0]\n问：你好\n答：你好👋!我是人工智能助手 ChatGLM-6B,很高兴见到你,欢迎问我任何问题。\n[Round 1]\n问：晚上睡不着应该怎么办\n答：",
-        "[Round 0]\n问：你好\n答：你好👋!我是人工智能助手 ChatGLM-6B,很高兴见到你,欢迎问我任何问题。\n[Round 1]\n问：晚上睡不着应该怎么办\n答：",
-        "<0>山东师范大学博士学位论文##129,16,199,21</0><1>构“大变”的成语。异体成语的运用体现出这一时期很多成语的构成要素并不十分固定，##36,30,287,35</1><2>成语结构也并不十分稳固，呈现出成语在结构上不断发生演变的过渡性特征，以及近代汉##36,39,291,44</2><3>语词汇向现代汉语词汇发展过程中的过渡性特征。##36,49,177,54</3><4>本章小结##146,62,180,69</4><5>本章我们在借鉴前人对成语的研究成果与界定的基础上，提出了对成语的界定：成语##48,77,291,83</5><6>是人们长期以来相沿习用的，意义相对完整、结构相对稳定的固定词组。成语的典型表现##36,87,291,92</6><7>形式为四字结构，多具有书面语色彩。进而提出了异体成语的定义：异体成语是整体意义##36,96,290,102</7><8>基本相同，形式上至少有一个相同的构成要素并且其他相异要素存在着互相替换的意义关##36,106,291,111</8><9>系，具有相同语法性质，结构稳定的一组词汇类聚。清末民初时期出现在白话报刊中的异##36,115,291,121</9><10>体成语，便是清末民初异体成语。清末民初异体成语中在当时使用频率最高的变体我们称##36,125,291,130</10><11>为清末民初异体成语的通体，其他称为清末民初异体成语的变体。##36,135,223,140</11><12>清末民初异体成语可以从形式、语义、结构等方面分类分析，总结分布特征。清末民##48,144,291,149</12><13>初异体成语在数量与分布上具有繁复性，在类型上具有多样化特征，在风格色彩上具有白##35,153,290,159</13><14>话化特征，在整体运用上具有过渡性特征等。##36,163,164,168</14><15>43##36,296,44,300</15><16>万方数据##26,310,48,315</16>",
-    #"<0>山东师范大学博士学位论文##129,16,199,21</0><1>构“大变”的成语。异体成语的运用体现出这一时期很多成语的构成要素并不十分固定，##36,30,287,35</1><2>成语结构也并不十分稳固，呈现出成语在结构上不断发生演变的过渡性特征，以及近代汉##36,39,291,44</2><3>语词汇向现代汉语词汇发展过程中的过渡性特征。##36,49,177,54</3><4>本章小结##146,62,180,69</4><5>本章我们在借鉴前人对成语的研究成果与界定的基础上，提出了对成语的界定：成语##48,77,291,83</5><6>是人们长期以来相沿习用的，意义相对完整、结构相对稳定的固定词组。成语的典型表现##36,87,291,92</6><7>形式为四字结构，多具有书面语色彩。进而提出了异体成语的定义：异体成语是整体意义##36,96,290,102</7><8>基本相同，形式上至少有一个相同的构成要素并且其他相异要素存在着互相替换的意义关##36,106,291,111</8><9>系，具有相同语法性质，结构稳定的一组词汇类聚。清末民初时期出现在白话报刊中的异##36,115,291,121</9><10>体成语，便是清末民初异体成语。清末民初异体成语中在当时使用频率最高的变体我们称##36,125,291,130</10><11>为清末民初异体成语的通体，其他称为清末民初异体成语的变体。##36,135,223,140</11><12>清末民初异体成语可以从形式、语义、结构等方面分类分析，总结分布特征。清末民##48,144,291,149</12><13>初异体成语在数量与分布上具有繁复性，在类型上具有多样化特征，在风格色彩上具有白##35,153,290,159</13><14>话化特征，在整体运用上具有过渡性特征等。##36,163,164,168</14><15>43##36,296,44,300</15><16>万方数据##26,310,48,315</16>",
-
+            # "[Round 0]\n问：你好\n答：你好👋!我是人工智能助手 ChatGLM-6B,很高兴见到你,欢迎问我任何问题。\n[Round 1]\n问：晚上睡不着应该怎么办\n答：",
+            "[Round 0]\n问：你好\n答：你好👋!我是人工智能助手 ChatGLM-6B,很高兴见到你,欢迎问我任何问题。\n[Round 1]\n问：晚上睡不着应该怎么办\n答：",
+            "<0>山东师范大学博士学位论文##129,16,199,21</0><1>构“大变”的成语。异体成语的运用体现出这一时期很多成语的构成要素并不十分固定，##36,30,287,35</1><2>成语结构也并不十分稳固，呈现出成语在结构上不断发生演变的过渡性特征，以及近代汉##36,39,291,44</2><3>语词汇向现代汉语词汇发展过程中的过渡性特征。##36,49,177,54</3><4>本章小结##146,62,180,69</4><5>本章我们在借鉴前人对成语的研究成果与界定的基础上，提出了对成语的界定：成语##48,77,291,83</5><6>是人们长期以来相沿习用的，意义相对完整、结构相对稳定的固定词组。成语的典型表现##36,87,291,92</6><7>形式为四字结构，多具有书面语色彩。进而提出了异体成语的定义：异体成语是整体意义##36,96,290,102</7><8>基本相同，形式上至少有一个相同的构成要素并且其他相异要素存在着互相替换的意义关##36,106,291,111</8><9>系，具有相同语法性质，结构稳定的一组词汇类聚。清末民初时期出现在白话报刊中的异##36,115,291,121</9><10>体成语，便是清末民初异体成语。清末民初异体成语中在当时使用频率最高的变体我们称##36,125,291,130</10><11>为清末民初异体成语的通体，其他称为清末民初异体成语的变体。##36,135,223,140</11><12>清末民初异体成语可以从形式、语义、结构等方面分类分析，总结分布特征。清末民##48,144,291,149</12><13>初异体成语在数量与分布上具有繁复性，在类型上具有多样化特征，在风格色彩上具有白##35,153,290,159</13><14>话化特征，在整体运用上具有过渡性特征等。##36,163,164,168</14><15>43##36,296,44,300</15><16>万方数据##26,310,48,315</16>",
+            # "<0>山东师范大学博士学位论文##129,16,199,21</0><1>构“大变”的成语。异体成语的运用体现出这一时期很多成语的构成要素并不十分固定，##36,30,287,35</1><2>成语结构也并不十分稳固，呈现出成语在结构上不断发生演变的过渡性特征，以及近代汉##36,39,291,44</2><3>语词汇向现代汉语词汇发展过程中的过渡性特征。##36,49,177,54</3><4>本章小结##146,62,180,69</4><5>本章我们在借鉴前人对成语的研究成果与界定的基础上，提出了对成语的界定：成语##48,77,291,83</5><6>是人们长期以来相沿习用的，意义相对完整、结构相对稳定的固定词组。成语的典型表现##36,87,291,92</6><7>形式为四字结构，多具有书面语色彩。进而提出了异体成语的定义：异体成语是整体意义##36,96,290,102</7><8>基本相同，形式上至少有一个相同的构成要素并且其他相异要素存在着互相替换的意义关##36,106,291,111</8><9>系，具有相同语法性质，结构稳定的一组词汇类聚。清末民初时期出现在白话报刊中的异##36,115,291,121</9><10>体成语，便是清末民初异体成语。清末民初异体成语中在当时使用频率最高的变体我们称##36,125,291,130</10><11>为清末民初异体成语的通体，其他称为清末民初异体成语的变体。##36,135,223,140</11><12>清末民初异体成语可以从形式、语义、结构等方面分类分析，总结分布特征。清末民##48,144,291,149</12><13>初异体成语在数量与分布上具有繁复性，在类型上具有多样化特征，在风格色彩上具有白##35,153,290,159</13><14>话化特征，在整体运用上具有过渡性特征等。##36,163,164,168</14><15>43##36,296,44,300</15><16>万方数据##26,310,48,315</16>",
         ]
         target_texts = ["", ""]
 
@@ -903,7 +948,7 @@ def benchmark(predictor, predictor_args, model_args):
     print("Avg Elapse time is: ", (end - start) / test_time)
     print("Output tokens is: ", output_tokens)
     print(
-        "Input length is: {}, Output length is: {}, bs is: {}, Generate speed is: {:.3f} tokens/s(ips), QPS: {:.3f} requests/s. ".format(
+        "Input length is: {}, Output length is: {}, bs is: {}, IPS: {:.3f} tokens/s, QPS: {:.3f} requests/s. ".format(
             predictor_args.src_length,
             predictor_args.max_length,
             predictor_args.batch_size,

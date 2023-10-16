@@ -1,5 +1,3 @@
-
-
 # Copyright (c) 2023 ChatGLM2-6B Model Team and PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,26 +17,30 @@ from typing import Optional
 
 import paddle
 import paddle.distributed.fleet as fleet
-from paddle.nn.quant import weight_quantize
 import paddle.nn as nn
-import paddle.nn.functional as F
-from paddle.distributed.fleet.utils import recompute
-from paddle.utils import map_structure
-from paddlenlp.experimental.transformers.fused_transformer_layers import (
-    FusedMultiTransformer,
-)
+from paddle.nn.quant import weight_quantize
 from paddlenlp_ops import get_padding_offset
 
-from paddlenlp.experimental.transformers.generation_utils import GenerationInferenceModel
+from paddlenlp.experimental.transformers.fused_transformer_layers import (
+    FusedMultiTransformerBase,
+    FusedMultiTransformerConfig,
+    FusedMultiTransformerWeightOnly,
+)
+from paddlenlp.experimental.transformers.generation_utils import (
+    GenerationInferenceModel,
+)
+from paddlenlp.transformers import ChatGLMv2Config, ChatGLMv2PretrainedModel
+
+# from paddlenlp.transformers import CHATGLM_V2_PRETRAINED_RESOURCE_FILES_MAP
+from paddlenlp.transformers.chatglm_v2.modeling import (
+    Embedding,
+    RMSNorm,
+    RotaryEmbedding,
+)
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithPast,
-    ModelOutput,
 )
-from paddlenlp.transformers import ChatGLMv2Config, ChatGLMv2PretrainedModel
-#from paddlenlp.transformers import CHATGLM_V2_PRETRAINED_RESOURCE_FILES_MAP
-from paddlenlp.transformers.chatglm_v2.modeling import Embedding,RotaryEmbedding,RMSNorm
-
 from paddlenlp.transformers.model_utils import (
     dy2st_nocheck_guard_context,
     register_base_model,
@@ -61,7 +63,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             config.hidden_size // config.num_attention_heads if config.kv_channels is None else config.kv_channels
         )
         self.rotary_pos_emb = RotaryEmbedding(rotary_dim // 2)
-        
+
         if config.tensor_parallel_degree > 1:
             if config.tensor_parallel_degree > 2:
                 raise ValueError(
@@ -76,11 +78,9 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         else:
             self.output_layer = nn.Linear(config.hidden_size, config.padded_vocab_size, bias_attr=False)
 
-
         self.num_layers = config.num_hidden_layers
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
-        self.head_size = self.hidden_size // self.num_heads
         self.head_size = self.hidden_size // self.num_heads
         self.multi_query_group_num = config.multi_query_group_num
 
@@ -103,7 +103,9 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         ]
 
         qkv_weight_attrs = [
-            paddle.ParamAttr(name="encoder.layers.{}.qkv_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0))
+            paddle.ParamAttr(
+                name="encoder.layers.{}.qkv_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
             for i in range(config.num_hidden_layers)
         ]
         qkv_bias_attrs = [
@@ -111,7 +113,10 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         ]
 
         out_proj_weight_attrs = [
-            paddle.ParamAttr(name="encoder.layers.{}.self_attention.dense.weight".format(i), initializer=paddle.nn.initializer.Constant(value=0))
+            paddle.ParamAttr(
+                name="encoder.layers.{}.self_attention.dense.weight".format(i),
+                initializer=paddle.nn.initializer.Constant(value=0),
+            )
             for i in range(config.num_hidden_layers)
         ]
 
@@ -121,12 +126,18 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         ]
 
         ffn1_weight_attrs = [
-            paddle.ParamAttr(name="encoder.layers.{}.mlp.dense_h_to_4h.weight".format(i), initializer=paddle.nn.initializer.Constant(value=0))
+            paddle.ParamAttr(
+                name="encoder.layers.{}.mlp.dense_h_to_4h.weight".format(i),
+                initializer=paddle.nn.initializer.Constant(value=0),
+            )
             for i in range(config.num_hidden_layers)
         ]
 
         ffn2_weight_attrs = [
-            paddle.ParamAttr(name="encoder.layers.{}.mlp.dense_4h_to_h.weight".format(i), initializer=paddle.nn.initializer.Constant(value=0))
+            paddle.ParamAttr(
+                name="encoder.layers.{}.mlp.dense_4h_to_h.weight".format(i),
+                initializer=paddle.nn.initializer.Constant(value=0),
+            )
             for i in range(config.num_hidden_layers)
         ]
 
@@ -139,17 +150,18 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
                 paddle.ParamAttr(name="encoder.layers.{}.qkv_weight_scale".format(i)) for i in range(self.num_layers)
             ]
             out_proj_weight_scale_attrs = [
-                paddle.ParamAttr(name="encoder.layers.{}.self_attention.dense.weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="encoder.layers.{}.self_attention.dense.weight_scale".format(i))
+                for i in range(self.num_layers)
             ]
             ffn1_weight_scale_attrs = [
-                paddle.ParamAttr(name="encoder.layers.{}.mlp.dense_h_to_4h.weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="encoder.layers.{}.mlp.dense_h_to_4h.weight_scale".format(i))
+                for i in range(self.num_layers)
             ]
             ffn2_weight_scale_attrs = [
-                paddle.ParamAttr(name="encoder.layers.{}.mlp.dense_4h_to_h.weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="encoder.layers.{}.mlp.dense_4h_to_h.weight_scale".format(i))
+                for i in range(self.num_layers)
             ]
-
-
-        self.transformer_block = FusedMultiTransformer(
+        transformer_config = FusedMultiTransformerConfig(
             config.hidden_size,
             config.num_attention_heads,
             config.ffn_hidden_size,
@@ -174,6 +186,11 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             epsilon=config.layernorm_epsilon,
             norm_type="rmsnorm",
         )
+
+        if self.use_weight_only:
+            self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
+        else:
+            self.transformer_block = FusedMultiTransformerBase(transformer_config)
 
         self.post_layer_norm = config.post_layer_norm
         if self.post_layer_norm:
@@ -236,41 +253,43 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         hidden_states = inputs_embeds
 
         # Rotary positional embeddings
+        # 32768
         rotary_pos_emb = self.rotary_pos_emb(self.max_sequence_length)
-
-        #print("position_ids",position_ids)
 
         if position_ids is not None:
             rotary_pos_emb = rotary_pos_emb[position_ids]
-            rotary_pos_emb = rotary_pos_emb[:,:seq_length,:,:]
-            #rotary_pos_emb = rotary_pos_emb[0:1,:seq_length,:,:]
+            rotary_pos_emb = rotary_pos_emb[:, :seq_length, :, :]
         else:
             rotary_pos_emb = rotary_pos_emb[None, :seq_length]
 
-
-        # make it to be [2, 1, seq_len, rotary_dim]
+        ones = paddle.ones([batch_size, seq_length, 32], dtype="float16")
+        zeros = paddle.zeros([batch_size, seq_length, 32], dtype="float16")
+        # make it to be [2, batch, seq_len, rotary_dim]
         rotary_pos_emb = rotary_pos_emb.transpose([3, 0, 1, 2])
-        #print("rotary_pos_emb.shape", rotary_pos_emb.shape)
-        if is_decoder:
-            # 这个修改是为了和masked_multihead_attention中位置编码的计算逻辑相匹配，累啊！
-            rotary_pos_emb = rotary_pos_emb.unsqueeze(-1).tile([1, 1, 1, 1, 2]).reshape([2,-1,1,64])
+        cos = rotary_pos_emb[0]
+        sin = rotary_pos_emb[1]
+        cos = paddle.concat([cos, ones], axis=-1)
+        sin = paddle.concat([sin, zeros], axis=-1)
+        rotary_pos_emb = paddle.stack([cos, sin], axis=0)
+        rotary_pos_emb = rotary_pos_emb.unsqueeze(-1).tile([1, 1, 1, 1, 2]).reshape([2, batch_size, seq_length, 128])
 
-        # Run encoder. 
+        # Run encoder.
         seq_lens = seq_len_decoder if is_decoder else seq_len_encoder
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
-                    input_ids,
-                    hidden_states,
-                    cum_offsets=cum_offsets,
-                    padding_offset=padding_offset,
-                    attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
-                    caches=cache_kvs,
-                    pre_caches=None,
-                    pre_caches_length=0,
-                    seq_lens=seq_lens,
-                    rotary_embs=paddle.cast(rotary_pos_emb, "float32"),
-                    rotary_emb_dims=1,
-                    time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None)
+                input_ids,
+                hidden_states,
+                cum_offsets=cum_offsets,
+                padding_offset=padding_offset,
+                attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
+                caches=cache_kvs,
+                pre_caches=None,
+                pre_caches_length=0,
+                seq_lens=seq_lens,
+                rotary_embs=paddle.cast(rotary_pos_emb, "float32"),
+                rotary_emb_dims=1,
+                time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
+            )
 
         hidden_states = self.final_layernorm(hidden_states)
 
@@ -279,33 +298,33 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
 
         return BaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=hidden_states,
-            past_key_values=presents,
-            hidden_states=all_hidden_states,
+            past_key_values=None,
+            hidden_states=None,
         )
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
-        prefix=""
-        self.embedding.word_embeddings.weight.set_value(state_dict.pop(prefix+"embedding.word_embeddings.weight"))
-        self.final_layernorm.weight.set_value(state_dict.pop(prefix+"encoder.final_layernorm.weight"))
-        self.output_layer.weight.set_value(state_dict.pop(prefix+"output_layer.weight"))
+        self.embedding.word_embeddings.weight.set_value(state_dict.pop("embedding.word_embeddings.weight"))
+        self.final_layernorm.weight.set_value(state_dict.pop("encoder.final_layernorm.weight"))
+        self.output_layer.weight.set_value(state_dict.pop("output_layer.weight"))
 
         for i in range(self.num_layers):
-            ln_scale = state_dict.pop(prefix+"encoder.layers.{}.input_layernorm.weight".format(i))
+            ln_scale = state_dict.pop("encoder.layers.{}.input_layernorm.weight".format(i))
 
-            q_weight = state_dict.pop(prefix+"encoder.layers.{}.self_attention.query.weight".format(i))
-            k_weight = state_dict.pop(prefix+"encoder.layers.{}.self_attention.key.weight".format(i))
-            v_weight = state_dict.pop(prefix+"encoder.layers.{}.self_attention.value.weight".format(i))
-            q_bias = state_dict[prefix+"encoder.layers.{}.self_attention.query.bias".format(i)]
-            k_bias = state_dict[prefix+"encoder.layers.{}.self_attention.key.bias".format(i)]
-            v_bias = state_dict[prefix+"encoder.layers.{}.self_attention.value.bias".format(i)]
-            
+            q_weight = state_dict.pop("encoder.layers.{}.self_attention.query.weight".format(i))
+            k_weight = state_dict.pop("encoder.layers.{}.self_attention.key.weight".format(i))
+            v_weight = state_dict.pop("encoder.layers.{}.self_attention.value.weight".format(i))
+            q_bias = state_dict["encoder.layers.{}.self_attention.query.bias".format(i)]
+            k_bias = state_dict["encoder.layers.{}.self_attention.key.bias".format(i)]
+            v_bias = state_dict["encoder.layers.{}.self_attention.value.bias".format(i)]
+
             import numpy as np
+
             k_weight = k_weight.reshape([4096, 2, 1, 128])
             k_bias = k_bias.reshape([2, 1, 128])
             v_weight = v_weight.reshape([4096, 2, 1, 128])
             v_bias = v_bias.reshape([2, 1, 128])
-            
+
             k_weight = np.tile(k_weight, [1, 1, self.num_heads // self.multi_query_group_num, 1])
             v_weight = np.tile(v_weight, [1, 1, self.num_heads // self.multi_query_group_num, 1])
             k_bias = np.tile(k_bias, [1, self.num_heads // self.multi_query_group_num, 1])
@@ -317,22 +336,22 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
 
             concated_qkv_weight = np.concatenate([q_weight, k_weight, v_weight], axis=-1)
             concated_qkv_weight = concated_qkv_weight.transpose(1, 0)
-            concated_qkv_weight = concated_qkv_weight.reshape([3 * self.hidden_size , self.hidden_size])
+            concated_qkv_weight = concated_qkv_weight.reshape([3 * self.hidden_size, self.hidden_size])
             concated_qkv_weight = paddle.to_tensor(concated_qkv_weight)
 
             concated_qkv_bias = np.concatenate([q_bias, k_bias, v_bias], axis=-1)
             concated_qkv_bias = concated_qkv_bias.reshape([3 * self.hidden_size])
             concated_qkv_bias = paddle.to_tensor(concated_qkv_bias)
 
-            out_proj_weight = state_dict.pop(prefix+"encoder.layers.{}.self_attention.dense.weight".format(i))
+            out_proj_weight = state_dict.pop("encoder.layers.{}.self_attention.dense.weight".format(i))
 
-            ffn_ln_scale = state_dict.pop(prefix+"encoder.layers.{}.post_attention_layernorm.weight".format(i))
+            ffn_ln_scale = state_dict.pop("encoder.layers.{}.post_attention_layernorm.weight".format(i))
 
-            ffn1_weight = state_dict.pop(prefix+"encoder.layers.{}.mlp.dense_h_to_4h.weight".format(i))
+            ffn1_weight = state_dict.pop("encoder.layers.{}.mlp.dense_h_to_4h.weight".format(i))
             ffn1_weight_0 = ffn1_weight[..., 0::2]
             ffn1_weight_1 = ffn1_weight[..., 1::2]
             ffn1_weight = paddle.concat([ffn1_weight_0, ffn1_weight_1], axis=-1)
-            ffn2_weight = state_dict.pop(prefix+"encoder.layers.{}.mlp.dense_4h_to_h.weight".format(i))
+            ffn2_weight = state_dict.pop("encoder.layers.{}.mlp.dense_4h_to_h.weight".format(i))
 
             self.transformer_block.ln_scales[i].set_value(ln_scale)
 
@@ -377,6 +396,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
                 self.transformer_block.ffn2_weights_scale[i].set_value(ffn2_weight_scale_tensor)
             else:
                 self.transformer_block.ffn2_weights[i].set_value(ffn2_weight)
+
 
 class ChatGLMv2ForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMv2PretrainedModel):
     def __init__(self, config: ChatGLMv2Config):
@@ -452,7 +472,7 @@ class ChatGLMv2ForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMv2Pret
 
     def forward(
         self,
-        input_ids:Optional[paddle.Tensor] = None,
+        input_ids: Optional[paddle.Tensor] = None,
         position_ids: Optional[paddle.Tensor] = None,
         attention_mask=None,
         inputs_embeds=None,
@@ -470,8 +490,8 @@ class ChatGLMv2ForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMv2Pret
     ):
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-        
-        #这个是为了保存输入的哦！
+
+        # 这个是为了保存输入的哦！
         # import numpy as np
         # static_dict = {
         # "input_ids" : input_ids.numpy(),
@@ -506,14 +526,13 @@ class ChatGLMv2ForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMv2Pret
         # np.savez('/zhoukangkang/my.npz', **static_dict)
         # exit(0)
 
-        # if (input_ids[0,0] == 906):
+        # if (input_ids.shape[1] == 1):
         #     import numpy as np
         #     static_dict = {
         #     "my" : lm_logits.numpy(),
         #     }
         #     np.savez('/zhoukangkang/my.npz', **static_dict)
         #     exit(0)
-
 
         loss = None
         if labels is not None:
@@ -544,4 +563,3 @@ class ChatGLMv2ForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMv2Pret
             hidden_states=transformer_outputs.hidden_states,
             attentions=transformer_outputs.attentions,
         )
-

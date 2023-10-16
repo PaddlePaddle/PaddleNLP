@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-import os
-os.environ["CUDA_VISIBLE_DEVICES"]="5"
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "5"
 os.environ["FLAGS_use_cuda_managed_memory"] = "true"
 
 import paddle
@@ -92,6 +92,8 @@ def main():
     predictor.tokenizer.save_pretrained(export_args.output_path)
     generate_rank_mapping(os.path.join(export_args.output_path, "rank_mapping.csv"))
 
+    if tensor_parallel_degree > 1:
+        export_args.output_path = os.path.join(export_args.output_path, f"rank_{tensor_parallel_rank}")
     validate_pdmodel(export_args.output_path, predictor_args.model_prefix)
 
 

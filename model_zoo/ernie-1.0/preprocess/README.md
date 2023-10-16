@@ -188,7 +188,6 @@ python -u  create_pretraining_data.py \
     --data_format "JSON" \
     --json_key "text" \
     --data_impl "mmap" \
-    --cn_seg_func "jieba" \
     --append_eos \
     --log_interval 5 \
     --workers 40
