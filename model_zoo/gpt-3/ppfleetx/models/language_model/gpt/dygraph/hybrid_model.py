@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import collections
 import logging
 import math
@@ -58,14 +59,15 @@ from .sequence_parallel_utils import (
 from paddlenlp.transformers.segment_parallel_utils  import ReshardLayer
 
 try:
-    from paddle.nn.functional.flash_attention import flash_attention
+    from paddle.nn.functional.flash_attention import flash_attention, flash_attn_unpadded
 except:
     flash_attention = None
+    flash_attn_unpadded = None
 try:
     from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 except:
     FusedDropoutAdd = None
-
+from einops import rearrange
 
 def get_attr(layer, name):
     if getattr(layer, name, None) is not None:
@@ -214,13 +216,20 @@ class MultiHeadAttention(nn.Layer):
         self.sep_parallel_degree = env.get_hcg().get_sep_parallel_world_size()
         if self.sep_parallel_degree > 1:
             self.reshard_layer = ReshardLayer()
+        from paddlenlp.trainer.plugins.timer import _Timer
+        self._timer = _Timer("flash_attn")
 
     def _fuse_prepare_qkv(self, query, use_cache=False, cache=None):
         mix_layer = self.qkv_proj(query)
         if self.reshard_layer is not None:
-            mix_layer = self.reshard_layer(mix_layer, split_axis=2, concat_axis=1,)
-            assert self.num_heads % self.sep_parallel_degree == 0, f"num_heads:{self.num_heads} must be divisible by sep_parallel_degree:{self.sep_parallel_degree}"
-            mix_layer = paddle.reshape_(mix_layer, [0, -1, self.num_heads // self.sep_parallel_degree, 3 * self.head_dim])  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
+            if os.environ.get("FLAGS_use_flash_attn_unpadded", "false") == "true":
+                mix_layer = self.reshard_layer(mix_layer, split_axis=2, concat_axis=0,)
+                assert self.num_heads % self.sep_parallel_degree == 0, f"num_heads:{self.num_heads} must be divisible by sep_parallel_degree:{self.sep_parallel_degree}"
+                mix_layer = paddle.reshape_(mix_layer, [-1, 0, self.num_heads // self.sep_parallel_degree, 3 * self.head_dim])  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
+            else:
+                mix_layer = self.reshard_layer(mix_layer, split_axis=2, concat_axis=1,)
+                assert self.num_heads % self.sep_parallel_degree == 0, f"num_heads:{self.num_heads} must be divisible by sep_parallel_degree:{self.sep_parallel_degree}"
+                mix_layer = paddle.reshape_(mix_layer, [0, -1, self.num_heads // self.sep_parallel_degree, 3 * self.head_dim])  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
         else:
             mix_layer = paddle.reshape_(mix_layer, [0, 0, -1, 3 * self.head_dim])
 
@@ -302,16 +311,34 @@ class MultiHeadAttention(nn.Layer):
             return self.Cache(key, value)
 
     def _flash_attention(self, q, k, v, attn_mask=None):
+        batch_size, seqlen_q, _, _ = q.shape
         if self.sequence_parallel:
             perm = [1, 0, 2, 3]
             q = tensor.transpose(x=q, perm=perm)
             k = tensor.transpose(x=k, perm=perm)
             v = tensor.transpose(x=v, perm=perm)
-        out, weights = flash_attention(
-            q, k, v, self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
-        )
-        if self.reshard_layer is not None:
-            out = self.reshard_layer(out, split_axis=1, concat_axis=2,)
+        # var_len
+        if os.environ.get("FLAGS_use_flash_attn_unpadded", "false") == "true":
+            q_, k_, v_ = [rearrange(x, 'b s ... -> (b s) ...') for x in [q, k, v]]
+            cu_seqlens_q = paddle.arange(0, (batch_size + 1) * seqlen_q, step=seqlen_q, dtype=paddle.int32)
+            cu_seqlens_k = cu_seqlens_q
+            seqlen_k = seqlen_q
+            scale = q_.shape[-1] ** (-0.5)
+            out, weights = flash_attn_unpadded(
+                q_, k_, v_, cu_seqlens_q, cu_seqlens_k, seqlen_q, seqlen_k, scale=scale,
+                dropout=self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
+            )
+            out = rearrange(out, '(b s) ... -> b s ...', b=batch_size)
+            if self.reshard_layer is not None:
+                out = self.reshard_layer(out, split_axis=0, concat_axis=2,)
+        else:
+            # not var_len
+            out, weights = flash_attention(
+                q, k, v, self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
+            )
+            # logger.info(f" flash attn elapsed:{elapsed}, q shape:{q.shape}, k shape:{k.shape}, v shape:{v.shape}, self.need_weights:{self.need_weights}, self.training:{self.training}, weights:{weights}")
+            if self.reshard_layer is not None:
+                out = self.reshard_layer(out, split_axis=1, concat_axis=2,)
 
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
         if self.sequence_parallel:
