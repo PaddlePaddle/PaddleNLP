@@ -16,12 +16,15 @@
 # This file is modified from
 #  https://github.com/huggingface/transformers/blob/main/src/transformers
 
+import collections
+import copy
 import os
 from typing import Any, Optional
 
 import numpy as np
 import paddle
 import paddle.distributed as dist
+from paddle.distributed import fleet
 
 __all__ = [
     "distributed_concat",
@@ -172,3 +175,92 @@ def distributed_file(filename):
 
         paddle.distributed.barrier()
         return filename
+
+
+TensorHolder = collections.namedtuple("TensorHolder", ["shape", "dtype", "name"])
+
+
+def nested_reduce_tensor(tensor):
+    if isinstance(tensor, dict):
+        # copy tensor since it will be inplace modified dict
+        tensor = copy.copy(tensor)
+        for key in list(tensor.keys()):
+            tensor[key] = nested_reduce_tensor(tensor[key])
+    if isinstance(tensor, (tuple, list)):
+        return type(tensor)(nested_reduce_tensor(t) for t in tensor)
+
+    if isinstance(tensor, paddle.Tensor):
+        return TensorHolder(tensor.shape, tensor.dtype, tensor.name)
+
+    return tensor
+
+
+def nested_empty_tensor(tensor):
+    if isinstance(tensor, dict):
+        for key in list(tensor.keys()):
+            tensor[key] = nested_empty_tensor(tensor[key])
+    if isinstance(tensor, list):
+        return type(tensor)(nested_empty_tensor(t) for t in tensor)
+
+    # TensorHolder is tuple
+    if isinstance(tensor, TensorHolder):
+        t = paddle.empty(tensor.shape, dtype=tensor.dtype, name=tensor.name)
+        t.name = tensor.name
+        return t
+
+    return tensor
+
+
+def nested_broadcast_tensor(tensor, src=0, group=None):
+    if isinstance(tensor, dict):
+        for key in list(tensor.keys()):
+            tensor[key] = nested_broadcast_tensor(tensor[key], src=src, group=group)
+    if isinstance(tensor, list):
+        return type(tensor)(nested_broadcast_tensor(t, src=src, group=group) for t in tensor)
+
+    if isinstance(tensor, paddle.Tensor):
+        paddle.distributed.broadcast(tensor, src=src, group=group, sync_op=True)
+    return tensor
+
+
+def broadcast_dp_optimizer(state_dict):
+    if paddle.distributed.get_world_size() <= 1:
+        return state_dict
+
+    try:
+        hcg = fleet.get_hybrid_communicate_group()
+        dp_group = hcg.get_data_parallel_group()
+        src_rank = hcg.get_data_parallel_group_src_rank()
+        process_rank = paddle.distributed.get_rank()
+    except:
+        dp_group = None
+        src_rank = 0
+        process_rank = paddle.distributed.get_rank()
+
+    if process_rank == src_rank:
+        assert (
+            state_dict is not None
+        ), f"Your local rank {paddle.distributed.get_rank()} must have a state_dict. dp_rank:{process_rank}, src_rank:{src_rank}"
+        fake_state_dict = [nested_reduce_tensor(state_dict)]
+    else:
+        assert (
+            state_dict is None
+        ), f"Your local rank {paddle.distributed.get_rank()}  are forbidden to have a state_dict. dp_rank:{process_rank}, src_rank:{src_rank}"
+        fake_state_dict = [None]
+
+    print("broccast fake_state_dict")
+    paddle.distributed.broadcast_object_list(
+        fake_state_dict,
+        src=src_rank,
+        group=dp_group,
+    )
+    fake_state_dict = fake_state_dict[0]
+    print("broccast fake_state_dict over")
+    if process_rank != src_rank:
+        state_dict = nested_empty_tensor(fake_state_dict)
+
+    print("nested build empty tensor over")
+    state_dict = nested_broadcast_tensor(state_dict, src=src_rank, group=dp_group)
+    print("nested_broadcast_tensor over")
+
+    return state_dict

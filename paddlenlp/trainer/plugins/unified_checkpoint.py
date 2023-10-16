@@ -329,7 +329,7 @@ def filter_params(model_to_save, state_dict):
             total_size += weight_size
 
         filter_tensor_list.append(current_block)
-        assert len(filter_tensor_list) == tp_size, "Error, partion failed!"
+        assert len(filter_tensor_list) == tp_size, "Error, partition failed!"
 
     paddle.distributed.broadcast_object_list(
         filter_tensor_list,

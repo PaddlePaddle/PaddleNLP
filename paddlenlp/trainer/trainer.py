@@ -125,6 +125,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
 )
 from .training_args import TrainingArguments
 from .utils.helper import (  # nested_truncate,
+    broadcast_dp_optimizer,
     distributed_concat,
     distributed_file,
     distributed_isfile,
@@ -716,6 +717,16 @@ class Trainer:
             self.state = TrainerState.load_from_json(
                 distributed_file(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
             )
+
+            if self.args.world_size > 1:
+                global_step_list = []
+                paddle.distributed.all_gather(
+                    global_step_list, paddle.to_tensor([self.state.global_step], dtype="int64")
+                )
+                assert (
+                    paddle.sum(paddle.stack(global_step_list) - global_step_list[0]) == 0
+                ), f"Error, get different globel step, please check! step list: {[x.item() for x in global_step_list]}"
+
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:
                 steps_trained_in_current_epoch = self.state.global_step % (num_update_steps_per_epoch)
@@ -2152,10 +2163,14 @@ class Trainer:
                 checkpoint, base_opt_name=OPTIMIZER_NAME
             )
         else:
-            optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
-            path = os.path.join(checkpoint, optimizer_name)
-            if os.path.isfile(path):
-                opt_state_dict = paddle.load(path)
+            if self.args.dataset_rank == 0:
+                optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+                path = os.path.join(checkpoint, optimizer_name)
+                if os.path.isfile(path):
+                    opt_state_dict = paddle.load(path)
+
+        # broadcast optimizer state in dp group
+        opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
 
         if opt_state_dict is not None:
             # Load in optimizer and scheduler states
