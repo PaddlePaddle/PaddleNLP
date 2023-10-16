@@ -145,6 +145,7 @@ class DistDataLoader(paddle.io.DataLoader):
             data = next(self._dataloader_iter)
             data_keys = list(data.keys())
 
+            # TODO(daisiming): Better methods are needed to support new data types.
             type_check = [paddle.int64, paddle.float32]
             for key in data_keys:
                 if data[key].dtype not in type_check:
