@@ -776,7 +776,6 @@ class Trainer:
 
             step_control = 0  # used in loop control, reset to 0 after every step
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
-
             for step, inputs in enumerate(epoch_iterator):
                 self.timers and self.timers("read-data").stop()
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
@@ -1809,7 +1808,15 @@ class Trainer:
             loss = self.compute_loss(model, inputs)
 
         if self.args.gradient_accumulation_steps > 1:
-            loss = loss / self.args.gradient_accumulation_steps
+            # add delay_scale_loss for sharding stage1
+            args = self.args
+            if self.sharding and ShardingOption.SHARD_OP in self.args.sharding:
+                sharding_parallel_config = set(args.sharding_parallel_config.split(" "))
+                enable_stage1_delay_scale_loss = "enable_stage1_delay_scale_loss" in sharding_parallel_config
+                if not enable_stage1_delay_scale_loss:
+                    loss = loss / self.args.gradient_accumulation_steps               
+            else: # in order to not confilict with other parallel stragtegy
+                loss = loss / self.args.gradient_accumulation_steps
 
         if self.do_grad_scaling:
             self.scaler.scale(loss).backward()

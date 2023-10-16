@@ -581,6 +581,7 @@ class TrainingArguments:
                 "enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation\n"
                 "enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed\n"
                 "enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap"
+                "enable_stage1_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner stage1 accumute step. instead of div accumute step on loss directly.\n"
             )
         },
     )
@@ -991,10 +992,11 @@ class TrainingArguments:
                                 "enable_stage1_tensor_fusion",
                                 "enable_stage1_overlap",
                                 "enable_stage2_overlap",
+                                "enable_stage1_delay_scale_loss",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, "
-                                    f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap."
+                                    f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap, enable_stage1_delay_scale_loss."
                                 )
                     try:
                         if (
@@ -1013,6 +1015,9 @@ class TrainingArguments:
                             strategy.hybrid_configs[
                                 "sharding_configs"
                             ].accumulate_steps = self.gradient_accumulation_steps
+
+                        strategy.hybrid_configs["sharding_configs"].stage1_delay_scale_loss = True if "enable_stage1_delay_scale_loss" in sharding_parallel_config else False
+                            
                     except KeyError:
                         warnings.warn(
                             "The enable_stage1_tensor_fusion or enable_stage1_overlap is not supported "
