@@ -147,7 +147,7 @@ def convert_weights(model_dir: str, output_dir: str | None = None):
     for file in files:
         file_state_dict = torch.load(file)
         for key in list(file_state_dict.keys()):
-            state_dict[key] = file_state_dict.pop(key).numpy()
+            state_dict[key] = file_state_dict.pop(key).cpu().numpy()
 
     for mapping in tqdm(mappings):
         torch_key, paddle_key = mapping[:2]

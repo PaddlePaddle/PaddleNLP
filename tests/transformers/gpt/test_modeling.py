@@ -27,9 +27,9 @@ from parameterized import parameterized, parameterized_class
 
 from paddlenlp.transformers import (
     GPTConfig,
+    GPTForCausalLM,
     GPTForSequenceClassification,
     GPTForTokenClassification,
-    GPTLMHeadModel,
     GPTModel,
     GPTTokenizer,
 )
@@ -206,7 +206,9 @@ class GPTModelTester:
         output_from_no_past = model(next_input_ids, return_dict=self.parent.return_dict)
         if self.parent.return_dict:
             output_from_no_past = output_from_no_past[0]
-        output_from_past = model(next_tokens, use_cache=True, cache=past, return_dict=self.parent.return_dict)[0]
+        output_from_past = model(
+            next_tokens, use_cache=True, past_key_values=past, return_dict=self.parent.return_dict
+        )[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1,), output_from_past.shape[-1]).item()
@@ -250,7 +252,11 @@ class GPTModelTester:
         if self.parent.return_dict:
             output_from_no_past = output_from_no_past[0]
         output_from_past = model(
-            next_tokens, cache=past, use_cache=True, attention_mask=attn_mask, return_dict=self.parent.return_dict
+            next_tokens,
+            past_key_values=past,
+            use_cache=True,
+            attention_mask=attn_mask,
+            return_dict=self.parent.return_dict,
         )[0]
 
         # select random slice
@@ -286,7 +292,7 @@ class GPTModelTester:
         output_from_past = model(
             next_tokens,
             attention_mask=next_attention_mask,
-            cache=past,
+            past_key_values=past,
             use_cache=True,
             return_dict=self.parent.return_dict,
         )[0]
@@ -301,7 +307,7 @@ class GPTModelTester:
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
     def create_and_check_lm_head_model(self, config, input_ids, input_mask, *args):
-        model = GPTLMHeadModel(config)
+        model = GPTForCausalLM(config)
         model.eval()
 
         result = model(
@@ -317,7 +323,7 @@ class GPTModelTester:
             self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_forward_and_backwards(self, config, input_ids, input_mask, *args):
-        model = GPTLMHeadModel(config)
+        model = GPTForCausalLM(config)
 
         if self.parent.use_labels:
             loss, logits = model(input_ids, labels=input_ids, return_dict=self.parent.return_dict)
@@ -410,9 +416,9 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
     use_labels = False
     return_dict = False
 
-    all_model_classes = (GPTModel, GPTLMHeadModel, GPTForSequenceClassification, GPTForTokenClassification)
-    all_generative_model_classes = {GPTLMHeadModel: (GPTModel, "gpt")}
-    all_parallelizable_model_classes = GPTLMHeadModel
+    all_model_classes = (GPTModel, GPTForCausalLM, GPTForSequenceClassification, GPTForTokenClassification)
+    all_generative_model_classes = {GPTForCausalLM: (GPTModel, "gpt")}
+    all_parallelizable_model_classes = GPTForCausalLM
     test_missing_keys = False
     test_model_parallel = True
 
@@ -497,7 +503,7 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
 
     @slow
     def test_batch_generation(self):
-        model = GPTLMHeadModel.from_pretrained("gpt2-en")
+        model = GPTForCausalLM.from_pretrained("gpt2-en")
         model.eval()
         tokenizer = GPTTokenizer.from_pretrained("gpt2-en")
 
@@ -572,7 +578,7 @@ class GPTCompatibilityTest(unittest.TestCase):
             ("GPTModel", "GPT2Model"),
             ("GPTForSequenceClassification", "GPT2ForSequenceClassification"),
             ("GPTForTokenClassification", "GPT2ForTokenClassification"),
-            ("GPTLMHeadModel", "GPT2LMHeadModel"),
+            ("GPTForCausalLM", "GPT2LMHeadModel"),
         ]
     )
     @require_package("transformers", "torch")
@@ -617,7 +623,7 @@ class GPTModelLanguageGenerationTest(PaddleNLPModelTest):
         self,
         verify_outputs=True,
     ):
-        model = GPTLMHeadModel.from_pretrained("gpt2-en")
+        model = GPTForCausalLM.from_pretrained("gpt2-en")
         model.eval()
 
         # The dog
@@ -657,7 +663,7 @@ class GPTModelLanguageGenerationTest(PaddleNLPModelTest):
     @slow
     def test_gpt_sample(self):
         tokenizer = GPTTokenizer.from_pretrained("gpt2-en")
-        model = GPTLMHeadModel.from_pretrained("gpt2-en")
+        model = GPTForCausalLM.from_pretrained("gpt2-en")
         model.eval()
 
         paddle.seed(128)
@@ -697,7 +703,7 @@ class GPTModelLanguageGenerationTest(PaddleNLPModelTest):
     def test_gpt_sample_max_time(self):
         # NOTE: duration changed sharply and can not be limit in a range for now.
         tokenizer = GPTTokenizer.from_pretrained("gpt2-en")
-        model = GPTLMHeadModel.from_pretrained("gpt2-en")
+        model = GPTForCausalLM.from_pretrained("gpt2-en")
         model.eval()
 
         paddle.seed(0)

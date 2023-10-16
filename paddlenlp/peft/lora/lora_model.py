@@ -19,12 +19,18 @@ from collections import OrderedDict
 from functools import partial
 from typing import Dict, List, Union
 
+import numpy as np
 import paddle
 import paddle.nn as nn
-from paddle.distributed.fleet.meta_parallel import ColumnParallelLinear
+from paddle.distributed.fleet.meta_parallel import (
+    ColumnParallelLinear,
+    PipelineLayer,
+    RowParallelLinear,
+)
 
 from ...transformers.conversion_utils import ConversionMixin
 from ...transformers.model_utils import PretrainedModel, _add_variant, dtype_guard
+from ...transformers.utils import weight_name_suffix
 from ...utils.distributed import distributed_gather
 from ...utils.env import LORA_WEIGHTS_NAME
 from ...utils.log import logger
@@ -34,30 +40,85 @@ from .lora_layers import (
     ColumnParallelLoRAMergedLinear,
     LoRALinear,
     LoRAMergedLinear,
+    RowParallelLoRALinear,
 )
+
+try:
+    from ...utils.quantization import (
+        ColumnParallelQuantizationLinear,
+        QuantizationLinear,
+        RowParallelQuantizationLinear,
+    )
+    from .lora_quantization_layers import (
+        ColumnParallelQuantizationLoRALinear,
+        QuantizationLoRALinear,
+        RowParallelQuantizationLoRALinear,
+    )
+except:
+    logger.warning(
+        "Quantization strategy is only available for PaddlePaddle >= 2.5.2. Please update your PaddlePaddle version to apply quantization strategy to LoRA."
+    )
+    QuantizationLinear = None
+    ColumnParallelQuantizationLinear = None
+    RowParallelQuantizationLinear = None
+    QuantizationLoRALinear = None
+    ColumnParallelQuantizationLoRALinear = None
+    RowParallelQuantizationLoRALinear = None
 
 
 class LoRAModel(nn.Layer):
+    # TODO:lugimzzz support restore in following PR
     restore_layer_map: Dict[nn.Layer, nn.Layer] = {
         LoRALinear: nn.Linear,
         LoRAMergedLinear: nn.Linear,
-        ColumnParallelLoRALinear: ColumnParallelLinear,
-        ColumnParallelLoRAMergedLinear: ColumnParallelLinear,
+        # ColumnParallelLoRALinear: ColumnParallelLinear,
+        # ColumnParallelLoRAMergedLinear: ColumnParallelLinear,
+        # RowParallelLoRALinear: RowParallelLinear,
+        # QuantizationLoRALinear: QuantizationLinear,
     }
 
     def __init__(self, model, lora_config: LoRAConfig) -> None:
         super().__init__()
+        self.quantized = False
         self.lora_config = lora_config
+        self.lora_split_mapping = {}
         if self.lora_config.dtype is None:
             self.lora_config.dtype = paddle.get_default_dtype()
         with dtype_guard(self.lora_config.dtype):
             self.model = self.get_lora_model(model, lora_config)
+        if isinstance(self.model, PipelineLayer):
+            self.model._single_to_pp_mapping = None
         if self.lora_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
             self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
             logger.warning(
                 f"Reset tensor_parallel_degree of lora_config to {self.model.config.tensor_parallel_degree}."
             )
         self.forward = self.model.forward
+
+    def add_lora_split_mapping(self, module_name, is_column=False):
+        self.lora_split_mapping[module_name] = is_column
+
+    def _get_tensor_parallel_mappings(self, config, is_split=True):
+
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+
+        fn = split_or_merge_func(
+            is_split=is_split,
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_rank=config.tensor_parallel_rank,
+            num_attention_heads=config.num_attention_heads,
+        )
+
+        def get_tensor_parallel_split_mappings():
+            final_actions = {}
+            for key, is_col in self.lora_split_mapping.items():
+                final_actions[key] = partial(fn, is_column=is_col)
+
+            return final_actions
+
+        mappings = get_tensor_parallel_split_mappings()
+
+        return mappings
 
     @classmethod
     def from_pretrained(cls, model, lora_path, **kwargs):
@@ -111,18 +172,8 @@ class LoRAModel(nn.Layer):
         logger.info("Load lora weight successfully")
 
     def _merge_trainable_tensor_parallel(self, trainable_state_dict):
-        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+        trainable_name_action_mappings = self._get_tensor_parallel_mappings(self.model.config, is_split=False)
 
-        fn = split_or_merge_func(
-            is_split=False,
-            tensor_parallel_degree=self.model.config.tensor_parallel_degree,
-            tensor_parallel_rank=self.model.config.tensor_parallel_rank,
-            num_attention_heads=self.model.config.num_attention_heads,
-        )
-        trainable_name_action_mappings = {}
-        for k in trainable_state_dict:
-            if "lora_B" in k:
-                trainable_name_action_mappings[k] = partial(fn, is_column=True)
         name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
         state_keys_map = ConversionMixin._resolve_prefix_keys(
             name_action_mappings.keys(), self.model.state_dict().keys()
@@ -143,24 +194,13 @@ class LoRAModel(nn.Layer):
                 tensor = action(ret) if is_dst else None
                 trainable_state_dict[key] = tensor
             else:
-                trainable_state_dict[key] = tensor.numpy() if is_dst else None
+                trainable_state_dict[key] = tensor.cpu().numpy() if is_dst else None
 
         return trainable_state_dict
 
     def _convert_tensor_parallel(self, lora_state_dict):
-        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+        lora_name_action_mappings = self._get_tensor_parallel_mappings(self.model.config, is_split=False)
 
-        fn = split_or_merge_func(
-            is_split=True,
-            tensor_parallel_degree=self.model.config.tensor_parallel_degree,
-            tensor_parallel_rank=self.model.config.tensor_parallel_rank,
-            num_attention_heads=self.model.config.num_attention_heads,
-        )
-
-        lora_name_action_mappings = {}
-        for k in lora_state_dict.keys():
-            if "lora_B" in k:
-                lora_name_action_mappings[k] = partial(fn, is_column=True)
         name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
         state_keys_map = ConversionMixin._resolve_prefix_keys(
             name_action_mappings.keys(), self.model.state_dict().keys()
@@ -175,6 +215,21 @@ class LoRAModel(nn.Layer):
         return lora_state_dict
 
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
+        if self.quantized and merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
+            merge_tensor_parallel = False
+            logger.warning(
+                "Quantized strategy does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
+            )
+        if (
+            isinstance(self.model, PipelineLayer)
+            and merge_tensor_parallel
+            and self.model.config.tensor_parallel_degree > 1
+        ):
+            merge_tensor_parallel = False
+            logger.warning(
+                "Pipeline parallism does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
+            )
+
         variant = kwargs.get("variant", None)
         is_main_process = kwargs.get("is_main_process", paddle.distributed.get_rank() == 0)
 
@@ -189,13 +244,14 @@ class LoRAModel(nn.Layer):
             if not is_main_process:
                 logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
                 return
-            variant = None
+            if variant is not None and "tp" in variant:
+                variant = "_".join([x for x in variant.split("_") if "tp" not in x])
             self.lora_config.tensor_parallel_degree = -1
         else:
             trainable_state_dict = self.get_trainable_state_dict()
             if self.model.config.tensor_parallel_degree > 1:
                 if variant is None:
-                    variant = f"tp{self.model.config.tensor_parallel_rank:0>2d}"
+                    variant = weight_name_suffix()
 
         # save lora weight
         lora_weight_name = _add_variant(LORA_WEIGHTS_NAME, variant)
@@ -205,7 +261,7 @@ class LoRAModel(nn.Layer):
         # save lora config
         if is_main_process:
             self.lora_config.save_pretrained(save_directory)
-            self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
+        self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
 
     def _find_and_replace_module(self, model, module_name, lora_config, enable_lora):
         parent_module = model
@@ -223,6 +279,7 @@ class LoRAModel(nn.Layer):
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
+                    bias_attr=False if module.bias is None else None,
                 )
             elif isinstance(module, ColumnParallelLinear):
                 # recover the original output_features
@@ -242,6 +299,65 @@ class LoRAModel(nn.Layer):
                         )
                     ),
                 )
+                # Lora column parallel will spilt lora B matrix
+                self.add_lora_split_mapping(module_name + ".lora_B", is_column=True)
+            elif isinstance(module, RowParallelLinear):
+                # recover the original output_features
+                lora_module = RowParallelLoRALinear(
+                    in_features=module.weight.shape[0] * module.world_size,
+                    out_features=module.weight.shape[1],
+                    has_bias=module.bias is not None,
+                    input_is_parallel=module.input_is_parallel,
+                    r=lora_config.r,
+                    lora_alpha=lora_config.lora_alpha,
+                    lora_dropout=lora_config.lora_dropout,
+                    merge_weights=lora_config.merge_weights,
+                )
+                # Lora column parallel will spilt lora A matrix
+                self.add_lora_split_mapping(module_name + ".lora_A", is_column=False)
+            elif QuantizationLinear is not None and isinstance(module, QuantizationLinear):
+                lora_module = QuantizationLoRALinear(
+                    in_features=module.in_features,
+                    out_features=module.out_features,
+                    quant_algo=module.quant_algo,
+                    dtype=module._dtype,
+                    bias_attr=False if module.bias is None else None,
+                    r=lora_config.r,
+                    lora_alpha=lora_config.lora_alpha,
+                    lora_dropout=lora_config.lora_dropout,
+                )
+                self.quantized = True
+            elif ColumnParallelQuantizationLinear is not None and isinstance(module, ColumnParallelQuantizationLinear):
+                lora_module = ColumnParallelQuantizationLoRALinear(
+                    in_features=module.in_features,
+                    out_features=module.out_features,
+                    quant_algo=module.quant_algo,
+                    dtype=module._dtype,
+                    bias_attr=False if module.bias is None else None,
+                    gather_output=module.gather_output,
+                    r=lora_config.r,
+                    lora_alpha=lora_config.lora_alpha,
+                    lora_dropout=lora_config.lora_dropout,
+                    lora_A_weight_attr=paddle.ParamAttr(
+                        initializer=nn.initializer.KaimingUniform(
+                            negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
+                        )
+                    ),
+                )
+                self.quantized = True
+            elif RowParallelQuantizationLinear is not None and isinstance(module, RowParallelQuantizationLinear):
+                lora_module = RowParallelQuantizationLoRALinear(
+                    in_features=module.in_features,
+                    out_features=module.out_features,
+                    quant_algo=module.quant_algo,
+                    dtype=module._dtype,
+                    bias_attr=False if module.bias is None else None,
+                    input_is_parallel=module.input_is_parallel,
+                    r=lora_config.r,
+                    lora_alpha=lora_config.lora_alpha,
+                    lora_dropout=lora_config.lora_dropout,
+                )
+                self.quantized = True
         else:
             if isinstance(module, nn.Linear):
                 lora_module = LoRAMergedLinear(
@@ -277,8 +393,11 @@ class LoRAModel(nn.Layer):
             raise ValueError(
                 f"LoRA strategy only supports paddle.nn.Linear or paddle.distributed.fleet.meta_parallel.ColumnParallelLinear. {module}({module_name}) is not supported。"
             )
-
-        lora_module.weight = module.weight
+        if getattr(lora_module, "quant_weight", None) is not None:
+            lora_module.quant_weight = module.quant_weight
+            lora_module.quant_scale = module.quant_scale
+        else:
+            lora_module.weight = module.weight
         if module.bias is not None:
             lora_module.bias = module.bias
         setattr(parent_module, attribute_chain[-1], lora_module)
@@ -309,9 +428,9 @@ class LoRAModel(nn.Layer):
         trainable_numel = 0
         for _, weight in self.model.state_dict().items():
             if weight.stop_gradient:
-                freeze_numel += weight.numel().item()
+                freeze_numel += np.prod(weight.shape)
             else:
-                trainable_numel += weight.numel().item()
+                trainable_numel += np.prod(weight.shape)
         logger.info(
             f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel+trainable_numel:.2e}|| Trainable:{trainable_numel / (freeze_numel+trainable_numel):.2%}"
         )
@@ -321,8 +440,18 @@ class LoRAModel(nn.Layer):
             if (
                 isinstance(layer, LoRALinear)
                 or isinstance(layer, ColumnParallelLoRALinear)
+                or isinstance(layer, RowParallelLoRALinear)
                 or isinstance(layer, LoRAMergedLinear)
                 or isinstance(layer, ColumnParallelLoRAMergedLinear)
+                or (QuantizationLoRALinear is not None and isinstance(layer, QuantizationLoRALinear))
+                or (
+                    ColumnParallelQuantizationLoRALinear is not None
+                    and isinstance(layer, ColumnParallelQuantizationLoRALinear)
+                )
+                or (
+                    RowParallelQuantizationLoRALinear is not None
+                    and isinstance(layer, RowParallelQuantizationLoRALinear)
+                )
             ):
                 for name, weight in layer.state_dict().items():
                     if self.lora_config.trainable_bias in ["lora", "all"] and "bias" in name:
@@ -395,13 +524,23 @@ class LoRAModel(nn.Layer):
             self.train()
 
         for layer_name, layer in self.model.named_sublayers():
-            if (
-                isinstance(layer, LoRALinear)
-                or isinstance(layer, ColumnParallelLoRALinear)
-                or isinstance(layer, LoRAMergedLinear)
-                or isinstance(layer, ColumnParallelLoRAMergedLinear)
-            ):
+            if isinstance(layer, LoRALinear) or isinstance(layer, LoRAMergedLinear):
                 self._find_and_restore_module(layer_name)
+            elif (
+                isinstance(layer, ColumnParallelLoRALinear)
+                or isinstance(layer, ColumnParallelLoRAMergedLinear)
+                or isinstance(layer, RowParallelLoRALinear)
+                or (QuantizationLoRALinear is not None and isinstance(layer, QuantizationLoRALinear))
+                or (
+                    ColumnParallelQuantizationLoRALinear is not None
+                    and isinstance(layer, ColumnParallelQuantizationLoRALinear)
+                )
+                or (
+                    RowParallelQuantizationLoRALinear is not None
+                    and isinstance(layer, RowParallelQuantizationLoRALinear)
+                )
+            ):
+                raise NotImplementedError(f"{layer} restoration is not supported yet.")
         return self.model
 
     def __getattr__(self, name: str):

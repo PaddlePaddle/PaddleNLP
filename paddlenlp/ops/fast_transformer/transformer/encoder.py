@@ -300,7 +300,7 @@ def encoder_forward(self, src, src_mask=None, cache=None):
             self.ffn_out_weight.append(layer.linear2.weight)
             self.ffn_out_bias.append(layer.linear2.bias)
 
-    (output,) = infer_transformer_encoder(
+    output = infer_transformer_encoder(
         input=[src],
         attn_mask=[src_mask],
         q_weight=self.q_weight,

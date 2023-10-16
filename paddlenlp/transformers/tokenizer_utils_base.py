@@ -40,14 +40,14 @@ from huggingface_hub import (
 from huggingface_hub.utils import EntryNotFoundError
 from paddle import __version__
 
-from paddlenlp.utils.downloader import (
+from ..utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     get_path_from_url_with_filelock,
     url_file_exists,
 )
-from paddlenlp.utils.env import TOKENIZER_CONFIG_NAME
-from paddlenlp.utils.log import logger
-
+from ..utils.env import TOKENIZER_CONFIG_NAME
+from ..utils.log import logger
+from .aistudio_utils import aistudio_download
 from .utils import resolve_cache_dir
 
 
@@ -1450,6 +1450,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         cache_dir = kwargs.pop("cache_dir", None)
+        from_aistudio = kwargs.pop("from_aistudio", None)
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
         vocab_files = {}
         init_configuration = {}
@@ -1462,8 +1463,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         vocab_files_target = {**cls.resource_files_names, **additional_files_names}
 
-        # From HF Hub
-        if from_hf_hub:
+        # From HF Hub or AI Studio
+        if from_hf_hub or from_aistudio:
             # Only include the necessary resource files specified by the tokenizer cls
             # Deep copy to avoid modifiying the class attributes
             vocab_files = copy.deepcopy(cls.resource_files_names)
@@ -1494,7 +1495,12 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             if file_path is None or os.path.isfile(file_path):
                 resolved_vocab_files[file_id] = file_path
                 continue
-            if from_hf_hub:
+            if from_aistudio:
+                resolved_vocab_files[file_id] = aistudio_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=file_path,
+                )
+            elif from_hf_hub:
                 resolved_vocab_files[file_id] = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=file_path,
@@ -1993,7 +1999,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         is_split_into_words: Union[bool, str] = False,
         padding: Union[bool, str, PaddingStrategy] = False,
         truncation: Union[bool, str, TruncationStrategy] = False,
-        return_position_ids: bool = False,
+        return_position_ids: bool = None,
         return_token_type_ids: Optional[bool] = None,
         return_attention_mask: Optional[bool] = None,
         return_length: bool = False,
@@ -2270,7 +2276,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         return_offsets_mapping: bool = False,
         return_length: bool = False,
         verbose: bool = True,
-        return_position_ids=False,
+        return_position_ids=None,
         **kwargs
     ) -> BatchEncoding:
         """
@@ -2439,7 +2445,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         is_split_into_words: bool = False,
         padding: Union[bool, str, PaddingStrategy] = False,
         truncation: Union[bool, str, TruncationStrategy] = False,
-        return_position_ids=False,
+        return_position_ids=None,
         # TODO(wj-mcat): keep align with `encode` method
         return_token_type_ids=None,
         return_attention_mask=None,
@@ -2766,7 +2772,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         stride: int = 0,
         pad_to_multiple_of: Optional[int] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
-        return_position_ids=False,
+        return_position_ids=None,
         return_token_type_ids: Optional[bool] = None,
         return_attention_mask: Optional[bool] = None,
         return_length=False,
@@ -2819,7 +2825,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             return_token_type_ids = "token_type_ids" in self.model_input_names
         if return_attention_mask is None:
             return_attention_mask = "attention_mask" in self.model_input_names
-
+        if return_position_ids is None:
+            return_position_ids = "position_ids" in self.model_input_names
         encoded_inputs = {}
         # Truncation: Handle max sequence length
         total_len = len_ids + len_pair_ids + (self.num_special_tokens_to_add(pair=pair) if add_special_tokens else 0)

@@ -20,6 +20,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle.common_ops_import import LayerHelper
+from paddle.framework import core
 
 import paddlenlp
 from paddlenlp.ops.ext_utils import LOADED_EXT, load
@@ -28,36 +29,19 @@ from paddlenlp.transformers.t5.modeling import T5DenseGatedGeluDense, T5DenseRel
 from paddlenlp.transformers.utils import fn_args_to_dict
 from paddlenlp.utils.log import logger
 
-if (getattr(paddle.fluid.framework, "_in_eager_mode_", False)) or (
-    hasattr(paddle.fluid.framework, "global_var")
-    and getattr(paddle.fluid.framework.global_var, "_in_eager_mode_", False)
-):
-    from paddle.framework import core
-
 
 def run_custom(op_name, inputs_names, inputs_var, attrs_names, attrs_val, outputs_names, outputs_dtype=None):
     ret = []
 
-    if (
-        getattr(paddle.fluid.framework, "_in_eager_mode_", False)
-        and getattr(paddle.fluid.framework, "_dygraph_tracer_", None) is not None
-    ) or (
-        hasattr(paddle.fluid.framework, "global_var")
-        and getattr(paddle.fluid.framework.global_var, "_in_eager_mode_", False)
-        and getattr(paddle.fluid.framework.global_var, "_dygraph_tracer_", None) is not None
-    ):
-        ctx = core.CustomOpKernelContext()
-
-        for ins in inputs_var:
-            ctx.add_inputs(ins)
-        for ats in attrs_val:
-            ctx.add_attr(ats)
-
-        for name in outputs_names:
-            ret.append(core.eager.Tensor())
-            ctx.add_outputs(ret[-1])
-
-        core.eager._run_custom_op(ctx, op_name, True)
+    if paddle.in_dynamic_mode():
+        new_inputs_var = []
+        for k, v in zip(inputs_names, inputs_var):
+            if not k.endswith("@VECTOR") and isinstance(v, (list, tuple)) and len(v) == 1:
+                new_inputs_var.append(v[0])
+            else:
+                new_inputs_var.append(v)
+        outs = core.eager._run_custom_op(op_name, *new_inputs_var, *attrs_val)
+        return outs[0] if len(outs) == 1 else outs
     else:
         inputs = dict(zip(inputs_names, inputs_var))
         attrs = dict(zip(attrs_names, attrs_val))
@@ -1915,19 +1899,7 @@ def transfer_param(p, is_bias=False, dtype="float16", restore_data=False):
     if str(p.dtype)[-len(dtype) :] == dtype and ("gpu" in str(p.place).lower() or "cuda" in str(p.place).lower()):
         return p
     if restore_data:
-        if (
-            getattr(paddle.fluid.framework, "_in_eager_mode_", False)
-            and getattr(paddle.fluid.framework, "_dygraph_tracer_", None) is not None
-        ) or (
-            hasattr(paddle.fluid.framework, "global_var")
-            and getattr(paddle.fluid.framework.global_var, "_in_eager_mode_", False)
-            and getattr(paddle.fluid.framework.global_var, "_dygraph_tracer_", None) is not None
-        ):
-            param_data = p.numpy()
-            new_p = paddle.create_parameter(shape=param_shape, dtype=dtype, is_bias=is_bias)
-            new_p.set_value(param_data.astype(dtype))
-            return new_p
-        elif paddle.in_dynamic_mode():
+        if paddle.in_dynamic_mode():
             param_data = p.numpy()
             # Creating parameters with Assign initializer is too slow. Maybe we
             # can cast to fp16 directly and get a tensor, while we do it more
@@ -3105,12 +3077,10 @@ class InferGptDecoding(nn.Layer):
         params["pos_emb"].append((self.model.gpt.embeddings.position_embeddings, "weight"))
 
         # if model share word_embeddings weight
-        if id(self.model.gpt.embeddings.word_embeddings) == id(self.model.lm_head.decoder.weight):
+        if id(self.model.gpt.embeddings.word_embeddings) == id(self.model.lm_head.weight):
             params["linear_weight"].append((self.model.gpt.embeddings.word_embeddings, "weight"))
         else:
-            params["linear_weight"].append(
-                (self.model.lm_head.decoder.weight, False, partial(setattr, self, "weight"))
-            )
+            params["linear_weight"].append((self.model.lm_head.weight, False, partial(setattr, self, "weight")))
 
         for k, v in params.items():
             setattr(self, k, v)
