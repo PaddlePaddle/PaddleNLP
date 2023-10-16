@@ -67,10 +67,6 @@ def assign_kv_heads(num_kv_heads, num_gpus):
     return assignment_list
 
 
-from paddle.incubate.nn.memory_efficient_attention import memory_efficient_attention
-from paddle.nn.functional.flash_attention import flash_attention
-
-
 class RotaryEmbedding(nn.Layer):
     def __init__(self, dim, original_impl=False):
         super().__init__()
@@ -95,7 +91,6 @@ class RotaryEmbedding(nn.Layer):
         # Calculate the product of position index and $\theta_i$
         idx_theta = paddle.outer(seq_idx, theta).astype(self.default_dtype)
 
-        # stack will add a dimension.
         cache = paddle.stack([paddle.cos(idx_theta), paddle.sin(idx_theta)], axis=-1)
 
         # this is to mimic the behaviour of complex32, else we will get different results
@@ -236,83 +231,6 @@ class CoreAttention(nn.Layer):
 
         return context_layer
 
-    def forward1(self, query_layer, key_layer, value_layer, attention_mask):
-        # 输入的都是[seq, batch ,head, head_dim]
-        assert query_layer.shape[3] == key_layer.shape[3]
-        assert query_layer.shape[3] == value_layer.shape[3]
-        assert query_layer.shape[2] == key_layer.shape[2]
-        assert query_layer.shape[2] == value_layer.shape[2]
-        assert query_layer.shape[1] == key_layer.shape[1]
-        assert query_layer.shape[1] == value_layer.shape[1]
-
-        seq_q = query_layer.shape[0]
-        seq_k = key_layer.shape[0]
-        seq_v = value_layer.shape[0]
-        assert seq_k == seq_v
-        batch = query_layer.shape[1]
-        head = query_layer.shape[2]
-        head_dim = query_layer.shape[3]
-
-        # print("打印")
-        # print(query_layer.shape)
-        # print(key_layer.shape)
-        # print(value_layer.shape)
-        # Raw attention scores
-
-        if attention_mask is None:
-            causal = seq_q == seq_k
-            q = query_layer.transpose([1, 0, 2, 3])
-            # return query_layer.reshape([seq_q,batch,-1])
-            k = key_layer.transpose([1, 0, 2, 3])
-            v = value_layer.transpose([1, 0, 2, 3])
-            context_layer = flash_attention(q, k, v, causal=causal)[0]
-            # context_layer = memory_efficient_attention(q,k,v,scale= 1.0 / self.norm_factor * self.coeff)
-            # context_layer = memory_efficient_attention(q,k,v)
-            context_layer = context_layer.transpose([1, 0, 2, 3])
-            context_layer = context_layer.reshape([seq_q, batch, -1])
-            return context_layer
-
-        query_layer = query_layer.reshape([seq_q, batch * head, head_dim])
-        key_layer = key_layer.reshape([seq_k, batch * head, head_dim])
-
-        # Raw attention scores. [b * np, sq, sk]
-        matmul_result = paddle.matmul(query_layer.transpose([1, 0, 2]), key_layer.transpose([1, 2, 0])) * (
-            1.0 / self.norm_factor
-        )
-
-        # change view to [b, np, sq, sk]
-        attention_scores = matmul_result
-
-        # attention scores and attention mask [b, np, sq, sk]
-        if self.attention_softmax_in_fp32:
-            attention_scores = attention_scores.astype("float32")
-        if self.coeff is not None:
-            attention_scores = attention_scores * self.coeff
-        if attention_mask is None and seq_q == seq_k:
-            attention_mask = paddle.tril(paddle.ones((batch, seq_q, seq_k), dtype="bool"))
-            attention_mask = ~attention_mask
-
-        if attention_mask is not None:
-            attention_scores = paddle.where(
-                attention_mask > 0,
-                paddle.full_like(attention_scores, paddle.finfo(attention_scores.dtype).min),
-                attention_scores,
-            )
-
-        attention_probs = F.softmax(attention_scores.astype("float32"), axis=-1, name="哈哈哈")
-        attention_probs = attention_probs.astype(self.default_dtype)
-
-        # attention_probs = self.attention_dropout(attention_probs)
-
-        value_layer = value_layer.reshape([seq_k, batch * head, -1])
-
-        context_layer = paddle.matmul(attention_probs, value_layer.transpose([1, 0, 2]))
-        context_layer = context_layer.reshape([batch, head, seq_q, head_dim])
-        context_layer = context_layer.transpose([2, 0, 1, 3])
-        context_layer = context_layer.reshape([seq_q, batch, head_dim * head])
-
-        return context_layer
-
 
 class SelfAttention(nn.Layer):
     """Parallel self-attention layer abstract class.
@@ -380,19 +298,6 @@ class SelfAttention(nn.Layer):
         key_layer = self.key(hidden_states)
         value_layer = self.value(hidden_states)
 
-        # q_weight = self.query.weight
-        # q_bias = self.query.bias
-        # k_weight = self.key.weight
-        # k_bias = self.key.bias
-        # v_weight = self.value.weight
-        # v_bias = self.value.bias
-        # self.qkv_weight = paddle.concat([q_weight, k_weight, v_weight], axis=-1)
-        # self.qkv_bias = paddle.concat([q_bias, k_bias, v_bias], axis=-1)
-
-        # qkv = paddle.matmul(hidden_states, self.qkv_weight)
-        # qkv += self.qkv_bias
-        # query_layer, key_layer, value_layer = paddle.split(qkv, [4096, 256, 256], axis=-1)
-
         query_layer = query_layer.reshape(
             [seq_length, batch_size, self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
         )
@@ -420,7 +325,6 @@ class SelfAttention(nn.Layer):
             multiplier = self.num_attention_heads_per_partition // self.kv_indices.shape[0]
         else:
             multiplier = self.num_attention_heads_per_partition // self.num_multi_query_groups_per_partition
-            # 32 // 2
 
         key_layer = key_layer.unsqueeze(-2).tile([1, 1, 1, multiplier, 1])
         key_layer = key_layer.reshape(
@@ -434,15 +338,8 @@ class SelfAttention(nn.Layer):
         # ==================================
         # core attention computation
         # ==================================
-        # print("use_cache", use_cache)
-        # print("query_layer", query_layer.shape)
-        # print("key_layer", key_layer.shape)
-        # print("value_layer", value_layer.shape)
-        # print("attention_mask", attention_mask)
 
         context_layer = self.core_attention(query_layer, key_layer, value_layer, attention_mask)
-
-        # print("context_layer", context_layer.shape)
 
         # =================
         # Output. [seq_length, b, h]
@@ -536,14 +433,6 @@ class GLMBlock(nn.Layer):
         use_cache=True,
     ):
         # hidden_states: [s, b, h]
-        # print("GLMBlock forward")
-        # print("hidden_states", hidden_states.shape)
-        # print(attention_mask)
-        # print(rotary_pos_emb.shape)
-        # print(kv_cache)
-        # if kv_cache is not None:
-        #     print(len(kv_cache))
-        # print("结束")
 
         # Layer norm at the beginning of the transformer layer.
         layernorm_output = self.input_layernorm(hidden_states)
@@ -591,9 +480,7 @@ class GLMTransformer(nn.Layer):
 
         # Number of layers.
         self.num_hidden_layers = config.num_hidden_layers
-        # self.num_hidden_layers = 1
-        # print("self.num_hidden_layers")
-        # print(self.num_hidden_layers)
+
         # Transformer layers.
         def build_layer(layer_number):
             return GLMBlock(config, layer_number)
@@ -952,23 +839,6 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
             "position_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
         }
 
-    def haha(self, input_ids, attention_mask, position_ids):
-        model_kwargs = {}
-        model_kwargs["use_cache"] = True
-        result = self.generate(
-            input_ids,
-            attention_mask,
-            position_ids,
-            decode_strategy="sampling",
-            top_k=1,
-            max_length=128,
-            bos_token_id=None,
-            eos_token_id=2,
-            pad_token_id=0,
-            **model_kwargs,
-        )
-        return result
-
     def forward(
         self,
         input_ids: Optional[paddle.Tensor] = None,
@@ -1002,15 +872,6 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
             hidden_states = hidden_states[-1:]
         lm_logits = self.chatglm_v2.output_layer(hidden_states)
         lm_logits = lm_logits.transpose([1, 0, 2])
-
-        if input_ids.shape[1] == 1:
-            import numpy as np
-
-            static_dict = {
-                "your": lm_logits[:, -1, :].numpy(),
-            }
-            np.savez("/zhoukangkang/your.npz", **static_dict)
-            exit(0)
 
         loss = None
         if labels is not None:
