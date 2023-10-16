@@ -86,17 +86,20 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.num_layers = config.num_hidden_layers
         self.epsilon = config.rms_norm_eps
         self.max_position_embeddings = config.max_position_embeddings
-
-        self.quant_model_path = config.model_name_or_path
         self.quant_type = config.quant_type
-        self.shift_smooth = config.shift_smooth
+
+        self.use_weight_only = False
+        self.weight_only_quant_bits = -1
 
         if "WINT" in self.quant_type:
             self.use_weight_only = True
             pattern = r"T(\d+)"
-            match = re.search(pattern, str)
+            match = re.search(pattern, self.quant_type)
             self.weight_only_quant_bits = match.group(1)
             self.weight_only_quant_algo = "weight_only_int" + str(self.weight_only_quant_bits)
+        elif "A8W8" in self.quant_type:
+            self.quant_model_path = config.model_name_or_path
+            self.shift_smooth = config.shift_smooth
         else:
             self.use_weight_only = False
             self.weight_only_quant_bits = -1

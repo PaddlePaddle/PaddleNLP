@@ -733,12 +733,12 @@ def create_predictor(
                     )
 
                     config.quant_bits = -1
+                    config.quant_type = predictor_args.quant_type
 
                     if predictor_args.quant_type.startswith("WINT"):
                         quant_bits = int(predictor_args.quant_type[-1])
                         config.quant_bits = quant_bits
                     elif "A8W8" in predictor_args.quant_type:
-                        config.quant_type = predictor_args.quant_type
                         config.model_name_or_path = predictor_args.model_name_or_path
                         config.quant_round_type = predictor_args.quant_round_type
                         config.quant_max_bound = predictor_args.quant_max_bound
