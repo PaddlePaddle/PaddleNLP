@@ -551,7 +551,7 @@ class ChatTemplate:
             template = self._compile_jinja_template(conversation)
             result = template.render(conversation_data)
             one_turn_conversation.append(result)
-        return "".join(one_turn_conversation)
+        return one_turn_conversation
 
     def render_query(self, query: str):
         if self.query is None:
@@ -575,7 +575,7 @@ class ChatTemplate:
         # [1 ... n-1] conversation
         final_query = self.system or ""
         for conversation in conversations[:-1]:
-            final_query += self.render_conversation(conversation)
+            final_query += "".join(self.render_conversation(conversation))
 
         if not isinstance(conversations[-1], list) and not len(conversations[-1]) != 1:
             raise ValueError(
@@ -611,7 +611,7 @@ class ChatTemplateMixin:
 
         return self(query, **tokenizer_kwargs)
 
-    def encode_chat_inputs(self, conversation: List[List[str, str]]):
+    def encode_chat_inputs(self, conversations: List[List[str, str]]):
         """Encodes conversation to pairs of token ids.
         Turn 0: bos + system + sep + user     bot + eos
         Turn t: sep + bot + query             bot + eos
@@ -622,11 +622,21 @@ class ChatTemplateMixin:
         Returns:
             List[list[int], list[int]]: the pair of input_ids and target_ids
         """
-        # TODO(wj-Mcat): complete in next pr
-        pass
-        # encode_ids = []
-        # for index, (user, bot) in enumerate(conversation):
-        #     pass
+        # encode system
+        result = {}
+        if self.chat_template.system:
+            result["system_ids"] = self.encode(self.chat_template.system)
+
+        # encode conversation
+        conversation_ids = []
+        for conversation in conversations:
+            user_input, bot_output = self.chat_template(conversation)
+            user_ids = self.encode(user_input, add_special_tokens=False)
+            bot_ids = self.encode(bot_output, add_special_tokens=False)
+            conversation_ids.append(user_ids, bot_ids)
+
+        result["conversations"] = conversation_ids
+        return result
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, from_hf_hub=False, subfolder=None, **kwargs):
