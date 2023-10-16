@@ -145,6 +145,7 @@ class FusedMultiTransformerConfig:
         num_heads,
         dim_feedforward,
         quant_bits=-1,  # -1 means use Half precision.
+        arch=80,  # SM_arch, 80 means use SM_arch=80 device like A100
         dropout_rate=0.0,
         activation="gelu",
         norm_type="layernorm",
@@ -177,6 +178,7 @@ class FusedMultiTransformerConfig:
         self.num_heads = num_heads
         self.dim_feedforward = dim_feedforward
         self.quant_bits = quant_bits
+        self.arch = arch
         self.dropout_rate = dropout_rate
         self.activation = activation
         self.norm_type = norm_type
@@ -765,6 +767,9 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
         assert self.quant_bits != -1
         self.weight_dtype = "int" + str(self.quant_bits)
 
+        self.arch = config.arch
+        assert (self.arch == 70) or (self.arch == 80), "Only accept arch == 70 or 80. "
+
         self.qkv_weights_scale = []
         self.linear_weights_scale = []
         self.ffn1_weights_scale = []
@@ -842,6 +847,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             bias=self.qkv_biases[i],
             weight_scale=self.qkv_weights_scale[i],
             weight_dtype=self.weight_dtype,
+            arch=self.arch,
         )
 
     def compute_out_linear(self, fmha_out, i):
@@ -850,6 +856,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             weight=self.linear_weights[i],
             weight_scale=self.linear_weights_scale[i],
             weight_dtype=self.weight_dtype,
+            arch=self.arch,
         )
 
     def compute_ffn1(self, tmp_out, i):
@@ -858,6 +865,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             weight=self.ffn1_weights[i],
             weight_scale=self.ffn1_weights_scale[i],
             weight_dtype=self.weight_dtype,
+            arch=self.arch,
         )
 
     def compute_ffn2(self, ffn1_out, i):
@@ -866,6 +874,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             weight=self.ffn2_weights[i],
             weight_scale=self.ffn2_weights_scale[i],
             weight_dtype=self.weight_dtype,
+            arch=self.arch,
         )
 
 
