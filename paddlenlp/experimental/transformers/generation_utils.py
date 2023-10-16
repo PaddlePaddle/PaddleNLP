@@ -565,7 +565,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="temperature"),  # temperature
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="top_p"),  # top_p
             paddle.static.InputSpec(shape=[None], dtype="int64", name="eos_token_id"),  # eos_token_id
-            # paddle.static.InputSpec(shape=[None, 1, None, None], dtype=dtype, name="attention_mask"),  # attention_mask
+            paddle.static.InputSpec(shape=[None, 1, None, None], dtype=dtype, name="src_mask"),  # src_mask
             # paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),  # position_ids
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="penalty_score"),  # penalty_score
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="frequency_score"),  # frequency_score
@@ -627,6 +627,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
         temperature=None,
         top_p=None,
         eos_token_id=None,
+        src_mask=None,
         penalty_score=None,
         frequency_score=None,
         presence_score=None,
@@ -677,6 +678,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
         model_kwargs["v_dequant_scales"] = v_dequant_scales
         model_kwargs["pre_key_caches"] = pre_key_caches
         model_kwargs["pre_value_caches"] = pre_value_caches
+        model_kwargs["src_mask"] = src_mask
 
         ret = self.sample(
             eos_token_id,
