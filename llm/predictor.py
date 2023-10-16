@@ -724,7 +724,6 @@ def create_predictor(
                 config.quant_bits = quant_bits
 
             config.arch = predictor_args.arch
-            print("Config is: ", config)
 
             if "llama" in config.architectures[0].lower():
                 if model_args.model_type == "llama-img2txt":

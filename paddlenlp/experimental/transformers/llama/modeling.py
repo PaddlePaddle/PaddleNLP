@@ -330,7 +330,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.norm.weight.set_value(paddle.to_tensor(state_dict["llama.norm.weight"], dtype=self.norm.weight.dtype))
 
         for idx in range(self.config.num_hidden_layers):
-            print("Layer idx is: ", idx)
             unfused_state_dict = {}
             unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
                 "llama.layers.{}.self_attn.q_proj.weight".format(idx)
