@@ -1814,8 +1814,10 @@ class Trainer:
                 sharding_parallel_config = set(args.sharding_parallel_config.split(" "))
                 enable_stage1_delay_scale_loss = "enable_stage1_delay_scale_loss" in sharding_parallel_config
                 if not enable_stage1_delay_scale_loss:
-                    loss = loss / self.args.gradient_accumulation_steps               
-            else: # in order to not confilict with other parallel stragtegy
+                    loss = loss / self.args.gradient_accumulation_steps
+                else:
+                    loss = loss               
+            else: # in order to not confilict with other parallel strategys
                 loss = loss / self.args.gradient_accumulation_steps
 
         if self.do_grad_scaling:
