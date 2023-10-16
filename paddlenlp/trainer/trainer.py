@@ -769,8 +769,6 @@ class Trainer:
 
         # profile_paddle.register_profile_hook(model)
 
-        # prof = profiler.Profiler(scheduler=[10, 12], timer_only=True)
-        # prof.start()
         self.timers and self.timers("read-data").start()
 
         for epoch in range(epochs_trained, num_train_epochs):
@@ -812,7 +810,7 @@ class Trainer:
                     steps_trained_progress_bar = None
 
                 if step_control % args.gradient_accumulation_steps == 0:
-                    profile_paddle.switch_profile(self.state.global_step, 10, 13, enable_layerwise_event=True)
+                    # profile_paddle.switch_profile(self.state.global_step, 20, 22, enable_layerwise_event=False)
                     self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
                     self.timers and self.timers("forward-backward").start()
 
@@ -940,17 +938,12 @@ class Trainer:
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
                     )
 
+                    # paddle.device.cuda.empty_cache()
+
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
-
-                    # prof.step()
-                    # print(f"[BENCHMARK][{step}/{self.state.global_step}] {prof.step_info()}")
-                    # if self.state.global_step == 30:
-                    #    prof.stop()
-                    #    prof.summary(op_detail=True)
-                    #    exit()
 
                     self._print_timer()
                     step_control = 0
