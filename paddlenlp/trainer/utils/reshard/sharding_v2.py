@@ -14,6 +14,9 @@
 
 import numpy as np
 import paddle
+from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
+    HybridParallelOptimizer,
+)
 from paddle.distributed.fleet.model import PipelineParallel
 
 from ....transformers.model_utils import unwrap_optimizer
@@ -142,14 +145,21 @@ def collect_split_info(optimizer, model):
             has_slice_grad = v._slice_grad is not None
             split_infos[k] = (index, padded_size, buffer_size, has_slice_grad)
 
-    if isinstance(model, PipelineParallel) and len(model._chunk_2_comm_buffers) > 0:
+    if isinstance(model, PipelineParallel) and model._sharding_comm_overlap > 0:
+        optimizer = unwrap_optimizer(optimizer, HybridParallelOptimizer)
+        assert optimizer is not None
+        # dalayed comm_overlap_hook register
+        model.register_sharding_comm_overlap_hook(optimizer)
         for (k, v) in model._chunk_2_comm_buffers.items():
             for comm_buffer in v:
                 gather_infos(comm_buffer)
+
     else:
         optimizer = unwrap_optimizer(optimizer, DygraphShardingOptimizerV2)
+        assert optimizer is not None
         for comm_buffer in optimizer._comm_buffer_list:
             gather_infos(comm_buffer)
+
     assert len(split_infos)
     return split_infos
 

@@ -949,7 +949,7 @@ class Trainer:
                             if self.optimizer._dp_enable:
                                 fused_allreduce_gradients_no_sync(list(parameters_list), self.optimizer._hcg)
                         else:
-                            assert self.args.use_moe, "moe should not `enable_dp_comm_overlap`"
+                            assert not self.args.use_moe, "moe should not `enable_dp_comm_overlap`"
 
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
@@ -2377,7 +2377,7 @@ class Trainer:
             if sharding_strategy == SHARDING_STRATEGY_V1
             else reshard_util.sharding_v2.restore
         )
-        node_model_state = restore_func(node_model_state, self.model, self.optimizer, self.hcg)
+        node_model_state = restore_func(node_model_state, self.model_wrapped, self.optimizer, self.hcg)
 
         if self.args.load_sharding_stage1_model:
             shard_func = (
@@ -2385,7 +2385,7 @@ class Trainer:
                 if cur_sharding_strategy == SHARDING_STRATEGY_V1
                 else reshard_util.sharding_v2.shard
             )
-            node_model_state = shard_func(node_model_state, self.model, self.optimizer, self.hcg)
+            node_model_state = shard_func(node_model_state, self.model_wrapped, self.optimizer, self.hcg)
 
         # drop structural name in the key
         node_model_state.unpack_keys()
