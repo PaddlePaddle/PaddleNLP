@@ -222,4 +222,4 @@ PD_BUILD_OP(encode_rotary_qk)
     .Outputs({"rotary_q_out", "rotary_kv_out"})
     .SetInplaceMap({{"q", "rotary_q_out"}, {"kv", "rotary_kv_out"}})
     .Attrs({"rotary_emb_dims: int", "use_neox: bool"})
-    .SetKernelFn(PD_KERNEL(RotaryQK));
+    .SetKernelFn(PD_KERNEL(RotaryQK)); 
