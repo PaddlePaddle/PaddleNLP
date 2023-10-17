@@ -397,7 +397,7 @@ class InferencePredictorMixin:
             pre_caches_length=pre_caches_length,
         )
 
-        if "chatglm" in self.architectures:
+        if "chatglmforcausallm" == self.architectures.lower():
             if inputs["input_ids"].shape[0] < self.config.batch_size:
                 self.tgt_pos = self.tgt_pos[: inputs["input_ids"].shape[0]]
             for i in range(inputs["input_ids"].shape[0]):
@@ -750,7 +750,21 @@ def create_predictor(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
                 model.eval()
-            elif "chatglm" in config.architectures[0].lower():
+
+            elif "chatglmv2forcausallm" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    ChatGLMv2ForCausalLMInferenceModel as Model,
+                )
+
+                config.quant_bits = -1
+                if predictor_args.quant_type.startswith("weight_only_int"):
+                    quant_bits = int(predictor_args.quant_type[-1])
+                    config.quant_bits = quant_bits
+                model = Model.from_pretrained(
+                    predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
+                )
+                model.eval()
+            elif "chatglmforcausallm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     ChatGLMForCausalLMInferenceModel,
                 )
