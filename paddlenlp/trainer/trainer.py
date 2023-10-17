@@ -977,7 +977,7 @@ class Trainer:
                             if self.optimizer._dp_enable:
                                 fused_allreduce_gradients_no_sync(list(parameters_list), self.optimizer._hcg)
                         else:
-                            assert self.args.use_moe, "moe should not `enable_dp_comm_overlap`"
+                            assert not self.args.use_moe, "moe should not `enable_dp_comm_overlap`"
 
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
