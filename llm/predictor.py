@@ -45,7 +45,7 @@ from paddlenlp.transformers import (
     PretrainedTokenizer,
 )
 from paddlenlp.utils.import_utils import import_module, is_paddlenlp_ops_available
-
+import paddle_custom_device.npu.passes as passes
 
 @dataclass
 class PredictorArgument:
@@ -86,6 +86,9 @@ class PredictorArgument:
             "help": "If benchmark set as `True`, we will force model decode to max_length, which is helpful to compute throughput. "
         },
     )
+    @property
+    def total_max_length(self):
+        return self.src_length + self.max_length
 
 
 @dataclass
@@ -285,7 +288,7 @@ class InferencePredictorMixin:
             self.cache_kvs[0].shape[-1],
         )
         total_max_length = config.src_length + config.max_length
-        self.pre_ids = paddle.full([config.batch_size, total_max_length], -1, dtype="int64")
+        self.pre_ids = paddle.full([config.batch_size, config.max_length], -1, dtype="int64")
         if "chatglm" in self.architectures:
             self.attention_mask = paddle.ones(
                 shape=(config.batch_size, 1, total_max_length, total_max_length),
@@ -297,12 +300,12 @@ class InferencePredictorMixin:
             )
         else:
             self.attention_mask = paddle.zeros(
-                shape=(config.batch_size, 1, total_max_length, total_max_length),
+                shape=(config.batch_size, 1, config.max_length, config.max_length),
                 dtype=self.dtype,
             )
 
         self.tgt_generation_mask = paddle.zeros(
-            shape=[config.batch_size, 1, 1, total_max_length],
+            shape=[config.batch_size, 1, config.max_length, config.max_length],
             dtype=self.dtype,
         )
         self.arange_tensor_encoder = paddle.zeros(shape=(config.batch_size, 1, total_max_length), dtype=self.dtype)
@@ -492,29 +495,38 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         self.predictor = self._create_predictor(config)
 
     def _create_predictor(self, predictor_args: PredictorArgument):
-        if not is_paddlenlp_ops_available():
-            raise ValueError(
-                "you should install the paddlenlp ops to run inference predictor, "
-                "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
-            )
+    #     if not is_paddlenlp_ops_available():
+    #         raise ValueError(
+    #             "you should install the paddlenlp ops to run inference predictor, "
+    #             "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
+    #         )
 
-        # register the custome ops
-        import_module("paddlenlp_ops.encode_rotary_qk")
-        import_module("paddlenlp_ops.get_padding_offset")
-        import_module("paddlenlp_ops.qkv_transpose_split")
-        import_module("paddlenlp_ops.rebuild_padding")
-        import_module("paddlenlp_ops.transpose_remove_padding")
-        import_module("paddlenlp_ops.write_cache_kv")
+    #     # register the custome ops
+    #     import_module("paddlenlp_ops.encode_rotary_qk")
+    #     import_module("paddlenlp_ops.get_padding_offset")
+    #     import_module("paddlenlp_ops.qkv_transpose_split")
+    #     import_module("paddlenlp_ops.rebuild_padding")
+    #     import_module("paddlenlp_ops.transpose_remove_padding")
+    #     import_module("paddlenlp_ops.write_cache_kv")
 
         infer_model_path = get_infer_model_path(predictor_args.model_name_or_path, predictor_args.model_prefix)
 
         config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
 
         config.switch_ir_optim(True)
-        device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
-        config.enable_use_gpu(100, device_id)
+        device_id = int(os.environ.get("FLAGS_selected_npus", 0))
+        config.enable_custom_device("npu", device_id)
+
         # config.disable_glog_info()
         # config.enable_memory_optim()
+        config.enable_save_optim_model(True)
+        config.set_optim_cache_dir("./optim_cache")
+
+        pass_builder = config.pass_builder()
+        # passes.addPasses(pass_builder, "llama7B_mp8_dynamic_batch")
+        passes.addPasses(pass_builder, "llama65B_mp8_dynamic_batch")
+
+        pass_builder.turn_on_debug()
 
         if self.tensor_parallel_degree > 1:
             trainer_endpoints = fleet.worker_endpoints()
@@ -689,7 +701,9 @@ def create_predictor(
                     LlamaForCausalLMInferenceModel,
                 )
 
-                cache_kvs_shape = LlamaForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
+                cache_kvs_shape = LlamaForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.max_length
+                )
                 predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
             elif "chatglm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
@@ -739,24 +753,25 @@ def predict():
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
 
-    with open(model_args.output_file, "w", encoding="utf-8") as f:
-        for bs, batch_source_text in enumerate(batch_source_texts):
-            outputs = predictor.predict(batch_source_text)
-
-            if predictor.tensor_parallel_rank > 0:
-                continue
-            for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
-                print("***********Source**********")
-                print(source)
-                print("***********Target**********")
-                print(target)
-                print("***********Output**********")
-                print(output)
-                out = {"src": source, "tgt": target, "output": output}
-                f.write(json.dumps(out, ensure_ascii=False) + "\n")
-
     if predictor_args.benchmark:
         benchmark(predictor, predictor_args, model_args)
+    else:
+        with open(model_args.output_file, "w", encoding="utf-8") as f:
+            for bs, batch_source_text in enumerate(batch_source_texts):
+                outputs = predictor.predict(batch_source_text)
+
+                if predictor.tensor_parallel_rank > 0:
+                    continue
+                for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
+                    print("***********Source**********")
+                    print(source)
+                    print("***********Target**********")
+                    print(target)
+                    print("***********Output**********")
+                    print(output)
+                    out = {"src": source, "tgt": target, "output": output}
+                    f.write(json.dumps(out, ensure_ascii=False) + "\n")
+
 
 
 def benchmark(predictor, predictor_args, model_args):
@@ -770,8 +785,8 @@ def benchmark(predictor, predictor_args, model_args):
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
-    warmup_time = 10
-    test_time = 100
+    warmup_time = 2
+    test_time = 2
 
     print("***********Start Warmup**********")
     for _ in range(warmup_time):
@@ -784,17 +799,17 @@ def benchmark(predictor, predictor_args, model_args):
         for bs, batch_source_text in enumerate(batch_benchmark_texts):
             outputs = predictor.predict(batch_source_text)
     end = time.perf_counter()
-
-    output_tokens = sum([len(output) for output in outputs])
-    print(
-        "Input length is: {}, Output length is: {}, bs is: {}, Generate speed is: {:.3f} tokens/s(ips), QPS: {:.3f} requests/s. ".format(
-            predictor_args.src_length,
-            predictor_args.max_length,
-            predictor_args.batch_size,
-            (output_tokens / (end - start) / test_time),
-            (predictor_args.batch_size / (end - start) / test_time),
+    if paddle.distributed.get_rank() == 0:
+        output_tokens = sum([len(output) for output in outputs])
+        print(
+            "Input length is: {}, Output length is: {}, bs is: {}, Generate speed is: {:.3f} tokens/s(ips), QPS: {:.3f} requests/s. ".format(
+                predictor_args.src_length,
+                predictor_args.max_length,
+                predictor_args.batch_size,
+                (output_tokens / (end - start) / test_time),
+                (predictor_args.batch_size / (end - start) / test_time),
+            )
         )
-    )
 
 
 if __name__ == "__main__":
