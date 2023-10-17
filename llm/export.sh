@@ -39,10 +39,11 @@ python -m paddle.distributed.launch \
     --gpus "0" \
      export_model.py \
     --model_name_or_path linly-ai/chinese-llama-2-7b \
-    --output_path ./llama-7b_inference_model_bf16_mp1_precache \
+    --output_path ./llama-7b_inference_model_bf16_mp1 \
     --dtype float16 \
     --inference_model \
     --block_size 64 \
-    --block_attn 
+    --src_length 1024 \
+    --block_attn
     # --export_precache \
-    # --prefix_path ${1}
+    # --prefix_path "/root/paddlejob/workspace/env_run/lzy/PaddleNLP/llm/ptuning-embedding/8-test/1/task_prompt_embeddings.npy"

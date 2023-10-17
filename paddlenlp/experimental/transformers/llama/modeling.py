@@ -602,7 +602,6 @@ class LlamaBlockInferenceModel(LlamaPretrainedModel):
         caches=None,
         rope_emb=None,
         block_tables=None,
-        pre_caches=None,
         seq_lens_encoder=None,
         seq_lens_decoder=None,
         seq_lens_this_time=None,

@@ -653,7 +653,7 @@ class DygraphBlockInferencePredictor(BasePredictor):
         self.total_max_length = config.src_length + config.max_length
         self.block_size = model.config.block_size
         self.num_layers = model.config.num_hidden_layers
-        pre_max_block_num = ((self.total_max_length + self.block_size - 1) // self.block_size + 3) // 4 * 4
+        pre_max_block_num = (self.total_max_length + self.block_size - 1) // self.block_size
         self.max_block_nums = config.batch_size * pre_max_block_num
         self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size)
 
@@ -670,6 +670,7 @@ class DygraphBlockInferencePredictor(BasePredictor):
         )
         
         self.inputs = {}
+        self.pre_cache_length = 0
         if config.export_precache:
             pre_cache_npy = np.load(config.prefix_path)
             self.pre_cache_length = pre_cache_npy.shape[-2]
@@ -816,7 +817,7 @@ class DygraphBlockInferencePredictor(BasePredictor):
             self.inputs["step_idx"][i : i + 1] = 0
             self.inputs["stop_flags"][i : i + 1] = False
             reset_stop_value(self.inputs["not_need_stop"])
-            need_block_nums = (length + self.config.max_length + self.block_size - 1) // self.block_size
+            need_block_nums = (length + self.config.max_length + self.pre_cache_length + self.block_size - 1) // self.block_size
             for bi in range(need_block_nums):
                 bi_now = self.free_list.pop()
                 self.used_list[i].append(bi_now)
@@ -842,6 +843,7 @@ class StaticBlockInferencePredictor(BasePredictor):
         self.num_layers = len(self.cache_kvs_shape) // 2
         pre_max_block_num = (self.total_max_length + config.block_size - 1) // config.block_size
         # not update
+        self.pre_cache_length = 0
         if config.export_precache:
             pre_cache_npy = np.load(config.prefix_path)
             self.pre_cache_length = pre_cache_npy.shape[-2]
@@ -1053,7 +1055,7 @@ class StaticBlockInferencePredictor(BasePredictor):
             self.inputs["step_idx"][i : i + 1] = 0
             self.inputs["stop_flags"][i : i + 1] = False
             reset_stop_value(self.inputs["not_need_stop"])
-            need_block_nums = (length + self.config.max_length + self.block_size - 1) // self.block_size
+            need_block_nums = (length + self.config.max_length + self.pre_cache_length + self.block_size - 1) // self.block_size
             for bi in range(need_block_nums):
                 bi_now = self.free_list.pop()
                 self.used_list[i].append(bi_now)
@@ -1333,8 +1335,8 @@ def benchmark(predictor, predictor_args, model_args):
     # batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
-    warmup_time = 2
-    test_time = 10
+    warmup_time = 1
+    test_time = 1
 
     print("***********Start Warmup**********")
     for _ in range(warmup_time):
