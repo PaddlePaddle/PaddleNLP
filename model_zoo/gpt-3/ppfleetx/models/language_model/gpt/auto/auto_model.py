@@ -202,17 +202,11 @@ class MultiHeadAttention(nn.Layer):
             return self.Cache(key, value)
 
     def _flash_attention(self, q, k, v, attn_mask=None):
-        perm = [1, 0, 2, 3]
-        q = tensor.transpose(x=q, perm=perm)
-        k = tensor.transpose(x=k, perm=perm)
-        v = tensor.transpose(x=v, perm=perm)
         out, weights = flash_attention(
             q, k, v, self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
         )
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
-        perm = [1, 0, 2]
-        out = tensor.transpose(x=out, perm=perm)
-        return (out, weights) if self.need_weights else out
+        return (out, weights)
 
     def core_attn(self, q, k, v, attn_mask=None):
         perm = [0, 2, 1, 3]
