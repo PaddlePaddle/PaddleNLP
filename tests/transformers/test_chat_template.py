@@ -39,6 +39,11 @@ class ChatTemplateTest(unittest.TestCase):
         expected_query = "你是一个人工智能助手\nHuman: 你好<sep> Bot: 您好，我是个人人工智能助手，请问有什么可以帮您。\nHuman: 今天的天气怎么样？<sep> Bot:"
         self.assertEqual(final_query, expected_query)
 
+    def test_inference_conversation_template_with_one_part(self):
+        conversations = [["你好"], ["今天的天气怎么样？"]]
+        with self.assertRaises(AssertionError):
+            self.chat_template(conversations)
+
     def test_null_chat_template(self):
         chat_template = ChatTemplate()
         query = "今天吃啥"
@@ -66,6 +71,7 @@ class ChatTemplateTest(unittest.TestCase):
         assert final_query == "Human: 你好<sep>Bot: 您好，我是个人人工智能助手\n\n" + query
 
 
+# TODO(wj-Mcat): `from_aistudio` param will be added later.
 class ChatTemplateIntegrationTest(unittest.TestCase):
     def test_llama2_chat_template(self):
         tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat")
@@ -79,4 +85,20 @@ class ChatTemplateIntegrationTest(unittest.TestCase):
         query = "你好"
         final_query = tokenizer.apply_chat_template(query, tokenize=False)
         expected_query = f"### Instruction:{query}  ### Response:"
+        self.assertEqual(final_query, expected_query)
+
+    def test_chatglm_bellegroup(self):
+        # refer to: https://huggingface.co/THUDM/chatglm-6b/blob/main/modeling_chatglm.py#L1267
+        tokenizer = AutoTokenizer.from_pretrained("THUDM/chatglm-6b-v1.1")
+        query = [["你好", "您好，我是个人人工智能助手"], ["今天吃啥"]]
+        final_query = tokenizer.apply_chat_template(query, tokenize=False)
+        expected_query = "[Round 0]\n问：你好\n答：您好，我是个人人工智能助手\n[Round 1]\n问：今天吃啥\n答："
+        self.assertEqual(final_query, expected_query)
+
+    def test_bloom_bellegroup(self):
+        # refer to: https://huggingface.co/BelleGroup/BELLE-7B-2M#use-model
+        tokenizer = AutoTokenizer.from_pretrained("bellegroup/belle-7b-2m")
+        query = "你好"
+        final_query = tokenizer.apply_chat_template(query, tokenize=False)
+        expected_query = f"Human: {query}\n\nAssistant:"
         self.assertEqual(final_query, expected_query)
