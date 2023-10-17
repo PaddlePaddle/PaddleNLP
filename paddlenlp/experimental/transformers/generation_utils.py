@@ -559,13 +559,16 @@ class GenerationBlockInferenceModel(GenerationMixin):
                     shape=cache_kvs_shapes[2 * i + 1], dtype=cachekv_dtype, name="value_caches_{}".format(i)
                 )
             )
-
+        if export_precache:
+            src_mask_spec = paddle.static.InputSpec(shape=[None, 1, None, None], dtype=dtype, name="src_mask")
+        else :
+            src_mask_spec = None
         input_spec = [
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),  # input_ids
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="temperature"),  # temperature
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="top_p"),  # top_p
             paddle.static.InputSpec(shape=[None], dtype="int64", name="eos_token_id"),  # eos_token_id
-            paddle.static.InputSpec(shape=[None, 1, None, None], dtype=dtype, name="src_mask"),  # src_mask
+            src_mask_spec,  # src_mask
             # paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),  # position_ids
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="penalty_score"),  # penalty_score
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="frequency_score"),  # frequency_score
