@@ -48,7 +48,11 @@ MODEL_CLASSES = {
     ),
 }
 
-from paddlenlp.data.causal_dataset import build_train_valid_test_datasets, print_rank_0
+from paddlenlp.data.causal_dataset import (
+    build_train_valid_test_datasets,
+    judge_data_splits,
+    print_rank_0,
+)
 
 
 def add_start_docstrings(*docstr):
@@ -164,6 +168,12 @@ def create_pretrained_dataset(
     tokenizer,
 ):
 
+    data_flag = judge_data_splits(
+        data_args.splits, training_args.do_train, training_args.do_eval, training_args.do_predict
+    )
+    if not data_flag:
+        raise ValueError("If do_train/do_eval/do_predict is True, the corresponding dataset split should not be 0!")
+
     train_val_test_num_samples = [
         training_args.per_device_train_batch_size
         * training_args.dataset_world_size
@@ -177,9 +187,12 @@ def create_pretrained_dataset(
     ]
 
     print_rank_0(" > datasets target sizes (minimum size):")
-    print_rank_0("    train:      {}".format(train_val_test_num_samples[0]))
-    print_rank_0("    validation: {}".format(train_val_test_num_samples[1]))
-    print_rank_0("    test:       {}".format(train_val_test_num_samples[2]))
+    if training_args.do_train:
+        print_rank_0("    train:      {}".format(train_val_test_num_samples[0]))
+    if training_args.do_eval:
+        print_rank_0("    validation: {}".format(train_val_test_num_samples[1]))
+    if training_args.do_predict:
+        print_rank_0("    test:       {}".format(train_val_test_num_samples[2]))
 
     # Build the datasets.
     train_dataset, valid_dataset, test_dataset = build_train_valid_test_datasets(
@@ -216,9 +229,12 @@ def create_pretrained_dataset(
             "labels": labels,
         }
 
-    print_dataset(train_dataset[0])
-    print_dataset(valid_dataset[0])
-    print_dataset(test_dataset[0])
+    if training_args.do_train:
+        print_dataset(train_dataset[0])
+    if training_args.do_eval:
+        print_dataset(valid_dataset[0])
+    if training_args.do_predict:
+        print_dataset(test_dataset[0])
 
     return train_dataset, valid_dataset, test_dataset, _collate_data
 

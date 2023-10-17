@@ -26,6 +26,24 @@ local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 #         return None
 
 
+def judge_data_splits(splits_string, do_train, do_eval, do_predict):
+    splits = []
+    if splits_string.find(",") != -1:
+        splits = [float(s) for s in splits_string.split(",")]
+    elif splits_string.find("/") != -1:
+        splits = [float(s) for s in splits_string.split("/")]
+    else:
+        splits = [float(splits_string)]
+    while len(splits) < 3:
+        splits.append(0.0)
+    splits = splits[:3]
+    splits_sum = sum(splits)
+    assert splits_sum > 0.0, "sum of splits should larger than 0.0!"
+    if (do_train and splits[0] == 0) or (do_eval and splits[1] == 0) or (do_predict and splits[2] == 0):
+        return False
+    return True
+
+
 def get_train_valid_test_split_(splits_string, size):
     """Get dataset splits from comma or '/' separated string list."""
 
@@ -281,6 +299,8 @@ class GPTDataset(paddle.io.Dataset):
         # Build index mappings.
         if need_data:
             # Checks
+            if len(documents) == 0:
+                return
             assert np.min(documents) >= 0
             assert np.max(documents) < indexed_dataset.sizes.shape[0]
 
