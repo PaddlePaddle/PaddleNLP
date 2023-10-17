@@ -30,16 +30,10 @@ from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
 from paddlenlp.transformers import ChatGLMv2Config, ChatGLMv2PretrainedModel
-
-# from paddlenlp.transformers import CHATGLM_V2_PRETRAINED_RESOURCE_FILES_MAP
 from paddlenlp.transformers.chatglm_v2.modeling import (
     Embedding,
     RMSNorm,
     RotaryEmbedding,
-)
-from paddlenlp.transformers.model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions,
-    CausalLMOutputWithPast,
 )
 from paddlenlp.transformers.model_utils import (
     dy2st_nocheck_guard_context,
@@ -262,10 +256,11 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         else:
             rotary_pos_emb = rotary_pos_emb[None, :seq_length]
 
-        ones = paddle.ones([batch_size, seq_length, 32], dtype="float16")
-        zeros = paddle.zeros([batch_size, seq_length, 32], dtype="float16")
+        ones = paddle.ones([batch_size, seq_length, 32], dtype=paddle.get_default_dtype())
+        zeros = paddle.zeros([batch_size, seq_length, 32], dtype=paddle.get_default_dtype())
         # make it to be [2, batch, seq_len, rotary_dim]
         rotary_pos_emb = rotary_pos_emb.transpose([3, 0, 1, 2])
+        # The following code is for consistency with PaddleNLP/csrc/generation/encode_rotary_qk.cu, so boring.
         cos = rotary_pos_emb[0]
         sin = rotary_pos_emb[1]
         cos = paddle.concat([cos, ones], axis=-1)
@@ -293,14 +288,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
 
         hidden_states = self.final_layernorm(hidden_states)
 
-        if not return_dict:
-            return tuple(v for v in [hidden_states, None, None, None] if v is not None)
-
-        return BaseModelOutputWithPastAndCrossAttentions(
-            last_hidden_state=hidden_states,
-            past_key_values=None,
-            hidden_states=None,
-        )
+        return tuple(v for v in [hidden_states, None, None, None] if v is not None)
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
@@ -320,19 +308,19 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
 
             import numpy as np
 
-            k_weight = k_weight.reshape([4096, 2, 1, 128])
-            k_bias = k_bias.reshape([2, 1, 128])
-            v_weight = v_weight.reshape([4096, 2, 1, 128])
-            v_bias = v_bias.reshape([2, 1, 128])
+            k_weight = k_weight.reshape([self.hidden_size, self.multi_query_group_num, 1, self.head_size])
+            k_bias = k_bias.reshape([self.multi_query_group_num, 1, self.head_size])
+            v_weight = v_weight.reshape([self.hidden_size, self.multi_query_group_num, 1, self.head_size])
+            v_bias = v_bias.reshape([self.multi_query_group_num, 1, self.head_size])
 
             k_weight = np.tile(k_weight, [1, 1, self.num_heads // self.multi_query_group_num, 1])
             v_weight = np.tile(v_weight, [1, 1, self.num_heads // self.multi_query_group_num, 1])
             k_bias = np.tile(k_bias, [1, self.num_heads // self.multi_query_group_num, 1])
             v_bias = np.tile(v_bias, [1, self.num_heads // self.multi_query_group_num, 1])
-            k_weight = k_weight.reshape([4096, 4096])
-            k_bias = k_bias.reshape([4096])
-            v_weight = v_weight.reshape([4096, 4096])
-            v_bias = v_bias.reshape([4096])
+            k_weight = k_weight.reshape([self.hidden_size, self.hidden_size])
+            k_bias = k_bias.reshape([self.hidden_size])
+            v_weight = v_weight.reshape([self.hidden_size, self.hidden_size])
+            v_bias = v_bias.reshape([self.hidden_size])
 
             concated_qkv_weight = np.concatenate([q_weight, k_weight, v_weight], axis=-1)
             concated_qkv_weight = concated_qkv_weight.transpose(1, 0)
@@ -347,6 +335,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
 
             ffn_ln_scale = state_dict.pop("encoder.layers.{}.post_attention_layernorm.weight".format(i))
 
+            # shuffle the column of ffn1's weight for fine grained FM
             ffn1_weight = state_dict.pop("encoder.layers.{}.mlp.dense_h_to_4h.weight".format(i))
             ffn1_weight_0 = ffn1_weight[..., 0::2]
             ffn1_weight_1 = ffn1_weight[..., 1::2]
@@ -491,14 +480,6 @@ class ChatGLMv2ForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMv2Pret
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        # 这个是为了保存输入的哦！
-        # import numpy as np
-        # static_dict = {
-        # "input_ids" : input_ids.numpy(),
-        # }
-        # np.savez('/zhoukangkang/chatglmv2.npz', **static_dict)
-        # exit(0)
-
         transformer_outputs = self.chatglm_v2(
             input_ids,
             position_ids=position_ids,
@@ -518,48 +499,5 @@ class ChatGLMv2ForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMv2Pret
         hidden_states = transformer_outputs[0]
 
         lm_logits = self.chatglm_v2.output_layer(hidden_states)
-
-        # import numpy as np
-        # static_dict = {
-        # "my" : lm_logits.numpy(),
-        # }
-        # np.savez('/zhoukangkang/my.npz', **static_dict)
-        # exit(0)
-
-        # if (input_ids.shape[1] == 1):
-        #     import numpy as np
-        #     static_dict = {
-        #     "my" : lm_logits.numpy(),
-        #     }
-        #     np.savez('/zhoukangkang/my.npz', **static_dict)
-        #     exit(0)
-
-        loss = None
-        if labels is not None:
-            reshaped_logits = lm_logits.reshape([-1, lm_logits.shape[-1]]).astype("float32")
-            reshaped_labels = labels.reshape([-1])
-
-            if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
-                loss_fn = fleet.meta_parallel.ParallelCrossEntropy()
-            else:
-                loss_fn = nn.CrossEntropyLoss(reduction="none")
-
-            loss_mask = (labels != -100).astype("float32")
-            loss = loss_fn(reshaped_logits, reshaped_labels)
-            loss = paddle.sum(loss.reshape([-1]).cast(paddle.float32) * loss_mask.reshape([-1]).cast(paddle.float32))
-            loss = loss / loss_mask.sum()
-
-            lm_logits = lm_logits.astype(hidden_states.dtype)
-            loss = loss.astype(hidden_states.dtype)
-
-        if not return_dict:
-            output = (lm_logits,) + transformer_outputs[1:]
-            return ((loss,) + output) if loss is not None else output
-
-        return CausalLMOutputWithPast(
-            loss=loss,
-            logits=lm_logits,
-            past_key_values=transformer_outputs.past_key_values,
-            hidden_states=transformer_outputs.hidden_states,
-            attentions=transformer_outputs.attentions,
-        )
+        output = (lm_logits,) + transformer_outputs[1:]
+        return output
