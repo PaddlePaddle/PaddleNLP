@@ -57,16 +57,16 @@ __all__ = [
 
 
 def save_unified_checkpoint(args, model, output_dir, safe_serialization=False):
-    """_summary_
+    """save unified checkpoint
 
     Args:
-        args (_type_): _description_
-        model (_type_): model to save
-        output_dir (_type_): save dir
+        args (TrainingArguments): Training Arguments
+        model (PretrainedModel): model to save
+        output_dir (str): save dir
         safe_serialization (bool, optional): use safetensors. Defaults to False.
 
     Raises:
-        ValueError: if model is an instanceof `PretrainedModel` and the model cannot be saved
+        ValueError: if model is not an instance of `PretrainedModel` and the model cannot be saved
     """
     if isinstance(model, PretrainedModel):
         model_to_save = model
@@ -106,11 +106,11 @@ def save_unified_checkpoint(args, model, output_dir, safe_serialization=False):
             json.dump(sharded_index, f, indent=4)
 
 
-def load_unified_checkpoint(model: paddle.nn.Layer, resume_from_checkpoint: str, safe_serialization=False) -> None:
+def load_unified_checkpoint(model, resume_from_checkpoint: str, safe_serialization=False) -> None:
     """Load potential model checkpoint
 
     Args:
-        model (nn.Layer): Your model to save
+        model (PretrainedModel): Your model to load
         resume_from_checkpoint (str): path of the checkpoint to load
 
     Returns:
@@ -197,7 +197,7 @@ def unified_checkpoint_into_shards(
         safe_serialization (bool, optional): safe serialization using safetensors. Defaults to False.
 
     Returns:
-        tuple: state_dict, and  config
+        tuple: state_dict, config, shard_file: file name, sharded_index: map for weight to file name.
     """
     assert hasattr(model_to_save, "config")
 
@@ -329,7 +329,7 @@ def filter_params(model_to_save, state_dict):
             total_size += weight_size
 
         filter_tensor_list.append(current_block)
-        assert len(filter_tensor_list) == tp_size, "Error, partion failed!"
+        assert len(filter_tensor_list) == tp_size, "Error, partition failed!"
 
     paddle.distributed.broadcast_object_list(
         filter_tensor_list,
