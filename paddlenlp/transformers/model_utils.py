@@ -1359,6 +1359,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             return resolved_archive_file, sharded_metadata, is_sharded
 
         if pretrained_model_name_or_path is not None:
+            # the following code use a lot of os.path.join, hence setting subfolder to empty str if None
+            if subfolder is None:
+                subfolder = ""
             pretrained_model_name_or_path = str(pretrained_model_name_or_path)
             is_local = os.path.isdir(pretrained_model_name_or_path)
 
