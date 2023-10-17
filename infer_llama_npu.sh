@@ -41,7 +41,8 @@ python -m paddle.distributed.launch --log_dir $log_dir --devices $use_device pyt
 
 
 # declare -A map
-# # 需要通过lspci -vvv -s <ID>,确认每个卡numa亲和性
+# # 1、通过npu-smi info，确认每个卡的Bus-Id
+# # 2、通过lspci -vvv -s <Bus-Id>,确认每个卡numa node 亲和性
 # map["0"]="0"
 # map["1"]="0"
 # map["2"]="0"
@@ -62,8 +63,9 @@ python -m paddle.distributed.launch --log_dir $log_dir --devices $use_device pyt
 #     do
 #     bind=${map["$RANK_ID"]}
 #     echo "Device ID: $RANK_ID, bind to NUMA node: $bind"
-#     numactl --cpunodebind=$bind --membind $bind python -m paddle.distributed.launch --master 127.0.0.1:49123 --rank $RANK_ID --devices $RANK_ID --nnodes $WORLD_SIZE python3 llm/predictor.py --model_name_or_path $model_dir --batch_size $BATCH_NUM --dtype "float16" --mode "static" --inference_model 1 &> $RANK_ID.log &
+#     numactl --cpunodebind=$bind --membind $bind python -m paddle.distributed.launch --master 127.0.0.1:49123 --rank $RANK_ID --devices $RANK_ID --nnodes $WORLD_SIZE python3 llm/predictor.py --model_name_or_path $model_dir --batch_size $BATCH_NUM --dtype "float16" --mode "static" --device "npu" --benchmark --inference_model 1 &> $RANK_ID.log &
 # done
+# fi
 # # tail -f 0.log
 
 
