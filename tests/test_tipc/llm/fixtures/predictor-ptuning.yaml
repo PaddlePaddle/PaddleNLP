@@ -2,7 +2,7 @@ llama:
   model_name: linly-ai/chinese-llama-2-7b
   fused_model: true
   dtype: float16
-  data_file: tests/fixtures/llm/zh_query.json
+  data_file: tests/fixtures/llm/query.json
 
 bloom:
   model_name: bellegroup/belle-7b-2m
