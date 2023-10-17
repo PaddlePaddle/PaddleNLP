@@ -258,6 +258,11 @@ def unified_checkpoint_into_shards(
             total_size_list = [y for x in pp_total_size_list for y in x]
             index_file_list = [y for x in pp_index_file_list for y in x]
 
+    # for pure sharding
+    if len(index_file_list) == 0 and len(total_size_list) == 0:
+        index_file_list = [index_weight_file]
+        total_size_list = [total_size]
+
     sharded_index = get_sharded_index(
         index_file_list,
         total_size_list,
@@ -293,6 +298,10 @@ def filter_params(model_to_save, state_dict):
 
     tp_size = tp_group.nranks
     tp_rank = tp_group.rank
+
+    # for pure sharding or pure pp
+    if tp_size <= 1:
+        return [list(state_dict.keys())]
 
     filter_tensor_list = [[] for i in range(tp_size)]
 
