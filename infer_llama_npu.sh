@@ -39,3 +39,31 @@ rm -rf $log_dir
 
 python -m paddle.distributed.launch --log_dir $log_dir --devices $use_device python llm/predictor.py --model_name_or_path $model_dir --batch_size 8 --dtype "float16" --mode "static" --device "npu" --benchmark --inference_model 
 
+
+# declare -A map
+# # 需要通过lspci -vvv -s <ID>,确认每个卡numa亲和性
+# map["0"]="0"
+# map["1"]="0"
+# map["2"]="0"
+# map["3"]="0"
+# map["4"]="1"
+# map["5"]="1"
+# map["6"]="1"
+# map["7"]="1"
+
+# RANK_ID_START=0
+# WORLD_SIZE=8
+# BATCH_NUM=8
+
+# if test -d "$model_dir";
+# then
+#     echo "Weight directory exists, runing......"
+#     for((RANK_ID=$RANK_ID_START;RANK_ID<$WORLD_SIZE;RANK_ID++));
+#     do
+#     bind=${map["$RANK_ID"]}
+#     echo "Device ID: $RANK_ID, bind to NUMA node: $bind"
+#     numactl --cpunodebind=$bind --membind $bind python -m paddle.distributed.launch --master 127.0.0.1:49123 --rank $RANK_ID --devices $RANK_ID --nnodes $WORLD_SIZE python3 llm/predictor.py --model_name_or_path $model_dir --batch_size $BATCH_NUM --dtype "float16" --mode "static" --inference_model 1 &> $RANK_ID.log &
+# done
+# # tail -f 0.log
+
+

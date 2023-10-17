@@ -794,11 +794,14 @@ def benchmark(predictor, predictor_args, model_args):
             outputs = predictor.predict(batch_source_text)
 
     print("***********Start Speed Test**********")
+    p = paddle.profiler.Profiler()
+    p.start()
     start = time.perf_counter()
     for _ in range(test_time):
         for bs, batch_source_text in enumerate(batch_benchmark_texts):
             outputs = predictor.predict(batch_source_text)
     end = time.perf_counter()
+    p.stop()
     if paddle.distributed.get_rank() == 0:
         output_tokens = sum([len(output) for output in outputs])
         print(
