@@ -2189,8 +2189,8 @@ class Trainer:
                 checkpoint, base_opt_name=OPTIMIZER_NAME
             )
         else:
-            if self.args.dataset_rank == 0:
-                optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+            optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+            if self.args.data_parallel_rank == 0:
                 path = os.path.join(checkpoint, optimizer_name)
                 if os.path.isfile(path):
                     opt_state_dict = paddle.load(path)
@@ -2202,7 +2202,7 @@ class Trainer:
             # Load in optimizer and scheduler states
             self.optimizer.set_state_dict(opt_state_dict)
         else:
-            raise ValueError(f"optimizer-state-dict not found, opt:{os.path.join(checkpoint, optimizer_name)}.")
+            raise ValueError(f"optimizer-state-dict not found, opt: {os.path.join(checkpoint, optimizer_name)}.")
 
         if distributed_isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
             self.lr_scheduler.set_state_dict(paddle.load(distributed_file(os.path.join(checkpoint, SCHEDULER_NAME))))

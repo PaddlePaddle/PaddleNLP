@@ -26,6 +26,8 @@ import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
 
+from paddlenlp.utils.log import logger
+
 __all__ = [
     "distributed_concat",
     "paddle_pad_and_concatenate",
@@ -228,26 +230,31 @@ def broadcast_dp_optimizer(state_dict):
     if paddle.distributed.get_world_size() <= 1:
         return state_dict
 
-    print("Start broadcast optimizer in dataparallel group.")
+    logger.info("Start broadcast optimizer in dataparallel group.")
     try:
         hcg = fleet.get_hybrid_communicate_group()
         dp_group = hcg.get_data_parallel_group()
         src_rank = hcg.get_data_parallel_group_src_rank()
         process_rank = paddle.distributed.get_rank()
+        # Don't broadcast optimizer for dp rank is 1.
+        if dp_group.nranks <= 1:
+            return state_dict
     except:
         dp_group = None
         src_rank = 0
         process_rank = paddle.distributed.get_rank()
 
     if process_rank == src_rank:
-        assert (
-            state_dict is not None
-        ), f"Your local rank {paddle.distributed.get_rank()} must have a state_dict. dp_rank:{process_rank}, src_rank:{src_rank}"
+        if state_dict is None:
+            logger.warning(
+                f"Your local rank {paddle.distributed.get_rank()} must have a state_dict. dp_rank:{process_rank}, src_rank:{src_rank}"
+            )
         fake_state_dict = [nested_reduce_tensor(state_dict)]
     else:
-        assert (
-            state_dict is None
-        ), f"Your local rank {paddle.distributed.get_rank()}  are forbidden to have a state_dict. dp_rank:{process_rank}, src_rank:{src_rank}"
+        if state_dict is not None:
+            logger.warning(
+                f"Your local rank {paddle.distributed.get_rank()}  are forbidden to have a state_dict. dp_rank:{process_rank}, src_rank:{src_rank}"
+            )
         fake_state_dict = [None]
 
     paddle.distributed.broadcast_object_list(
