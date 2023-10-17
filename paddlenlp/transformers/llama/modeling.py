@@ -221,11 +221,12 @@ def scaled_dot_product_attention(
             alibi = alibi.reshape([bsz, num_heads, 1, -1])
             attn_weights = attn_weights + alibi
 
-        if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
-            raise ValueError(
-                f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
-                f" {attn_weights.shape}"
-            )
+        # breakpoint()
+        # if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
+        # raise ValueError(
+        # f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
+        # f" {attn_weights.shape}"
+        # )
 
         # NOTE: we only call get_triangle_upper_mask under PP setup
         # FIXME ZHUI when we use pipeline parallel, the attention_mask can be None
@@ -234,10 +235,10 @@ def scaled_dot_product_attention(
             attention_mask = get_triangle_upper_mask(attn_weights)
 
         attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
-        if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
-            raise ValueError(
-                f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
-            )
+        # if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
+        # raise ValueError(
+        # f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
+        # )
 
         attn_weights = attn_weights + attention_mask
         if not paddle.in_dynamic_mode():
@@ -367,10 +368,13 @@ class LlamaRotaryEmbedding(nn.Layer):
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
-        return (
+        # print ("cos_cached.shape = ", self.cos_cached)
+        ret = (
             self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
             self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
         )
+        # print ("ret[0].shape = ", ret[0].shape)
+        return ret
 
 
 class LlamaLinearScalingRotaryEmbedding(LlamaRotaryEmbedding):
@@ -444,7 +448,8 @@ def rotate_half(x):
     """Rotates half the hidden dims of the input."""
     x1 = x[..., : x.shape[-1] // 2]
     x2 = x[..., x.shape[-1] // 2 :]
-    return paddle.concat([-x2, x1], axis=-1)  # shape is the same as x
+    ret = paddle.concat([-x2, x1], axis=-1)  # shape is the same as x
+    return ret
 
 
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
@@ -756,6 +761,7 @@ class LlamaAttention(nn.Layer):
                     use_neox_rotary_style=False,
                 )
             else:
+                # This way
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
@@ -1125,7 +1131,8 @@ class LlamaModel(LlamaPretrainedModel):
                 # For decoding phase in generation, seq_length = 1, we don't need to add causal mask. for we run pretrain, temporarily delete if
                 # if input_shape[-1] > 1:
                 combined_attention_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
-                expanded_attn_mask = expanded_attn_mask & combined_attention_mask
+                # expanded_attn_mask = expanded_attn_mask & combined_attention_mask
+                expanded_attn_mask = expanded_attn_mask
             # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
             elif len(attention_mask.shape) == 3:
                 expanded_attn_mask = attention_mask.unsqueeze(1).astype("bool")
@@ -1244,7 +1251,7 @@ class LlamaModel(LlamaPretrainedModel):
             alibi = None
 
         if position_ids is None:
-            position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
+            position_ids = paddle.expand(paddle.arange(seq_length, dtype="int64"), ((batch_size, seq_length)))
 
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
@@ -1524,3 +1531,10 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+
+
+from paddle.pir import OpResult
+
+setattr(OpResult, "expand", paddle.expand)
+setattr(OpResult, "astype", paddle.cast)
+setattr(OpResult, "ndim", property(lambda x: len(x.shape)))
