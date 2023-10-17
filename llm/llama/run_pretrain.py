@@ -54,7 +54,7 @@ MODEL_CLASSES = {
 
 from paddlenlp.data.causal_dataset import (
     build_train_valid_test_datasets,
-    judge_data_splits,
+    judge_data_split,
     print_rank_0,
 )
 
@@ -209,8 +209,8 @@ def create_pretrained_dataset(
     need_data=True,
 ):
 
-    data_flag = judge_data_splits(
-        data_args.splits, training_args.do_train, training_args.do_eval, training_args.do_predict
+    data_flag = judge_data_split(
+        data_args.split, training_args.do_train, training_args.do_eval, training_args.do_predict
     )
     if not data_flag:
         raise ValueError("If do_train/do_eval/do_predict is True, the corresponding dataset split should not be 0!")

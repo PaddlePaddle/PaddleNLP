@@ -26,7 +26,7 @@ local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 #         return None
 
 
-def judge_data_splits(splits_string, do_train, do_eval, do_predict):
+def judge_data_split(splits_string, do_train, do_eval, do_predict):
     splits = []
     if splits_string.find(",") != -1:
         splits = [float(s) for s in splits_string.split(",")]
