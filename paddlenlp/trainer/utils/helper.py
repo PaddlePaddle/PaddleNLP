@@ -174,6 +174,7 @@ def distributed_file(filename):
                 f.write(file_object)
 
         paddle.distributed.barrier()
+
         return filename
 
 
@@ -227,6 +228,7 @@ def broadcast_dp_optimizer(state_dict):
     if paddle.distributed.get_world_size() <= 1:
         return state_dict
 
+    print("Start broadcast optimizer in dataparallel group.")
     try:
         hcg = fleet.get_hybrid_communicate_group()
         dp_group = hcg.get_data_parallel_group()
@@ -248,19 +250,15 @@ def broadcast_dp_optimizer(state_dict):
         ), f"Your local rank {paddle.distributed.get_rank()}  are forbidden to have a state_dict. dp_rank:{process_rank}, src_rank:{src_rank}"
         fake_state_dict = [None]
 
-    print("broccast fake_state_dict")
     paddle.distributed.broadcast_object_list(
         fake_state_dict,
         src=src_rank,
         group=dp_group,
     )
     fake_state_dict = fake_state_dict[0]
-    print("broccast fake_state_dict over")
     if process_rank != src_rank:
         state_dict = nested_empty_tensor(fake_state_dict)
 
-    print("nested build empty tensor over")
     state_dict = nested_broadcast_tensor(state_dict, src=src_rank, group=dp_group)
-    print("nested_broadcast_tensor over")
 
     return state_dict
