@@ -560,7 +560,7 @@ def shard_checkpoint(
             weight_map[key] = shard_file
 
     # Add the metadata
-    metadata = {"total_size": total_size}
+    metadata = {"total_size": int(total_size)}
     index = {"metadata": metadata, "weight_map": weight_map}
     return shards, index
 
