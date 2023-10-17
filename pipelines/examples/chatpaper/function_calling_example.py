@@ -19,7 +19,12 @@ import gradio as gr
 from prompt_utils import functions, get_parse_args
 
 from pipelines.document_stores import BaiduElasticsearchDocumentStore
-from pipelines.nodes import DensePassageRetriever, EmbeddingRetriever
+from pipelines.nodes import (
+    BM25Retriever,
+    DensePassageRetriever,
+    EmbeddingRetriever,
+    ErnieRanker,
+)
 from pipelines.pipelines import Pipeline
 
 args = get_parse_args()
@@ -35,7 +40,6 @@ document_store_with_docs = BaiduElasticsearchDocumentStore(
     embedding_dim=args.embedding_dim,
     similarity="dot_prod",
     vector_type="bpack_vector",
-    search_fields=["content", "meta"],
     index=args.abstract_index_name,
     index_type=args.index_type,
 )
@@ -58,9 +62,22 @@ else:
         embed_title=args.embed_title,
         precision="fp16",
     )
+ranker = ErnieRanker(model_name_or_path="rocketqa-base-cross-encoder", use_gpu=True)
+bm_retriever = BM25Retriever(document_store=document_store_with_docs)
 
 pipeline = Pipeline()
 pipeline.add_node(component=dpr_retriever, name="DenseRetriever", inputs=["Query"])
+pipeline.add_node(component=ranker, name="Ranker", inputs=["DenseRetriever"])
+
+
+single_pipe = Pipeline()
+single_pipe.add_node(component=bm_retriever, name="BMRetriever", inputs=["Query"])
+# 向量检索会引入很多英文噪声数据，暂时放弃
+# single_pipe.add_node(component=dpr_retriever, name="DenseRetriever", inputs=["Query"])
+# single_pipe.add_node(
+#     component=JoinDocuments(join_mode="concatenate"), name="JoinResults", inputs=["BMRetriever", "DenseRetriever"]
+# )
+single_pipe.add_node(component=ranker, name="Ranker", inputs=["BMRetriever"])
 
 
 def search_multi_paper(query, top_k=3):
@@ -68,9 +85,10 @@ def search_multi_paper(query, top_k=3):
         query=query,
         params={
             "DenseRetriever": {
-                "top_k": top_k,
+                "top_k": 10,
                 "index": args.abstract_index_name,
             },
+            "Ranker": {"top_k": top_k},
         },
     )
 
@@ -92,14 +110,16 @@ def search_single_paper(query, title):
             "title": {"$eq": title},
         }
     }
-    prediction = pipeline.run(
+    prediction = single_pipe.run(
         query=query,
         params={
-            "DenseRetriever": {
-                "top_k": 3,
-                "index": args.full_text_index_name,
-                "filters": filters,
-            },
+            "BMRetriever": {"top_k": 5, "index": args.full_text_index_name, "filters": filters},
+            # "DenseRetriever": {
+            #     "top_k": 5,
+            #     "index": args.full_text_index_name,
+            #     "filters": filters,
+            # },
+            "Ranker": {"top_k": 3},
         },
     )
 
@@ -186,23 +206,28 @@ def prediction(history):
             "search_single_paper": search_single_paper,
             "get_literature_review": get_literature_review,
         }
-        func = name2function[function_call["name"]]
-        func_args = json.loads(function_call["arguments"])
-        if function_call["name"] == "get_literature_review":
-            func_args["history"] = history
-            func_args["messages"] = messages
-        res = func(**func_args)
-        # 对于多篇论文检索加入润色prompt
-        if function_call["name"] == "search_multi_paper":
-            res["prompt"] = "请根据论文检索工具的结果返回每篇论文的标题（加粗）, 内容以及关键词，使用自然语言的方式输出，不允许胡编乱造，不要使用json或者表格的形式。"
-        elif function_call["name"] == "get_literature_review":
-            res["prompt"] = "请根据生成的综述，先在开头加上总结性的话语，然后按照某某论文提出什么方法，这个方法有什么点，解决了什么问题的方式输出综述，不要使用json或者表格的形式。"
-        logs.append(f"Function Call调用结果: {res}")
-        # Step 3: return msg to erniebot
-        messages.append({"role": "assistant", "content": None, "function_call": function_call})
-        messages.append(
-            {"role": "function", "name": function_call["name"], "content": json.dumps(res, ensure_ascii=False)}
-        )
+
+        # 负样本, 目前不做处理，直接跳过
+        if function_call["name"] not in name2function:
+            logs.append(f"Function Call的名称{function_call['name']}不存在")
+        else:
+            func = name2function[function_call["name"]]
+            func_args = json.loads(function_call["arguments"])
+            if function_call["name"] == "get_literature_review":
+                func_args["history"] = history
+                func_args["messages"] = messages
+            res = func(**func_args)
+            # 对于多篇论文检索加入润色prompt
+            if function_call["name"] == "search_multi_paper":
+                res["prompt"] = "请根据论文检索工具的结果返回每篇论文的标题（加粗）, 内容以及关键词，使用自然语言的方式输出，不允许胡编乱造，不要使用json或者表格的形式。"
+            elif function_call["name"] == "get_literature_review":
+                res["prompt"] = "请根据生成的综述，先在开头加上总结性的话语，然后按照某某论文提出什么方法，这个方法有什么点，解决了什么问题的方式输出综述，不要使用json或者表格的形式。"
+            logs.append(f"Function Call调用结果: {res}")
+            # Step 3: return msg to erniebot
+            messages.append({"role": "assistant", "content": None, "function_call": function_call})
+            messages.append(
+                {"role": "function", "name": function_call["name"], "content": json.dumps(res, ensure_ascii=False)}
+            )
         response = erniebot.ChatCompletion.create(model="ernie-bot-3.5", messages=messages, stream=True)
         stream_output = ""
         for character in response:
@@ -223,12 +248,13 @@ def launch_ui():
     with gr.Blocks(title="维普论文助手", theme=gr.themes.Base()) as demo:
         gr.HTML("""<h1 align="center">维普论文助手</h1>""")
         with gr.Column():
-            chatbot = gr.Chatbot(value=[[None, "您好, 我是维普论文小助手"]], scale=35, height=500)
+            chatbot = gr.Chatbot(value=[[None, "您好, 我是维普论文小助手"]], scale=35, height=800)
             message = gr.Textbox(placeholder="你能帮我找一些有关机器学习和强化学习方面的论文吗", lines=1, max_lines=20)
             with gr.Row():
                 submit = gr.Button("🚀 提交", variant="primary", scale=1)
                 clear = gr.Button("清除", variant="primary", scale=1)
-            log = gr.Textbox(value="当前轮次日志")
+            # 默认日志可见
+            log = gr.Textbox(value="当前轮次日志", visible=True)
         message.submit(add_message_chatbot, inputs=[message, chatbot], outputs=[message, chatbot]).then(
             prediction, inputs=[chatbot], outputs=[chatbot, log]
         )

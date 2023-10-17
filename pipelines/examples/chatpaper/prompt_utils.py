@@ -58,6 +58,8 @@ functions = [
                     "arguments": '{ "query": "半监督学习", "top_k": 6}',
                 },
             },
+            {"role": "user", "content": "请介绍一下机器学习"},
+            {"role": "assistant", "function_call": {"thoughts": "我不需要使用以上工具", "arguments": "{}"}},
         ],
     },
     {
