@@ -194,14 +194,13 @@ def scaled_dot_product_attention(
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
         if alibi is not None:
             attention_mask = attention_mask.cast(alibi.dtype) + alibi
-
         # TODO: attention_mask is None is not reliable
         attn_output = F.scaled_dot_product_attention(
             query_states,
             key_states,
             value_states,
             attn_mask=attention_mask,
-            is_causal=attention_mask is None,
+            is_causal=config.is_causal,
         )
         attn_weights = None
         if sequence_parallel:
