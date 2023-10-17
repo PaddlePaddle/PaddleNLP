@@ -673,6 +673,7 @@ class DygraphBlockInferencePredictor(BasePredictor):
         if config.export_precache:
             pre_cache_npy = np.load(config.prefix_path)
             self.pre_cache_length = pre_cache_npy.shape[-2]
+            config.max_length -= self.pre_cache_length
             self.pre_key_cache = [paddle.zeros([config.batch_size, self.num_attention_heads, self.pre_cache_length, self.head_dim], dtype=self.dtype) for _ in range(self.num_layers)]
             self.pre_value_cache = [paddle.zeros([config.batch_size, self.num_attention_heads, self.pre_cache_length, self.head_dim], dtype=self.dtype) for _ in range(self.num_layers)]
             print("pre_cache_length: ", self.pre_cache_length)
@@ -714,8 +715,12 @@ class DygraphBlockInferencePredictor(BasePredictor):
             self.inputs["v_quant_scales"] = self.v_quant_scales
             self.inputs["k_dequant_scales"] = self.k_dequant_scales
             self.inputs["v_dequant_scales"] = self.v_dequant_scales
-
-        self.inputs["min_length"] = paddle.full(shape=[config.batch_size, 1], fill_value=2, dtype="int64")
+        
+        if config.benchmark:
+            min_length = config.max_length
+        else:
+            min_length = 2
+        self.inputs["min_length"] = paddle.full(shape=[config.batch_size, 1], fill_value=min_length, dtype="int64")
         self.inputs["max_length"] = paddle.full(
             shape=[config.batch_size, 1], fill_value=config.max_length, dtype="int64"
         )
@@ -840,6 +845,7 @@ class StaticBlockInferencePredictor(BasePredictor):
         if config.export_precache:
             pre_cache_npy = np.load(config.prefix_path)
             self.pre_cache_length = pre_cache_npy.shape[-2]
+            config.max_length -= self.pre_cache_length
             for i in range(self.num_layers):
                 self.inputs["pre_key_caches_{}".format(i)] = paddle.to_tensor(pre_cache_npy[i][0], dtype=config.dtype).unsqueeze(0).broadcast_to([config.batch_size, self.num_attention_heads, self.pre_cache_length, self.head_dim])
                 self.inputs["pre_value_caches_{}".format(i)] = paddle.to_tensor(pre_cache_npy[i][1], dtype=config.dtype).unsqueeze(0).broadcast_to([config.batch_size, self.num_attention_heads, self.pre_cache_length, self.head_dim])
@@ -877,7 +883,12 @@ class StaticBlockInferencePredictor(BasePredictor):
             self.v_dequant_scales = [
                 paddle.zeros([self.num_attention_heads], dtype="float32") for _ in range(self.num_layers)
             ]
-        self.inputs["min_length"] = paddle.full(shape=[config.batch_size, 1], fill_value=2, dtype="int64")
+
+        if config.benchmark:
+            min_length = config.max_length
+        else:
+            min_length = 2
+        self.inputs["min_length"] = paddle.full(shape=[config.batch_size, 1], fill_value=min_length, dtype="int64")
         self.inputs["max_length"] = paddle.full(
             shape=[config.batch_size, 1], fill_value=config.max_length, dtype="int64"
         )
@@ -1008,7 +1019,7 @@ class StaticBlockInferencePredictor(BasePredictor):
     def predict(self, input_texts: str | list[str]):
         self._preprocess(input_texts)
         real_bsz = len(input_texts)
-        
+
         import copy
         seq_lens_this_time = copy.deepcopy(self.inputs["seq_lens_this_time"][:real_bsz])
         self.seq_lens_handle.share_external_data(seq_lens_this_time)
@@ -1315,10 +1326,11 @@ def predict():
 
 def benchmark(predictor, predictor_args, model_args):
     # Just construct a simple benchmark input. We pad input to the src_length.
-    test_texts = "hello world, how are you?"
+    # test_texts = "hello world, how are you?"
+    test_texts = ""
     benchmark_texts = [test_texts + "<pad>" * predictor_args.src_length for _ in range(predictor_args.batch_size)]
 
-    batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
+    # batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
     warmup_time = 2
@@ -1326,16 +1338,16 @@ def benchmark(predictor, predictor_args, model_args):
 
     print("***********Start Warmup**********")
     for _ in range(warmup_time):
-        for bs, batch_source_text in enumerate(batch_benchmark_texts):
-            predictor.predict(batch_source_text)
+        # for bs, batch_source_text in enumerate(batch_benchmark_texts):
+            predictor.predict(benchmark_texts)
 
     print("***********Start Test**********")
     output_tokens = 0
     start = time.perf_counter()
     for _ in range(test_time):
-        for bs, batch_source_text in enumerate(batch_benchmark_texts):
-            predictor.predict(batch_source_text)
-            print("bs: ", predictor_args.batch_size)
+        # for bs, batch_source_text in enumerate(batch_benchmark_texts):
+            predictor.predict(benchmark_texts)
+            # print("bs: ", predictor_args.batch_size)
             output_tokens += (
                 predictor_args.batch_size * predictor_args.max_length
             )  # sum([len(output) for output in outputs])
