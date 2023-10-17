@@ -464,7 +464,13 @@ class FusedMultiTransformerBase(Layer):
         return ln_out
 
     def compute_qkv_linear(self, ln_out, i):
-        return self.linear(ln_out, self.qkv_weights[i], self.qkv_biases[i], transpose_weight=True)
+        if float(paddle.version.cuda()) < 11.6:
+            qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
+            qkv_out = paddle.add(qkv_out, self.qkv_biases[i])
+            return qkv_out
+        else:
+            # This method requires CUDA version >= 11.6.
+            return self.linear(ln_out, self.qkv_weights[i], self.qkv_biases[i], transpose_weight=True)
 
     def compute_qkv(self, src, residual_input, i):
         ln_out = self.compute_layernorm_before_qkv(src, i)
