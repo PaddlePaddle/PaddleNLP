@@ -15,6 +15,7 @@
 
 from typing import Optional
 
+import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
@@ -247,7 +248,6 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         hidden_states = inputs_embeds
 
         # Rotary positional embeddings
-        # 32768
         rotary_pos_emb = self.rotary_pos_emb(self.max_sequence_length)
 
         if position_ids is not None:
@@ -305,8 +305,6 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             q_bias = state_dict["encoder.layers.{}.self_attention.query.bias".format(i)]
             k_bias = state_dict["encoder.layers.{}.self_attention.key.bias".format(i)]
             v_bias = state_dict["encoder.layers.{}.self_attention.value.bias".format(i)]
-
-            import numpy as np
 
             k_weight = k_weight.reshape([self.hidden_size, self.multi_query_group_num, 1, self.head_size])
             k_bias = k_bias.reshape([self.multi_query_group_num, 1, self.head_size])

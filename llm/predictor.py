@@ -713,6 +713,11 @@ def create_predictor(
             config.tensor_parallel_degree = tensor_parallel_degree
             config.tensor_parallel_rank = tensor_parallel_rank
 
+            config.quant_bits = -1
+            if predictor_args.quant_type.startswith("weight_only_int"):
+                quant_bits = int(predictor_args.quant_type[-1])
+                config.quant_bits = quant_bits
+
             if "llama" in config.architectures[0].lower():
                 if model_args.model_type == "llama-img2txt":
                     # we use llama for img2txt.
@@ -723,13 +728,6 @@ def create_predictor(
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMInferenceModel as LlamaInferenceModel,
                     )
-
-                    config.quant_bits = -1
-
-                    if predictor_args.quant_type.startswith("weight_only_int"):
-                        quant_bits = int(predictor_args.quant_type[-1])
-                        config.quant_bits = quant_bits
-
                 model = LlamaInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
@@ -756,10 +754,6 @@ def create_predictor(
                     ChatGLMv2ForCausalLMInferenceModel as Model,
                 )
 
-                config.quant_bits = -1
-                if predictor_args.quant_type.startswith("weight_only_int"):
-                    quant_bits = int(predictor_args.quant_type[-1])
-                    config.quant_bits = quant_bits
                 model = Model.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
