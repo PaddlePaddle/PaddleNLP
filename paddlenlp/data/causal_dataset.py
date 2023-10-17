@@ -297,10 +297,7 @@ class GPTDataset(paddle.io.Dataset):
         self.return_doc_ids = return_doc_ids
 
         # Build index mappings.
-        if need_data:
-            # Checks
-            if len(documents) == 0:
-                return
+        if need_data and len(documents) > 0:
             assert np.min(documents) >= 0
             assert np.max(documents) < indexed_dataset.sizes.shape[0]
 
@@ -328,7 +325,7 @@ class GPTDataset(paddle.io.Dataset):
             paddle.distributed.barrier()
 
         # Load mappings.
-        if need_data:
+        if need_data and len(documents) > 0:
             start_time = time.time()
             print_rank_0(f" > loading doc-idx mapping from {doc_idx_filename}")
             self.doc_idx = np.load(doc_idx_filename, allow_pickle=True, mmap_mode="r")
