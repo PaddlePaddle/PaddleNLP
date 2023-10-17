@@ -2396,12 +2396,11 @@ class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
                         "space_type": self.space_type,
                         "parameters": {"ef_construction": self.ef_construction, "m": self.m},
                     }
-
-            else:
-                mapping["mappings"]["properties"][self.embedding_field] = {
-                    "type": self.vector_type,
-                    "dims": self.embedding_dim,
-                }
+                else:
+                    mapping["mappings"]["properties"][self.embedding_field] = {
+                        "type": self.vector_type,
+                        "dims": self.embedding_dim,
+                    }
 
             if self.index_type == "hnsw":
                 mapping["settings"]["index"] = {"knn": True}

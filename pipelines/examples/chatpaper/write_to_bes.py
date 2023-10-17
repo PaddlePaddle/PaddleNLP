@@ -52,6 +52,9 @@ parser.add_argument('--end_idx', default=-1, type=int, help='The file count end 
 parser.add_argument("--search_engine", choices=['faiss', 'bes'], default="faiss", help="The type of ANN search engine.")
 parser.add_argument("--es_chunk_size", default=500, type=int, help="Number of docs in one chunk sent to es")
 parser.add_argument('--duplicate_documents', choices=["skip", "overwrite", "fail"], default="overwrite", help="Handle duplicates document based on parameter options.")
+parser.add_argument('--write_abstract', default=False, type=bool, help="The title to be  embedded into embedding")
+parser.add_argument("--number_of_shards", default=1, type=int, help="The number of shards.")
+parser.add_argument('--index_type', choices=['hnsw', 'flat'], default="flat", help="The index type of ANN search engine")
 args = parser.parse_args()
 # yapf: enable
 
@@ -82,19 +85,16 @@ def get_doc_store():
             chunk_size=args.es_chunk_size,
             thread_count=args.es_thread_count,
             queue_size=args.es_queue_size,
-            index_type="hnsw",
+            index_type=args.index_type,
             duplicate_documents=args.duplicate_documents,
             timeout=60,
+            number_of_shards=args.number_of_shards,
         )
 
         return document_store
 
 
-if __name__ == "__main__":
-    file_paths = glob.glob(os.path.join(args.file_paths, "*.jsonl"))
-    file_paths.sort()
-    file_paths = file_paths[args.start_idx : args.end_idx]
-
+def write_fulltext(file_paths):
     log_file = open("log_writer.txt", "w")
     for file_path in tqdm(file_paths):
         print(f"Processing file: {file_path}")
@@ -115,3 +115,35 @@ if __name__ == "__main__":
     # thread_count = 1
     # with ThreadPoolExecutor(max_workers=thread_count) as executor:
     #     executor.map(embedding_extraction, file_paths)
+
+
+def write_abstract(file_paths):
+    log_file = open("log_writer.txt", "w")
+    for file_path in tqdm(file_paths):
+        print(f"Processing file: {file_path}")
+        docs = read_data(file_path)
+        print(len(docs))
+        docs = [item for item in docs if len(item["content"]) > 100]
+        print(len(docs))
+        document_store = get_doc_store()
+        try:
+            # Manually write
+            # RequestError(400, 'search_phase_execution_exception', 'Result window is too large, from + size must be less than or equal to: [10000] but was [1596034]. See the scroll api for a more efficient way to request large data sets. This limit can be set by changing the [index.max_result_window] index level setting.')
+            # urllib3.exceptions.ReadTimeoutError: HTTPConnectionPool(host='10.41.101.215', port='8718'): Read timed out. (read timeout=30)
+
+            for i in range(0, len(docs), 5_0000):
+                document_store.write_documents(docs[i : i + 5_0000])
+                break
+        except Exception as e:
+            print("Indexing failed, please try again.")
+            log_file.write(file_path + "\t" + str(e) + "\n")
+
+
+if __name__ == "__main__":
+    file_paths = glob.glob(os.path.join(args.file_paths, "*.jsonl"))
+    file_paths.sort()
+    file_paths = file_paths[args.start_idx : args.end_idx]
+    if args.write_abstract:
+        write_abstract(file_paths)
+    else:
+        write_fulltext(file_paths)
