@@ -464,6 +464,9 @@ def main():
     config.sep_parallel_degree = training_args.sep_parallel_degree
     assert config.num_attention_heads % config.sep_parallel_degree == 0, f"num_attention_heads:{config.num_attention_heads} must be divisible by sep_parallel_degree {config.sep_parallel_degree}"
 
+    # hack
+    config.num_hidden_layers = 4
+
     print("Final pre-training config:", config)
 
     # Set the dtype for loading model

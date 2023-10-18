@@ -221,14 +221,9 @@ class MultiHeadAttention(nn.Layer):
     def _fuse_prepare_qkv(self, query, use_cache=False, cache=None):
         mix_layer = self.qkv_proj(query)
         if self.reshard_layer is not None:
-            if os.environ.get("FLAGS_use_flash_attn_unpadded", "false") == "true":
-                mix_layer = self.reshard_layer(mix_layer, split_axis=2, concat_axis=0,)
-                assert self.num_heads % self.sep_parallel_degree == 0, f"num_heads:{self.num_heads} must be divisible by sep_parallel_degree:{self.sep_parallel_degree}"
-                mix_layer = paddle.reshape_(mix_layer, [-1, 0, self.num_heads // self.sep_parallel_degree, 3 * self.head_dim])  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
-            else:
-                mix_layer = self.reshard_layer(mix_layer, split_axis=2, concat_axis=1,)
-                assert self.num_heads % self.sep_parallel_degree == 0, f"num_heads:{self.num_heads} must be divisible by sep_parallel_degree:{self.sep_parallel_degree}"
-                mix_layer = paddle.reshape_(mix_layer, [0, -1, self.num_heads // self.sep_parallel_degree, 3 * self.head_dim])  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
+            mix_layer = self.reshard_layer(mix_layer, split_axis=2, concat_axis=1)
+            assert self.num_heads % self.sep_parallel_degree == 0, f"num_heads:{self.num_heads} must be divisible by sep_parallel_degree:{self.sep_parallel_degree}"
+            mix_layer = paddle.reshape_(mix_layer, [0, -1, self.num_heads // self.sep_parallel_degree, 3 * self.head_dim])  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
         else:
             mix_layer = paddle.reshape_(mix_layer, [0, 0, -1, 3 * self.head_dim])
 
@@ -315,11 +310,11 @@ class MultiHeadAttention(nn.Layer):
             q = tensor.transpose(x=q, perm=perm)
             k = tensor.transpose(x=k, perm=perm)
             v = tensor.transpose(x=v, perm=perm)
-            out, weights = flash_attention(
-                q, k, v, self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
-            )
-            if self.reshard_layer is not None:
-                out = self.reshard_layer(out, split_axis=1, concat_axis=2,)
+        out, weights = flash_attention(
+            q, k, v, self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
+        )
+        if self.reshard_layer is not None:
+            out = self.reshard_layer(out, split_axis=1, concat_axis=2)
 
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
         if self.sequence_parallel:
