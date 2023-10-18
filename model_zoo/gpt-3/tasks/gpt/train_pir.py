@@ -27,7 +27,22 @@ from ppfleetx.models import build_module
 from ppfleetx.optims import build_lr_scheduler, build_optimizer
 from ppfleetx.utils import config
 
-if __name__ == "__main__":
+
+class MovingAverage:
+    def __init__(self):
+        self.sum = 0
+        self.val = [0] * self.window_size
+        self.cnt = 0
+
+    def update(self, val, n):
+        self.cnt = min(self.cnt + n, self.window_size)
+        offset = max(self.window_size - n, 0)
+        self.sum -= sum(self.values[:-offset])
+        self.sum = val * min(n, self.window_size)
+        self.avg = self.sum / self.cnt
+
+
+def main():
     args = config.parse_args()
     cfg = config.get_config(args.config, overrides=args.override, show=False)
     paddle.device.set_device("gpu:0")
@@ -36,20 +51,17 @@ if __name__ == "__main__":
     config.print_config(cfg)
 
     amp_config = cfg.Engine.mix_precision
-    amp_enable = amp_config["enable"]
-    amp_dtype = amp_config.get("dtype", "float16")
-    amp_level = amp_config.get("level", "O2")
-    use_main_grad = amp_config.get("use_main_grad", False)
     scale_loss = amp_config["scale_loss"]
-    custom_black_list = amp_config["custom_black_list"]
-    custom_white_list = amp_config["custom_white_list"]
 
     scaler = paddle.amp.GradScaler(init_loss_scaling=scale_loss)
 
     train_data_loader = build_dataloader(cfg.Data, "Train")
-    eval_data_loader = build_dataloader(cfg.Data, "Eval")
 
-    model = paddle.jit.to_static(module.model)
+    enable_to_static = cfg.Global.to_static
+    if str(enable_to_static).lower() == "true":
+        model = paddle.jit.to_static(module.model)
+    else:
+        model = module.model
 
     cfg.Optimizer.lr.update(
         {
@@ -69,20 +81,10 @@ if __name__ == "__main__":
             tokens, position_ids, labels, loss_mask = batch
 
             preds = model(tokens, position_ids)
-
             loss = module.loss_fn(preds, labels, loss_mask)
 
-            if amp_enable and amp_dtype == "float16":
-                scaled = scaler.scale(loss)
-                scaled.backward()
-            else:
-                loss.backward()
-
-            if amp_enable and amp_dtype == "float16":
-                scaler.step(optimizer)
-                scaler.update()
-            else:
-                optimizer.step()
+            loss.backward()
+            optimizer.step()
 
             optimizer.clear_grad()
             lr_scheduler.step(global_batch_size)
@@ -98,15 +100,5 @@ if __name__ == "__main__":
             )
 
 
-class MovingAverage:
-    def __init__(self):
-        self.sum = 0
-        self.val = [0] * self.window_size
-        self.cnt = 0
-
-    def update(self, val, n):
-        self.cnt = min(self.cnt + n, self.window_size)
-        offset = max(self.window_size - n, 0)
-        self.sum -= sum(self.values[:-offset])
-        self.sum = val * min(n, self.window_size)
-        self.avg = self.sum / self.cnt
+if __name__ == "__main__":
+    main()
