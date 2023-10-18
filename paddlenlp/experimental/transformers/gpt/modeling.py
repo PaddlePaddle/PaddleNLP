@@ -19,7 +19,8 @@ from paddle.distributed import fleet
 from paddlenlp_ops import get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
-    FusedMultiTransformer,
+    FusedMultiTransformerBase,
+    FusedMultiTransformerConfig,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
@@ -111,7 +112,7 @@ class GPTInferenceModel(GPTPretrainedModel):
         ffn2_bias_attrs = [
             paddle.ParamAttr(name="gpt.decoder.layers.{}.linear2.bias".format(i)) for i in range(self.num_layers)
         ]
-        self.transformer_block = FusedMultiTransformer(
+        transformer_config = FusedMultiTransformerConfig(
             config.hidden_size,
             config.num_attention_heads,
             4 * config.hidden_size,
@@ -134,6 +135,7 @@ class GPTInferenceModel(GPTPretrainedModel):
             epsilon=1e-5,
             norm_type="layernorm",
         )
+        self.transformer_block = FusedMultiTransformerBase(transformer_config)
         self.norm = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
 
     def get_input_embeddings(self):

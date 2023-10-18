@@ -32,6 +32,7 @@
 
    安装 <get_started/installation>
    10分钟完成高精度中文情感分析 <get_started/quick_start>
+   对话模板 <get_started/chat_template>
 
 .. toctree::
    :maxdepth: 1

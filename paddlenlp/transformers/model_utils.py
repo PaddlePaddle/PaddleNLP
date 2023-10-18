@@ -1320,7 +1320,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         from_hf_hub: bool = False,
         from_aistudio: bool = False,
         cache_dir: str | None = None,
-        subfolder: str = "",
+        subfolder: Optional[str] = None,
         config: PretrainedConfig = None,
         convert_from_torch: bool = False,
         use_safetensors: bool | None = None,
@@ -1362,6 +1362,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             return resolved_archive_file, sharded_metadata, is_sharded
 
         if pretrained_model_name_or_path is not None:
+            # the following code use a lot of os.path.join, hence setting subfolder to empty str if None
+            if subfolder is None:
+                subfolder = ""
             pretrained_model_name_or_path = str(pretrained_model_name_or_path)
             is_local = os.path.isdir(pretrained_model_name_or_path)
 
@@ -1929,7 +1932,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         dtype = kwargs.pop("dtype", None)
         from_hf_hub = kwargs.get("from_hf_hub", False)
         from_aistudio = kwargs.get("from_aistudio", False)
-        subfolder = kwargs.get("subfolder", "")
+        subfolder = kwargs.get("subfolder", None)
         variant = kwargs.pop("variant", None)
         use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
 

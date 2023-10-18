@@ -45,7 +45,7 @@ from ..utils.downloader import (
     get_path_from_url_with_filelock,
     url_file_exists,
 )
-from ..utils.env import TOKENIZER_CONFIG_NAME
+from ..utils.env import CHAT_TEMPLATE_CONFIG_NAME, TOKENIZER_CONFIG_NAME
 from ..utils.log import logger
 from .aistudio_utils import aistudio_download
 from .utils import resolve_cache_dir
@@ -1459,6 +1459,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             "added_tokens_file": ADDED_TOKENS_FILE,
             "special_tokens_map_file": SPECIAL_TOKENS_MAP_FILE,
             "tokenizer_config_file": TOKENIZER_CONFIG_FILE,
+            "chat_template_file": CHAT_TEMPLATE_CONFIG_NAME,
         }
 
         vocab_files_target = {**cls.resource_files_names, **additional_files_names}
@@ -1519,6 +1520,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     logger.info("Downloading %s and saved to %s" % (file_path, cache_dir))
                     try:
                         if not url_file_exists(file_path):
+                            # skip warning for chat-template config file
+                            if file_path.endswith(CHAT_TEMPLATE_CONFIG_NAME):
+                                continue
+
                             logger.warning(f"file<{file_path}> not exist")
                             resolved_vocab_files[file_id] = None
                             continue
