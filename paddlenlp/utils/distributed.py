@@ -56,7 +56,10 @@ def convert_file_size_to_int(size: Union[int, str]):
 
 
 def reduce_tensor(tensor, buffer_size="32MiB"):
-    numel = int(paddle.numel(tensor).item())
+    if tensor.dtype == paddle.int8:
+        numel = np.prod(tensor.shape)
+    else:
+        numel = int(paddle.numel(tensor).item())
     # dtype = str(tensor.dtype)
     # numel_bits = numel * dtype_byte_size(tensor.dtype)
     buffer_size = convert_file_size_to_int(buffer_size)
@@ -122,7 +125,7 @@ def distributed_gather(tensor: Any, dst: int = 0, group=None, offload=False) -> 
 
                 if is_dst:
                     for i in range(len(output_tensors)):
-                        output_tensors[i].append(slice_output_tensors[i].numpy())
+                        output_tensors[i].append(slice_output_tensors[i].cpu().numpy())
 
             tensor.reshape_(origin_shape)
             if is_dst:

@@ -286,6 +286,8 @@ class SpacyTextSplitter(TextSplitter):
 
     def split_text(self, text: str, separator: Optional[str] = None, **kwargs) -> List[str]:
         """Split incoming text and return chunks."""
+        if len(text) > 1000000:
+            self._tokenizer.max_length = len(text) + 100
         splits = (str(s) for s in self._tokenizer(text).sents)
         return self._merge_splits(splits, separator, **kwargs)
 
@@ -391,7 +393,6 @@ class MarkdownHeaderTextSplitter(BaseComponent):
         # header_stack: List[Dict[str, Union[int, str]]] = []
         header_stack: List[HeaderType] = []
         initial_metadata: Dict[str, str] = {}
-
         for line in lines:
             stripped_line = line.strip()
             # Check each line against each of the header types (e.g., #, ##)
@@ -495,9 +496,9 @@ class MarkdownHeaderTextSplitter(BaseComponent):
         # We now want to combine these smaller pieces into medium size
         # chunks to send to the LLM.
         if chunk_size is None:
-            chunk_size = self.chunk_size
+            chunk_size = self._chunk_size
         if chunk_overlap is None:
-            chunk_overlap = self.chunk_overlap
+            chunk_overlap = self._chunk_overlap
         if separator is None:
             separator = self._separator
         separator_len = self._length_function(separator)

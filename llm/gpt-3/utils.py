@@ -129,10 +129,23 @@ def init_dist_env(
 ):
 
     strategy = fleet.DistributedStrategy()
+
+    def is_segment_parallel_supported():
+        import inspect
+
+        members = [name for (name, date) in inspect.getmembers(fleet.HybridCommunicateGroup)]
+        return "get_sep_parallel_world_size" in members
+
     if tensor_parallel_degree == 1 and sharding_parallel_degree == 1:
-        order = ["pp", "dp", "sharding", "mp"]
+        if is_segment_parallel_supported():
+            order = ["pp", "dp", "sharding", "sep", "mp"]
+        else:
+            order = ["pp", "dp", "sharding", "mp"]
     else:
-        order = ["dp", "pp", "sharding", "mp"]
+        if is_segment_parallel_supported():
+            order = ["dp", "pp", "sharding", "sep", "mp"]
+        else:
+            order = ["dp", "pp", "sharding", "mp"]
 
     strategy.hybrid_configs = {
         "dp_degree": data_parallel_degree,
@@ -172,6 +185,7 @@ def convert_example(
     tokenizer,
     max_source_length,
     max_target_length,
+    is_test=False,
 ):
     """
     Convert an example into necessary features.
@@ -197,18 +211,18 @@ def convert_example(
 
     outputs = tokenizer(
         output_seq,
-        max_seq_len=max_target_length,
+        max_length=max_target_length,
         # pad_to_max_seq_len=True,
         truncation_strategy="longest_first",
-        return_attention_mask=True,
+        return_attention_mask=False,
         return_token_type_ids=False,
     )
     inputs = tokenizer(
         input_seq,
-        max_seq_len=max_source_length,
+        max_length=max_source_length,
         # pad_to_max_seq_len=True,
         truncation_strategy="longest_first",
-        return_attention_mask=True,
+        return_attention_mask=False,
         return_length=False,
     )
 
@@ -217,6 +231,12 @@ def convert_example(
         final[k] = inputs[k] + outputs[k]
         if k == "input_ids":
             final["labels"] = [tokenizer.pad_token_id] * len(inputs["input_ids"]) + outputs[k]
+    if is_test:
+        return dict(input_ids=inputs["input_ids"], labels=outputs["input_ids"])
+
+    # shift inputs and labels
+    final["input_ids"] = final["input_ids"][:-1]
+    final["labels"] = final["labels"][1:]
     return final
 
 
@@ -318,16 +338,13 @@ class GPTTrainer(Trainer):
             loss, logits, labels = super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
             # argmax here to avoid gather all logits, which is too memory-consuming.
             # keepdim in order to maintain the same shape as logits
-            if model.config.lm_shift_labels:
-                return (loss, logits[..., :-1, :].argmax(axis=-1, keepdim=True), labels[..., 1:])
-            else:
-                return (loss, logits.argmax(axis=-1, keepdim=True), labels)
+            return (loss, logits.argmax(axis=-1, keepdim=True), labels)
 
         model.eval()
 
         preds = model.generate(
             input_ids=inputs["input_ids"],
-            attention_mask=inputs["attention_mask"],
+            attention_mask=inputs["attention_mask"] if "attention_mask" in inputs else None,
             max_length=self.args.tgt_length,
             min_length=0,
             use_cache=True,

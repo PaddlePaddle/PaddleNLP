@@ -25,6 +25,7 @@ yacs
 coverage
 h5py
 pytest
+pytest-timeout
 parameterized
 scikit-learn
 cma
@@ -39,3 +40,4 @@ onnxruntime
 sacremoses
 soundfile
 librosa
+gradio

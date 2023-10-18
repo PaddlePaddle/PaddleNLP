@@ -14,6 +14,7 @@
 """
 GPT/Llama pretraining scripts.
 """
+
 import math
 import os
 import random
@@ -23,6 +24,8 @@ from typing import Optional
 
 import numpy as np
 import paddle
+from configuration import GPTConfig
+from modeling import GPTForCausalLM
 
 from paddlenlp.trainer import (
     PdArgumentParser,
@@ -34,8 +37,6 @@ from paddlenlp.trainer import (
 from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
-    GPTConfig,
-    GPTForPretraining,
     LinearAnnealingWithWarmupDecay,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
@@ -44,11 +45,11 @@ from paddlenlp.utils.log import logger
 MODEL_CLASSES = {
     "gpt": (
         GPTConfig,
-        GPTForPretraining,
+        GPTForCausalLM,
     ),
 }
 
-from dataset import GPTDataset, get_train_valid_test_split_
+from paddlenlp.data.causal_dataset import build_train_valid_test_datasets, print_rank_0
 
 
 def add_start_docstrings(*docstr):
@@ -98,6 +99,13 @@ class DataArguments:
         default=False,
         metadata={"help": "Use share folder for data dir and output dir on multi machine."},
     )
+
+    data_impl: str = field(default="mmap", metadata={"help": "The format of the preprocessed data."})
+    skip_warmup: bool = field(
+        default=True,
+        metadata={"help": "Whether to skip the warmup process of mmap files."},
+    )
+    data_cache: str = field(default=None, metadata={"help": "The path of the cached dataset."})
 
 
 @dataclass
@@ -153,7 +161,7 @@ def create_pretrained_dataset(
     tokenizer,
 ):
 
-    train_valid_test_num_samples = [
+    train_val_test_num_samples = [
         training_args.per_device_train_batch_size
         * training_args.dataset_world_size
         * training_args.max_steps
@@ -165,74 +173,60 @@ def create_pretrained_dataset(
         training_args.per_device_eval_batch_size * training_args.dataset_world_size * training_args.test_iters,
     ]
 
-    input_prefix = data_file[0]
+    print_rank_0(" > datasets target sizes (minimum size):")
+    print_rank_0("    train:      {}".format(train_val_test_num_samples[0]))
+    print_rank_0("    validation: {}".format(train_val_test_num_samples[1]))
+    print_rank_0("    test:       {}".format(train_val_test_num_samples[2]))
 
-    for suffix in ["_ids.npy", "_idx.npz"]:
-        if not os.path.isfile(input_prefix + suffix):
-            raise ValueError("File Not found, %s" % (input_prefix + suffix))
-
-    sample_ids = np.load(input_prefix + "_ids.npy", mmap_mode="r", allow_pickle=True)
-    # All documment ids, extend as 1-D array.
-
-    process_data = np.load(input_prefix + "_idx.npz")
-    # The len(sample_lens) num of docs
-    # The sum(sample_lens) should equal len(sample_ids)
-    sample_lens = process_data["lens"]
-
-    splits = get_train_valid_test_split_(data_args.split, len(sample_lens))
-    assert len(sample_lens) >= splits[-1], "The document nums should larger than max of splits, but %s < %s" % (
-        len(sample_lens),
-        splits[-1],
+    # Build the datasets.
+    train_dataset, valid_dataset, test_dataset = build_train_valid_test_datasets(
+        data_prefix=data_file,
+        data_impl=data_args.data_impl,
+        splits_string=data_args.split,
+        train_val_test_num_samples=train_val_test_num_samples,
+        seq_length=data_args.max_seq_length,
+        seed=training_args.seed,
+        skip_warmup=data_args.skip_warmup,
+        data_cache_path=data_args.data_cache,
     )
 
     def print_dataset(data, mode="train"):
         logger.info(f"Sample data for {mode} mode")
-        input_ids, loss_mask, attention_mask, position_ids, labels = data
-        logger.info(tokenizer._decode(input_ids))
+        # input_ids, loss_mask, attention_mask, position_ids, labels = data
+        input_ids = data["text"]
+
+        logger.info(tokenizer._decode(input_ids))  # todo
+
         # logger.info(tokenizer._decode(labels))
         # logger.info(tokenizer.convert_ids_to_tokens(input_ids))
 
-    def build_dataset(index, name):
-        dataset = GPTDataset(
-            file_prefix=input_prefix,
-            build_data_file=training_args.local_process_index == 0,
-            micro_batch_size=training_args.per_device_train_batch_size
-            if name == "train"
-            else training_args.per_device_eval_batch_size,
-            name="gpt_" + name,
-            max_seq_len=data_args.max_seq_length,
-            num_samples=train_valid_test_num_samples[index],
-            documents=np.arange(splits[index], splits[index + 1]),
-            sample_ids=sample_ids,
-            sample_lens=sample_lens,
-            eos_id=tokenizer.eos_token_id,
-            seed=training_args.seed,
-        )
-        print_dataset(dataset[0], name)
-        return dataset
-
     from paddlenlp.data import Stack
 
+    # eod_token = tokenizer.eos_token_id
+
     def _collate_data(data, stack_fn=Stack()):
-        num_fields = len(data[0])
-        out = [None] * num_fields
-        # 0:input_ids, 1:loss_mask, 2:attention_mask, 3:position_ids, 4:labels
-        for i in (0, 1, 2, 3, 4):
-            out[i] = stack_fn([x[i] for x in data])
+        tokens_ = stack_fn(x["text"] for x in data)
+        # Unpack.
+        # tokens_ = paddle.to_tensor(tokens_, dtype="int64")
+        labels = tokens_[:, 1:]
+        tokens = tokens_[:, :-1]
+
+        # # Loss mask.
+        # loss_mask = paddle.ones(tokens.shape, dtype=paddle.float32)
+        # loss_mask[data == eod_token] = 0.0
+
+        # Attention mask.
+        attention_mask = paddle.ones(tokens.shape, dtype=paddle.int64)
 
         return {
-            "input_ids": out[0],
-            # "token_type_ids": out[1],
-            # "attention_mask": out[2],
-            "loss_mask": out[3],
-            "labels": out[4],
+            "input_ids": tokens,
+            "attention_mask": attention_mask,
+            "labels": labels,
         }
 
-    # Note, data should be broardcast to all devices.
-    # for train, valid, test, the distinct data num is data_world_size
-    train_dataset = build_dataset(0, "train")
-    valid_dataset = build_dataset(1, "valid")
-    test_dataset = build_dataset(2, "test")
+    print_dataset(train_dataset[0])
+    print_dataset(valid_dataset[0])
+    print_dataset(test_dataset[0])
 
     return train_dataset, valid_dataset, test_dataset, _collate_data
 
@@ -245,9 +239,10 @@ def get_train_data_file(args):
         files = [
             os.path.join(args.input_dir, f)
             for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz" in str(f))
+            if (os.path.isfile(os.path.join(args.input_dir, f)) and ("_idx.npz" in str(f) or ".idx" in str(f)))
         ]
         files = [x.replace("_idx.npz", "") for x in files]
+        files = [x.replace(".idx", "") for x in files]  # add
 
         if len(files) > 1:
             ret = []
@@ -342,6 +337,9 @@ def main():
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
 
+    if data_args.data_cache is not None:
+        os.makedirs(data_args.data_cache, exist_ok=True)
+
     set_seed(training_args)
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
@@ -387,7 +385,7 @@ def main():
 
     config.lm_shift_labels = False
     config.use_flash_attention = model_args.use_flash_attention
-    config.use_fused_rms_norm = model_args.use_fused_rms_norm
+    # config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
@@ -449,7 +447,6 @@ def main():
         optimizers=(None, lr_scheduler),
         tokenizer=tokenizer,
     )
-
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:
         checkpoint = training_args.resume_from_checkpoint

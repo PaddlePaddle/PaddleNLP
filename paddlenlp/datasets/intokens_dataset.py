@@ -17,20 +17,60 @@ from paddle.io import Dataset, IterableDataset
 from scipy.linalg import block_diag
 
 
-class InTokensMapDataset(Dataset):
+class InTokens:
+    required_input_keys = ["input_ids", "labels"]
+    required_output_keys = ["input_ids", "labels", "attention_mask"]
+    # Only supported the following keys for InTokens. Keys outside of the set will be ignored.
+    supported_input_keys = ["input_ids", "labels", "attention_mask", "position_ids"]
+
+    @classmethod
+    def _pad_batch_records(cls, batch_records):
+        # Only consider supported input keys
+        input_keys = [key for key in batch_records[0].keys() if key in cls.supported_input_keys]
+
+        # Check required_keys
+        for key in cls.required_input_keys:
+            if key not in input_keys:
+                raise ValueError(f"feature `{key}` is required for InTokensDataset")
+        # Output features must include all required output keys
+        for key in cls.required_output_keys:
+            if key not in input_keys:
+                input_keys.append(key)
+
+        batched_features = {key: [] for key in input_keys}
+        for record in batch_records:
+            batched_features["input_ids"].extend(record["input_ids"])
+            batched_features["labels"].extend(record["labels"])
+            seq_length = len(record["input_ids"])
+            # If attention_mask is not given, assume it's causal mask
+            attention_mask = record.get("attention_mask", np.tril(np.ones([seq_length, seq_length], dtype=bool)))
+            batched_features["attention_mask"].append(attention_mask)
+            # NOTE: position_ids is optional and not required by every model
+            # We append instead of extend here to accomodate 2D position ids
+            if "position_ids" in record:
+                batched_features["position_ids"].append(record["position_ids"])
+        block_attention_mask = block_diag(*batched_features["attention_mask"])
+        # convert to 3-D [batch_size(1), seq_length, seq_length]
+        batched_features["attention_mask"] = np.expand_dims(block_attention_mask, axis=0)
+        if "position_ids" in batched_features:
+            # Accomodate both 1D and 2D position ids
+            batched_features["position_ids"] = np.concatenate(batched_features["position_ids"], axis=-1).tolist()
+        return batched_features
+
+
+class InTokensMapDataset(InTokens, Dataset):
     def __init__(self, data, tokenizer, max_length):
         self.tokenizer = tokenizer
-        self.data = data
         self.max_length = max_length
-        self.dataset = self._create_intokens_data()
+        self.new_data = self._create_intokens_data(data)
 
-    def _create_intokens_data(self):
+    def _create_intokens_data(self, data):
         batch_records, max_len = [], 0
         cur_len_so_far = 0
 
         total_data = []
-        for i in range(len(self.data)):
-            record = self.data[i]
+        for i in range(len(data)):
+            record = data[i]
             max_len = max(max_len, len(record["input_ids"]))
             to_append = (cur_len_so_far + len(record["input_ids"])) <= self.max_length
             if to_append:
@@ -38,12 +78,7 @@ class InTokensMapDataset(Dataset):
                 cur_len_so_far += len(record["input_ids"])
             else:
                 # exceed max length
-                padded_list = _pad_batch_records(
-                    batch_records,
-                    pad_id=self.tokenizer.pad_token_id,
-                    bos_token_id=self.tokenizer.bos_token_id,
-                    max_length=self.max_length,
-                )
+                padded_list = self._pad_batch_records(batch_records)
                 total_data.append(padded_list)
                 # reset
                 batch_records, max_len = [], 0
@@ -54,27 +89,23 @@ class InTokensMapDataset(Dataset):
 
         # remaining data
         if batch_records:
-            padded_list = _pad_batch_records(
-                batch_records,
-                pad_id=self.tokenizer.pad_token_id,
-                bos_token_id=self.tokenizer.bos_token_id,
-                max_length=self.max_length,
-            )
+            padded_list = self._pad_batch_records(batch_records)
             total_data.append(padded_list)
         return total_data
 
     def __getitem__(self, idx):
-        return self.dataset[idx]
+        return self.new_data[idx]
 
     def __len__(self):
-        return len(self.dataset)
+        return len(self.new_data)
 
 
-class InTokensIterableDataset(IterableDataset):
+class InTokensIterableDataset(InTokens, IterableDataset):
     def __init__(self, data, tokenizer, max_length):
         self.data = data
         self.tokenizer = tokenizer
         self.max_length = max_length
+        self.intokens_global_step = 0
 
     def __iter__(self):
         batch_records, max_len = [], 0
@@ -84,55 +115,19 @@ class InTokensIterableDataset(IterableDataset):
             to_append = (cur_len_so_far + len(record["input_ids"])) <= self.max_length
             if to_append:
                 batch_records.append(record)
+                self.intokens_global_step += 1
                 cur_len_so_far += len(record["input_ids"])
             else:
                 # exceed max length
-                padded_list = _pad_batch_records(
-                    batch_records,
-                    pad_id=self.tokenizer.pad_token_id,
-                    bos_token_id=self.tokenizer.bos_token_id,
-                    max_length=self.max_length,
-                )
+                padded_list = self._pad_batch_records(batch_records)
                 yield padded_list
                 # reset
                 batch_records, max_len = [], 0
                 cur_len_so_far = 0
                 # append current data
                 batch_records.append(record)
+                self.intokens_global_step += 1
                 cur_len_so_far += len(record["input_ids"])
-
         if batch_records:
-            padded_list = _pad_batch_records(
-                batch_records,
-                pad_id=self.tokenizer.pad_token_id,
-                bos_token_id=self.tokenizer.bos_token_id,
-                max_length=self.max_length,
-            )
+            padded_list = self._pad_batch_records(batch_records)
             yield padded_list
-
-
-def _pad_batch_records(batch_records, pad_id, bos_token_id, label_pad_id=-100, max_length=4096):
-
-    keys = batch_records[0].keys()
-    data_map = {}
-    data_batch_map = {}
-    for key in keys:
-        if isinstance(batch_records[0][key], list):
-            batch_record_token_ids = [record[key] for record in batch_records]
-            # To adapt to chatglm position_2d
-            if key == "position_ids":
-                batch_token_ids = np.concatenate(batch_record_token_ids, axis=-1).tolist()
-            else:
-                batch_token_ids = sum(batch_record_token_ids, [])
-            data_batch_map[key] = batch_record_token_ids
-            # concated dataset
-            data_map[key] = batch_token_ids
-
-    batch_map = {}
-    batch_map.update(data_map)
-    batch_map["attention_mask"] = [np.array(record["attention_mask"]) for record in batch_records]
-    batch_map["attention_mask"] = [np.tril(block_diag(*batch_map["attention_mask"])).tolist()]
-    if "token_type_ids" in batch_map:
-        batch_map.pop("token_type_ids")
-
-    return batch_map

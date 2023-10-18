@@ -32,7 +32,7 @@ try:
         Urllib3HttpConnection,
     )
     from elasticsearch.exceptions import RequestError
-    from elasticsearch.helpers import bulk, scan
+    from elasticsearch.helpers import parallel_bulk, scan
 except (ImportError, ModuleNotFoundError) as ie:
     from pipelines.utils.import_utils import _optional_component_not_installed
 
@@ -85,6 +85,9 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         synonyms: Optional[List] = None,
         synonym_type: str = "synonym",
         use_system_proxy: bool = False,
+        chunk_size: int = 500,
+        thread_count: int = 32,
+        queue_size: int = 32,
     ):
         """
         A DocumentStore using Elasticsearch to store and query the documents for our search.
@@ -157,7 +160,9 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                              Synonym or Synonym_graph to handle synonyms, including multi-word synonyms correctly during the analysis process.
                              More info at https://www.elastic.co/guide/en/elasticsearch/reference/current/analysis-synonym-graph-tokenfilter.html
         :param use_system_proxy: Whether to use system proxy.
-
+        :param queue_size: size of the task queue between the main thread (producing chunks to send) and the processing threads. for more info at https://elasticsearch-py.readthedocs.io/en/v8.8.2/helpers.html?highlight=bulk#bulk-helpers
+        :param chunk_size: number of docs in one chunk sent to es (default: 500)
+        :param thread_count: size of the threadpool to use for the bulk requests
         """
         # save init parameters to enable export of component config as YAML
         self.set_config(
@@ -256,6 +261,9 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
 
         self.duplicate_documents = duplicate_documents
         self.refresh_type = refresh_type
+        self.chunk_size = chunk_size
+        self.thread_count = thread_count
+        self.queue_size = queue_size
 
     def similarity_check(self, similarity):
         if similarity in ["cosine", "dot_product", "l2"]:
@@ -443,6 +451,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                     mapping["mappings"]["properties"].update({field: {"type": "text"}})
 
             if self.embedding_field:
+                mapping["settings"]["number_of_shards"] = 1
+                mapping["settings"]["number_of_replicas"] = 2
                 mapping["mappings"]["properties"][self.embedding_field] = {
                     "type": self.vector_type,
                     "dims": self.embedding_dim,
@@ -477,7 +487,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                     "updated_at": {"type": "date", "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"}
                     # TODO add pipeline_hash and pipeline_name once we migrated the REST API to pipelines
                 }
-            }
+            },
+            "settings": {"number_of_shards": 1, "number_of_replicas": 2},
         }
         try:
             self.client.indices.create(index=index_name, body=mapping, headers=headers)
@@ -677,11 +688,27 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
 
             # Pass batch_size number of documents to bulk
             if len(documents_to_index) % batch_size == 0:
-                bulk(self.client, documents_to_index, request_timeout=300, refresh=self.refresh_type, headers=headers)
+                for success, info in parallel_bulk(
+                    self.client,
+                    documents_to_index,
+                    chunk_size=self.chunk_size,
+                    thread_count=self.thread_count,
+                    queue_size=self.queue_size,
+                ):
+                    if not success:
+                        logger.error("A document failed:", info)
                 documents_to_index = []
 
         if documents_to_index:
-            bulk(self.client, documents_to_index, request_timeout=300, refresh=self.refresh_type, headers=headers)
+            for success, info in parallel_bulk(
+                self.client,
+                documents_to_index,
+                chunk_size=self.chunk_size,
+                thread_count=self.thread_count,
+                queue_size=self.queue_size,
+            ):
+                if not success:
+                    logger.error("A document failed:", info)
 
     def write_labels(
         self,
@@ -735,11 +762,27 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
 
             # Pass batch_size number of labels to bulk
             if len(labels_to_index) % batch_size == 0:
-                bulk(self.client, labels_to_index, request_timeout=300, refresh=self.refresh_type, headers=headers)
+                for success, info in parallel_bulk(
+                    self.client,
+                    labels_to_index,
+                    chunk_size=self.chunk_size,
+                    thread_count=self.thread_count,
+                    queue_size=self.queue_size,
+                ):
+                    if not success:
+                        logger.error("A document failed:", info)
                 labels_to_index = []
 
         if labels_to_index:
-            bulk(self.client, labels_to_index, request_timeout=300, refresh=self.refresh_type, headers=headers)
+            for success, info in parallel_bulk(
+                self.client,
+                labels_to_index,
+                chunk_size=self.chunk_size,
+                thread_count=self.thread_count,
+                queue_size=self.queue_size,
+            ):
+                if not success:
+                    logger.error("A document failed:", info)
 
     def update_document_meta(
         self, id: str, meta: Dict[str, str], headers: Optional[Dict[str, str]] = None, index: str = None
@@ -1481,7 +1524,6 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         )
 
         logging.getLogger("elasticsearch").setLevel(logging.CRITICAL)
-
         with tqdm(total=document_count, position=0, unit=" Docs", desc="Updating embeddings") as progress_bar:
             for result_batch in get_batches_from_generator(result, batch_size):
                 document_batch = [
@@ -1505,8 +1547,15 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                         "doc": {self.embedding_field: emb.tolist()},
                     }
                     doc_updates.append(update)
-
-                bulk(self.client, doc_updates, request_timeout=300, refresh=self.refresh_type, headers=headers)
+                for success, info in parallel_bulk(
+                    self.client,
+                    doc_updates,
+                    chunk_size=self.chunk_size,
+                    thread_count=self.thread_count,
+                    queue_size=self.queue_size,
+                ):
+                    if not success:
+                        logger.error("A document failed:", info)
                 progress_bar.update(batch_size)
 
     def delete_all_documents(
@@ -2141,8 +2190,15 @@ class OpenSearchDocumentStore(ElasticsearchDocumentStore):
                             "doc": {new_embedding_field: doc.embedding.tolist()},
                         }
                         doc_updates.append(update)
-
-                bulk(self.client, doc_updates, request_timeout=300, refresh=self.refresh_type, headers=headers)
+                for success, info in parallel_bulk(
+                    self.client,
+                    doc_updates,
+                    chunk_size=self.chunk_size,
+                    thread_count=self.thread_count,
+                    queue_size=self.queue_size,
+                ):
+                    if not success:
+                        logger.error("A document failed:", info)
                 progress_bar.update(batch_size)
 
 
@@ -2164,6 +2220,10 @@ class OpenDistroElasticsearchDocumentStore(OpenSearchDocumentStore):
 
 
 class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
+    ef_construction = 200
+    m = 32
+    space_type = "l2"
+
     def similarity_check(self, similarity):
         if similarity in ["cosine", "dot_prod", "l2", "l1"]:
             self.similarity = similarity
@@ -2217,6 +2277,116 @@ class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
                 }
             }
         }
+        try:
+            self.client.indices.create(index=index_name, body=mapping, headers=headers)
+        except RequestError as e:
+            # With multiple workers we need to avoid race conditions, where:
+            # - there's no index in the beginning
+            # - both want to create one
+            # - one fails as the other one already created it
+            if not self.client.indices.exists(index=index_name, headers=headers):
+                raise e
+
+    def _create_document_index(self, index_name: str, headers: Optional[Dict[str, str]] = None):
+        """
+        Create a new index for storing documents. In case if an index with the name already exists, it ensures that
+        the embedding_field is present.
+        """
+        # check if the existing index has the embedding field; if not create it
+        if self.client.indices.exists(index=index_name, headers=headers):
+            mapping = self.client.indices.get(index_name, headers=headers)[index_name]["mappings"]
+            if self.search_fields:
+                for search_field in self.search_fields:
+                    if search_field in mapping["properties"] and mapping["properties"][search_field]["type"] != "text":
+                        raise Exception(
+                            f"The search_field '{search_field}' of index '{index_name}' with type '{mapping['properties'][search_field]['type']}' "
+                            f"does not have the right type 'text' to be queried in fulltext search. Please use only 'text' type properties as search_fields. "
+                            f"This error might occur if you are trying to use pipelines 1.0 and above with an existing elasticsearch index created with a previous version of pipelines."
+                            f"In this case deleting the index with `curl -X DELETE \"{self.pipeline_config['params']['host']}:{self.pipeline_config['params']['port']}/{index_name}\"` will fix your environment. "
+                            f"Note, that all data stored in the index will be lost!"
+                        )
+            if self.embedding_field:
+                if (
+                    self.embedding_field in mapping["properties"]
+                    and mapping["properties"][self.embedding_field]["type"] != self.vector_type
+                ):
+                    raise Exception(
+                        f"The '{index_name}' index in Elasticsearch already has a field called '{self.embedding_field}'"
+                        f" with the type '{mapping['properties'][self.embedding_field]['type']}'. Please update the "
+                        f"document_store to use a different name for the embedding_field parameter."
+                    )
+                if self.index_type != "hnsw":
+                    mapping["properties"][self.embedding_field] = {
+                        "type": self.vector_type,
+                        "dims": self.embedding_dim,
+                    }
+                self.client.indices.put_mapping(index=index_name, body=mapping, headers=headers)
+            return
+
+        if self.custom_mapping:
+            mapping = self.custom_mapping
+        else:
+            mapping = {
+                "mappings": {
+                    "properties": {self.name_field: {"type": "keyword"}, self.content_field: {"type": "text"}},
+                    "dynamic_templates": [
+                        {
+                            "strings": {
+                                "path_match": "*",
+                                "match_mapping_type": "string",
+                                "mapping": {"type": "keyword"},
+                            }
+                        }
+                    ],
+                },
+                "settings": {
+                    "analysis": {
+                        "analyzer": {
+                            "default": {
+                                "type": self.analyzer,
+                            }
+                        }
+                    }
+                },
+            }
+
+            if self.synonyms:
+                for field in self.search_fields:
+                    mapping["mappings"]["properties"].update({field: {"type": "text", "analyzer": "synonym"}})
+                mapping["mappings"]["properties"][self.content_field] = {"type": "text", "analyzer": "synonym"}
+
+                mapping["settings"]["analysis"]["analyzer"]["synonym"] = {
+                    "tokenizer": "whitespace",
+                    "filter": ["lowercase", "synonym"],
+                }
+                mapping["settings"]["analysis"]["filter"] = {
+                    "synonym": {"type": self.synonym_type, "synonyms": self.synonyms}
+                }
+
+            else:
+                for field in self.search_fields:
+                    mapping["mappings"]["properties"].update({field: {"type": "text"}})
+
+            if self.embedding_field:
+                mapping["settings"]["number_of_shards"] = 1
+                mapping["settings"]["number_of_replicas"] = 2
+                if self.index_type == "hnsw":
+                    mapping["mappings"]["properties"][self.embedding_field] = {
+                        "type": self.vector_type,
+                        "dims": self.embedding_dim,
+                        "index_type": "hnsw",
+                        "space_type": self.space_type,
+                        "parameters": {"ef_construction": self.ef_construction, "m": self.m},
+                    }
+
+            else:
+                mapping["mappings"]["properties"][self.embedding_field] = {
+                    "type": self.vector_type,
+                    "dims": self.embedding_dim,
+                }
+
+            if self.index_type == "hnsw":
+                mapping["settings"]["index"] = {"knn": True}
         try:
             self.client.indices.create(index=index_name, body=mapping, headers=headers)
         except RequestError as e:

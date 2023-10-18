@@ -25,6 +25,7 @@ __all__ = [
 LLAMA_PRETRAINED_INIT_CONFIGURATION = {
     # Hypothetical model weights (tiny-random-llama & micro-random-llama) for test only
     "__internal_testing__/micro-random-llama": {
+        "architectures": ["LlamaForCausalLM"],
         "hidden_size": 64,
         "initializer_range": 0.02,
         "intermediate_size": 1000,
@@ -42,6 +43,7 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "use_flash_attention": False,
     },
     "__internal_testing__/tiny-random-llama": {
+        "architectures": ["LlamaForCausalLM"],
         "hidden_size": 768,
         "initializer_range": 0.02,
         "intermediate_size": 11008,
@@ -58,74 +60,6 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "use_recompute": False,
         "use_flash_attention": False,
     },
-    "facebook/llama-7b": {
-        "hidden_size": 4096,
-        "initializer_range": 0.02,
-        "intermediate_size": 11008,
-        "max_position_embeddings": 2048,
-        "model_type": "llama",
-        "num_attention_heads": 32,
-        "num_hidden_layers": 32,
-        "rms_norm_eps": 1e-06,
-        "vocab_size": 32000,
-        "bos_token_id": 1,
-        "eos_token_id": 2,
-        "pad_token_id": 0,
-        "use_cache": False,
-        "use_recompute": False,
-        "use_flash_attention": False,
-    },
-    "facebook/llama-13b": {
-        "hidden_size": 5120,
-        "initializer_range": 0.02,
-        "intermediate_size": 13824,
-        "max_position_embeddings": 2048,
-        "model_type": "llama",
-        "num_attention_heads": 40,
-        "num_hidden_layers": 40,
-        "rms_norm_eps": 1e-06,
-        "vocab_size": 32000,
-        "bos_token_id": 1,
-        "eos_token_id": 2,
-        "pad_token_id": 0,
-        "use_cache": False,
-        "use_recompute": False,
-        "use_flash_attention": False,
-    },
-    "facebook/llama-30b": {
-        "hidden_size": 6656,
-        "initializer_range": 0.02,
-        "intermediate_size": 17920,
-        "max_position_embeddings": 2048,
-        "model_type": "llama",
-        "num_attention_heads": 52,
-        "num_hidden_layers": 60,
-        "rms_norm_eps": 1e-06,
-        "vocab_size": 32000,
-        "bos_token_id": 1,
-        "eos_token_id": 2,
-        "pad_token_id": 0,
-        "use_cache": False,
-        "use_recompute": False,
-        "use_flash_attention": False,
-    },
-    "facebook/llama-65b": {
-        "hidden_size": 8192,
-        "initializer_range": 0.02,
-        "intermediate_size": 22016,
-        "max_position_embeddings": 2048,
-        "model_type": "llama",
-        "num_attention_heads": 64,
-        "num_hidden_layers": 80,
-        "rms_norm_eps": 1e-05,
-        "vocab_size": 32000,
-        "bos_token_id": 1,
-        "eos_token_id": 2,
-        "pad_token_id": 0,
-        "use_cache": False,
-        "use_recompute": False,
-        "use_flash_attention": False,
-    },
 }
 
 # Hypothetical model weights (tiny-random-llama) for test only
@@ -133,10 +67,6 @@ LLAMA_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
         "__internal_testing__/micro-random-llama": "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/micro-random-llama/model_state.pdparams",
         "__internal_testing__/tiny-random-llama": "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-llama/model_state.pdparams",
-        "facebook/llama-7b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-7b/model_state.pdparams",
-        "facebook/llama-13b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-13b/model_state.pdparams",
-        "facebook/llama-30b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-30b/model_state.pdparams",
-        "facebook/llama-65b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-65b/model_state.pdparams",
     },
 }
 
@@ -171,11 +101,16 @@ class LlamaConfig(PretrainedConfig):
             relevant if `config.is_decoder=True`.
         tie_word_embeddings(`bool`, *optional*, defaults to `False`):
             Whether to tie weight embeddings
-        rope_fusion_level(`str`, *optional*, defaults to ``):
-            The level of fusion of rope embedding. Can be chosen from:
-            (1) 'full': fuse sin cos compute and rope embedding
-            (2) 'core': only fuse rope embedding, will compute the sin and cos
-            (3) None: don't fuse any part of the rope embedding
+        use_fused_rope(`bool`, *optional*, defaults to False):
+            Enable rope fusion or not.
+        num_key_value_heads (`int`, *optional*):
+            This is the number of key_value heads that should be used to implement Grouped Query Attention. If
+            `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
+            `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+            converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
+            by meanpooling all the original heads within that group. For more details checkout [this
+            paper](https://arxiv.org/pdf/2305.13245.pdf). If it is not specified, will default to
+            `num_attention_heads`.
         Example:
     ```python
     >>> from paddlenlp.transformer import LlamaModel, LlamaConfig
@@ -206,41 +141,55 @@ class LlamaConfig(PretrainedConfig):
         hidden_size=4096,
         intermediate_size=11008,
         max_position_embeddings=2048,
+        seq_length=2048,
         num_hidden_layers=32,
         num_attention_heads=32,
+        num_key_value_heads=None,
         initializer_range=0.02,
         rms_norm_eps=1e-6,
         use_cache=True,
         use_recompute=False,
         recompute_granularity="full",
+        pp_recompute_interval=1,
+        no_recompute_layers=None,
         fuse_attention_qkv=False,
-        use_flash_attention=False,
         fuse_attention_ffn=False,
+        use_flash_attention=False,
         use_fused_rms_norm=False,
+        use_fused_rope=False,
         tensor_parallel_output=True,
         sequence_parallel=False,
         fuse_sequence_parallel_allreduce=False,
-        lm_shift_labels=True,
+        virtual_pp_degree=1,
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
         tie_word_embeddings=False,
         alibi=False,
-        rope_fusion_level=None,
+        rope_scaling_factor=1.0,
+        rope_scaling_type=None,
         **kwargs,
     ):
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.intermediate_size = intermediate_size
         self.max_position_embeddings = max_position_embeddings
+        self.seq_length = seq_length
         self.num_hidden_layers = num_hidden_layers
         self.num_attention_heads = num_attention_heads
+
+        if num_key_value_heads is None:
+            num_key_value_heads = num_attention_heads
+        self.num_key_value_heads = num_key_value_heads
+
         self.initializer_range = initializer_range
         self.rms_norm_eps = rms_norm_eps
 
         self.use_cache = use_cache
         self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
+        self.no_recompute_layers = no_recompute_layers
+        self.pp_recompute_interval = pp_recompute_interval
         self.fuse_attention_qkv = fuse_attention_qkv
         self.use_flash_attention = use_flash_attention
         self.fuse_attention_ffn = fuse_attention_ffn
@@ -248,14 +197,16 @@ class LlamaConfig(PretrainedConfig):
         self.tensor_parallel_output = tensor_parallel_output
         self.sequence_parallel = sequence_parallel
         self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
-        self.lm_shift_labels = lm_shift_labels
+        self.virtual_pp_degree = virtual_pp_degree
 
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
         self.alibi = alibi
 
-        self.rope_fusion_level = rope_fusion_level
+        self.use_fused_rope = use_fused_rope
+        self.rope_scaling_factor = rope_scaling_factor
+        self.rope_scaling_type = rope_scaling_type
 
         super().__init__(
             pad_token_id=pad_token_id,

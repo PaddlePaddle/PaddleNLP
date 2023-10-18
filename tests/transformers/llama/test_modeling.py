@@ -24,7 +24,9 @@ from parameterized import parameterized
 from paddlenlp.transformers import LlamaConfig, LlamaForCausalLM, LlamaModel
 from tests.testing_utils import require_package, slow
 from tests.transformers.test_configuration_common import ConfigTester
+from tests.transformers.test_generation_utils import GenerationTesterMixin
 from tests.transformers.test_modeling_common import (
+    GenerationD2STestMixin,
     ModelTesterMixin,
     ModelTesterPretrainedMixin,
     ids_tensor,
@@ -100,7 +102,7 @@ class LlamaModelTester:
         self.return_dict = return_dict
 
     def prepare_config_and_inputs(self):
-        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
+        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size, dtype=paddle.int64)
 
         input_mask = None
         if self.use_input_mask:
@@ -146,6 +148,25 @@ class LlamaModelTester:
         model.eval()
         result = model(input_ids)
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
+
+    def create_and_check_model_attention_mask(
+        self, config: LlamaConfig, input_ids, input_mask, sequence_labels, token_labels, choice_labels
+    ):
+        model = LlamaModel(config)
+        model.eval()
+        attn_mask_2d = random_attention_mask([self.batch_size, self.seq_length])
+        result_2d = model(input_ids, attention_mask=attn_mask_2d)[0]
+        batch, seq_length = input_ids.shape
+        causal_mask = paddle.tril(paddle.ones((batch, seq_length, seq_length), dtype=attn_mask_2d.dtype))
+        attn_mask_3d = causal_mask & attn_mask_2d.unsqueeze(-1)
+        result_3d = model(input_ids, attention_mask=attn_mask_3d)[0]
+        attn_mask_4d = attn_mask_3d.unsqueeze(1)
+        result_4d = model(input_ids, attention_mask=attn_mask_4d)[0]
+        result_no_attention_mask = model(input_ids, attention_mask=None)[0]
+        # Assert non-padding tokens have the same logits with different attention_mask shape
+        self.parent.assertTrue((result_2d[attn_mask_2d] == result_3d[attn_mask_2d]).all())
+        self.parent.assertTrue((result_2d[attn_mask_2d] == result_4d[attn_mask_2d]).all())
+        self.parent.assertTrue((result_2d[attn_mask_2d] == result_no_attention_mask[attn_mask_2d]).all())
 
     def create_and_check_model_past_large_inputs(
         self,
@@ -226,13 +247,36 @@ class LlamaModelTester:
         else:
             self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
+    def check_model_position_ids(self, config, input_ids, input_mask, *args):
+        model = LlamaForCausalLM(config)
+        model.eval()
 
-class LlamaModelTest(ModelTesterMixin, unittest.TestCase):
+        result_no_position_id = model(
+            input_ids,
+            labels=input_ids if self.parent.use_labels else None,
+            return_dict=self.parent.return_dict,
+        )
+        batch_size, seq_len = input_ids.shape
+        position_ids = paddle.arange(seq_len).expand((batch_size, seq_len))
+        result_position_id = model(
+            input_ids,
+            position_ids,
+            labels=input_ids if self.parent.use_labels else None,
+            return_dict=self.parent.return_dict,
+        )
+        if self.parent.use_labels:
+            self.parent.assertTrue((result_position_id[1] == result_no_position_id[1]).all())
+        else:
+            self.parent.assertTrue((result_position_id[0] == result_no_position_id[0]).all())
+
+
+class LlamaModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     base_model_class = LlamaModel
     return_dict = False
     use_labels = False
 
     all_model_classes = (LlamaModel, LlamaForCausalLM)
+    all_generative_model_classes = {LlamaForCausalLM: (LlamaModel, "llama")}
 
     def setUp(self):
         super().setUp()
@@ -240,14 +284,34 @@ class LlamaModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester = LlamaModelTester(self)
         self.config_tester = ConfigTester(self, config_class=LlamaConfig, vocab_size=256, hidden_size=24)
 
+    def _get_input_ids_and_config(self):
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+
+        input_ids = inputs_dict[self.input_name]
+        attention_mask = paddle.ones_like(input_ids, dtype=paddle.int64)
+
+        max_batch_size = 2
+        sequence_length = input_ids.shape[-1] // 2
+        input_ids = input_ids[:max_batch_size, :sequence_length]
+        attention_mask = attention_mask[:max_batch_size, :sequence_length]
+        max_length = 3
+
+        return config, input_ids, attention_mask, max_length
+
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_model(*config_and_inputs)
 
-    def test_model_name_list(self):
-        pass
+    def test_model_attention_mask(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_model_attention_mask(*config_and_inputs)
 
-    def test_resize_tokens_embeddings(self):
+    def test_model_position_ids(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.check_model_position_ids(*config_and_inputs)
+
+    def test_generate_without_input_ids(self):
+        # this requires 4-D attention mask logic, which is not supported yet
         pass
 
     def test_llama_lm_head_model(self):
@@ -303,6 +367,10 @@ class LlamaModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
             ]
         )
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+
+class LlamaGenerationD2STest(GenerationD2STestMixin, unittest.TestCase):
+    internal_testing_model = "__internal_testing__/micro-random-llama"
 
 
 class LlamaCompatibilityTest(unittest.TestCase):

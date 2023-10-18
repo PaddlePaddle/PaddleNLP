@@ -232,11 +232,13 @@ class TrainingArguments:
               disable_partial_send_recv, optmize send speed for tensor parallel.
               enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
               enable_dp_comm_overlap, fuse data parallel gradient communication.
+              enable_sharding_comm_overlap, fuse sharding stage 1 parallel gradient communication.
         sharding_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
             following config is support:
               enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation
               enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed
+              enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap.
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -313,6 +315,10 @@ class TrainingArguments:
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
         flatten_param_grads (`bool`, *optional*):
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
+        skip_profile_timer (`bool`, *optional*):
+            Whether skip profile timer, timer will record time usage of forward/ backward/ step, etc.
+        distributed_dataloader (`bool`, *optional*):
+            Whether to use distributed dataloader. Default is `False`.
     """
 
     output_dir: str = field(
@@ -499,6 +505,23 @@ class TrainingArguments:
             )
         },
     )
+    save_sharded_model: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "When use sharding stage1 and set save_sharded_model True, each shanding rank only save part of the model. It reduce time to save the model."
+            )
+        },
+    )
+
+    load_sharded_model: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "When use sharding stage1 and set load_sharded_model True, it means loading the sharded model. The sharded model is saved when we set save_sharded_model True."
+            )
+        },
+    )
     tensor_parallel_degree: int = field(
         default=-1,
         metadata={
@@ -523,6 +546,18 @@ class TrainingArguments:
             )
         },
     )
+    tensor_parallel_config: str = field(
+        default="",
+        metadata={
+            "help": (
+                "Some additional configs which affect model parallel performance, we provide some option to config it."
+                "following config is support:\n"
+                "enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance. \n"
+                "enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.\n"
+                "enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true.  It can accelerate model parallel further."
+            )
+        },
+    )
     pipeline_parallel_config: str = field(
         default="",
         metadata={
@@ -533,6 +568,7 @@ class TrainingArguments:
                 "disable_partial_send_recv, optmize send speed for tensor parallel.\n"
                 "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
                 "enable_dp_comm_overlap, fuse data parallel gradient communication. \n"
+                "enable_sharding_comm_overlap, fuse sharding stage 1 parallel gradient communication. \n"
             )
         },
     )
@@ -543,7 +579,20 @@ class TrainingArguments:
                 "Some additional config it highly affect the useage of sharding parallel, we provide some option to config it."
                 "following config is support: \n"
                 "enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation\n"
-                "enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed"
+                "enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed\n"
+                "enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap"
+            )
+        },
+    )
+    hybrid_parallel_topo_order: str = field(
+        default=None,
+        metadata={
+            "help": (
+                "In hybrid parallelism, the order of communication groups may affect efficiency.\n"
+                "Following options are supported:\n"
+                "- pp_first. the topo order is dp, pp, sharding, mp \n"
+                "- sharding_first. the topo order is dp, sharding, pp, mp \n"
+                "Defalut is None, for pp_first"
             )
         },
     )
@@ -638,6 +687,13 @@ class TrainingArguments:
     lazy_data_processing: Optional[bool] = field(
         default=True,
         metadata={"help": "Whether use lazy data processing."},
+    )
+    skip_profile_timer: Optional[bool] = field(
+        default=True,
+        metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl."},
+    )
+    distributed_dataloader: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to use distributed dataloader."}
     )
 
     def __post_init__(self):
@@ -740,15 +796,24 @@ class TrainingArguments:
         if len(self.sharding) == 0 and self.sharding_parallel_degree > 0:
             warnings.warn("`--sharding_parallel_degree` is useful only when `--sharding` is specified.")
 
-        if len(self.sharding) > 0 or self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1:
+        if paddle.distributed.get_world_size() > 1 and (
+            len(self.sharding) > 0 or self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1
+        ):
             self.use_hybrid_parallel = True
+
+        if self.distributed_dataloader and not (self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1):
+            warnings.warn("We set `distributed_dataloader` to False if tp_degree <= 1 and pp_degree <= 1")
+            self.distributed_dataloader = False
 
         if self.amp_master_grad:
             if (
-                self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1
-            ) or self.fp16_opt_level != "O2":
+                self.pipeline_parallel_degree <= 1
+                and self.tensor_parallel_degree <= 1
+                and (not self.sharding or ShardingOption.FULL_SHARD in self.sharding)
+            ):
                 raise ValueError(
-                    "Temporarily amp master grad only suport for tensor/pipeline parallel with fp16_opt_level O2. please set amp_master_grad to False."
+                    "Temporarily amp master grad only support for tensor/pipeline/sharding"
+                    " (stage 1 and stage 2) parallel. Please set amp_master_grad to False."
                 )
             if not (self.bf16 or self.fp16):
                 logger.warning("set amp_master_grad to false since amp is disabled.")
@@ -785,8 +850,8 @@ class TrainingArguments:
             if sharding_parallel_degree > 1 and ShardingOption.SHARD_OP in self.sharding:
                 assert self.data_parallel_degree == 1, "sharding stage1 can not coexist with dp for now"
 
-            if ShardingOption.OFFLOAD in self.sharding or ShardingOption.FULL_SHARD in self.sharding:
-                warnings.warn("`offload` and `stage3` is not supported NOW!")
+            if ShardingOption.OFFLOAD in self.sharding:
+                warnings.warn("`offload` is not supported NOW!")
 
             if pipeline_parallel_degree > 1:
                 if ShardingOption.FULL_SHARD in self.sharding or ShardingOption.SHARD_GRAD_OP in self.sharding:
@@ -806,6 +871,8 @@ class TrainingArguments:
                                 "disable_partial_send_recv",
                                 "enable_delay_scale_loss",
                                 "enable_dp_comm_overlap",
+                                "enable_sharding_comm_overlap",
+                                "enable_timer",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -821,8 +888,14 @@ class TrainingArguments:
                     logger.info(f"PP configs:{strategy.pipeline_configs}, use master_grad: {self.amp_master_grad}")
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
-                        "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config,
+                        "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config
+                        and self.data_parallel_degree > 1,
+                        "sharding_comm_overlap": "enable_sharding_comm_overlap" in pipeline_parallel_config
+                        and self.sharding_parallel_degree > 1,
+                        "enable_timer": "enable_timer" in pipeline_parallel_config,
                     }
+                    if dygraph_pp_configs["dp_comm_overlap"]:
+                        raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
 
                     if self.do_eval:
                         assert (
@@ -836,16 +909,76 @@ class TrainingArguments:
                 if tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
 
+                    if " " in self.tensor_parallel_config:
+                        mp_config = set(self.tensor_parallel_config.split(" "))
+                    else:
+                        mp_config = set(self.tensor_parallel_config.split(","))
+
+                    for x in mp_config:
+                        if len(x) > 0:
+                            if x not in [
+                                "enable_mp_async_allreduce",
+                                "enable_mp_skip_c_identity",
+                                "enable_mp_fused_linear_param_grad_add",
+                            ]:
+                                raise ValueError(
+                                    f"Found unknown tensor parallell config {x}, "
+                                    f"accept config is enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add"
+                                )
+                    try:
+                        if "enable_mp_async_allreduce" in mp_config:
+                            strategy.hybrid_configs["mp_configs"].mp_async_allreduce = True
+                            if "enable_mp_skip_c_identity" in mp_config:
+                                strategy.hybrid_configs["mp_configs"].mp_skip_c_identity = True
+                            if "enable_mp_fused_linear_param_grad_add" in mp_config:
+                                strategy.hybrid_configs["mp_configs"].mp_fused_linear_param_grad_add = True
+                        else:
+                            if "enable_mp_skip_c_identity" in mp_config:
+                                warnings.warn(
+                                    "enable_mp_skip_c_identity only works with enable_mp_async_allreduce. It will not work."
+                                )
+                            if "enable_mp_fused_linear_param_grad_add" in mp_config:
+                                warnings.warn(
+                                    "enable_mp_fused_linear_param_grad_add only works with enable_mp_async_allreduce. It will not work."
+                                )
+                    except:
+                        warnings.warn(
+                            "The enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add are not supported "
+                            "by current version of Paddle. Please try latest develop Paddle."
+                        )
+
+                if self.hybrid_parallel_topo_order is None:
+                    self.hybrid_parallel_topo_order = "pp_first"
+                assert self.hybrid_parallel_topo_order in ["pp_first", "sharding_first"]
+
+                def is_segment_parallel_supported():
+                    import inspect
+
+                    members = [name for (name, date) in inspect.getmembers(fleet.HybridCommunicateGroup)]
+                    return "get_sep_parallel_world_size" in members
+
+                if self.hybrid_parallel_topo_order == "pp_first":
+                    if is_segment_parallel_supported():
+                        order = ["dp", "pp", "sharding", "sep", "mp"]
+                    else:
+                        order = ["dp", "pp", "sharding", "mp"]
+                if self.hybrid_parallel_topo_order == "sharding_first":
+                    if is_segment_parallel_supported():
+                        order = ["dp", "sharding", "pp", "sep", "mp"]
+                    else:
+                        order = ["dp", "sharding", "pp", "mp"]
+
                 hybrid_configs = {
                     "dp_degree": self.data_parallel_degree,
                     "mp_degree": tensor_parallel_degree,
                     "pp_degree": pipeline_parallel_degree,
                     "sharding_degree": sharding_parallel_degree,
+                    "order": order,
                 }
 
                 if pipeline_parallel_degree > 1:
                     hybrid_configs["pp_configs"] = dygraph_pp_configs
-                    logger.info(f"using pipline configs:{dygraph_pp_configs}")
+                    logger.info(f"using pipeline configs:{dygraph_pp_configs}")
 
                 # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
                 strategy.hybrid_configs = hybrid_configs
@@ -854,12 +987,24 @@ class TrainingArguments:
                     sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
                     for x in sharding_parallel_config:
                         if len(x) > 0:
-                            if x not in ["enable_stage1_tensor_fusion", "enable_stage1_overlap"]:
+                            if x not in [
+                                "enable_stage1_tensor_fusion",
+                                "enable_stage1_overlap",
+                                "enable_stage2_overlap",
+                            ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, "
-                                    f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap."
+                                    f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap."
                                 )
                     try:
+                        if (
+                            "enable_stage1_tensor_fusion" in sharding_parallel_config
+                            or "enable_stage1_overlap" in sharding_parallel_config
+                        ):
+                            assert pipeline_parallel_degree == 1, (
+                                "For pipeline parallel with sharding, the sharding overlap and tensor fusion "
+                                "should be configured in pipeline_parallel_config."
+                            )
                         strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
                             True if "enable_stage1_tensor_fusion" in sharding_parallel_config else False
                         )
@@ -873,10 +1018,16 @@ class TrainingArguments:
                             "The enable_stage1_tensor_fusion or enable_stage1_overlap is not supported "
                             "by current version of Paddle. Please try latest develop Paddle."
                         )
+                    if "enable_stage2_overlap" in sharding_parallel_config:
+                        assert (
+                            ShardingOption.SHARD_GRAD_OP in self.sharding
+                        ), f"enable_stage2_overlap expects sharding=stage2, but got {self.sharding}."
+                        assert self.logging_steps > 1, (
+                            "The logging_steps should be greater than 1 for stage2 overlap, "
+                            f"but got logging_steps={self.logging_steps}."
+                        )
                 fleet.init(is_collective=True, strategy=strategy)
-
                 logger.info(strategy)
-
         else:
             world_size = paddle.distributed.get_world_size()
             if world_size > 1:
@@ -1030,6 +1181,22 @@ class TrainingArguments:
         else:
             return None
 
+    def sharded_name_suffix(self, shard_id=None):
+        if self.use_hybrid_parallel:
+            name = []
+            if self.tensor_parallel_degree > 1:
+                name.append(f"tp{self.tensor_parallel_rank:0>2d}")
+            if self.pipeline_parallel_degree > 1:
+                name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
+            if self.sharding_parallel_degree > 1:
+                if shard_id is None:
+                    shard_id = self.sharding_parallel_rank
+                assert isinstance(shard_id, int)
+                name.append(f"shard{shard_id:0>2d}")
+            return "_".join(name)
+        else:
+            return None
+
     @property
     def process_index(self):
         """
@@ -1088,7 +1255,9 @@ class TrainingArguments:
         if self.save_on_each_node:
             return self.local_process_index == 0
         else:
-            if self.use_hybrid_parallel:
+            if self.should_save_sharding_stage1_model:
+                return True
+            elif self.use_hybrid_parallel:
                 # save on dataset rank 0
                 return self.sharding_parallel_rank == 0 and self.data_parallel_rank == 0
             else:
@@ -1100,6 +1269,28 @@ class TrainingArguments:
         Whether or not to use no_sync for the gradients when doing gradient accumulation.
         """
         return True
+
+    @property
+    def should_save_sharding_stage1_model(self):
+        return (
+            ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.save_sharded_model
+        )
+
+    @property
+    def should_load_sharding_stage1_model(self):
+        return (
+            ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.load_sharded_model
+        )
+
+    @property
+    def should_load_dataset(self):
+        if not self.distributed_dataloader:
+            return True
+        else:
+            if self.tensor_parallel_rank == 0 and self.pipeline_parallel_rank == 0:
+                return True
+            else:
+                return False
 
     @contextlib.contextmanager
     def main_process_first(self, local=True, desc="work"):
@@ -1195,8 +1386,11 @@ class TrainingArguments:
             args = self
             key = "Training"
 
+        import paddlenlp
+
         logger.info("{:^40}".format("{} Configuration Arguments".format(key)))
         logger.info("{:30}: {}".format("paddle commit id", paddle.version.commit))
+        logger.info("{:30}: {}".format("paddlenlp commit id", paddlenlp.version.commit))
 
         for a in dir(args):
             if a[:2] != "__":  # don't print double underscore methods

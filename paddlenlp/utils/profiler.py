@@ -44,6 +44,7 @@ class ProfilerOptions(object):
       profile_path     - a string, the path to save the serialized profile data,
                          which can be used to generate a timeline.
       exit_on_finished - a boolean.
+      record_shapes    - a boolean.
     """
 
     def __init__(self, options_str):
@@ -57,6 +58,7 @@ class ProfilerOptions(object):
             "profile_path": "/tmp/profile",
             "exit_on_finished": True,
             "timer_only": True,
+            "record_shapes": False,
         }
         self._parse_from_string(options_str)
 
@@ -73,6 +75,8 @@ class ProfilerOptions(object):
             elif key in ["state", "sorted_key", "tracer_option", "profile_path"]:
                 self._options[key] = value
             elif key == "timer_only":
+                self._options[key] = value
+            elif key == "record_shapes":
                 self._options[key] = value
 
     def __getitem__(self, name):
@@ -105,10 +109,12 @@ def add_profiler_step(options_str=None):
     # timer_only = False the output Timeline information can be found in the profiler_log directory
     if _prof is None:
         _timer_only = str(_profiler_options["timer_only"]) == str(True)
+        _record_shapes = str(_profiler_options["record_shapes"]) == str(True)
         _prof = profiler.Profiler(
             scheduler=(_profiler_options["batch_range"][0], _profiler_options["batch_range"][1]),
-            on_trace_ready=profiler.export_chrome_tracing("./profiler_log"),
+            on_trace_ready=profiler.export_chrome_tracing(_profiler_options["profile_path"]),
             timer_only=_timer_only,
+            record_shapes=_record_shapes,
         )
         _prof.start()
     else:

@@ -122,12 +122,22 @@ def get_dp_seed():
 
 def init_dist_env(config):
     paddle.set_device(config.Global.device)
-
     strategy = fleet.DistributedStrategy()
+    def is_segment_parallel_supported():
+        import inspect
+        members = [name for (name, date) in inspect.getmembers(fleet.HybridCommunicateGroup)]
+        return "get_sep_parallel_world_size" in members
+
     if config.Distributed.mp_degree == 1 and config.Distributed.sharding.sharding_degree == 1:
-        order = ["pp", "dp", "sharding", "mp"]
+        if is_segment_parallel_supported():
+            order = ["pp", "dp", "sharding", "sep", "mp"]
+        else:
+            order = ["pp", "dp", "sharding", "mp"]
     else:
-        order = ["dp", "pp", "sharding", "mp"]
+        if is_segment_parallel_supported():
+            order = ["dp", "pp", "sharding", "sep", "mp"]
+        else:
+            order = ["dp", "pp", "sharding", "mp"]
 
     strategy.hybrid_configs = {
         "dp_degree": config.Distributed.dp_degree,
@@ -189,7 +199,7 @@ def get_data_world_rank():
 def work_at_local_rank0(func):
     def wrapper(*args, **kwargs):
         local_rank = 0
-        if paddle.fluid.core.is_compiled_with_dist() and paddle.distributed.get_world_size() > 1:
+        if paddle.base.core.is_compiled_with_dist() and paddle.distributed.get_world_size() > 1:
             local_rank = paddle.distributed.ParallelEnv().dev_id
         if local_rank == 0:
             func(*args, **kwargs)

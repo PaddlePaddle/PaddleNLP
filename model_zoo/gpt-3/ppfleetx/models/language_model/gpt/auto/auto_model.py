@@ -24,9 +24,10 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.common_ops_import import convert_dtype
-from paddle.fluid import layers
+from paddle.base import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from ppfleetx.distributed.apis import auto_env
+from ppfleetx.utils.log import logger
 
 from ..dygraph.processor import (
     ForcedBOSTokenLogitsProcessor,
@@ -42,6 +43,11 @@ try:
 except:
     FusedDropoutAdd = None
 FusedDropoutAdd = None
+
+try:
+    from paddle.nn.functional.flash_attention import flash_attention
+except:
+    flash_attention = None
 
 
 def get_attr(layer, name):
@@ -77,6 +83,7 @@ class MultiHeadAttention(nn.Layer):
         scale_qk_coeff=1.0,
         use_recompute=False,
         recompute_granularity="full",
+        use_flash_attn=False,
         ipp=None,
     ):
         super(MultiHeadAttention, self).__init__()
@@ -91,6 +98,7 @@ class MultiHeadAttention(nn.Layer):
         self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
         self.ipp = ipp
+        self.use_flash_attn = use_flash_attn if flash_attention else None
 
         self.head_dim = embed_dim // num_heads
         assert self.head_dim * num_heads == self.embed_dim, "embed_dim[{}] must be divisible by num_heads[{}]".format(self.embed_dim, num_heads)
@@ -193,6 +201,13 @@ class MultiHeadAttention(nn.Layer):
             # incremental_state with initial value, mainly for usage like UniLM
             return self.Cache(key, value)
 
+    def _flash_attention(self, q, k, v, attn_mask=None):
+        out, weights = flash_attention(
+            q, k, v, self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
+        )
+        out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
+        return (out, weights)
+
     def core_attn(self, q, k, v, attn_mask=None):
         perm = [0, 2, 1, 3]
         q = tensor.transpose(x=q, perm=perm)
@@ -236,10 +251,15 @@ class MultiHeadAttention(nn.Layer):
         else:
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
 
-        if self.use_recompute and self.recompute_granularity == "core_attn":
-            out, weights = auto.recompute(self.core_attn)(q, k, v, attn_mask)
+        if self.use_flash_attn and attn_mask is None:
+            attn_func = self._flash_attention
         else:
-            out, weights = self.core_attn(q, k, v, attn_mask=attn_mask)
+            attn_func = self.core_attn
+
+        if self.use_recompute and self.recompute_granularity == "core_attn":
+            out, weights = auto.recompute(attn_func)(q, k, v, attn_mask)
+        else:
+            out, weights = attn_func(q, k, v, attn_mask=attn_mask)
 
         auto.shard_tensor(self.out_proj.weight, auto_env.get_mesh()[self.ipp], [auto_env.get_mesh().mp_dim, None])
 
@@ -291,7 +311,7 @@ class TransformerDecoder(nn.Layer):
 
         for i, mod in enumerate(self.layers):
             ipp = mod.ipp
-            mod = auto.shard_op(mod, auto_env.get_mesh()[ipp])
+            auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().dp_dim, None, None])
 
             if cache is None:
                 if use_cache:
@@ -305,8 +325,6 @@ class TransformerDecoder(nn.Layer):
             else:
                 output, new_cache = mod(output, memory, tgt_mask=tgt_mask, use_cache=use_cache, cache=cache[i])
                 new_caches.append(new_cache)
-
-            auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().dp_dim, None, None])
 
         if self.norm is not None:
             output = self.norm(output)
@@ -351,6 +369,7 @@ class TransformerDecoderLayer(nn.Layer):
         scale_qk_coeff=1.0,
         use_recompute=False,
         recompute_granularity="full",
+        use_flash_attn=False,
         use_fused_dropout_add=True,
         ipp=None,
     ):
@@ -385,6 +404,7 @@ class TransformerDecoderLayer(nn.Layer):
             scale_qk_coeff=scale_qk_coeff,
             use_recompute=use_recompute,
             recompute_granularity=recompute_granularity,
+            use_flash_attn=use_flash_attn,
             ipp=ipp,
         )
 
@@ -518,6 +538,7 @@ class GPTModelAuto(nn.Layer):
         scale_qk_by_layer_num=True,
         recompute_granularity="full",
         freeze_embedding=False,
+        use_flash_attn=False,
         fused_softmax_with_triangular=False,
         use_fused_dropout_add=True,
     ):
@@ -533,6 +554,13 @@ class GPTModelAuto(nn.Layer):
             raise RuntimeError(
                 "Please call auto_env.init_dist_env(config). AutoPrallel modeling need `mesh` to annotate distributed attribute."
             )
+
+        if use_flash_attn:
+            if flash_attention:
+                logger.info("Flash-attention enabled.")
+            else:
+                use_flash_attn = False
+                logger.warning("Flash-attention is not support in this Paddle version.")
 
         self.embeddings = GPTEmbeddings(
             vocab_size,
@@ -571,6 +599,7 @@ class GPTModelAuto(nn.Layer):
                     use_recompute=use_recompute,
                     recompute_granularity=recompute_granularity,
                     use_fused_dropout_add=use_fused_dropout_add,
+                    use_flash_attn=use_flash_attn,
                     ipp=layer_to_pipe[i],
                 )
             )
@@ -979,7 +1008,7 @@ class GPTForGenerationAuto(nn.Layer):
             x_dims_mapping = [auto_env.get_mesh().dp_dim] + [None] * (len(logits.shape) - 1)
             w_dims_mapping = [auto_env.get_mesh().mp_dim, None]
             matmul = auto.shard_op(paddle.matmul, auto_env.get_mesh()[-1], [x_dims_mapping, w_dims_mapping, None])
-            with paddle.fluid.name_scope("skip_quant"):
+            with paddle.base.name_scope("skip_quant"):
                 logits = matmul(logits, get_attr(self.gpt.embeddings.word_embeddings, "weight"), transpose_y=True)
 
             # [batch_size, vocab_size]
@@ -1148,10 +1177,20 @@ class GPTForGenerationAuto(nn.Layer):
 
         if self.inference:
             # Note(ZhenyuLi): Avoid the synchronization caused by scale in dy2static
-            min_len = input_ids.shape[-1]
-            max_len = input_ids.shape[-1]
-            paddle.increment(min_len, min_length)
-            paddle.increment(max_len, max_length)
+            if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+                # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior
+                # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+                # removed after static graphs support inplace and stride.
+                with paddle.framework._no_check_dy2st_diff():
+                    min_len = input_ids.shape[-1]
+                    max_len = input_ids.shape[-1]
+                    paddle.increment(min_len, min_length)
+                    paddle.increment(max_len, max_length)
+            else:
+                min_len = input_ids.shape[-1]
+                max_len = input_ids.shape[-1]
+                paddle.increment(min_len, min_length)
+                paddle.increment(max_len, max_length)
         else:
             input_len = input_ids.shape[-1]
             max_len = max_length + input_len
@@ -1174,18 +1213,34 @@ class GPTForGenerationAuto(nn.Layer):
                 input_ids, model_kwargs = self.expand_inputs_for_generation(
                     input_ids, expand_size=num_return_sequences, **model_kwargs
                 )
-
-            ret = self.sample(
-                input_ids,
-                logits_processors,
-                max_len,
-                pad_token_id,
-                eos_token_id,
-                top_k,
-                top_p,
-                temperature,
-                **model_kwargs,
-            )
+            if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+                # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior
+                # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+                # removed after static graphs support inplace and stride.
+                with paddle.framework._no_check_dy2st_diff():
+                    ret = self.sample(
+                        input_ids,
+                        logits_processors,
+                        max_len,
+                        pad_token_id,
+                        eos_token_id,
+                        top_k,
+                        top_p,
+                        temperature,
+                        **model_kwargs,
+                    )
+            else:
+                ret = self.sample(
+                    input_ids,
+                    logits_processors,
+                    max_len,
+                    pad_token_id,
+                    eos_token_id,
+                    top_k,
+                    top_p,
+                    temperature,
+                    **model_kwargs,
+                )
         else:
             raise ValueError(f"Not support {decode_strategy} strategy yet!")
         return ret

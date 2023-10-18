@@ -27,7 +27,6 @@ from typing import Optional, Tuple, Type
 
 import numpy as np
 import paddle
-import paddle.fluid as fluid
 from paddle.distributed.utils.launch_utils import (
     TrainerProc,
     find_free_ports,
@@ -35,6 +34,8 @@ from paddle.distributed.utils.launch_utils import (
     watch_local_trainers,
 )
 
+from paddlenlp.taskflow.utils import static_mode_guard
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.utils.env import CONFIG_NAME, LEGACY_CONFIG_NAME, MODEL_HOME
@@ -881,7 +882,7 @@ class DistributedTest(unittest.TestCase):
         eager_mode=True,
         allocator_strategy="auto_growth",
     ):
-        if not fluid.core.is_compiled_with_cuda() or fluid.core.get_cuda_device_count() == 0:
+        if not paddle.framework.core.is_compiled_with_cuda() or paddle.framework.core.get_cuda_device_count() == 0:
             return
 
         cluster = None
@@ -905,3 +906,160 @@ class DistributedTest(unittest.TestCase):
                 print("Local procs complete, POD info:{}".format(pod))
                 break
             time.sleep(3)
+
+
+class GenerationD2STestMixin:
+    article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
+    internal_testing_model = None
+
+    TokenizerClass = AutoTokenizer
+    CausalLMClass = AutoModelForCausalLM
+    max_new_tokens = 20
+
+    def setUp(self):
+        paddle.disable_static()
+        super().setUp()
+
+    def tearDown(self):
+        paddle.disable_static()
+        super().setUp()
+
+    def test_to_static_use_top_k(self):
+        tokenizer = self.TokenizerClass.from_pretrained(self.internal_testing_model)
+        if tokenizer.__class__.__name__ == "LlamaTokenizer":
+            tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token else "<pad>"
+
+        model = self.CausalLMClass.from_pretrained(self.internal_testing_model)
+        model_kwargs = tokenizer(
+            self.article,
+            max_length=self.max_new_tokens,
+            truncation=True,
+            truncation_side="left",
+            return_tensors="pd",
+            padding=True,
+            add_special_tokens=True,
+        )
+        model.is_encoder_decoder = False
+
+        model.eval()
+
+        model_kwargs["use_cache"] = True
+        model_kwargs["max_length"] = self.max_new_tokens + model_kwargs["input_ids"].shape[-1]
+
+        decoded_ids = model.greedy_search(
+            logits_processors=None,
+            bos_token_id=model.config.bos_token_id,
+            pad_token_id=model.config.pad_token_id,
+            eos_token_id=model.config.eos_token_id,
+            **model_kwargs,
+        )[0]
+
+        dygraph_decoded_ids = decoded_ids.tolist()
+
+        with static_mode_guard():
+            with tempfile.TemporaryDirectory() as tempdir:
+                path = os.path.join(tempdir, "model")
+                model.to_static(
+                    path,
+                    config=dict(
+                        use_top_p=False,
+                    ),
+                )
+
+                model_path = os.path.join(tempdir, "model.pdmodel")
+                params_path = os.path.join(tempdir, "model.pdiparams")
+                config = paddle.inference.Config(model_path, params_path)
+
+                config.disable_gpu()
+                config.disable_glog_info()
+                predictor = paddle.inference.create_predictor(config)
+
+                model_kwargs["top_k"] = 1
+                model_kwargs["max_new_tokens"] = self.max_new_tokens
+
+                # create input
+                for key in model_kwargs.keys():
+                    if paddle.is_tensor(model_kwargs[key]):
+                        model_kwargs[key] = model_kwargs[key].numpy()
+                    elif isinstance(model_kwargs[key], float):
+                        model_kwargs[key] = np.array(model_kwargs[key], dtype="float32")
+                    else:
+                        model_kwargs[key] = np.array(model_kwargs[key], dtype="int64")
+
+                input_handles = {}
+                for name in predictor.get_input_names():
+                    input_handles[name] = predictor.get_input_handle(name)
+                    input_handles[name].copy_from_cpu(model_kwargs[name])
+
+                predictor.run()
+                output_names = predictor.get_output_names()
+                output_handle = predictor.get_output_handle(output_names[0])
+                results = output_handle.copy_to_cpu()
+
+                static_decoded_ids = results.tolist()
+
+        self.assertEqual(len(dygraph_decoded_ids[0]), self.max_new_tokens)
+        self.assertEqual(len(static_decoded_ids[0]), self.max_new_tokens)
+        self.assertEqual(dygraph_decoded_ids, static_decoded_ids)
+
+    def test_to_static_use_top_p(self):
+        tokenizer = self.TokenizerClass.from_pretrained(self.internal_testing_model)
+        if tokenizer.__class__.__name__ == "LlamaTokenizer":
+            tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token else "<pad>"
+        model = self.CausalLMClass.from_pretrained(self.internal_testing_model)
+
+        model_kwargs = tokenizer(
+            self.article,
+            max_length=self.max_new_tokens,
+            truncation=True,
+            truncation_side="left",
+            return_tensors="pd",
+            padding=True,
+            add_special_tokens=True,
+        )
+
+        model.eval()
+
+        model_kwargs["use_cache"] = True
+        model_kwargs["max_new_tokens"] = self.max_new_tokens
+
+        with static_mode_guard():
+            with tempfile.TemporaryDirectory() as tempdir:
+
+                path = os.path.join(tempdir, "model")
+                model.to_static(
+                    path,
+                    config=dict(
+                        use_top_p=False,
+                    ),
+                )
+
+                model_path = os.path.join(tempdir, "model.pdmodel")
+                params_path = os.path.join(tempdir, "model.pdiparams")
+                config = paddle.inference.Config(model_path, params_path)
+
+                config.disable_gpu()
+                config.disable_glog_info()
+                predictor = paddle.inference.create_predictor(config)
+
+                model_kwargs["top_k"] = 1
+                model_kwargs["max_new_tokens"] = self.max_new_tokens
+                # create input
+                for key in model_kwargs.keys():
+                    if paddle.is_tensor(model_kwargs[key]):
+                        model_kwargs[key] = model_kwargs[key].numpy()
+                    else:
+                        model_kwargs[key] = np.array(model_kwargs[key])
+
+                input_handles = {}
+                for name in predictor.get_input_names():
+                    input_handles[name] = predictor.get_input_handle(name)
+                    input_handles[name].copy_from_cpu(model_kwargs[name])
+
+                predictor.run()
+                output_names = predictor.get_output_names()
+                output_handle = predictor.get_output_handle(output_names[0])
+                results = output_handle.copy_to_cpu()
+
+        self.assertEqual(len(results.tolist()[0]), self.max_new_tokens)
+        self.assertIsNotNone(results)
