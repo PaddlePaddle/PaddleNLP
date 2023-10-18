@@ -26,6 +26,26 @@ local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 #         return None
 
 
+def check_data_split(splits_string, do_train, do_eval, do_predict):
+    splits = []
+    if splits_string.find(",") != -1:
+        splits = [float(s) for s in splits_string.split(",")]
+    elif splits_string.find("/") != -1:
+        splits = [float(s) for s in splits_string.split("/")]
+    else:
+        splits = [float(splits_string)]
+    while len(splits) < 3:
+        splits.append(0.0)
+    splits = splits[:3]
+    splits_sum = sum(splits)
+    data_flag = True
+    assert splits_sum > 0.0, "sum of splits should larger than 0.0!"
+    if (do_train and splits[0] == 0) or (do_eval and splits[1] == 0) or (do_predict and splits[2] == 0):
+        data_flag = False
+    if not data_flag:
+        raise ValueError("If do_train/do_eval/do_predict is True, the corresponding dataset split should not be 0!")
+
+
 def get_train_valid_test_split_(splits_string, size):
     """Get dataset splits from comma or '/' separated string list."""
 
@@ -279,8 +299,7 @@ class GPTDataset(paddle.io.Dataset):
         self.return_doc_ids = return_doc_ids
 
         # Build index mappings.
-        if need_data:
-            # Checks
+        if need_data and len(documents) > 0:
             assert np.min(documents) >= 0
             assert np.max(documents) < indexed_dataset.sizes.shape[0]
 
@@ -308,7 +327,7 @@ class GPTDataset(paddle.io.Dataset):
             paddle.distributed.barrier()
 
         # Load mappings.
-        if need_data:
+        if need_data and len(documents) > 0:
             start_time = time.time()
             print_rank_0(f" > loading doc-idx mapping from {doc_idx_filename}")
             self.doc_idx = np.load(doc_idx_filename, allow_pickle=True, mmap_mode="r")
