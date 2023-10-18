@@ -76,7 +76,7 @@ class InferenceTest(unittest.TestCase):
 
         return full_match / len(result_1_result), count / len(result_1_result)
 
-    def t1est_predictor(self):
+    def test_predictor(self):
         config = self._load_config(self.model_name)
 
         # 0. download the ground-truth file for comparing

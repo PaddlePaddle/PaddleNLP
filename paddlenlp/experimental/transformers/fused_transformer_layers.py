@@ -715,7 +715,6 @@ class FusedMultiTransformerBase(Layer):
             src = tmp_out
 
         if time_step is None:
-            print(cum_offsets, seq_lens, input_ids)
             out = rebuild_padding(tmp_out, cum_offsets, seq_lens, input_ids)
         else:
             out = tmp_out
