@@ -130,6 +130,7 @@ from .utils.helper import (  # nested_truncate,
 )
 from .utils.sharding_io import ShardingIO
 
+
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
 DEFAULT_PROGRESS_CALLBACK = ProgressCallback
 
@@ -725,6 +726,7 @@ class Trainer:
 
             npu_accelerate_plugin(self.optimizer)
 
+
         self.timers and self.timers("read-data").start()
 
         for epoch in range(epochs_trained, num_train_epochs):
@@ -737,12 +739,8 @@ class Trainer:
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
-                # split sequence dim
-                # logger.info("before split inputs shape:{}".format(inputs["input_ids"].shape))
-                if self.args.use_hybrid_parallel:
+                if self.args.use_hybrid_parallel and fleet.get_hybrid_communicate_group().get_sep_parallel_world_size() > 1:
                     inputs = split_inputs_sequence_dim(inputs)
-                # logger.info("after split inputs shape:{}".format(inputs["input_ids"].shape))
-                #
                 self.timers and self.timers("read-data").stop()
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
@@ -845,7 +843,6 @@ class Trainer:
                                 self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
                             if self.optimizer._dp_enable or self.optimizer._sep_enable:
-                                # logger.info(f"self.optimizer._dp_enable:{self.optimizer._dp_enable}, self.optimizer._sep_enable:{self.optimizer._sep_enable}")
                                 fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
@@ -866,7 +863,6 @@ class Trainer:
                     )
                     optimizer_was_run = True
                     if self.do_grad_scaling:
-                        logger.info(f"fp16:{args.fp16} do grad scaling step.")
                         scale_before = self.scaler._scale.cpu().numpy()
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
@@ -877,7 +873,6 @@ class Trainer:
                                 f"optimizer not run, scale_before: {scale_before[0]}, scale_after: {scale_after[0]}"
                             )
                     elif isinstance(self.optimizer, HybridParallelOptimizer):
-                        # logger.info(f"bf16:{args.bf16} hybrid parallel optimizer step.")
                         self.optimizer._step(parameters_list)
                     else:
                         self.optimizer.step()
@@ -1050,7 +1045,6 @@ class Trainer:
                     self._globalstep_last_start_time,
                     num_samples=total_train_batch_size * num_steps,
                     num_steps=num_steps,
-                    seq_length=self.args.seq_length,
                 )
             )
 
@@ -1486,7 +1480,6 @@ class Trainer:
         in_pipeline_parallel_mode = self.args.pipeline_parallel_degree > 1
         in_sharding_parallel_mode = self.sharding is not None
         in_tensor_parallel_model = self.args.tensor_parallel_degree > 1
-
         in_sep_parallel_mode = self.args.sep_parallel_degree > 1
 
         # Pipeline mode
@@ -1597,7 +1590,6 @@ class Trainer:
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
 
-            logger.info("distributed_model")
             model = fleet.distributed_model(model)
             assert self.optimizer is not None, "Tensor parallel mode need decorate optimizer, pelease init optimizer."
             if self.args.amp_master_grad:
@@ -1642,8 +1634,6 @@ class Trainer:
         if self.enable_autocast_context_manager:
             custom_black_list = ["reduce_sum", "c_softmax_with_cross_entropy"]
             custom_white_list = []
-            # custom_black_list = ["reduce_sum", "c_softmax_with_cross_entropy", "matmul_v2"]
-            # custom_white_list = ["flash_attn"]
             if self.args.fp16_opt_level == "O2":
                 # https://github.com/PaddlePaddle/Paddle/blob/eb97f4f0adca40b16a309b927e480178beb8ae96/python/paddle/amp/amp_lists.py#L85-L86
                 # the lookup_table is in black_list, but in O2, we need it return fp16

@@ -67,7 +67,6 @@ try:
     from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 except:
     FusedDropoutAdd = None
-from einops import rearrange
 
 def get_attr(layer, name):
     if getattr(layer, name, None) is not None:
@@ -311,32 +310,14 @@ class MultiHeadAttention(nn.Layer):
             return self.Cache(key, value)
 
     def _flash_attention(self, q, k, v, attn_mask=None):
-        batch_size, seqlen_q, _, _ = q.shape
         if self.sequence_parallel:
             perm = [1, 0, 2, 3]
             q = tensor.transpose(x=q, perm=perm)
             k = tensor.transpose(x=k, perm=perm)
             v = tensor.transpose(x=v, perm=perm)
-        # var_len
-        if os.environ.get("FLAGS_use_flash_attn_unpadded", "false") == "true":
-            q_, k_, v_ = [rearrange(x, 'b s ... -> (b s) ...') for x in [q, k, v]]
-            cu_seqlens_q = paddle.arange(0, (batch_size + 1) * seqlen_q, step=seqlen_q, dtype=paddle.int32)
-            cu_seqlens_k = cu_seqlens_q
-            seqlen_k = seqlen_q
-            scale = q_.shape[-1] ** (-0.5)
-            out, weights = flash_attn_unpadded(
-                q_, k_, v_, cu_seqlens_q, cu_seqlens_k, seqlen_q, seqlen_k, scale=scale,
-                dropout=self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
-            )
-            out = rearrange(out, '(b s) ... -> b s ...', b=batch_size)
-            if self.reshard_layer is not None:
-                out = self.reshard_layer(out, split_axis=0, concat_axis=2,)
-        else:
-            # not var_len
             out, weights = flash_attention(
                 q, k, v, self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
             )
-            # logger.info(f" flash attn elapsed:{elapsed}, q shape:{q.shape}, k shape:{k.shape}, v shape:{v.shape}, self.need_weights:{self.need_weights}, self.training:{self.training}, weights:{weights}")
             if self.reshard_layer is not None:
                 out = self.reshard_layer(out, split_axis=1, concat_axis=2,)
 
@@ -835,7 +816,7 @@ class GPTModelHybrid(nn.Layer):
                     do_recompute=i not in no_recompute_layers,
                     skip_quant_tensors=skip_tensor_map.get("block_{}".format(i), []),
                     use_flash_attn=use_flash_attn,
-                    use_fused_dropout_add=False,
+                    use_fused_dropout_add=use_fused_dropout_add,
                 )
             )
 

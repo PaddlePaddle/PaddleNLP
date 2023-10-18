@@ -550,7 +550,8 @@ class TrainingArguments:
         default=-1,
         metadata={
             "help": (
-                "sequence parallel"
+                "The paddle sequence parallel strategy. It can reduce the GPU memory of activation to 1/sep, and it is orthogonal to "
+                "data parallel, sharding stage1, tensor parallel and pipeline parallel strategy. "
             )
         },
     )

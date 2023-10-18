@@ -313,6 +313,7 @@ class EagerEngine(BasicEngine):
         valid_data_loader = valid_data_loader() if valid_data_loader is not None else None
         eval_finished_step = 0
         for step, batch in enumerate(train_data_loader()):
+
             if epoch_index == self._load_recovery["epoch"]:
                 if step < self._load_recovery["step"]:
                     continue
@@ -507,7 +508,6 @@ class EagerEngine(BasicEngine):
             if self._accumulate_steps > 1:
                 # div the loss for backward
                 loss_bw = loss_bw / self._accumulate_steps
-
             self._module.backward(loss_bw)
 
             detach_loss = loss.detach()

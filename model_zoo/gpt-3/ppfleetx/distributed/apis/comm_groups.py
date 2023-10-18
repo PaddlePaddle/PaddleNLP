@@ -24,7 +24,6 @@ from paddle.distributed.fleet.base.strategy_group import (
 
 
 def create_hcg(strategy, hcg_name):
-    print(f"create_hcg, hcg_name:{hcg_name}")
     if hcg_name == "HybridCommunicateGroup":
         fleet.init(is_collective=True, strategy=strategy)
         hcg = fleet.get_hybrid_communicate_group()

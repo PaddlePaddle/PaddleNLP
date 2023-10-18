@@ -395,7 +395,6 @@ def main():
     # Log model and data config
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
-    training_args.seq_length = data_args.max_seq_length
 
     # Log on each process the small summary:
     logger.warning(
@@ -453,14 +452,7 @@ def main():
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
     config.sep_parallel_degree = training_args.sep_parallel_degree
-    assert config.num_attention_heads % config.sep_parallel_degree == 0
-
-    # hack to change model size
-    config.num_hidden_layers = 4
-    config.num_attention_heads = 64
-    config.num_key_value_heads = 64
-    # config.intermediate_size = config.hidden_size
-    #
+    assert config.num_attention_heads % config.sep_parallel_degree == 0, f"num_attention_heads:{config.num_attention_heads} must be divisible by sep_parallel_degree {config.sep_parallel_degree}"
 
     print("Final pre-training config:", config)
 
@@ -553,10 +545,10 @@ def main():
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         metrics = train_result.metrics
-        # trainer.save_model()
+        trainer.save_model()
         trainer.log_metrics("train", metrics)
-        # trainer.save_metrics("train", metrics)
-        # trainer.save_state()
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
 
     if training_args.do_predict:
         test_ret = trainer.predict(test_dataset)

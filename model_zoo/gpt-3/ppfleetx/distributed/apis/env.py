@@ -73,8 +73,8 @@ def set_seed(seed):
     #        sharding_rank * (mp_size * pp_size * dp_size)
     # seed offset is order to avoid conflicts with the parameter initialization seed
 
-    # seed_offset = seed + 1024 + paddle.distributed.get_world_size()
-    seed_offset = seed + 1024
+    seed_offset = seed + 1024 + paddle.distributed.get_world_size()
+
     global_seed = (
         seed_offset + \
         sep_rank * (mp_size) + \
@@ -113,7 +113,6 @@ def set_seed(seed):
         + dp_rank * (mp_size * pp_size)
         + sharding_rank * (mp_size * pp_size * dp_size)
     )
-    # _dp_seed = global_seed
 
 
 def set_hcg(hcg):

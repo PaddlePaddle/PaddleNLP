@@ -55,6 +55,8 @@ export PYTHONPATH=../../:$PYTHONPATH
 mode="dp"
 mode="tp"
 mode="sep"
+# test for 4 nodes
+num_attention_heads=32
 # seq_len=32768
 # seq_len=8192
 
@@ -81,6 +83,7 @@ python -m paddle.distributed.launch --log_dir "dp_log" --devices "0" \
     -o Distributed.mp_degree=1 \
     -o Distributed.sep_degree=1 \
     -o Model.use_recompute=False \
+    -o Model.num_attention_heads=${num_attention_heads} \
     -o Model.max_position_embeddings=${seq_len} \
     -o Data.Train.dataset.max_seq_len=${seq_len} \
     -o Data.Eval.dataset.max_seq_len=${seq_len} \
@@ -97,6 +100,7 @@ python -m paddle.distributed.launch --log_dir "tp_log" --devices "0,1,2,3,4,5,6,
     -o Distributed.mp_degree=8 \
     -o Distributed.sep_degree=1 \
     -o Model.use_recompute=False \
+    -o Model.num_attention_heads=${num_attention_heads} \
     -o Model.max_position_embeddings=${seq_len} \
     -o Data.Train.dataset.max_seq_len=${seq_len} \
     -o Data.Eval.dataset.max_seq_len=${seq_len} \
@@ -119,6 +123,7 @@ python -m paddle.distributed.launch \
     -o Distributed.mp_degree=1 \
     -o Distributed.sep_degree=${gpu_num} \
     -o Model.use_recompute=False \
+    -o Model.num_attention_heads=${num_attention_heads} \
     -o Model.max_position_embeddings=${seq_len} \
     -o Data.Train.dataset.max_seq_len=${seq_len} \
     -o Data.Eval.dataset.max_seq_len=${seq_len} \
