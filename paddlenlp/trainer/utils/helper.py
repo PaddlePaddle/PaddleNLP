@@ -230,7 +230,7 @@ def broadcast_dp_optimizer(state_dict):
     if paddle.distributed.get_world_size() <= 1:
         return state_dict
 
-    logger.info("Start broadcast optimizer in dataparallel group.")
+    logger.info("Start broadcast optimizer in data parallel group.")
     try:
         hcg = fleet.get_hybrid_communicate_group()
         dp_group = hcg.get_data_parallel_group()
