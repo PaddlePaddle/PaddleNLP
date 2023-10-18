@@ -358,7 +358,7 @@ class Trainer:
         if self.args.pipeline_parallel_degree > 1:
             from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
-            assert isinstance(
+            assert (isinstance(model, LoRAModel) and isinstance(model.model, PipelineLayer)) or isinstance(
                 model, PipelineLayer
             ), "Only support pipeline parallel mode when model is PipelineLayer!!!"
 
@@ -495,7 +495,7 @@ class Trainer:
         tp_merge = True
         if isinstance(self.model, LoRAModel):
             weight_name = LORA_WEIGHTS_NAME
-            if self.model.quantized:
+            if self.model.quantized or self.args.pipeline_parallel_degree > 1:
                 tp_merge = False
         elif isinstance(self.model, PrefixModelForCausalLM):
             weight_name = PREFIX_WEIGHTS_NAME
@@ -1047,16 +1047,18 @@ class Trainer:
 
     def _load_best_model_from_peft_checkpoint(self):
         tp_merge = True
-
-        if isinstance(self.model, LoRAModel) and self.model.quantized:
-            best_model_path = os.path.join(
-                self.state.best_model_checkpoint, _add_variant(LORA_WEIGHTS_NAME, self.args.weight_name_suffix)
-            )
-            tp_merge = False
-        elif isinstance(self.model, LoRAModel) and not self.model.quantized:
-            best_model_path = os.path.join(self.state.best_model_checkpoint, LORA_WEIGHTS_NAME)
+        if isinstance(self.model, LoRAModel):
+            weight_name = LORA_WEIGHTS_NAME
+            if self.model.quantized or self.args.pipeline_parallel_degree > 1:
+                tp_merge = False
         elif isinstance(self.model, PrefixModelForCausalLM):
-            best_model_path = os.path.join(self.state.best_model_checkpoint, PREFIX_WEIGHTS_NAME)
+            weight_name = PREFIX_WEIGHTS_NAME
+        if tp_merge:
+            best_model_path = os.path.join(self.state.best_model_checkpoint, weight_name)
+        else:
+            best_model_path = os.path.join(
+                self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
+            )
 
         if os.path.exists(best_model_path):
             # We load the model state dict on the CPU to avoid an OOM error.
@@ -1210,7 +1212,7 @@ class Trainer:
                     process_index=self.args.dataset_rank,
                 )
 
-            return DataLoader(
+            return _DataLoader(
                 train_dataset,
                 batch_size=self.args.per_device_train_batch_size,
                 collate_fn=self.data_collator,
@@ -1290,7 +1292,7 @@ class Trainer:
                     process_index=self.args.dataset_rank,
                 )
 
-            return DataLoader(
+            return _DataLoader(
                 eval_dataset,
                 batch_size=self.args.per_device_eval_batch_size,
                 collate_fn=self.data_collator,
@@ -1343,7 +1345,7 @@ class Trainer:
                     process_index=self.args.dataset_rank,
                 )
 
-            return DataLoader(
+            return _DataLoader(
                 test_dataset,
                 batch_size=self.args.per_device_eval_batch_size * self.world_size,
                 collate_fn=self.data_collator,  # _get_collator_with_removed_columns
@@ -1599,6 +1601,8 @@ class Trainer:
             prepare_pipeline_inputs_func = (
                 model._prepare_pipeline_inputs_func if hasattr(model, "_prepare_pipeline_inputs_func") else None
             )
+            if isinstance(model, LoRAModel):
+                model = model.model
             model = fleet.distributed_model(model)
             if prepare_pipeline_inputs_func is not None:
                 model._prepare_pipeline_inputs_func = prepare_pipeline_inputs_func
@@ -1943,7 +1947,7 @@ class Trainer:
 
         output_dir = os.path.join(run_dir, checkpoint_folder)
 
-        if isinstance(self.model, LoRAModel) and self.model.quantized:
+        if isinstance(self.model, LoRAModel) and (self.model.quantized or self.args.pipeline_parallel_degree > 1):
             self.save_model(output_dir)
         elif isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
             self.save_model(output_dir, True)
@@ -2122,12 +2126,12 @@ class Trainer:
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
 
         if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
-            # lugimzzz: Force merge_tensor_parallel to True for LoRA & Prefix Model until there is an option to merge params during training.
             self.model.save_pretrained(
                 output_dir,
                 variant=self.args.weight_name_suffix,
                 merge_tensor_parallel=merge_tensor_parallel,
                 is_main_process=self.args.should_save,
+                max_shard_size="1024GB",
             )
         elif not isinstance(self.model, PretrainedModel):
             if isinstance(unwrap_model(self.model), PretrainedModel):
@@ -2143,6 +2147,7 @@ class Trainer:
                         merge_tensor_parallel=merge_tensor_parallel,
                         variant=weight_name_suffix,
                         is_main_process=self.args.should_save,
+                        max_shard_size="1024GB",
                     )
                 else:
                     unwrap_model(self.model).save_pretrained(
@@ -2150,6 +2155,7 @@ class Trainer:
                         merge_tensor_parallel=merge_tensor_parallel,
                         variant=self.args.weight_name_suffix,
                         is_main_process=self.args.should_save,
+                        max_shard_size="1024GB",
                     )
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
@@ -2174,6 +2180,7 @@ class Trainer:
                     merge_tensor_parallel=merge_tensor_parallel,
                     variant=weight_name_suffix,
                     is_main_process=self.args.should_save,
+                    max_shard_size="1024GB",
                 )
             else:
                 self.model.save_pretrained(
@@ -2181,6 +2188,7 @@ class Trainer:
                     merge_tensor_parallel=merge_tensor_parallel,
                     variant=self.args.weight_name_suffix,
                     is_main_process=self.args.should_save,
+                    max_shard_size="1024GB",
                 )
         if self.args.should_save_sharding_stage1_model:
             self.sharding_io.save_distributed_model_meta(output_dir)

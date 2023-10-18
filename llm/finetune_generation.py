@@ -242,6 +242,9 @@ def main():
             )
 
     if model_args.prefix_tuning:
+        if training_args.pipeline_parallel_degree > 1:
+            raise NotImplementedError("Prefix tuning is not implemented for pipeline parallelism.")
+
         prefix_tuning_params = get_prefix_tuning_params(model)
         prefix_config = PrefixConfig(
             num_prefix_tokens=model_args.num_prefix_tokens,
@@ -309,13 +312,20 @@ def main():
     # Create trainer
     max_length = data_args.max_length if training_args.pipeline_parallel_degree > 1 else None
     padding = "max_length" if training_args.pipeline_parallel_degree > 1 else True
+    if training_args.pipeline_parallel_degree > 1:
+        metrics = None
+    elif data_args.eval_with_do_generation:
+        metrics = compute_metrics_do_generation
+    else:
+        metrics = compute_metrics
+
     trainer = CausalLMTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics_do_generation if data_args.eval_with_do_generation else compute_metrics,
+        compute_metrics=metrics,
         data_collator=DataCollatorForSeq2Seq(
             tokenizer=tokenizer,
             max_length=max_length,
