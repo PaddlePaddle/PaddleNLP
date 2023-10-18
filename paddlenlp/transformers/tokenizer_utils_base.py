@@ -40,14 +40,14 @@ from huggingface_hub import (
 from huggingface_hub.utils import EntryNotFoundError
 from paddle import __version__
 
-from paddlenlp.utils.downloader import (
+from ..utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     get_path_from_url_with_filelock,
     url_file_exists,
 )
-from paddlenlp.utils.env import TOKENIZER_CONFIG_NAME
-from paddlenlp.utils.log import logger
-
+from ..utils.env import CHAT_TEMPLATE_CONFIG_NAME, TOKENIZER_CONFIG_NAME
+from ..utils.log import logger
+from .aistudio_utils import aistudio_download
 from .utils import resolve_cache_dir
 
 
@@ -1450,6 +1450,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         cache_dir = kwargs.pop("cache_dir", None)
+        from_aistudio = kwargs.pop("from_aistudio", None)
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
         vocab_files = {}
         init_configuration = {}
@@ -1458,12 +1459,13 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             "added_tokens_file": ADDED_TOKENS_FILE,
             "special_tokens_map_file": SPECIAL_TOKENS_MAP_FILE,
             "tokenizer_config_file": TOKENIZER_CONFIG_FILE,
+            "chat_template_file": CHAT_TEMPLATE_CONFIG_NAME,
         }
 
         vocab_files_target = {**cls.resource_files_names, **additional_files_names}
 
-        # From HF Hub
-        if from_hf_hub:
+        # From HF Hub or AI Studio
+        if from_hf_hub or from_aistudio:
             # Only include the necessary resource files specified by the tokenizer cls
             # Deep copy to avoid modifiying the class attributes
             vocab_files = copy.deepcopy(cls.resource_files_names)
@@ -1494,7 +1496,12 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             if file_path is None or os.path.isfile(file_path):
                 resolved_vocab_files[file_id] = file_path
                 continue
-            if from_hf_hub:
+            if from_aistudio:
+                resolved_vocab_files[file_id] = aistudio_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=file_path,
+                )
+            elif from_hf_hub:
                 resolved_vocab_files[file_id] = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=file_path,
@@ -1513,6 +1520,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     logger.info("Downloading %s and saved to %s" % (file_path, cache_dir))
                     try:
                         if not url_file_exists(file_path):
+                            # skip warning for chat-template config file
+                            if file_path.endswith(CHAT_TEMPLATE_CONFIG_NAME):
+                                continue
+
                             logger.warning(f"file<{file_path}> not exist")
                             resolved_vocab_files[file_id] = None
                             continue

@@ -29,6 +29,7 @@ from sklearn.metrics import accuracy_score
 from paddlenlp.datasets import InTokensIterableDataset
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
+from paddlenlp.transformers import LlamaForCausalLMPipe
 from paddlenlp.utils.log import logger
 
 
@@ -111,7 +112,7 @@ def get_lora_target_modules(model):
         ]
     elif model.base_model_prefix == "bloom":
         target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
-    elif model.base_model_prefix == "llama":
+    elif model.base_model_prefix == "llama" or isinstance(model, LlamaForCausalLMPipe):
         target_modules = [
             ".*q_proj.*",
             ".*v_proj.*",
@@ -183,7 +184,7 @@ class CausalLMTrainer(Trainer):
         prediction_loss_only: bool,
         ignore_keys=None,
     ):
-        if prediction_loss_only:
+        if prediction_loss_only or self.args.pipeline_parallel_degree > 1:
             return super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
         elif not self.do_generation:
             loss, logits, labels = super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
@@ -293,7 +294,7 @@ class CausalLMTrainer(Trainer):
 
 def get_infer_model_path(input_dir, model_prefix):
     if dist.get_world_size() > 1:
-        local_rank = dist.ParallelEnv().dev_id
+        local_rank = dist.get_rank()
         return os.path.join(input_dir, "rank_{}".format(local_rank), model_prefix)
     else:
         return os.path.join(input_dir, model_prefix)
@@ -394,6 +395,7 @@ def dybatch_preprocess(
     benchmark: bool = False,
 ):
     """Pre-process generation inputs."""
+    inputs = {}
     if "chatglm" in architectures:
         input_ids = []
         position_ids = []
@@ -403,7 +405,6 @@ def dybatch_preprocess(
             input_ids.append(tokens["input_ids"][0])
             position_ids.append(tokens["position_ids"][0])
 
-        inputs = {}
         pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][0]
         inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
         bs = inputs["input_ids"].shape[0]
@@ -413,9 +414,8 @@ def dybatch_preprocess(
         for i in range(len(position_ids)):
             inst_data_pos.append(np.array([list(inst) + [0] * (max_len - len(inst)) for inst in position_ids[i]]))
         inputs["position_ids"] = paddle.to_tensor(np.array(inst_data_pos))
-    else:
+    elif "gpt" in architectures:
         input_ids = []
-        position_ids = []
         if isinstance(texts, str):
             texts = [texts]
 
@@ -430,7 +430,33 @@ def dybatch_preprocess(
             )
             input_ids.append(tokens["input_ids"][0])
 
-        inputs = {}
+        pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][-1]
+        inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
+        bs = inputs["input_ids"].shape[0]
+        max_len = max(map(len, input_ids))
+
+        position_ids = paddle.arange(sum(seq_len), dtype="int64")
+        pre_len = seq_len[0]
+        for length in seq_len[1:]:
+            position_ids[pre_len : length + pre_len] = position_ids[pre_len : length + pre_len] - pre_len
+            pre_len += length
+        inputs["position_ids"] = position_ids
+    else:
+        input_ids = []
+        if isinstance(texts, str):
+            texts = [texts]
+
+        for text in texts:
+            tokens = tokenizer(
+                text,
+                return_tensors="np",
+                padding=False,
+                max_length=src_length,
+                return_attention_mask=False,
+                return_token_type_ids=False,
+            )
+            input_ids.append(tokens["input_ids"][0])
+
         pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][-1]
         inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
         bs = inputs["input_ids"].shape[0]

@@ -21,7 +21,8 @@ from paddle.distributed import fleet
 from paddlenlp_ops import get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
-    FusedMultiTransformer,
+    FusedMultiTransformerBase,
+    FusedMultiTransformerConfig,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
@@ -31,7 +32,10 @@ from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
 )
-from paddlenlp.transformers.model_utils import register_base_model
+from paddlenlp.transformers.model_utils import (
+    dy2st_nocheck_guard_context,
+    register_base_model,
+)
 
 __all__ = [
     "BloomModelInferenceModel",
@@ -109,7 +113,8 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
         ffn1_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn1_bias".format(i)) for i in range(config.n_layer)]
         ffn2_weight_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn2_weight".format(i)) for i in range(config.n_layer)]
         ffn2_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn2_bias".format(i)) for i in range(config.n_layer)]
-        self.transformer_block = FusedMultiTransformer(
+
+        transformer_config = FusedMultiTransformerConfig(
             self.embed_dim,
             self.n_head,
             4 * self.embed_dim,
@@ -130,6 +135,8 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
             ffn2_weight_attrs=ffn2_weight_attrs,
             ffn2_bias_attrs=ffn2_bias_attrs,
         )
+
+        self.transformer_block = FusedMultiTransformerBase(transformer_config)
         self.cache_kvs = []
 
         # Final Layer Norm
@@ -159,6 +166,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
         inputs_embeds=None,
         cache=None,
         cache_kvs=None,
+        pre_caches=None,
         seq_len_encoder=None,
         seq_len_decoder=None,
         return_dict=None,
@@ -190,8 +198,11 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
             inputs_embeds = self.word_embeddings(ids_remove_padding)
 
         hidden_states = self.word_embeddings_layernorm(inputs_embeds)
+        position_offset = 0
+        if not is_decoder and pre_caches is not None:
+            position_offset = 128
 
-        with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
+        with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
                 src=hidden_states,
                 input_ids=input_ids,
@@ -199,6 +210,8 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                 padding_offset=padding_offset,
                 attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
                 caches=cache_kvs,
+                pre_caches=pre_caches,
+                pre_caches_length=position_offset,
                 seq_lens=seq_len,
                 time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
             )
@@ -380,6 +393,7 @@ class BloomForCausalLMInferenceModel(GenerationInferenceModel, BloomPreTrainedMo
         # only last token for inputs_ids if cache is defined in kwargs
         attention_mask = kwargs.get("attention_mask", None)
         position_ids = kwargs.get("position_ids", None)
+        pre_caches = kwargs.get("pre_caches", None)
         seq_len_encoder = kwargs.get("seq_len_encoder", None)
         seq_len_decoder = kwargs.get("seq_len_decoder", None)
         cache = kwargs.get("cache", None)
@@ -392,6 +406,7 @@ class BloomForCausalLMInferenceModel(GenerationInferenceModel, BloomPreTrainedMo
             "position_ids": position_ids,
             "cache_kvs": cache_kvs,
             "cache": cache,
+            "pre_caches": pre_caches,
             "use_cache": True,
             "seq_len_encoder": seq_len_encoder,
             "seq_len_decoder": seq_len_decoder,
@@ -408,6 +423,7 @@ class BloomForCausalLMInferenceModel(GenerationInferenceModel, BloomPreTrainedMo
         labels=None,
         use_cache=None,
         cache_kvs=None,
+        pre_caches=None,
         output_attentions=None,
         output_hidden_states=None,
         seq_len_encoder=None,
@@ -429,6 +445,7 @@ class BloomForCausalLMInferenceModel(GenerationInferenceModel, BloomPreTrainedMo
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
             cache_kvs=cache_kvs,
+            pre_caches=pre_caches,
             seq_len_encoder=seq_len_encoder,
             seq_len_decoder=seq_len_decoder,
             return_dict=return_dict,

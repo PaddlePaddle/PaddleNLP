@@ -155,14 +155,14 @@ def run_main_query(query, url="0.0.0.0:8082", model_name="m3e", model_version="1
     return runner.Run_query(query)
 
 
-def embeddings_multi_doc(data, batch_size=32, num_process=10, url="0.0.0.0:8082"):
+def embeddings_multi_doc(data, batch_size=32, num_process=10, url="0.0.0.0:8082", model_name="m3e", model_version="1"):
     workers = len(data) // batch_size + 1
     offset = [i * batch_size for i in range(workers)]
     if offset[-1] != len(data):
         offset += [len(data)]
     data_index = zip(offset, offset[1:])
     data_list = [data[start:end] for start, end in data_index]
-    func = partial(run_main_doc, url=url)
+    func = partial(run_main_doc, url=url, model_name=model_name, model_version=model_version)
     pool = Pool(processes=min(num_process, multiprocessing.cpu_count()))
     result = pool.map(func, data_list)
     pool.close()  # close the process pool and no longer accept new processes
@@ -337,3 +337,6 @@ class ParallelRetriever(BaseRetriever):
 
     def embed_queries(self, texts: List[str], **kwargs) -> List[np.ndarray]:
         return run_main_query(texts, self.url)
+
+    def embed_documents(self, docs: List[Document], **kwargs):
+        return run_main_query([d.content for d in docs], self.url)

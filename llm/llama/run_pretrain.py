@@ -38,6 +38,7 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     LlamaConfig,
     LlamaForCausalLM,
+    LlamaForCausalLMPipe,
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
@@ -50,10 +51,12 @@ MODEL_CLASSES = {
     ),
 }
 
-from fused_layers import mock_layers
-from modeling_pp import LlamaForCausalLMPipe
 
-from paddlenlp.data.causal_dataset import build_train_valid_test_datasets, print_rank_0
+from paddlenlp.data.causal_dataset import (
+    build_train_valid_test_datasets,
+    check_data_split,
+    print_rank_0,
+)
 
 
 def add_start_docstrings(*docstr):
@@ -178,14 +181,9 @@ class ModelArguments:
         default=False,
         metadata={"help": "whether to use fuse sequence parallel allreduce"},
     )
-    rope_fusion_level: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "The level of fusion of rope embedding. Can be chosen from:\n"
-            "(1) 'full': fuse sin cos compute and rope embedding\n"
-            "(2) 'core': only fuse rope embedding, will compute the sin and cos\n"
-            "(3) None: don't fuse any part of the rope embedding"
-        },
+    use_fused_rope: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable rope fusion or not."},
     )
     no_recompute_layers: Optional[List[int]] = field(
         default=None,
@@ -210,6 +208,9 @@ def create_pretrained_dataset(
     tokenizer,
     need_data=True,
 ):
+
+    check_data_split(data_args.split, training_args.do_train, training_args.do_eval, training_args.do_predict)
+
     train_val_test_num_samples = [
         training_args.per_device_train_batch_size
         * training_args.dataset_world_size
@@ -223,9 +224,12 @@ def create_pretrained_dataset(
     ]
 
     print_rank_0(" > datasets target sizes (minimum size):")
-    print_rank_0("    train:      {}".format(train_val_test_num_samples[0]))
-    print_rank_0("    validation: {}".format(train_val_test_num_samples[1]))
-    print_rank_0("    test:       {}".format(train_val_test_num_samples[2]))
+    if training_args.do_train:
+        print_rank_0("    train:      {}".format(train_val_test_num_samples[0]))
+    if training_args.do_eval:
+        print_rank_0("    validation: {}".format(train_val_test_num_samples[1]))
+    if training_args.do_predict:
+        print_rank_0("    test:       {}".format(train_val_test_num_samples[2]))
 
     # Build the datasets.
     train_dataset, valid_dataset, test_dataset = build_train_valid_test_datasets(
@@ -236,6 +240,7 @@ def create_pretrained_dataset(
         seq_length=data_args.max_seq_length,
         seed=training_args.seed,
         skip_warmup=data_args.skip_warmup,
+        share_folder=data_args.share_folder,
         data_cache_path=data_args.data_cache,
         need_data=need_data,
     )
@@ -261,9 +266,12 @@ def create_pretrained_dataset(
         }
 
     if need_data:
-        print_dataset(train_dataset[0], "train")
-        print_dataset(valid_dataset[0], "valid")
-        print_dataset(test_dataset[0], "test")
+        if training_args.do_train:
+            print_dataset(train_dataset[0], "train")
+        if training_args.do_eval:
+            print_dataset(valid_dataset[0], "valid")
+        if training_args.do_predict:
+            print_dataset(test_dataset[0], "test")
 
     return train_dataset, valid_dataset, test_dataset, _collate_data
 
@@ -376,6 +384,8 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     if training_args.enable_linear_fused_grad_add:
+        from fused_layers import mock_layers
+
         mock_layers()
 
     if model_args.tokenizer_name_or_path is None:
@@ -443,7 +453,7 @@ def main():
     config.virtual_pp_degree = model_args.virtual_pp_degree
     config.sequence_parallel = model_args.sequence_parallel
     config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
-    config.rope_fusion_level = model_args.rope_fusion_level
+    config.use_fused_rope = model_args.use_fused_rope
     config.no_recompute_layers = model_args.no_recompute_layers
     config.pp_recompute_interval = model_args.pp_recompute_interval
     config.recompute_use_reentrant = model_args.recompute_use_reentrant
@@ -472,7 +482,6 @@ def main():
             model_args.model_name_or_path,
             config=config,
             dtype=dtype,
-            load_state_as_np=True,
         )
     else:
         model = model_class._from_config(config, dtype=dtype)

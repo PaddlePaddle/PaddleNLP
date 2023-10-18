@@ -89,7 +89,9 @@ def main():
     predictor.tokenizer.save_pretrained(export_args.output_path)
     generate_rank_mapping(os.path.join(export_args.output_path, "rank_mapping.csv"))
 
-    validate_pdmodel(export_args.output_path, "model")
+    if tensor_parallel_degree > 1:
+        export_args.output_path = os.path.join(export_args.output_path, f"rank_{tensor_parallel_rank}")
+    validate_pdmodel(export_args.output_path, predictor_args.model_prefix)
 
 
 if __name__ == "__main__":
