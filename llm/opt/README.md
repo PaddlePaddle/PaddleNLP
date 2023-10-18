@@ -16,7 +16,7 @@
 |facebook/opt-30b |
 |facebook/opt-66b |
 |facebook/opt-iml-1.3b |
-|opt-iml-max-1.3b |
+|facebook/opt-iml-max-1.3b |
 
 ## 2. 模型精调
 请参考[LLM全流程工具介绍](../README.md)
