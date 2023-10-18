@@ -36,6 +36,17 @@ class DummyDataset(paddle.io.Dataset):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
 class DistDataLoader(paddle.io.DataLoader):
     """
     DistDataLoader is a wrapper of paddle.io.DataLoader.
