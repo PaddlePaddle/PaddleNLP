@@ -80,6 +80,7 @@ class DistDataLoader(paddle.io.DataLoader):
         self.dp_rank = self._hcg.get_data_parallel_rank()
         sharding_rank = self._hcg.get_sharding_parallel_rank()
         self._need_data = (self.mp_rank == 0) and (self.pp_rank == 0)
+        self._dtype_list = [paddle.int64, paddle.int32, paddle.float32, paddle.float64, paddle.float16]
         self._data_int64_keys, self._data_int64_keys_size = None, None
         self._data_fp32_keys, self._data_fp32_keys_size = None, None
 
