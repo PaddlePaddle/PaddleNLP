@@ -443,7 +443,7 @@ class InferencePredictorMixin:
                         paddle.ones(shape=(length, length), dtype=self.config.dtype)
                     ).unsqueeze_(axis=0)
 
-                    self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
+                    self.attention_mask[i, :, :length, : length + pre_caches_length] = paddle.concat(
                         [prefix_attention_mask, post_attention_mask], axis=2
                     )
                 self.arange_tensor_encoder[i, :, : length + pre_caches_length] = paddle.arange(
