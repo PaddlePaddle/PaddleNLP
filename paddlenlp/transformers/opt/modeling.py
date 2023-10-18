@@ -959,7 +959,7 @@ class OPTLMHead(Layer):
         self.decoder_weight = (
             self.create_parameter(
                 default_initializer=paddle.nn.initializer.Uniform(low=-0.1, high=0.1),
-                shape=[config.vocab_size, config.hidden_size],
+                shape=[config.vocab_size, config.word_embed_proj_dim],
                 dtype=config.dtype,
                 is_bias=True,
             )
