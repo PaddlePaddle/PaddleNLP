@@ -14,6 +14,8 @@
 
 from paddlenlp.transformers import PretrainedConfig
 
+__all__ = ["QWenConfig"]
+
 
 class QWenConfig(PretrainedConfig):
     model_type = "qwen"
