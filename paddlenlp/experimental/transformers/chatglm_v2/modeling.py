@@ -300,7 +300,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             for i in state_dict.keys():
                 if i.find(name) >= 0:
                     result_list.append(i)
-            assert len(result_list) == 1
+            assert len(result_list) == 1, name + " must be only one in state_dict"
             return result_list[0]
 
         self.embedding.word_embeddings.weight.set_value(state_dict.pop(key("embedding.word_embeddings.weight")))
