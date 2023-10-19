@@ -34,13 +34,11 @@ def load_tp_params(tp_degree, path):
     tp_state_dict_list = []
     for tp in range(tp_degree):
         tp_state_dict = {}
-        tp_params = glob.glob(os.path.join(path, f"model_state.tp{tp:0>2d}-*.pdparams"))
-        tp_params.sort()
-        for tp_name in tp_params:
-            logger.info(f"loading {tp_name}")
-            tmp = paddle.load(tp_name, return_numpy=True)
-            for k, v in tmp.items():
-                tp_state_dict[k] = v
+        tp_name = os.path.join(path, f"model_state.tp{tp:0>2d}.pdparams")
+        logger.info(f"loading {tp_name}")
+        tmp = paddle.load(tp_name, return_numpy=True)
+        for k, v in tmp.items():
+            tp_state_dict[k] = v
         # model_state.tp00-00001-of-00002
         # tp_name = os.path.join(path, f"model_state.tp{tp:0>2d}-00001-of-00002.pdparams")
         # logger.info(f"loading {tp_name}")
@@ -61,14 +59,14 @@ def merge_tensor_parallel(model_class, state_dict_list, config) -> None:
     name_action_mappings = model_class._get_tensor_parallel_mappings(config, is_split=False)
     state_keys_map = model_class._resolve_prefix_keys(name_action_mappings.keys(), state_dict_list[0].keys())
 
-    # bloom.word_embeddings.weight
     for k, v in state_keys_map.items():
         name_action_mappings[v] = name_action_mappings.pop(k)
+
     state_dict_to_save = {}
     for key in state_dict_list[0].keys():
         tensor = state_dict_list[0][key]
         if key in name_action_mappings:
-            ret = [state_dict_list[0][key]]
+            ret = [x[key] for x in state_dict_list]
             action = name_action_mappings.pop(key)
             tensor = action(ret)
 

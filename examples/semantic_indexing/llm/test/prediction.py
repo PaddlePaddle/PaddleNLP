@@ -45,6 +45,7 @@ class Eval_modle:
             use_flash_attention=True,
             sentence_pooling_method="weighted_mean",
             normalized=True,
+            tensor_parallel_degree=0
         )
         self._model.eval()
 
