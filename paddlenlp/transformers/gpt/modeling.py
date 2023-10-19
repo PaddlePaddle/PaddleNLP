@@ -84,6 +84,38 @@ def get_triangle_upper_mask(x, mask=None):
     return mask
 
 
+def save_hook(pre_fix, tensor):
+    # 使用方法：
+    # tensor.register_hook(save_hook(tensor))
+    def _save_fn(grad):
+        np.save(
+            pre_fix + tensor.name + "_grad_" + str(paddle.distributed.get_rank()), paddle.cast(grad, dtype="float32")
+        )
+
+    return _save_fn
+
+
+class ConcatInput(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, inp, group=None, axis=-1):
+        inputs = []
+        paddle.distributed.all_gather(inputs, inp, group=group)
+        with paddle.no_grad():
+            cat = paddle.concat(inputs, axis=axis)
+        ctx.cat_args = group
+        ctx.axis = axis
+        return cat
+
+    @staticmethod
+    def backward(ctx, grad):
+        group = ctx.cat_args
+        axis = ctx.axis
+        with paddle.no_grad():
+            grads = paddle.split(grad, paddle.distributed.get_world_size(group), axis=axis)
+        grad = grads[paddle.distributed.get_rank(group)]
+        return grad
+
+
 def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, transpose_y=True, tensor_parallel_output=True):
     is_fleet_init = True
     tensor_parallel_degree = 1
@@ -95,14 +127,9 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, transpose_y=True, tensor
         is_fleet_init = False
 
     if is_fleet_init and tensor_parallel_degree > 1 and y.is_distributed:
-        # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
-        input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
-        logits = paddle.matmul(input_parallel, y, transpose_y=transpose_y)
-
-        if tensor_parallel_output:
-            return logits
-
-        return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
+        y = ConcatInput.apply(y, group=model_parallel_group, axis=0)
+        logits = paddle.matmul(x, y, transpose_y=transpose_y)
+        return logits
 
     else:
         logits = paddle.matmul(x, y, transpose_y=transpose_y)
@@ -369,6 +396,10 @@ class MultiHeadAttention(nn.Layer):
             out = outputs
 
         # project to output
+        if self.config.tensor_parallel_degree > 1:
+            out = ConcatInput.apply(
+                out, group=fleet.get_hybrid_communicate_group().get_model_parallel_group(), axis=-1
+            )
         out = self.out_proj(out)
 
         outs = [out]
@@ -594,8 +625,13 @@ class GPTDecoderLayer(nn.Layer):
 
         with seed_guard_context("global_seed"):
             if not self.config.use_fused_dropout_add:
+                hidden_states = self.linear1(hidden_states)
+                if self.config.tensor_parallel_degree > 1:
+                    hidden_states = ConcatInput.apply(
+                        hidden_states, group=fleet.get_hybrid_communicate_group().get_model_parallel_group(), axis=-1
+                    )
                 hidden_states = residual + self.dropout2(
-                    self.linear2(self.activation(self.linear1(hidden_states), approximate=True))
+                    self.linear2(self.activation(hidden_states, approximate=True))
                 )
             else:
                 hidden_states = self.fused_dropout_add2(
@@ -702,6 +738,7 @@ class GPTPretrainedModel(PretrainedModel):
                 "layers.0.linear1.bias": partial(fn, is_column=True),
                 # Row Linear
                 "word_embeddings.weight": partial(fn, is_column=False),
+                "lm_head.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.out_proj.weight": partial(fn, is_column=False),
                 "layers.0.linear2.weight": partial(fn, is_column=False),
             }
@@ -1112,10 +1149,11 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
     def __init__(self, config):
         super(GPTPretrainingCriterion, self).__init__()
         self.config = config
-        if config.tensor_parallel_degree > 1 and config.tensor_parallel_output:
-            self.loss_func = fleet.meta_parallel.ParallelCrossEntropy(ignore_index=config.ignore_index)
-        else:
-            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=config.ignore_index)
+        # if config.tensor_parallel_degree > 1 and config.tensor_parallel_output:
+        #     self.loss_func = fleet.meta_parallel.ParallelCrossEntropy(ignore_index=config.ignore_index)
+        # else:
+        #     self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=config.ignore_index)
+        self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=config.ignore_index)
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask=None):
         """
