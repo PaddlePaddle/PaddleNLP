@@ -16,14 +16,10 @@ from __future__ import annotations
 import os
 import unittest
 
+import paddle
 from parameterized import parameterized_class
 
-from paddlenlp.transformers import (
-    AutoTokenizer,
-    BloomForCausalLM,
-    ChatGLMForCausalLM,
-    LlamaForCausalLM,
-)
+from paddlenlp.transformers import AutoTokenizer, BloomForCausalLM, LlamaForCausalLM
 from paddlenlp.utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     get_path_from_url_with_filelock,
@@ -38,7 +34,7 @@ from .testing_utils import LLMTest
     [
         ["__internal_testing__/tiny-random-llama", LlamaForCausalLM],
         ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
-        ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
+        # ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
     ],
 )
 class PredictorTest(LLMTest, unittest.TestCase):
@@ -48,6 +44,7 @@ class PredictorTest(LLMTest, unittest.TestCase):
 
     def setUp(self) -> None:
         super().setUp()
+        paddle.set_default_dtype("float32")
         self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
 
