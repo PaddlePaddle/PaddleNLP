@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
         module.model.set_state_dict(model_dict)
 
-    input_text = "Hi, GPT2. Tell me who Jack Ma is."
+    input_text = "Hi, GPT2. Tell me who Jack Ma is ."
     result = module.generate(input_text)
 
     print(f"Prompt: {input_text}")
