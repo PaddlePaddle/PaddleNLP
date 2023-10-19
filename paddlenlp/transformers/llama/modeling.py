@@ -46,6 +46,7 @@ from paddlenlp.transformers.model_outputs import (
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 from paddlenlp.utils.log import logger
 
+from ..segment_parallel_utils import ReshardLayer
 from ..sequence_parallel_utils import (
     ColumnSequenceParallelLinear,
     GatherOp,
@@ -53,7 +54,6 @@ from ..sequence_parallel_utils import (
     ScatterOp,
     mark_as_sequence_parallel_parameter,
 )
-from ..segment_parallel_utils import ReshardLayer
 from .configuration import (
     LLAMA_PRETRAINED_INIT_CONFIGURATION,
     LLAMA_PRETRAINED_RESOURCE_FILES_MAP,
@@ -206,9 +206,15 @@ def scaled_dot_product_attention(
         )
         if reshard_layer is not None:
             # attn_output shape: [bs, seqlen, num_head/sep, head_dim]
-            attn_output = reshard_layer(attn_output, split_axis=1, concat_axis=2,)
+            attn_output = reshard_layer(
+                attn_output,
+                split_axis=1,
+                concat_axis=2,
+            )
             # attn_output shape: [bs, seqlen/sep, num_head, head_dim]
-            assert q_len % config.sep_parallel_degree == 0, f"q_len:{q_len}, config.sep_parallel_degree:{config.sep_parallel_degree}"
+            assert (
+                q_len % config.sep_parallel_degree == 0
+            ), f"q_len:{q_len}, config.sep_parallel_degree:{config.sep_parallel_degree}"
             q_len = q_len // config.sep_parallel_degree
             num_heads = num_heads * config.sep_parallel_degree
         if sequence_parallel:
@@ -260,8 +266,12 @@ def scaled_dot_product_attention(
         attn_output = attn_output.transpose([0, 2, 1, 3])
 
         if reshard_layer is not None:
-            attn_output = reshard_layer(attn_output, split_axis=1, concat_axis=2,)
-            q_len = q_len //  config.sep_parallel_degree
+            attn_output = reshard_layer(
+                attn_output,
+                split_axis=1,
+                concat_axis=2,
+            )
+            q_len = q_len // config.sep_parallel_degree
             num_heads = num_heads * config.sep_parallel_degree
 
         if sequence_parallel:
@@ -683,7 +693,7 @@ class LlamaAttention(nn.Layer):
 
         if config.rope:
             self._init_rope()
-        
+
         self.reshard_layer = None
         if config.sep_parallel_degree > 1:
             assert self.num_key_value_heads % config.sep_parallel_degree == 0
@@ -737,10 +747,19 @@ class LlamaAttention(nn.Layer):
             if self.reshard_layer is not None:
                 if self.sequence_parallel:
                     assert self.seq_length % self.config.sep_parallel_degree == 0
-                    mix_layer = paddle.reshape_(mix_layer, [-1, self.seq_length // self.config.sep_parallel_degree, 3 * self.num_heads * self.head_dim])
+                    mix_layer = paddle.reshape_(
+                        mix_layer,
+                        [-1, self.seq_length // self.config.sep_parallel_degree, 3 * self.num_heads * self.head_dim],
+                    )
                 # [bs, seq_len / sep, num_head, head_dim] -> [bs, seq_len, num_head / sep, head_dim]
-                mix_layer = self.reshard_layer(mix_layer, split_axis=2, concat_axis=1,)
-                mix_layer = paddle.reshape_(mix_layer, [0, self.seq_length, -1, 3 * self.head_dim])  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
+                mix_layer = self.reshard_layer(
+                    mix_layer,
+                    split_axis=2,
+                    concat_axis=1,
+                )
+                mix_layer = paddle.reshape_(
+                    mix_layer, [0, self.seq_length, -1, 3 * self.head_dim]
+                )  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
             else:
                 if self.sequence_parallel:
                     target_shape = [-1, self.seq_length, self.num_heads, 3 * self.head_dim]
@@ -753,11 +772,25 @@ class LlamaAttention(nn.Layer):
             key_states = self.k_proj(hidden_states)
             value_states = self.v_proj(hidden_states)
             if self.reshard_layer is not None:
-                query_states = self.reshard_layer(query_states, split_axis=2, concat_axis=1,)
-                key_states = self.reshard_layer(key_states, split_axis=2, concat_axis=1,)
-                value_states = self.reshard_layer(value_states, split_axis=2, concat_axis=1,)
-                query_states = paddle.reshape_(query_states, [0, self.seq_length, -1, self.head_dim])  # [bs, seq_len, num_head/k, head_dim], k is sep degree
-                key_states  = paddle.reshape_(key_states, [0, self.seq_length, -1, self.head_dim])
+                query_states = self.reshard_layer(
+                    query_states,
+                    split_axis=2,
+                    concat_axis=1,
+                )
+                key_states = self.reshard_layer(
+                    key_states,
+                    split_axis=2,
+                    concat_axis=1,
+                )
+                value_states = self.reshard_layer(
+                    value_states,
+                    split_axis=2,
+                    concat_axis=1,
+                )
+                query_states = paddle.reshape_(
+                    query_states, [0, self.seq_length, -1, self.head_dim]
+                )  # [bs, seq_len, num_head/k, head_dim], k is sep degree
+                key_states = paddle.reshape_(key_states, [0, self.seq_length, -1, self.head_dim])
                 value_states = paddle.reshape_(value_states, [0, self.seq_length, -1, self.head_dim])
             else:
                 if self.sequence_parallel:
@@ -830,7 +863,7 @@ class LlamaAttention(nn.Layer):
                 output_attentions,
                 alibi,
                 self.sequence_parallel,
-                reshard_layer = self.reshard_layer,
+                reshard_layer=self.reshard_layer,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
@@ -843,7 +876,7 @@ class LlamaAttention(nn.Layer):
                 output_attentions,
                 alibi,
                 self.sequence_parallel,
-                reshard_layer = self.reshard_layer,
+                reshard_layer=self.reshard_layer,
             )
         if output_attentions:
             attn_output, attn_weights = outputs
@@ -1256,7 +1289,6 @@ class LlamaModel(LlamaPretrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
-
         if self.sequence_parallel:
             # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
             bs, seq_len, hidden_size = inputs_embeds.shape
@@ -1396,15 +1428,17 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
 
             if self.config.sep_parallel_degree > 1:
                 _hcg = fleet.get_hybrid_communicate_group()
-                masked_lm_loss = ConcatSePMaskedLoss.apply(
-                    masked_lm_loss, axis=1, group=_hcg.get_sep_parallel_group())
+                masked_lm_loss = ConcatSePMaskedLoss.apply(masked_lm_loss, axis=1, group=_hcg.get_sep_parallel_group())
             # skip ignore_index which loss == 0
             masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
             loss = paddle.mean(masked_lm_loss)
 
         return loss
 
+
 from paddle.autograd import PyLayer
+
+
 class ConcatSePMaskedLoss(PyLayer):
     @staticmethod
     def forward(ctx, inp, axis, group):
@@ -1421,10 +1455,10 @@ class ConcatSePMaskedLoss(PyLayer):
         axis = ctx.args_axis
         group = ctx.args_group
         with paddle.no_grad():
-            grads = paddle.split(
-                grad, paddle.distributed.get_world_size(group), axis=axis)
+            grads = paddle.split(grad, paddle.distributed.get_world_size(group), axis=axis)
         grad = grads[paddle.distributed.get_rank(group)]
         return grad
+
 
 class LlamaLMHead(nn.Layer):
     def __init__(self, config: LlamaConfig):

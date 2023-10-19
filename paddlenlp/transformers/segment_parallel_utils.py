@@ -24,7 +24,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import sys
 
 import numpy as np
@@ -42,9 +41,12 @@ def split_inputs_sequence_dim(inputs, sep_rank=None, sep_degree=None):
         _hcg = fleet.get_hybrid_communicate_group()
         sep_degree = _hcg.get_sep_parallel_world_size()
         sep_rank = _hcg.get_sep_parallel_rank()
-    assert isinstance(sep_degree, int) and isinstance(sep_rank, int), f"sep_degree and sep_rank must be int"
+    assert isinstance(sep_degree, int) and isinstance(
+        sep_rank, int
+    ), f"sep_degree:{type(sep_degree)} and sep_rank:{type(sep_rank)} must be int"
     if sep_degree <= 1:
         return inputs
+
     def do_split_sequence_dim(data, sep_rank, sep_degree):
         if data is None:
             return None
@@ -127,10 +129,14 @@ class ReshardLayer(paddle.nn.Layer):
 
         input_data = x
         if len(shape) == 3:
-            reshard_tensor = ReshardQKV.apply(input_data, self.sep_group, split_axis=split_axis, concat_axis=concat_axis)
+            reshard_tensor = ReshardQKV.apply(
+                input_data, self.sep_group, split_axis=split_axis, concat_axis=concat_axis
+            )
         else:
             input_data = input_data.reshape([0, 0, -1])
-            reshard_tensor = ReshardQKV.apply(input_data, self.sep_group, split_axis=split_axis, concat_axis=concat_axis)
+            reshard_tensor = ReshardQKV.apply(
+                input_data, self.sep_group, split_axis=split_axis, concat_axis=concat_axis
+            )
             reshard_tensor.reshape_(shape)
         return reshard_tensor
 
@@ -173,7 +179,6 @@ def test_qkv_out(x, y_grad, func, split_axis=2, concat_axis=0):
 def test_reshard_layer(x, y_grad, split_axis=0, concat_axis=2):
     x = x.detach()
     x.stop_gradient = False
-    input_data = x
     reshard_layer = ReshardLayer(sep_group=_get_global_group())
     y = reshard_layer(
         x,
@@ -308,13 +313,14 @@ def main():
     test_split_inputs()
     test_reshard()
 
+
 def test_split_inputs():
     batch_size = 8
     seq_len = 4096
     sep = dist.get_world_size()
     sep_rank = dist.get_rank()
     assert sep == 2, f"sep should be 2, but {sep}"
-    
+
     inputs_ids = paddle.randint(low=0, high=65535, shape=(batch_size, seq_len))
     labels = paddle.randint(low=0, high=2, shape=(batch_size, seq_len))
     inputs = {"inputs_ids": inputs_ids, "labels": labels}
@@ -378,7 +384,9 @@ def test_reshard():
     input_data, bin_bout_expected_output_data, bin_sout_expected_output_data = prepare_data(
         batch_major=True, dim_size=3, batch_size=2, seq_len=4, num_head=4, h=8
     )
-    print(f"input_data shape: {input_data.shape}, bin_bout_expected_output_data shape: {bin_bout_expected_output_data.shape}")
+    print(
+        f"input_data shape: {input_data.shape}, bin_bout_expected_output_data shape: {bin_bout_expected_output_data.shape}"
+    )
     check_equal(
         input_data,
         bin_bout_expected_output_data,

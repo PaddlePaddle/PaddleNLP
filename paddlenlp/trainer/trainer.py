@@ -83,8 +83,8 @@ from ..transformers.model_utils import (
     load_sharded_checkpoint,
     unwrap_model,
 )
-from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..transformers.segment_parallel_utils import split_inputs_sequence_dim
+from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
     LORA_WEIGHTS_NAME,
@@ -135,7 +135,6 @@ from .utils.helper import (  # nested_truncate,
     nested_truncate,
 )
 from .utils.sharding_io import ShardingIO
-
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
 DEFAULT_PROGRESS_CALLBACK = ProgressCallback
@@ -699,7 +698,9 @@ class Trainer:
                     all_reduce_dtype = "float32"
                 trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
                 paddle.distributed.all_reduce(trainable_numel_tensor)
-                trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size // self.args.sep_parallel_degree
+                trainable_numel = (
+                    int(trainable_numel_tensor.item()) // self.args.dataset_world_size // self.args.sep_parallel_degree
+                )
                 # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
                 # so, the trainable numel is a little bigger than real.
                 logger.info(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
@@ -783,7 +784,6 @@ class Trainer:
 
             npu_accelerate_plugin(self.optimizer)
 
-
         self.timers and self.timers("read-data").start()
 
         for epoch in range(epochs_trained, num_train_epochs):
@@ -796,7 +796,10 @@ class Trainer:
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
-                if self.args.use_hybrid_parallel and fleet.get_hybrid_communicate_group().get_sep_parallel_world_size() > 1:
+                if (
+                    self.args.use_hybrid_parallel
+                    and fleet.get_hybrid_communicate_group().get_sep_parallel_world_size() > 1
+                ):
                     inputs = split_inputs_sequence_dim(inputs)
                 self.timers and self.timers("read-data").stop()
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
@@ -1689,9 +1692,12 @@ class Trainer:
 
                 self.optimizer = optimizer
 
-
         # pure tesnor parallel mode, no pipeline_parallel, no sharding.
-        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and (in_tensor_parallel_model or in_sep_parallel_mode):
+        if (
+            not in_pipeline_parallel_mode
+            and not in_sharding_parallel_mode
+            and (in_tensor_parallel_model or in_sep_parallel_mode)
+        ):
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
 
