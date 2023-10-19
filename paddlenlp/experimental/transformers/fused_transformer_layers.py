@@ -799,7 +799,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             )
 
             ffn1_weight_scale = self.create_parameter(
-                shape=[config.dim_feedforward * 2],
+                shape=[config.dim_feedforward * 2] if config.activation.endswith("glu") else [config.dim_feedforward],
                 attr=ffn1_weight_scale_attr,
                 dtype=paddle.float32,
                 is_bias=False,

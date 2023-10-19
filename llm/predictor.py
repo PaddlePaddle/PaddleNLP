@@ -712,6 +712,11 @@ def create_predictor(
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
             config.tensor_parallel_degree = tensor_parallel_degree
             config.tensor_parallel_rank = tensor_parallel_rank
+            config.quant_bits = -1
+
+            if predictor_args.quant_type.startswith("weight_only_int"):
+                quant_bits = int(predictor_args.quant_type[-1])
+                config.quant_bits = quant_bits
 
             config.quant_bits = -1
             if predictor_args.quant_type.startswith("weight_only_int"):
