@@ -42,6 +42,19 @@ except:
     flash_attention = None
 
 
+def get_triangle_upper_mask(x, mask=None):
+    if mask is not None:
+        return mask
+    # [bsz, n_head, q_len, kv_seq_len]
+    shape = x.shape
+    #  [bsz, 1, q_len, kv_seq_len]
+    shape[1] = 1
+    mask = paddle.full(shape, paddle.finfo(x.dtype).min, dtype=x.dtype)
+    mask = paddle.triu(mask, diagonal=1)
+    mask.stop_gradient = True
+    return mask
+
+
 def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
     is_fleet_init = True
     tensor_parallel_degree = 1
@@ -125,7 +138,7 @@ class QWenAttention(nn.Layer):
         self.attn_dropout = nn.Dropout(config.attn_dropout_prob)
 
     def _attn(self, query, key, value, config, attention_mask=None):
-
+        # Support the flash attention and normal attention
         bsz, q_len, num_heads, head_dim = query.shape
         _, kv_seq_len, _, _ = value.shape
 
@@ -134,7 +147,6 @@ class QWenAttention(nn.Layer):
             # Current Flash Attention doesn't support attn maskt
             # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
             # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
-
             attn_output, attn_weights = flash_attention(
                 query,
                 key,
@@ -145,9 +157,11 @@ class QWenAttention(nn.Layer):
             attn_weights = self.attn_dropout(attn_weights)
             return attn_output, attn_weights
         else:
-
+            # [bz, sql, nh, hid] ==> [bz, nh, sql hdim]
             query = query.transpose([0, 2, 1, 3])
+            # [bz, sql, nh, hid] ==> [bz, nh, sql hdim]
             key = key.transpose([0, 2, 1, 3])
+            # [bz, sql, nh, hid] ==> [bz, nh, sql hdim]
             value = value.transpose([0, 2, 1, 3])
 
             attn_weights = paddle.matmul(query / math.sqrt(head_dim), key.transpose([0, 1, 3, 2]))
@@ -157,8 +171,12 @@ class QWenAttention(nn.Layer):
                     f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
                     f" {attn_weights.shape}"
                 )
+            # If the attention mask is None, we need to construct the causal attention mask
+            if attention_mask is None:
+                attention_mask = get_triangle_upper_mask(attn_weights)
             attn_weights = attn_weights + attention_mask
 
+            # TODO(wawltor) Check the ouput dtype of softmax is float32, and attn_weights dtype is float16/bfloat16
             if not paddle.in_dynamic_mode():
                 attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(value.dtype)
             else:
