@@ -40,7 +40,7 @@ from .testing_utils import LLMTest
         ["__internal_testing__/tiny-random-llama", LlamaForCausalLM],
         ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
         ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
-        ["__internal_testing__/tiny-random-chatglm2", ChatGLMv2ForCausalLM],
+        ["__internal_testing__/tiny-fused-chatglm2", ChatGLMv2ForCausalLM],
     ],
 )
 class PredictorTest(LLMTest, unittest.TestCase):
