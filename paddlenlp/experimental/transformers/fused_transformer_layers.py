@@ -520,6 +520,7 @@ class FusedMultiTransformerBase(Layer):
         write_cache_kv(k_out, v_out, caches[i], seq_lens + pre_caches_length)
 
         # cutlass fmha
+        # hahahha
         qktv_out = variable_length_memory_efficient_attention(
             q_out,
             k_out,
