@@ -15,6 +15,7 @@
 
 from typing import Optional
 
+import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
@@ -247,7 +248,6 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         hidden_states = inputs_embeds
 
         # Rotary positional embeddings
-        # 32768
         rotary_pos_emb = self.rotary_pos_emb(self.max_sequence_length)
 
         if position_ids is not None:
@@ -256,8 +256,8 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         else:
             rotary_pos_emb = rotary_pos_emb[None, :seq_length]
 
-        ones = paddle.ones([batch_size, seq_length, 32], dtype=paddle.get_default_dtype())
-        zeros = paddle.zeros([batch_size, seq_length, 32], dtype=paddle.get_default_dtype())
+        ones = paddle.ones([batch_size, seq_length, self.head_size // 4], dtype=paddle.get_default_dtype())
+        zeros = paddle.zeros([batch_size, seq_length, self.head_size // 4], dtype=paddle.get_default_dtype())
         # make it to be [2, batch, seq_len, rotary_dim]
         rotary_pos_emb = rotary_pos_emb.transpose([3, 0, 1, 2])
         # The following code is for consistency with PaddleNLP/csrc/generation/encode_rotary_qk.cu, so boring.
@@ -266,7 +266,9 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         cos = paddle.concat([cos, ones], axis=-1)
         sin = paddle.concat([sin, zeros], axis=-1)
         rotary_pos_emb = paddle.stack([cos, sin], axis=0)
-        rotary_pos_emb = rotary_pos_emb.unsqueeze(-1).tile([1, 1, 1, 1, 2]).reshape([2, batch_size, seq_length, 128])
+        rotary_pos_emb = (
+            rotary_pos_emb.unsqueeze(-1).tile([1, 1, 1, 1, 2]).reshape([2, batch_size, seq_length, self.head_size])
+        )
 
         # Run encoder.
         seq_lens = seq_len_decoder if is_decoder else seq_len_encoder
@@ -292,21 +294,28 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
-        self.embedding.word_embeddings.weight.set_value(state_dict.pop("embedding.word_embeddings.weight"))
-        self.final_layernorm.weight.set_value(state_dict.pop("encoder.final_layernorm.weight"))
-        self.output_layer.weight.set_value(state_dict.pop("output_layer.weight"))
+        # find the real name.
+        def key(name):
+            result_list = []
+            for i in state_dict.keys():
+                if i.find(name) >= 0:
+                    result_list.append(i)
+            assert len(result_list) == 1, name + " must be only one in state_dict"
+            return result_list[0]
+
+        self.embedding.word_embeddings.weight.set_value(state_dict.pop(key("embedding.word_embeddings.weight")))
+        self.final_layernorm.weight.set_value(state_dict.pop(key("encoder.final_layernorm.weight")))
+        self.output_layer.weight.set_value(state_dict.pop(key("output_layer.weight")))
 
         for i in range(self.num_layers):
-            ln_scale = state_dict.pop("encoder.layers.{}.input_layernorm.weight".format(i))
+            ln_scale = state_dict.pop(key("encoder.layers.{}.input_layernorm.weight".format(i)))
 
-            q_weight = state_dict.pop("encoder.layers.{}.self_attention.query.weight".format(i))
-            k_weight = state_dict.pop("encoder.layers.{}.self_attention.key.weight".format(i))
-            v_weight = state_dict.pop("encoder.layers.{}.self_attention.value.weight".format(i))
-            q_bias = state_dict["encoder.layers.{}.self_attention.query.bias".format(i)]
-            k_bias = state_dict["encoder.layers.{}.self_attention.key.bias".format(i)]
-            v_bias = state_dict["encoder.layers.{}.self_attention.value.bias".format(i)]
-
-            import numpy as np
+            q_weight = state_dict.pop(key("encoder.layers.{}.self_attention.query.weight".format(i)))
+            k_weight = state_dict.pop(key("encoder.layers.{}.self_attention.key.weight".format(i)))
+            v_weight = state_dict.pop(key("encoder.layers.{}.self_attention.value.weight".format(i)))
+            q_bias = state_dict.pop(key("encoder.layers.{}.self_attention.query.bias".format(i)))
+            k_bias = state_dict.pop(key("encoder.layers.{}.self_attention.key.bias".format(i)))
+            v_bias = state_dict.pop(key("encoder.layers.{}.self_attention.value.bias".format(i)))
 
             k_weight = k_weight.reshape([self.hidden_size, self.multi_query_group_num, 1, self.head_size])
             k_bias = k_bias.reshape([self.multi_query_group_num, 1, self.head_size])
@@ -331,16 +340,16 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             concated_qkv_bias = concated_qkv_bias.reshape([3 * self.hidden_size])
             concated_qkv_bias = paddle.to_tensor(concated_qkv_bias)
 
-            out_proj_weight = state_dict.pop("encoder.layers.{}.self_attention.dense.weight".format(i))
+            out_proj_weight = state_dict.pop(key("encoder.layers.{}.self_attention.dense.weight".format(i)))
 
-            ffn_ln_scale = state_dict.pop("encoder.layers.{}.post_attention_layernorm.weight".format(i))
+            ffn_ln_scale = state_dict.pop(key("encoder.layers.{}.post_attention_layernorm.weight".format(i)))
 
             # shuffle the column of ffn1's weight for fine grained FM
-            ffn1_weight = state_dict.pop("encoder.layers.{}.mlp.dense_h_to_4h.weight".format(i))
+            ffn1_weight = state_dict.pop(key("encoder.layers.{}.mlp.dense_h_to_4h.weight".format(i)))
             ffn1_weight_0 = ffn1_weight[..., 0::2]
             ffn1_weight_1 = ffn1_weight[..., 1::2]
             ffn1_weight = paddle.concat([ffn1_weight_0, ffn1_weight_1], axis=-1)
-            ffn2_weight = state_dict.pop("encoder.layers.{}.mlp.dense_4h_to_h.weight".format(i))
+            ffn2_weight = state_dict.pop(key("encoder.layers.{}.mlp.dense_4h_to_h.weight".format(i)))
 
             self.transformer_block.ln_scales[i].set_value(ln_scale)
 
@@ -501,3 +510,7 @@ class ChatGLMv2ForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMv2Pret
         lm_logits = self.chatglm_v2.output_layer(hidden_states)
         output = (lm_logits,) + transformer_outputs[1:]
         return output
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict):
+        self.chatglm_v2.set_state_dict(state_dict)

@@ -14,20 +14,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import bisect
 import io
 import itertools
 import json
+import os
 import re
 import unicodedata
 from collections import OrderedDict
+from dataclasses import asdict, dataclass
 from typing import Dict, List, Optional, Tuple, Union
 
+import numpy
 import numpy as np
+import paddle
 import six
+from jinja2.exceptions import TemplateError
+from jinja2.sandbox import ImmutableSandboxedEnvironment
 from paddle.utils import try_import
 
+from paddlenlp.utils.env import CHAT_TEMPLATE_CONFIG_NAME
 from paddlenlp.utils.log import logger
 
 try:
@@ -50,7 +58,7 @@ from .tokenizer_utils_base import (
     TextInputPair,
     TruncationStrategy,
 )
-from .utils import InitTrackerMeta, fn_args_to_dict
+from .utils import InitTrackerMeta, fn_args_to_dict, resolve_cache_dir
 
 __all__ = [
     "PretrainedTokenizer",
@@ -500,8 +508,172 @@ def tokenize_chinese_chars(text):
     return output
 
 
+@dataclass
+class ChatTemplate:
+    conversation: list[str] | None = None
+    system: str | None = None
+    query: str = None
+
+    @staticmethod
+    @lru_cache()
+    def _compile_jinja_template(chat_template):
+        def raise_exception(message):
+            raise TemplateError(message)
+
+        jinja_env = ImmutableSandboxedEnvironment(trim_blocks=True, lstrip_blocks=True, keep_trailing_newline=True)
+        jinja_env.globals["raise_exception"] = raise_exception
+        return jinja_env.from_string(chat_template)
+
+    def render_conversation(self, conversation_data: list[str] | dict[str, str], index: int = 0) -> str:
+        """
+        Args:
+            conversation_data (list[str]): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        if self.conversation is None:
+            raise ValueError(
+                "The template for multi-turns is invalid, please check `conversation` filed in your chat-template."
+            )
+
+        if isinstance(conversation_data, list):
+            assert (
+                len(conversation_data) == 2
+            ), "Each round/turn of conversation must be two participants, eg: [user-query, bot-query]"
+
+            conversation_data = {"user": conversation_data[0], "bot": conversation_data[1], "index": index}
+
+        one_turn_conversation = []
+        for conversation in self.conversation:
+            template = self._compile_jinja_template(conversation)
+            result = template.render(conversation_data)
+            one_turn_conversation.append(result)
+        return "".join(one_turn_conversation)
+
+    def render_query(self, query: str, index: int = 0):
+        if self.query is None:
+            return query
+
+        template = self._compile_jinja_template(self.query)
+        return template.render(query=query, index=index)
+
+    def __call__(self, conversations: list[list[str]] | str):
+        """render the conversations by chat-template
+
+        Args:
+            conversations (list[list[str]]): the conversations of use and bot
+
+        Returns:
+            str: the result of conversation
+        """
+        if isinstance(conversations, str):
+            conversations = [[conversations]]
+
+        # [1 ... n-1] conversation
+        final_query = self.system or ""
+        for index, conversation in enumerate(conversations[:-1]):
+            final_query += self.render_conversation(conversation, index=index)
+
+        if not isinstance(conversations[-1], list) and not len(conversations[-1]) != 1:
+            raise ValueError(
+                "The length of last conversation must be one, eg: [[user-query, bot-answer], [user-query, bot-answer], ..., [user-query]]"
+            )
+
+        final_query += self.render_query(conversations[-1][0], index=len(conversations) - 1)
+        return final_query
+
+    @classmethod
+    def from_dict(cls, config: dict):
+        return cls(**config)
+
+    @classmethod
+    def from_file(cls, file: str):
+        with open(file, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        return cls.from_dict(config)
+
+
+class ChatTemplateMixin:
+    chat_template: Optional[ChatTemplate] = None
+
+    def apply_chat_template(
+        self, conversation: List[List[str, str]] | str, tokenize: bool = True, **tokenizer_kwargs
+    ) -> str | dict[str, numpy.ndarray | paddle.Tensor]:
+        if isinstance(conversation, str):
+            conversation = [[conversation]]
+
+        query = self.chat_template(conversation)
+        if not tokenize:
+            return query
+
+        return self(query, **tokenizer_kwargs)
+
+    def encode_chat_inputs(self, conversation: List[List[str, str]]):
+        """Encodes conversation to pairs of token ids.
+        Turn 0: bos + system + sep + user     bot + eos
+        Turn t: sep + bot + query             bot + eos
+
+        Args:
+            conversation (List[List[str, str]]): the conversation of data
+
+        Returns:
+            List[list[int], list[int]]: the pair of input_ids and target_ids
+        """
+        # TODO(wj-Mcat): complete in next pr
+        pass
+        # encode_ids = []
+        # for index, (user, bot) in enumerate(conversation):
+        #     pass
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+        cache_dir = kwargs.get("cache_dir", None)
+        from_hf_hub = kwargs.get("from_hf_hub", None)
+
+        tokenizer = super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
+
+        # load chat-template
+        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+
+        chat_template_file = os.path.join(cache_dir, CHAT_TEMPLATE_CONFIG_NAME)
+        if not os.path.exists(chat_template_file):
+            return tokenizer
+
+        tokenizer.init_chat_template(chat_template_file)
+        return tokenizer
+
+    def init_chat_template(self, chat_template: str | dict):
+        """init chat_tempalte by file_path or template dict data
+
+        Args:
+            chat_template (str | dict): file_path or template dict data
+        """
+        if isinstance(chat_template, str):
+            if not os.path.exists(chat_template):
+                raise FileNotFoundError("The chat-template file does not exist: {}".format(chat_template))
+
+            self.chat_template = ChatTemplate.from_file(chat_template)
+        elif isinstance(chat_template, dict):
+            self.chat_template = ChatTemplate.from_dict(chat_template)
+        elif isinstance(chat_template, ChatTemplate):
+            self.chat_template = chat_template
+        else:
+            raise ValueError("Receive error chat_template data: ", chat_template)
+
+    def save_resources(self, save_directory):
+        super().save_resources(save_directory)
+
+        if self.chat_template is not None:
+            chat_template_file = os.path.join(save_directory, CHAT_TEMPLATE_CONFIG_NAME)
+            with open(chat_template_file, "w", encoding="utf-8") as f:
+                json.dump(asdict(self.chat_template), f, ensure_ascii=False, indent=4)
+            logger.info("Chat-template config file saved in " + chat_template_file)
+
+
 @six.add_metaclass(InitTrackerMeta)
-class PretrainedTokenizer(PretrainedTokenizerBase):
+class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
     """
     Base class for all tokenizers.
 
