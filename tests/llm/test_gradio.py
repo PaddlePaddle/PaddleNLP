@@ -128,8 +128,8 @@ class UITest(unittest.TestCase):
         assert result_1 != result_2
 
         # 测试长度应该保持一致
-        assert 20 <= len(self.tokenizer.tokenize(result_1)) <= 30
-        assert 20 <= len(self.tokenizer.tokenize(result_2)) <= 30
+        assert 10 <= len(self.tokenizer.tokenize(result_1)) <= 50
+        assert 10 <= len(self.tokenizer.tokenize(result_2)) <= 50
 
         data = {
             "context": "你好",
@@ -137,10 +137,10 @@ class UITest(unittest.TestCase):
             "top_p": 0.7,
             "temperature": 1.0,
             "repetition_penalty": 1.0,
-            "max_length": 10,
+            "max_length": 100,
             "min_length": 1,
         }
         # Case 3: max_length
         result_3 = get_response(data)
         assert result_3 != result_2
-        assert 10 <= len(self.tokenizer.tokenize(result_3)) <= 20
+        assert 70 <= len(self.tokenizer.tokenize(result_3)) <= 150

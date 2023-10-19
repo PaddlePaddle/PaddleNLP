@@ -110,7 +110,8 @@ class GenerationInferenceModel(GenerationMixin):
             config.get("logits_processors", None),
             precache_input_spec,
         ]
-        if self.config["model_type"] and "chatglm" in self.config.model_type:
+        # use "==" to distingusih between chatglm and chatglm_v2.
+        if self.config["model_type"] and "chatglm" == self.config.model_type.lower():
             input_spec[2] = paddle.static.InputSpec(
                 shape=[None, None, None], dtype="int64", name="position_ids"
             )  # position_ids
