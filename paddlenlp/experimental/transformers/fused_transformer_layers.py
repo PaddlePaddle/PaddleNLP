@@ -466,7 +466,8 @@ class FusedMultiTransformerBase(Layer):
     def compute_qkv_linear(self, ln_out, i):
         if float(paddle.version.cuda()) < 11.6:
             qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
-            qkv_out = paddle.add(qkv_out, self.qkv_biases[i])
+            if self.qkv_biases[i] is not None:
+                qkv_out = paddle.add(qkv_out, self.qkv_biases[i])
             return qkv_out
         else:
             # This method requires CUDA version >= 11.6.

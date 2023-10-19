@@ -18,10 +18,10 @@ import unittest
 
 from parameterized import parameterized_class
 
-from paddlenlp.transformers import (
+from paddlenlp.transformers import (  # ChatGLMForCausalLM,
     AutoTokenizer,
     BloomForCausalLM,
-    ChatGLMForCausalLM,
+    ChatGLMv2ForCausalLM,
     LlamaForCausalLM,
 )
 from paddlenlp.utils.downloader import (
@@ -38,7 +38,8 @@ from .testing_utils import LLMTest
     [
         ["__internal_testing__/tiny-random-llama", LlamaForCausalLM],
         ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
-        ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
+        # ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
+        ["__internal_testing__/tiny-fused-chatglm2", ChatGLMv2ForCausalLM],
     ],
 )
 class PredictorTest(LLMTest, unittest.TestCase):
