@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import unittest
 
 from parameterized import parameterized_class
@@ -48,6 +49,7 @@ class PredictorTest(LLMTest, unittest.TestCase):
 
     def setUp(self) -> None:
         super().setUp()
+        shutil.rmtree(os.path.join("~/.paddlenlp/models", self.model_name_or_path))
         self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
 
@@ -98,6 +100,8 @@ class PredictorPrecacheTest(LLMTest, unittest.TestCase):
 
     def setUp(self) -> None:
         super().setUp()
+        shutil.rmtree(os.path.join("~/.paddlenlp/models", self.model_name_or_path))
+
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
         self.download_precache_files()
 
