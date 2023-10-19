@@ -16,11 +16,11 @@ import argparse
 
 search_response = {
     "type": "object",
-    "description": "检索结果，内容为论文摘要, 标题以及关键词",
+    "description": "工具结果，内容为论文摘要, 标题以及关键词",
     "properties": {
         "documents": {
             "type": "array",
-            "description": "检索结果，内容为论文摘要, 标题以及关键词",
+            "description": "工具结果，内容为论文摘要, 标题以及关键词",
             "items": {
                 "type": "object",
                 "properties": {
@@ -37,12 +37,12 @@ search_response = {
 functions = [
     {
         "name": "search_multi_paper",
-        "description": "根据query, 在论文库内检索最相关的论文",
+        "description": "根据query, 在论文库内查找最相关的论文",
         "parameters": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "论文检索的查询语句"},
-                "top_k": {"type": "integer", "description": "论文检索的数量，默认值为3"},
+                "query": {"type": "string", "description": "论文工具的查询语句"},
+                "top_k": {"type": "integer", "description": "论文工具的数量，默认值为3"},
             },
             "required": ["query"],
         },
@@ -54,7 +54,7 @@ functions = [
                 "content": None,
                 "function_call": {
                     "name": "search_multi_paper",
-                    "thoughts": "这是一个多篇论文搜索请求。我需要设置query为'半监督学习',检索数量为6",
+                    "thoughts": "这是一个多篇论文搜索请求。我需要设置query为'半监督学习',查找数量为6",
                     "arguments": '{ "query": "半监督学习", "top_k": 6}',
                 },
             },
@@ -64,12 +64,12 @@ functions = [
     },
     {
         "name": "search_single_paper",
-        "description": "根据论文标题定位具体论文, 再通过query检索该篇论文中最相关的内容片段",
+        "description": "根据论文标题定位具体论文, 再通过query查找该篇论文中最相关的内容片段",
         "parameters": {
             "type": "object",
-            "description": "根据论文标题定位具体论文, 再通过query检索该篇论文中最相关的内容片段",
+            "description": "根据论文标题定位具体论文, 再通过query查找该篇论文中最相关的内容片段",
             "properties": {
-                "query": {"type": "string", "description": "根据输入的query在用户指定的单篇论文上检索最相关的信息"},
+                "query": {"type": "string", "description": "根据输入的query在用户指定的单篇论文上查找最相关的信息"},
                 "title": {"type": "string", "description": "论文标题，用于定位单篇论文"},
             },
             "required": ["query", "title"],

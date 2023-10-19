@@ -1321,14 +1321,17 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         # +1 in similarity to avoid negative numbers (for cosine sim)
         body = {"size": top_k, "query": self._get_vector_similarity_query(query_emb, top_k)}
         if filters:
-            filter_ = {"bool": {"filter": LogicalFilterClause.parse(filters).convert_to_elasticsearch()}}
-            if body["query"]["script_score"]["query"] == {"match_all": {}}:
-                body["query"]["script_score"]["query"] = filter_
+            if self.index_type == "hnsw":
+                filter_ = {"filter": LogicalFilterClause.parse(filters).convert_to_elasticsearch()}
+                body["query"]["knn"][self.embedding_field].update(filter_)
             else:
-                body["query"]["script_score"]["query"]["bool"]["filter"]["bool"]["must"].append(filter_)
+                filter_ = {"bool": {"filter": LogicalFilterClause.parse(filters).convert_to_elasticsearch()}}
+                if body["query"]["script_score"]["query"] == {"match_all": {}}:
+                    body["query"]["script_score"]["query"] = filter_
+                else:
+                    body["query"]["script_score"]["query"]["bool"]["filter"]["bool"]["must"].append(filter_)
 
         excluded_meta_data: Optional[list] = None
-
         if self.excluded_meta_data:
             excluded_meta_data = deepcopy(self.excluded_meta_data)
 
@@ -1342,7 +1345,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         if excluded_meta_data:
             body["_source"] = {"excludes": excluded_meta_data}
 
-        logger.debug(f"Retriever query: {body}")
+        # logger.debug(f"Retriever query: {body}")
         try:
             result = self.client.search(index=index, body=body, request_timeout=600, headers=headers)["hits"]["hits"]
             if len(result) == 0:
@@ -2091,7 +2094,7 @@ class OpenSearchDocumentStore(ElasticsearchDocumentStore):
             # use default parameters
             pass
         elif self.index_type == "hnsw":
-            method["parameters"] = {"ef_construction": 80, "m": 64}
+            method["parameters"] = {"ef_construction": self.ef_construction, "m": self.m}
         else:
             logger.error("Please set index_type to either 'flat' or 'hnsw'")
 
@@ -2260,18 +2263,29 @@ class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
             script_score_query = {
                 "bool": {"filter": {"bool": {"must": [{"exists": {"field": self.embedding_field}}]}}}
             }
-
-        query = {
-            "script_score": {
-                "query": script_score_query,
-                "script": {
-                    # offset score to ensure a positive range as required by Elasticsearch
-                    "source": "bpack_knn_script",
-                    "lang": "knn",
-                    "params": {"space": self.similarity, "field": "embedding", "vector": query_emb.tolist()},
-                },
+        if self.index_type == "hnsw":
+            query = {
+                "knn": {
+                    self.embedding_field: {
+                        "vector": query_emb.tolist(),
+                        "k": 16,
+                        "ef": self.ef_construction,
+                    }
+                }
             }
-        }
+        else:
+            query = {
+                "script_score": {
+                    "query": script_score_query,
+                    "script": {
+                        # offset score to ensure a positive range as required by Elasticsearch
+                        "source": "bpack_knn_script",
+                        "lang": "knn",
+                        "params": {"space": self.similarity, "field": "embedding", "vector": query_emb.tolist()},
+                    },
+                }
+            }
+
         return query
 
     def _create_label_index(self, index_name: str, headers: Optional[Dict[str, str]] = None):
