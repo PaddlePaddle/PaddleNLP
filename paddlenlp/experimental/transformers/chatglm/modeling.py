@@ -20,7 +20,8 @@ from paddle.distributed import fleet
 from paddlenlp_ops import get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
-    FusedMultiTransformer,
+    FusedMultiTransformerBase,
+    FusedMultiTransformerConfig,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
@@ -183,7 +184,8 @@ class ChatGLMStackDyBatch(nn.Layer):
         ]
         ffn2_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn2_bias".format(i)) for i in range(config.num_layers)]
         alpha = (2 * self.config.num_hidden_layers) ** 0.5
-        self.transformer_block = FusedMultiTransformer(
+
+        transformer_config = FusedMultiTransformerConfig(
             config.hidden_size,
             config.num_attention_heads,
             4 * config.hidden_size,
@@ -209,6 +211,7 @@ class ChatGLMStackDyBatch(nn.Layer):
             norm_type="layernorm",
             use_neox_rotary_style=True,
         )
+        self.transformer_block = FusedMultiTransformerBase(transformer_config)
 
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
@@ -227,6 +230,7 @@ class ChatGLMStackDyBatch(nn.Layer):
         use_cache=None,
         cache=None,
         cache_kvs=None,
+        pre_caches=None,
         seq_len_encoder=None,
         seq_len_decoder=None,
         past_key_values=None,
@@ -269,8 +273,8 @@ class ChatGLMStackDyBatch(nn.Layer):
         coses = []
         sines = []
         if self.position_encoding_2d:
-            block_position_ids = position_ids[:, 1, :].transpose([1, 0])
-            position_ids = position_ids[:, 0, :].transpose([1, 0])
+            block_position_ids = position_ids[:batch_size, 1, :].transpose([1, 0])
+            position_ids = position_ids[:batch_size, 0, :].transpose([1, 0])
             coses.append(cos.squeeze(1)[position_ids].unsqueeze(2))
             sines.append(sin.squeeze(1)[position_ids].unsqueeze(2))
 
@@ -292,10 +296,12 @@ class ChatGLMStackDyBatch(nn.Layer):
 
         rotary_embeds = paddle.concat([coses, sines])
 
-        attention_mask = (attention_mask) * -1000000
-
         new_cache = [None]
         hidden_states = self.input_layernorm(hidden_states)
+
+        position_offset = 0
+        if encode_seq_length > 1 and pre_caches is not None:
+            position_offset = 128
 
         with dy2st_nocheck_guard_context():
             hidden_states, new_cache = self.transformer_block(
@@ -305,11 +311,14 @@ class ChatGLMStackDyBatch(nn.Layer):
                 padding_offset=padding_offset,
                 attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
                 caches=cache_kvs,
+                pre_caches=pre_caches,
+                pre_caches_length=position_offset,
                 rotary_embs=paddle.cast(rotary_embeds, "float32"),
                 rotary_emb_dims=2 if self.config.position_encoding_2d else 1,
                 seq_lens=seq_lens,
                 time_step=time_step,
             )
+
         return (hidden_states, new_cache)
 
     @paddle.no_grad()
@@ -415,6 +424,7 @@ class ChatGLMModelDyBatch(ChatGLMPretrainedModel):
         inputs_embeds=None,
         use_cache=None,
         cache_kvs=None,
+        pre_caches=None,
         seq_len_encoder=None,
         seq_len_decoder=None,
         past_key_values=None,
@@ -448,6 +458,7 @@ class ChatGLMModelDyBatch(ChatGLMPretrainedModel):
             use_cache=use_cache,
             cache=cache,
             cache_kvs=cache_kvs,
+            pre_caches=pre_caches,
             seq_len_encoder=seq_len_encoder,
             seq_len_decoder=seq_len_decoder,
             past_key_values=past_key_values,
@@ -527,15 +538,17 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
         position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
         cache = kwargs.get("cache", None)
+        pre_caches = kwargs.get("pre_caches", None)
 
         time_step = None
         if cache is not None:
             time_step = self.time_step
             input_ids = tgt_ids
             position_ids = tgt_pos
-            attention_mask = 1 - tgt_generation_mask
+            attention_mask = (1 - tgt_generation_mask) * paddle.finfo(tgt_generation_mask.dtype).min
         else:
             self.time_step = paddle.to_tensor(input_ids.shape[1], dtype="int32", place=paddle.CPUPlace())
+            attention_mask = (1 - attention_mask) * paddle.finfo(tgt_generation_mask.dtype).min
             paddle.increment(self.time_step, -1)
 
         model_inputs = {
@@ -547,6 +560,7 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
             "seq_len_decoder": seq_len_decoder,
             "cache": cache,
             "time_step": time_step,
+            "pre_caches": pre_caches,
         }
         return model_inputs
 
@@ -560,6 +574,7 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
         use_cache=False,
         cache=None,
         cache_kvs=None,
+        pre_caches=None,
         seq_len_encoder=None,
         seq_len_decoder=None,
         past_key_values=None,
@@ -582,6 +597,7 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
             use_cache=use_cache,
             cache=cache,
             cache_kvs=cache_kvs,
+            pre_caches=pre_caches,
             seq_len_encoder=seq_len_encoder,
             seq_len_decoder=seq_len_decoder,
             past_key_values=past_key_values,
@@ -636,5 +652,7 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
-        self.lm_head.weight.set_value(state_dict["transformer.word_embeddings.weight"])
+        self.lm_head.weight.set_value(
+            state_dict["transformer.word_embeddings.weight"].astype(self.lm_head.weight.dtype)
+        )
         self.model.transformer.set_state_dict({k: state_dict[k] for k in state_dict.keys()})

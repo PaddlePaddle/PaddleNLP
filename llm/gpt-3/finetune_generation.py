@@ -153,7 +153,6 @@ def main():
         model_args.model_name_or_path,
         config=config,
         dtype=dtype,
-        load_state_as_np=True,
     )
     if model_args.lora:
         if model_args.lora_path is None:

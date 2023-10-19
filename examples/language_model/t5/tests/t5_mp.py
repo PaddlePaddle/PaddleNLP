@@ -44,7 +44,6 @@ def main():
         tensor_parallel_degree=tensor_parallel_degree,
         tensor_parallel_rank=tensor_parallel_rank,
         dtype="float32",
-        low_cpu_mem_usage=True,
     )
     model.eval()
     loss = model(
@@ -63,7 +62,6 @@ def main():
             tensor_parallel_degree=tensor_parallel_degree,
             tensor_parallel_rank=tensor_parallel_rank,
             dtype="float32",
-            low_cpu_mem_usage=True,
         )
         load_model.eval()
         loss = load_model(
@@ -85,7 +83,6 @@ def main():
             tensor_parallel_degree=tensor_parallel_degree,
             tensor_parallel_rank=tensor_parallel_rank,
             dtype="float32",
-            low_cpu_mem_usage=True,
         )
         load_model.eval()
         loss = load_model(

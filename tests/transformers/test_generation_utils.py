@@ -564,7 +564,7 @@ class GenerationTesterMixin:
             output_ids_generate = model.generate(
                 generation_config=GenerationConfig(
                     decode_strategy="greedy_search",
-                    max_length=max_length,
+                    max_new_tokens=max_length,
                 )
             )
 
@@ -994,13 +994,15 @@ class GenerationIntegrationTests:
         bart_model.generate(
             input_ids,
             generation_config=GenerationConfig(
-                decode_strategy="sampling", top_k=1, max_length=30, logits_processors=logits_processor
+                decode_strategy="sampling", top_k=1, max_new_tokens=30, logits_processors=logits_processor
             ),
         )
 
         bart_model.generate(
             input_ids,
-            generation_config=GenerationConfig(decode_strategy="sampling", top_k=1, max_length=30, min_length=25),
+            generation_config=GenerationConfig(
+                decode_strategy="sampling", top_k=1, max_new_tokens=30, min_new_tokens=25
+            ),
         )
 
     # BART supports inputs_embeds
@@ -1104,32 +1106,33 @@ class GenerationUtilsTestCase(unittest.TestCase):
 
         # 1. generate with no special eos_token_id
         # [520, 8, 9, 59, 124, 635, 8, 12, 8, 10, 8, 10, 8, 10, 8, 10, 8, 10, 8, 10]
-        decoded_ids = model.generate(paddle.to_tensor([input_ids]), generation_config=GenerationConfig(max_length=20))[
-            0
-        ].tolist()[0]
+        decoded_ids = model.generate(
+            paddle.to_tensor([input_ids]), generation_config=GenerationConfig(max_new_tokens=20)
+        )[0].tolist()[0]
         self.assertEqual(len(decoded_ids), 20)
 
         # 2. generate with single special eos_token_id (12)
         decoded_ids = model.generate(
-            paddle.to_tensor([input_ids]), generation_config=GenerationConfig(max_length=20, eos_token_id=12)
+            paddle.to_tensor([input_ids]), generation_config=GenerationConfig(max_new_tokens=20, eos_token_id=12)
         )[0].tolist()[0]
         self.assertEqual(decoded_ids, [520, 8, 9, 59, 124, 635, 8, 12])
 
         decoded_ids = model.generate(
-            paddle.to_tensor([input_ids]), generation_config=GenerationConfig(max_length=20, eos_token_id=635)
+            paddle.to_tensor([input_ids]), generation_config=GenerationConfig(max_new_tokens=20, eos_token_id=635)
         )[0].tolist()[0]
         self.assertEqual(decoded_ids, [520, 8, 9, 59, 124, 635])
 
         # 3. generate with single tokens
         decoded_ids = model.generate(
-            paddle.to_tensor([input_ids]), generation_config=GenerationConfig(max_length=20, eos_token_id=[124, 635])
+            paddle.to_tensor([input_ids]),
+            generation_config=GenerationConfig(max_new_tokens=20, eos_token_id=[124, 635]),
         )[0].tolist()[0]
         self.assertEqual(decoded_ids, [520, 8, 9, 59, 124, 635])
 
         # 4. generate with multi tokens
         decoded_ids = model.generate(
             paddle.to_tensor([input_ids]),
-            generation_config=GenerationConfig(max_length=20, eos_token_id=[[59, 124], [124, 635]]),
+            generation_config=GenerationConfig(max_new_tokens=20, eos_token_id=[[59, 124], [124, 635]]),
         )[0].tolist()[0]
         self.assertEqual(decoded_ids, [520, 8, 9, 59, 124])
 
@@ -1143,14 +1146,15 @@ class GenerationUtilsTestCase(unittest.TestCase):
         # 1. get the dygraph decoded_ids
         expected_output_ids = [[15426, 15426, 15426, 15426, 15426, 15426], [18966, 18000, 23410, 23410, 23410, 23410]]
 
-        decoded_ids = model.generate(paddle.to_tensor(input_ids), generation_config=GenerationConfig(max_length=6))[
-            0
-        ].tolist()
+        decoded_ids = model.generate(
+            paddle.to_tensor(input_ids), generation_config=GenerationConfig(max_new_tokens=6)
+        )[0].tolist()
 
         self.assertEqual(expected_output_ids, decoded_ids)
 
         decoded_ids = model.generate(
-            paddle.to_tensor(input_ids), generation_config=GenerationConfig(max_length=6, eos_token_id=[1800, 23410])
+            paddle.to_tensor(input_ids),
+            generation_config=GenerationConfig(max_new_tokens=6, eos_token_id=[1800, 23410]),
         )[0].tolist()
         self.assertEqual(expected_output_ids, decoded_ids)
 
