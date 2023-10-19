@@ -515,7 +515,7 @@ class ChatTemplate:
     query: str = None
 
     @staticmethod
-    @lru_cache
+    @lru_cache()
     def _compile_jinja_template(chat_template):
         def raise_exception(message):
             raise TemplateError(message)
