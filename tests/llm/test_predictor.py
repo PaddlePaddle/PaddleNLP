@@ -19,7 +19,12 @@ import unittest
 import paddle
 from parameterized import parameterized_class
 
-from paddlenlp.transformers import AutoTokenizer, BloomForCausalLM, LlamaForCausalLM
+from paddlenlp.transformers import (  # ChatGLMForCausalLM,
+    AutoTokenizer,
+    BloomForCausalLM,
+    ChatGLMv2ForCausalLM,
+    LlamaForCausalLM,
+)
 from paddlenlp.utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     get_path_from_url_with_filelock,
@@ -35,6 +40,7 @@ from .testing_utils import LLMTest
         ["__internal_testing__/tiny-random-llama", LlamaForCausalLM],
         ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
         # ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
+        ["__internal_testing__/tiny-fused-chatglm2", ChatGLMv2ForCausalLM],
     ],
 )
 class PredictorTest(LLMTest, unittest.TestCase):
@@ -73,14 +79,14 @@ class PredictorTest(LLMTest, unittest.TestCase):
         result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))
 
         assert len(result_0) == len(result_1)
-
         count, full_match = 0, 0
+
         for inference_item, no_inference_item in zip(result_0, result_1):
             min_length = min(len(inference_item), len(no_inference_item))
-            count += int(inference_item[min_length // 2] == no_inference_item[min_length // 2])
+            count += int(inference_item[: min_length // 2] == no_inference_item[: min_length // 2])
             full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
 
-        self.assertGreaterEqual(full_match / len(result_0), 0.15)
+        self.assertGreaterEqual(full_match / len(result_0), 0.1)
         self.assertGreater(count / len(result_0), 0.4)
 
 

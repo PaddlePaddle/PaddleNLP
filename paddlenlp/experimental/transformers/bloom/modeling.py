@@ -18,11 +18,13 @@ from typing import Tuple, Union
 import paddle
 from paddle import Tensor, nn
 from paddle.distributed import fleet
+from paddle.nn.quant import weight_quantize
 from paddlenlp_ops import get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
+    FusedMultiTransformerWeightOnly,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
@@ -74,6 +76,18 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
 
         self.embed_dim = config.hidden_size
         self.n_head = config.n_head
+        self.use_weight_only = False
+        self.quant_bits = config.quant_bits
+        self.quant_algo = "weight_only_int" + str(self.quant_bits)
+        if self.quant_bits != -1:
+            self.use_weight_only = True
+
+        if self.use_weight_only:
+            assert (
+                self.quant_algo == "weight_only_int8" or self.quant_algo == "weight_only_int4"
+            ), "Expected quant_algo equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
+                self.quant_algo
+            )
 
         # Embedding + LN Embedding
         if config.tensor_parallel_degree > 1:
@@ -101,23 +115,59 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
         # Transformer blocks
         ln_scale_attrs = [paddle.ParamAttr(name="fusemt.{}.ln_scale".format(i)) for i in range(config.n_layer)]
         ln_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ln_bias".format(i)) for i in range(config.n_layer)]
-        qkv_weight_attrs = [paddle.ParamAttr(name="fusemt.{}.qkv_weight".format(i)) for i in range(config.n_layer)]
+        qkv_weight_attrs = [
+            paddle.ParamAttr(
+                name="fusemt.{}.qkv_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(config.n_layer)
+        ]
         qkv_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.qkv_bias".format(i)) for i in range(config.n_layer)]
         linear_weight_attrs = [
-            paddle.ParamAttr(name="fusemt.{}.linear_weight".format(i)) for i in range(config.n_layer)
+            paddle.ParamAttr(
+                name="fusemt.{}.linear_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(config.n_layer)
         ]
         linear_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.linear_bias".format(i)) for i in range(config.n_layer)]
         ffn_ln_scale_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn_ln_scale".format(i)) for i in range(config.n_layer)]
         ffn_ln_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn_ln_bias".format(i)) for i in range(config.n_layer)]
-        ffn1_weight_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn1_weight".format(i)) for i in range(config.n_layer)]
+        ffn1_weight_attrs = [
+            paddle.ParamAttr(
+                name="fusemt.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(config.n_layer)
+        ]
         ffn1_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn1_bias".format(i)) for i in range(config.n_layer)]
-        ffn2_weight_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn2_weight".format(i)) for i in range(config.n_layer)]
+        ffn2_weight_attrs = [
+            paddle.ParamAttr(
+                name="fusemt.{}.ffn2_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(config.n_layer)
+        ]
         ffn2_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn2_bias".format(i)) for i in range(config.n_layer)]
+        qkv_weight_scale_attrs = None
+        linear_weight_scale_attrs = None
+        ffn1_weight_scale_attrs = None
+        ffn2_weight_scale_attrs = None
+        if self.use_weight_only:
+            qkv_weight_scale_attrs = [
+                paddle.ParamAttr(name="fusemt.{}.qkv_weight_scale".format(i)) for i in range(config.n_layer)
+            ]
+            linear_weight_scale_attrs = [
+                paddle.ParamAttr(name="fusemt.{}.linear_weight_scale".format(i)) for i in range(config.n_layer)
+            ]
+            ffn1_weight_scale_attrs = [
+                paddle.ParamAttr(name="fusemt.{}.ffn1_weight_scale".format(i)) for i in range(config.n_layer)
+            ]
+            ffn2_weight_scale_attrs = [
+                paddle.ParamAttr(name="fusemt.{}.ffn2_weight_scale".format(i)) for i in range(config.n_layer)
+            ]
 
         transformer_config = FusedMultiTransformerConfig(
             self.embed_dim,
             self.n_head,
             4 * self.embed_dim,
+            quant_bits=self.quant_bits,
             activation="gelu",
             num_layers=config.n_layer,
             nranks=config.tensor_parallel_degree,
@@ -125,18 +175,26 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
             ln_scale_attrs=ln_scale_attrs,
             ln_bias_attrs=ln_bias_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
+            qkv_weight_scale_attrs=qkv_weight_scale_attrs,
             qkv_bias_attrs=qkv_bias_attrs,
             linear_weight_attrs=linear_weight_attrs,
+            linear_weight_scale_attrs=linear_weight_scale_attrs,
             linear_bias_attrs=linear_bias_attrs,
             ffn_ln_scale_attrs=ffn_ln_scale_attrs,
             ffn_ln_bias_attrs=ffn_ln_bias_attrs,
             ffn1_weight_attrs=ffn1_weight_attrs,
+            ffn1_weight_scale_attrs=ffn1_weight_scale_attrs,
             ffn1_bias_attrs=ffn1_bias_attrs,
             ffn2_weight_attrs=ffn2_weight_attrs,
+            ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
             ffn2_bias_attrs=ffn2_bias_attrs,
         )
 
-        self.transformer_block = FusedMultiTransformerBase(transformer_config)
+        if self.use_weight_only:
+            self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
+        else:
+            self.transformer_block = FusedMultiTransformerBase(transformer_config)
+
         self.cache_kvs = []
 
         # Final Layer Norm
@@ -166,6 +224,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
         inputs_embeds=None,
         cache=None,
         cache_kvs=None,
+        pre_caches=None,
         seq_len_encoder=None,
         seq_len_decoder=None,
         return_dict=None,
@@ -197,6 +256,9 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
             inputs_embeds = self.word_embeddings(ids_remove_padding)
 
         hidden_states = self.word_embeddings_layernorm(inputs_embeds)
+        position_offset = 0
+        if not is_decoder and pre_caches is not None:
+            position_offset = 128
 
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
@@ -206,6 +268,8 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                 padding_offset=padding_offset,
                 attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
                 caches=cache_kvs,
+                pre_caches=pre_caches,
+                pre_caches_length=position_offset,
                 seq_lens=seq_len,
                 time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
             )
@@ -217,7 +281,6 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict, use_structured_name=True):
-
         for k, v in state_dict.items():
             if k.find("word_embeddings.weight") >= 0:
                 self.word_embeddings.weight.set_value(paddle.to_tensor(v))
@@ -239,7 +302,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                 elif k.endswith("input_layernorm.bias"):
                     self.transformer_block.ln_biases[idx].set_value(paddle.to_tensor(v).astype("float32"))
                 elif k.endswith("self_attention.query_key_value.weight"):
-                    v = (
+                    qkv_weight_tensor = (
                         v.reshape(
                             [
                                 self.embed_dim,
@@ -251,7 +314,16 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                         .transpose([2, 1, 3, 0])
                         .reshape([-1, self.embed_dim])
                     )
-                    self.transformer_block.qkv_weights[idx].set_value(paddle.to_tensor(v))
+
+                    if self.use_weight_only:
+                        qkv_weight_tensor = paddle.transpose(qkv_weight_tensor, perm=[1, 0])
+                        qkv_quanted_weight_tensor, qkv_weight_scale_tensor = weight_quantize(
+                            qkv_weight_tensor, algo=self.quant_algo
+                        )
+                        self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor)
+                        self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor)
+                    else:
+                        self.transformer_block.qkv_weights[idx].set_value(qkv_weight_tensor)
                 elif k.endswith("self_attention.query_key_value.bias"):
                     v = (
                         v.reshape(
@@ -266,7 +338,15 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                     )
                     self.transformer_block.qkv_biases[idx].set_value(paddle.to_tensor(v))
                 elif k.endswith("self_attention.dense.weight"):
-                    self.transformer_block.linear_weights[idx].set_value(paddle.to_tensor(v))
+                    linear_weight_tensor = paddle.to_tensor(v)
+                    if self.use_weight_only:
+                        linear_quanted_weight_tensor, linear_weight_scale_tensor = weight_quantize(
+                            linear_weight_tensor, algo=self.quant_algo
+                        )
+                        self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor)
+                        self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor)
+                    else:
+                        self.transformer_block.linear_weights[idx].set_value(linear_weight_tensor)
                 elif k.endswith("self_attention.dense.bias"):
                     self.transformer_block.linear_biases[idx].set_value(paddle.to_tensor(v))
                 elif k.endswith("post_attention_layernorm.weight"):
@@ -274,11 +354,28 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                 elif k.endswith("post_attention_layernorm.bias"):
                     self.transformer_block.ffn_ln_biases[idx].set_value(paddle.to_tensor(v).astype("float32"))
                 elif k.endswith("mlp.dense_h_to_4h.weight"):
-                    self.transformer_block.ffn1_weights[idx].set_value(paddle.to_tensor(v))
+                    ffn1_weight_tensor = paddle.to_tensor(v)
+                    if self.use_weight_only:
+                        ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
+                            ffn1_weight_tensor, algo=self.quant_algo
+                        )
+                        self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor)
+                        self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor)
+                    else:
+                        self.transformer_block.ffn1_weights[idx].set_value(ffn1_weight_tensor)
                 elif k.endswith("mlp.dense_h_to_4h.bias"):
                     self.transformer_block.ffn1_biases[idx].set_value(paddle.to_tensor(v))
                 elif k.endswith("mlp.dense_4h_to_h.weight"):
-                    self.transformer_block.ffn2_weights[idx].set_value(paddle.to_tensor(v))
+                    ffn2_weight_tensor = paddle.to_tensor(v)
+                    if self.use_weight_only:
+                        ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(
+                            ffn2_weight_tensor, algo=self.quant_algo
+                        )
+                        self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
+                        self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
+                    else:
+                        self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight_tensor)
+
                 elif k.endswith("mlp.dense_4h_to_h.bias"):
                     self.transformer_block.ffn2_biases[idx].set_value(paddle.to_tensor(v))
                 else:
@@ -387,6 +484,7 @@ class BloomForCausalLMInferenceModel(GenerationInferenceModel, BloomPreTrainedMo
         # only last token for inputs_ids if cache is defined in kwargs
         attention_mask = kwargs.get("attention_mask", None)
         position_ids = kwargs.get("position_ids", None)
+        pre_caches = kwargs.get("pre_caches", None)
         seq_len_encoder = kwargs.get("seq_len_encoder", None)
         seq_len_decoder = kwargs.get("seq_len_decoder", None)
         cache = kwargs.get("cache", None)
@@ -399,6 +497,7 @@ class BloomForCausalLMInferenceModel(GenerationInferenceModel, BloomPreTrainedMo
             "position_ids": position_ids,
             "cache_kvs": cache_kvs,
             "cache": cache,
+            "pre_caches": pre_caches,
             "use_cache": True,
             "seq_len_encoder": seq_len_encoder,
             "seq_len_decoder": seq_len_decoder,
@@ -415,6 +514,7 @@ class BloomForCausalLMInferenceModel(GenerationInferenceModel, BloomPreTrainedMo
         labels=None,
         use_cache=None,
         cache_kvs=None,
+        pre_caches=None,
         output_attentions=None,
         output_hidden_states=None,
         seq_len_encoder=None,
@@ -436,6 +536,7 @@ class BloomForCausalLMInferenceModel(GenerationInferenceModel, BloomPreTrainedMo
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
             cache_kvs=cache_kvs,
+            pre_caches=pre_caches,
             seq_len_encoder=seq_len_encoder,
             seq_len_decoder=seq_len_decoder,
             return_dict=return_dict,
