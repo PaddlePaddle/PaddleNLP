@@ -1210,6 +1210,15 @@ ernie_health(){
     ernie-health
 }
 
+segment_parallel_utils(){
+cd ${nlp_dir}
+echo "test segment_parallel_utils"
+export CUDA_VISIBLE_DEVICES=${cudaid1},${cudaid2}
+echo $CUDA_VISIBLE_DEVICES
+time (python -m paddle.distributed.launch tests/transformers/test_segment_parallel_utils.py >${log_path}/segment_parallel_utils) >>${log_path}/segment_parallel_utils 2>&1
+print_info $? segment_parallel_utils
+}
+
 gpt-3() {
     bash ${nlp_dir}/scripts/regression/ci_gpt-3.sh
     print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'`
