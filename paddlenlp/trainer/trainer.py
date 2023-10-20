@@ -1864,7 +1864,7 @@ class Trainer:
             self._pp_data_buffer = []
         self._pp_data_buffer.append(inputs)
         if len(self._pp_data_buffer) != self.args.gradient_accumulation_steps:
-            return paddle.zeros([]), {}
+            return paddle.zeros([1]), {}
 
         # for v in self._pp_data_buffer[0].values():
         #     assert isinstance(v, paddle.Tensor), f"Only support tensor as pipeline mode input, got type {type(v)}"
@@ -1899,7 +1899,7 @@ class Trainer:
 
         model.micro_batch_size, model.accumulate_steps = config_backup
         if not hasattr(model._layers._loss_fn, "info"):
-            return loss.detach()
+            return loss.detach(), {}
 
         if model.is_pipeline_last_stage():
             buf = [
@@ -1920,7 +1920,11 @@ class Trainer:
         model._layers._loss_fn.info = {}
         assert isinstance(loss, dict), f"expect info to dict, got {type(loss)}"
         loss = map_structure(lambda v: v.detach() if isinstance(v, paddle.Tensor) else v, loss)
-        return loss
+        if isinstance(loss, dict):
+            total_loss = loss["loss"]
+        else:
+            total_loss = loss
+        return total_loss, loss
 
     def save_model(
         self,
