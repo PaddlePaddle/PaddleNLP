@@ -578,7 +578,9 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
 
         config.switch_ir_optim(True)
-        config.delete_pass("gpu_cpu_map_matmul_v2_to_matmul_pass")
+        # remove `gpu_cpu_map_matmul_v2_to_matmul_pass` to avoid mapping matmul_v2 -> matmul op
+        if predictor_args.dtype == "bfloat16":
+            config.delete_pass("gpu_cpu_map_matmul_v2_to_matmul_pass")
 
         device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
         config.enable_use_gpu(100, device_id)
