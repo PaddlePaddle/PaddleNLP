@@ -165,6 +165,8 @@ class TestReshardLayer(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    CUDA_VISIBLE_DEVICES = os.environ["CUDA_VISIBLE_DEVICES"]
-    print(f"CUDA_VISIBLE_DEVICES is set to {CUDA_VISIBLE_DEVICES}")
-    unittest.main()
+    cuda_visible_devices = os.environ["CUDA_VISIBLE_DEVICES"]
+    print(f"CUDA_VISIBLE_DEVICES is set to {cuda_visible_devices}")
+    gpu_set = set([k.strip() for k in cuda_visible_devices.split(',')])
+    if len(gpu_set) > 1:
+        unittest.main()
