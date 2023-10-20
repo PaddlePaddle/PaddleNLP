@@ -118,7 +118,7 @@ class ColumnParallelQuantedLoRALinear(ConvertibleQuantedLayer):
         self.is_mp = layer.is_mp
         self.model_parallel_group = layer.model_parallel_group
         self.gather_output = layer.gather_output
-        self.is_mp = self.layer.is_mp
+        self.is_mp = layer.is_mp
 
         # Mark the weight as unmerged
         self.merged = False
@@ -137,8 +137,10 @@ class ColumnParallelQuantedLoRALinear(ConvertibleQuantedLayer):
         if self.merge_weights and self.merged:
             weight = self.weight
         else:
-            weight = self.weight + self.lora_A @ self.lora_B * self.scaling
-
+            weight = (
+                self.weight
+                + mp_ops._c_identity(self.lora_A, group=self.model_parallel_group) @ self.lora_B * self.scaling
+            )
         quant_input = self.activation_quanter(input) if self.activation_quanter is not None else input
         quant_weight = self.weight_quanter(weight) if self.weight_quanter is not None else weight
 
@@ -205,7 +207,7 @@ class RowParallelQuantedLoRALinear(ConvertibleQuantedLayer):
         self.is_mp = layer.is_mp
         self.model_parallel_group = layer.model_parallel_group
         self.input_is_parallel = layer.input_is_parallel
-        self.is_mp = self.layer.is_mp
+        self.is_mp = layer.is_mp
 
         # Mark the weight as unmerged
         self.merged = False
@@ -224,7 +226,10 @@ class RowParallelQuantedLoRALinear(ConvertibleQuantedLayer):
         if self.merge_weights and self.merged:
             weight = self.weight
         else:
-            weight = self.weight + self.lora_A @ self.lora_B * self.scaling
+            weight = (
+                self.weight
+                + self.lora_A @ mp_ops._c_identity(self.lora_B, group=self.model_parallel_group) * self.scaling
+            )
 
         quant_input = self.activation_quanter(input) if self.activation_quanter is not None else input
         quant_weight = self.weight_quanter(weight) if self.weight_quanter is not None else weight
