@@ -1679,6 +1679,12 @@ class Trainer:
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
 
+        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and not in_tensor_parallel_model:
+            if self.args.amp_master_grad:
+                mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
+                if self.optimizer is not None:
+                    self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
+
         return model
 
     def _prepare_input(self, data: Union[paddle.Tensor, Any]) -> Union[paddle.Tensor, Any]:
