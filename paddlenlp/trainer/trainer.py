@@ -95,6 +95,7 @@ from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
+from .plugins.unified_checkpoint import load_unified_checkpoint, save_unified_checkpoint
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -125,6 +126,8 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
 from .training_args import TrainingArguments
 from .utils.helper import (  # nested_truncate,
     distributed_concat,
+    distributed_file,
+    distributed_isfile,
     nested_concat,
     nested_detach,
     nested_numpify,
@@ -495,6 +498,16 @@ class Trainer:
             if resume_from_checkpoint is None:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
+        if self.args.unified_checkpoint:
+            if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
+                load_unified_checkpoint(
+                    self.model,
+                    resume_from_checkpoint,
+                    safe_serialization=True,
+                )
+                logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
+                return
+
         if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
             self._load_from_peft_checkpoint(resume_from_checkpoint)
             return
@@ -697,10 +710,12 @@ class Trainer:
         steps_trained_progress_bar = None
 
         # Check if continuing training from a checkpoint
-        if resume_from_checkpoint is not None and os.path.isfile(
+        if resume_from_checkpoint is not None and distributed_isfile(
             os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
         ):
-            self.state = TrainerState.load_from_json(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
+            self.state = TrainerState.load_from_json(
+                distributed_file(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
+            )
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:
                 steps_trained_in_current_epoch = self.state.global_step % (num_update_steps_per_epoch)
@@ -1915,6 +1930,7 @@ class Trainer:
         if self.args.use_hybrid_parallel:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
+                logger.info("Saving optimizer files.")
                 paddle.save(
                     self.optimizer.state_dict(),
                     os.path.join(output_dir, optimizer_name),
@@ -1922,6 +1938,7 @@ class Trainer:
 
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
+                logger.info("Saving optimizer files.")
                 paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
             # FIXME: manybe only save one copy
@@ -2046,15 +2063,24 @@ class Trainer:
             shutil.rmtree(checkpoint)
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
-        # If we are executing this function, we are the process zero, so we don't check for that.
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
         logger.info(f"Saving model checkpoint to {output_dir}")
         # Save a trained model and configuration using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
 
-        merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
+        if self.args.should_save:
+            if self.tokenizer is not None:
+                self.tokenizer.save_pretrained(output_dir)
+            # Good practice: save your training arguments together with the trained model
+            paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
 
+        if self.args.unified_checkpoint:
+            save_unified_checkpoint(self.args, self.model, output_dir, safe_serialization=True)
+            return
+
+        merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
+        # peft model
         if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
             self.model.save_pretrained(
                 output_dir,
@@ -2063,6 +2089,7 @@ class Trainer:
                 is_main_process=self.args.should_save,
                 max_shard_size="1024GB",
             )
+        # TODO: @ZHUI unifiy unwrap_model(self.model) and self.model
         elif not isinstance(self.model, PretrainedModel):
             if isinstance(unwrap_model(self.model), PretrainedModel):
                 if self.args.should_save_sharding_stage1_model:
@@ -2123,15 +2150,9 @@ class Trainer:
         if self.args.should_save_sharding_stage1_model:
             self.sharding_io.save_distributed_model_meta(output_dir)
 
-        if self.args.should_save:
-            if self.tokenizer is not None:
-                self.tokenizer.save_pretrained(output_dir)
-
-            # Good practice: save your training arguments together with the trained model
-            paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
-
     def _load_optimizer_and_scheduler(self, checkpoint):
         """If optimizer and scheduler states exist, load them."""
+        # TODO: Support DP broadcast optimizer.
         if checkpoint is None:
             return
 
@@ -2146,16 +2167,20 @@ class Trainer:
             if os.path.isfile(path):
                 opt_state_dict = paddle.load(path)
 
-        if opt_state_dict is not None and os.path.isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
+        if opt_state_dict is not None:
             # Load in optimizer and scheduler states
             self.optimizer.set_state_dict(opt_state_dict)
-
-            self.lr_scheduler.set_state_dict(paddle.load(os.path.join(checkpoint, SCHEDULER_NAME)))
-            if self.do_grad_scaling and os.path.isfile(os.path.join(checkpoint, SCALER_NAME)):
-                self.scaler.load_state_dict(paddle.load(os.path.join(checkpoint, SCALER_NAME), return_numpy=True))
         else:
-            raise ValueError(
-                f"optimizer-state-dict not found, opt:{os.path.join(checkpoint, optimizer_name)} scheduler:{os.path.join(checkpoint, SCHEDULER_NAME)}"
+            raise ValueError(f"optimizer-state-dict not found, opt:{os.path.join(checkpoint, optimizer_name)}.")
+
+        if distributed_isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
+            self.lr_scheduler.set_state_dict(paddle.load(distributed_file(os.path.join(checkpoint, SCHEDULER_NAME))))
+        else:
+            raise ValueError(f"scheduler-file not found, scheduler:{os.path.join(checkpoint, SCHEDULER_NAME)}")
+
+        if self.do_grad_scaling and distributed_isfile(os.path.join(checkpoint, SCALER_NAME)):
+            self.scaler.load_state_dict(
+                paddle.load(distributed_file(os.path.join(checkpoint, SCALER_NAME)), return_numpy=True)
             )
 
     def log(self, logs: Dict[str, float], **kwargs) -> None:

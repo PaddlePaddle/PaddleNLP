@@ -1037,8 +1037,10 @@ class ConversionMixin:
         raise NotImplementedError
 
     @classmethod
-    def get_tensor_parallel_convert_actions(cls, config: PretrainedConfig, loaded_state_dict_keys, ignore_error=False):
-        name_action_mappings = cls._get_tensor_parallel_mappings(config)
+    def get_tensor_parallel_convert_actions(
+        cls, config: PretrainedConfig, loaded_state_dict_keys, is_split=True, ignore_error=False
+    ):
+        name_action_mappings = cls._get_tensor_parallel_mappings(config, is_split=is_split)
         state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), loaded_state_dict_keys, ignore_error)
         for k, v in state_keys_map.items():
             name_action_mappings[v] = name_action_mappings.pop(k)

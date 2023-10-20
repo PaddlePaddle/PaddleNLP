@@ -80,7 +80,8 @@ class DistDataLoader(paddle.io.DataLoader):
         self.dp_rank = self._hcg.get_data_parallel_rank()
         sharding_rank = self._hcg.get_sharding_parallel_rank()
         self._need_data = (self.mp_rank == 0) and (self.pp_rank == 0)
-        self._data_keys, self._data_keys_size = None, None
+        self._data_int64_keys, self._data_int64_keys_size = None, None
+        self._data_fp32_keys, self._data_fp32_keys_size = None, None
 
         if self._need_data:
             self._dataloader = paddle.io.DataLoader(
@@ -138,59 +139,98 @@ class DistDataLoader(paddle.io.DataLoader):
         return self
 
     def __next__(self):
-        data_keys_size = 0
+        data_int64_keys_size, data_fp32_keys_size = 0, 0
         if self._need_data:
             # {'input_ids': int64, 'labels': int64}
             data = next(self._dataloader_iter)
-            data_keys_size, data_keys = len(data.keys()), list(data.keys())
-            data_list = [data[key] for key in data_keys]
-            # TODO(daisiming): add more type assertion.
-            assert {item.dtype for item in data_list} == {
-                paddle.int64
-            }, f"Distloader requires dtype == `int64`, got:{[item.dtype for item in data_list]}"
+            data_keys = list(data.keys())
+
+            # TODO(daisiming): Better methods are needed to support new data types.
+            type_check = [paddle.int64, paddle.float32]
+            for key in data_keys:
+                if data[key].dtype not in type_check:
+                    raise ValueError(
+                        f"Dist dataloader requires dtype == `int64` or dtype == 'float32', but got: {data[key].dtype}"
+                    )
+
+            data_int64_list = [data[key] for key in data_keys if data[key].dtype == paddle.int64]
+            data_int64_keys = [key for key in data_keys if data[key].dtype == paddle.int64]
+            data_fp32_list = [data[key] for key in data_keys if data[key].dtype == paddle.float32]
+            data_fp32_keys = [key for key in data_keys if data[key].dtype == paddle.float32]
+            data_int64_keys_size, data_fp32_keys_size = len(data_int64_keys), len(data_fp32_keys)
 
         # broadcast data keys size
-        data_keys_size = paddle.to_tensor(data_keys_size)
-        if self._data_keys_size is None:
-            if self.mp_group.rank > -1 and self.pp_rank == 0:
-                paddle.distributed.broadcast(data_keys_size, src=self.mp_src_rank, group=self.mp_group)
+        data_int64_keys_size = paddle.to_tensor(data_int64_keys_size)
+        data_fp32_keys_size = paddle.to_tensor(data_fp32_keys_size)
+        if self._data_int64_keys_size is None:
+            if self.mp_group is not None and self.pp_rank == 0:
+                paddle.distributed.broadcast(data_int64_keys_size, src=self.mp_src_rank, group=self.mp_group)
+                paddle.distributed.broadcast(data_fp32_keys_size, src=self.mp_src_rank, group=self.mp_group)
             if self._pp_data_group is not None:
                 paddle.distributed.broadcast(
-                    data_keys_size, src=self._pp_data_group.ranks[0], group=self._pp_data_group
+                    data_int64_keys_size, src=self._pp_data_group.ranks[0], group=self._pp_data_group
                 )
-            self._data_keys_size = int(data_keys_size.item())
+                paddle.distributed.broadcast(
+                    data_fp32_keys_size, src=self._pp_data_group.ranks[0], group=self._pp_data_group
+                )
+            self._data_int64_keys_size = int(data_int64_keys_size.item())
+            self._data_fp32_keys_size = int(data_fp32_keys_size.item())
 
         if not self._need_data:
-            data_keys = [None for i in range(self._data_keys_size)]
+            data_int64_keys = [None for i in range(self._data_int64_keys_size)]
+            data_fp32_keys = [None for i in range(self._data_fp32_keys_size)]
 
         # broadcast data keys name
-        if self._data_keys is None:
-            if self.mp_group.rank > -1 and self.pp_rank == 0:
-                paddle.distributed.broadcast_object_list(data_keys, src=self.mp_src_rank, group=self.mp_group)
+        if self._data_int64_keys is None:
+            if self.mp_group is not None and self.pp_rank == 0:
+                paddle.distributed.broadcast_object_list(data_int64_keys, src=self.mp_src_rank, group=self.mp_group)
+                if self._data_fp32_keys_size > 0:
+                    paddle.distributed.broadcast_object_list(data_fp32_keys, src=self.mp_src_rank, group=self.mp_group)
             if self._pp_data_group is not None:
                 paddle.distributed.broadcast_object_list(
-                    data_keys, src=self._pp_data_group.ranks[0], group=self._pp_data_group
+                    data_int64_keys, src=self._pp_data_group.ranks[0], group=self._pp_data_group
                 )
-            self._data_keys = data_keys
+                if self._data_fp32_keys_size > 0:
+                    paddle.distributed.broadcast_object_list(
+                        data_fp32_keys, src=self._pp_data_group.ranks[0], group=self._pp_data_group
+                    )
+            self._data_int64_keys = data_int64_keys
+            self._data_fp32_keys = data_fp32_keys
 
         # broadcast data
         if not self._need_data:
-            data_list = [None for i in range(self._data_keys_size)]
-        if self.mp_group.rank > -1 and self.pp_rank == 0:
-            data_list = broadcast_data_list(data_list, paddle.int64, self.mp_rank, self.mp_group, self.mp_src_rank)
+            data_int64_list = [None for i in range(self._data_int64_keys_size)]
+            data_fp32_list = [None for i in range(self._data_fp32_keys_size)]
+        if self.mp_group is not None and self.pp_rank == 0:
+            data_int64_list = broadcast_data_list(
+                data_int64_list, paddle.int64, self.mp_rank, self.mp_group, self.mp_src_rank
+            )
+            if self._data_fp32_keys_size > 0:
+                data_fp32_list = broadcast_data_list(
+                    data_fp32_list, paddle.float32, self.mp_rank, self.mp_group, self.mp_src_rank
+                )
 
         if self._pp_data_group is not None:
             # Note(daisimng): In last stage of pp, we don't need input_ids.
             # It will be removed in future.
-            data_list = broadcast_data_list(
-                data_list,
+            data_int64_list = broadcast_data_list(
+                data_int64_list,
                 paddle.int64,
                 self.pp_rank,
                 self._pp_data_group,
                 self._pp_data_group.ranks[0],
             )
+            if self._data_fp32_keys_size > 0:
+                data_fp32_list = broadcast_data_list(
+                    data_fp32_list,
+                    paddle.float32,
+                    self.pp_rank,
+                    self._pp_data_group,
+                    self._pp_data_group.ranks[0],
+                )
 
-        out = dict([(key, data) for key, data in zip(self._data_keys, data_list)])
+        out = dict([(key, data) for key, data in zip(self._data_int64_keys, data_int64_list)])
+        out.update([(key, data) for key, data in zip(self._data_fp32_keys, data_fp32_list)])
         return out
 
 
