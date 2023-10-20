@@ -391,9 +391,11 @@ class LlamaRotaryEmbedding(nn.Layer):
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
+        cos = self.cos_cached[:, :, :seq_len, ...]
+        sin = self.sin_cached[:, :, :seq_len, ...]
         return (
-            self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
-            self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
+            cos.cast(x.dtype) if cos.dtype != x.dtype else cos,
+            sin.cast(x.dtype) if sin.dtype != x.dtype else sin,
         )
 
 
@@ -453,15 +455,14 @@ class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
         # x: [bs, num_attention_heads, seq_len, head_size]
         if seq_len > self.max_position_embeddings:
             scale_cos, scale_sin = self._scale_cos_sin(seq_len=seq_len)
-            return (
-                scale_cos[:, :, :seq_len, ...].cast(x.dtype),
-                scale_sin[:, :, :seq_len, ...].cast(x.dtype),
-            )
         else:
-            return (
-                self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
-                self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
-            )
+            scale_cos, scale_sin = self.cos_cached, self.sin_cached
+        cos = scale_cos[:, :, :seq_len, ...]
+        sin = scale_sin[:, :, :seq_len, ...]
+        return (
+            cos.cast(x.dtype) if cos.dtype != x.dtype else cos,
+            sin.cast(x.dtype) if sin.dtype != x.dtype else sin,
+        )
 
 
 def rotate_half(x):
