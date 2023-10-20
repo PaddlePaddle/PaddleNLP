@@ -45,7 +45,7 @@ std::vector<paddle::Tensor> rebuild_padding_v2(const paddle::Tensor& tmp_out, //
     std::vector<int64_t> tmp_out_shape = tmp_out.shape();
     const int token_num = tmp_out_shape[0];
     const int dim_embed = tmp_out_shape[1];
-    const int bsz = seq_lens_decoder.shape()[0];
+    const int bsz = cum_offsets.shape()[0];
     auto out = paddle::full({bsz, dim_embed}, 0, tmp_out.dtype(), tmp_out.place());
     constexpr int PackSize = VEC_16B / sizeof(DataType_);
     int elem_nums = out.numel();
@@ -110,7 +110,7 @@ std::vector<std::vector<int64_t>> RebuildPaddingV2InferShape(const std::vector<i
                                                              const std::vector<int64_t>& cum_offsets_shape,
                                                              const std::vector<int64_t>& seq_lens_decoder_shape,
                                                              const std::vector<int64_t>& seq_lens_encoder_shape) {
-    int64_t bsz = seq_lens_decoder_shape[0];
+    int64_t bsz = cum_offsets_shape[0];
     int64_t dim_embed = tmp_out_shape[1];
     return {{bsz, dim_embed}};
 }
