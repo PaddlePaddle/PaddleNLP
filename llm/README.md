@@ -215,32 +215,27 @@ python merge_lora_params.py \
 
 ## 4. 模型推理
 
+此外 PaddleNLP 还提供了高性能推理模型，从而加速 LLM 模型的部署落地，详细文档请看：[Inference Model](./inference.md)
+
 ### 4.1 动态图推理
 
 ```shell
 # 预训练&SFT动态图模型推理
 python predictor.py \
     --model_name_or_path meta-llama/Llama-2-7b-chat \
-    --batch_size 1 \
     --data_file ./data/dev.json \
-    --dtype "float16" \
-    --mode "dynamic"
+    --dtype float16
 
 # LoRA动态图模型推理
 python predictor.py \
     --model_name_or_path meta-llama/Llama-2-7b-chat \
-    --batch_size 1 \
-    --data_file ./data/dev.json \
-    --lora_path ./checkpoints/llama_lora_ckpts \
-    --mode "dynamic"
+    --lora_path ./checkpoints/llama_lora_ckpts
 
 # Prefix Tuning动态图模型推理
 python predictor.py \
     --model_name_or_path meta-llama/Llama-2-7b-chat \
-    --batch_size 1 \
     --data_file ./data/dev.json \
-    --prefix_path ./checkpoints/llama_pt_ckpts \
-    --mode "dynamic"
+    --prefix_path ./checkpoints/llama_pt_ckpts
 ```
 
 ### 4.2 静态图推理
@@ -258,71 +253,14 @@ python export_model.py \
 # 静态图模型推理
 python predictor.py \
     --model_name_or_path inference \
-    --batch_size 1 \
     --data_file ./data/dev.json \
-    --dtype "float16" \
-    --mode "static"
+    --dtype float16 \
+    --mode static
 ```
 
-### 4.3 Inference Model 动态图推理
+### 4.3 Inference Model 推理
 
-```shell
-# Inference Model 动态图推理
-# LoRA需要先合并参数，详见3.7LoRA参数合并
-# Prefix Tuning暂不支持
-python predictor.py \
-    --model_name_or_path meta-llama/Llama-2-7b-chat \
-    --dtype float16 \
-    --max_length 1024 \
-    --mode "dynamic" \
-    --inference_model
-```
-
-### 4.4 Inference Model 静态图推理
-
-```shell
-# 首先需要运行一下命令将Inference Model动态图导出为静态图
-# LoRA需要先合并参数，详见3.7LoRA参数合并
-# Prefix Tuning暂不支持
-python export_model.py \
-    --model_name_or_path meta-llama/Llama-2-7b-chat \
-    --output_path ./inference \
-    --dtype float16 \
-    --inference_model
-
-# Inference Model 静态图推理
-python predictor.py \
-    --model_name_or_path ./inference \
-    --dtype float16 \
-    --max_length 1024 \
-    --output_file "infer.json" \
-    --mode "static" \
-    --inference_model
-```
-
-
-### 4.5 参数介绍
-
-<details><summary>&emsp; 脚本参数介绍 </summary><div>
-
-- `model_name_or_path`: 必须，预训练模型名称或者本地的模型路径，用于热启模型和分词器，默认为None。
-- `batch_size`: 批处理大小，默认为8。该参数越大，占用显存越高；该参数越小，占用显存越低。
-- `src_length`: 模型输入上下文最大token长度，默认为1024。
-- `max_length`:模型输入（上下文+生成内容）的最大token长度, 默认为2048。
-- `lora_path`: LoRA参数和配置路径，对LoRA参数进行初始化，默认为None。
-- `prefix_path`: Prefix Tuning参数和配置路径，对Prefix Tuning参数进行初始化，默认为None。
-- `top_k`: “采样”策略中为 top-k 过滤保留的最高概率标记的数量。默认为1，等价于贪心策略。
-- `top_p`:“采样”策略中 top-p 过滤的累积概率。默认为1.0，表示不起作用。
-- `temperature`:“采样”策略中会对输出logit除以temperature。默认为1.0，表示不起作用。
-- `data_file`:必须，待推理json文件，默认为None。
-- `output_file`:保存推理结果文件名，默认为output.json。
-- `device`: 运行环境，默认为gpu。
-- `dtype`: 模型参数dtype，默认为None。如果没有传入`lora_path`、`prefix_path`则必须传入
-- `model_type`: 初始化不同类型模型，gpt-3: GPTForCausalLM; ernie-3.5-se: Ernie35ForCausalLM; 默认为 None。
-- `mode`: 使用动态图或者静态图推理，值为：[dynamic, static]，默认为 dynamic。
-- `inference_model`: 是否使用Inference Model 推理，默认值为 False。
-
-</div></details>
+此外 PaddleNLP 还提供了高性能推理模型，从而加速 LLM 模型的部署落地，详细文档请看：[Inference Model](./inference.md)
 
 ## 5. 服务部署
 
