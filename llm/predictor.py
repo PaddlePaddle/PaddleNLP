@@ -577,7 +577,7 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
 
         config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
 
-        config.switch_ir_optim(True)
+        config.switch_ir_optim(predictor_args.dtype != "bfloat16")
         device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
         config.enable_use_gpu(100, device_id)
         # config.disable_glog_info()
