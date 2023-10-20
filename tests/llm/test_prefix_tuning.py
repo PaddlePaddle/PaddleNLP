@@ -28,9 +28,12 @@ from .testing_utils import LLMTest
     ["model_dir"],
     [
         ["llama"],
+        ["bloom"],
+        ["chatglm"],
+        ["chatglm2"],
     ],
 )
-class LoraTest(LLMTest, unittest.TestCase):
+class PrefixTuningTest(LLMTest, unittest.TestCase):
     config_path: str = "./tests/fixtures/llm/prefix_tuning.yaml"
     model_dir: str = None
 
@@ -55,13 +58,15 @@ class LoraTest(LLMTest, unittest.TestCase):
 
             main()
 
-        self.run_predictor(
-            {
-                "inference_model": True,
-                "prefix_path": self.output_dir,
-                "model_name_or_path": prefix_tuning_config["model_name_or_path"],
-            }
-        )
+        if self.model_dir not in ["chatglm2"]:
+            self.run_predictor(
+                {
+                    "inference_model": True,
+                    "prefix_path": self.output_dir,
+                    "model_name_or_path": prefix_tuning_config["model_name_or_path"],
+                }
+            )
+
         self.run_predictor(
             {
                 "inference_model": False,

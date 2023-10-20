@@ -21,7 +21,9 @@ from paddle.nn.quant import weight_quantize
 from paddlenlp_ops import fused_get_rotary_embedding, get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
-    FusedMultiTransformer,
+    FusedMultiTransformerBase,
+    FusedMultiTransformerConfig,
+    FusedMultiTransformerWeightOnly,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
@@ -161,7 +163,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 paddle.ParamAttr(name="fusellama.{}.ffn2_weight_scale".format(i)) for i in range(self.num_layers)
             ]
 
-        self.transformer_block = FusedMultiTransformer(
+        transformer_config = FusedMultiTransformerConfig(
             self.hidden_size,
             self.num_attention_heads,
             self.intermediate_size,
@@ -184,6 +186,12 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             norm_type="rmsnorm",
             use_neox_rotary_style=True,
         )
+
+        if self.use_weight_only:
+            self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
+        else:
+            self.transformer_block = FusedMultiTransformerBase(transformer_config)
+
         self.norm = FusedLlamaRMSNorm(config)
 
         self.cache_kvs = None

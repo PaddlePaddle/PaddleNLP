@@ -397,7 +397,7 @@ class InferencePredictorMixin:
             pre_caches_length=pre_caches_length,
         )
 
-        if "chatglm" in self.architectures:
+        if "chatglmforcausallm" == self.architectures.lower():
             if inputs["input_ids"].shape[0] < self.config.batch_size:
                 self.tgt_pos = self.tgt_pos[: inputs["input_ids"].shape[0]]
             for i in range(inputs["input_ids"].shape[0]):
@@ -434,9 +434,26 @@ class InferencePredictorMixin:
                 self.attention_mask[i, :, :length, :length] = paddle.tril(
                     paddle.ones(shape=(length, length), dtype=self.config.dtype)
                 )
-                self.arange_tensor_encoder[i, :, :length] = paddle.arange(length).astype(self.config.dtype)
+                if pre_caches_length > 0:
+                    if self.config.prefix_path is None:
+                        prefix_attention_mask = paddle.zeros([1, length, pre_caches_length], dtype=self.config.dtype)
+                    else:
+                        prefix_attention_mask = paddle.ones([1, length, pre_caches_length], dtype=self.config.dtype)
+                    post_attention_mask = paddle.tril(
+                        paddle.ones(shape=(length, length), dtype=self.config.dtype)
+                    ).unsqueeze_(axis=0)
 
-                self.tgt_generation_mask[i, :, 0, :length] = paddle.ones(shape=[1, length], dtype=self.config.dtype)
+                    self.attention_mask[i, :, :length, : length + pre_caches_length] = paddle.concat(
+                        [prefix_attention_mask, post_attention_mask], axis=2
+                    )
+                self.arange_tensor_encoder[i, :, : length + pre_caches_length] = paddle.arange(
+                    length + pre_caches_length
+                ).astype(self.config.dtype)
+
+                self.tgt_generation_mask[i, :, 0, : length + pre_caches_length] = paddle.ones(
+                    shape=[1, length + pre_caches_length], dtype=self.config.dtype
+                )
+            inputs["tgt_pos"] = inputs["tgt_pos"] + pre_caches_length
             # alibi encoder
             alibi_slopes = get_alibi_slopes(self.model_config.n_head)
             inputs["position_ids"] = paddle.to_tensor(alibi_slopes, dtype="float32")
@@ -695,6 +712,16 @@ def create_predictor(
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
             config.tensor_parallel_degree = tensor_parallel_degree
             config.tensor_parallel_rank = tensor_parallel_rank
+            config.quant_bits = -1
+
+            if predictor_args.quant_type.startswith("weight_only_int"):
+                quant_bits = int(predictor_args.quant_type[-1])
+                config.quant_bits = quant_bits
+
+            config.quant_bits = -1
+            if predictor_args.quant_type.startswith("weight_only_int"):
+                quant_bits = int(predictor_args.quant_type[-1])
+                config.quant_bits = quant_bits
 
             if "llama" in config.architectures[0].lower():
                 if model_args.model_type == "llama-img2txt":
@@ -706,13 +733,6 @@ def create_predictor(
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMInferenceModel as LlamaInferenceModel,
                     )
-
-                    config.quant_bits = -1
-
-                    if predictor_args.quant_type.startswith("weight_only_int"):
-                        quant_bits = int(predictor_args.quant_type[-1])
-                        config.quant_bits = quant_bits
-
                 model = LlamaInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
@@ -733,7 +753,17 @@ def create_predictor(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
                 model.eval()
-            elif "chatglm" in config.architectures[0].lower():
+
+            elif "chatglmv2forcausallm" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    ChatGLMv2ForCausalLMInferenceModel as Model,
+                )
+
+                model = Model.from_pretrained(
+                    predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
+                )
+                model.eval()
+            elif "chatglmforcausallm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     ChatGLMForCausalLMInferenceModel,
                 )

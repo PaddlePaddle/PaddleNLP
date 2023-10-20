@@ -456,7 +456,7 @@ def _partion_for_pipeline_mode(keys):
 
 def shard_checkpoint(
     state_dict: Dict[str, paddle.Tensor],
-    max_shard_size: Union[int, str] = "1024GB",
+    max_shard_size: Union[int, str] = "10GB",
     weights_name: str = PADDLE_WEIGHTS_NAME,
     shard_format="naive",
 ):
@@ -466,8 +466,8 @@ def shard_checkpoint(
 
     The sub-checkpoints are determined by iterating through the `state_dict` in the order of its keys, so there is no
     optimization made to make each sub-checkpoint as close as possible to the maximum size passed. For example, if the
-    limit is 1024GB and we have weights of sizes [600GB, 600GB, 200GB, 600GB, 200GB, 200GB] they will get sharded as [600GB], [600+200GB],
-    [600+200+200GB] and not [600+200+200GB], [600+200GB], [600GB].
+    limit is 10GB and we have weights of sizes [6GB, 6GB, 2GB, 6GB, 2GB, 2GB] they will get sharded as [6GB], [6+2GB],
+    [6+2+2GB] and not [6+2+2GB], [6+2GB], [6GB].
 
     <Tip warning={true}>
 
@@ -478,7 +478,7 @@ def shard_checkpoint(
 
     Args:
         state_dict (`Dict[str, paddle.Tensor]`): The state dictionary of a model to save.
-        max_shard_size (`int` or `str`, *optional*, defaults to `"1024GB"`):
+        max_shard_size (`int` or `str`, *optional*, defaults to `"10GB"`):
             The maximum size of each sub-checkpoint. If expressed as a string, needs to be digits followed by a unit
             (like `"5MB"`).
         weights_name (`str`, *optional*, defaults to `"model_state.pdparams"`):
@@ -1320,7 +1320,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         from_hf_hub: bool = False,
         from_aistudio: bool = False,
         cache_dir: str | None = None,
-        subfolder: str = "",
+        subfolder: Optional[str] = None,
         config: PretrainedConfig = None,
         convert_from_torch: bool = False,
         use_safetensors: bool | None = None,
@@ -1362,6 +1362,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             return resolved_archive_file, sharded_metadata, is_sharded
 
         if pretrained_model_name_or_path is not None:
+            # the following code use a lot of os.path.join, hence setting subfolder to empty str if None
+            if subfolder is None:
+                subfolder = ""
             pretrained_model_name_or_path = str(pretrained_model_name_or_path)
             is_local = os.path.isdir(pretrained_model_name_or_path)
 
@@ -1929,7 +1932,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         dtype = kwargs.pop("dtype", None)
         from_hf_hub = kwargs.get("from_hf_hub", False)
         from_aistudio = kwargs.get("from_aistudio", False)
-        subfolder = kwargs.get("subfolder", "")
+        subfolder = kwargs.get("subfolder", None)
         variant = kwargs.pop("variant", None)
         use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
 
@@ -2122,7 +2125,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         is_main_process: bool = True,
         state_dict: Optional[dict] = None,
         save_function: Callable = paddle.save,
-        max_shard_size: Union[int, str] = "1024GB",
+        max_shard_size: Union[int, str] = "10GB",
         safe_serialization: bool = False,
         variant: Optional[str] = None,
         *args,
@@ -2259,7 +2262,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 save_function(shard, os.path.join(save_directory, shard_file))
 
         if index is None:
-            path_to_weights = os.path.join(save_directory, _add_variant(PADDLE_WEIGHTS_NAME, variant))
+            if not safe_serialization:
+                path_to_weights = os.path.join(save_directory, _add_variant(PADDLE_WEIGHTS_NAME, variant))
+            else:
+                path_to_weights = os.path.join(save_directory, _add_variant(SAFE_WEIGHTS_NAME, variant))
             logger.info(f"Model weights saved in {path_to_weights}")
 
         else:

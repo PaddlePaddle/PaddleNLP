@@ -701,6 +701,10 @@ class TrainingArguments:
     distributed_dataloader: Optional[bool] = field(
         default=False, metadata={"help": "Whether to use distributed dataloader."}
     )
+    unified_checkpoint: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether to unify hybrid parallel checkpoint."},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -1015,7 +1019,7 @@ class TrainingArguments:
                         else:
                             warnings.warn(
                                 "For pipeline parallel with sharding, the sharding overlap and tensor fusion "
-                                "should be configured in pipeline_parallel_config. "
+                                "should be configured in pipeline_parallel_config."
                                 '"enable_stage1_tensor_fusion" and "enable_stage1_overlap" in sharding_parallel_config will be ignored.'
                             )
                     except KeyError:
@@ -1038,6 +1042,12 @@ class TrainingArguments:
             if world_size > 1:
                 if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized():
                     paddle.distributed.init_parallel_env()
+
+        if self.unified_checkpoint and not self.use_hybrid_parallel:
+            logger.warning(
+                "The unified_checkpoint only avaliable for hybrid_parallel. Set unified_checkpoint to False for not using hybrid_parallel."
+            )
+            self.unified_checkpoint = False
 
         if self.report_to is None:
             logger.info(
@@ -1183,6 +1193,7 @@ class TrainingArguments:
             if self.pipeline_parallel_degree > 1:
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
             return "_".join(name)
+
         else:
             return None
 
