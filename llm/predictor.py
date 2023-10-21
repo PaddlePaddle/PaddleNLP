@@ -53,11 +53,11 @@ class PredictorArgument:
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
     src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
     max_length: int = field(default=2048, metadata={"help": "the max length for decoding."})
-    top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
-    top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
+    top_k: int = field(default=1, metadata={"help": "top_k parameter for generation"})
+    top_p: float = field(default=1.0, metadata={"help": "top_p parameter for generation"})
     temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
     repetition_penalty: float = field(default=1.0, metadata={"help": "repetition penalty parameter for generation"})
-    device: str = field(default="gpu", metadata={"help": "Device"})
+    device: str = field(default="npu", metadata={"help": "Device"})
     dtype: str = field(default=None, metadata={"help": "Model dtype"})
     lora_path: str = field(default=None, metadata={"help": "The directory of LoRA parameters. Default to None"})
     export_precache: bool = field(default=False, metadata={"help": "whether use prefix weight to do infer"})
@@ -300,12 +300,12 @@ class InferencePredictorMixin:
             )
         else:
             self.attention_mask = paddle.zeros(
-                shape=(config.batch_size, 1, config.max_length, config.max_length),
+                shape=(1, 1, config.max_length, config.max_length),
                 dtype=self.dtype,
             )
 
         self.tgt_generation_mask = paddle.zeros(
-            shape=[config.batch_size, 1, config.max_length, config.max_length],
+            shape=[1, 1, config.max_length, config.max_length],
             dtype=self.dtype,
         )
         self.arange_tensor_encoder = paddle.zeros(shape=(config.batch_size, 1, total_max_length), dtype=self.dtype)
@@ -438,34 +438,34 @@ class InferencePredictorMixin:
 
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
-                self.attention_mask[i, 0, :length, :length] = paddle.tril(
-                    paddle.ones(shape=(length, length), dtype=self.config.dtype)
-                )
+            self.attention_mask[0, 0, :length, :length] = paddle.tril(
+                paddle.ones(shape=(length, length), dtype=self.config.dtype)
+            )
 
-                if pre_caches_length > 0:
-                    if self.config.prefix_path is None:
-                        prefix_attention_mask = paddle.zeros(
-                            [1, length, pre_caches_length], dtype=self.attention_mask.dtype
-                        )
-                    else:
-                        prefix_attention_mask = paddle.ones(
-                            [1, length, pre_caches_length], dtype=self.attention_mask.dtype
-                        )
-                    post_attention_mask = paddle.tril(
-                        paddle.ones(shape=(length, length), dtype=self.attention_mask.dtype)
-                    ).unsqueeze_(axis=0)
-                    self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
-                        [prefix_attention_mask, post_attention_mask], axis=2
-                    )
+                # if pre_caches_length > 0:
+                #     if self.config.prefix_path is None:
+                #         prefix_attention_mask = paddle.zeros(
+                #             [1, length, pre_caches_length], dtype=self.attention_mask.dtype
+                #         )
+                #     else:
+                #         prefix_attention_mask = paddle.ones(
+                #             [1, length, pre_caches_length], dtype=self.attention_mask.dtype
+                #         )
+                #     post_attention_mask = paddle.tril(
+                #         paddle.ones(shape=(length, length), dtype=self.attention_mask.dtype)
+                #     ).unsqueeze_(axis=0)
+                #     self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
+                #         [prefix_attention_mask, post_attention_mask], axis=2
+                #     )
 
-                if self.config.prefix_path is None:
-                    self.tgt_generation_mask[i, 0, 0, pre_caches_length : length + pre_caches_length] = paddle.ones(
-                        shape=[1, length], dtype="float16"
-                    )
-                else:
-                    self.tgt_generation_mask[i, 0, 0, : length + pre_caches_length] = paddle.ones(
-                        shape=[1, length + pre_caches_length], dtype=self.config.dtype
-                    )
+                # if self.config.prefix_path is None:
+                #     self.tgt_generation_mask[i, 0, 0, pre_caches_length : length + pre_caches_length] = paddle.ones(
+                #         shape=[1, length], dtype="float16"
+                #     )
+                # else:
+                #     self.tgt_generation_mask[i, 0, 0, : length + pre_caches_length] = paddle.ones(
+                #         shape=[1, length + pre_caches_length], dtype=self.config.dtype
+                #     )
 
         inputs["pre_ids"] = self.pre_ids
         inputs["attention_mask"] = self.attention_mask
@@ -747,30 +747,30 @@ def predict():
                 source_texts.append(example["src"])
                 target_texts.append(example["tgt"])
     else:
-        source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
-        target_texts = ["", ""]
+        source_texts = ["hello world, how are you?", "hello world, how are you?", "hello world, how are you?", "hello world, how are you?", "hello world, how are you?", "hello world, how are you?", "hello world, how are you?", "hello world, how are you?"]
+        target_texts = ["", "", "", "", "", "", "", ""]
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
 
-    if predictor_args.benchmark:
-        benchmark(predictor, predictor_args, model_args)
-    else:
-        with open(model_args.output_file, "w", encoding="utf-8") as f:
-            for bs, batch_source_text in enumerate(batch_source_texts):
-                outputs = predictor.predict(batch_source_text)
+    # if predictor_args.benchmark:
+    #     benchmark(predictor, predictor_args, model_args)
+    # else:
+    with open(model_args.output_file, "w", encoding="utf-8") as f:
+        for bs, batch_source_text in enumerate(batch_source_texts):
+            outputs = predictor.predict(batch_source_text)
 
-                if predictor.tensor_parallel_rank > 0:
-                    continue
-                for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
-                    print("***********Source**********")
-                    print(source)
-                    print("***********Target**********")
-                    print(target)
-                    print("***********Output**********")
-                    print(output)
-                    out = {"src": source, "tgt": target, "output": output}
-                    f.write(json.dumps(out, ensure_ascii=False) + "\n")
+            if predictor.tensor_parallel_rank > 0:
+                continue
+            for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
+                print("***********Source**********")
+                print(source)
+                print("***********Target**********")
+                print(target)
+                print("***********Output**********")
+                print(output)
+                out = {"src": source, "tgt": target, "output": output}
+                f.write(json.dumps(out, ensure_ascii=False) + "\n")
 
 
 

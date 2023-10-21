@@ -437,7 +437,7 @@ def dybatch_preprocess(
         position_ids = paddle.zeros(shape=[bs, max_length], dtype="int64")
 
         for i in range(bs):
-            position_ids[i, pre_caches_length : pre_caches_length + seq_len[i]] = paddle.arange(seq_len[i])
+            position_ids[i, : seq_len[i]] = paddle.arange(seq_len[i])
         inputs["position_ids"] = position_ids
 
     tgt_ids = [input[-1:] for input in input_ids]
@@ -462,7 +462,7 @@ def dybatch_preprocess(
     inputs["top_p"] = (
         np.array(
             [
-                top_p,
+                0.0,
             ]
             * bs
         )
@@ -472,7 +472,7 @@ def dybatch_preprocess(
     inputs["temperature"] = (
         np.array(
             [
-                temperature,
+                1.0,
             ]
             * bs
         )
@@ -480,7 +480,7 @@ def dybatch_preprocess(
         .astype("float32")
     )
     inputs["seq_len_encoder"] = seq_len.astype("int32").reshape(-1, 1)
-    inputs["seq_len_decoder"] = (seq_len + pre_caches_length).astype("int32").reshape(-1, 1)
+    inputs["seq_len_decoder"] = seq_len.astype("int32").reshape(-1, 1)
     inputs["step_idx"] = np.array(step_idx).astype("int64").reshape(-1, 1)
     inputs["tgt_ids"] = np.array(tgt_ids).astype("int64").reshape(-1, 1)
     inputs["tgt_pos"] = tgt_pos.reshape(-1, 1)
