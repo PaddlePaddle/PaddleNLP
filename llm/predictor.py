@@ -304,7 +304,7 @@ class InferencePredictorMixin:
                 dtype=self.dtype,
             )
 
-        self.tgt_generation_mask = paddle.zeros(
+        self.tgt_generation_mask = paddle.ones(
             shape=[1, 1, config.max_length, config.max_length],
             dtype=self.dtype,
         )
