@@ -28,16 +28,16 @@ export FLAGS_eager_delete_tensor_gb=-1.0
 export FLAGS_allocator_strategy="auto_growth"
 
 # model_dir="/home/data/acltransformer_testdata/weights/inference-dy7b-mp8/"
-model_dir="/home/data/dataset/llama-7b/topp/inference-mp8-topp"
+# model_dir="/home/data/dataset/llama-7b/topp/inference-mp8-topp"
 # model_dir="/home/data/dataset/llama-7b/inference-7b-dy-mp8-be61dce"
 # 切换模型注意修改custom op
 # model_dir="/home/data/dataset/llama-65b/inference-65b-dy-be61dce-topp"
-#  model_dir="/home/data/dataset/llama-65b/inference-65b-dy-be61dce/"
+ model_dir="/home/data/dataset/llama-65b/inference-65b-dy-be61dce/"
 
 log_dir=mp8
 rm -rf $log_dir
 
-python -m paddle.distributed.launch --log_dir $log_dir --devices $use_device python llm/predictor.py --model_name_or_path $model_dir --batch_size 8 --dtype "float16" --mode "static" --device "npu" --benchmark --inference_model 
+python -m paddle.distributed.launch --log_dir $log_dir --devices $use_device python llm/predictor.py --model_name_or_path $model_dir --batch_size 8 --dtype "float16" --mode "static" --device "npu" --inference_model 
 
 
 # declare -A map
