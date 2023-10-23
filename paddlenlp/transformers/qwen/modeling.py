@@ -152,9 +152,9 @@ class QWenAttention(nn.Layer):
                 key,
                 value,
                 causal=query.shape[1] != 1,
-                return_softmax=True,
+                dropout=config.attn_dropout_prob,
+                return_softmax=config.attn_dropout_prob > 0.0,
             )
-            attn_weights = self.attn_dropout(attn_weights)
             return attn_output, attn_weights
         else:
             # [bz, sql, nh, hid] ==> [bz, nh, sql hdim]
