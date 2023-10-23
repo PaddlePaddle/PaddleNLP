@@ -1187,7 +1187,6 @@ class Trainer:
                     num_steps=num_steps,
                 )
             )
-            logger.debug(tr_loss_scalar)
             self._total_loss_scalar += (
                 tr_loss_scalar.pop("loss") if isinstance(tr_loss_scalar, dict) else tr_loss_scalar
             )
