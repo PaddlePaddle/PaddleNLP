@@ -71,8 +71,8 @@ class InferenceTest(unittest.TestCase):
         count, full_match = 0, 0
         for item_1, item_2 in zip(result_1_result, result_2_result):
             min_length = min(len(item_1), len(item_2))
-            count += int(item_1[min_length // 2] == item_2[min_length // 2])
-            full_match += int(item_1[: min_length // 2] == item_2[: min_length // 2])
+            count += int(item_1[:min_length // 2] == item_2[:min_length // 2])
+            full_match += int(item_1[: min_length] == item_2[: min_length])
 
         return full_match / len(result_1_result), count / len(result_1_result)
 
@@ -174,7 +174,9 @@ class PTuningInfereneTest(InferenceTest):
         config["export_precache"] = 1
         return config
 
-    def t1est_predictor(self):
+    def test_predictor(self):
+        if self.model_name == "chatglm2":
+            return
         config = self._load_config(self.model_name)
 
         # 0. download the ground-truth file for comparing
@@ -186,7 +188,6 @@ class PTuningInfereneTest(InferenceTest):
         config["output_path"] = self.output_path
         command_prefix = " ".join([f"{key}={value}" for key, value in config.items()])
 
-        '''
         # 1.run dynamic model
         subprocess.run(
             command_prefix + " bash " + self.run_predictor_shell_path, stdout=sys.stdout, stderr=sys.stderr, shell=True)
@@ -212,7 +213,6 @@ class PTuningInfereneTest(InferenceTest):
         full_match_acc, half_match_acc = self.compare_result(self.predict_file_name, "static.json")
         self.assertGreater(full_match_acc, 0.6)
         self.assertGreater(half_match_acc, 0.8)
-        '''
 
         # 3. run sample decoding & benchmark on fused-mt model
         subprocess.run(
