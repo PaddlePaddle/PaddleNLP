@@ -528,7 +528,7 @@ class ChatTemplate:
         jinja_env.globals["raise_exception"] = raise_exception
         return jinja_env.from_string(chat_template)
 
-    def render_conversation(self, conversation_data: list[str] | dict[str, str]) -> str:
+    def render_conversation(self, conversation_data: list[str] | dict[str, str]) -> list[str]:
         """
         Args:
             conversation_data (list[str]): _description_
@@ -569,11 +569,13 @@ class ChatTemplate:
         Returns:
             str: the result of conversation
         """
+
         if isinstance(conversations, str):
             conversations = [[conversations]]
 
         # [1 ... n-1] conversation
         final_query = self.system or ""
+
         for conversation in conversations[:-1]:
             final_query += "".join(self.render_conversation(conversation))
 
@@ -630,10 +632,10 @@ class ChatTemplateMixin:
         # encode conversation
         conversation_ids = []
         for conversation in conversations:
-            user_input, bot_output = self.chat_template(conversation)
+            user_input, bot_output = self.chat_template.render_conversation(conversation)
             user_ids = self.encode(user_input, add_special_tokens=False)
             bot_ids = self.encode(bot_output, add_special_tokens=False)
-            conversation_ids.append(user_ids, bot_ids)
+            conversation_ids.append([user_ids, bot_ids])
 
         result["conversations"] = conversation_ids
         return result

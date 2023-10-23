@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
+
 import numpy as np
 
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
@@ -51,6 +53,7 @@ def tokenize_example(tokenizer, example, data_args):
         truncation_side="left",
         add_special_tokens=True,
     )
+
     tgt_max_length = data_args.max_length - len(tokenized_source["input_ids"])
     tokenized_target = tokenizer(
         target,
@@ -69,9 +72,52 @@ def tokenize_example(tokenizer, example, data_args):
     return tokenized_source, tokenized_target_input_ids
 
 
+def tokenize_examples(tokenizer, example, data_args):
+    example["src"] = example["src"] if isinstance(example["src"], list) else [example["src"]]
+    example["tgt"] = example["tgt"] if isinstance(example["tgt"], list) else [example["tgt"]]
+
+    assert len(example["src"]) == len(example["tgt"])
+
+    conversations = [[src, tgt] for src, tgt in zip(example["src"], example["tgt"])]
+
+    if data_args.use_chat_template:
+        tokenizer_kwargs = {
+            "max_length": data_args.src_length + data_args.max_length,
+            "truncation": True,
+            "truncation_side": "right",
+            "add_special_tokens": True,
+        }
+        conversation_inputs: list[tuple[list[int], list[int]]] = tokenizer.encode_chat_inputs(
+            conversations, **tokenizer_kwargs
+        )
+    else:
+        conversation_inputs = [
+            [
+                tokenizer.encode(src, add_special_tokens=True)["input_ids"],
+                tokenizer.encode(tgt, add_special_tokens=False)["input_ids"] + [tokenizer.eos_token_id],
+            ]
+            for src, tgt in conversations
+        ]
+
+    input_ids, labels = [], []
+    sequence_length = 0
+    for user_input_ids, bot_input_ids in conversation_inputs:
+        input_ids.extend(user_input_ids + bot_input_ids)
+        labels.extend(len(user_input_ids) * [-100] + bot_input_ids)
+        sequence_length += len(user_input_ids) + len(bot_input_ids)
+
+    attention_mask = np.tril(np.ones([sequence_length, sequence_length], dtype=bool))
+    position_ids = list(range(sequence_length))
+    before_length = 0
+    for user_input_ids, bot_input_ids in conversation_inputs:
+        attention_mask[before_length : before_length + len(user_input_ids)] = False
+
+    tokenized_source = {"input_ids": input_ids, "attention_mask": attention_mask, "position_ids": position_ids}
+    return tokenized_source, labels
+
+
 def convert_example_common(example, tokenizer, data_args, is_test=True, intokens=False):
     tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
-
     if is_test:
         return {
             **tokenized_source,
@@ -93,8 +139,27 @@ def convert_example_common(example, tokenizer, data_args, is_test=True, intokens
         return features
 
 
-def convert_example_chatglm(example, tokenizer, data_args, is_test=True, intokens=False):
+def convert_examples_common(example, tokenizer, data_args, is_test=True, intokens=False):
+    rounds_inputs, labels = tokenize_examples(tokenizer, example, data_args)
+    if is_test:
+        return {
+            **rounds_inputs,
+            "labels": labels,
+        }
+    else:
+        input_ids = rounds_inputs["input_ids"]
+        # shift input_ids and labels
+        input_ids, labels = input_ids[:-1], labels[1:]
+        seq_length = len(input_ids)
+        features = {"input_ids": input_ids, "labels": labels}
+        features["position_ids"] = list(range(seq_length))
+        if intokens:
+            features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
 
+        return features
+
+
+def convert_example_chatglm(example, tokenizer, data_args, is_test=True, intokens=False):
     tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
     if is_test:
         return {

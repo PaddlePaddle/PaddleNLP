@@ -44,6 +44,10 @@ class DataArgument:
             "help": "Weather to return `MapDataset` or an `IterDataset`.True for `IterDataset`. False for `MapDataset`."
         },
     )
+    use_chat_template: bool = field(
+        default=False,
+        metadata={"help": "whether use `chat_template` to handle inputs & targets"},
+    )
 
 
 @dataclass
