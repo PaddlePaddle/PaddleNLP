@@ -182,7 +182,6 @@ def scaled_dot_product_attention(
     output_attentions,
     alibi=None,
     sequence_parallel=False,
-    is_causal=True,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
@@ -194,15 +193,16 @@ def scaled_dot_product_attention(
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
         if alibi is not None:
             attention_mask = attention_mask.cast(alibi.dtype) + alibi
-        # TODO: attention_mask is None is not reliable
+
         attn_output = F.scaled_dot_product_attention(
             query_states,
             key_states,
             value_states,
-            attn_mask=attention_mask,
+            attn_mask=attention_mask if config.is_causal is False else None,
             is_causal=config.is_causal,
         )
         attn_weights = None
+        
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
