@@ -2,15 +2,17 @@
 
 PaddleNLP 中已经添加高性能推理模型相关实现，支持：
 
-|          Model          | Inference Model | PTuning | Wint8/4 | PTQ |
-|:-----------------------:|:---------------:|:-------:|:-----:|:---:|
-|   [LLaMA1/2, BaiChuan2-7B](./llama)   |        ✅        |    ✅    |   ✅   |  ❌  |
-|   [ChatGLM](./chatglm)  |        ✅        |    ✅    |   ✅   |  ❌  |
-|  [ChatGLM2](./chatglm2) |        ✅        |    🚧    |   🚧   |  ❌  |
-|     [Bloom](./bloom)    |        ✅        |    ✅    |   ✅   |  ❌  |
-|     [GPT-3](./gpt-3)    |        ✅        |    ❌    |   ❌   |  ❌  |
-|      [Qwen](./qwen)     |        ❌        |    ❌    |   ❌   |  ❌  |
-| [BaiChuan2-13B](./baichuan) |        ❌        |    ❌    |   ❌   |  ❌  |
+| Model                       | Inference Model | PTuning | Wint8 | PTQ |
+|-----------------------------|-----------------|---------|-------|-----|
+| [LLaMA1/2](./llama)         | ✅               | ✅       | ✅     | ✅   |
+| [ChatGLM](./chatglm)        | ✅               | ✅       | ✅     | ❌   |
+| [ChatGLM2](./chatglm2)      | ✅               | ❌       | ❌     | ❌   |
+| [BaiChuan1](./baichuan)     | ✅               | ✅       | ✅     | ✅   |
+| [BaiChuan2-7B](./baichuan)  | ❌               | ❌       | ❌     | ❌   |
+| [BaiChuan2-13B](./baichuan) | ✅               | ✅       | ✅     | ✅   |
+| [Bloom](./bloom)            | ✅               | ✅       | ✅     | ❌   |
+| [GPT-3](./gpt-3)            | ✅               | ❌       | ❌     | ❌   |
+| [Qwen](./qwen)              | ❌               | ❌       | ❌     | ❌   |
 
 [TOC]
 
