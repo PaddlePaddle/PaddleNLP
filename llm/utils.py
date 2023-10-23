@@ -396,7 +396,7 @@ def dybatch_preprocess(
 ):
     """Pre-process generation inputs."""
     inputs = {}
-    if "chatglm" in architectures:
+    if "chatglmforcausallm" == architectures.lower():
         input_ids = []
         position_ids = []
 

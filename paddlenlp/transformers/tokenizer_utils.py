@@ -31,6 +31,8 @@ import numpy
 import numpy as np
 import paddle
 import six
+from jinja2.exceptions import TemplateError
+from jinja2.sandbox import ImmutableSandboxedEnvironment
 from paddle.utils import try_import
 
 from paddlenlp.utils.env import CHAT_TEMPLATE_CONFIG_NAME
@@ -513,14 +515,8 @@ class ChatTemplate:
     query: str = None
 
     @staticmethod
-    @lru_cache
+    @lru_cache()
     def _compile_jinja_template(chat_template):
-        try:
-            from jinja2.exceptions import TemplateError
-            from jinja2.sandbox import ImmutableSandboxedEnvironment
-        except ImportError:
-            raise ImportError("apply_chat_template requires jinja2 to be installed.")
-
         def raise_exception(message):
             raise TemplateError(message)
 
@@ -528,7 +524,7 @@ class ChatTemplate:
         jinja_env.globals["raise_exception"] = raise_exception
         return jinja_env.from_string(chat_template)
 
-    def render_conversation(self, conversation_data: list[str] | dict[str, str]) -> list[str]:
+    def render_conversation(self, conversation_data: list[str] | dict[str, str], index: int = 0) -> list[str]:
         """
         Args:
             conversation_data (list[str]): _description_
@@ -538,13 +534,15 @@ class ChatTemplate:
         """
         if self.conversation is None:
             raise ValueError(
-                "the template for multi-turns is invalid, please check `conversation` filed in your chat-template."
+                "The template for multi-turns is invalid, please check `conversation` filed in your chat-template."
             )
 
         if isinstance(conversation_data, list):
-            assert len(conversation_data) == 2, "only support two type of conversation, eg: [user-query, bot-query]"
+            assert (
+                len(conversation_data) == 2
+            ), "Each round/turn of conversation must be two participants, eg: [user-query, bot-query]"
 
-            conversation_data = {"user": conversation_data[0], "bot": conversation_data[1]}
+            conversation_data = {"user": conversation_data[0], "bot": conversation_data[1], "index": index}
 
         one_turn_conversation = []
         for conversation in self.conversation:
@@ -553,12 +551,12 @@ class ChatTemplate:
             one_turn_conversation.append(result)
         return one_turn_conversation
 
-    def render_query(self, query: str):
+    def render_query(self, query: str, index: int = 0):
         if self.query is None:
             return query
 
         template = self._compile_jinja_template(self.query)
-        return template.render(query=query)
+        return template.render(query=query, index=index)
 
     def __call__(self, conversations: list[list[str]] | str):
         """render the conversations by chat-template
@@ -569,22 +567,20 @@ class ChatTemplate:
         Returns:
             str: the result of conversation
         """
-
         if isinstance(conversations, str):
             conversations = [[conversations]]
 
         # [1 ... n-1] conversation
         final_query = self.system or ""
-
-        for conversation in conversations[:-1]:
-            final_query += "".join(self.render_conversation(conversation))
+        for index, conversation in enumerate(conversations[:-1]):
+            final_query += "".join(self.render_conversation(conversation, index=index))
 
         if not isinstance(conversations[-1], list) and not len(conversations[-1]) != 1:
             raise ValueError(
-                "the length of last conversation must be one, eg: [[user-query, bot-answer], [user-query, bot-answer], ..., [user-query]]"
+                "The length of last conversation must be one, eg: [[user-query, bot-answer], [user-query, bot-answer], ..., [user-query]]"
             )
 
-        final_query += self.render_query(conversations[-1][0])
+        final_query += self.render_query(conversations[-1][0], index=len(conversations) - 1)
         return final_query
 
     @classmethod
@@ -631,21 +627,43 @@ class ChatTemplateMixin:
 
         # encode conversation
         conversation_ids = []
-        for conversation in conversations:
-            user_input, bot_output = self.chat_template.render_conversation(conversation)
+        for index, conversation in enumerate(conversations):
+            user_input, bot_output = self.chat_template.render_conversation(conversation, index=index)
             user_ids = self.encode(user_input, add_special_tokens=False)
             bot_ids = self.encode(bot_output, add_special_tokens=False)
-            conversation_ids.append([user_ids, bot_ids])
+            conversation_ids.append(self.encode_chat_inputs_post_process(user_ids, bot_ids, index=index))
 
         result["conversations"] = conversation_ids
         return result
 
+    def encode_chat_inputs_post_process(self, user_ids: list[int], bot_ids: list[int], index=0):
+        """Round 0: bos + system + sep + user    bot + eos [there is valid system prompt]
+           Round 0: bos + user                   bot + eos
+           Round t: sep + bos + user             bot + eos
+        Args:
+            user_ids (list[int]): the ids of user query
+            bot_ids (list[int]): the ids of bot answer
+
+        Returns:
+            the final round conversation_ids
+        """
+        if index == 0:
+            if self.chat_template.system:
+                user_ids = [self.sep_token_id] + user_ids
+            else:
+                user_ids = [self.bos_token_id] + user_ids
+        else:
+            user_ids = [self.sep_token_id, self.bos_token_id] + user_ids
+
+        bot_ids = bot_ids + [self.eos_token_id]
+        return [user_ids, bot_ids]
+
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, from_hf_hub=False, subfolder=None, **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         cache_dir = kwargs.get("cache_dir", None)
-        tokenizer = super().from_pretrained(
-            pretrained_model_name_or_path, *args, from_hf_hub=from_hf_hub, subfolder=subfolder, **kwargs
-        )
+        from_hf_hub = kwargs.get("from_hf_hub", None)
+
+        tokenizer = super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
 
         # load chat-template
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
@@ -666,7 +684,7 @@ class ChatTemplateMixin:
         """
         if isinstance(chat_template, str):
             if not os.path.exists(chat_template):
-                raise FileNotFoundError("the chat-template file does not exist: {}".format(chat_template))
+                raise FileNotFoundError("The chat-template file does not exist: {}".format(chat_template))
 
             self.chat_template = ChatTemplate.from_file(chat_template)
         elif isinstance(chat_template, dict):
@@ -674,7 +692,7 @@ class ChatTemplateMixin:
         elif isinstance(chat_template, ChatTemplate):
             self.chat_template = chat_template
         else:
-            raise ValueError("receive error chat_template data: ", chat_template)
+            raise ValueError("Receive error chat_template data: ", chat_template)
 
     def save_resources(self, save_directory):
         super().save_resources(save_directory)
@@ -683,7 +701,7 @@ class ChatTemplateMixin:
             chat_template_file = os.path.join(save_directory, CHAT_TEMPLATE_CONFIG_NAME)
             with open(chat_template_file, "w", encoding="utf-8") as f:
                 json.dump(asdict(self.chat_template), f, ensure_ascii=False, indent=4)
-            logger.info("chat-template config file saved in " + chat_template_file)
+            logger.info("Chat-template config file saved in " + chat_template_file)
 
 
 @six.add_metaclass(InitTrackerMeta)
