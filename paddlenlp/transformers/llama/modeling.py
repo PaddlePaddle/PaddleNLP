@@ -198,11 +198,11 @@ def scaled_dot_product_attention(
             query_states,
             key_states,
             value_states,
-            attn_mask=attention_mask if config.is_causal is False else None,
-            is_causal=config.is_causal,
+            attn_mask=attention_mask,
+            is_causal=attention_mask is None,
         )
         attn_weights = None
-        
+
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
@@ -258,6 +258,12 @@ def scaled_dot_product_attention(
 def masked_fill(x, mask, value):
     y = paddle.full(x.shape, value, x.dtype)
     return paddle.where(mask, y, x)
+
+
+def is_casual_mask(attention_mask, dtype):
+    mask = paddle.tril(paddle.ones(attention_mask.shape))
+    inf_mask = paddle.where(mask, 0.0, paddle.finfo(dtype).min)
+    return (inf_mask == attention_mask).all().item()
 
 
 def _make_causal_mask(input_ids_shape, past_key_values_length):
@@ -1244,6 +1250,10 @@ class LlamaModel(LlamaPretrainedModel):
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
+
+        is_casual = is_casual_mask(attention_mask, inputs_embeds.dtype)
+        if is_casual:
+            attention_mask = None
         hidden_states = inputs_embeds
 
         # decoder layers
