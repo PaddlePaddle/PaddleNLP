@@ -142,7 +142,7 @@ class QWenAttention(nn.Layer):
         bsz, q_len, num_heads, head_dim = query.shape
         _, kv_seq_len, _, _ = value.shape
 
-        if config.use_flash_attention and flash_attention is not None:
+        if config.use_flash_attn and flash_attention is not None:
             # Flash Attention now ignore attention mask
             # Current Flash Attention doesn't support attn maskt
             # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
