@@ -77,6 +77,14 @@ def run_forward_backward(x, y_grad, split_axis=0, concat_axis=2):
     return y, x.grad
 
 
+def should_test(sep_degree):
+    if sep_degree <= 1:
+        print(f"sep degree should greater than 1, but is {sep_degree}, skip this test")
+        cuda_visible_devices = os.environ["CUDA_VISIBLE_DEVICES"]
+        print(f"CUDA_VISIBLE_DEVICES is set to {cuda_visible_devices}")
+    return sep_degree > 1
+
+
 class TestReshardLayer(unittest.TestCase):
     def setUp(self):
         dist.init_parallel_env()
@@ -86,7 +94,8 @@ class TestReshardLayer(unittest.TestCase):
         seq_len = 4096
         sep = dist.get_world_size()
         sep_rank = dist.get_rank()
-        assert sep == 2, f"sep should be 2, but {sep}"
+        if not should_test(sep):
+            return
 
         inputs_ids = paddle.randint(low=0, high=65535, shape=(batch_size, seq_len))
         labels = paddle.randint(low=0, high=2, shape=(batch_size, seq_len))
@@ -103,6 +112,8 @@ class TestReshardLayer(unittest.TestCase):
         # [s / sep, b, h] -> [s, b, h / sep]
         seq_len = 16
         sep = dist.get_world_size()
+        if not should_test(sep):
+            return
         assert seq_len % sep == 0, f"seq_len should be divisible by sep, seq_len:{seq_len}, sep:{sep}"
 
         def check_equal(input_data, expected_output_data, split_axis=0, concat_axis=2):
@@ -165,8 +176,4 @@ class TestReshardLayer(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    cuda_visible_devices = os.environ["CUDA_VISIBLE_DEVICES"]
-    print(f"CUDA_VISIBLE_DEVICES is set to {cuda_visible_devices}")
-    gpu_set = set([k.strip() for k in cuda_visible_devices.split(",")])
-    if len(gpu_set) > 1:
-        unittest.main()
+    unittest.main()
