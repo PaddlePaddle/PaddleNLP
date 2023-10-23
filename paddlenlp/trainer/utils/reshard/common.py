@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 from collections import OrderedDict
 
 import numpy as np
@@ -145,6 +144,9 @@ class NodeModelState:
             self._lr_scheduler = lr_scheduler
 
     def map_names(self, map_func):
+        """
+        rename param names and change the keys of the dicts(model_weights, opt, master_weights) accordingly
+        """
         # model weighs
         model_weights_tmp = OrderedDict()
         (self._model_weights, model_weights_tmp) = (model_weights_tmp, self._model_weights)
@@ -180,6 +182,11 @@ class NodeModelState:
         return self
 
     def drop_rank(self):
+        """
+        drop rank in the keys of the state dict
+        change dict of (key, rank)=>tensor to dict of key =>tensor
+        """
+
         def drop(state, l=2):
             tmp_state = OrderedDict()
             (state, tmp_state) = (tmp_state, state)
@@ -197,6 +204,10 @@ class NodeModelState:
         return self
 
     def collapse_key(self):
+        """
+        collapse dict of (key, rank)=>tensor to dict of key=>list[(rank, tensor)]
+        """
+
         def collapse(state, l):
             tmp_state = OrderedDict()
             (state, tmp_state) = (tmp_state, state)
@@ -220,6 +231,10 @@ class NodeModelState:
         return self
 
     def flatten_key(self):
+        """
+        flatten dict of key=>list[(rank, tensor)], to dict of (key, rank)=>tensor
+        """
+
         def flatten(state, l):
             tmp_state = OrderedDict()
             (state, tmp_state) = (tmp_state, state)
@@ -228,7 +243,7 @@ class NodeModelState:
                 assert len(key) == l
                 for (rank, items) in tmp_state[key]:
                     state[(key, rank)] = items
-                tmp_state[key]
+                del tmp_state[key]
             return state
 
         self._model_weights = flatten(self._model_weights, 2)
@@ -237,7 +252,11 @@ class NodeModelState:
         return self
 
     def pack_keys(self, structure_name_mapping=None):
-
+        """
+        change the key of model_weights dict from param_name to (structure_name, param_name);
+        change the key of opt dict from opt_name to (structure_name, param_name, opt_name);
+        chnage the key of master weights dict from param_name to (structure_name, param_name)
+        """
         # pack key for pp convert
         def _opt_name_to_tname(tensor_names, opt_names):
             tensor_names = set(tensor_names)
@@ -297,6 +316,12 @@ class NodeModelState:
         return self
 
     def unpack_keys(self):
+        """
+        the opposite of pack_keys,
+        revert the key of model_weights dict from  (structure_name, param_name) to param_name
+        revert the key of opt dict from  (structure_name, param_name, opt_name) to opt_name
+        revert the key of master weights dict from (structure_name, param_name) to param_name
+        """
         # model weights
         model_weights_tmp = OrderedDict()
         (self._model_weights, model_weights_tmp) = (model_weights_tmp, self._model_weights)
@@ -326,30 +351,10 @@ class NodeModelState:
             del master_weights_tmp[key]
         return self
 
-    def _model_file(self, dir):
-        return os.path.join(
-            dir,
-            f"model_state.tp{self._mp_rank:0>2d}_pp{self._pp_rank:0>2d}_shard{self._sharding_rank:0>2d}.pdparams",
-        )
-
-    def _optimizer_file(self, dir):
-        return os.path.join(
-            dir, f"optimizer.tp{self._mp_rank:0>2d}_pp{self._pp_rank:0>2d}_shard{self._sharding_rank:0>2d}.pdopt"
-        )
-
-    def save(self, dir):
-        model_file = self._model_file(dir)
-        paddle.save(self._model_weights, model_file)
-
-    def load(self, dir):
-        model_file = self._model_file(dir)
-        model_state = paddle.load(model_file)
-        self.add_weights(model_state)
-        opt_file = self._optimizer_file(dir)
-        opt_state = paddle.load(opt_file)
-        self.add_opts(opt_state)
-
     def split_state(self, split_func):
+        """
+        split this node state to multiple node state according to the passed in split_func
+        """
         node_model_states = {}
         for (k, v) in self._model_weights.items():
             rank = split_func(k)
@@ -372,35 +377,54 @@ class NodeModelState:
         return node_model_states
 
     def even_distribute(self, group):
-        def distribute(get_state):
-            self.collapse_key()
-            state = get_state()
-            state_keys_list = all_gather_simple_object(list(state.keys()), group)
-            total_state_key = set()
-            for keys in state_keys_list:
-                for k in keys:
-                    total_state_key.add(k)
-            total_state_key = list(total_state_key)
-            total_state_key = sorted(total_state_key)
+        """
+        distribute the node state evenly among all workers in group， and make sure
+        in the dicts of (key, rank)=>tensor, items keys of the same key but different rank are distributed to the
+        same worker
+        """
+
+        def build_router(state_dict):
+            state_keys_list = all_gather_simple_object([(k, v.shape) for (k, v) in state_dict.items()], group)
+
+            key_to_size = {}
+            for l in state_keys_list:
+                for (k, shape) in l:
+                    key, rank = k
+                    if key not in key_to_size:
+                        key_to_size[key] = 0
+                    key_to_size[key] = key_to_size[key] + np.prod(shape)
+
+            key_to_size = sorted(list(key_to_size.items()), key=lambda x: x[1], reverse=True)
+            node_distributed = [0 for _ in range(group.nranks)]
             key_to_rank = {}
-            for (i, key) in enumerate(total_state_key):
-                key_to_rank[key] = i % group.nranks
+            for (k, v) in key_to_size:
+                min_val = min(node_distributed)
+                min_index = node_distributed.index(min_val)
+                key_to_rank[k] = min_index
+                node_distributed[min_index] = node_distributed[min_index] + v
+
+            return key_to_rank
+
+        def distribute(state_dict):
+
+            key_to_rank = build_router(state_dict)
 
             def filter_func(key):
                 assert key[0] in key_to_rank, key
                 dst_rank = key_to_rank[key[0]]
                 return dst_rank == group.rank
 
-            self.flatten_key()
-            state = get_state()
-            return _all_gather_state_dict(state, filter_func, group)
+            return _all_gather_state_dict(state_dict, filter_func, group)
 
-        self._model_weights = distribute(lambda: self._model_weights)
-        self._opt_state = distribute(lambda: self._opt_state)
-        self._master_weights = distribute(lambda: self._master_weights)
+        self._model_weights = distribute(self._model_weights)
+        self._opt_state = distribute(self._opt_state)
+        self._master_weights = distribute(self._master_weights)
         return self
 
     def reshard(self, group, filter_func):
+        """
+        reshard according to the passed in filter_func
+        """
         self._model_weights = _all_gather_state_dict(self._model_weights, filter_func, group)
         self._opt_state = _all_gather_state_dict(self._opt_state, filter_func, group)
         self._master_weights = _all_gather_state_dict(self._master_weights, filter_func, group)
@@ -409,6 +433,10 @@ class NodeModelState:
         return self
 
     def split_items(self, split_func):
+        """
+        split tensor in the dicts of key=tensor, change the dicts to dicts of key=>list[(rank, tensor)]
+        """
+
         def split(state, l):
             tmp_state = OrderedDict()
             (state, tmp_state) = (tmp_state, state)
@@ -426,6 +454,10 @@ class NodeModelState:
         return self
 
     def merge_items(self, merge_func):
+        """
+        merge list in the dicts of key=>list[(rank, tensor)]  a tensor, change the dicts to dicts of key=>tensor
+        """
+
         def merge(state, l):
             tmp_state = OrderedDict()
             (state, tmp_state) = (tmp_state, state)

@@ -60,13 +60,16 @@ def shard(node_model_state, model, optimizer, hcg):
 
         offset = buffer_slice - index % buffer_slice
         tensors = []
-        tensors.append((index // buffer_slice, get_slice(v, 0, offset)))
+        tensors.append((index // buffer_slice, get_slice(v, 0, min(offset, padded_size))))
+
         left_size = padded_size - offset
-        for _ in range((left_size + buffer_slice - 1) // buffer_slice):
-            end = min(offset + buffer_slice, padded_size)
-            assert end <= buffer_size
-            tensors.append(((offset + index) // buffer_slice, get_slice(v, offset, end)))
-            offset = end
+
+        if left_size > 0:
+            for _ in range((left_size + buffer_slice - 1) // buffer_slice):
+                end = min(offset + buffer_slice, padded_size)
+                assert end <= buffer_size
+                tensors.append(((offset + index) // buffer_slice, get_slice(v, offset, end)))
+                offset = end
 
         return tensors
 

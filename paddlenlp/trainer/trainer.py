@@ -555,8 +555,8 @@ class Trainer:
         pp_degree = parallel_config["pp_degree"]
         mp_degree = parallel_config["mp_degree"]
         sharding_degree = parallel_config["sharding_degree"]
-        self.args.pipeline_parallel_degree == pp_degree
-        self.args.tensor_parallel_degree == mp_degree
+        assert self.args.pipeline_parallel_degree == pp_degree
+        assert self.args.tensor_parallel_degree == mp_degree
         cur_sharding_degree = self.args.sharding_parallel_degree
 
         state_dict = OrderedDict()
