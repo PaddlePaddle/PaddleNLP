@@ -81,19 +81,22 @@ def tokenize_rounds_example(tokenizer, example, data_args):
     conversations = [[src, tgt] for src, tgt in zip(example["src"], example["tgt"])]
 
     conversation_result: list[tuple[list[int], list[int]]] = tokenizer.encode_chat_inputs(conversations)
+    system_ids = conversation_result.pop("system", []) or []
 
-    system_ids = conversation_result.pop("system", [])
-    sequence_length = len(system_ids)
+    # truncate conversations
     input_ids, labels = system_ids, [-100] * len(system_ids)
-    for user_input_ids, bot_input_ids in conversation_result.pop("conversations"):
+    sequence_length = len(input_ids)
+    conversations_ids = conversation_result.pop("conversations")
+    for index in range(len(conversations_ids) - 1, -1, -1):
+        user_input_ids, bot_input_ids = conversations_ids[index][0], conversations_ids[index][1]
+        if len(input_ids) + len(user_input_ids) + len(bot_input_ids) > data_args.max_length:
+            break
+
         input_ids.extend(user_input_ids + bot_input_ids)
         labels.extend(len(user_input_ids) * [-100] + bot_input_ids)
         sequence_length += len(user_input_ids) + len(bot_input_ids)
 
-    attention_mask = np.tril(np.ones([sequence_length, sequence_length], dtype=bool))
-    position_ids = list(range(sequence_length))
-
-    tokenized_source = {"input_ids": input_ids, "attention_mask": attention_mask, "position_ids": position_ids}
+    tokenized_source = {"input_ids": input_ids}
     return tokenized_source, labels
 
 
@@ -149,7 +152,7 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, i
     input_ids, labels = input_ids[:-1], labels[1:]
     seq_length = len(input_ids)
     features = {"input_ids": input_ids, "labels": labels}
-    features["position_ids"] = list(range(seq_length))
+    # features["position_ids"] = list(range(seq_length))
     if intokens:
         features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
 

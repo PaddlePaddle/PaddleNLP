@@ -514,8 +514,9 @@ class ChatTemplate:
     system: str | None = None
     query: str = None
 
-    sep_token_id: str | None = None
-    eos_token_id: str | None = None
+    sep_token_id: int | None = None
+    eos_token_id: int | None = None
+    bos_token_id: int | None = None
 
     @staticmethod
     @lru_cache()
@@ -600,11 +601,19 @@ class ChatTemplate:
 class ChatTemplateMixin:
     chat_template: Optional[ChatTemplate] = None
 
+    @property
     def chat_template_eos_token_id(self):
         if self.chat_template.eos_token_id:
             return self.chat_template.eos_token_id
         return self.eos_token_id
 
+    @property
+    def chat_template_bos_token_id(self):
+        if self.chat_template.bos_token_id:
+            return self.chat_template.bos_token_id
+        return self.bos_token_id
+
+    @property
     def chat_template_sep_token_id(self):
         if self.chat_template.sep_token_id:
             return self.chat_template.sep_token_id
@@ -662,15 +671,31 @@ class ChatTemplateMixin:
         Returns:
             the final round conversation_ids
         """
+
+        def concat_ids(obj1: list[int] | int, obj2: list[int] | int):
+            if obj1:
+                if not isinstance(obj1, list):
+                    obj1 = [obj1]
+            else:
+                obj1 = []
+
+            if obj2:
+                if not isinstance(obj2, list):
+                    obj2 = [obj2]
+            else:
+                obj2 = []
+
+            return obj1 + obj2
+
         if index == 0:
             if self.chat_template.system:
-                user_ids = [self.sep_token_id] + user_ids
+                user_ids = concat_ids(self.chat_template_sep_token_id, user_ids)
             else:
-                user_ids = [self.bos_token_id] + user_ids
+                user_ids = concat_ids(self.chat_template_bos_token_id, user_ids)
         else:
-            user_ids = [self.sep_token_id, self.bos_token_id] + user_ids
+            user_ids = concat_ids(self.chat_template_sep_token_id, user_ids)
 
-        bot_ids = bot_ids + [self.eos_token_id]
+        bot_ids = concat_ids(bot_ids, self.chat_template_eos_token_id)
         return [user_ids, bot_ids]
 
     @classmethod

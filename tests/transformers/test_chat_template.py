@@ -36,7 +36,7 @@ class ChatTemplateTest(unittest.TestCase):
     def test_inference_conversation_template(self):
         conversations = [["你好", "您好，我是个人人工智能助手，请问有什么可以帮您。"], ["今天的天气怎么样？"]]
         final_query = self.chat_template(conversations)
-        expected_query = "你是一个人工智能助手\nHuman: 你好<sep> Bot: 您好，我是个人人工智能助手，请问有什么可以帮您。\nHuman: 今天的天气怎么样？<sep> Bot:"
+        expected_query = "你是一个人工智能助手\nHuman: 你好<sep>Bot: 您好，我是个人人工智能助手，请问有什么可以帮您。\nHuman: 今天的天气怎么样？<sep> Bot:"
         self.assertEqual(final_query, expected_query)
 
     def test_inference_conversation_template_with_one_part(self):
@@ -101,4 +101,25 @@ class ChatTemplateIntegrationTest(unittest.TestCase):
         query = "你好"
         final_query = tokenizer.apply_chat_template(query, tokenize=False)
         expected_query = f"Human: {query}\n\nAssistant:"
+        self.assertEqual(final_query, expected_query)
+
+    def test_qwen_14b_chat(self):
+        # refer to: https://huggingface.co/Qwen/Qwen-14B-Chat/blob/main/qwen_generation_utils.py#L119`
+        tokenizer = AutoTokenizer.from_pretrained("qwen/qwen-14b-chat")
+        query = "你好"
+        final_query = tokenizer.apply_chat_template(query, tokenize=False)
+
+        import pdb
+
+        pdb.set_trace()
+        expected_query = "You are a helpful assistant.\n<|im_start|>user\n你好<|im_end|>\n<|im_start|>assistant\n"
+        self.assertEqual(final_query, expected_query)
+
+        query = [["你好", "您好，我是个人人工智能助手"], ["今天吃啥"]]
+        final_query = tokenizer.apply_chat_template(query, tokenize=False)
+        expected_query = (
+            "You are a helpful assistant.\n<|im_start|>user\n你好<|im_end|>"
+            "\n<|im_start|>assistant\n您好，我是个人人工智能助手<|im_end|>"
+            "\n<|im_start|>user\n今天吃啥<|im_end|>\n<|im_start|>assistant\n"
+        )
         self.assertEqual(final_query, expected_query)
