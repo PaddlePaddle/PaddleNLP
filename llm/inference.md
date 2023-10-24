@@ -4,17 +4,26 @@ PaddleNLP 中已经添加高性能推理模型相关实现，支持：
 
 | Model                       | Inference Model | PTuning | Wint8 | PTQ |
 |-----------------------------|-----------------|---------|-------|-----|
-| [LLaMA1/2](./llama)         | ✅               | ✅       | ✅     | ✅   |
+| [LLaMA1/2](./llama)         | ✅               | ✅       | ✅     | 🚧   |
 | [ChatGLM](./chatglm)        | ✅               | ✅       | ✅     | ❌   |
 | [ChatGLM2](./chatglm2)      | ✅               | ❌       | ❌     | ❌   |
-| [BaiChuan1](./baichuan)     | ✅               | ✅       | ✅     | ✅   |
+| [BaiChuan1](./baichuan)     | ✅               | ✅       | ✅     | 🚧   |
 | [BaiChuan2-7B](./baichuan)  | ❌               | ❌       | ❌     | ❌   |
-| [BaiChuan2-13B](./baichuan) | ✅               | ✅       | ✅     | ✅   |
+| [BaiChuan2-13B](./baichuan) | ✅               | ✅       | ✅     | ❌   |
 | [Bloom](./bloom)            | ✅               | ✅       | ✅     | ❌   |
 | [GPT-3](./gpt-3)            | ✅               | ❌       | ❌     | ❌   |
 | [Qwen](./qwen)              | ❌               | ❌       | ❌     | ❌   |
 
 [TOC]
+
+## 安装自定义算子库
+
+PaddleNLP 针对于Transformer 系列编写了高性能自定义算子，提升模型在推理和解码过程中的性能。
+
+```shell
+git clone https://github.com/PaddlePaddle/PaddleNLP
+cd ./paddlenlp/csrc && python setup_cuda.py install
+```
 
 ## 预训练 & SFT 模型 & Lora 推理
 
@@ -26,6 +35,12 @@ PaddleNLP 中已经添加高性能推理模型相关实现，支持：
 * 静态图推理
 
 ### 动态图推理
+
+model = LlamaForCausalLM.from_pretrained()
+model.generate(...)
+
+model = LlamaForCausalLMInferenceModel.from_pretrained()
+model.generate()
 
 ```python
 python predictor.py \
