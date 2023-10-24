@@ -69,6 +69,7 @@ __all__ = [
     "LlamaPretrainedModel",
     "LlamaForCausalLM",
     "LlamaPretrainingCriterion",
+    "LlamaModelForScore",
 ]
 
 
@@ -1518,4 +1519,97 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
+        )
+
+
+from typing import Any
+
+from paddlenlp.transformers import PretrainedConfig
+from paddlenlp.transformers.score_model_utils import ScoreModelMixin, ScoreModelOutput
+
+
+class LlamaModelForScore(ScoreModelMixin, LlamaPretrainedModel):
+    _keys_to_ignore_on_load_missing = ["lm_head.weight"]
+
+    def __init__(self, config: PretrainedConfig, **kwargs: Any) -> None:
+        super().__init__(config)
+        self.llama = LlamaModel(config)
+
+        # config.architectures = [self.__class__.__name__]
+        self.init_score_head(config, hidden_size=config.hidden_size, **kwargs)
+
+    def get_input_embeddings(self) -> nn.Embedding:
+        return self.llama.embed_tokens
+
+    def set_input_embeddings(self, value: nn.Embedding) -> None:
+        self.llama.embed_tokens = value
+
+    def get_output_embeddings(self) -> None:
+        return None
+
+    def set_decoder(self, decoder: PretrainedModel) -> None:
+        self.llama = decoder
+
+    def get_decoder(self) -> PretrainedModel:
+        return self.llama
+
+    def forward(  # pylint: disable=too-many-arguments
+        self,
+        input_ids: paddle.Tensor,
+        attention_mask: paddle.Tensor,
+        position_ids: paddle.Tensor | None = None,
+        past_key_values: list[paddle.Tensor] | None = None,
+        inputs_embeds: paddle.Tensor | None = None,
+        use_cache: bool | None = None,
+        output_attentions: bool | None = None,
+        output_hidden_states: bool | None = None,
+        return_dict: bool | None = None,
+    ) -> tuple[paddle.Tensor, paddle.Tensor] | ScoreModelOutput:
+        """
+        Args:
+
+        Returns:
+
+        Examples:
+
+        ```python
+        >>> from safe_rlhf.models.llama.modeling_llama import LlamaModelForScore
+        >>> from transformers import LlamaTokenizer
+
+        >>> model = LlamaForCausalLM.from_pretrained(PATH_TO_CONVERTED_WEIGHTS)
+        >>> tokenizer = AutoTokenizer.from_pretrained(PATH_TO_CONVERTED_TOKENIZER)
+
+        >>> prompt = "Hey, are you conscious? Can you talk to me?"
+        >>> inputs = tokenizer(prompt, return_tensors="pt")
+
+        # got score
+        >>> outputs = model(**inputs)
+        >>> scores = outputs.scores
+        >>> scores
+        tensor([[[0.0000]]])
+        ```
+        """
+        assert attention_mask is not None
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        outputs = self.llama(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        hidden_states = outputs[0]  # size = (B, L, E)
+        return self.get_score(
+            hidden_states,
+            attention_mask=attention_mask,
+            return_dict=return_dict,
         )
