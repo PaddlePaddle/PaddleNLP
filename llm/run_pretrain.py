@@ -34,13 +34,13 @@ from paddlenlp.trainer import (
     get_last_checkpoint,
     speed_metrics,
 )
-from paddlenlp.transformers import (  # LlamaForCausalLMPipe,
+from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
+    AutoModelForCausalLMPipe,
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
-    QWenForCausalLMPipe,
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
@@ -455,8 +455,7 @@ def main():
 
     model_class = AutoModelForCausalLM
     if training_args.pipeline_parallel_degree > 1:
-        # model_class = LlamaForCausalLMPipe
-        model_class = QWenForCausalLMPipe
+        model_class = AutoModelForCausalLMPipe
 
     if model_args.continue_training:
         model = model_class.from_pretrained(
