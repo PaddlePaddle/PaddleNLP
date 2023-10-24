@@ -36,6 +36,24 @@ from .configuration import QWenConfig
 
 MAX_NTK_SEQ_LENGTH = 32768
 
+try:
+    from paddle.nn.functional.flash_attention import flash_attention
+except:
+    flash_attention = None
+
+
+def get_triangle_upper_mask(x, mask=None):
+    if mask is not None:
+        return mask
+    # [bsz, n_head, q_len, kv_seq_len]
+    shape = x.shape
+    #  [bsz, 1, q_len, kv_seq_len]
+    shape[1] = 1
+    mask = paddle.full(shape, paddle.finfo(x.dtype).min, dtype=x.dtype)
+    mask = paddle.triu(mask, diagonal=1)
+    mask.stop_gradient = True
+    return mask
+
 
 def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
     is_fleet_init = True
@@ -66,6 +84,7 @@ class QWenAttention(nn.Layer):
     def __init__(self, config):
         super().__init__()
 
+        self.config = config
         self.seq_length = config.seq_length
 
         self.hidden_size = config.hidden_size
@@ -119,22 +138,49 @@ class QWenAttention(nn.Layer):
         self.attn_dropout = nn.Dropout(config.attn_dropout_prob)
 
     def _attn(self, query, key, value, attention_mask=None):
-        attn_weights = paddle.matmul(query, key.transpose([0, 1, 3, 2]))
+        # Support the flash attention and normal attention
+        bsz, q_len, num_heads, head_dim = query.shape
+        _, kv_seq_len, _, _ = value.shape
 
-        if self.scale_attn_weights:
-            attn_weights = attn_weights * self.inv_norm_factor
+        if self.config.use_flash_attn and flash_attention is not None:
+            # Flash Attention now ignore attention mask
+            # Current Flash Attention doesn't support attn maskt
+            # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
+            # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
+            attn_output, attn_weights = flash_attention(
+                query,
+                key,
+                value,
+                causal=query.shape[1] != 1,
+                dropout=self.config.attn_dropout_prob,
+                return_softmax=self.config.attn_dropout_prob > 0.0,
+            )
+            return attn_output, attn_weights
+        else:
+            # [bz, sql, nh, hid] ==> [bz, nh, sql hdim]
+            query = query.transpose([0, 2, 1, 3])
+            # [bz, sql, nh, hid] ==> [bz, nh, sql hdim]
+            key = key.transpose([0, 2, 1, 3])
+            # [bz, sql, nh, hid] ==> [bz, nh, sql hdim]
+            value = value.transpose([0, 2, 1, 3])
 
-        attn_weights = attn_weights + attention_mask
+            attn_weights = paddle.matmul(query / math.sqrt(head_dim), key.transpose([0, 1, 3, 2]))
 
-        attn_weights = nn.functional.softmax(attn_weights, axis=-1)
+            if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
+                raise ValueError(
+                    f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
+                    f" {attn_weights.shape}"
+                )
+            # If the attention mask is None, we need to construct the causal attention mask
+            if attention_mask is None:
+                attention_mask = get_triangle_upper_mask(attn_weights)
+            attn_weights = attn_weights + attention_mask
+            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(value.dtype)
 
-        attn_weights = attn_weights.astype(value.dtype)
-        attn_weights = self.attn_dropout(attn_weights)
-
-        attn_output = paddle.matmul(attn_weights, value)
-        attn_output = attn_output.transpose([0, 2, 1, 3])
-
-        return attn_output, attn_weights
+            attn_weights = self.attn_dropout(attn_weights)
+            attn_output = paddle.matmul(attn_weights, value)
+            attn_output = attn_output.transpose([0, 2, 1, 3])
+            return attn_output, attn_weights
 
     def _split_heads(self, tensor, num_heads, attn_head_size):
         new_shape = tensor.shape[:-1] + [num_heads, attn_head_size]
@@ -213,9 +259,6 @@ class QWenAttention(nn.Layer):
             logn_tensor = self.logn_tensor[:, seq_start:seq_end, :, :]
             query = query * logn_tensor.expand(query.shape)
 
-        query = query.transpose([0, 2, 1, 3])
-        key = key.transpose([0, 2, 1, 3])
-        value = value.transpose([0, 2, 1, 3])
         attn_output, attn_weight = self._attn(query, key, value, attention_mask)
         context_layer = self._merge_heads(attn_output, self.num_heads, self.head_dim)
 
