@@ -243,8 +243,7 @@ def create_pretrained_dataset(
         logger.info(f"Sample data for {mode} mode.")
         # input_ids, loss_mask, attention_mask, position_ids, labels = data
         input_ids = data["text"]
-
-        logger.info(tokenizer._decode(input_ids))
+        logger.info(tokenizer._decode(list(input_ids)))
 
     from paddlenlp.data import Stack
 
