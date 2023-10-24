@@ -514,6 +514,9 @@ class ChatTemplate:
     system: str | None = None
     query: str = None
 
+    sep_token_id: str | None = None
+    eos_token_id: str | None = None
+
     @staticmethod
     @lru_cache()
     def _compile_jinja_template(chat_template):
@@ -527,10 +530,10 @@ class ChatTemplate:
     def render_conversation(self, conversation_data: list[str] | dict[str, str], index: int = 0) -> list[str]:
         """
         Args:
-            conversation_data (list[str]): _description_
+            conversation_data (list[str]): the conversation data which must be two parts
 
         Returns:
-            _type_: _description_
+            list[str]: the rendered conversation data
         """
         if self.conversation is None:
             raise ValueError(
@@ -597,6 +600,17 @@ class ChatTemplate:
 class ChatTemplateMixin:
     chat_template: Optional[ChatTemplate] = None
 
+    def chat_template_eos_token_id(self):
+        if self.chat_template.eos_token_id:
+            return self.chat_template.eos_token_id
+        return self.eos_token_id
+
+    def chat_template_sep_token_id(self):
+        if self.chat_template.sep_token_id:
+            return self.chat_template.sep_token_id
+
+        return self.sep_token_id
+
     def apply_chat_template(
         self, conversation: List[List[str, str]] | str, tokenize: bool = True, **tokenizer_kwargs
     ) -> str | dict[str, numpy.ndarray | paddle.Tensor]:
@@ -628,9 +642,10 @@ class ChatTemplateMixin:
         # encode conversation
         conversation_ids = []
         for index, conversation in enumerate(conversations):
-            user_input, bot_output = self.chat_template.render_conversation(conversation, index=index)
-            user_ids = self.encode(user_input, add_special_tokens=False)
-            bot_ids = self.encode(bot_output, add_special_tokens=False)
+            conversation_result = self.chat_template.render_conversation(conversation, index=index)
+            user_input, bot_output = conversation_result
+            user_ids = self.encode(user_input, add_special_tokens=False)["input_ids"]
+            bot_ids = self.encode(bot_output, add_special_tokens=False)["input_ids"]
             conversation_ids.append(self.encode_chat_inputs_post_process(user_ids, bot_ids, index=index))
 
         result["conversations"] = conversation_ids
