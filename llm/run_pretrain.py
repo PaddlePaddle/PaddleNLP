@@ -22,6 +22,11 @@ from typing import List, Optional
 import numpy as np
 import paddle
 
+from paddlenlp.data.causal_dataset import (
+    build_train_valid_test_datasets,
+    check_data_split,
+    print_rank_0,
+)
 from paddlenlp.trainer import (
     PdArgumentParser,
     Trainer,
@@ -40,20 +45,6 @@ from paddlenlp.transformers import (  # LlamaForCausalLMPipe,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
-
-MODEL_CLASSES = {
-    "llama": (
-        AutoConfig,
-        AutoModelForCausalLM,
-    ),
-}
-
-
-from paddlenlp.data.causal_dataset import (
-    build_train_valid_test_datasets,
-    check_data_split,
-    print_rank_0,
-)
 
 
 def add_start_docstrings(*docstr):
@@ -143,7 +134,7 @@ class ModelArguments:
     )
     use_fused_rms_norm: bool = field(
         default=False,
-        metadata={"help": "llama, use_fused_rms_norm"},
+        metadata={"help": "llama or other model, use_fused_rms_norm"},
     )
     fuse_attention_qkv: bool = field(
         default=False,
