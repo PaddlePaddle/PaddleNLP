@@ -7,12 +7,12 @@ PaddleNLP 中已经添加高性能推理模型相关实现，支持：
 | [LLaMA1/2](./llama)         | ✅               | ✅       | ✅     | 🚧   |
 | [ChatGLM](./chatglm)        | ✅               | ✅       | ✅     | ❌   |
 | [ChatGLM2](./chatglm2)      | ✅               | ❌       | ❌     | ❌   |
-| [BaiChuan1](./baichuan)     | ✅               | ✅       | ✅     | 🚧   |
-| [BaiChuan2-7B](./baichuan)  | ❌               | ❌       | ❌     | ❌   |
-| [BaiChuan2-13B](./baichuan) | ✅               | ✅       | ✅     | ❌   |
 | [Bloom](./bloom)            | ✅               | ✅       | ✅     | ❌   |
 | [GPT-3](./gpt-3)            | ✅               | ❌       | ❌     | ❌   |
 | [Qwen](./qwen)              | ❌               | ❌       | ❌     | ❌   |
+| [BaiChuan1](./baichuan)     | ✅               | ✅       | ✅     | 🚧   |
+| [BaiChuan2-7B](./baichuan)  | ✅               | ✅       | ✅     | 🚧   |
+| [BaiChuan2-13B](./baichuan) | ❌               | ❌       | ❌     | ❌   |
 
 [TOC]
 
