@@ -71,8 +71,8 @@ class InferenceTest(unittest.TestCase):
         count, full_match = 0, 0
         for item_1, item_2 in zip(result_1_result, result_2_result):
             min_length = min(len(item_1), len(item_2))
-            count += int(item_1[:min_length // 2] == item_2[:min_length // 2])
-            full_match += int(item_1[: min_length] == item_2[: min_length])
+            count += int(item_1[: min_length // 2] == item_2[: min_length // 2])
+            full_match += int(item_1[:min_length] == item_2[:min_length])
 
         return full_match / len(result_1_result), count / len(result_1_result)
 
@@ -190,7 +190,8 @@ class PTuningInfereneTest(InferenceTest):
 
         # 1.run dynamic model
         subprocess.run(
-            command_prefix + " bash " + self.run_predictor_shell_path, stdout=sys.stdout, stderr=sys.stderr, shell=True)
+            command_prefix + " bash " + self.run_predictor_shell_path, stdout=sys.stdout, stderr=sys.stderr, shell=True
+        )
 
         full_match_acc, _ = self.compare_result("dynamic.json", "static.json")
         self.assertGreater(full_match_acc, 0.8)
