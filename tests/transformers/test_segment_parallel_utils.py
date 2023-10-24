@@ -80,8 +80,6 @@ def run_forward_backward(x, y_grad, split_axis=0, concat_axis=2):
 def should_test(sep_degree):
     if sep_degree <= 1:
         print(f"sep degree should greater than 1, but is {sep_degree}, skip this test")
-        cuda_visible_devices = os.environ["CUDA_VISIBLE_DEVICES"]
-        print(f"CUDA_VISIBLE_DEVICES is set to {cuda_visible_devices}")
     return sep_degree > 1
 
 
