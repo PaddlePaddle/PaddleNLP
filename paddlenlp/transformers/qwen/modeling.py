@@ -42,7 +42,10 @@ try:
 except:
     flash_attention = None
 
-from paddle.incubate.nn.functional import fused_rotary_position_embedding
+try:
+    from paddle.incubate.nn.functional import fused_rotary_position_embedding
+except:
+    fused_rotary_position_embedding = None
 
 
 def get_triangle_upper_mask(x, mask=None):
