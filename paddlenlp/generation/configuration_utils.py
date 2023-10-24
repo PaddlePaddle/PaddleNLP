@@ -403,7 +403,7 @@ class GenerationConfig:
         ```"""
         config_file_name = config_file_name if config_file_name is not None else GENERATION_CONFIG_NAME
 
-        subfolder = kwargs.pop("subfolder", "")
+        subfolder = kwargs.pop("subfolder", None)
 
         config_path = os.path.join(pretrained_model_name_or_path, config_file_name)
         config_path = str(config_path)

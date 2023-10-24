@@ -25,6 +25,12 @@ pretrain:
     chatglm:
       model_type: chatglm
       model_name_or_path: __internal_testing__/tiny-fused-chatglm
+    chatglm2:
+      model_type: chatglm2
+      model_name_or_path: __internal_testing__/tiny-random-chatglm2
+    bloom:
+      model_type: bloom
+      model_name_or_path: __internal_testing__/tiny-fused-bloom
 
 inference-predict:
   default:
