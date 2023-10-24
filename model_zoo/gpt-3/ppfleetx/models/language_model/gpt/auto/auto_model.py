@@ -292,6 +292,25 @@ class MultiHeadAttention(nn.Layer):
         # project to output
         out = self.out_proj(out)
 
+        if self.sequence_parallel:
+            # FIXME Hack to shard op for module (linear)
+            last_op = out.block.ops[-1]
+            from paddle.distributed.auto_parallel.static.dist_context import get_default_distributed_context
+            from paddle.distributed.auto_parallel.static.dist_op import DistributedOperator
+            default_dist_ctx = get_default_distributed_context()
+            original_id = last_op.desc.original_id()
+            assert len(last_op.output_arg_names) == 1, "Output is more than one: [{}].".format(str(last_op))
+            assert original_id not in default_dist_ctx._dist_ops_for_program, "Op already has dist attribute."
+            
+            output_var_name = last_op.output_arg_names[0]
+            assert output_var_name == out.name, "out name: {}, output_var_name: {}".format(output_var_name, out.name)
+            dist_op = DistributedOperator(last_op)
+            output_tensor = dist_op.get_serial_output(output_var_name)
+            tensor_dist_attr = dist_op.dist_attr.get_output_dist_attr(output_var_name)
+            tensor_dist_attr.dims_mapping = [-1] * len(output_tensor.shape)
+            tensor_dist_attr.mark_annotated("dims_mapping")
+            print("##############",output_var_name, out.name)            
+
         outs = [out]
         if self.need_weights:
             outs.append(weights)
@@ -574,6 +593,8 @@ class GPTEmbeddings(nn.Layer):
 
         # [b, s, h] -> [s, b, h] 
         if self.sequence_parallel:
+
+            auto.shard_tensor(embeddings, auto_env.get_mesh()[0], [None, None, None]) # annotation to prevent unsharded propogation backward
             embeddings = paddle.transpose(embeddings, perm=[1, 0, 2])
             # TODO (JZ-LIANG) only constrain the sharding of seq axis propagate forward from here but not backward.
             auto.shard_tensor(embeddings, auto_env.get_mesh()[0], [auto_env.get_mesh().sp_dim, None, None])
