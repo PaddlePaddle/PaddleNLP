@@ -137,12 +137,12 @@ class QWenAttention(nn.Layer):
 
         self.attn_dropout = nn.Dropout(config.attn_dropout_prob)
 
-    def _attn(self, query, key, value, config, attention_mask=None):
+    def _attn(self, query, key, value, attention_mask=None):
         # Support the flash attention and normal attention
         bsz, q_len, num_heads, head_dim = query.shape
         _, kv_seq_len, _, _ = value.shape
 
-        if config.use_flash_attn and flash_attention is not None:
+        if self.config.use_flash_attn and flash_attention is not None:
             # Flash Attention now ignore attention mask
             # Current Flash Attention doesn't support attn maskt
             # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
@@ -152,8 +152,8 @@ class QWenAttention(nn.Layer):
                 key,
                 value,
                 causal=query.shape[1] != 1,
-                dropout=config.attn_dropout_prob,
-                return_softmax=config.attn_dropout_prob > 0.0,
+                dropout=self.config.attn_dropout_prob,
+                return_softmax=self.config.attn_dropout_prob > 0.0,
             )
             return attn_output, attn_weights
         else:
@@ -175,13 +175,8 @@ class QWenAttention(nn.Layer):
             if attention_mask is None:
                 attention_mask = get_triangle_upper_mask(attn_weights)
             attn_weights = attn_weights + attention_mask
+            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(value.dtype)
 
-            # TODO(wawltor) Check the ouput dtype of softmax is float32, and attn_weights dtype is float16/bfloat16
-            if not paddle.in_dynamic_mode():
-                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(value.dtype)
-            else:
-                with paddle.amp.auto_cast(False):
-                    attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(value.dtype)
             attn_weights = self.attn_dropout(attn_weights)
             attn_output = paddle.matmul(attn_weights, value)
             attn_output = attn_output.transpose([0, 2, 1, 3])
@@ -264,7 +259,7 @@ class QWenAttention(nn.Layer):
             logn_tensor = self.logn_tensor[:, seq_start:seq_end, :, :]
             query = query * logn_tensor.expand(query.shape)
 
-        attn_output, attn_weight = self._attn(query, key, value, self.config, attention_mask)
+        attn_output, attn_weight = self._attn(query, key, value, attention_mask)
         context_layer = self._merge_heads(attn_output, self.num_heads, self.head_dim)
 
         attn_output = self.c_proj(context_layer)
