@@ -16,6 +16,15 @@ PaddleNLP 中已经添加高性能推理模型相关实现，支持：
 
 [TOC]
 
+## 安装自定义算子库
+
+PaddleNLP 针对于Transformer 系列编写了高性能自定义算子，提升模型在推理和解码过程中的性能。
+
+```shell
+git clone https://github.com/PaddlePaddle/PaddleNLP
+cd ./paddlenlp/csrc && python setup_cuda.py install
+```
+
 ## 预训练 & SFT 模型 & Lora 推理
 
 > Lora 模型在推理之前是需要合并参数，详细可见：[合并 Lora 参数](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#37-lora-%E5%8F%82%E6%95%B0%E5%90%88%E5%B9%B6)。
