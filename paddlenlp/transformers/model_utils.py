@@ -962,6 +962,17 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         return model
 
+    @classmethod
+    def from_config(cls, config, **kwargs):
+        """
+        All context managers that the model should be initialized under go here.
+
+        Args:
+            dtype (`paddle.dtype`, *optional*):
+                Override the default `paddle.dtype` and load the model under this dtype.
+        """
+        return cls._from_config(config, **kwargs)
+
     @property
     def base_model(self):
         """

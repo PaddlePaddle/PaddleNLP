@@ -464,7 +464,7 @@ def main():
             dtype=dtype,
         )
     else:
-        model = model_class._from_config(config, dtype=dtype)
+        model = model_class.from_config(config, dtype=dtype)
 
     if model_args.sequence_parallel:
         register_sequence_parallel_allreduce_hooks(
