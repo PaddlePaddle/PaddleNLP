@@ -23,6 +23,7 @@ import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
+from paddle.utils import try_import
 
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPast,
@@ -153,7 +154,7 @@ class QWenAttention(nn.Layer):
         bsz, q_len, num_heads, head_dim = query.shape
         _, kv_seq_len, _, _ = value.shape
 
-        if self.config.use_flash_attn and flash_attention is not None:
+        if self.config.use_flash_attention and flash_attention is not None:
             # Flash Attention now ignore attention mask
             # Current Flash Attention doesn't support attn maskt
             # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
@@ -965,9 +966,15 @@ def apply_rotary_pos_emb(t, freqs):
     return paddle.concat([t_, t_pass_], axis=-1).astype(t.dtype)
 
 
+def rms_norm_fused(x_in, w, eps):
+    fused_ln = try_import("fused_ln")
+    return fused_ln.fused_rms_norm(x_in, w, eps)[0]
+
+
 class QWenRMSNorm(nn.Layer):
     def __init__(self, config):
         super().__init__()
+        self.config = config
 
         self.eps = config.layer_norm_epsilon
         self.weight = paddle.create_parameter(
@@ -980,5 +987,8 @@ class QWenRMSNorm(nn.Layer):
         return x * paddle.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
 
     def forward(self, x):
+        if self.config.use_fused_rms_norm:
+            return rms_norm_fused(x, self.weight, self.eps)
+
         output = self._norm(x.astype(paddle.float32)).astype(x.dtype)
         return output * self.weight

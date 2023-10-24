@@ -39,8 +39,10 @@ class QWenConfig(PretrainedConfig):
         rotary_emb_base=10000,
         use_dynamic_ntk=True,
         use_logn_attn=True,
-        use_flash_attn="auto",
+        use_flash_attention=False,
+        use_fused_rms_norm=False,
         intermediate_size=22016,
+        tensor_parallel_output=True,
         no_bias=True,
         tie_word_embeddings=False,
         **kwargs,
@@ -62,7 +64,8 @@ class QWenConfig(PretrainedConfig):
         self.rotary_emb_base = rotary_emb_base
         self.use_dynamic_ntk = use_dynamic_ntk
         self.use_logn_attn = use_logn_attn
-        self.use_flash_attn = use_flash_attn
+        self.use_flash_attention = use_flash_attention
+        self.use_fused_rms_norm = use_fused_rms_norm
         self.no_bias = no_bias
 
         super().__init__(tie_word_embeddings=tie_word_embeddings, **kwargs)
