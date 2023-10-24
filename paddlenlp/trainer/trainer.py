@@ -54,6 +54,7 @@ from paddle.distributed.fleet.utils.hybrid_parallel_util import (
 )
 from paddle.distributed.fleet.utils.timer_helper import get_timers as paddle_get_timers
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
+from paddle.utils import map_structure
 from tqdm.auto import tqdm
 
 from ..data import DataCollator, DataCollatorWithPadding, default_data_collator
@@ -835,7 +836,7 @@ class Trainer:
 
         self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
 
-        tr_loss = paddle.to_tensor(0.0)
+        tr_loss = None
         self._total_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
 
@@ -931,7 +932,9 @@ class Trainer:
                         logger.warning("found `no sync` param when `use_moe=False`")
                     fused_allreduce_gradients(nonmoe_list, hcg)
 
-                tr_loss += tr_loss_step
+                if tr_loss is None:
+                    tr_loss = map_structure(lambda x: paddle.zeros_like(x), tr_loss_step)
+                map_structure(lambda x, y: x.add_(y), tr_loss, tr_loss_step)
                 if (step + 1) % args.gradient_accumulation_steps == 0:
                     self.timers and self.timers("forward-backward").stop()
                     # Maunally collect gradients when group_sharded_parallel can't accept dp_group
@@ -1091,7 +1094,7 @@ class Trainer:
                     "on multiple nodes, you should activate `--save_on_each_node`."
                 )
 
-        self._total_loss_scalar += tr_loss.item()
+        self._total_loss_scalar += tr_loss.pop("loss").item() if isinstance(tr_loss, dict) else tr_loss.item()
         train_loss = self._total_loss_scalar / self.state.global_step
 
         metrics = speed_metrics("train", start_time, num_samples=num_train_samples, num_steps=self.state.max_steps)
@@ -1159,12 +1162,16 @@ class Trainer:
             logs: Dict[str, float] = {}
 
             # all_gather + mean() to get average loss over all processes
-            tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
-
-            # reset tr_loss to zero
-            tr_loss.subtract_(tr_loss)
-
-            logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
+            tr_loss_scalar = map_structure(lambda x: self._nested_gather(x).mean().item(), tr_loss)
+            map_structure(lambda x: x.zero_(), tr_loss)
+            if isinstance(tr_loss_scalar, dict):
+                for k, v in tr_loss_scalar.items():
+                    logs[k] = round(v / (self.state.global_step - self._globalstep_last_logged), 8)
+            elif isinstance(tr_loss_scalar, (list, tuple)):
+                for i, v in enumerate(tr_loss_scalar):
+                    logs[f"loss_{i}"] = round(v / (self.state.global_step - self._globalstep_last_logged), 8)
+            else:
+                logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
             logs["learning_rate"] = float("{0:.3e}".format(self._get_learning_rate()))
             logs["global_step"] = int(self.state.global_step)
 
@@ -1180,8 +1187,9 @@ class Trainer:
                     num_steps=num_steps,
                 )
             )
-
-            self._total_loss_scalar += tr_loss_scalar
+            self._total_loss_scalar += (
+                tr_loss_scalar.pop("loss") if isinstance(tr_loss_scalar, dict) else tr_loss_scalar
+            )
             self._globalstep_last_logged = self.state.global_step
             self._globalstep_last_start_time = time.time()
 
@@ -1782,12 +1790,13 @@ class Trainer:
             self._past = outputs[self.args.past_index]
 
         # We don't use .loss here since the model may return tuples instead of ModelOutput.
+        loss = outputs["loss"] if isinstance(outputs, dict) else outputs
         if isinstance(outputs, dict):
-            loss = outputs.pop("loss")
-            outputs = {k: nested_detach(v) for k, v in outputs.items()}
-        else:
+            loss = outputs["loss"]
+        elif isinstance(outputs, tuple):
             loss = outputs[0]
-            outputs = nested_detach(outputs[1:])
+        else:
+            loss = outputs
 
         return (loss, outputs) if return_outputs else loss
 
@@ -1817,17 +1826,19 @@ class Trainer:
         with self.autocast_smart_context_manager():
             loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
         if self.args.gradient_accumulation_steps > 1:
-            loss = loss / self.args.gradient_accumulation_steps
+            loss = map_structure(lambda x: x / self.args.gradient_accumulation_steps, loss)
+
+        if isinstance(loss, dict):
+            total_loss = loss["loss"]
+        else:
+            total_loss = loss
 
         if self.do_grad_scaling:
-            self.scaler.scale(loss).backward()
+            self.scaler.scale(total_loss).backward()
         else:
-            loss.backward()
+            total_loss.backward()
 
-        if isinstance(outputs, dict) and "loss" in outputs:
-            loss = outputs.pop("loss") / self.args.gradient_accumulation_steps
-
-        return loss.detach(), outputs
+        return map_structure(lambda v: v.detach(), loss), outputs
 
     def training_pipeline_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         """
@@ -1852,7 +1863,7 @@ class Trainer:
             self._pp_data_buffer = []
         self._pp_data_buffer.append(inputs)
         if len(self._pp_data_buffer) != self.args.gradient_accumulation_steps:
-            return paddle.zeros([]), {}
+            return paddle.zeros([1]), {}
 
         # for v in self._pp_data_buffer[0].values():
         #     assert isinstance(v, paddle.Tensor), f"Only support tensor as pipeline mode input, got type {type(v)}"
@@ -1891,25 +1902,28 @@ class Trainer:
 
         if model.is_pipeline_last_stage():
             buf = [
-                {
-                    k: (v.item() if isinstance(v, paddle.Tensor) else v) / self.args.gradient_accumulation_steps
-                    for k, v in model._layers._loss_fn.info.items()
-                }
+                map_structure(
+                    lambda v: (v.item() if isinstance(v, paddle.Tensor) else v)
+                    / self.args.gradient_accumulation_steps,
+                    model._layers._loss_fn.info,
+                )
             ]
         else:
             buf = [None]
         hcg = fleet.get_hybrid_communicate_group()
         dist.broadcast_object_list(buf, src=hcg._pp_comm_group.ranks[-1], group=hcg.get_pipe_parallel_group())
-        info = buf[0]
+        loss = buf[0]
 
         # 当 pipenline 模型需要返回并打印多个 loss 时，需要在组网 `model._layers._loss_fn` 中插入 dict `info`.
         # `info` 中持有需要被打印的 name-tensor 对。
         model._layers._loss_fn.info = {}
-        assert isinstance(info, dict), f"expect info to dict, got {type(info)}"
-        info = {k: v.detach() if isinstance(v, paddle.Tensor) else v for k, v in info.items()}
-        if "loss" in info:
-            loss = paddle.to_tensor(info.pop("loss"))
-        return loss.detach(), info
+        assert isinstance(loss, dict), f"expect info to dict, got {type(loss)}"
+        loss = map_structure(lambda v: v.detach() if isinstance(v, paddle.Tensor) else v, loss)
+        if isinstance(loss, dict):
+            total_loss = loss["loss"]
+        else:
+            total_loss = loss
+        return total_loss, loss
 
     def save_model(
         self,
@@ -2931,6 +2945,8 @@ class Trainer:
             if has_labels:
                 with self.autocast_smart_context_manager():
                     loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
+                if isinstance(loss, dict):
+                    loss = loss.pop("loss")  # TODO:(@Meiyim) support eval structure loss
                 loss = loss.mean().detach()
 
                 if isinstance(outputs, dict):
