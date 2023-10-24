@@ -13,10 +13,7 @@
 # limitations under the License.
 """ Mistral model configuration"""
 
-from ...configuration_utils import PretrainedConfig
-from ...utils import logging
-
-logger = logging.get_logger(__name__)
+from ..configuration_utils import PretrainedConfig
 
 MISTRAL_PRETRAINED_CONFIG_ARCHIVE_MAP = {
     "mistralai/Mistral-7B-v0.1": "https://huggingface.co/mistralai/Mistral-7B-v0.1/resolve/main/config.json",
