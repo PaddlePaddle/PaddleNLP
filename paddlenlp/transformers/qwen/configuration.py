@@ -14,6 +14,8 @@
 
 from paddlenlp.transformers import PretrainedConfig
 
+__all__ = ["QWenConfig"]
+
 
 class QWenConfig(PretrainedConfig):
     model_type = "qwen"
@@ -41,6 +43,7 @@ class QWenConfig(PretrainedConfig):
         use_fused_rms_norm=False,
         use_fused_rope=False,
         intermediate_size=22016,
+        tensor_parallel_output=True,
         no_bias=True,
         tie_word_embeddings=False,
         **kwargs,

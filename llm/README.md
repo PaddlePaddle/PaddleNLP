@@ -11,7 +11,7 @@
 | [GPT-3](./gpt-3) |   ✅  |  ✅  |  ✅  |  🚧  | ✅   | 🚧 |
 | [OPT](./opt) | 🚧 | ✅ | ✅ | 🚧 |  ✅ | 🚧 |
 | [GLM](./glm) | ❌  | ✅ | ✅ | 🚧 |  ✅ | 🚧 |
-| [Qwen](./qwen) | ❌ | ✅ | ✅ | ✅ |  ✅ | 🚧 |
+| [Qwen](./qwen) | ✅ | ✅ | ✅ | ✅ |  ✅ | 🚧 |
 
 
 * ✅: Supported
@@ -39,6 +39,11 @@
 
 ## 2. 预训练
 [LLaMA v1/v2](./llama)、[GPT-3](./gpt-3) 目录中提供了模型预训练的数据准备和训练细节，后续我们将支持更多的模型预训练。
+```
+# 千问模型预训练
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./qwen/pretrain_argument_stage2.json
+
+```
 
 ## 3. 精调
 目前精调统一脚本只支持[LLaMA v1/v2](./llama)、[ChatGLM-6B](./chatglm)、[ChatGLM2-6B](./chatglm2)、[Bloom](./bloom)、[OPT](./opt)、[Qwen](./qwen)，其他模型精调使用详见对应模型目录。接下来我们将以**Llama 2**为例介绍如何使用统一脚本进行SFT、LoRA、Prefix Tuning。更多LoRA、Prefix Tuning请参见[PEFT文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/peft.md)。
