@@ -211,9 +211,10 @@ class _BaseAutoModelClass:
 
     # TODO: Refactor into AutoConfig when available
     @classmethod
-    def _get_model_class_from_config(cls, pretrained_model_name_or_path, config_file_path):
-        with io.open(config_file_path, encoding="utf-8") as f:
-            config = json.load(f)
+    def _get_model_class_from_config(cls, pretrained_model_name_or_path, config_file_path, config=None):
+        if config is None:
+            with io.open(config_file_path, encoding="utf-8") as f:
+                config = json.load(f)
 
         # Get class name corresponds to this configuration
         if is_standard_config(config):
@@ -261,6 +262,11 @@ class _BaseAutoModelClass:
                     + " or ".join(task + ".from_pretrained" for task in all_tasks)
                     + f" to load '{pretrained_model_name_or_path}'\n"
                 )
+
+    @classmethod
+    def from_config(cls, config, **kwargs):
+        model_class = cls._get_model_class_from_config(None, None, config)
+        return model_class._from_config(config, **kwargs)
 
     @classmethod
     def _from_pretrained(cls, pretrained_model_name_or_path, task=None, *model_args, **kwargs):
