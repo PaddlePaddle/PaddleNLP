@@ -312,6 +312,7 @@ class GPTConfig(PretrainedConfig):
         max_position_embeddings: int = 512,
         type_vocab_size: int = 16,
         initializer_range: float = 0.02,
+        rms_norm_eps=1e-5,
         pad_token_id: int = 0,
         eos_token_id: int = 7,
         bos_token_id: int = 0,
@@ -331,6 +332,8 @@ class GPTConfig(PretrainedConfig):
         enable_fuse_transformer: bool = False,
         fused_softmax_with_triangular: bool = False,
         virtual_pp_degree: int = 1,
+        sequence_parallel=False,
+        fuse_sequence_parallel_allreduce=False,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -346,6 +349,7 @@ class GPTConfig(PretrainedConfig):
         self.max_position_embeddings = max_position_embeddings
         self.type_vocab_size = type_vocab_size
         self.initializer_range = initializer_range
+        self.rms_norm_eps = rms_norm_eps
 
         self.pad_token_id = pad_token_id
         self.eos_token_id = eos_token_id
@@ -368,3 +372,5 @@ class GPTConfig(PretrainedConfig):
         self.use_fused_dropout_add = use_fused_dropout_add
         self.fused_softmax_with_triangular = fused_softmax_with_triangular
         self.virtual_pp_degree = virtual_pp_degree
+        self.sequence_parallel = sequence_parallel
+        self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
