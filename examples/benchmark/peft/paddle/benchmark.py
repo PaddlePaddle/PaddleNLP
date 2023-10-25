@@ -109,7 +109,6 @@ def main():
             dtype=dtype,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             tensor_parallel_rank=training_args.tensor_parallel_rank,
-            is_causal=False,
         )
 
     if model_args.lora:
