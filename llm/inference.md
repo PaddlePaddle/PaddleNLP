@@ -36,12 +36,6 @@ cd ./paddlenlp/csrc && python setup_cuda.py install
 
 ### 动态图推理
 
-model = LlamaForCausalLM.from_pretrained()
-model.generate(...)
-
-model = LlamaForCausalLMInferenceModel.from_pretrained()
-model.generate()
-
 ```python
 python predictor.py \
     --model_name_or_path meta-llama/Llama-2-7b-chat \
