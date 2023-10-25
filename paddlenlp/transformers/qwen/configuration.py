@@ -34,6 +34,7 @@ class QWenConfig(PretrainedConfig):
         max_position_embeddings=8192,
         scale_attn_weights=True,
         use_cache=True,
+        recompute_granularity="full",
         kv_channels=128,
         rotary_pct=1.0,
         rotary_emb_base=10000,
@@ -59,6 +60,7 @@ class QWenConfig(PretrainedConfig):
         self.initializer_range = initializer_range
         self.scale_attn_weights = scale_attn_weights
         self.use_cache = use_cache
+        self.recompute_granularity = recompute_granularity
         self.max_position_embeddings = max_position_embeddings
         self.kv_channels = kv_channels
         self.rotary_pct = rotary_pct

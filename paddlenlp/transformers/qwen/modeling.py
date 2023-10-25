@@ -103,7 +103,6 @@ class QWenAttention(nn.Layer):
 
         self.config = config
         self.seq_length = config.seq_length
-
         self.hidden_size = config.hidden_size
         self.split_size = config.hidden_size
         self.num_heads = config.num_attention_heads
@@ -111,6 +110,8 @@ class QWenAttention(nn.Layer):
         self.inv_norm_factor = 1.0 / math.sqrt(self.head_dim)
 
         self.scale_attn_weights = True
+        self.enable_recompute = False
+        self.recompute_granularity = config.recompute_granularity
 
         self.projection_size = config.kv_channels * config.num_attention_heads
 
@@ -282,7 +283,13 @@ class QWenAttention(nn.Layer):
             logn_tensor = self.logn_tensor[:, seq_start:seq_end, :, :]
             query = query * logn_tensor.expand(query.shape)
 
-        attn_output, attn_weight = self._attn(query, key, value, attention_mask)
+        has_gradient = not (query.stop_gradient and key.stop_gradient and value.stop_gradient)
+        if self.enable_recompute and self.training and has_gradient and self.recompute_granularity == "core_attn":
+            attn_output, attn_weight = recompute(
+                self._attn, query, key, value, attention_mask, use_reentrant=self.config.recompute_use_reentrant
+            )
+        else:
+            attn_output, attn_weight = self._attn(query, key, value, attention_mask)
         context_layer = self._merge_heads(attn_output, self.num_heads, self.head_dim)
 
         attn_output = self.c_proj(context_layer)
@@ -537,6 +544,7 @@ class QWenModel(QWenPretrainedModel):
         self.num_hidden_layers = config.num_hidden_layers
         self.embed_dim = config.hidden_size
         self.enable_recompute = False
+        self.recompute_granularity = config.recompute_granularity
 
         if config.tensor_parallel_degree > 1:
             self.wte = mpu.VocabParallelEmbedding(
@@ -688,7 +696,7 @@ class QWenModel(QWenPretrainedModel):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
-            if self.enable_recompute and self.training and has_gradient:
+            if self.enable_recompute and self.training and has_gradient and self.recompute_granularity == "full":
                 outputs = self.recompute_training(
                     block,
                     hidden_states,
