@@ -501,10 +501,7 @@ def shard_checkpoint(
     if shard_format == "naive":
         for key, weight in state_dict.items():
             # _C_ops.numel not yet support paddle.int8
-            if weight.dtype == paddle.int8:
-                weight_size = np.prod(weight.shape) * dtype_byte_size(weight.dtype)
-            else:
-                weight_size = weight.numel().item() * dtype_byte_size(weight.dtype)
+            weight_size = np.prod(weight.shape) * dtype_byte_size(weight.dtype)
             # If this weight is going to tip up over the maximal size, we split.
             if current_block_size + weight_size > max_shard_size:
                 # fix if the first param is large than max_shard_size
@@ -563,7 +560,7 @@ def shard_checkpoint(
             weight_map[key] = shard_file
 
     # Add the metadata
-    metadata = {"total_size": total_size}
+    metadata = {"total_size": int(total_size)}
     index = {"metadata": metadata, "weight_map": weight_map}
     return shards, index
 
@@ -964,6 +961,17 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             model = cls(config, **kwargs)
 
         return model
+
+    @classmethod
+    def from_config(cls, config, **kwargs):
+        """
+        All context managers that the model should be initialized under go here.
+
+        Args:
+            dtype (`paddle.dtype`, *optional*):
+                Override the default `paddle.dtype` and load the model under this dtype.
+        """
+        return cls._from_config(config, **kwargs)
 
     @property
     def base_model(self):
@@ -1771,7 +1779,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
                 # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
                 state_dict = load_state_dict(
-                    shard_file, tp_actions if pre_tensor_parallel_split else None, set(expected_keys)
+                    shard_file,
+                    tp_actions if pre_tensor_parallel_split else None,
+                    set(expected_keys) if quantization_config is None else None,
                 )
                 if quantization_config is not None:
                     state_dict = convert_to_quantize_state_dict(
