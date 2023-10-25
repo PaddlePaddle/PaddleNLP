@@ -152,9 +152,8 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, i
     input_ids, labels = input_ids[:-1], labels[1:]
     seq_length = len(input_ids)
     features = {"input_ids": input_ids, "labels": labels}
-    # features["position_ids"] = list(range(seq_length))
     if intokens:
-        features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
+        features["attention_mask"] = np.tri(seq_length, seq_length, dtype=np.bool)
 
     rounds_inputs.update(features)
     return rounds_inputs
