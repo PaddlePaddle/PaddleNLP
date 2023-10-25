@@ -573,6 +573,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="penalty_score"),  # penalty_score
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="frequency_score"),  # frequency_score
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="presence_score"),  # presence_score
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="next_tokens"),  # next_tokens
+            paddle.static.InputSpec(shape=[None, 1], dtype="bool", name="is_block_step"),  # is_block_step
             paddle.static.InputSpec(shape=[None, 1], dtype="int32", name="seq_lens_this_time"),  # seq_lens_this_time
             paddle.static.InputSpec(shape=[None, 1], dtype="int32", name="seq_lens_encoder"),  # seq_lens_encoder
             paddle.static.InputSpec(shape=[None, 1], dtype="int32", name="seq_lens_decoder"),  # seq_lens_decoder
@@ -634,6 +636,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
         penalty_score=None,
         frequency_score=None,
         presence_score=None,
+        next_tokens=None,
+        is_block_step=None,
         seq_lens_this_time=None,  # update
         seq_lens_encoder=None,  # update
         seq_lens_decoder=None,  # update
@@ -681,6 +685,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
         model_kwargs["v_dequant_scales"] = v_dequant_scales
         model_kwargs["pre_key_caches"] = pre_key_caches
         model_kwargs["pre_value_caches"] = pre_value_caches
+        model_kwargs["next_tokens"] = next_tokens
+        model_kwargs["is_block_step"] = is_block_step
         model_kwargs["src_mask"] = src_mask
 
         ret = self.sample(
@@ -713,9 +719,9 @@ class GenerationBlockInferenceModel(GenerationMixin):
             outputs,
             top_k,
             top_p,
-               penalty_score,
-               frequency_score,
-               presence_score,
+            penalty_score,
+            frequency_score,
+            presence_score,
             temperature,
             model_kwargs,
         ):
@@ -729,9 +735,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 step_idx,
                 model_kwargs["stop_flags"])
 
-            logits = outputs  # if isinstance(outputs, tuple) else outputs
-
-            logits = paddle.cast(logits, paddle.float32)
+            logits = paddle.cast(outputs, paddle.float32)
 
             # pre-process distribution
             logits = get_token_penalty_multi_scores(
@@ -748,7 +752,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
 
             # sample
             probs = F.softmax(logits)
-            _, next_tokens = top_p_sampling(probs, top_p, -1)
+            # _, next_tokens = top_p_sampling(probs, top_p, -1)
+            _, next_tokens = paddle.topk(probs, 1, -1)
 
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
@@ -758,7 +763,11 @@ class GenerationBlockInferenceModel(GenerationMixin):
             length_cond = paddle.greater_equal(model_kwargs["step_idx"], model_kwargs["max_dec_len"])
             stop_flags = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
             set_stop_value_multi_ends_v2(
-                next_tokens, stop_flags, model_kwargs["seq_lens_this_time"], eos_token_id
+                next_tokens, 
+                stop_flags, 
+                model_kwargs["seq_lens_this_time"], 
+                eos_token_id,
+                model_kwargs["next_tokens"]
             )  # multi ends
             paddle.assign(stop_flags, model_kwargs["stop_flags"])
             # update inputs
@@ -771,6 +780,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 model_kwargs["input_ids"],
                 model_kwargs["stop_nums"],
                 next_tokens,
+                model_kwargs["is_block_step"]
             )
             save_output(next_tokens, model_kwargs["not_need_stop"], self.config.tensor_parallel_rank)
             return next_tokens

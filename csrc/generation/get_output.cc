@@ -5,7 +5,7 @@
 #include <sys/types.h>
 #include "paddle/extension.h"
 
-#define MAX_BSZ 128
+#define MAX_BSZ 256
 
 struct msgdata {
     long mtype;

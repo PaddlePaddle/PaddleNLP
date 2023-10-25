@@ -382,6 +382,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 qkv_quanted_weight_tensor, qkv_weight_scale_tensor = weight_quantize(
                     qkv_weight_tensor, algo=self.quant_algo
                 )
+                qkv_weight_scale_tensor=qkv_weight_scale_tensor.cast(qkv_weight_tensor.dtype)
                 self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor)
                 self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor)
             else:
@@ -392,6 +393,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 linear_quanted_weight_tensor, linear_weight_scale_tensor = weight_quantize(
                     linear_weight_tensor, algo=self.quant_algo
                 )
+                linear_weight_scale_tensor=linear_weight_scale_tensor.cast(linear_weight_tensor.dtype)
                 self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor)
                 self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor)
             else:
@@ -409,6 +411,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
                     ffn1_weight_tensor, algo=self.quant_algo
                 )
+                ffn1_weight_scale_tensor = ffn1_weight_scale_tensor.cast(ffn1_weight_tensor.dtype)
                 self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor)
                 self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor)
             else:
@@ -419,6 +422,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(
                     ffn2_weight_tensor, algo=self.quant_algo
                 )
+                ffn2_weight_scale_tensor = ffn2_weight_scale_tensor.cast(ffn2_weight_tensor.dtype)
                 self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
                 self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
             else:
@@ -615,6 +619,8 @@ class LlamaBlockInferenceModel(LlamaPretrainedModel):
         ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
             input_ids, seq_lens_this_time
         )
+        # paddle.static.Print(seq_lens_this_time, message="seq_lens_this_time", summarize=-1)
+        # paddle.static.Print(cum_offsets, message="cum_offsets", summarize=-1)
 
         inputs_embeds = self.embed_tokens(ids_remove_padding)
 
@@ -694,6 +700,7 @@ class LlamaBlockInferenceModel(LlamaPretrainedModel):
                 qkv_quanted_weight_tensor, qkv_weight_scale_tensor = weight_quantize(
                     qkv_weight_tensor, algo=self.quant_algo
                 )
+                qkv_weight_scale_tensor=qkv_weight_scale_tensor.cast(qkv_weight_tensor.dtype)
                 self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor)
                 self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor)
             else:
@@ -704,6 +711,7 @@ class LlamaBlockInferenceModel(LlamaPretrainedModel):
                 linear_quanted_weight_tensor, linear_weight_scale_tensor = weight_quantize(
                     linear_weight_tensor, algo=self.quant_algo
                 )
+                linear_weight_scale_tensor=linear_weight_scale_tensor.cast(linear_weight_tensor.dtype)
                 self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor)
                 self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor)
             else:
@@ -721,6 +729,7 @@ class LlamaBlockInferenceModel(LlamaPretrainedModel):
                 ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
                     ffn1_weight_tensor, algo=self.quant_algo
                 )
+                ffn1_weight_scale_tensor = ffn1_weight_scale_tensor.cast(ffn1_weight_tensor.dtype)
                 self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor)
                 self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor)
             else:
@@ -731,6 +740,7 @@ class LlamaBlockInferenceModel(LlamaPretrainedModel):
                 ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(
                     ffn2_weight_tensor, algo=self.quant_algo
                 )
+                ffn2_weight_scale_tensor = ffn2_weight_scale_tensor.cast(ffn2_weight_tensor.dtype)
                 self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
                 self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
             else:

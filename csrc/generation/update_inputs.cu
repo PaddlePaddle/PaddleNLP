@@ -9,6 +9,7 @@ __global__ void update_inputs_kernel(
     int64_t *input_ids,
     const int64_t *stop_nums,
     const bool *stop_flags,
+    const bool *is_block_step,
     const int64_t *next_tokens,
     const int bsz,
     const int max_bsz,
@@ -22,7 +23,11 @@ __global__ void update_inputs_kernel(
   if (thread_idx < max_bsz) {
     if (thread_idx < bsz) {
       stop_flag_now = stop_flags[thread_idx];
-      stop_flag_now_int = static_cast<int64_t>(stop_flag_now);
+      if (is_block_step[thread_idx]) {
+        stop_flag_now_int = 0;
+      } else {
+        stop_flag_now_int = static_cast<int64_t>(stop_flag_now);
+      }
     } else {
       stop_flag_now_int = 1;
     }
@@ -53,7 +58,8 @@ void UpdateInputes(const paddle::Tensor& stop_flags,
                    const paddle::Tensor& seq_lens_decoder,
                    const paddle::Tensor& input_ids,
                    const paddle::Tensor& stop_nums,
-                   const paddle::Tensor& next_tokens) {
+                   const paddle::Tensor& next_tokens,
+                   const paddle::Tensor& is_block_step) {
   const int max_bsz = stop_flags.shape()[0];
   const int now_bsz = seq_lens_this_time.shape()[0];
   const int input_ids_stride = input_ids.shape()[1];
@@ -66,6 +72,7 @@ void UpdateInputes(const paddle::Tensor& stop_flags,
     const_cast<int64_t*>(input_ids.data<int64_t>()),
     stop_nums.data<int64_t>(),
     stop_flags.data<bool>(),
+    is_block_step.data<bool>(),
     next_tokens.data<int64_t>(),
     now_bsz,
     max_bsz,
@@ -84,7 +91,8 @@ PD_BUILD_OP(update_inputs)
              "seq_lens_decoder",
              "input_ids",
              "stop_nums",
-             "next_tokens"})
+             "next_tokens",
+             "is_block_step"})
     .Outputs({"not_need_stop_out",
               "seq_lens_this_time_out",
               "seq_lens_encoder_out",

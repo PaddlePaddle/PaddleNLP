@@ -293,7 +293,7 @@ class FusedMultiTransformer(Layer):
                 qkv_weight_scale = self.create_parameter(
                     shape=[3 * num_heads * self.head_dim],
                     attr=qkv_weight_scale_attr,
-                    dtype=paddle.float32,
+                    dtype=self._dtype,
                     is_bias=False,
                 )
 
@@ -323,7 +323,7 @@ class FusedMultiTransformer(Layer):
                 linear_weight_scale = self.create_parameter(
                     shape=[embed_dim],
                     attr=linear_weight_scale_attr,
-                    dtype=paddle.float32,
+                    dtype=self._dtype,
                     is_bias=False,
                 )
             linear_weight = self.create_parameter(
@@ -373,7 +373,7 @@ class FusedMultiTransformer(Layer):
                 ffn1_weight_scale = self.create_parameter(
                     shape=[dim_feedforward * 2],
                     attr=ffn1_weight_scale_attr,
-                    dtype=paddle.float32,
+                    dtype=self._dtype,
                     is_bias=False,
                 )
             ffn1_weight = self.create_parameter(
@@ -402,7 +402,7 @@ class FusedMultiTransformer(Layer):
                 ffn2_weight_scale = self.create_parameter(
                     shape=[embed_dim],
                     attr=ffn2_weight_scale_attr,
-                    dtype=paddle.float32,
+                    dtype=self._dtype,
                     is_bias=False,
                 )
 
@@ -898,7 +898,7 @@ class FusedBlockMultiTransformer(Layer):
                 qkv_weight_scale = self.create_parameter(
                     shape=[3 * num_heads * self.head_dim],
                     attr=qkv_weight_scale_attr,
-                    dtype=paddle.float32,
+                    dtype=self._dtype,
                     is_bias=False,
                 )
 
@@ -928,7 +928,7 @@ class FusedBlockMultiTransformer(Layer):
                 linear_weight_scale = self.create_parameter(
                     shape=[embed_dim],
                     attr=linear_weight_scale_attr,
-                    dtype=paddle.float32,
+                    dtype=self._dtype,
                     is_bias=False,
                 )
             linear_weight = self.create_parameter(
@@ -978,7 +978,7 @@ class FusedBlockMultiTransformer(Layer):
                 ffn1_weight_scale = self.create_parameter(
                     shape=[dim_feedforward * 2],
                     attr=ffn1_weight_scale_attr,
-                    dtype=paddle.float32,
+                    dtype=self._dtype,
                     is_bias=False,
                 )
             ffn1_weight = self.create_parameter(
@@ -1007,7 +1007,7 @@ class FusedBlockMultiTransformer(Layer):
                 ffn2_weight_scale = self.create_parameter(
                     shape=[embed_dim],
                     attr=ffn2_weight_scale_attr,
-                    dtype=paddle.float32,
+                    dtype=self._dtype,
                     is_bias=False,
                 )
 

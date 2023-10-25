@@ -51,6 +51,7 @@ setup(
             "./generation/reset_need_stop_value.cc",
             "./generation/save_with_output_msg.cc",
             "./generation/write_int8_cache_kv.cu",
+            "./generation/step.cu",
         ],
         extra_compile_args={
             "cxx": ["-O3"],
