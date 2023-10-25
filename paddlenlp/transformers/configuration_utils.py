@@ -504,7 +504,6 @@ class PretrainedConfig:
         self.output_attentions = kwargs.pop("output_attentions", False)
         self.use_cache = kwargs.pop("use_cache", False)
         self.use_flash_attention = kwargs.pop("use_flash_attention", False)
-        self.is_causal = kwargs.pop("is_causal", True)
         self.quantization_config = kwargs.pop("quantization_config", None)
 
         self.pruned_heads = kwargs.pop("pruned_heads", {})
