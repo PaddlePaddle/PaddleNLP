@@ -142,6 +142,7 @@ class InferenceTest(unittest.TestCase):
         with open(os.path.join(self.output_path, "log.log"), "r") as f:
             content = f.read()
 
+        print(content)
         keyword = "IPS:"
         ips_index = content.index(keyword)
         if ips_index == -1:
