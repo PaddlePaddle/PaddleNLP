@@ -328,6 +328,7 @@ class GPTConfig(PretrainedConfig):
         use_flash_attention: bool = False,
         use_fused_dropout_add: bool = False,
         fused_linear: bool = False,
+        use_fused_rms_norm: bool = False,
         fuse_attention_qkv=False,
         enable_fuse_transformer: bool = False,
         fused_softmax_with_triangular: bool = False,
@@ -356,6 +357,7 @@ class GPTConfig(PretrainedConfig):
         self.bos_token_id = bos_token_id
         self.eol_token_id = eol_token_id
 
+        self.use_fused_rms_norm = use_fused_rms_norm
         self.fuse_attention_qkv = fuse_attention_qkv
         self.use_flash_attention = use_flash_attention
 
