@@ -920,11 +920,6 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         self.quant_max_bound = config.quant_max_bound
         self.quant_min_bound = config.quant_min_bound
 
-        self.use_shift_smooth_quant = False
-
-        if config.linear_shift_attrs is not None:
-            self.use_shift_smooth_quant = True
-
         if self._dtype == "bfloat16":
             self._fuse_kernel_compute_dtype = "bf16"
         elif self._dtype == "float16":
@@ -1014,7 +1009,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
             self.ffn1_out_scales.append(ffn1_out_scale)
             self.ffn2_out_scales.append(ffn2_out_scale)
 
-            if self.use_shift_smooth_quant:
+            if linear_shift is not None:
                 self.linear_shifts.append(linear_shift)
                 self.linear_smooths.append(linear_smooth)
                 self.ffn2_shifts.append(ffn2_shift)
@@ -1126,8 +1121,8 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         fmha_out = transpose_remove_padding(qktv_out, seq_lens, padding_offset)
         fmha_out = quant_int8(
             fmha_out,
-            self.linear_shifts[i],
-            self.linear_smooths[i],
+            self.linear_shifts[i] if len(self.linear_shifts) > 0 else None,
+            self.linear_smooths[i] if len(self.linear_smooths) > 0 else None,
             self.act_scales["out_linear_in_scale"][i],
             self.quant_round_type,
             self.quant_max_bound,
@@ -1146,8 +1141,8 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
             rotary_emb_dims=rotary_emb_dims,
             use_neox_rotary_style=self.use_neox_rotary_style,
             qkv_out_scale=self.qkv_out_scales[i],
-            out_shift=self.linear_shifts[i],
-            out_smooth=self.linear_smooths[i],
+            out_shift=self.linear_shifts[i] if len(self.linear_shifts) > 0 else None,
+            out_smooth=self.linear_smooths[i] if len(self.linear_smooths) > 0 else None,
             out_scale=self.act_scales["out_linear_in_scale"][i],
             quant_round_type=self.quant_round_type,
             quant_max_bound=self.quant_max_bound,
@@ -1184,8 +1179,8 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
             act_method=self.activation,
             compute_dtype=self._fuse_kernel_compute_dtype,
             dequant_scales=self.ffn1_out_scales[i],
-            shift=self.ffn2_shifts[i],
-            smooth=self.ffn2_smooths[i],
+            shift=self.ffn2_shifts[i] if len(self.ffn2_shifts) > 0 else None,
+            smooth=self.ffn2_smooths[i] if len(self.ffn2_smooths) > 0 else None,
             quant_scale=self.act_scales["ffn2_in_scale"][i],
             quant_round_type=self.quant_round_type,
             quant_max_bound=self.quant_max_bound,

@@ -76,18 +76,10 @@ class PredictorArgument:
         default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
-    quant_type: str = field(default="", metadata={"help": "Quantization type. Supported values: A8W8, WINT4, WINT8"})
-    quant_round_type: int = field(
-        default=0,
-        metadata={
-            "help": "The quant round type, 0:-rounding to nearest ties to even， 1: -rounding to nearest ties away from zero"
-        },
+    quant_type: str = field(
+        default="", metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"}
     )
-    quant_max_bound: float = field(default=127.0, metadata={"help": "The max bound of float type to int type"})
-    quant_min_bound: float = field(default=-127.0, metadata={"help": "The min bound of float type to int type"})
-    shift_smooth: bool = field(
-        default=False, metadata={"help": "Whether to apply shift and smooth in ptq, valid when quant_type is A8W8"}
-    )
+
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     benchmark: bool = field(
         default=False,
@@ -724,16 +716,20 @@ def create_predictor(
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
             config.tensor_parallel_degree = tensor_parallel_degree
             config.tensor_parallel_rank = tensor_parallel_rank
-            config.quant_bits = -1
+            config.weight_only_quant_bits = -1
 
             if predictor_args.quant_type.startswith("weight_only_int"):
-                quant_bits = int(predictor_args.quant_type[-1])
-                config.quant_bits = quant_bits
+                weight_only_quant_bits = int(predictor_args.quant_type[-1])
+                config.weight_only_quant_bits = weight_only_quant_bits
+                config.quant_type = predictor_args.quant_type
 
-            config.quant_bits = -1
-            if predictor_args.quant_type.startswith("weight_only_int"):
-                quant_bits = int(predictor_args.quant_type[-1])
-                config.quant_bits = quant_bits
+            if "a8w8" in config.quant_config["quant_algo"]:
+                config.model_name_or_path = predictor_args.model_name_or_path
+                config.quant_type = config.quant_config["quant_algo"]
+
+                # Turn on GEMM int8 kernel tuning
+                paddle.base.core.enable_autotune()
+                paddle.base.core.update_autotune_status()
 
             if "llama" in config.architectures[0].lower():
                 if model_args.model_type == "llama-img2txt":
@@ -745,19 +741,6 @@ def create_predictor(
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMInferenceModel as LlamaInferenceModel,
                     )
-
-                    config.quant_bits = -1
-                    config.quant_type = predictor_args.quant_type
-
-                    if predictor_args.quant_type.startswith("WINT"):
-                        quant_bits = int(predictor_args.quant_type[-1])
-                        config.quant_bits = quant_bits
-                    elif "A8W8" in predictor_args.quant_type:
-                        config.model_name_or_path = predictor_args.model_name_or_path
-                        config.quant_round_type = predictor_args.quant_round_type
-                        config.quant_max_bound = predictor_args.quant_max_bound
-                        config.quant_min_bound = predictor_args.quant_min_bound
-                        config.shift_smooth = predictor_args.shift_smooth
                 model = LlamaInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
@@ -951,18 +934,15 @@ def benchmark(predictor, predictor_args, model_args):
     print("Avg Elapse time is: ", (end - start) / test_time)
     print("Output tokens is: ", output_tokens)
     print(
-        "Input length is: {}, Output length is: {}, bs is: {}, Generate speed is: {:.3f} tokens/s(ips), time: {}, QPS: {:.3f} requests/s. ".format(
+        "Input length is: {}, Output length is: {}, bs is: {}, IPS: {:.3f} tokens/s, QPS: {:.3f} requests/s. ".format(
             predictor_args.src_length,
             predictor_args.max_length,
             predictor_args.batch_size,
-            (output_tokens / (end - start) / test_time),
-            (end - start) / test_time,
-            (predictor_args.batch_size / (end - start) / test_time),
+            (output_tokens / (end - start)),
+            (predictor_args.batch_size * test_time / (end - start)),
         )
     )
 
 
 if __name__ == "__main__":
-    paddle.base.core.enable_autotune()
-    paddle.base.core.update_autotune_status()
     predict()

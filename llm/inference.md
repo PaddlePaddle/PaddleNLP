@@ -153,16 +153,15 @@ python predictor.py \
 
 ## PTQ Int8 推理
 
-这一步依赖PTQ校准产出的量化模型，相比Weight Only Int8/4 推理`quant_type`参数须设置为`A8W8`。
+这一步依赖PTQ校准产出的量化模型，无须额外设置相关参数。
 ### 动态图推理
 ```shell
 python predictor.py \
-    --model_name_or_path checkpoints/llama_ptq_ckpts \
+    --model_name_or_path checkpoints/llama_ptq_ckpts_smooth \
     --dtype float16 \
     --max_length 1024 \
     --mode "dynamic" \
-    --inference_model \
-    --quant_type "A8W8"
+    --inference_model
 ```
 
 
@@ -173,11 +172,10 @@ python predictor.py \
 
 ```shell
 python export_model.py \
-    --model_name_or_path checkpoints/llama_ptq_ckpts \
+    --model_name_or_path checkpoints/llama_ptq_ckpts_smooth \
     --output_path ./inference_ptq \
     --dtype float16 \
-    --inference_model \
-    --quant_type "A8W8"
+    --inference_model
 ```
 
 * 静态图推理
