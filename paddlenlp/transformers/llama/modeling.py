@@ -1253,7 +1253,7 @@ class LlamaModel(LlamaPretrainedModel):
         )  # [bs, 1, seq_len, seq_len]
         if self.config.use_flash_attention:
             is_casual = is_casual_mask(attention_mask)
-            if is_casual:
+            if is_casual and alibi is None:
                 attention_mask = None
         hidden_states = inputs_embeds
 
