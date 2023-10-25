@@ -43,6 +43,7 @@ from paddlenlp.generation.logits_process import (
     MinLengthLogitsProcessor,
     NoBadWordsLogitsProcessor,
     NoRepeatNGramLogitsProcessor,
+    PrefixConstrainedLogitsProcessor,
     RepetitionPenaltyLogitsProcessor,
     SequenceBiasLogitsProcessor,
     TemperatureLogitsWarper,
@@ -363,3 +364,24 @@ class LogitsProcessorTest(unittest.TestCase):
         no_bad_words_dist_proc = NoBadWordsLogitsProcessor(bad_words_ids=[[4]], eos_token_id=eos_token_id)
         filtered_scores = no_bad_words_dist_proc(input_ids, scores.clone())
         self.assertTrue(paddle.allclose(scores, filtered_scores, atol=1e-3).numpy())
+
+    def test_prefix_constrained_logits_processor(self):
+        vocab_size = 5
+        batch_size = 2
+
+        input_ids = paddle.to_tensor([[0, 1, 3, 1], [0, 1, 0, 1]])
+        scores = self._get_uniform_logits(batch_size, vocab_size)
+
+        def prefix_allowed_tokens_fn(batch_id, inputs_ids):
+            return [[0, 1], [2, 3]][batch_id]
+
+        prefix_constrained_logits_proc = PrefixConstrainedLogitsProcessor(prefix_allowed_tokens_fn, 1)
+
+        filtered_scores = prefix_constrained_logits_proc(input_ids, scores.clone())
+
+        # batch 1: 1st, 2nd (0, 1) token are allowed
+        # batch 2: 3rd, 4th (2, 3) token are allowed
+        self.assertListEqual(
+            (filtered_scores == paddle.finfo(filtered_scores.dtype).min).tolist(),
+            [[False, False, True, True, True], [True, True, False, False, True]],
+        )

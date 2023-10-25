@@ -16,6 +16,7 @@
 # This file is modified from
 #  https://github.com/huggingface/transformers/blob/main/src/transformers
 
+import os
 from typing import Any, Optional
 
 import numpy as np
@@ -124,3 +125,50 @@ def nested_truncate(tensors, limit):
     if isinstance(tensors, (list, tuple)):
         return type(tensors)(nested_truncate(t, limit) for t in tensors)
     return tensors[:limit]
+
+
+def distributed_isfile(filename):
+    """Check all machine nodes. return False if no machine have such file."""
+    trainers_num = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
+    if trainers_num <= 1:
+        return os.path.isfile(filename)
+    else:
+        local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+        file_count = paddle.zeros([1], dtype="int64")
+        if local_rank == 0 and os.path.isfile(filename):
+            file_count += 1
+
+        paddle.distributed.all_reduce(file_count)
+        return file_count >= 1
+
+
+def distributed_file(filename):
+    trainers_num = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
+    if trainers_num <= 1:
+        return filename
+    else:
+        local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+        found_file = paddle.to_tensor([2**20], dtype="int64")
+        if local_rank == 0 and os.path.isfile(filename):
+            found_file = paddle.to_tensor([paddle.distributed.get_rank()], dtype="int64")
+
+        tensor_list = []
+        paddle.distributed.all_gather(tensor_list, found_file)
+        src = paddle.min(paddle.concat(tensor_list)).item()
+
+        file_object_list = [None]
+        if paddle.distributed.get_rank() == src:
+            file_object_list = [open(filename, "rb").read()]
+
+        paddle.distributed.broadcast_object_list(file_object_list, src=src)
+        file_object = file_object_list[0]
+
+        if local_rank == 0 and not os.path.isfile(filename):
+            if not os.path.exists(os.path.dirname(filename)):
+                os.makedirs(os.path.dirname(filename))
+
+            with open(filename, "wb") as f:
+                f.write(file_object)
+
+        paddle.distributed.barrier()
+        return filename

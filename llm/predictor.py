@@ -405,7 +405,7 @@ class InferencePredictorMixin:
             pre_caches_length=pre_caches_length,
         )
 
-        if "chatglm" in self.architectures:
+        if "chatglmforcausallm" == self.architectures.lower():
             if inputs["input_ids"].shape[0] < self.config.batch_size:
                 self.tgt_pos = self.tgt_pos[: inputs["input_ids"].shape[0]]
             for i in range(inputs["input_ids"].shape[0]):
@@ -451,7 +451,7 @@ class InferencePredictorMixin:
                         paddle.ones(shape=(length, length), dtype=self.config.dtype)
                     ).unsqueeze_(axis=0)
 
-                    self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
+                    self.attention_mask[i, :, :length, : length + pre_caches_length] = paddle.concat(
                         [prefix_attention_mask, post_attention_mask], axis=2
                     )
                 self.arange_tensor_encoder[i, :, : length + pre_caches_length] = paddle.arange(
@@ -586,6 +586,10 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
 
         config.switch_ir_optim(True)
+        # remove `gpu_cpu_map_matmul_v2_to_matmul_pass` to avoid mapping matmul_v2 -> matmul op
+        if predictor_args.dtype == "bfloat16":
+            config.delete_pass("gpu_cpu_map_matmul_v2_to_matmul_pass")
+
         device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
         config.enable_use_gpu(100, device_id)
         # config.disable_glog_info()
@@ -720,6 +724,16 @@ def create_predictor(
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
             config.tensor_parallel_degree = tensor_parallel_degree
             config.tensor_parallel_rank = tensor_parallel_rank
+            config.quant_bits = -1
+
+            if predictor_args.quant_type.startswith("weight_only_int"):
+                quant_bits = int(predictor_args.quant_type[-1])
+                config.quant_bits = quant_bits
+
+            config.quant_bits = -1
+            if predictor_args.quant_type.startswith("weight_only_int"):
+                quant_bits = int(predictor_args.quant_type[-1])
+                config.quant_bits = quant_bits
 
             if "llama" in config.architectures[0].lower():
                 if model_args.model_type == "llama-img2txt":
@@ -744,7 +758,6 @@ def create_predictor(
                         config.quant_max_bound = predictor_args.quant_max_bound
                         config.quant_min_bound = predictor_args.quant_min_bound
                         config.shift_smooth = predictor_args.shift_smooth
-
                 model = LlamaInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
@@ -765,7 +778,17 @@ def create_predictor(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
                 model.eval()
-            elif "chatglm" in config.architectures[0].lower():
+
+            elif "chatglmv2forcausallm" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    ChatGLMv2ForCausalLMInferenceModel as Model,
+                )
+
+                model = Model.from_pretrained(
+                    predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
+                )
+                model.eval()
+            elif "chatglmforcausallm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     ChatGLMForCausalLMInferenceModel,
                 )

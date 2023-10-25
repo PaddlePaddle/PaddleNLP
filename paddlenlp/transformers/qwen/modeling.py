@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import math
+import warnings
 from functools import partial
 from typing import List
 
@@ -22,6 +23,7 @@ import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
+from paddle.utils import try_import
 
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPast,
@@ -34,7 +36,22 @@ from ...utils.converter import StateDictNameMapping, init_name_mappings
 from ..model_outputs import ModelOutput
 from .configuration import QWenConfig
 
+__all__ = [
+    "QWenBlock",
+    "QWenForCausalLM",
+    "QWenPretrainedModel",
+    "QWenModel",
+    "QWenLMHead",
+    "QWenPretrainingCriterion",
+]
+
+
 MAX_NTK_SEQ_LENGTH = 32768
+
+try:
+    from paddle.nn.functional.flash_attention import flash_attention
+except:
+    flash_attention = None
 
 
 def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
@@ -62,10 +79,24 @@ def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
         return logits
 
 
+def get_triangle_upper_mask(x, mask=None):
+    if mask is not None:
+        return mask
+    # [bsz, n_head, q_len, kv_seq_len]
+    shape = x.shape
+    #  [bsz, 1, q_len, kv_seq_len]
+    shape[1] = 1
+    mask = paddle.full(shape, paddle.finfo(x.dtype).min, dtype=x.dtype)
+    mask = paddle.triu(mask, diagonal=1)
+    mask.stop_gradient = True
+    return mask
+
+
 class QWenAttention(nn.Layer):
     def __init__(self, config):
         super().__init__()
 
+        self.config = config
         self.seq_length = config.seq_length
 
         self.hidden_size = config.hidden_size
@@ -119,22 +150,49 @@ class QWenAttention(nn.Layer):
         self.attn_dropout = nn.Dropout(config.attn_dropout_prob)
 
     def _attn(self, query, key, value, attention_mask=None):
-        attn_weights = paddle.matmul(query, key.transpose([0, 1, 3, 2]))
+        # Support the flash attention and normal attention
+        bsz, q_len, num_heads, head_dim = query.shape
+        _, kv_seq_len, _, _ = value.shape
 
-        if self.scale_attn_weights:
-            attn_weights = attn_weights * self.inv_norm_factor
+        if self.config.use_flash_attention and flash_attention is not None:
+            # Flash Attention now ignore attention mask
+            # Current Flash Attention doesn't support attn maskt
+            # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
+            # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
+            attn_output, attn_weights = flash_attention(
+                query,
+                key,
+                value,
+                causal=query.shape[1] != 1,
+                dropout=self.config.attn_dropout_prob,
+                return_softmax=self.config.attn_dropout_prob > 0.0,
+            )
+            return attn_output, attn_weights
+        else:
+            # [bz, sql, nh, hid] ==> [bz, nh, sql hdim]
+            query = query.transpose([0, 2, 1, 3])
+            # [bz, sql, nh, hid] ==> [bz, nh, sql hdim]
+            key = key.transpose([0, 2, 1, 3])
+            # [bz, sql, nh, hid] ==> [bz, nh, sql hdim]
+            value = value.transpose([0, 2, 1, 3])
 
-        attn_weights = attn_weights + attention_mask
+            attn_weights = paddle.matmul(query / math.sqrt(head_dim), key.transpose([0, 1, 3, 2]))
 
-        attn_weights = nn.functional.softmax(attn_weights, axis=-1)
+            if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
+                raise ValueError(
+                    f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
+                    f" {attn_weights.shape}"
+                )
+            # If the attention mask is None, we need to construct the causal attention mask
+            if attention_mask is None:
+                attention_mask = get_triangle_upper_mask(attn_weights)
+            attn_weights = attn_weights + attention_mask
+            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(value.dtype)
 
-        attn_weights = attn_weights.astype(value.dtype)
-        attn_weights = self.attn_dropout(attn_weights)
-
-        attn_output = paddle.matmul(attn_weights, value)
-        attn_output = attn_output.transpose([0, 2, 1, 3])
-
-        return attn_output, attn_weights
+            attn_weights = self.attn_dropout(attn_weights)
+            attn_output = paddle.matmul(attn_weights, value)
+            attn_output = attn_output.transpose([0, 2, 1, 3])
+            return attn_output, attn_weights
 
     def _split_heads(self, tensor, num_heads, attn_head_size):
         new_shape = tensor.shape[:-1] + [num_heads, attn_head_size]
@@ -213,9 +271,6 @@ class QWenAttention(nn.Layer):
             logn_tensor = self.logn_tensor[:, seq_start:seq_end, :, :]
             query = query * logn_tensor.expand(query.shape)
 
-        query = query.transpose([0, 2, 1, 3])
-        key = key.transpose([0, 2, 1, 3])
-        value = value.transpose([0, 2, 1, 3])
         attn_output, attn_weight = self._attn(query, key, value, attention_mask)
         context_layer = self._merge_heads(attn_output, self.num_heads, self.head_dim)
 
@@ -269,17 +324,9 @@ class QWenMLP(nn.Layer):
 class QWenBlock(nn.Layer):
     def __init__(self, config):
         super().__init__()
-        hidden_size = config.hidden_size
-
-        self.ln_1 = RMSNorm(
-            hidden_size,
-            eps=config.layer_norm_epsilon,
-        )
+        self.ln_1 = QWenRMSNorm(config)
         self.attn = QWenAttention(config)
-        self.ln_2 = RMSNorm(
-            hidden_size,
-            eps=config.layer_norm_epsilon,
-        )
+        self.ln_2 = QWenRMSNorm(config)
 
         self.mlp = QWenMLP(config)
 
@@ -320,10 +367,14 @@ class QWenBlock(nn.Layer):
         else:
             outputs = (hidden_states,) + outputs[1:]
 
+        # remove empty tuple for pipeline parallel
+        if type(outputs) is tuple and len(outputs) == 1:
+            outputs = outputs[0]
+
         return outputs
 
 
-class QWenPreTrainedModel(PretrainedModel):
+class QWenPretrainedModel(PretrainedModel):
     config_class = QWenConfig
     base_model_prefix = "qwen"
 
@@ -468,7 +519,7 @@ class QWenPreTrainedModel(PretrainedModel):
                 )
 
 
-class QWenModel(QWenPreTrainedModel):
+class QWenModel(QWenPretrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.config = config
@@ -494,10 +545,7 @@ class QWenModel(QWenPreTrainedModel):
                 for i in range(config.num_hidden_layers)
             ]
         )
-        self.ln_f = RMSNorm(
-            self.embed_dim,
-            eps=config.layer_norm_epsilon,
-        )
+        self.ln_f = QWenRMSNorm(config)
 
     def get_input_embeddings(self):
         return self.wte
@@ -652,7 +700,11 @@ class QWenModel(QWenPreTrainedModel):
                     output_attentions=output_attentions,
                 )
 
-            hidden_states = outputs[0]
+            if type(outputs) is tuple:
+                hidden_states = outputs[0]
+            else:
+                hidden_states = outputs
+
             if use_cache is True:
                 presents = presents + (outputs[2 if output_attentions else 1],)
 
@@ -702,13 +754,49 @@ class QWenLMHead(nn.Layer):
         return logits
 
 
-class QWenForCausalLM(QWenPreTrainedModel):
+class QWenPretrainingCriterion(paddle.nn.Layer):
+    """
+    Criterion for Llama.
+    It calculates the final loss.
+    """
+
+    def __init__(self, config):
+
+        super(QWenPretrainingCriterion, self).__init__()
+        self.ignore_index = getattr(config, "ignore_index", -100)
+        self.config = config
+        self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
+
+        if self.enable_parallel_cross_entropy:  # and False: # and lm_head is distributed
+            self.loss_func = mpu.ParallelCrossEntropy(ignore_index=self.ignore_index)
+        else:
+            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
+
+    def forward(self, prediction_scores, masked_lm_labels):
+        if self.enable_parallel_cross_entropy:
+            if prediction_scores.shape[-1] == self.config.vocab_size:
+                warnings.warn(
+                    f"enable_parallel_cross_entropy, the vocab_size should be splited: {prediction_scores.shape[-1]}, {self.config.vocab_size}"
+                )
+                self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
+
+        with paddle.amp.auto_cast(False):
+            masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
+            # skip ignore_index which loss == 0
+            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
+            loss = paddle.mean(masked_lm_loss)
+
+        return loss
+
+
+class QWenForCausalLM(QWenPretrainedModel):
     _keys_to_ignore_on_load_missing = [r"h\.\d+\.attn\.rotary_emb\.inv_freq"]
 
     def __init__(self, config):
         super().__init__(config)
         self.qwen = QWenModel(config)
         self.lm_head = QWenLMHead(config)
+        self.criterion = QWenPretrainingCriterion(config)
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -802,12 +890,24 @@ class QWenForCausalLM(QWenPreTrainedModel):
         )
         hidden_states = transformer_outputs[0]
 
-        lm_logits = self.lm_head(hidden_states)
+        # if labels is None，means we need full output, instead of tensor_parallel_output
+        # tensor_parallel_output is togather with ParallelCrossEntropy
+        tensor_parallel_output = (
+            self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
+        )
+
+        lm_logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
 
         loss = None
         if labels is not None:
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(lm_logits, labels)
+            loss = self.criterion(lm_logits, labels)
+
+        # lm_logits = self.lm_head(hidden_states)
+
+        # loss = None
+        # if labels is not None:
+        #     loss_fct = nn.CrossEntropyLoss()
+        #     loss = loss_fct(lm_logits, labels)
 
         if not return_dict:
             output = (lm_logits,) + transformer_outputs[1:]
@@ -866,12 +966,19 @@ def apply_rotary_pos_emb(t, freqs):
     return paddle.concat([t_, t_pass_], axis=-1).astype(t.dtype)
 
 
-class RMSNorm(nn.Layer):
-    def __init__(self, dim: int, eps: float = 1e-6):
+def rms_norm_fused(x_in, w, eps):
+    fused_ln = try_import("fused_ln")
+    return fused_ln.fused_rms_norm(x_in, w, eps)[0]
+
+
+class QWenRMSNorm(nn.Layer):
+    def __init__(self, config):
         super().__init__()
-        self.eps = eps
+        self.config = config
+
+        self.eps = config.layer_norm_epsilon
         self.weight = paddle.create_parameter(
-            shape=[dim],
+            shape=[config.hidden_size],
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(1.0),
         )
@@ -880,5 +987,8 @@ class RMSNorm(nn.Layer):
         return x * paddle.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
 
     def forward(self, x):
+        if self.config.use_fused_rms_norm:
+            return rms_norm_fused(x, self.weight, self.eps)
+
         output = self._norm(x.astype(paddle.float32)).astype(x.dtype)
         return output * self.weight
