@@ -24,7 +24,7 @@ top_p=${top_p:-"0.0"}
 benchmark=${benchmark:-"0"}
 
 
-common_arguments="--decode_strategy ${decode_strategy} --src_length 512 --max_length 512 --dtype ${dtype} --batch_size 1 --prefix_path ${prefix_path} --export_precache ${export_precache}"
+common_arguments="--decode_strategy ${decode_strategy} --src_length 300 --max_length 200 --dtype ${dtype} --batch_size 1 --prefix_path ${prefix_path} --export_precache ${export_precache}"
 if [ $fused_model ]; then
     common_arguments+=" --inference_model "
 fi
