@@ -185,7 +185,7 @@ class ModelArguments:
         default=False,
         metadata={"help": "Enable rope fusion or not."},
     )
-    no_recompute_layers: Optional[List[int]] = field(
+    no_recompute_layers: Optional[List[str]] = field(
         default=None,
         metadata={"help": "Specify the full transformer layers that should not be recomputed."},
     )
@@ -443,6 +443,7 @@ def main():
         logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
 
     if model_args.no_recompute_layers is not None:
+        model_args.no_recompute_layers = parser.parse_integer_list(model_args.no_recompute_layers)
         model_args.no_recompute_layers.sort()
 
     config.use_flash_attention = model_args.use_flash_attention
