@@ -30,7 +30,6 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
-from paddle.utils import try_import
 
 from ...utils.converter import StateDictNameMapping
 from ...utils.log import logger
@@ -152,75 +151,6 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     expanded_mask = mask.expand([batch_size, 1, tgt_length, src_length])
 
     return expanded_mask
-
-
-def rms_norm_fused(x_in, w, eps):
-    fused_ln = try_import("fused_ln")
-    return fused_ln.fused_rms_norm(x_in, w, eps)[0]
-
-
-class GPTRMSNorm(nn.Layer):
-    """Root Mean Square Layer Normalization"""
-
-    def __init__(self, config):
-        super().__init__()
-        self.hidden_size = config.hidden_size
-        self.weight = paddle.create_parameter(
-            shape=[self.hidden_size],
-            dtype=paddle.get_default_dtype(),
-            default_initializer=nn.initializer.Constant(1.0),
-        )
-        self.variance_epsilon = config.rms_norm_eps
-        self.config = config
-
-        if config.sequence_parallel:
-            mark_as_sequence_parallel_parameter(self.weight)
-
-    def forward(self, hidden_states):
-        if self.config.use_fused_rms_norm:
-            return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
-
-        if paddle.in_dynamic_mode():
-            with paddle.amp.auto_cast(False):
-                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
-                hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
-        else:
-            variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
-            hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
-
-        if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
-            hidden_states = paddle.cast(hidden_states, self.weight.dtype)
-        return hidden_states * self.weight
-
-
-class GPTLayerNorm(nn.Layer):
-    """Layer Normalization"""
-
-    def __init__(self, config):
-        super().__init__()
-        self.hidden_size = config.hidden_size
-        self.weight = paddle.create_parameter(
-            shape=[self.hidden_size],
-            dtype=paddle.get_default_dtype(),
-            default_initializer=nn.initializer.Constant(1.0),
-        )
-        self.bias = paddle.create_parameter(
-            shape=[self.hidden_size],
-            dtype=paddle.get_default_dtype(),
-            default_initializer=nn.initializer.Constant(0.0),
-        )
-        self.epsilon = config.layer_norm_eps
-        self.config = config
-
-        if config.sequence_parallel:
-            mark_as_sequence_parallel_parameter(self.weight)
-            mark_as_sequence_parallel_parameter(self.bias)
-
-    def forward(self, hidden_states):
-        hidden_states = F.layer_norm(hidden_states, [self.hidden_size], epsilon=self.epsilon)
-        if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
-            hidden_states = paddle.cast(hidden_states, self.weight.dtype)
-        return hidden_states * self.weight + self.bias
 
 
 class MultiHeadAttention(nn.Layer):
@@ -494,10 +424,12 @@ class TransformerDecoder(nn.Layer):
 
         self.config = config
         self.layers = decoder_layers
+        self.norm = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
+
         if config.sequence_parallel:
-            self.norm = GPTLayerNorm(config)
-        else:
-            self.norm = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
+            mark_as_sequence_parallel_parameter(self.norm.weight)
+            mark_as_sequence_parallel_parameter(self.norm.bias)
+
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
         # Enable_recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
@@ -650,12 +582,13 @@ class GPTDecoderLayer(nn.Layer):
             self.linear1 = nn.Linear(config.hidden_size, config.intermediate_size, bias_attr=True)
             self.linear2 = nn.Linear(config.intermediate_size, config.hidden_size, bias_attr=True)
 
+        self.norm1 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
+        self.norm2 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
         if config.sequence_parallel:
-            self.norm1 = GPTLayerNorm(config)
-            self.norm2 = GPTLayerNorm(config)
-        else:
-            self.norm1 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
-            self.norm2 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
+            mark_as_sequence_parallel_parameter(self.norm1.weight)
+            mark_as_sequence_parallel_parameter(self.norm1.bias)
+            mark_as_sequence_parallel_parameter(self.norm2.weight)
+            mark_as_sequence_parallel_parameter(self.norm2.bias)
 
         if config.use_fused_dropout_add:
             self.fused_dropout_add1 = FusedDropoutAdd(config.attention_probs_dropout_prob, mode="upscale_in_train")
