@@ -83,6 +83,7 @@ class MultiHeadAttention(nn.Layer):
         scale_qk_coeff=1.0,
         use_recompute=False,
         recompute_granularity="full",
+        enable_refined_recompute=True,
         use_flash_attn=False,
         ipp=None,
     ):
@@ -97,6 +98,7 @@ class MultiHeadAttention(nn.Layer):
         self.scale_qk_coeff = scale_qk_coeff
         self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
+        self.enable_refined_recompute = enable_refined_recompute
         self.ipp = ipp
         self.use_flash_attn = use_flash_attn if flash_attention else None
 
@@ -247,14 +249,22 @@ class MultiHeadAttention(nn.Layer):
         value = query if value is None else value
         # compute q ,k ,v
         if self.fuse_attn_qkv:
-            q, k, v, cache = self._fuse_prepare_qkv(query, use_cache, cache)
+            if self.enable_refined_recompute:
+                q, k, v, cache = auto.exclude_ops_in_recompute(self._fuse_prepare_qkv)(query, use_cache, cache)
+            else:
+                q, k, v, cache = self._fuse_prepare_qkv(query, use_cache, cache)
         else:
-            q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
+            if self.enable_refined_recompute:
+                q, k, v, cache = auto.exclude_ops_in_recompute(self._prepare_qkv)(query, key, value, use_cache, cache)
+            else:
+                q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
 
         if self.use_flash_attn and attn_mask is None:
             attn_func = self._flash_attention
         else:
             attn_func = self.core_attn
+        if self.enable_refined_recompute:
+                attn_func = auto.exclude_ops_in_recompute(attn_func)
 
         if self.use_recompute and self.recompute_granularity == "core_attn":
             out, weights = auto.recompute(attn_func)(q, k, v, attn_mask)
@@ -264,7 +274,10 @@ class MultiHeadAttention(nn.Layer):
         auto.shard_tensor(self.out_proj.weight, auto_env.get_mesh()[self.ipp], [auto_env.get_mesh().mp_dim, None])
 
         # project to output
-        out = self.out_proj(out)
+        if self.enable_refined_recompute:
+            out = auto.exclude_ops_in_recompute(self.out_proj)(out)
+        else:
+            out = self.out_proj(out)
 
         outs = [out]
         if self.need_weights:
@@ -369,6 +382,7 @@ class TransformerDecoderLayer(nn.Layer):
         scale_qk_coeff=1.0,
         use_recompute=False,
         recompute_granularity="full",
+        enable_refined_recompute=True,
         use_flash_attn=False,
         use_fused_dropout_add=True,
         ipp=None,
@@ -383,6 +397,7 @@ class TransformerDecoderLayer(nn.Layer):
         self.normalize_before = normalize_before
         self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
+        self.enable_refined_recompute = enable_refined_recompute
         self.ipp = ipp
         if not FusedDropoutAdd:
             self.use_fused_dropout_add = False
@@ -425,11 +440,21 @@ class TransformerDecoderLayer(nn.Layer):
         else:
             self.activation = getattr(F, activation)
 
+    def linear1_func(self, tag):
+        return self.linear1(tag)
+
+    def linear2_func(self, tag):
+        return self.linear2(tag)
+
     def forward(self, tgt, memory, tgt_mask=None, use_cache=False, cache=None):
 
         auto.shard_tensor(self.linear1.weight, auto_env.get_mesh()[self.ipp], [None, auto_env.get_mesh().mp_dim])
         auto.shard_tensor(self.linear2.weight, auto_env.get_mesh()[self.ipp], [auto_env.get_mesh().mp_dim, None])
-
+        
+        if self.enable_refined_recompute:
+            self.linear1_func = auto.exclude_ops_in_recompute(self.linear1_func)
+            self.linear2_func = auto.exclude_ops_in_recompute(self.linear2_func)
+            
         residual = tgt
 
         if self.normalize_before:
@@ -455,10 +480,10 @@ class TransformerDecoderLayer(nn.Layer):
             tgt = self.norm2(tgt)
 
         if not self.use_fused_dropout_add:
-            tgt = self.dropout2(self.linear2(self.activation(self.linear1(tgt))))
+            tgt = self.dropout2(self.linear2_func(self.activation(self.linear1_func(tgt))))
             tgt = residual + tgt
         else:
-            tgt = self.fused_dropout_add2(self.linear2(self.activation(self.linear1(tgt))), residual)
+            tgt = self.fused_dropout_add2(self.linear2_func(self.activation(self.linear1_func(tgt))), residual)
 
         if not self.normalize_before:
             tgt = self.norm2(tgt)
