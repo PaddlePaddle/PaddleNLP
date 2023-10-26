@@ -1634,7 +1634,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 quantization_linear_list = [".".join([prefix, s]) for s in quantization_linear_list]
 
         # Weight quantization if not yet quantized & update loaded_keys
-        if config.quantization_config.is_weight_quantized():
+        if config.quantization_config.is_weight_quantize():
             try:
                 from ..utils.quantization import (
                     convert_to_quantize_state_dict,
@@ -1646,7 +1646,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 state_dict = convert_to_quantize_state_dict(
                     state_dict,
                     quantization_linear_list,
-                    config.quantization_config.quant_algo,
+                    config.quantization_config.weight_quantize_algo,
                     dtype,
                 )
                 loaded_keys = [k for k in state_dict.keys()]
@@ -1741,7 +1741,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 ignore_mismatched_sizes,
             )
 
-            if config.quantization_config.is_weight_quantized():
+            if config.quantization_config.is_weight_quantize():
                 error_msgs = _load_state_dict_into_meta_model(
                     model_to_load,
                     state_dict,
@@ -1781,13 +1781,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 state_dict = load_state_dict(
                     shard_file,
                     tp_actions if pre_tensor_parallel_split else None,
-                    None if config.quantization_config.is_weight_quantized() else set(expected_keys),
+                    None if config.quantization_config.is_weight_quantize() else set(expected_keys),
                 )
-                if config.quantization_config.is_weight_quantized():
+                if config.quantization_config.is_weight_quantize():
                     state_dict = convert_to_quantize_state_dict(
                         state_dict,
                         quantization_linear_list,
-                        config.quantization_config.quant_algo,
+                        config.quantization_config.weight_quantize_algo,
                         dtype,
                     )
 
@@ -1810,7 +1810,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
                     logger.info("Converted state_dict to Tensor Parallel Format")
 
-                if low_cpu_mem_usage or config.quantization_config.is_weight_quantized():
+                if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
                     new_error_msgs = _load_state_dict_into_meta_model(
                         model_to_load,
                         state_dict,
@@ -1983,7 +1983,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if dtype is None:
             dtype = config.dtype
 
-        if config.quantization_config.is_weight_quantized():
+        if config.quantization_config.is_weight_quantize():
             try:
                 from ..utils.quantization import replace_with_quantization_linear
             except ImportError:
@@ -1997,7 +1997,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config.dtype = dtype
 
         init_contexts = []
-        if low_cpu_mem_usage or config.quantization_config.is_weight_quantized():
+        if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
             # Instantiate model.
             init_contexts.append(no_init_weights(_enable=True))
             if is_paddle_support_lazy_init():
@@ -2007,7 +2007,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             init_contexts.append(dtype_guard(dtype))
 
         # Quantization method requires empty init to avoid unnecessary GPU allocation
-        if config.quantization_config.is_weight_quantized():
+        if config.quantization_config.is_weight_quantize():
             quantization_init_contexts = []
             quantization_init_contexts.append(no_init_weights(_enable=True))
             if is_paddle_support_lazy_init():
@@ -2090,10 +2090,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             keep_in_fp32_modules = []
 
         quantization_linear_list = None
-        if config.quantization_config.is_weight_quantized():
+        if config.quantization_config.is_weight_quantize():
             with ContextManagers(quantization_init_contexts):
                 quantization_linear_list = replace_with_quantization_linear(
-                    model, **config.quantization_config.to_dict()
+                    model=model,
+                    quant_algo=config.quantization_config.weight_quantize_algo,
+                    llm_int8_threshold=config.quantization_config.llm_int8_threshold,
                 )
 
         model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
@@ -2204,7 +2206,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if config_to_save.tensor_parallel_degree > 1:
                 if not config_to_save.quantization_config.is_support_merge_tensor_parallel() and merge_tensor_parallel:
                     logger.warning(
-                        f"Quantization strategy: {config_to_save.quantization_config.quant_algo} does not support merge tensor parallel, thus we set merge_tensor_parallel to False."
+                        f"Quantization strategy: {config_to_save.quantization_config.weight_quantize_algo} does not support merge tensor parallel, thus we set merge_tensor_parallel to False."
                     )
                     merge_tensor_parallel = False
                 if merge_tensor_parallel:

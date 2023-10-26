@@ -65,9 +65,9 @@ class ModelArgument:
 
 @dataclass
 class QuantArgument:
-    quant_algo: str = field(
+    quant_type: str = field(
         default="a8w8",
-        metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4,weight_only_int8"},
+        metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"},
     )
 
     # QAT related parameters
