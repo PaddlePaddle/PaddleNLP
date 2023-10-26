@@ -817,8 +817,7 @@ class PretrainedConfig:
                 f"You are using a model of type {config_dict['model_type']} to instantiate a model of type "
                 f"{cls.model_type}. This is not supported for all configurations of models and can yield errors."
             )
-        if "quantization_config" in config_dict:
-            config_dict["quantization_config"] = QuantizationConfig.from_dict(config_dict["quantization_config"])
+
         config = cls(**config_dict)
 
         if hasattr(config, "pruned_heads"):
