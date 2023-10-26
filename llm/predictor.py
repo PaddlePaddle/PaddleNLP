@@ -300,12 +300,12 @@ class InferencePredictorMixin:
             )
         else:
             self.attention_mask = paddle.zeros(
-                shape=(1, 1, config.max_length, config.max_length),
+                shape=(config.batch_size, 1, config.max_length, config.max_length),
                 dtype=self.dtype,
             )
 
         self.tgt_generation_mask = paddle.ones(
-            shape=[1, 1, config.max_length, config.max_length],
+            shape=[config.batch_size, 1, config.max_length, config.max_length],
             dtype=self.dtype,
         )
         self.arange_tensor_encoder = paddle.zeros(shape=(config.batch_size, 1, total_max_length), dtype=self.dtype)
@@ -426,7 +426,7 @@ class InferencePredictorMixin:
 
         else:
             pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
-            inputs = dybatch_preprocess(
+            inputs, pad_lens = dybatch_preprocess(
                 self.tokenizer,
                 source,
                 self.config.max_length,
@@ -434,13 +434,19 @@ class InferencePredictorMixin:
                 top_p=self.config.top_p,
                 temperature=self.config.temperature,
                 pre_caches_length=pre_caches_length,
+                return_pad_len=True
             )
 
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
-            self.attention_mask[0, 0, :length, :length] = paddle.tril(
-                paddle.ones(shape=(length, length), dtype=self.config.dtype)
-            )
+                pad_len = pad_lens[i]
+                padding_mask = paddle.tril(paddle.ones(shape=(length, length), dtype=self.config.dtype))
+                padding_mask[ :, length - pad_len : length] = paddle.zeros(shape=[pad_len], dtype=self.config.dtype)
+
+                self.attention_mask[i, 0, :length, :length] = padding_mask
+
+                self.tgt_generation_mask[i, 0, :, length - pad_len : length] = paddle.zeros(
+                    shape=[pad_len], dtype=self.config.dtype)
 
                 # if pre_caches_length > 0:
                 #     if self.config.prefix_path is None:

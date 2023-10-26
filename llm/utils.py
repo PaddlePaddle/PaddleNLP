@@ -367,7 +367,7 @@ def get_alibi_slopes(num_heads):
     return slopes.astype("float32")
 
 
-def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
+def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right", return_pad_len=False):
     """Pad sequences to the max sequence length in batch."""
     max_len = max(map(len, insts))
     if pad_style == "left":
@@ -376,10 +376,15 @@ def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
         inst_data = np.array([list(inst) + [pad_id] * (max_len - len(inst)) for inst in insts])
 
     if return_seq_len:
-        seq_len = np.array([len(inst) for inst in insts])
-        return inst_data.astype("int64").reshape([-1, max_len]), seq_len
+          if return_pad_len:
+              seq_len = np.array([len(inst) for inst in inst_data]) # 返回pad之后的长度
+              before_pad_len =  np.array([len(inst) for inst in insts])
+              return inst_data.astype("int64").reshape([-1, max_len]), seq_len, (seq_len - before_pad_len)
+          else:
+              seq_len = np.array([len(inst) for inst in insts]) # 返回pad之前的长度
+              return inst_data.astype("int64").reshape([-1, max_len]), seq_len
     else:
-        return inst_data.astype("int64").reshape([-1, max_len])
+          return inst_data.astype("int64").reshape([-1, max_len])
 
 
 def dybatch_preprocess(
@@ -391,6 +396,7 @@ def dybatch_preprocess(
     temperature: float,
     pre_caches_length: int = 0,
     benchmark: bool = False,
+    return_pad_len = False,
 ):
     """Pre-process generation inputs."""
     if "chatglm" in architectures:
@@ -430,7 +436,7 @@ def dybatch_preprocess(
 
         inputs = {}
         pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][-1]
-        inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
+        inputs["input_ids"], seq_len, pad_lens = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True, return_pad_len=True)
         bs = inputs["input_ids"].shape[0]
         max_len = max(map(len, input_ids))
 
@@ -538,7 +544,10 @@ def dybatch_preprocess(
         .reshape((-1, 1))
     )
     inputs["stop_nums"] = np.array([bs]).astype("int64")
-    return inputs
+    if return_pad_len:
+      return inputs, pad_lens
+    else:
+      return inputs
 
 
 def load_real_time_tokens():
