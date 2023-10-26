@@ -25,12 +25,22 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-from datasets.preference import PreferenceDataset
+from data.preference import PreferenceDataset
 from reward_trainer import RewardTrainer
 
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
-from paddlenlp.transformers import AutoConfig, AutoTokenizer, LlamaModelForScore
+from paddlenlp.transformers import (
+    AutoConfig,
+    AutoTokenizer,
+    LlamaModelForScore,
+    LlamaTokenizer,
+)
 from paddlenlp.utils.log import logger
+
+# launch would unset http_proxy
+# export https_proxy=http://172.19.57.45:3128
+os.environ["http_proxy"] = "http://172.19.57.45:3128"
+os.environ["https_proxy"] = "http://172.19.57.45:3128"
 
 
 @dataclass
@@ -41,6 +51,11 @@ class TrainingArguments(TrainingArguments):
             "help": "Calculate ranking loss with all token-wise reward outputs in the sequence or the "
             "sequence-wise reward output only (the reward of the last token in each sequence)."
         },
+    )
+    # regularization
+    regularization: float = field(
+        default=0.0,
+        metadata={"help": "The regularization strength for the L2 regularization for score outputs."},
     )
 
 
@@ -147,12 +162,12 @@ class DataArgument:
     @property
     def parsed_train_datasets(self) -> tuple[str, dict[str, Any]]:
         """Parse dataset path and its proportion and optionally additional arguments from `train_datasets`."""
-        return self.parse_dataset(self.train_datasets)
+        return [self.parse_dataset(string) for string in self.train_datasets.split(",")]
 
     @property
     def parsed_eval_datasets(self) -> tuple[str, dict[str, Any]]:
         """Parse dataset path and its proportion and optionally additional arguments from `eval_datasets`."""
-        return self.parse_dataset(self.eval_datasets)
+        return [self.parse_dataset(string) for string in self.eval_datasets.split(",")]
 
 
 def main():
@@ -216,6 +231,10 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.model_name_or_path, model_max_length=data_args.max_length, padding_side="right"
     )
+    if isinstance(tokenizer, LlamaTokenizer):
+        # tokenizer.pad_token_id = tokenizer.eos_token_id
+        # to be consistent with PKU-Alignment/alpaca-7b-reproduced
+        tokenizer.pad_token_id = 32000  # tokenizer.eos_token_id
 
     train_ds = PreferenceDataset(data_args.parsed_train_datasets, tokenizer=tokenizer)
 

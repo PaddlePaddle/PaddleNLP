@@ -24,9 +24,6 @@ from typing_extensions import TypedDict  # Python 3.10+
 
 from .base import CollatorBase, RawSample, TokenizedDataset
 
-# from safe_rlhf.datasets.utils import format_prompt, right_padding
-
-
 __all__ = [
     "PreferenceDataset",
     "PreferenceCollator",
@@ -128,7 +125,7 @@ class PreferenceCollator(CollatorBase):
         input_ids = [sample["better_input_ids"] for sample in samples] + [
             sample["worse_input_ids"] for sample in samples
         ]  # size = (2 * B, L)
-        attention_mask = [np.ones(input_id.shape, dtype=np.bool) for input_id in input_ids]  # size = (2 * B, L)
+        attention_mask = [np.ones(input_id.shape, dtype=bool) for input_id in input_ids]  # size = (2 * B, L)
 
         input_ids = right_padding(input_ids, padding_value=self.pad_token_id)  # size = (2 * B, L)
         attention_mask = right_padding(attention_mask, padding_value=0)  # size = (2 * B, L)

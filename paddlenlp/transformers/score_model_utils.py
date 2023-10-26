@@ -162,7 +162,7 @@ class ScoreModelMixin:
         return_dict: bool | None = None,
     ) -> ScoreModelOutput:
         """Forward pass of the score model."""
-        print("=" * 20, hidden_state)
+        # print("=" * 20, hidden_state)
         scores = self.score_head(hidden_state)  # size = (B, L, D)
 
         end_score = []

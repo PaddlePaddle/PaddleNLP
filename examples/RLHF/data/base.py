@@ -22,7 +22,7 @@ import copy
 import os
 import warnings
 from fractions import Fraction
-from typing import Any, Callable, ClassVar, Collection, Dict, Iterable, Iterator, List
+from typing import Any, Callable, ClassVar, Collection, Iterable, Iterator, List
 from weakref import WeakValueDictionary
 
 import numpy as np
@@ -170,7 +170,7 @@ class RawSample(TypedDict, total=False):
     """Whether ``other_answer`` is safe."""
 
 
-class RawDataset(Dataset[RawSample]):
+class RawDataset(Dataset):
     """Dataset that provides raw text samples."""
 
     NAME: ClassVar[str]
@@ -255,7 +255,7 @@ class RawDataset(Dataset[RawSample]):
         return train_dataset, test_dataset
 
 
-class TokenizedDataset(Dataset[Dict[str, paddle.Tensor]]):
+class TokenizedDataset(Dataset):
     """Dataset that provides tokenized samples."""
 
     raw_datasets: list[RawDataset]

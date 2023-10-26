@@ -12,13 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict
-
 import paddle
 import paddle.nn.functional as F
 
+import paddlenlp.trainer.trainer as trainer
 from paddlenlp.trainer import Trainer
 from paddlenlp.transformers.score_model_utils import ScoreModelOutput
+
+_tr_acc = None
+
+speed_metrics = trainer.speed_metrics
+
+
+def patch_speed_metrics(split, start_time, num_samples=None, num_steps=None):
+    # split: interval, train, eval, test
+    result = speed_metrics(split, start_time, num_samples, num_steps)
+    # accuracy
+    global _tr_acc
+    tr_acc, total_acc_scalar, nested_gather = _tr_acc
+    tr_acc_scalar = nested_gather(tr_acc).mean().item()
+    total_acc_scalar += tr_acc_scalar
+    tr_acc.subtract_(tr_acc)
+    _tr_acc[1] = total_acc_scalar
+    result["accuracy"] = round(tr_acc_scalar / num_steps, 8)
+    if split == "train":
+        result["train_accuracy"] = round(total_acc_scalar / num_steps, 8)
+    return result
+
+
+trainer.speed_metrics = patch_speed_metrics
 
 
 class RewardTrainer(Trainer):
@@ -46,7 +68,7 @@ class RewardTrainer(Trainer):
             scores, end_scores = output
 
         # size = (B, L)
-        higher_rewards, lower_rewards = scores.squeeze(dim=-1).chunk(chunks=2, axis=0)
+        higher_rewards, lower_rewards = scores.squeeze(axis=-1).chunk(chunks=2, axis=0)
         # size = (B,)
         higher_end_rewards, lower_end_rewards = end_scores.squeeze(axis=-1).chunk(chunks=2, axis=0)
 
@@ -81,7 +103,7 @@ class RewardTrainer(Trainer):
             # print("=" * 20, "higher_end_rewards:", higher_end_rewards)
             # print("=" * 20, "lower_end_rewards:", lower_end_rewards)
         elif self.args.loss_type == "sequence-wise":
-            loss = -F.logsigmoid(higher_end_rewards - lower_end_rewards).mean()
+            loss = -F.log_sigmoid(higher_end_rewards - lower_end_rewards).mean()
 
             if self.args.regularization > 0.0:
                 loss = loss + self.args.regularization * (
@@ -90,26 +112,18 @@ class RewardTrainer(Trainer):
         else:
             raise ValueError(f"Unknown loss type: {self.args.loss_type}")
 
-        accuracy = (higher_end_rewards > lower_end_rewards).float().mean()  # size = ()
+        accuracy = (higher_end_rewards > lower_end_rewards).cast("float32").mean()  # size = ()
+
         # hack for accuracy track in training
-        self._acc = accuracy.detach()
-        return {
-            "loss": loss,  # size = ()
-            "higher_end_rewards": higher_end_rewards,  # size = (B,)
-            "lower_end_rewards": lower_end_rewards,  # size = (B,)
-            "accuracy": accuracy,  # size = ()
-        }
+        global _tr_acc
+        if _tr_acc is None:
+            _tr_acc = [paddle.to_tensor(0.0), 0.0, self._nested_gather]
+        _tr_acc[0] = _tr_acc[0] + accuracy.detach()
 
-    def log(self, logs: Dict[str, float], **kwargs) -> None:
-        """
-        Log `logs` on the various objects watching training.
-
-        Subclass and override this method to inject custom behavior.
-
-        Args:
-            logs (`Dict[str, float]`):
-                The values to log.
-        """
-        self._total_acc_scalar += self._tr_acc_scalar
-
-        super(RewardTrainer, self).log(logs, **kwargs)
+        # return {
+        #     "loss": loss,  # size = ()
+        #     "higher_end_rewards": higher_end_rewards,  # size = (B,)
+        #     "lower_end_rewards": lower_end_rewards,  # size = (B,)
+        #     "accuracy": accuracy,  # size = ()
+        # }
+        return loss
