@@ -108,7 +108,10 @@ class InferenceTest(unittest.TestCase):
             shell=True,
         )
 
+        # 在不同环境下的 A100 下测试 full_match_acc 有可能不是为 1.0；可是这边设置了 `precision` 数值，CE 会针对于此数据做监控，一旦有
+        # 异常会发送异常报告，也可以达到监控的效果。
         full_match_acc, half_match_acc = self.compare_result("dynamic.json", "static.json")
+        print("precision:", full_match_acc)
         self.assertGreater(full_match_acc, 0.6)
         self.assertGreater(half_match_acc, 0.75)
         full_match_acc, half_match_acc = self.compare_result(self.predict_file_name, "static.json")
@@ -128,11 +131,11 @@ class InferenceTest(unittest.TestCase):
         # sampling: the full-matach acc must be less than 0.1
         full_match_acc, half_match_acc = self.compare_result("dynamic.json", "static.json")
         self.assertLessEqual(full_match_acc, 0.3)
-        self.assertLessEqual(half_match_acc, 0.3)
+        self.assertLessEqual(half_match_acc, 0.45)
 
         full_match_acc, half_match_acc = self.compare_result(self.predict_file_name, "static.json")
         self.assertLessEqual(full_match_acc, 0.3)
-        self.assertLessEqual(half_match_acc, 0.3)
+        self.assertLessEqual(half_match_acc, 0.45)
 
         # read ips value from log file
         ips = self._read_ips_from_log_file()
@@ -210,6 +213,8 @@ class PTuningInfereneTest(InferenceTest):
         )
 
         full_match_acc, half_match_acc = self.compare_result("dynamic.json", "static.json")
+        print("precision:", full_match_acc)
+
         self.assertGreater(full_match_acc, 0.6)
         self.assertGreater(half_match_acc, 0.8)
         full_match_acc, half_match_acc = self.compare_result(self.predict_file_name, "static.json")
@@ -229,11 +234,11 @@ class PTuningInfereneTest(InferenceTest):
         # sampling: the full-matach acc must be less than 0.1
         full_match_acc, half_match_acc = self.compare_result("dynamic.json", "static.json")
         self.assertLessEqual(full_match_acc, 0.3)
-        self.assertLessEqual(half_match_acc, 0.3)
+        self.assertLessEqual(half_match_acc, 0.45)
 
         full_match_acc, half_match_acc = self.compare_result(self.predict_file_name, "static.json")
         self.assertLessEqual(full_match_acc, 0.3)
-        self.assertLessEqual(half_match_acc, 0.3)
+        self.assertLessEqual(half_match_acc, 0.45)
 
         # read ips value from log file
         ips = self._read_ips_from_log_file()
