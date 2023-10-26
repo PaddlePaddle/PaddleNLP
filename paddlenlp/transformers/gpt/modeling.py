@@ -160,6 +160,8 @@ def rms_norm_fused(x_in, w, eps):
 
 
 class GPTRMSNorm(nn.Layer):
+    """Root Mean Square Layer Normalization"""
+
     def __init__(self, config):
         super().__init__()
         self.hidden_size = config.hidden_size
@@ -191,6 +193,36 @@ class GPTRMSNorm(nn.Layer):
         return hidden_states * self.weight
 
 
+class GPTLayerNorm(nn.Layer):
+    """Layer Normalization"""
+
+    def __init__(self, config):
+        super().__init__()
+        self.hidden_size = config.hidden_size
+        self.weight = paddle.create_parameter(
+            shape=[self.hidden_size],
+            dtype=paddle.get_default_dtype(),
+            default_initializer=nn.initializer.Constant(1.0),
+        )
+        self.bias = paddle.create_parameter(
+            shape=[self.hidden_size],
+            dtype=paddle.get_default_dtype(),
+            default_initializer=nn.initializer.Constant(0.0),
+        )
+        self.epsilon = config.layer_norm_eps
+        self.config = config
+
+        if config.sequence_parallel:
+            mark_as_sequence_parallel_parameter(self.weight)
+            mark_as_sequence_parallel_parameter(self.bias)
+
+    def forward(self, hidden_states):
+        hidden_states = F.layer_norm(hidden_states, [self.hidden_size], epsilon=self.epsilon)
+        if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
+            hidden_states = paddle.cast(hidden_states, self.weight.dtype)
+        return hidden_states * self.weight + self.bias
+
+
 class MultiHeadAttention(nn.Layer):
     """
     Attention mapps queries and a set of key-value pairs to outputs, and
@@ -213,7 +245,7 @@ class MultiHeadAttention(nn.Layer):
         self.enable_recompute = False
 
         self.use_flash_attention = config.use_flash_attention if flash_attention else False
-        # self.sequence_parallel = config.sequence_parallel
+
         self.head_dim = config.hidden_size // config.num_attention_heads
         assert (
             self.head_dim * config.num_attention_heads == config.hidden_size
@@ -459,8 +491,10 @@ class TransformerDecoder(nn.Layer):
 
         self.config = config
         self.layers = decoder_layers
-        self.norm = GPTRMSNorm(config)
-
+        if config.sequence_parallel:
+            self.norm = GPTLayerNorm(config)
+        else:
+            self.norm = nn.LayerNorm(config.hidden_size, epsilon=1e-5, weight_attr=True, bias_attr=True)
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
         # Enable_recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
@@ -613,8 +647,12 @@ class GPTDecoderLayer(nn.Layer):
             self.linear1 = nn.Linear(config.hidden_size, config.intermediate_size, bias_attr=True)
             self.linear2 = nn.Linear(config.intermediate_size, config.hidden_size, bias_attr=True)
 
-        self.norm1 = GPTRMSNorm(config)
-        self.norm2 = GPTRMSNorm(config)
+        if config.sequence_parallel:
+            self.norm1 = GPTLayerNorm(config)
+            self.norm2 = GPTLayerNorm(config)
+        else:
+            self.norm1 = nn.LayerNorm(config.hidden_size, epsilon=1e-5, weight_attr=True, bias_attr=True)
+            self.norm2 = nn.LayerNorm(config.hidden_size, epsilon=1e-5, weight_attr=True, bias_attr=True)
 
         if config.use_fused_dropout_add:
             self.fused_dropout_add1 = FusedDropoutAdd(config.attention_probs_dropout_prob, mode="upscale_in_train")

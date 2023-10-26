@@ -312,7 +312,7 @@ class GPTConfig(PretrainedConfig):
         max_position_embeddings: int = 512,
         type_vocab_size: int = 16,
         initializer_range: float = 0.02,
-        rms_norm_eps=1e-5,
+        layer_norm_eps=1e-5,
         pad_token_id: int = 0,
         eos_token_id: int = 7,
         bos_token_id: int = 0,
@@ -328,7 +328,6 @@ class GPTConfig(PretrainedConfig):
         use_flash_attention: bool = False,
         use_fused_dropout_add: bool = False,
         fused_linear: bool = False,
-        use_fused_rms_norm: bool = False,
         fuse_attention_qkv=False,
         enable_fuse_transformer: bool = False,
         fused_softmax_with_triangular: bool = False,
@@ -350,14 +349,13 @@ class GPTConfig(PretrainedConfig):
         self.max_position_embeddings = max_position_embeddings
         self.type_vocab_size = type_vocab_size
         self.initializer_range = initializer_range
-        self.rms_norm_eps = rms_norm_eps
+        self.layer_norm_eps = layer_norm_eps
 
         self.pad_token_id = pad_token_id
         self.eos_token_id = eos_token_id
         self.bos_token_id = bos_token_id
         self.eol_token_id = eol_token_id
 
-        self.use_fused_rms_norm = use_fused_rms_norm
         self.fuse_attention_qkv = fuse_attention_qkv
         self.use_flash_attention = use_flash_attention
 
