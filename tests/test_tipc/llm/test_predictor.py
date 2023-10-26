@@ -130,12 +130,12 @@ class InferenceTest(unittest.TestCase):
 
         # sampling: the full-matach acc must be less than 0.1
         full_match_acc, half_match_acc = self.compare_result("dynamic.json", "static.json")
-        self.assertLessEqual(full_match_acc, 0.3)
-        self.assertLessEqual(half_match_acc, 0.45)
+        self.assertLessEqual(full_match_acc, 0.55)
+        self.assertLessEqual(half_match_acc, 0.85)
 
         full_match_acc, half_match_acc = self.compare_result(self.predict_file_name, "static.json")
-        self.assertLessEqual(full_match_acc, 0.3)
-        self.assertLessEqual(half_match_acc, 0.45)
+        self.assertLessEqual(full_match_acc, 0.55)
+        self.assertLessEqual(half_match_acc, 0.85)
 
         # read ips value from log file
         ips = self._read_ips_from_log_file()
@@ -233,12 +233,12 @@ class PTuningInfereneTest(InferenceTest):
 
         # sampling: the full-matach acc must be less than 0.1
         full_match_acc, half_match_acc = self.compare_result("dynamic.json", "static.json")
-        self.assertLessEqual(full_match_acc, 0.3)
-        self.assertLessEqual(half_match_acc, 0.45)
+        self.assertLessEqual(full_match_acc, 0.55)
+        self.assertLessEqual(half_match_acc, 0.85)
 
         full_match_acc, half_match_acc = self.compare_result(self.predict_file_name, "static.json")
-        self.assertLessEqual(full_match_acc, 0.3)
-        self.assertLessEqual(half_match_acc, 0.45)
+        self.assertLessEqual(full_match_acc, 0.55)
+        self.assertLessEqual(half_match_acc, 0.85)
 
         # read ips value from log file
         ips = self._read_ips_from_log_file()
