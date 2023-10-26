@@ -42,12 +42,12 @@ from paddle import __version__
 
 from ..utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
+    aistudio_file_exists_download,
     get_path_from_url_with_filelock,
     url_file_exists,
 )
 from ..utils.env import CHAT_TEMPLATE_CONFIG_NAME, TOKENIZER_CONFIG_NAME
 from ..utils.log import logger
-from .aistudio_utils import aistudio_download
 from .utils import resolve_cache_dir
 
 
@@ -1468,7 +1468,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         if from_hf_hub or from_aistudio:
             # Only include the necessary resource files specified by the tokenizer cls
             # Deep copy to avoid modifiying the class attributes
-            vocab_files = copy.deepcopy(cls.resource_files_names)
+            # vocab_files = copy.deepcopy(cls.resource_files_names)
+            vocab_files = copy.deepcopy(vocab_files_target)
             vocab_files["tokenizer_config_file"] = cls.tokenizer_config_file
         # From built-in pretrained models
         elif pretrained_model_name_or_path in cls.pretrained_init_configuration:
@@ -1497,10 +1498,12 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 resolved_vocab_files[file_id] = file_path
                 continue
             if from_aistudio:
-                resolved_vocab_files[file_id] = aistudio_download(
-                    repo_id=pretrained_model_name_or_path,
-                    filename=file_path,
+                res, cache_path = aistudio_file_exists_download(
+                    pretrained_model_name_or_path,
+                    file_path,
                 )
+                if res:
+                    resolved_vocab_files[file_id] = cache_path
             elif from_hf_hub:
                 resolved_vocab_files[file_id] = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
@@ -1602,6 +1605,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         # TODO(guosheng): avoid reduplication of position args and key word args
         tokenizer = cls(*init_args, **init_kwargs)
+
+        # chat_template.json memo
+        tokenizer.chat_template_path = resolved_vocab_files.get("chat_template_file", None)
+
         special_tokens_map_file = resolved_vocab_files.pop("special_tokens_map_file", None)
         if special_tokens_map_file is not None:
             with open(special_tokens_map_file, encoding="utf-8") as special_tokens_map_handle:

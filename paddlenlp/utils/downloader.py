@@ -30,6 +30,7 @@ from huggingface_hub import get_hf_file_metadata, hf_hub_url
 from huggingface_hub.utils import EntryNotFoundError
 from tqdm.auto import tqdm
 
+from ..transformers.aistudio_utils import aistudio_download
 from .env import DOWNLOAD_SERVER, FAILED_STATUS, SUCCESS_STATUS
 from .log import logger
 
@@ -423,6 +424,20 @@ def download_check(model_id, model_class, addition=None):
         checker.start()
         checker.join()
     logger.enable()
+
+
+def aistudio_file_exists_download(repo_id: str, file_path: str):
+    try:
+        cache_path = aistudio_download(
+            repo_id=repo_id,
+            filename=file_path,
+        )
+        return True, cache_path
+    except Exception as e:
+        if "object does not exist" in e.args[0]:
+            return False, None
+        else:
+            raise e
 
 
 def url_file_exists(url: str) -> bool:
