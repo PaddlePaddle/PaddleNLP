@@ -28,6 +28,7 @@ from paddlenlp.transformers.conversion_utils import (
     init_name_mappings,
 )
 from paddlenlp.utils.log import logger
+i=0
 
 from ..activations import ACT2FN
 from ..model_outputs import (
@@ -263,10 +264,15 @@ class MistralAttention(nn.Layer):
         padding_mask: Optional[paddle.Tensor] = None,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         bsz, q_len, _ = hidden_states.shape
+        global i
+        import numpy as np; np.save('hs_{}'.format(i), hidden_states.astype('float32').numpy())
 
         query_states = self.q_proj(hidden_states)
         key_states = self.k_proj(hidden_states)
         value_states = self.v_proj(hidden_states)
+        import numpy as np; np.save('q_{}'.format(i), query_states.astype('float32').numpy())
+        import numpy as np; np.save('k_{}'.format(i), key_states.astype('float32').numpy())
+        import numpy as np; np.save('v_{}'.format(i), value_states.astype('float32').numpy())
 
         query_states = query_states.reshape([bsz, q_len, self.num_heads, self.head_dim]).transpose([0, 2, 1, 3])
         key_states = key_states.reshape([bsz, q_len, self.num_key_value_heads, self.head_dim]).transpose([0, 2, 1, 3])
@@ -290,6 +296,7 @@ class MistralAttention(nn.Layer):
         value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) / math.sqrt(self.head_dim)
+        import numpy as np; np.save('aw_{}'.format(i), attn_weights.astype('float32').numpy())
 
         if attn_weights.shape != [bsz, self.num_heads, q_len, kv_seq_len]:
             raise ValueError(
@@ -319,6 +326,8 @@ class MistralAttention(nn.Layer):
         attn_output = attn_output.reshape([bsz, q_len, self.hidden_size])
 
         attn_output = self.o_proj(attn_output)
+        import numpy as np; np.save('ao_{}'.format(i), attn_output.astype('float32').numpy())
+        i += 1
 
         if not output_attentions:
             attn_weights = None
@@ -1104,6 +1113,7 @@ class MistralForCausalLM(MistralPreTrainedModel):
         hidden_states = outputs[0]
         logits = self.lm_head(hidden_states)
         logits = logits.astype('float32')
+        import numpy as np; np.save('l', logits.astype('float32').numpy())
 
         loss = None
         if labels is not None:

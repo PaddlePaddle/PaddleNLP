@@ -915,6 +915,7 @@ class GenerationMixin(object):
 
         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
 
+        print(generation_config.decode_strategy)
         if generation_config.decode_strategy == "greedy_search":
             if generation_config.num_return_sequences > 1:
                 raise ValueError(
