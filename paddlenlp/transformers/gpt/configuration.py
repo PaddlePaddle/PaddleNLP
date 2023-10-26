@@ -301,6 +301,7 @@ class GPTConfig(PretrainedConfig):
 
     def __init__(
         self,
+        seq_length=1024,
         vocab_size: int = 50304,
         hidden_size: int = 768,
         num_hidden_layers: int = 12,
@@ -328,7 +329,8 @@ class GPTConfig(PretrainedConfig):
         use_flash_attention: bool = False,
         use_fused_dropout_add: bool = False,
         fused_linear: bool = False,
-        fuse_attention_qkv=False,
+        fuse_attention_qkv: bool = False,
+        fuse_attention_ffn: bool = False,
         enable_fuse_transformer: bool = False,
         fused_softmax_with_triangular: bool = False,
         virtual_pp_degree: int = 1,
@@ -337,7 +339,7 @@ class GPTConfig(PretrainedConfig):
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
-
+        self.seq_length = seq_length
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
@@ -357,6 +359,7 @@ class GPTConfig(PretrainedConfig):
         self.eol_token_id = eol_token_id
 
         self.fuse_attention_qkv = fuse_attention_qkv
+        self.fuse_attention_ffn = fuse_attention_ffn
         self.use_flash_attention = use_flash_attention
 
         self.num_partitions = num_partitions
@@ -374,3 +377,8 @@ class GPTConfig(PretrainedConfig):
         self.virtual_pp_degree = virtual_pp_degree
         self.sequence_parallel = sequence_parallel
         self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
+
+        if self.sequence_parallel:
+            assert (
+                self.tensor_parallel_degree > 1
+            ), f"senquence-parallel only works in mp, got mp={self.tensor_parallel_degree}"

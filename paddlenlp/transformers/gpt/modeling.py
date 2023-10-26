@@ -315,8 +315,8 @@ class MultiHeadAttention(nn.Layer):
             self.out_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
 
     def _fuse_prepare_qkv(self, query, use_cache=False, past_key_value=None):
-        # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
         if self.config.sequence_parallel:
+            # [bs, seq_len, num_head * head_dim] -> [bs / n, seq_len, num_head, head_dim] (n is model parallelism)
             target_shape = [-1, self.config.seq_length, self.num_attention_heads, 3 * self.head_dim]
         else:
             target_shape = [0, 0, self.num_attention_heads, 3 * self.head_dim]
@@ -346,8 +346,8 @@ class MultiHeadAttention(nn.Layer):
         to reduce redundant calculations.
 
         """
-        # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
         if self.config.sequence_parallel:
+            # [bs, seq_len, num_head * head_dim] -> [bs/n, seq_len, num_head * head_dim] (n is model parallelism)
             target_shape = [-1, self.config.seq_length, self.num_attention_heads, self.head_dim]
         else:
             target_shape = [0, 0, self.num_attention_heads, self.head_dim]
@@ -464,14 +464,17 @@ class MultiHeadAttention(nn.Layer):
         else:
             out = outputs
 
-        if self.config.sequence_parallel:
-            out = out.reshape([-1, 0])  # [bs, seq_len, dim] => [bs * seq_len, dim]
+        # if sequence_parallel is true, out shape are [bs, seq_len, num_head * head_dim / n]
+        # else their shape are [bs, q_len, num_head * head_dim / n], n is mp parallelism.
 
-        # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
-        # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
+        if self.config.sequence_parallel:
+            bs, seq_len, dim = out.shape
+            out = out.reshape([bs * seq_len, dim])  # [bs, seq_len, dim / n] => [bs * seq_len, dim / n]
 
         # project to output
         out = self.out_proj(out)
+        # if sequence_parallel is true, out shape are [bs * seq_len / n, dim]
+        # else their shape are [bs, seq_len, dim], n is mp parallelism.
 
         outs = [out]
         if output_attentions:
@@ -494,7 +497,7 @@ class TransformerDecoder(nn.Layer):
         if config.sequence_parallel:
             self.norm = GPTLayerNorm(config)
         else:
-            self.norm = nn.LayerNorm(config.hidden_size, epsilon=1e-5, weight_attr=True, bias_attr=True)
+            self.norm = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
         # Enable_recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
@@ -651,8 +654,8 @@ class GPTDecoderLayer(nn.Layer):
             self.norm1 = GPTLayerNorm(config)
             self.norm2 = GPTLayerNorm(config)
         else:
-            self.norm1 = nn.LayerNorm(config.hidden_size, epsilon=1e-5, weight_attr=True, bias_attr=True)
-            self.norm2 = nn.LayerNorm(config.hidden_size, epsilon=1e-5, weight_attr=True, bias_attr=True)
+            self.norm1 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
+            self.norm2 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
 
         if config.use_fused_dropout_add:
             self.fused_dropout_add1 = FusedDropoutAdd(config.attention_probs_dropout_prob, mode="upscale_in_train")
@@ -669,6 +672,8 @@ class GPTDecoderLayer(nn.Layer):
     def forward(
         self, hidden_states, attention_mask=None, use_cache=False, past_key_value=None, output_attentions=False
     ):
+        # when sequence_parallel=True:
+        # hidden_states => [bs * seq_len / n, embed_dim]
         residual = hidden_states
 
         if self.config.normalize_before:
@@ -695,6 +700,8 @@ class GPTDecoderLayer(nn.Layer):
             hidden_states = self.self_attn(
                 hidden_states, None, None, attention_mask, use_cache, past_key_value, output_attentions
             )
+        # when sequence_parallel=True:
+        # hidden_states => [bs * seq_len / n, embed_dim]
         incremental_cache = hidden_states[-1] if use_cache else None
         attention_weights = hidden_states[1] if output_attentions else None
         hidden_states = hidden_states[0] if (use_cache or output_attentions) else hidden_states
@@ -712,6 +719,8 @@ class GPTDecoderLayer(nn.Layer):
         if self.config.normalize_before:
             hidden_states = self.norm2(hidden_states)
 
+        # when sequence_parallel=True:
+        # hidden_states => [bs * seq_len / n, embed_dim]
         with seed_guard_context("global_seed"):
             if not self.config.use_fused_dropout_add:
                 hidden_states = residual + self.dropout2(
@@ -1209,10 +1218,10 @@ class GPTModel(GPTPretrainedModel):
         attention_mask.stop_gradient = True
 
         if self.config.sequence_parallel:
-            # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
             bs, seq_len, hidden_size = embedding_output.shape
+            # [bs, seq_len, dim] -> [bs * seq_len, dim]
             embedding_output = paddle.reshape_(embedding_output, [bs * seq_len, hidden_size])
-            # [seq_len * bs / n, num_head * head_dim] (n is mp parallelism)
+            # [bs * seq_len / n, dim] (n is mp parallelism)
             embedding_output = ScatterOp.apply(embedding_output)
 
         outputs = self.decoder(
