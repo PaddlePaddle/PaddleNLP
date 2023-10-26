@@ -452,6 +452,8 @@ class PretrainedConfig:
         self.output_hidden_states = kwargs.pop("output_hidden_states", False)
         self.output_attentions = kwargs.pop("output_attentions", False)
         self.use_cache = kwargs.pop("use_cache", False)
+        if "quantization_config" in kwargs and isinstance(kwargs["quantization_config"], Dict):
+            kwargs["quantization_config"] = QuantizationConfig.from_dict(kwargs["quantization_config"])
         self.quantization_config = kwargs.pop("quantization_config", QuantizationConfig())
         self.use_flash_attention = kwargs.pop("use_flash_attention", False)
 
