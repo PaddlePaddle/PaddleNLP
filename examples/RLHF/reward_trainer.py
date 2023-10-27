@@ -12,11 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+import numpy as np
 import paddle
+import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.io import Dataset
 
 import paddlenlp.trainer.trainer as trainer
-from paddlenlp.trainer import Trainer
+from paddlenlp.data import DataCollator
+from paddlenlp.trainer import (
+    EvalPrediction,
+    Trainer,
+    TrainerCallback,
+    TrainingArguments,
+)
+from paddlenlp.trainer.utils import nested_detach
+from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
 from paddlenlp.transformers.score_model_utils import ScoreModelOutput
 
 _tr_acc = None
@@ -27,6 +40,8 @@ speed_metrics = trainer.speed_metrics
 def patch_speed_metrics(split, start_time, num_samples=None, num_steps=None):
     # split: interval, train, eval, test
     result = speed_metrics(split, start_time, num_samples, num_steps)
+    if split not in ["train", "interval"]:
+        return result
     # accuracy
     global _tr_acc
     tr_acc, total_acc_scalar, nested_gather = _tr_acc
@@ -43,7 +58,51 @@ def patch_speed_metrics(split, start_time, num_samples=None, num_steps=None):
 trainer.speed_metrics = patch_speed_metrics
 
 
+def compute_accuracy(eval_pred) -> Dict[str, float]:
+    higher_end_rewards, lower_end_rewards = eval_pred
+    accuracy = (higher_end_rewards > lower_end_rewards).astype("float32").mean().item()
+    rewards = np.concatenate([higher_end_rewards, lower_end_rewards], axis=0)
+    reward_mean = rewards.mean().item()
+    reward_std = rewards.std().item()
+    return {
+        "eval/accuracy": accuracy,
+        "eval/rewards_mean": reward_mean,
+        "eval/rewards_std": reward_std,
+    }
+
+
 class RewardTrainer(Trainer):
+    def __init__(
+        self,
+        model: Union[PretrainedModel, nn.Layer] = None,
+        criterion: nn.Layer = None,
+        args: TrainingArguments = None,
+        data_collator: Optional[DataCollator] = None,
+        train_dataset: Optional[Dataset] = None,
+        eval_dataset: Union[Dataset, Dict[str, Dataset]] = None,
+        tokenizer: Optional[PretrainedTokenizer] = None,
+        compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
+        callbacks: Optional[List[TrainerCallback]] = None,
+        optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
+        preprocess_logits_for_metrics: Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor] = None,
+    ):
+        if compute_metrics is None:
+            compute_metrics = compute_accuracy
+
+        super().__init__(
+            model,
+            criterion,
+            args,
+            data_collator,
+            train_dataset,
+            eval_dataset,
+            tokenizer,
+            compute_metrics,
+            callbacks,
+            optimizers,
+            preprocess_logits_for_metrics,
+        )
+
     def compute_loss(self, model, inputs, return_outputs=False):
         """
         How the loss is computed by Trainer. By default, all models return the loss in the first element.
@@ -126,4 +185,43 @@ class RewardTrainer(Trainer):
         #     "lower_end_rewards": lower_end_rewards,  # size = (B,)
         #     "accuracy": accuracy,  # size = ()
         # }
+        if return_outputs:
+            return loss, {
+                "higher_end_rewards": higher_end_rewards,
+                "lower_end_rewards": lower_end_rewards,
+                "accuracy": accuracy,
+            }
         return loss
+
+    def prediction_step(
+        self,
+        model: nn.Layer,
+        inputs: Dict[str, Union[paddle.Tensor, Any]],
+        prediction_loss_only: bool,
+        ignore_keys: Optional[List[str]] = None,
+    ):
+        if self.args.pipeline_parallel_degree > 1:
+            # hack for pipeline mode
+            inputs = self._prepare_inputs(inputs)
+            return self.prediction_pipeline_step(model, inputs, prediction_loss_only, ignore_keys)
+        else:
+            inputs = self._prepare_inputs(inputs)
+
+        better_input_ids = inputs["better_input_ids"]
+        worse_input_ids = inputs["worse_input_ids"]
+        better_attention_mask = inputs["better_attention_mask"]
+        worse_attention_mask = inputs["worse_attention_mask"]
+
+        with paddle.no_grad():
+            with self.autocast_smart_context_manager():
+                higher_rewards = self.model(better_input_ids, better_attention_mask)
+                lower_rewards = self.model(worse_input_ids, worse_attention_mask)
+            if isinstance(higher_rewards, dict):
+                higher_end_rewards = higher_rewards.end_scores.squeeze(axis=-1)
+                lower_end_rewards = lower_rewards.end_scores.squeeze(axis=-1)
+            else:
+                _, higher_end_rewards = higher_rewards
+                _, lower_end_rewards = lower_rewards
+        higher_end_rewards = nested_detach(higher_end_rewards)
+        lower_end_rewards = nested_detach(lower_end_rewards)
+        return None, higher_end_rewards, lower_end_rewards
