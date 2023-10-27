@@ -4,6 +4,10 @@ use_device="0,1,2,3,4,5,6,7"
 visible_device_="8,9,10,11,12,13,14,15"
 # use_device="0"
 export ASCEND_RT_VISIBLE_DEVICES=$visible_device_
+
+BATCH_NUM=24
+SRC_LEN=3072
+MAX_LEN=4096
 # 加速库日志
 # export ATB_LOG_TO_FILE=1
 # export ATB_LOG_TO_STDOUT=1
@@ -24,6 +28,10 @@ export HCCL_OP_BASE_FFTS_MODE_ENABLE=TRUE
 # export ATB_PROFILING_ENABLE=1
 
 export FLAGS_eager_delete_tensor_gb=-1.0 
+if [ $BATCH_NUM -gt 20 ] && [ $MAX_LEN -gt 4000 ];
+then
+    export FLAGS_eager_delete_tensor_gb=0.5
+fi
 # export FLAGS_new_executor_serial_run=1
 export FLAGS_allocator_strategy="auto_growth"
 
@@ -37,7 +45,7 @@ export FLAGS_allocator_strategy="auto_growth"
 log_dir=mp8
 rm -rf $log_dir
 
-python -m paddle.distributed.launch --log_dir $log_dir --devices $use_device python llm/predictor.py --model_name_or_path $model_dir --batch_size 8 --dtype "float16" --mode "static" --device "npu" --inference_model 
+python -m paddle.distributed.launch --log_dir $log_dir --devices $use_device python llm/predictor.py --model_name_or_path $model_dir --batch_size $BATCH_NUM --src_length $SRC_LEN --max_length $MAX_LEN --dtype "float16" --mode "static" --device "npu" --inference_model 
 
 
 # declare -A map
