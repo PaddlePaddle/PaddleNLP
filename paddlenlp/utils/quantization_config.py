@@ -16,9 +16,27 @@ import copy
 import json
 from dataclasses import dataclass
 
+quant_inference_mapping = {"avg": "abs_max", "abs_max_channel_wise": "abs_max_channel_wise", "abs_max": "abs_max"}
+
 
 @dataclass
 class QuantizationConfig:
+    """
+    This is the configuration class to store quantization configuration.
+    Args:
+        weight_quantize_algo: Weight quantization algorithm.
+        quant_type: Quantization type appplied to weight and activation, weight may still keep in float tensor.
+        shift: Whether the model applied the shift strategy.
+        smooth: Whether the model applied the smooth strategy.
+        shift_smooth_all_linears: Whether the model applied shift or smooth strategy for all linears.
+        quant_round_type: The quant round type, 0:-rounding to nearest ties to even， 1: -rounding to nearest ties away from zero.
+        llm_int8_threshold: The threshold for llm.int8 quantization.
+        weight_double_quant: Whether quant weight scale.
+        weight_blocksize: Block size for weight quantization.
+        weight_quant_method: The method for weight quantization.
+        act_quant_method: The method for activation quantization.
+    """
+
     def __init__(
         self,
         weight_quantize_algo=None,
@@ -28,15 +46,20 @@ class QuantizationConfig:
         shift_smooth_all_linears=False,
         quant_round_type=0,
         llm_int8_threshold=6.0,
+        weight_double_quant=False,
+        weight_blocksize=0,
+        weight_quant_method="abs_max_channel_wise",
+        act_quant_method="abs_max",
     ):
         if weight_quantize_algo is not None and weight_quantize_algo not in [
             "weight_only_int8",
             "weight_only_int4",
             "llm.int8",
             "a8w8",
+            "nf4",
         ]:
             raise ValueError(
-                f"weight_quantize_algo:{weight_quantize_algo} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8']"
+                f"weight_quantize_algo:{weight_quantize_algo} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4']"
             )
         if quant_type is not None and quant_type not in ["weight_only_int8", "weight_only_int4", "a8w8"]:
             raise ValueError(
@@ -50,9 +73,13 @@ class QuantizationConfig:
         self.shift_smooth_all_linears = shift_smooth_all_linears
         self.quant_round_type = quant_round_type
         self.llm_int8_threshold = llm_int8_threshold
+        self.weight_double_quant = weight_double_quant
+        self.weight_blocksize = weight_blocksize
+        self.weight_quant_method = weight_quant_method
+        self.act_quant_method = quant_inference_mapping[act_quant_method]
 
     def is_weight_quantize(self):
-        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8"]:
+        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "nf4", "a8w8"]:
             return True
         else:
             return False
