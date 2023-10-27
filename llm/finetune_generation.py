@@ -133,7 +133,7 @@ def main():
             model_args.model_name_or_path,
             config=model_config,
         )
-
+    return 0
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     if isinstance(tokenizer, LlamaTokenizer):
@@ -398,6 +398,12 @@ def main():
             logger.info(
                 f"Not found quant.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
             )
+        trainer.model.config.quantization_config.quant_type = quant_args.quant_type
+        trainer.model.config.quantization_config.smooth = quant_args.smooth
+        trainer.model.config.quantization_config.shift = quant_args.shift
+        trainer.model.config.quantization_config.shift_smooth_all_linears = (
+            quant_args.smooth_all_linears or quant_args.shift_all_linears
+        )
         ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
         if quant_args.shift or quant_args.smooth:
             ptq_model_config = get_ptq_model_config(trainer.model)
