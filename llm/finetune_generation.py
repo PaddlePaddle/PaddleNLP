@@ -133,7 +133,7 @@ def main():
             model_args.model_name_or_path,
             config=model_config,
         )
-
+    return 0
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     if isinstance(tokenizer, LlamaTokenizer):

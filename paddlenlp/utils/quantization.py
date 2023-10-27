@@ -13,9 +13,11 @@
 # limitations under the License.
 
 import gc
+from typing import List
 
 import paddle
 import paddle.nn as nn
+from github.PaddleSlim.paddleslim.lc.layers.linear import WeightQuantizationLinear
 from paddle.distributed.fleet.base import topology as tp
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import (
@@ -23,7 +25,7 @@ from paddle.distributed.fleet.meta_parallel import (
     RowParallelLinear,
     get_rng_state_tracker,
 )
-from paddle.nn.quant import llm_int8_linear, weight_only_linear, weight_quantize
+from paddle.nn.quant import llm_int8_linear, weight_only_linear
 
 from .log import logger
 
@@ -335,16 +337,23 @@ def replace_with_quantization_linear(model, quant_algo, name_prefix="", llm_int8
             else:
                 bias_attr = None
 
-            model._sub_layers[name] = QuantizationLinear(
-                child.weight.shape[0],
-                child.weight.shape[1],
-                quant_algo,
-                child._dtype,
-                bias_attr=bias_attr,
-                llm_int8_threshold=llm_int8_threshold,
-            )
+            from github.PaddleSlim.paddleslim.lc.layers.nf4_linear import NF4Linear
+
+            quantization_linear = NF4Linear(child)
+            model._sub_layers[name] = quantization_linear
+
+            # model._sub_layers[name] = QuantizationLinear(
+            #     child.weight.shape[0],
+            #     child.weight.shape[1],
+            #     quant_algo,
+            #     child._dtype,
+            #     bias_attr=bias_attr,
+            #     llm_int8_threshold=llm_int8_threshold,
+            # )
             del child
-            quantization_linear_list.append(name_prefix + name)
+
+            # quantization_linear_list.append(name_prefix + name)
+            quantization_linear_list.append(quantization_linear)
         elif isinstance(child, ColumnParallelLinear):
             if child.bias is None:
                 bias_attr = False
@@ -386,26 +395,27 @@ def replace_with_quantization_linear(model, quant_algo, name_prefix="", llm_int8
     return quantization_linear_list
 
 
-def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quant_algo, dtype):
-    for name in quantization_linear_list:
-        weight_name = name + ".weight"
-        quant_weight_name = name + ".quant_weight"
-        quant_scale_name = name + ".quant_scale"
+def convert_to_quantize_state_dict(
+    state_dict, quantization_linear_list: List[WeightQuantizationLinear], quant_algo, dtype
+):
+    for linear in quantization_linear_list:
+        weight_name = linear.weight_name
+        quant_weight_name = linear.quant_weight_name
 
-        if quant_weight_name in state_dict and quant_scale_name in state_dict:
+        # weight_name = name + ".weight"
+        # quant_weight_name = name + ".quant_weight"
+        # quant_scale_name = name + ".quant_scale"
+
+        if quant_weight_name in state_dict:
             if state_dict[quant_weight_name].dtype != paddle.int8:
                 raise ValueError(
                     f"{quant_weight_name} should be {paddle.int8} in state_dict but received dtype {state_dict[quant_weight_name].dtype}."
                 )
-            if state_dict[quant_scale_name].dtype != paddle.float32:
-                raise ValueError(
-                    f"{quant_scale_name} should be {paddle.float32} in state_dict but received dtype {state_dict[quant_scale_name].dtype}."
-                )
+
         elif weight_name in state_dict:
             target_weight = state_dict.pop(weight_name).cast(dtype)
-            quant_weight, quant_scale = weight_quantize(target_weight, quant_algo)
+            quant_weight = linear.quantize(target_weight)
             state_dict[quant_weight_name] = quant_weight
-            state_dict[quant_scale_name] = quant_scale
             del target_weight
         gc.collect()
     return state_dict
