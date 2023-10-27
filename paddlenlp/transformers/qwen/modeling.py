@@ -824,9 +824,12 @@ class QWenForCausalLM(QWenPretrainedModel):
         # update attention_mask
         if not is_encoder_decoder and "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]
-            model_kwargs["attention_mask"] = paddle.concat(
-                [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)], axis=-1
-            )
+            if attention_mask is not None and len(attention_mask.shape) == 2:
+                model_kwargs["attention_mask"] = paddle.concat(
+                    [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)], axis=-1
+                )
+            else:
+                model_kwargs["attention_mask"] = None
 
         return model_kwargs
 
