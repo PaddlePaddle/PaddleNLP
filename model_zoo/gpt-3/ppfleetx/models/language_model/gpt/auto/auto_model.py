@@ -386,7 +386,7 @@ class TransformerDecoderLayer(nn.Layer):
         scale_qk_coeff=1.0,
         use_recompute=False,
         recompute_granularity="full",
-        enable_refined_recompute=True,
+        enable_refined_recompute=False,
         use_flash_attn=False,
         use_fused_dropout_add=True,
         ipp=None,
@@ -606,12 +606,14 @@ class GPTModelAuto(nn.Layer):
         fuse_attn_qkv=False,
         scale_qk_by_layer_num=True,
         recompute_granularity="full",
+        enable_refined_recompute=False,
         freeze_embedding=False,
         use_flash_attn=False,
         fused_softmax_with_triangular=False,
         use_fused_dropout_add=True,
     ):
-
+        print("++++ recompute_granularity: {}".format(recompute_granularity))
+        print("++++ enable_refined_recompute: {}".format(enable_refined_recompute))
         super(GPTModelAuto, self).__init__()
 
         self.initializer_range = initializer_range
@@ -667,6 +669,7 @@ class GPTModelAuto(nn.Layer):
                     scale_qk_coeff=num_layers if scale_qk_by_layer_num else 1.0,
                     use_recompute=use_recompute,
                     recompute_granularity=recompute_granularity,
+                    enable_refined_recompute=enable_refined_recompute,
                     use_fused_dropout_add=use_fused_dropout_add,
                     use_flash_attn=use_flash_attn,
                     ipp=layer_to_pipe[i],
