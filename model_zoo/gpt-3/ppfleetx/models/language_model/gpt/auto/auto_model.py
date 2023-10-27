@@ -612,8 +612,6 @@ class GPTModelAuto(nn.Layer):
         fused_softmax_with_triangular=False,
         use_fused_dropout_add=True,
     ):
-        print("++++ recompute_granularity: {}".format(recompute_granularity))
-        print("++++ enable_refined_recompute: {}".format(enable_refined_recompute))
         super(GPTModelAuto, self).__init__()
 
         self.initializer_range = initializer_range
