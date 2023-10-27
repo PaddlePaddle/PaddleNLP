@@ -439,8 +439,8 @@ class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
             scale_cos, scale_sin = self._scale_cos_sin(seq_len=seq_len)
         else:
             scale_cos, scale_sin = self.cos_cached, self.sin_cached
-        cos = scale_cos[:, :, :seq_len, ...]
-        sin = scale_sin[:, :, :seq_len, ...]
+        cos = scale_cos[:, :seq_len, :, ...]
+        sin = scale_sin[:, :seq_len, :, ...]
         return (
             cos.cast(x.dtype) if cos.dtype != x.dtype else cos,
             sin.cast(x.dtype) if sin.dtype != x.dtype else sin,
