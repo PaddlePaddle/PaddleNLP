@@ -83,7 +83,7 @@ class MultiHeadAttention(nn.Layer):
         scale_qk_coeff=1.0,
         use_recompute=False,
         recompute_granularity="full",
-        enable_refined_recompute=True,
+        enable_refined_recompute=False,
         use_flash_attn=False,
         ipp=None,
     ):
@@ -263,13 +263,17 @@ class MultiHeadAttention(nn.Layer):
             attn_func = self._flash_attention
         else:
             attn_func = self.core_attn
-        if self.enable_refined_recompute:
-                attn_func = auto.exclude_ops_in_recompute(attn_func)
 
         if self.use_recompute and self.recompute_granularity == "core_attn":
-            out, weights = auto.recompute(attn_func)(q, k, v, attn_mask)
+            if self.enable_refined_recompute:
+                out, weights = auto.recompute(auto.exclude_ops_in_recompute(attn_func))(q, k, v, attn_mask)
+            else:
+                out, weights = auto.recompute(attn_func)(q, k, v, attn_mask)
         else:
-            out, weights = attn_func(q, k, v, attn_mask=attn_mask)
+            if self.enable_refined_recompute:
+                out, weights = auto.exclude_ops_in_recompute(attn_func)(q, k, v, attn_mask=attn_mask)
+            else:
+                out, weights = attn_func(q, k, v, attn_mask=attn_mask)
 
         auto.shard_tensor(self.out_proj.weight, auto_env.get_mesh()[self.ipp], [auto_env.get_mesh().mp_dim, None])
 
@@ -419,6 +423,7 @@ class TransformerDecoderLayer(nn.Layer):
             scale_qk_coeff=scale_qk_coeff,
             use_recompute=use_recompute,
             recompute_granularity=recompute_granularity,
+            enable_refined_recompute=enable_refined_recompute,
             use_flash_attn=use_flash_attn,
             ipp=ipp,
         )
@@ -450,10 +455,6 @@ class TransformerDecoderLayer(nn.Layer):
 
         auto.shard_tensor(self.linear1.weight, auto_env.get_mesh()[self.ipp], [None, auto_env.get_mesh().mp_dim])
         auto.shard_tensor(self.linear2.weight, auto_env.get_mesh()[self.ipp], [auto_env.get_mesh().mp_dim, None])
-        
-        if self.enable_refined_recompute:
-            self.linear1_func = auto.exclude_ops_in_recompute(self.linear1_func)
-            self.linear2_func = auto.exclude_ops_in_recompute(self.linear2_func)
             
         residual = tgt
 
@@ -480,10 +481,16 @@ class TransformerDecoderLayer(nn.Layer):
             tgt = self.norm2(tgt)
 
         if not self.use_fused_dropout_add:
-            tgt = self.dropout2(self.linear2_func(self.activation(self.linear1_func(tgt))))
+            if self.recompute_granularity == 'full' and self.enable_refined_recompute:
+                tgt = self.dropout2(auto.exclude_ops_in_recompute(self.linear2_func)(self.activation(auto.exclude_ops_in_recompute(self.linear1_func)(tgt))))
+            else:
+                tgt = self.dropout2(self.linear2_func(self.activation(self.linear1_func(tgt))))
             tgt = residual + tgt
         else:
-            tgt = self.fused_dropout_add2(self.linear2_func(self.activation(self.linear1_func(tgt))), residual)
+            if self.recompute_granularity == 'full' and self.enable_refined_recompute:
+                tgt = self.fused_dropout_add2(auto.exclude_ops_in_recompute(self.linear2_func)(self.activation(auto.exclude_ops_in_recompute(self.linear1_func)(tgt))), residual)
+            else:
+                tgt = self.fused_dropout_add2(self.linear2_func(self.activation(self.linear1_func(tgt))), residual)
 
         if not self.normalize_before:
             tgt = self.norm2(tgt)
