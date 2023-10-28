@@ -792,7 +792,7 @@ def benchmark(predictor, predictor_args, model_args):
     print("***********Start Benchmark**********")
 
     warmup_time = 2
-    test_time = 2
+    test_time = 1
 
     print("***********Start Warmup**********")
     for _ in range(warmup_time):
@@ -811,12 +811,13 @@ def benchmark(predictor, predictor_args, model_args):
     if paddle.distributed.get_rank() == 0:
         output_tokens = sum([len(output) for output in outputs])
         print(
-            "Input length is: {}, Output length is: {}, bs is: {}, Generate speed is: {:.3f} tokens/s(ips), QPS: {:.3f} requests/s. ".format(
+            "Input length is: {}, Output length is: {}, bs is: {}, Generate speed is: {:.3f} tokens/s(ips), QPS: {:.3f} requests/s. total_time:{} ".format(
                 predictor_args.src_length,
                 predictor_args.max_length,
                 predictor_args.batch_size,
                 (output_tokens / (end - start) / test_time),
                 (predictor_args.batch_size / (end - start) / test_time),
+                (end - start)
             )
         )
 

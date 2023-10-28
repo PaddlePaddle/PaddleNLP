@@ -5,7 +5,7 @@ visible_device_="8,9,10,11,12,13,14,15"
 # use_device="0"
 export ASCEND_RT_VISIBLE_DEVICES=$visible_device_
 
-BATCH_NUM=24
+BATCH_NUM=8
 SRC_LEN=3072
 MAX_LEN=4096
 # 加速库日志
@@ -18,6 +18,12 @@ MAX_LEN=4096
 # 调试打开
 # export FLAGS_npu_blocking_run=true
 # export GLOG_v=4
+
+# 落Tensor
+# export ATB_SAVE_TENSOR=1
+# export ATB_SAVE_TENSOR_END=0
+# export ATB_SAVE_TENSOR_START=0
+# export ATB_SAVE_TENSOR_RUNNER="SelfAttentionFusionOpsRunner"
 
 #EVENT消减
 export FLAGS_use_stream_safe_cuda_allocator=0
@@ -62,7 +68,6 @@ python -m paddle.distributed.launch --log_dir $log_dir --devices $use_device pyt
 
 # RANK_ID_START=0
 # WORLD_SIZE=8
-# BATCH_NUM=8
 
 # if test -d "$model_dir";
 # then
@@ -71,7 +76,7 @@ python -m paddle.distributed.launch --log_dir $log_dir --devices $use_device pyt
 #     do
 #     bind=${map["$RANK_ID"]}
 #     echo "Device ID: $RANK_ID, bind to NUMA node: $bind"
-#     numactl --cpunodebind=$bind --membind $bind python -m paddle.distributed.launch --master 127.0.0.1:49123 --rank $RANK_ID --devices $RANK_ID --nnodes $WORLD_SIZE python3 llm/predictor.py --model_name_or_path $model_dir --batch_size $BATCH_NUM --dtype "float16" --mode "static" --device "npu" --benchmark --inference_model 1 &> $RANK_ID.log &
+#     numactl --cpunodebind=$bind --membind $bind python -m paddle.distributed.launch --master 127.0.0.1:49123 --rank $RANK_ID --devices $RANK_ID --nnodes $WORLD_SIZE python3 llm/predictor.py --model_name_or_path $model_dir --batch_size $BATCH_NUM --src_length $SRC_LEN --max_length $MAX_LEN --dtype "float16" --mode "static" --device "npu" --benchmark --inference_model 1 &> $RANK_ID.log &
 # done
 # fi
 # # tail -f 0.log

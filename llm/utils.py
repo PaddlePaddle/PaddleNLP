@@ -436,7 +436,10 @@ def dybatch_preprocess(
 
         inputs = {}
         pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][-1]
-        inputs["input_ids"], seq_len, pad_lens = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True, return_pad_len=True)
+        if return_pad_len:
+            inputs["input_ids"], seq_len, pad_lens = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True, return_pad_len=return_pad_len)
+        else:
+            inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True, return_pad_len=return_pad_len)
         bs = inputs["input_ids"].shape[0]
         max_len = max(map(len, input_ids))
 
