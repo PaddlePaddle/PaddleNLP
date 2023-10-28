@@ -231,6 +231,38 @@ class GPTInferenceModel(GPTPretrainedModel):
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         dtype = paddle.get_default_dtype()
+        for i in range(self.num_layers):
+            q_proj_weight = state_dict.pop(f"gpt.decoder.layers.{i}.self_attn.q_proj.weight")
+            k_proj_weight = state_dict.pop(f"gpt.decoder.layers.{i}.self_attn.k_proj.weight")
+            v_proj_weight = state_dict.pop(f"gpt.decoder.layers.{i}.self_attn.v_proj.weight")
+
+            q_proj_weight = q_proj_weight.transpose([1, 0]).reshape(
+                [self.num_attention_heads, self.hidden_size // self.num_attention_heads, self.hidden_size]
+            )
+            k_proj_weight = k_proj_weight.transpose([1, 0]).reshape(
+                [self.num_attention_heads, self.hidden_size // self.num_attention_heads, self.hidden_size]
+            )
+            v_proj_weight = v_proj_weight.transpose([1, 0]).reshape(
+                [self.num_attention_heads, self.hidden_size // self.num_attention_heads, self.hidden_size]
+            )
+
+            concated_qkv_weight = (
+                paddle.concat([q_proj_weight, k_proj_weight, v_proj_weight], axis=1)
+                .reshape([3 * self.hidden_size, self.hidden_size])
+                .transpose([1, 0])
+            )
+            state_dict[f"gpt.decoder.layers.{i}.self_attn.qkv_proj.weight"] = concated_qkv_weight
+
+            q_proj_bias = state_dict.pop(f"gpt.decoder.layers.{i}.self_attn.q_proj.bias")
+            k_proj_bias = state_dict.pop(f"gpt.decoder.layers.{i}.self_attn.k_proj.bias")
+            v_proj_bias = state_dict.pop(f"gpt.decoder.layers.{i}.self_attn.v_proj.bias")
+
+            q_proj_bias = q_proj_bias.reshape([self.num_attention_heads, self.hidden_size // self.num_attention_heads])
+            k_proj_bias = k_proj_bias.reshape([self.num_attention_heads, self.hidden_size // self.num_attention_heads])
+            v_proj_bias = v_proj_bias.reshape([self.num_attention_heads, self.hidden_size // self.num_attention_heads])
+
+            concated_qkv_bias = paddle.concat([q_proj_bias, k_proj_bias, v_proj_bias], axis=-1).reshape([-1])
+            state_dict[f"gpt.decoder.layers.{i}.self_attn.qkv_proj.bias"] = concated_qkv_bias
 
         for k, v in state_dict.items():
             if k.startswith("gpt."):
