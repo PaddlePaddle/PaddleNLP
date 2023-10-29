@@ -390,7 +390,7 @@ class BloomAttention(nn.Layer):
                 key_states,
                 value_states,
                 attn_mask=attention_mask,
-                is_causal=attention_mask is None,
+                is_causal=False,
             )
             attn_weights = None
             # [batch_size, seq_len, num_heads, head_dim] = > [batch_size, seq_len, hidden_size]
