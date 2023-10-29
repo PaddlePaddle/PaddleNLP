@@ -26,6 +26,7 @@ csv.field_size_limit(500 * 1024 * 1024)
 
 # yapf: disable
 parser = argparse.ArgumentParser()
+parser.add_argument('--model_type', choices=['bloom', 'llama', 'baichuan'], default="bloom", help="The model types")
 parser.add_argument("--query_model", default="bigscience/bloomz-7b1-mt", type=str, help="The ann index name")
 parser.add_argument("--passage_model", default="bigscience/bloomz-7b1-mt", type=str, help="The ann index name")
 parser.add_argument("--query_max_length", default=64, type=int, help="Number of element to retrieve from embedding search")
@@ -37,12 +38,21 @@ args = parser.parse_args()
 
 class PaddleModel:
     def __init__(
-        self, query_model, corpus_model, batch_size=1, max_seq_len=512, sep=" ", pooling_mode="mean_tokens", **kwargs
+        self,
+        query_model,
+        corpus_model,
+        model_type="bloom",
+        batch_size=1,
+        max_seq_len=512,
+        sep=" ",
+        pooling_mode="mean_tokens",
+        **kwargs
     ):
         self.query_model = Eval_modle(
             model=query_model,
             max_seq_len=max_seq_len,
             batch_size=batch_size,
+            model_type=model_type,
         )
         self.sep = sep
 
@@ -86,6 +96,7 @@ class T2RRetrieval(AbsTaskRetrieval):
         self,
         model_query,
         model_corpus,
+        model_type="bloom",
         split="test",
         batch_size=32,
         corpus_chunk_size=None,
@@ -101,7 +112,7 @@ class T2RRetrieval(AbsTaskRetrieval):
 
         from beir.retrieval.search.dense import DenseRetrievalExactSearch as DRES
 
-        model = PaddleModel(model_query, model_corpus)
+        model = PaddleModel(model_query, model_corpus, model_type)
 
         model = DRES(
             model,
@@ -172,4 +183,4 @@ def load_t2ranking_for_retraviel(num_max_passages: float):
 
 
 tasks = T2RRetrieval(num_max_passages=10000)
-tasks.evaluate(model_query=args.query_model, model_corpus=args.passage_model, split="dev")
+tasks.evaluate(model_query=args.query_model, model_corpus=args.passage_model, model_type=args.model_type, split="dev")

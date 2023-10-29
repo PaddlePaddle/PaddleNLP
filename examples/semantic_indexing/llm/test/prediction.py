@@ -14,7 +14,7 @@
 
 import numpy as np
 import paddle
-from modeling import BloomBiEncoderModel
+from modeling import BloomBiEncoderModel, LlamaBiEncoderModel
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.transformers import AutoTokenizer
@@ -27,10 +27,12 @@ class Eval_modle:
         batch_size: int = 1,
         max_seq_len: int = 512,
         return_tensors: str = "np",
+        model_type: str = "bloom",
     ):
         self.model = model
         self.batch_size = batch_size
         self.return_tensors = return_tensors
+        self.model_type = model_type
         self._construct_model()
         self._construct_tokenizer()
 
@@ -38,15 +40,27 @@ class Eval_modle:
         """
         Construct the inference model for the predictor.
         """
-        self._model = BloomBiEncoderModel.from_pretrained(
-            pretrained_model_name_or_path=self.model,
-            dtype="bfloat16",
-            low_cpu_mem_usage=True,
-            use_flash_attention=True,
-            sentence_pooling_method="weighted_mean",
-            normalized=True,
-            tensor_parallel_degree=0
-        )
+        if self.model_type == "bloom":
+            self._model = BloomBiEncoderModel.from_pretrained(
+                pretrained_model_name_or_path=self.model,
+                dtype="bfloat16",
+                low_cpu_mem_usage=True,
+                use_flash_attention=True,
+                sentence_pooling_method="weighted_mean",
+                normalized=True,
+                tensor_parallel_degree=0,
+            )
+        elif self.model_type in ["baichuan", "llama"]:
+            self._model = LlamaBiEncoderModel.from_pretrained(
+                pretrained_model_name_or_path=self.model,
+                dtype="bfloat16",
+                low_cpu_mem_usage=True,
+                use_flash_attention=True,
+                sentence_pooling_method="weighted_mean",
+                normalized=True,
+                tensor_parallel_degree=0,
+            )
+
         self._model.eval()
 
     def _construct_tokenizer(self):

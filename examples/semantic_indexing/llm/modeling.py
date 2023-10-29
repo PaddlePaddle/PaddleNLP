@@ -225,8 +225,6 @@ class LlamaBiEncoderModel(LlamaPretrainedModel):
         return embedding
 
     def encode(self, features):
-        if features is None:
-            return None
         psg_out = self.llama(**features, return_dict=True)
         p_reps = self.sentence_embedding(psg_out.last_hidden_state, features["attention_mask"])
         if self.normalized:

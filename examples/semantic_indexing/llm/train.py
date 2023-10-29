@@ -98,7 +98,7 @@ def main():
             temperature=training_args.temperature,
             use_flash_attention=model_args.use_flash_attention,
         )
-    elif "llama" in model_args.model_name_or_path:
+    elif "llama" in model_args.model_name_or_path or "baichuan" in model_args.model_name_or_path:
         model = LlamaBiEncoderModel.from_pretrained(
             pretrained_model_name_or_path=model_args.model_name_or_path,
             dtype=dtype,
@@ -128,7 +128,7 @@ def main():
                 v.stop_gradient = True
 
     if training_args.fine_tune_type == "lora":
-        if "llama" in model_args.model_name_or_path:
+        if "llama" in model_args.model_name_or_path or "baichuan" in model_args.model_name_or_path:
             target_modules = [".*q_proj.*", ".*k_proj.*", ".*v_proj.*"]
         else:
             target_modules = [".*query_key_value.*"]

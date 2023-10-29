@@ -11,13 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import glob
 import os
 
 import paddle
-from modeling import BloomBiEncoderModel
+from modeling import BloomBiEncoderModel, LlamaBiEncoderModel
 
-from paddlenlp.transformers import BloomConfig
+from paddlenlp.transformers import BloomConfig, LlamaConfig
 from paddlenlp.utils.log import logger
 
 
@@ -26,6 +25,9 @@ def parse_arguments():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name_or_path", default=None, required=True, help="The directory of model.")
+    parser.add_argument(
+        "--model_type", choices=["bloom", "llama", "baichuan"], default="bloom", help="The model types"
+    )
     parser.add_argument("--device", type=str, default="gpu", help="Device")
     return parser.parse_args()
 
@@ -86,8 +88,12 @@ def merge_tensor_parallel(model_class, state_dict_list, config) -> None:
 def main():
     args = parse_arguments()
     paddle.set_device(args.device)
-    config = BloomConfig.from_pretrained(args.model_name_or_path)
-    model_class = BloomBiEncoderModel
+    if args.model_type == "bloom":
+        config = BloomConfig.from_pretrained(args.model_name_or_path)
+        model_class = BloomBiEncoderModel
+    elif args.model_type in ["baichuan", "llama"]:
+        config = LlamaConfig.from_pretrained(args.model_name_or_path)
+        model_class = LlamaBiEncoderModel
 
     tp_state_dict_list = load_tp_params(4, args.model_name_or_path)
     state_dict_to_save = merge_tensor_parallel(
