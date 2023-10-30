@@ -1498,11 +1498,11 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 resolved_vocab_files[file_id] = file_path
                 continue
             if from_aistudio:
-                res, cache_path = aistudio_file_exists_download(
+                file_exists, cache_path = aistudio_file_exists_download(
                     pretrained_model_name_or_path,
                     file_path,
                 )
-                if res:
+                if file_exists:
                     resolved_vocab_files[file_id] = cache_path
             elif from_hf_hub:
                 resolved_vocab_files[file_id] = hf_hub_download(
