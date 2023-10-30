@@ -1541,9 +1541,14 @@ class Trainer:
             model = paddle.DataParallel(model)
             # Distributed training (should be after fp16 initialization)
 
+            if self.args.amp_master_grad:
+                mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
+                if self.optimizer is not None:
+                    self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
+
         in_pipeline_parallel_mode = self.args.pipeline_parallel_degree > 1
         in_sharding_parallel_mode = self.sharding is not None
-        in_tensor_parallel_model = self.args.tensor_parallel_degree > 1
+        in_tensor_parallel_mode = self.args.tensor_parallel_degree > 1
 
         # Pipeline mode
         if in_pipeline_parallel_mode:
@@ -1669,7 +1674,7 @@ class Trainer:
                 self.optimizer = optimizer
 
         # pure tesnor parallel mode, no pipeline_parallel, no sharding.
-        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and in_tensor_parallel_model:
+        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and in_tensor_parallel_mode:
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
 
@@ -1678,12 +1683,6 @@ class Trainer:
             if self.args.amp_master_grad:
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
-
-        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and not in_tensor_parallel_model:
-            if self.args.amp_master_grad:
-                mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
-                if self.optimizer is not None:
-                    self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
 
         return model
 
