@@ -761,10 +761,6 @@ class GPTModelAuto(nn.Layer):
             use_cache=use_cache,
             cache=cache,
         )
-
-        # we attach the allgather of SP into logit layer
-        # if self.sequence_parallel:
-        #     auto.shard_tensor(tgt, auto_env.get_mesh()[self.ipp], [None, None, None])
         
         return encoder_outputs
 
