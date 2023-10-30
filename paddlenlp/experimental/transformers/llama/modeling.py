@@ -94,16 +94,16 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             self.use_weight_only = True
         elif "a8w8" in self.quant_type:
             self.quant_model_path = config.model_name_or_path
-            self.shift = config.quant_config["shift"]
-            self.smooth = config.quant_config["smooth"]
-            self.shift_smooth_all_linears = config.quant_config["shift_smooth_all_linears"]
+            self.shift = config.quantization_config.shift
+            self.smooth = config.quantization_config.smooth
+            self.shift_smooth_all_linears = config.quantization_config.shift_smooth_all_linears
         else:
             self.use_weight_only = False
 
         if self.use_weight_only:
             assert (
                 self.quant_type == "weight_only_int8" or self.quant_type == "weight_only_int4"
-            ), "Expected quant_algo equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
+            ), "Expected quant_type equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
                 self.quant_type
             )
 
@@ -173,7 +173,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         ffn2_bias_attrs = None
 
         if self.quant_type == "a8w8":
-            self.quant_round_type = config.quant_config["quant_round_type"]
+            self.quant_round_type = config.quantization_config.quant_round_type
 
             qkv_out_scale_attrs = [
                 paddle.ParamAttr(name="fusellama.{}.qkv_out_scale".format(i)) for i in range(self.num_layers)

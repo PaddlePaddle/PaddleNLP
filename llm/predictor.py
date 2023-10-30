@@ -77,7 +77,8 @@ class PredictorArgument:
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     quant_type: str = field(
-        default=None, metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"}
+        default=None,
+        metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"},
     )
 
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
@@ -717,15 +718,17 @@ def create_predictor(
             config.tensor_parallel_degree = tensor_parallel_degree
             config.tensor_parallel_rank = tensor_parallel_rank
             config.weight_only_quant_bits = -1
+            config.quant_type = None
+            config.model_name_or_path = ""
 
-            if predictor_args.quant_type.startswith("weight_only_int"):
+            if predictor_args.quant_type is not None and predictor_args.quant_type.startswith("weight_only_int"):
                 weight_only_quant_bits = int(predictor_args.quant_type[-1])
                 config.weight_only_quant_bits = weight_only_quant_bits
                 config.quant_type = predictor_args.quant_type
 
-            if "a8w8" in config.quant_config["quant_algo"]:
+            if "a8w8" in config.quantization_config.quant_type:
                 config.model_name_or_path = predictor_args.model_name_or_path
-                config.quant_type = config.quant_config["quant_algo"]
+                config.quant_type = config.quantization_config.quant_type
 
                 # Turn on GEMM int8 kernel tuning
                 paddle.base.core.enable_autotune()
