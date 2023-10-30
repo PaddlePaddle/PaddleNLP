@@ -631,7 +631,7 @@ class ChatTemplateMixin:
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         tokenizer = super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
 
-        if not os.path.exists(tokenizer.chat_template_path):
+        if tokenizer.chat_template_path is None or not os.path.exists(tokenizer.chat_template_path):
             return tokenizer
 
         tokenizer.init_chat_template(tokenizer.chat_template_path)
