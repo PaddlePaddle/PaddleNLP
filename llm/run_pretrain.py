@@ -115,7 +115,6 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to pre-train from.
     """
 
-    model_type: Optional[str] = field(default="llama", metadata={"help": "Use for CI test."})
     model_name_or_path: str = field(
         default="__internal_testing__/tiny-random-llama",
         metadata={
