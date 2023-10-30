@@ -24,11 +24,13 @@ import paddle
 import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import (
     ColumnParallelLinear,
+    PipelineLayer,
     RowParallelLinear,
 )
 
 from ...transformers.conversion_utils import ConversionMixin
 from ...transformers.model_utils import PretrainedModel, _add_variant, dtype_guard
+from ...transformers.utils import weight_name_suffix
 from ...utils.distributed import distributed_gather
 from ...utils.env import LORA_WEIGHTS_NAME
 from ...utils.log import logger
@@ -53,9 +55,6 @@ try:
         RowParallelQuantizationLoRALinear,
     )
 except:
-    logger.warning(
-        "Quantization strategy is only available for PaddlePaddle >= 2.5.2. Please update your PaddlePaddle version to apply quantization strategy to LoRA."
-    )
     QuantizationLinear = None
     ColumnParallelQuantizationLinear = None
     RowParallelQuantizationLinear = None
@@ -84,6 +83,8 @@ class LoRAModel(nn.Layer):
             self.lora_config.dtype = paddle.get_default_dtype()
         with dtype_guard(self.lora_config.dtype):
             self.model = self.get_lora_model(model, lora_config)
+        if isinstance(self.model, PipelineLayer):
+            self.model._single_to_pp_mapping = None
         if self.lora_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
             self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
             logger.warning(
@@ -216,6 +217,15 @@ class LoRAModel(nn.Layer):
             logger.warning(
                 "Quantized strategy does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
             )
+        if (
+            isinstance(self.model, PipelineLayer)
+            and merge_tensor_parallel
+            and self.model.config.tensor_parallel_degree > 1
+        ):
+            merge_tensor_parallel = False
+            logger.warning(
+                "Pipeline parallism does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
+            )
 
         variant = kwargs.get("variant", None)
         is_main_process = kwargs.get("is_main_process", paddle.distributed.get_rank() == 0)
@@ -231,13 +241,14 @@ class LoRAModel(nn.Layer):
             if not is_main_process:
                 logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
                 return
-            variant = None
+            if variant is not None and "tp" in variant:
+                variant = "_".join([x for x in variant.split("_") if "tp" not in x])
             self.lora_config.tensor_parallel_degree = -1
         else:
             trainable_state_dict = self.get_trainable_state_dict()
             if self.model.config.tensor_parallel_degree > 1:
                 if variant is None:
-                    variant = f"tp{self.model.config.tensor_parallel_rank:0>2d}"
+                    variant = weight_name_suffix()
 
         # save lora weight
         lora_weight_name = _add_variant(LORA_WEIGHTS_NAME, variant)
@@ -265,6 +276,7 @@ class LoRAModel(nn.Layer):
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
+                    bias_attr=False if module.bias is None else None,
                 )
             elif isinstance(module, ColumnParallelLinear):
                 # recover the original output_features
