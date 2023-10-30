@@ -25,7 +25,7 @@ export FLAGS_cache_inference_while_scope=1
 
 
 python predictor.py \
-    --model_name_or_path ./llama7b-inference_model_fp1 \
+    --model_name_or_path ./llama7b-inference_model_fp16 \
     --dtype float16 \
     --src_length 300 \
     --max_length 100 \

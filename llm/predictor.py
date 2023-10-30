@@ -77,7 +77,7 @@ class PredictorArgument:
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     quant_type: str = field(
-        default="", metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"}
+        default=None, metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"}
     )
 
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
