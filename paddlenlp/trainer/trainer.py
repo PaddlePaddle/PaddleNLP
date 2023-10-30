@@ -350,16 +350,12 @@ class Trainer:
                 self.args.tensor_parallel_degree > 1 and self.sharding is None
             ):
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
-                if self.args.amp_master_grad:
-                    mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
                 self.scaler = fleet.distributed_scaler(self.scaler)
             elif self.sharding is not None:
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
                 if self.amp_dtype == "float16" or self.amp_dtype == "bfloat16":
                     if ShardingOption.SHARD_OP in self.args.sharding:
                         self.scaler = fleet.distributed_scaler(self.scaler)
-                        if self.args.amp_master_grad:
-                            mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
                     else:
                         # scaler for stage2 and stage3
                         from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
@@ -370,7 +366,6 @@ class Trainer:
                             assert (
                                 ShardingOption.SHARD_GRAD_OP in self.args.sharding
                             ), "Main grad doesn't support sharding stage 3 for now."
-                            mix_precision_utils.MixPrecisionScaler(self.scaler)  # return value has no use
 
                         self.scaler = GroupShardedScaler(self.scaler)
                 else:
