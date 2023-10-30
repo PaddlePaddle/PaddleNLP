@@ -12,12 +12,6 @@ ptq:
     eval_with_do_generation: false
     do_ptq: true
     ptq_step: 4
-    smooth: true
-    smooth_step: 4
-    smooth_all_linears: true
-    smooth_piecewise_search: true
-    smooth_k_piece: 1
-    smooth_search_piece: true
   default:
     llama:
       model_name_or_path: __internal_testing__/tiny-random-llama
@@ -35,14 +29,10 @@ inference-predict:
     batch_size: 2
     decode_strategy: greedy_search
     dtype: float16
-    quant_type: "A8W8"
-    shift_smooth: true
 
 inference-to-static:
   default:
     dtype: float16
-    quant_type: "A8W8"
-    shift_smooth: true
 
 
 inference-infer:

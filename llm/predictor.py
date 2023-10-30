@@ -726,7 +726,7 @@ def create_predictor(
                 config.weight_only_quant_bits = weight_only_quant_bits
                 config.quant_type = predictor_args.quant_type
 
-            if "a8w8" in config.quantization_config.quant_type:
+            if config.quantization_config.quant_type is not None and "a8w8" in config.quantization_config.quant_type:
                 config.model_name_or_path = predictor_args.model_name_or_path
                 config.quant_type = config.quantization_config.quant_type
 

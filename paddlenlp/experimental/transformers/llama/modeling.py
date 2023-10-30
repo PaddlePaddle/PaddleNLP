@@ -90,9 +90,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.use_weight_only = False
         self.weight_only_quant_bits = config.weight_only_quant_bits
 
-        if "weight_only_int" in self.quant_type:
+        if self.quant_type is not None and "weight_only_int" in self.quant_type:
             self.use_weight_only = True
-        elif "a8w8" in self.quant_type:
+        elif self.quant_type is not None and "a8w8" in self.quant_type:
             self.quant_model_path = config.model_name_or_path
             self.shift = config.quantization_config.shift
             self.smooth = config.quantization_config.smooth
@@ -549,7 +549,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     )
 
                 if self.shift:
-                    self.transformer_block.ln_scales[idx].set_value(
+                    self.transformer_block.ln_biases[idx].set_value(
                         paddle.to_tensor(state_dict["llama.layers.{}.input_layernorm.bias".format(idx)])
                     )
                     self.transformer_block.ffn_ln_biases[idx].set_value(
@@ -586,7 +586,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         [unfused_state_dict["mlp.gate_proj.bias"], unfused_state_dict["mlp.up_proj.bias"]], axis=-1
                     )
 
-                    self.transformer_block.ffn1_bias[idx].set_value(paddle.to_tensor(concated_ffn1_bias))
+                    self.transformer_block.ffn1_biases[idx].set_value(paddle.to_tensor(concated_ffn1_bias))
 
                     if self.shift_smooth_all_linears:
                         self.transformer_block.linear_biases[idx].set_value(

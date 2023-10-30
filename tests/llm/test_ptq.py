@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import os
 import sys
 import unittest
 
@@ -50,3 +51,34 @@ class FinetuneTest(LLMTest, unittest.TestCase):
             main()
 
         self.run_predictor({"inference_model": True})
+
+    def test_ptq_smooth(self):
+        finetune_config = load_test_config(self.config_path, "ptq", self.model_dir)
+
+        finetune_config["dataset_name_or_path"] = self.data_dir
+        finetune_config["output_dir"] = self.output_dir
+        finetune_config["smooth"] = True
+
+        with argv_context_guard(finetune_config):
+            from finetune_generation import main
+
+            main()
+
+        self.run_predictor({"inference_model": True})
+        self._read_result(os.path.join(self.output_dir, "predict.json"))
+
+    def test_ptq_shift(self):
+        finetune_config = load_test_config(self.config_path, "ptq", self.model_dir)
+
+        finetune_config["dataset_name_or_path"] = self.data_dir
+        finetune_config["output_dir"] = self.output_dir
+        finetune_config["shift"] = True
+
+        with argv_context_guard(finetune_config):
+            from finetune_generation import main
+
+            main()
+
+        self.run_predictor({"inference_model": True})
+
+    # TODO(@wufeisheng): add test_ptq_shift_smooth_all_linear
