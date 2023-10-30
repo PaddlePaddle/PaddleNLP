@@ -25,6 +25,9 @@ pretrain:
     chatglm:
       model_type: chatglm
       model_name_or_path: __internal_testing__/tiny-fused-chatglm
+    qwen:
+      model_type: qwen
+      model_name_or_path: __internal_testing__/tiny-fused-qwen
 
 inference-predict:
   default:
