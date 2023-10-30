@@ -49,6 +49,25 @@ try:
 except:
     flash_attention = None
 
+def shard_op_for_sequence_parallel_linear(tgt):
+    # FIXME Hack to shard op for module (linear)
+    last_op = tgt.block.ops[-2]
+    assert last_op.type in ["matmul", "matmul_v2"]
+    from paddle.distributed.auto_parallel.static.dist_context import get_default_distributed_context
+    from paddle.distributed.auto_parallel.static.dist_op import DistributedOperator
+    default_dist_ctx = get_default_distributed_context()
+    original_id = last_op.desc.original_id()
+    assert len(last_op.output_arg_names) == 1, "Output is more than one: [{}].".format(str(last_op))
+    assert original_id not in default_dist_ctx._dist_ops_for_program, "Op already has dist attribute."
+    
+    output_var_name = last_op.output_arg_names[0]
+    assert output_var_name != tgt.name, "out name: {}, output_var_name: {}".format(output_var_name, tgt.name)
+    dist_op = DistributedOperator(last_op)
+    output_tensor = dist_op.get_serial_output(output_var_name)
+    tensor_dist_attr = dist_op.dist_attr.get_output_dist_attr(output_var_name)
+    tensor_dist_attr.dims_mapping = [-1] * len(output_tensor.shape)
+    tensor_dist_attr.mark_annotated("dims_mapping")
+
 
 def get_attr(layer, name):
     if getattr(layer, name, None) is not None:
@@ -294,22 +313,7 @@ class MultiHeadAttention(nn.Layer):
 
         if self.sequence_parallel:
             # FIXME Hack to shard op for module (linear)
-            last_op = out.block.ops[-1]
-            from paddle.distributed.auto_parallel.static.dist_context import get_default_distributed_context
-            from paddle.distributed.auto_parallel.static.dist_op import DistributedOperator
-            default_dist_ctx = get_default_distributed_context()
-            original_id = last_op.desc.original_id()
-            assert len(last_op.output_arg_names) == 1, "Output is more than one: [{}].".format(str(last_op))
-            assert original_id not in default_dist_ctx._dist_ops_for_program, "Op already has dist attribute."
-            
-            output_var_name = last_op.output_arg_names[0]
-            assert output_var_name == out.name, "out name: {}, output_var_name: {}".format(output_var_name, out.name)
-            dist_op = DistributedOperator(last_op)
-            output_tensor = dist_op.get_serial_output(output_var_name)
-            tensor_dist_attr = dist_op.dist_attr.get_output_dist_attr(output_var_name)
-            tensor_dist_attr.dims_mapping = [-1] * len(output_tensor.shape)
-            tensor_dist_attr.mark_annotated("dims_mapping")
-            print("##############",output_var_name, out.name)            
+            shard_op_for_sequence_parallel_linear(out)    
 
         outs = [out]
         if self.need_weights:
@@ -358,7 +362,17 @@ class TransformerDecoder(nn.Layer):
 
         for i, mod in enumerate(self.layers):
             ipp = mod.ipp
-            auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().dp_dim, None, None])
+            # TODO(zhaoyingli) Annotation of SP and DP are conflict here!
+            # DP-PP required the input of Transformer Layer to be annotated as :
+            # auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().dp_dim, None, None])
+            # But the above annotation will cutoff the propagation of SP sharding when SP is used along.
+            # A better solution is to allow the DP sharding propagate across PP Mesh.  
+            if not self.sequence_parallel: 
+                auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().dp_dim, None, None])
+            elif auto_env.get_mesh().dp_dim is not None:
+                auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().tp_dim, auto_env.get_mesh().dp_dim, None])
+            else:
+                pass
 
             if cache is None:
                 if use_cache:
@@ -487,7 +501,6 @@ class TransformerDecoderLayer(nn.Layer):
             tgt = self.norm1(tgt)
 
         if self.sequence_parallel:
-            # TODO(JZ-LIANG) make sure unsharded annotation would not be changed
             auto.shard_tensor(tgt, auto_env.get_mesh()[self.ipp], [None, None, None])
 
         if use_cache is False:
@@ -518,6 +531,9 @@ class TransformerDecoderLayer(nn.Layer):
             # Enter TP Region
             auto.shard_tensor(tgt, auto_env.get_mesh()[0], [None, None, None])
             tgt = self.linear2(self.activation(self.linear1(tgt)))
+            # NOTE shard_op to cut off the SP sharding propagation backward.
+            shard_op_for_sequence_parallel_linear(tgt)
+
             # Enter SP Region
             auto.shard_tensor(tgt, auto_env.get_mesh()[0], [auto_env.get_mesh().sp_dim, None, None])
             if not self.use_fused_dropout_add:
@@ -1347,3 +1363,5 @@ class GPTForGenerationAuto(nn.Layer):
         else:
             raise ValueError(f"Not support {decode_strategy} strategy yet!")
         return ret
+
+
