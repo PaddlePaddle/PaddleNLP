@@ -112,6 +112,7 @@ function _train(){
             --prefix_tuning ${prefix_tuning} \
             --benchmark 1 \
             --intokens 1 \
+            --use_flash_attention 1 \
             --device gpu"
 
     # 以下为通用执行命令，无特殊可不用修改
