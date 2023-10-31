@@ -312,8 +312,8 @@ def TopPProcess(probs: paddle.Tensor, top_p: float, min_tokens_to_keep: int):
         sorted_indices = paddle.argsort(probs, descending=True)
         sorted_probs = paddle.sort(probs, descending=True)
 
-        sorted_probs  = paddle.cast(sorted_probs, paddle.bfloat16)
-        sorted_indices = paddle.cast(sorted_indices, paddle.int64)
+        sorted_probs = paddle.cast(sorted_probs, paddle.bfloat16)
+
     else:
         sorted_indices = paddle.argsort(probs, descending=True)
         sorted_probs = paddle.sort(probs, descending=True)
