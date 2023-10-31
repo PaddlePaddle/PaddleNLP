@@ -125,6 +125,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
 )
 from .training_args import TrainingArguments
 from .utils.helper import (  # nested_truncate,
+    broadcast_dp_optimizer,
     distributed_concat,
     distributed_file,
     distributed_isfile,
@@ -594,6 +595,22 @@ class Trainer:
         args = self.args
         self.is_in_train = True
 
+        logger.info(f"Starting training from resume_from_checkpoint : {resume_from_checkpoint}")
+
+        # The resume_from_checkpoint could be None in some machine node.
+        # Here we reset None to temp directory.
+        if args.world_size > 1:
+            is_resume_from_checkpoint = paddle.to_tensor([resume_from_checkpoint is not None])
+            paddle.distributed.all_reduce(is_resume_from_checkpoint)
+            is_resume_from_checkpoint = is_resume_from_checkpoint.item()
+            if is_resume_from_checkpoint > 0 and is_resume_from_checkpoint < paddle.distributed.get_world_size():
+                if resume_from_checkpoint is None:
+                    resume_from_checkpoint = os.path.join(self.args.output_dir, "local_tempdir")
+                    if os.path.exists(resume_from_checkpoint) and self.args.local_rank == 0:
+                        shutil.rmtree(resume_from_checkpoint)
+                    os.makedirs(resume_from_checkpoint, exist_ok=True)
+                    logger.info(f"Reset resume_from_checkpoint to temp directory : {resume_from_checkpoint}")
+
         # memory metrics - must set up as early as possible
         self._memory_tracker.start()
 
@@ -716,6 +733,15 @@ class Trainer:
             self.state = TrainerState.load_from_json(
                 distributed_file(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
             )
+            if self.args.world_size > 1:
+                global_step_list = []
+                paddle.distributed.all_gather(
+                    global_step_list, paddle.to_tensor([self.state.global_step], dtype="int64")
+                )
+                assert (
+                    paddle.sum(paddle.stack(global_step_list) - global_step_list[0]) == 0
+                ), f"Error, get different globel step, please check! step list: {[x.item() for x in global_step_list]}"
+
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:
                 steps_trained_in_current_epoch = self.state.global_step % (num_update_steps_per_epoch)
@@ -1417,13 +1443,24 @@ class Trainer:
         # if use distributed training
         if self.args.world_size > 1:
             process_index = self.args.process_index
-            rng_file = os.path.join(checkpoint, f"rng_state_{process_index}.pth")
-            if not os.path.isfile(rng_file):
-                logger.info(
-                    f"Didn't find an RNG file for process {process_index}, if you are resuming a training that "
-                    "wasn't launched in a distributed fashion, reproducibility is not guaranteed."
-                )
-                return
+            rng_file_list = [None for x in range(self.args.world_size)]
+            if self.args.should_save:
+                rng_file = os.path.join(checkpoint, f"rng_state_{self.args.world_size}.pth")
+                if os.path.isfile(rng_file):
+                    rng_file_list = paddle.load(rng_file, return_numpy=True)
+            paddle.distributed.broadcast_object_list(rng_file_list, src=0)
+            # if rng_file_list still empty, then use old style rng_state
+            if rng_file_list[0] is None:
+                rng_file = os.path.join(checkpoint, f"rng_state_{process_index}.pth")
+                if not os.path.isfile(rng_file):
+                    logger.info(
+                        f"Didn't find an RNG file for process {process_index}, if you are resuming a training that "
+                        "wasn't launched in a distributed fashion, reproducibility is not guaranteed."
+                    )
+                    return
+                checkpoint_rng_state = paddle.load(rng_file, return_numpy=True)
+            else:
+                checkpoint_rng_state = rng_file_list[process_index]
         else:
             rng_file = os.path.join(checkpoint, "rng_state.pth")
             if not os.path.isfile(rng_file):
@@ -1433,7 +1470,8 @@ class Trainer:
                 )
                 return
 
-        checkpoint_rng_state = paddle.load(rng_file, return_numpy=True)
+            checkpoint_rng_state = paddle.load(rng_file, return_numpy=True)
+
         random.setstate(checkpoint_rng_state["python"])
         np.random.set_state(checkpoint_rng_state["numpy"])
 
@@ -1979,21 +2017,19 @@ class Trainer:
                 "hybrid_parallel_rng_state_tracker"
             ] = fleet.meta_parallel.get_rng_state_tracker().get_states_tracker()
 
-        # A process can arrive here before the process 0 has a chance to save the model, in which case output_dir may
-        # not yet exist.
-        os.makedirs(output_dir, exist_ok=True)
-
         if self.args.world_size > 1:
-            # use global process_index to save
-            process_index = self.args.process_index
-            paddle.save(rng_states, os.path.join(output_dir, f"rng_state_{process_index}.pth"))
+            rng_states_list = []
+            paddle.distributed.all_gather_object(rng_states_list, rng_states)
+            if self.args.should_save:
+                os.makedirs(output_dir, exist_ok=True)
+                paddle.save(rng_states_list, os.path.join(output_dir, f"rng_state_{self.args.world_size}.pth"))
         else:
+            os.makedirs(output_dir, exist_ok=True)
             paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
 
         # Maybe delete some older checkpoints.
-        if self.args.should_save_model_state and (
-            True if not self.args.use_hybrid_parallel else self.args.local_rank == 0
-        ):
+        # For hybrid parallel training, the checkpoint files maybe on different node.
+        if self.args.should_save_model_state and self.args.local_rank == 0:
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
 
     def set_optimizer_grouped_parameters(self, optimizer_grouped_parameters=None):
@@ -2163,15 +2199,19 @@ class Trainer:
             )
         else:
             optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
-            path = os.path.join(checkpoint, optimizer_name)
-            if os.path.isfile(path):
-                opt_state_dict = paddle.load(path)
+            if self.args.data_parallel_rank == 0:
+                path = os.path.join(checkpoint, optimizer_name)
+                if os.path.isfile(path):
+                    opt_state_dict = paddle.load(path)
+
+        # broadcast optimizer state in dp group
+        opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
 
         if opt_state_dict is not None:
             # Load in optimizer and scheduler states
             self.optimizer.set_state_dict(opt_state_dict)
         else:
-            raise ValueError(f"optimizer-state-dict not found, opt:{os.path.join(checkpoint, optimizer_name)}.")
+            raise ValueError(f"optimizer-state-dict not found, opt: {os.path.join(checkpoint, optimizer_name)}.")
 
         if distributed_isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
             self.lr_scheduler.set_state_dict(paddle.load(distributed_file(os.path.join(checkpoint, SCHEDULER_NAME))))
