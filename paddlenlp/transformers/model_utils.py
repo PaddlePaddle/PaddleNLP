@@ -28,6 +28,7 @@ from functools import partial
 # from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
 
+import aistudio_sdk
 import numpy as np
 import paddle
 import paddle.nn as nn
@@ -1216,6 +1217,67 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 revision=revision,
                 create_pr=create_pr,
             )
+
+    def save_to_aistudio(
+        self,
+        repo_id,
+        private=True,
+        license="Apache License 2.0",
+        exist_ok=True,
+        safe_serialization=True,
+        subfolder=None,
+        **kwargs
+    ):
+        """
+        Uploads all elements of this model to a new AiStudio Hub repository.
+        Args:
+            repo_id (str): Repository name for your model/tokenizer in the Hub.
+            token (str): Your token for the Hub.
+            private (bool, optional): Whether the model/tokenizer is set to private. Defaults to True.
+            license (str): The license of your model/tokenizer. Defaults to: "Apache License 2.0".
+            exist_ok (bool, optional): Whether to override existing repository. Defaults to: True.
+            safe_serialization (bool, optional): Whether to save the model in safe serialization way. Defaults to: True.
+            subfolder (str, optional): Push to a subfolder of the repo instead of the root
+        """
+
+        res = aistudio_sdk.hub.create_repo(repo_id=repo_id, private=private, license=license, **kwargs)
+        if "error_code" in res:
+            if res["error_code"] == 10003 and exist_ok:
+                logger.info(
+                    f"Repo {repo_id} already exists, it will override files with the same name. To avoid this, please set exist_ok=False"
+                )
+            else:
+                logger.error(
+                    f"Failed to create repo {repo_id}, error_code: {res['error_code']}, error_msg: {res['error_msg']}"
+                )
+        else:
+            logger.info(f"Successfully created repo {repo_id}")
+
+        with tempfile.TemporaryDirectory() as root_dir:
+            if subfolder is not None:
+                save_dir = os.path.join(root_dir, subfolder)
+            else:
+                save_dir = root_dir
+            # save model
+            self.save_pretrained(
+                save_dir,
+                shard_format="pipeline",
+                safe_serialization=(is_safetensors_available() and safe_serialization),
+                max_shard_size="5GB",
+            )
+
+            # Upload model and return
+            logger.info(f"Pushing to the {repo_id}. This might take a while")
+            for filename in os.listdir(save_dir):
+                res = aistudio_sdk.hub.upload(
+                    repo_id=repo_id, path_or_fileobj=os.path.join(save_dir, filename), path_in_repo=filename, **kwargs
+                )
+                if "error_code" in res:
+                    logger.error(
+                        f"Failed to upload {filename}, error_code: {res['error_code']}, error_msg: {res['error_msg']}"
+                    )
+                else:
+                    logger.info(f"{filename}: {res['message']}")
 
     def resize_token_embeddings(self, new_num_tokens: Optional[int] = None) -> nn.Embedding:
         """
