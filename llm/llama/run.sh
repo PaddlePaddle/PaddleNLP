@@ -1,6 +1,7 @@
-# export FLAGS_prim_all=true
-# export FLAGS_enable_pir_api=True
+export FLAGS_prim_all=true
+export FLAGS_enable_pir_api=True
 export FLAGS_cudnn_deterministc=1
+export ENABLE_FALL_BACK=False 
 export CUDA_VISIBLE_DEVICES=6
 
 if [ ! -d ./data ]
@@ -18,7 +19,7 @@ then
 fi
 
 task_name_or_path="llama_output"
-python run_pretrain.py \
+GLOG_vmodule=generated_vjp=4 python run_pretrain.py \
     --model_type "llama" \
     --model_name_or_path "__internal_testing__/tiny-random-llama" \
     --tokenizer_name_or_path "__internal_testing__/tiny-random-llama" \
@@ -34,22 +35,20 @@ python run_pretrain.py \
     --learning_rate 0.00001 \
     --min_learning_rate 0.000005 \
     --lr_scheduler_type "cosine" \
-    --max_steps 500 \
-    --save_steps 500 \
+    --max_steps 5000 \
+    --save_steps 5000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
     --max_grad_norm 1.0 \
     --logging_steps 1\
     --dataloader_num_workers 1 \
-    --eval_steps 500 \
+    --eval_steps 5000 \
     --report_to "visualdl" \
     --disable_tqdm true \
     --continue_training 0\
     --recompute 0 \
     --do_train \
-    --do_eval \
     --device "gpu" \
     --seed 2023 \
-    --use_fused_rms_norm False \
-    # --fp16  \
-    # --fp16_opt_level "O2"
+    --use_fused_rms_norm False
+
