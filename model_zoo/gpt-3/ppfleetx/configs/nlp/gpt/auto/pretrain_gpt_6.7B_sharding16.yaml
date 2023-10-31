@@ -21,8 +21,8 @@ Model:
   use_recompute: True
   recompute_granularity:
   refined_ops_patterns:
-    - {main_ops: [matmul_v2, elementwise_add], num: -1, pre_ops: [], suf_ops: []}
-    - {main_ops: [flash_attn], num: -1, pre_ops: [], suf_ops: []}
+    - {main_ops: [matmul_v2, elementwise_add], num: 0, pre_ops: [], suf_ops: []}
+    - {main_ops: [flash_attn], num: 0, pre_ops: [], suf_ops: []}
   no_recompute_layers:
 
 
