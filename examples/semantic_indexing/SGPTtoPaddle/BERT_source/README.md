@@ -1,1 +1,1 @@
-BERT source
+BERT模型信息
