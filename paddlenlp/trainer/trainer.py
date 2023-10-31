@@ -2510,6 +2510,7 @@ class Trainer:
             test_dataloader,
             description="Prediction",
             ignore_keys=ignore_keys,
+            prediction_loss_only=True if self.compute_metrics is None else None,
             metric_key_prefix=metric_key_prefix,
             max_eval_iters=self.args.max_evaluate_steps,
         )
