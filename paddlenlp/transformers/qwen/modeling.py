@@ -53,6 +53,11 @@ try:
 except:
     flash_attention = None
 
+try:
+    from paddle.incubate.nn.functional import fused_rotary_position_embedding
+except:
+    fused_rotary_position_embedding = None
+
 
 def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
     is_fleet_init = True
@@ -98,7 +103,6 @@ class QWenAttention(nn.Layer):
 
         self.config = config
         self.seq_length = config.seq_length
-
         self.hidden_size = config.hidden_size
         self.split_size = config.hidden_size
         self.num_heads = config.num_attention_heads
@@ -106,6 +110,8 @@ class QWenAttention(nn.Layer):
         self.inv_norm_factor = 1.0 / math.sqrt(self.head_dim)
 
         self.scale_attn_weights = True
+        self.enable_recompute = False
+        self.recompute_granularity = config.recompute_granularity
 
         self.projection_size = config.kv_channels * config.num_attention_heads
 
@@ -236,7 +242,7 @@ class QWenAttention(nn.Layer):
             self._ntk_cached = ntk_alpha
         else:
             ntk_alpha = self._ntk_cached
-        rotary_pos_emb = self.rotary_emb(kv_seq_len, ntk_alpha=ntk_alpha)
+        rotary_pos_emb = self.rotary_emb(value, kv_seq_len, ntk_alpha=ntk_alpha)
 
         if rotary_pos_emb is not None:
             if isinstance(rotary_pos_emb, tuple):
@@ -245,13 +251,19 @@ class QWenAttention(nn.Layer):
                 rotary_pos_emb = (rotary_pos_emb,) * 2
 
         if rotary_pos_emb is not None:
-            q_pos_emb, k_pos_emb = rotary_pos_emb
-            # Slice the pos emb for current inference
-            cur_len = query.shape[1]
-            q_pos_emb = q_pos_emb[:, -cur_len:, :, :]
-            k_pos_emb = k_pos_emb[:, -cur_len:, :, :]
-            query = apply_rotary_pos_emb(query, q_pos_emb)
-            key = apply_rotary_pos_emb(key, k_pos_emb)
+            cos, sin = rotary_pos_emb
+            if self.config.use_fused_rope:
+                query, key, _ = fused_rotary_position_embedding(
+                    query,
+                    key,
+                    v=None,
+                    sin=sin,
+                    cos=cos,
+                    position_ids=None,
+                    use_neox_rotary_style=False,
+                )
+            else:
+                query, key = apply_rotary_pos_emb(query, key, cos, sin)
 
         if layer_past is not None:
             past_key, past_value = layer_past[0], layer_past[1]
@@ -271,7 +283,13 @@ class QWenAttention(nn.Layer):
             logn_tensor = self.logn_tensor[:, seq_start:seq_end, :, :]
             query = query * logn_tensor.expand(query.shape)
 
-        attn_output, attn_weight = self._attn(query, key, value, attention_mask)
+        has_gradient = not (query.stop_gradient and key.stop_gradient and value.stop_gradient)
+        if self.enable_recompute and self.training and has_gradient and self.recompute_granularity == "core_attn":
+            attn_output, attn_weight = recompute(
+                self._attn, query, key, value, attention_mask, use_reentrant=self.config.recompute_use_reentrant
+            )
+        else:
+            attn_output, attn_weight = self._attn(query, key, value, attention_mask)
         context_layer = self._merge_heads(attn_output, self.num_heads, self.head_dim)
 
         attn_output = self.c_proj(context_layer)
@@ -327,7 +345,6 @@ class QWenBlock(nn.Layer):
         self.ln_1 = QWenRMSNorm(config)
         self.attn = QWenAttention(config)
         self.ln_2 = QWenRMSNorm(config)
-
         self.mlp = QWenMLP(config)
 
     def forward(
@@ -527,6 +544,7 @@ class QWenModel(QWenPretrainedModel):
         self.num_hidden_layers = config.num_hidden_layers
         self.embed_dim = config.hidden_size
         self.enable_recompute = False
+        self.recompute_granularity = config.recompute_granularity
 
         if config.tensor_parallel_degree > 1:
             self.wte = mpu.VocabParallelEmbedding(
@@ -678,7 +696,7 @@ class QWenModel(QWenPretrainedModel):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
-            if self.enable_recompute and self.training and has_gradient:
+            if self.enable_recompute and self.training and has_gradient and self.recompute_granularity == "full":
                 outputs = self.recompute_training(
                     block,
                     hidden_states,
@@ -933,12 +951,11 @@ class RotaryEmbedding(nn.Layer):
         super().__init__()
         self.dim = dim
         self.base = base
-        self.inv_freq = 1.0 / (base ** (paddle.arange(0, dim, 2, dtype=paddle.float32) / dim))
-        self._rotary_pos_emb_cache = None
+        self.inv_freq = 1.0 / (self.base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype="float32") / self.dim))
         self._seq_len_cached = 0
         self._ntk_alpha_cached = 1.0
 
-    def update_rotary_pos_emb_cache(self, max_seq_len, offset=0, ntk_alpha=1.0):
+    def update_cos_sin_cache(self, max_seq_len, offset=0, ntk_alpha=1.0):
         seqlen = max_seq_len + offset
         if seqlen > self._seq_len_cached or ntk_alpha != self._ntk_alpha_cached:
             base = self.base * ntk_alpha ** (self.dim / (self.dim - 2))
@@ -948,28 +965,32 @@ class RotaryEmbedding(nn.Layer):
             seq = paddle.arange(self._seq_len_cached)
             freqs = paddle.outer(seq.astype(self.inv_freq.dtype), self.inv_freq)
             emb = paddle.concat([freqs, freqs], axis=-1)
+            self.cos_cached = emb.cos()[None, :, None, :]
+            self.sin_cached = emb.sin()[None, :, None, :]
 
-            self._rotary_pos_emb_cache = emb.unsqueeze([0, 2])
+    def forward(self, x, max_seq_len, offset=0, ntk_alpha=1.0):
+        self.update_cos_sin_cache(max_seq_len, offset, ntk_alpha)
+        cos = self.cos_cached[:, offset : offset + max_seq_len, :, ...]
+        sin = self.sin_cached[:, offset : offset + max_seq_len, :, ...]
+        return (
+            cos.cast(x.dtype) if cos.dtype != x.dtype else cos,
+            sin.cast(x.dtype) if sin.dtype != x.dtype else sin,
+        )
 
-    def forward(self, max_seq_len, offset=0, ntk_alpha=1.0):
-        self.update_rotary_pos_emb_cache(max_seq_len, offset, ntk_alpha)
-        return self._rotary_pos_emb_cache[:, offset : offset + max_seq_len]
 
-
-def _rotate_half(x):
-
-    x = x.reshape(x.shape[:-1] + [2, -1])
-    x1, x2 = x.unbind(axis=-2)
+def rotate_half(x):
+    """Rotates half the hidden dims of the input."""
+    x1 = x[..., : x.shape[-1] // 2]
+    x2 = x[..., x.shape[-1] // 2 :]
     return paddle.concat([-x2, x1], axis=-1)
 
 
-def apply_rotary_pos_emb(t, freqs):
-    rot_dim = freqs.shape[-1]
-    t_, t_pass_ = t[..., :rot_dim], t[..., rot_dim:]
-    t_ = t_.astype(paddle.float32)
-    t_pass_ = t_pass_.astype(paddle.float32)
-    t_ = (t_ * freqs.cos()) + (_rotate_half(t_) * freqs.sin())
-    return paddle.concat([t_, t_pass_], axis=-1).astype(t.dtype)
+def apply_rotary_pos_emb(q, k, cos, sin):
+    cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+    sin = sin[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+    q_embed = (q * cos) + (rotate_half(q) * sin)
+    k_embed = (k * cos) + (rotate_half(k) * sin)
+    return q_embed, k_embed
 
 
 def rms_norm_fused(x_in, w, eps):
@@ -981,7 +1002,6 @@ class QWenRMSNorm(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.config = config
-
         self.eps = config.layer_norm_epsilon
         self.weight = paddle.create_parameter(
             shape=[config.hidden_size],
