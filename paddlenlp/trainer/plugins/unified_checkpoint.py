@@ -128,6 +128,10 @@ def load_unified_checkpoint(model, resume_from_checkpoint: str, safe_serializati
 
     model_state_dict = model.state_dict()
     expected_keys = set(list(model_state_dict.keys()))
+    missing_keys = expected_keys - set(loaded_keys)
+
+    if len(missing_keys) > 0:
+        raise ValueError(f"missing_keys: {missing_keys}")
 
     def _remove_unused_keys(
         state_dict,
@@ -253,10 +257,12 @@ def unified_checkpoint_into_shards(
         paddle.distributed.all_gather_object(
             pp_total_size_list, total_size_list if len(total_size_list) > 0 else total_size, pp_group
         )
-
         if isinstance(pp_total_size_list[0], list):
             total_size_list = [y for x in pp_total_size_list for y in x]
             index_file_list = [y for x in pp_index_file_list for y in x]
+        else:
+            index_file_list = pp_index_file_list
+            total_size_list = pp_total_size_list
 
     # for pure sharding
     if len(index_file_list) == 0 and len(total_size_list) == 0:
