@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 
+import aistudio_sdk
 import numpy as np
 import paddle
 from huggingface_hub import (
@@ -1836,32 +1837,20 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             )
 
     def save_to_aistudio(
-        self,
-        repo_id,
-        token=None,
-        private=False,
-        license="Apache License 2.0",
-        exist_ok=True,
-        subfolder=None,
+        self, repo_id, private=True, license="Apache License 2.0", exist_ok=True, subfolder=None, **kwargs
     ):
         """
         Uploads all elements of this model to a new AiStudio Hub repository.
         Args:
             repo_id (str): Repository name for your model/tokenizer in the Hub.
-            token (str, optional): Your token for the Hub. Defaults to None.
-            private (bool, optional): Whether the model/tokenizer is set to private.
+            token (str): Your token for the Hub.
+            private (bool, optional): Whether the model/tokenizer is set to private. Defaults to True.
             license (str): The license of your model/tokenizer. Defaults to: "Apache License 2.0".
             exist_ok (bool, optional): Whether to override existing repository. Defaults to: True.
             subfolder (str, optional): Push to a subfolder of the repo instead of the root
         """
-        import aistudio_sdk
 
-        res = aistudio_sdk.hub.create_repo(
-            repo_id=repo_id,
-            private=private,
-            license=license,
-            token=token,
-        )
+        res = aistudio_sdk.hub.create_repo(repo_id=repo_id, private=private, license=license, **kwargs)
         if "error_code" in res:
             if res["error_code"] == 10003 and exist_ok:
                 logger.info(
@@ -1883,14 +1872,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             self.save_pretrained(save_dir)
 
             # Upload model and return
-            print(os.listdir(save_dir))
             logger.info(f"Pushing to the {repo_id}. This might take a while")
             for filename in os.listdir(save_dir):
                 res = aistudio_sdk.hub.upload(
-                    repo_id=repo_id,
-                    path_or_fileobj=os.path.join(save_dir, filename),
-                    path_in_repo=filename,
-                    token=token,
+                    repo_id=repo_id, path_or_fileobj=os.path.join(save_dir, filename), path_in_repo=filename, **kwargs
                 )
                 if "error_code" in res:
                     logger.error(
