@@ -16,7 +16,6 @@ import math
 import warnings
 from functools import partial
 from typing import List
-from altair import Position
 
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
@@ -1002,6 +1001,7 @@ def rotate_half(x):
     x2 = x[..., x.shape[-1] // 2 :]
     return paddle.concat([-x2, x1], axis=-1)
 
+
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None):
 
     if position_ids is None:
@@ -1016,6 +1016,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None):
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
+
 
 def rms_norm_fused(x_in, w, eps):
     fused_ln = try_import("fused_ln")
