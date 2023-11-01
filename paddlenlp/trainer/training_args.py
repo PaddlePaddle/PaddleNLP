@@ -225,6 +225,12 @@ class TrainingArguments:
             pipeline_parallel_degree means split all transformer layers to how many stages.
             default -1 for not use pipeline parallel.
             Note. this need model support in source code, see llama modeling_pp.py file
+        tensor_parallel_config (`str`, *optional*)(
+            Some additional configs which affect model parallel performance, we provide some option to config it.
+            following config is support:
+              enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance.
+              enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.
+              enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true. It can accelerate model parallel further.
         pipeline_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it.
             following config is support:
@@ -1001,22 +1007,21 @@ class TrainingArguments:
                                     f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap."
                                 )
                     try:
-                        if (
-                            "enable_stage1_tensor_fusion" in sharding_parallel_config
-                            or "enable_stage1_overlap" in sharding_parallel_config
-                        ):
-                            assert pipeline_parallel_degree == 1, (
+                        if pipeline_parallel_degree == 1:
+                            strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
+                                True if "enable_stage1_tensor_fusion" in sharding_parallel_config else False
+                            )
+                            if "enable_stage1_overlap" in sharding_parallel_config:
+                                strategy.hybrid_configs["sharding_configs"].comm_overlap = True
+                                strategy.hybrid_configs[
+                                    "sharding_configs"
+                                ].accumulate_steps = self.gradient_accumulation_steps
+                        else:
+                            warnings.warn(
                                 "For pipeline parallel with sharding, the sharding overlap and tensor fusion "
                                 "should be configured in pipeline_parallel_config."
+                                '"enable_stage1_tensor_fusion" and "enable_stage1_overlap" in sharding_parallel_config will be ignored.'
                             )
-                        strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
-                            True if "enable_stage1_tensor_fusion" in sharding_parallel_config else False
-                        )
-                        if "enable_stage1_overlap" in sharding_parallel_config:
-                            strategy.hybrid_configs["sharding_configs"].comm_overlap = True
-                            strategy.hybrid_configs[
-                                "sharding_configs"
-                            ].accumulate_steps = self.gradient_accumulation_steps
                     except KeyError:
                         warnings.warn(
                             "The enable_stage1_tensor_fusion or enable_stage1_overlap is not supported "

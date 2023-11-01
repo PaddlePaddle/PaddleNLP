@@ -17,6 +17,6 @@
     "smooth_step": 16,
     "smooth_all_linears": true,
     "smooth_piecewise_search": true,
-    "smooth_k_piece": true,
+    "smooth_k_piece": 3,
     "smooth_search_piece": true
   }
