@@ -40,5 +40,5 @@ onnxruntime
 sacremoses
 soundfile
 librosa
-gradio==3.45.0
+gradio>=3.45.0
 tiktoken
