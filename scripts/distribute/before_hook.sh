@@ -37,7 +37,7 @@ function gpt-3() {
     python -m pip install -r requirements.txt --force-reinstall
     
     cd ppfleetx/ops && python setup_cuda.py install && cd ../..
-    python -m pip install numpy==1.22.4 --force-reinstall
+    #python -m pip install numpy==1.22.4 --force-reinstall
     python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
 
     echo -e "\033[31m ---- download data  \033[0m"
