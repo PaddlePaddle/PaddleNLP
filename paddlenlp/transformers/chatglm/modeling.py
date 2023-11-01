@@ -36,6 +36,11 @@ from ..model_outputs import (
 )
 from .configuration import CHATGLM_PRETRAINED_RESOURCE_FILES_MAP, ChatGLMConfig
 
+try:
+    from paddle.nn.functional.flash_attention import flash_attention
+except:
+    flash_attention = None
+
 __all__ = [
     "ChatGLMModel",
     "ChatGLMPretrainedModel",
@@ -245,8 +250,12 @@ class ChatGLMAttention(nn.Layer):
         q_layer, k_layer, v_layer = paddle.split(mixed_layer, 3, axis=-1)
         # [s, b, n, h/n]
         q_layer, k_layer = self._core_attention(q_layer, k_layer, position_ids, rotary_embeds)
-
-        if self.config.use_flash_attention:
+        version = paddle.version.full_version
+        version_check = True
+        if version != "0.0.0" and version <= "2.5.2":
+            paddle.utils.require_version(min_version="2.5.2")
+            version_check = False
+        if self.config.use_flash_attention and version_check:
             # Flash Attention now ignore attention mask
             # Current Flash Attention doesn't support attn maskt
             # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]

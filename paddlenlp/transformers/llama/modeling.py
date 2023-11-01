@@ -195,6 +195,14 @@ def scaled_dot_product_attention(
             attention_mask = attention_mask.cast(alibi.dtype) + alibi
         version = paddle.version.full_version
         if version != "0.0.0" and version <= "2.5.2":
+            attn_output, attn_weights = flash_attention(
+                query_states,
+                key_states,
+                value_states,
+                causal=True,
+                return_softmax=output_attentions,
+            )
+        else:
             attn_output = F.scaled_dot_product_attention(
                 query_states,
                 key_states,
@@ -203,14 +211,6 @@ def scaled_dot_product_attention(
                 is_causal=attention_mask is None,
             )
             attn_weights = None
-        else:
-            attn_output, attn_weights = flash_attention(
-                query_states,
-                key_states,
-                value_states,
-                causal=True,
-                return_softmax=output_attentions,
-            )
 
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])

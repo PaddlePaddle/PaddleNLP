@@ -378,8 +378,12 @@ class BloomAttention(nn.Layer):
         (query_layer, key_layer, value_layer) = self._split_heads(fused_qkv)
 
         batch_size, q_length, _, _ = query_layer.shape
-
-        if self.config.use_flash_attention:
+        version = paddle.version.full_version
+        version_check = True
+        if version != "0.0.0" and version <= "2.5.2":
+            paddle.utils.require_version(min_version="2.5.2")
+            version_check = False
+        if self.config.use_flash_attention and version_check:
             query_states, key_states, value_states = query_layer, key_layer, value_layer
 
             attention_mask = attention_mask.cast(alibi.dtype) + alibi
