@@ -730,12 +730,12 @@ class GPTPretrainingCriterionAuto(nn.Layer):
         auto.shard_tensor(
             loss_mask, auto_env.get_mesh()[-1], [auto_env.get_mesh().dp_dim] + [None] * (len(loss_mask.shape) - 1)
         )
+        with paddle.amp.auto_cast(False):
+            masked_lm_loss = self.loss_func(prediction_scores.astype('float32'), masked_lm_labels.unsqueeze(2))
 
-        masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
-
-        loss_mask = loss_mask.reshape([-1])
-        masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
-        loss = masked_lm_loss / loss_mask.sum()
+            loss_mask = loss_mask.reshape([-1])
+            masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
+            loss = masked_lm_loss / loss_mask.sum()
         return loss
 
 
