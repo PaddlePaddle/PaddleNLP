@@ -251,6 +251,14 @@ class ChatGLMAttention(nn.Layer):
             # Current Flash Attention doesn't support attn maskt
             # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
             # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
+            if cache is not None:
+                cache_k, cache_v = cache[0], cache[1]
+                # [s + c, b, n, h/n]
+                k_layer = paddle.concat([cache_k, k_layer], axis=0)
+                v_layer = paddle.concat([cache_v, v_layer], axis=0)
+            cache_kv = None
+            if use_cache:
+                cache_kv = (k_layer, v_layer)
 
             # [s, b, n, h/n] = > [batch_size, seq_len, num_heads, head_dim]
             q_layer = paddle.transpose(q_layer, [1, 0, 2, 3])
@@ -272,7 +280,7 @@ class ChatGLMAttention(nn.Layer):
             attn_output = paddle.transpose(attn_output, [1, 0, 2])
             attn_output = self.dense(attn_output)
 
-            output, cache_kv, attention_probs = attn_output, None, attn_weights
+            output, attention_probs = attn_output, attn_weights
         else:
             if cache is not None:
                 cache_k, cache_v = cache[0], cache[1]

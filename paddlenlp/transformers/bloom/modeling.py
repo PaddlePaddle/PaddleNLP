@@ -381,6 +381,7 @@ class BloomAttention(nn.Layer):
 
         if self.config.use_flash_attention:
             query_states, key_states, value_states = query_layer, key_layer, value_layer
+
             attention_mask = attention_mask.cast(alibi.dtype) + alibi
             attention_mask = attention_mask.reshape(
                 [query_states.shape[0], -1, attention_mask.shape[-2], attention_mask.shape[-1]]
@@ -396,7 +397,22 @@ class BloomAttention(nn.Layer):
             # [batch_size, seq_len, num_heads, head_dim] = > [batch_size, seq_len, hidden_size]
             attn_output = attn_output.reshape([attn_output.shape[0], attn_output.shape[1], -1])
             output_tensor = self.dense(attn_output)
-            present = None
+
+            query_layer = query_layer.transpose([0, 2, 1, 3])
+            key_layer = key_layer.transpose([0, 2, 3, 1])
+            value_layer = value_layer.transpose([0, 2, 1, 3])
+            if layer_past is not None:
+                past_key, past_value = layer_past
+                # concatenate along seq_length dimension:
+                #  - key: [batch_size, self.num_heads, head_dim, kv_length]
+                #  - value: [batch_size, self.num_heads, kv_length, head_dim]
+                key_layer = paddle.concat((past_key, key_layer), axis=3)
+                value_layer = paddle.concat((past_value, value_layer), axis=2)
+
+            if use_cache is True:
+                present = (key_layer, value_layer)
+            else:
+                present = None
         else:
 
             query_layer = query_layer.transpose([0, 2, 1, 3])
