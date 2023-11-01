@@ -282,6 +282,8 @@ from .rw.tokenizer import *
 from .qwen.modeling import *
 from .qwen.configuration import *
 from .qwen.tokenizer import *
+from .mistral.modeling import *
+from .mistral.configuration import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available

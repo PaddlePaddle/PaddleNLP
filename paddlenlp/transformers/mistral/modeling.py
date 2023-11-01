@@ -20,15 +20,16 @@ import paddle
 import paddle.nn.functional as F
 from paddle import nn
 from paddle.distributed.fleet.utils import recompute
+import paddle.distributed.fleet.meta_parallel as mpu
+from paddle.distributed import fleet
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
-#import paddle.distributed.fleet.meta_parallel as mpu
 
 from paddlenlp.transformers.conversion_utils import (
     StateDictNameMapping,
     init_name_mappings,
 )
 from paddlenlp.utils.log import logger
-i=0
+#i=0
 
 from ..activations import ACT2FN
 from ..model_outputs import (
@@ -100,7 +101,6 @@ def _make_sliding_window_causal_mask(
     return mask[None, None, :, :].expand([bsz, 1, tgt_len, tgt_len + past_key_values_length])
 
 
-# Copied from transformers.models.bart.modeling_bart._expand_mask
 def _expand_mask(mask: paddle.Tensor, dtype: paddle.dtype, tgt_len: Optional[int] = None):
     """
     Expands attention_mask from `[bsz, seq_len]` to `[bsz, 1, tgt_seq_len, src_seq_len]`.
@@ -115,7 +115,6 @@ def _expand_mask(mask: paddle.Tensor, dtype: paddle.dtype, tgt_len: Optional[int
     return paddle.where(inverted_mask > 0.5, paddle.full_like(inverted_mask, paddle.finfo(dtype).min), inverted_mask)
 
 
-# Copied from transformers.models.llama.modeling_llama.LlamaRMSNorm with Llama->Mistral
 class MistralRMSNorm(nn.Layer):
     def __init__(self, hidden_size, eps=1e-6):
         """
@@ -173,7 +172,6 @@ class MistralRotaryEmbedding(nn.Layer):
         )
 
 
-# Copied from transformers.models.llama.modeling_llama.rotate_half
 def rotate_half(x):
     """Rotates half the hidden dims of the input."""
     x1 = x[..., : x.shape[-1] // 2]
@@ -181,7 +179,6 @@ def rotate_half(x):
     return paddle.concat((-x2, x1), axis=-1)
 
 
-# Copied from transformers.models.llama.modeling_llama.apply_rotary_pos_emb
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
     cos = cos[position_ids].unsqueeze(1)  # [seq_len, dim] -> [batch_size, 1, seq_len, head_dim]
     sin = sin[position_ids].unsqueeze(1)
@@ -196,9 +193,31 @@ class MistralMLP(nn.Layer):
         self.config = config
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
-        self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-        self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-        self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
+        if config.tensor_parallel_degree > 1:
+            self.gate_proj = mpu.ColumnParallelLinear(
+                self.hidden_size,
+                self.intermediate_size,
+                gather_output=False,
+                has_bias=False,
+            )
+            self.up_proj = mpu.ColumnParallelLinear(
+                self.hidden_size,
+                self.intermediate_size,
+                gather_output=False,
+                has_bias=False,
+            )
+
+            self.down_proj = mpu.RowParallelLinear(
+                self.intermediate_size,
+                self.hidden_size,
+                input_is_parallel=True,
+                has_bias=False,
+            )
+        else:
+            self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+            self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
+
         self.act_fn = ACT2FN[config.hidden_act]
 
     def forward(self, x):
@@ -239,10 +258,63 @@ class MistralAttention(nn.Layer):
                 f"hidden_size must be divisible by num_heads (got `hidden_size`: {self.hidden_size}"
                 f" and `num_heads`: {self.num_heads})."
             )
-        self.q_proj = nn.Linear(self.hidden_size, self.num_heads * self.head_dim, bias_attr=False)
-        self.k_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias_attr=False)
-        self.v_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias_attr=False)
-        self.o_proj = nn.Linear(self.num_heads * self.head_dim, self.hidden_size, bias_attr=False)
+        if config.tensor_parallel_degree > 1:
+            if self.num_key_value_heads % config.tensor_parallel_degree != 0:
+                raise ValueError(
+                    f"num_key_value_heads must be divisible by tensor_parallel_degree (got `num_key_value_heads`: {self.num_key_value_heads}"
+                    f" and `tensor_parallel_degree`: {config.tensor_parallel_degree})."
+                )
+
+            self.q_proj = mpu.ColumnParallelLinear(
+                self.hidden_size,
+                self.num_heads * self.head_dim,
+                has_bias=False,
+                gather_output=False,
+            )
+            self.k_proj = mpu.ColumnParallelLinear(
+                self.hidden_size,
+                self.num_key_value_heads * self.head_dim,
+                has_bias=False,
+                gather_output=False,
+            )
+            self.v_proj = mpu.ColumnParallelLinear(
+                self.hidden_size,
+                self.num_key_value_heads * self.head_dim,
+                has_bias=False,
+                gather_output=False,
+            )
+        else:
+            self.q_proj = nn.Linear(
+                self.hidden_size,
+                self.num_heads * self.head_dim,
+                bias_attr=False,
+            )
+            self.k_proj = nn.Linear(
+                self.hidden_size,
+                self.num_key_value_heads * self.head_dim,
+                bias_attr=False,
+            )
+            self.v_proj = nn.Linear(
+                self.hidden_size,
+                self.num_key_value_heads * self.head_dim,
+                bias_attr=False,
+            )
+
+        if config.tensor_parallel_degree > 1:
+            self.o_proj = mpu.RowParallelLinear(
+                self.num_heads * self.head_dim,
+                self.hidden_size,
+                has_bias=False,
+                input_is_parallel=True,
+            )
+            self.num_heads = self.num_heads // config.tensor_parallel_degree
+            self.num_key_value_heads = self.num_key_value_heads // config.tensor_parallel_degree
+        else:
+            self.o_proj = nn.Linear(
+                self.num_heads * self.head_dim,
+                self.hidden_size,
+                bias_attr=False,
+            )
 
         self.rotary_emb = MistralRotaryEmbedding(
             self.head_dim,
@@ -264,15 +336,15 @@ class MistralAttention(nn.Layer):
         padding_mask: Optional[paddle.Tensor] = None,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         bsz, q_len, _ = hidden_states.shape
-        global i
-        import numpy as np; np.save('hs_{}'.format(i), hidden_states.astype('float32').numpy())
+        #global i
+        #import numpy as np; np.save('hs_{}'.format(i), hidden_states.astype('float32').numpy())
 
         query_states = self.q_proj(hidden_states)
         key_states = self.k_proj(hidden_states)
         value_states = self.v_proj(hidden_states)
-        import numpy as np; np.save('q_{}'.format(i), query_states.astype('float32').numpy())
-        import numpy as np; np.save('k_{}'.format(i), key_states.astype('float32').numpy())
-        import numpy as np; np.save('v_{}'.format(i), value_states.astype('float32').numpy())
+        #import numpy as np; np.save('q_{}'.format(i), query_states.astype('float32').numpy())
+        #import numpy as np; np.save('k_{}'.format(i), key_states.astype('float32').numpy())
+        #import numpy as np; np.save('v_{}'.format(i), value_states.astype('float32').numpy())
 
         query_states = query_states.reshape([bsz, q_len, self.num_heads, self.head_dim]).transpose([0, 2, 1, 3])
         key_states = key_states.reshape([bsz, q_len, self.num_key_value_heads, self.head_dim]).transpose([0, 2, 1, 3])
@@ -296,7 +368,7 @@ class MistralAttention(nn.Layer):
         value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) / math.sqrt(self.head_dim)
-        import numpy as np; np.save('aw_{}'.format(i), attn_weights.astype('float32').numpy())
+        #import numpy as np; np.save('aw_{}'.format(i), attn_weights.astype('float32').numpy())
 
         if attn_weights.shape != [bsz, self.num_heads, q_len, kv_seq_len]:
             raise ValueError(
@@ -323,11 +395,11 @@ class MistralAttention(nn.Layer):
             )
 
         attn_output = attn_output.transpose([0, 2, 1, 3])
-        attn_output = attn_output.reshape([bsz, q_len, self.hidden_size])
+        attn_output = attn_output.reshape([bsz, q_len, self.num_heads * self.head_dim])
 
         attn_output = self.o_proj(attn_output)
-        import numpy as np; np.save('ao_{}'.format(i), attn_output.astype('float32').numpy())
-        i += 1
+        #import numpy as np; np.save('ao_{}'.format(i), attn_output.astype('float32').numpy())
+        #i += 1
 
         if not output_attentions:
             attn_weights = None
@@ -648,7 +720,7 @@ class MistralDecoderLayer(nn.Layer):
 
 class MistralPreTrainedModel(PretrainedModel):
     config_class = MistralConfig
-    base_model_prefix = "model"
+    base_model_prefix = "mistral"
     supports_gradient_checkpointing = True
     _no_split_modules = ["MistralDecoderLayer"]
     _skip_keys_device_placement = "past_key_values"
@@ -711,22 +783,14 @@ class MistralPreTrainedModel(PretrainedModel):
             }
 
             # Column Linear
-            if config.fuse_attention_qkv:
-                base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
-            else:
-                base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
-                # if we have enough num_key_value_heads to split, then split it.
-                if config.num_key_value_heads % config.tensor_parallel_degree == 0:
-                    base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
-                    base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
+            base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
+            # if we have enough num_key_value_heads to split, then split it.
+            if config.num_key_value_heads % config.tensor_parallel_degree == 0:
+                base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
 
-            if config.fuse_attention_ffn:
-                base_actions["layers.0.mlp.gate_up_fused_proj.weight"] = partial(
-                    fn, is_column=True, is_naive_2fuse=True
-                )
-            else:
-                base_actions["layers.0.mlp.gate_proj.weight"] = partial(fn, is_column=True)
-                base_actions["layers.0.mlp.up_proj.weight"] = partial(fn, is_column=True)
+            base_actions["layers.0.mlp.gate_proj.weight"] = partial(fn, is_column=True)
+            base_actions["layers.0.mlp.up_proj.weight"] = partial(fn, is_column=True)
 
             for key, action in base_actions.items():
                 if "layers.0." in key:
@@ -747,11 +811,9 @@ class MistralPreTrainedModel(PretrainedModel):
             (
                 nn.Linear,
                 nn.Embedding,
-                #mpu.VocabParallelEmbedding,
-                #mpu.ColumnParallelLinear,
-                #mpu.RowParallelLinear,
-                #ColumnSequenceParallelLinear,
-                #RowSequenceParallelLinear,
+                mpu.VocabParallelEmbedding,
+                mpu.ColumnParallelLinear,
+                mpu.RowParallelLinear,
             ),
         ):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -790,7 +852,18 @@ class MistralModel(MistralPreTrainedModel):
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
 
-        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
+        if config.tensor_parallel_degree > 1:
+            self.embed_tokens = mpu.VocabParallelEmbedding(
+                config.vocab_size,
+                config.hidden_size,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+            )
+        else:
+            self.embed_tokens = nn.Embedding(
+                config.vocab_size,
+                config.hidden_size,
+                self.padding_idx,
+            )
         self.layers = nn.LayerList([MistralDecoderLayer(config) for _ in range(config.num_hidden_layers)])
         self.norm = MistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
@@ -976,6 +1049,60 @@ class MistralModel(MistralPreTrainedModel):
             attentions=all_self_attns,
         )
 
+def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, tensor_parallel_output=True):
+    is_fleet_init = True
+    tensor_parallel_degree = 1
+    try:
+        hcg = fleet.get_hybrid_communicate_group()
+        model_parallel_group = hcg.get_model_parallel_group()
+        tensor_parallel_degree = hcg.get_model_parallel_world_size()
+    except:
+        is_fleet_init = False
+
+    if paddle.in_dynamic_mode():
+        y_is_distributed = y.is_distributed
+    else:
+        y_is_distributed = tensor_parallel_degree > 1
+
+    if is_fleet_init and tensor_parallel_degree > 1 and y_is_distributed:
+        # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
+        input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
+        logits = paddle.matmul(input_parallel, y, transpose_y=False)
+
+        if tensor_parallel_output:
+            return logits
+
+        return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
+
+    else:
+        logits = paddle.matmul(x, y, transpose_y=False)
+        return logits
+
+
+class MistralLMHead(nn.Layer):
+    def __init__(self, config: MistralConfig):
+        super(MistralLMHead, self).__init__()
+        self.config = config
+        if config.tensor_parallel_degree > 1:
+            vocab_size = config.vocab_size // config.tensor_parallel_degree
+        else:
+            vocab_size = config.vocab_size
+
+        self.weight = self.create_parameter(
+            shape=[config.hidden_size, vocab_size],
+            dtype=paddle.get_default_dtype(),
+        )
+        # Must set distributed attr for Tensor Parallel !
+        self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
+        if self.weight.is_distributed:
+            self.weight.split_axis = 1
+
+    def forward(self, hidden_states, tensor_parallel_output=None):
+        if tensor_parallel_output is None:
+            tensor_parallel_output = self.config.tensor_parallel_output
+
+        logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
+        return logits
 
 class MistralForCausalLM(MistralPreTrainedModel):
     _tied_weights_keys = ["lm_head.weight"]
@@ -984,7 +1111,8 @@ class MistralForCausalLM(MistralPreTrainedModel):
         super().__init__(config)
         self.model = MistralModel(config)
         self.vocab_size = config.vocab_size
-        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
+        #self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
+        self.lm_head = MistralLMHead(config)
 
     def get_input_embeddings(self):
         return self.model.embed_tokens
@@ -1113,19 +1241,14 @@ class MistralForCausalLM(MistralPreTrainedModel):
         hidden_states = outputs[0]
         logits = self.lm_head(hidden_states)
         logits = logits.astype('float32')
-        import numpy as np; np.save('l', logits.astype('float32').numpy())
+        #import numpy as np; np.save('l', logits.astype('float32').numpy())
 
         loss = None
         if labels is not None:
-            # Shift so that tokens < n predict n
-            shift_logits = logits[..., :-1, :]
-            shift_labels = labels[..., 1:]
-            # Flatten the tokens
             loss_fct = CrossEntropyLoss()
-            shift_logits = shift_logits.reshape([-1, self.config.vocab_size])
-            shift_labels = shift_labels.reshape([-1])
-            # Enable model parallelism
-            loss = loss_fct(shift_logits, shift_labels)
+            #logits = logits.reshape([-1, self.config.vocab_size])
+            #labels = labels.reshape([-1])
+            loss = loss_fct(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]

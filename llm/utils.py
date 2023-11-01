@@ -86,6 +86,14 @@ def get_prefix_tuning_params(model):
         hidden_size = model.config.hidden_size
         postprocess_past_key_value = qwen_postprocess_past_key_value
         multi_query_group_num = None
+    elif model.base_model_prefix == "mistral":
+        from paddlenlp.peft.prefix import llama_postprocess_past_key_value
+
+        num_attention_heads = model.config.num_attention_heads
+        num_hidden_layers = model.config.num_hidden_layers
+        hidden_size = model.config.hidden_size
+        postprocess_past_key_value = llama_postprocess_past_key_value
+        multi_query_group_num = model.config.num_attention_heads // model.config.num_key_value_heads
     else:
         raise ValueError(f"Unknown base_model_prefix: {model.base_model_prefix}. ")
     return dict(
@@ -112,7 +120,7 @@ def get_lora_target_modules(model):
         ]
     elif model.base_model_prefix == "bloom":
         target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
-    elif model.base_model_prefix == "llama" or isinstance(model, LlamaForCausalLMPipe):
+    elif model.base_model_prefix == "llama" or model.base_model_prefix == "mistral" or isinstance(model, LlamaForCausalLMPipe):
         target_modules = [
             ".*q_proj.*",
             ".*v_proj.*",
