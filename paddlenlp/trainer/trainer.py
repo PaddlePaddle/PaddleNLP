@@ -2200,9 +2200,12 @@ class Trainer:
         else:
             optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             if self.args.data_parallel_rank == 0:
-                path = os.path.join(checkpoint, optimizer_name)
-                if os.path.isfile(path):
-                    opt_state_dict = paddle.load(path)
+                if self.args.unified_checkpoint:
+                    path = os.path.join(checkpoint, optimizer_name)
+                    if os.path.isfile(path):
+                        opt_state_dict = paddle.load(path)
+                else:
+                    pass
 
         # broadcast optimizer state in dp group
         opt_state_dict = broadcast_dp_optimizer(opt_state_dict)

@@ -14,21 +14,32 @@
 
 set -x
 unset CUDA_VISIBLE_DEVICES
+
+export FLAGS_embedding_deterministic=1
+export FLAGS_cudnn_deterministic=1
+export NVIDIA_TF32_OVERRIDE=0
+export NCCL_ALGO=Tree
+export Flags_mp_aysnc_allreduce=1
+export Flags_skip_mp_c_identity=1
+export FLAGS_shard_norm_align_dp=0
+export FLAGS_shard_use_reduce=1
+
+
 task_name="llama_hybrid"
-rm -rf output/$task_name/
-rm -rf "output/$task_name""_log"
+# rm -rf output/$task_name/
+rm -rf "/ssd2/zhonghui03/output/$task_name""_log"
 
 
 PYTHONPATH=../../:$PYTHONPATH  \
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
-    --log_dir "output/$task_name""_log" \
+    --log_dir "/ssd2/zhonghui03/output/$task_name""_log" \
     run_pretrain.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
     --tokenizer_name_or_path "facebook/llama-7b" \
     --input_dir "./data" \
-    --output_dir "output/$task_name" \
+    --output_dir "/ssd2/zhonghui03/output/$task_name" \
     --split 949,50,1 \
     --max_seq_length 2048 \
     --per_device_train_batch_size 1 \
