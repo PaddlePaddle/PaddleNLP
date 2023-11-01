@@ -451,34 +451,35 @@ class Trainer:
                 `bool` and equals `True`, load the last checkpoint in *args.output_dir* as saved by a previous instance
                 of [`Trainer`]. Only load model state dict.
         """
-        tp_merge = True
-        if isinstance(self.model, LoRAModel):
-            weight_name = LORA_WEIGHTS_NAME
-            if self.model.quantized or self.args.pipeline_parallel_degree > 1:
-                tp_merge = False
-        elif isinstance(self.model, PrefixModelForCausalLM):
-            weight_name = PREFIX_WEIGHTS_NAME
 
-        if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
-            if tp_merge:
-                weights_file = os.path.join(resume_from_checkpoint, weight_name)
-            else:
-                weights_file = os.path.join(
-                    resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
-                )
+        if resume_from_checkpoint is not None:
+            convert_tp = False
+            if isinstance(self.model, LoRAModel):
+                if self.model.quantized or self.args.pipeline_parallel_degree > 1:
+                    weights_file = os.path.join(
+                        resume_from_checkpoint, _add_variant(LORA_WEIGHTS_NAME, self.args.weight_name_suffix)
+                    )
+                else:
+                    weights_file = os.path.join(resume_from_checkpoint, LORA_WEIGHTS_NAME)
+                    if self.model.lora_config.tensor_parallel_degree > 1:
+                        convert_tp = True
+            elif isinstance(self.model, PrefixModelForCausalLM):
+                weights_file = os.path.join(resume_from_checkpoint, PREFIX_WEIGHTS_NAME)
+                if self.model.prefix_config.tensor_parallel_degree > 1:
+                    convert_tp = True
+            if self.args.dataset_rank == 0:
+                logger.info(f"Loading model from {resume_from_checkpoint} .")
 
-            logger.info(f"Loading model from {resume_from_checkpoint} .")
+                if os.path.isfile(weights_file):
+                    # We load the model state dict on the CPU to avoid an OOM error.
+                    state_dict = paddle.load(weights_file, return_numpy=True)
+                    if convert_tp:
+                        state_dict = self.model._convert_tensor_parallel(state_dict)
 
-            if os.path.isfile(weights_file):
-                # We load the model state dict on the CPU to avoid an OOM error.
-                state_dict = paddle.load(weights_file, return_numpy=True)
-                if tp_merge:
-                    state_dict = self.model._convert_tensor_parallel(state_dict)
-
-                # If the model is on the GPU, it still works!
-                self._set_state_dict_in_model(state_dict)
-                # release memory
-                del state_dict
+                    # If the model is on the GPU, it still works!
+                    self._set_state_dict_in_model(state_dict)
+                    # release memory
+                    del state_dict
         elif resume_from_checkpoint is not None:
             logger.info(f"not loading ckpt :{self.args.dataset_rank}")
 
@@ -1043,24 +1044,26 @@ class Trainer:
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
     def _load_best_model_from_peft_checkpoint(self):
-        tp_merge = True
+        convert_tp = False
         if isinstance(self.model, LoRAModel):
-            weight_name = LORA_WEIGHTS_NAME
             if self.model.quantized or self.args.pipeline_parallel_degree > 1:
-                tp_merge = False
+                best_model_path = os.path.join(
+                    self.state.best_model_checkpoint, _add_variant(LORA_WEIGHTS_NAME, self.args.weight_name_suffix)
+                )
+            else:
+                best_model_path = os.path.join(self.state.best_model_checkpoint, LORA_WEIGHTS_NAME)
+                if self.model.lora_config.tensor_parallel_degree > 1:
+                    convert_tp = True
+
         elif isinstance(self.model, PrefixModelForCausalLM):
-            weight_name = PREFIX_WEIGHTS_NAME
-        if tp_merge:
-            best_model_path = os.path.join(self.state.best_model_checkpoint, weight_name)
-        else:
-            best_model_path = os.path.join(
-                self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
-            )
+            best_model_path = os.path.join(self.state.best_model_checkpoint, PREFIX_WEIGHTS_NAME)
+            if self.model.prefix_config.tensor_parallel_degree > 1:
+                convert_tp = True
 
         if os.path.exists(best_model_path):
             # We load the model state dict on the CPU to avoid an OOM error.
             state_dict = paddle.load(best_model_path, return_numpy=True)
-            if tp_merge:
+            if convert_tp:
                 state_dict = self.model._convert_tensor_parallel(state_dict)
             # If the model is on the GPU, it still works!
             self._set_state_dict_in_model(state_dict)
