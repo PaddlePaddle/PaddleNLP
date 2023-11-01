@@ -93,19 +93,16 @@ fi
 get_diff_TO_case # 获取待执行case列表
 case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${case_list[*]}))  # 去重并将结果存储回原列表
 if [[ ${#case_list[*]} -ne 0 ]];then
+    echo -e "\033[31m =======CI Check case========= \033"
+    echo -e "\033[31m ---- case_list length: ${#case_list[*]}, cases: ${case_list[*]} \033"
+    set +e
+    echo -e "\033[31m ---- start run case  \033"
     # Install paddle
     install_paddle
     if [[ FLAGS_paddlenlp -eq 1 ]];then
         # 安装本地paddlenlp
         install_paddlenlp
     fi
-    python -m pip list
-
-    echo -e "\033[31m =======CI Check case========= \033"
-    echo -e "\033[31m ---- case_list length: ${#case_list[*]}, cases: ${case_list[*]} \033"
-    set +e
-    echo -e "\033[31m ---- start run case  \033"
-    
     case_num=1
     for case in ${case_list[*]};do
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: ${case} \033"
