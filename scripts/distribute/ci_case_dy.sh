@@ -412,6 +412,7 @@ function check_result() {
 
 main() {
     echo -e "\033[31m ---- Start executing dygraph case \033[0m"
+    cd ${case_path}
     case_list_chain
 }
 
