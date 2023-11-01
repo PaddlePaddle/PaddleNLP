@@ -22,6 +22,7 @@ from paddle.incubate.nn.functional import (
     masked_multihead_attention,
     variable_length_memory_efficient_attention,
 )
+from flash_atten2 import flash_attn_varlen_fwd
 from paddle.nn import Layer
 from paddle.nn.initializer import Constant
 from paddle.nn.quant import weight_only_linear
@@ -172,9 +173,15 @@ class FusedMultiTransformerConfig:
         nranks=1,
         trans_qkvw=True,
         ring_id=-1,
+        kv_num_heads=-1,
     ):
         self.embed_dim = embed_dim
         self.num_heads = num_heads
+        if kv_num_heads > 0:
+            self.kv_num_heads = kv_num_heads
+            assert nranks == 1, "nranks should be 1 for kv_num_heads > 0"
+        else:
+            self.kv_num_heads = num_heads
         self.dim_feedforward = dim_feedforward
         self.quant_bits = quant_bits
         self.dropout_rate = dropout_rate
@@ -249,6 +256,7 @@ class FusedMultiTransformerBase(Layer):
         assert config.num_heads % config.nranks == 0
         assert config.dim_feedforward % config.nranks == 0
         num_heads = config.num_heads // config.nranks
+        kv_num_heads = config.kv_num_heads // config.nranks
         dim_feedforward = config.dim_feedforward // config.nranks
         self._dim_feedforward = dim_feedforward
 
@@ -298,7 +306,7 @@ class FusedMultiTransformerBase(Layer):
                     dtype=self._norm_weight_dtype,
                 )
 
-            self.init_weight_shape(num_heads, dim_feedforward, config)
+            self.init_weight_shape(num_heads, kv_num_heads, dim_feedforward, config)
 
             qkv_weight = self.create_parameter(
                 shape=self.qkv_weight_shape,
@@ -310,7 +318,7 @@ class FusedMultiTransformerBase(Layer):
             qkv_bias = None
             if qkv_bias_attr:
                 qkv_bias = self.create_parameter(
-                    shape=[3 * num_heads * self.head_dim],
+                    shape=[(num_heads + 2 * kv_num_heads) * self.head_dim],
                     attr=qkv_bias_attr,
                     dtype=self._dtype,
                     is_bias=True,
@@ -438,11 +446,11 @@ class FusedMultiTransformerBase(Layer):
         assert param.name not in self._parameters
         self._parameters[param.name] = param
 
-    def init_weight_shape(self, num_heads, dim_feedforward, config):
+    def init_weight_shape(self, num_heads, kv_num_heads, dim_feedforward, config):
         self.qkv_weight_shape = (
-            [3 * num_heads * self.head_dim, self.embed_dim]
+            [(num_heads + 2 * kv_num_heads) * self.head_dim, self.embed_dim]
             if config.trans_qkvw
-            else [self.embed_dim * 3 * num_heads, self.head_dim]
+            else [self.embed_dim * (num_heads + 2 * kv_num_heads), self.head_dim]
         )
         self.linear_weight_shape = [num_heads * self.head_dim, self.embed_dim]
         self.ffn1_weight_shape = (
@@ -498,10 +506,21 @@ class FusedMultiTransformerBase(Layer):
         q_out: bsz, numhead, seq_len, headsize
         kv_out: 2, bsz, numhead, seq_len, headsize
         """
-        q_out, k_out, v_out = qkv_transpose_split(
-            qkv_out, padding_offset, seq_lens, input_ids, self.num_heads // self.nranks, self.head_dim
-        )
+        # [all_seq, hidden_dim + group * head_dim + group * head_dim]
+        # q_out, k_out, v_out = qkv_transpose_split(
+        #     qkv_out, padding_offset, seq_lens, input_ids, self.num_heads // self.nranks, self.head_dim
+        # )
+        kv_num_head = (qkv_out.shape[1] - self.num_heads * self.head_dim) // self.head_dim // 2
+        q_out, k_out, v_out = paddle.split(qkv_out, num_or_sections=[self.num_heads * self.head_dim, 
+                                                                     kv_num_head * self.head_dim, 
+                                                                     kv_num_head * self.head_dim], axis=-1)
+        q_out = q_out.reshape([-1, self.num_heads, self.head_dim])
+        k_out = k_out.reshape([-1, kv_num_head, self.head_dim])
+        v_out = v_out.reshape([-1, kv_num_head, self.head_dim])
 
+        # [batch, head, seq, head_dim]
+        
+        # rotary_embs is [2, batch_size, seq_length, self.head_size]
         # rotary emb (inplace)
         if rotary_embs is not None:
             encode_rotary_qk(
@@ -519,17 +538,83 @@ class FusedMultiTransformerBase(Layer):
 
         # write cache kv (inplace)
         write_cache_kv(k_out, v_out, caches[i], seq_lens + pre_caches_length)
+        
+        # [bath and seq, group, head_dim]
+
+
+        # new_q_out = paddle.zeros([2, 643, 32, 128], dtype=paddle.get_default_dtype())
+        # new_k_out = paddle.zeros([2, 643, 2, 128], dtype=paddle.get_default_dtype())
+        # new_v_out = paddle.zeros([2, 643, 2, 128], dtype=paddle.get_default_dtype())
+        # new_q_out[0,:57] = q_out[:57,:,:]
+        # new_q_out[1,:643] = q_out[57:,:,:]
+        # new_k_out[0,:57] = k_out[:57,:,:]
+        # new_k_out[1,:643] = k_out[57:,:,:]
+        # new_v_out[0,:57] = v_out[:57,:,:]
+        # new_v_out[1,:643] = v_out[57:,:,:]
+        # q_out = new_q_out.transpose([0, 2, 1, 3])
+        # k_out = new_k_out.transpose([0, 2, 1, 3])
+        # v_out = new_v_out.transpose([0, 2, 1, 3])
+
 
         # cutlass fmha
-        qktv_out = variable_length_memory_efficient_attention(
-            q_out,
-            k_out,
-            v_out,
-            seq_lens,
-            seq_lens + pre_caches_length,
-            mask=attn_mask,
-            scale=float(self.head_dim**-0.5),
-        )
+        # qktv_out = variable_length_memory_efficient_attention(
+        #     q_out,
+        #     k_out,
+        #     v_out,
+        #     seq_lens,
+        #     seq_lens + pre_caches_length,
+        #     mask=attn_mask,
+        #     scale=float(self.head_dim**-0.5),
+        # )
+
+        # q_out = q_out.transpose([0, 2, 1, 3])
+        # k_out = k_out.transpose([0, 2, 1, 3])
+        # v_out = v_out.transpose([0, 2, 1, 3])
+        # q_out = paddle.concat([q_out[0,:57], q_out[1,:643]], axis=0)
+        # k_out = paddle.concat([k_out[0,:57], k_out[1,:643]], axis=0)
+        # v_out = paddle.concat([v_out[0,:57], v_out[1,:643]], axis=0)
+
+        zero = paddle.to_tensor([0],dtype="int32").reshape([1])
+        max_len = paddle.max(seq_lens).reshape([1])
+        batch = seq_lens.shape[0]
+        cu_seqlens_q = paddle.concat([zero, paddle.cumsum(seq_lens.reshape([batch]))])
+
+        res0 = flash_attn_varlen_fwd(q_out,
+                                     k_out,
+                                     v_out,
+                                     cu_seqlens_q = cu_seqlens_q,
+                                     cu_seqlens_k = cu_seqlens_q,
+                                     max_seqlen_q=max_len,
+                                     max_seqlen_k=max_len,
+                                     softmax_scale = float(self.head_dim**-0.5), 
+                                     zero_tensors = False, 
+                                     is_causal = True)
+        res0 = res0.reshape([-1, 32 * self.head_dim])
+
+        return res0
+
+        # seq = 643
+        # head_dim = 128
+        # batch = 2
+        # num_heads = 32
+        # group = 2
+        # k_out = k_out.reshape([batch, group, 1, seq, head_dim])
+        # k_out = paddle.tile(k_out, [1, 1, 16, 1, 1])
+        # k_out = k_out.reshape([batch, num_heads, seq, head_dim])
+        # v_out = v_out.reshape([batch, group, 1, seq, head_dim])
+        # v_out = paddle.tile(v_out, [1, 1, 16, 1, 1])
+        # v_out = v_out.reshape([batch, num_heads, seq, head_dim])
+        # res1 = paddle.matmul(q_out, k_out.transpose([0, 1, 3, 2]))
+
+        # a = paddle.tril(paddle.ones(shape=(seq, seq), dtype="float16"))
+        # a = (a * 1000 - 1000)
+
+        # res1 = res1 * float(head_dim ** -0.5)
+        # for i in range(res1.shape[0]):
+        #     for j in range(res1.shape[1]):
+        #         res1[i,j,:,:] += a
+        # res1 = paddle.nn.functional.softmax(res1, -1)
+        # qktv_out =  paddle.matmul(res1, v_out)
 
         return transpose_remove_padding(qktv_out, seq_lens, padding_offset)
 
@@ -825,8 +910,8 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
     def get_weight_create_dype(self):
         return "int8"  # If use weightonly int4, params dtype is int8, and one of the dimension will be half.
 
-    def init_weight_shape(self, num_heads, dim_feedforward, config):
-        super().init_weight_shape(num_heads, dim_feedforward, config)
+    def init_weight_shape(self, num_heads, kv_num_heads, dim_feedforward, config):
+        super().init_weight_shape(num_heads, kv_num_heads, dim_feedforward, config)
 
         self.linear_weight_shape = [self.embed_dim, num_heads * self.head_dim]
         self.ffn1_weight_shape = (

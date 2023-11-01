@@ -398,6 +398,9 @@ class GenerationInferenceModel(GenerationMixin):
         # gives it a value, means we will entered into decoder phase.
         model_kwargs["cache"] = 0
 
+        import datetime
+        starttime = datetime.datetime.now()
+
         # decoder
         while paddle.less_than(
             paddle.sum(paddle.cast(model_kwargs["stop_flags"], "int64")),
@@ -412,6 +415,12 @@ class GenerationInferenceModel(GenerationMixin):
             )
             step_idx_ori += 1
             all_next_tokens = paddle.concat([all_next_tokens, next_tokens], axis = -1)
+
+        endtime = datetime.datetime.now()
+        duringtime = endtime - starttime
+        time_ms = duringtime.seconds * 1000 + duringtime.microseconds / 1000.0
+        print("The whoel end to end time : ", time_ms / 1., "ms")
+
 
         return (
             all_next_tokens,
