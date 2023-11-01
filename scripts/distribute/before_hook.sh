@@ -23,7 +23,7 @@ export log_path=/workspace/PaddleNLP/model_logs
 function gpt-3() {
     export case_path=/workspace/PaddleNLP/model_zoo/gpt-3
     export data_path=/fleetx_data
-    
+
     cd ${case_path}
     echo -e "\033[31m ---- Set FLAGS  \033[0m"
     export FLAGS_new_executor_micro_batching=True  # True：打开新执行器
@@ -119,8 +119,4 @@ function gpt-3() {
     ln -s ${data_path}/GPT_345M_QAT_wo_analysis ${case_path}/GPT_345M_QAT_wo_analysis
 }
 
-main() {
-    $1
-}
-
-main$@
+$1
