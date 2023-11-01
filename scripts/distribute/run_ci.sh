@@ -113,6 +113,7 @@ if [[ ${#case_list[*]} -ne 0 ]];then
             bash /workspace/PaddleNLP/scripts/distribute/before_hook.sh ${case}
             echo -e "\033[31m ---- running case gpt-3 auto \033"
             bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh
+            print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'`
             echo -e "\033[31m ---- running case gpt-3 dynamic \033"
             bash /workspace/PaddleNLP/scripts/distribute/ci_case_dy.sh
             print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'`
