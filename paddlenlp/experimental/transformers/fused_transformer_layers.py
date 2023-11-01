@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import paddle
 import paddle.distributed as dist
+from flash_atten2 import flash_attn_varlen_fwd
 from paddle.framework import LayerHelper, in_dynamic_mode
 from paddle.incubate.nn.functional import (
     fused_layer_norm,
@@ -22,7 +23,6 @@ from paddle.incubate.nn.functional import (
     masked_multihead_attention,
     variable_length_memory_efficient_attention,
 )
-from flash_atten2 import flash_attn_varlen_fwd
 from paddle.nn import Layer
 from paddle.nn.initializer import Constant
 from paddle.nn.quant import weight_only_linear
@@ -510,16 +510,20 @@ class FusedMultiTransformerBase(Layer):
         # q_out, k_out, v_out = qkv_transpose_split(
         #     qkv_out, padding_offset, seq_lens, input_ids, self.num_heads // self.nranks, self.head_dim
         # )
-        kv_num_head = (qkv_out.shape[1] - self.num_heads * self.head_dim) // self.head_dim // 2
-        q_out, k_out, v_out = paddle.split(qkv_out, num_or_sections=[self.num_heads * self.head_dim, 
-                                                                     kv_num_head * self.head_dim, 
-                                                                     kv_num_head * self.head_dim], axis=-1)
-        q_out = q_out.reshape([-1, self.num_heads, self.head_dim])
-        k_out = k_out.reshape([-1, kv_num_head, self.head_dim])
-        v_out = v_out.reshape([-1, kv_num_head, self.head_dim])
+
+        q_num_heads = self.num_heads // self.nranks
+        kv_num_heads = (qkv_out.shape[1] // self.head_dim - q_num_heads) // 2
+        q_out, k_out, v_out = paddle.split(
+            qkv_out,
+            num_or_sections=[q_num_heads * self.head_dim, kv_num_heads * self.head_dim, kv_num_heads * self.head_dim],
+            axis=-1,
+        )
+        q_out = q_out.reshape([-1, q_num_heads, self.head_dim])
+        k_out = k_out.reshape([-1, kv_num_heads, self.head_dim])
+        v_out = v_out.reshape([-1, kv_num_heads, self.head_dim])
 
         # [batch, head, seq, head_dim]
-        
+
         # rotary_embs is [2, batch_size, seq_length, self.head_size]
         # rotary emb (inplace)
         if rotary_embs is not None:
@@ -538,9 +542,8 @@ class FusedMultiTransformerBase(Layer):
 
         # write cache kv (inplace)
         write_cache_kv(k_out, v_out, caches[i], seq_lens + pre_caches_length)
-        
-        # [bath and seq, group, head_dim]
 
+        # [bath and seq, group, head_dim]
 
         # new_q_out = paddle.zeros([2, 643, 32, 128], dtype=paddle.get_default_dtype())
         # new_k_out = paddle.zeros([2, 643, 2, 128], dtype=paddle.get_default_dtype())
@@ -554,7 +557,6 @@ class FusedMultiTransformerBase(Layer):
         # q_out = new_q_out.transpose([0, 2, 1, 3])
         # k_out = new_k_out.transpose([0, 2, 1, 3])
         # v_out = new_v_out.transpose([0, 2, 1, 3])
-
 
         # cutlass fmha
         # qktv_out = variable_length_memory_efficient_attention(
@@ -574,22 +576,24 @@ class FusedMultiTransformerBase(Layer):
         # k_out = paddle.concat([k_out[0,:57], k_out[1,:643]], axis=0)
         # v_out = paddle.concat([v_out[0,:57], v_out[1,:643]], axis=0)
 
-        zero = paddle.to_tensor([0],dtype="int32").reshape([1])
+        zero = paddle.to_tensor([0], dtype="int32").reshape([1])
         max_len = paddle.max(seq_lens).reshape([1])
         batch = seq_lens.shape[0]
         cu_seqlens_q = paddle.concat([zero, paddle.cumsum(seq_lens.reshape([batch]))])
 
-        res0 = flash_attn_varlen_fwd(q_out,
-                                     k_out,
-                                     v_out,
-                                     cu_seqlens_q = cu_seqlens_q,
-                                     cu_seqlens_k = cu_seqlens_q,
-                                     max_seqlen_q=max_len,
-                                     max_seqlen_k=max_len,
-                                     softmax_scale = float(self.head_dim**-0.5), 
-                                     zero_tensors = False, 
-                                     is_causal = True)
-        res0 = res0.reshape([-1, 32 * self.head_dim])
+        res0 = flash_attn_varlen_fwd(
+            q_out,
+            k_out,
+            v_out,
+            cu_seqlens_q=cu_seqlens_q,
+            cu_seqlens_k=cu_seqlens_q,
+            max_seqlen_q=max_len,
+            max_seqlen_k=max_len,
+            softmax_scale=float(self.head_dim**-0.5),
+            zero_tensors=False,
+            is_causal=True,
+        )
+        res0 = res0.reshape([-1, q_num_heads * self.head_dim])
 
         return res0
 
