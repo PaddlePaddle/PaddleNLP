@@ -381,7 +381,9 @@ class BloomAttention(nn.Layer):
         version = paddle.version.full_version
         version_check = True
         if version != "0.0.0" and version <= "2.5.2":
-            paddle.utils.require_version(min_version="2.5.2")
+            logger.warning(
+                "PaddlePaddle version 2.5.3 or higher is required, please upgrade your PaddlePaddle to 2.5.3 or other higher version."
+            )
             version_check = False
         if self.config.use_flash_attention and version_check:
             query_states, key_states, value_states = query_layer, key_layer, value_layer
