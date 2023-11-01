@@ -97,7 +97,7 @@ def _make_sliding_window_causal_mask(
     mask = paddle.log(mask).astype(dtype)
 
     if past_key_values_length > 0:
-        mask = paddle.concat([paddle.zeros(tgt_len, past_key_values_length, dtype=dtype), mask], axis=-1)
+        mask = paddle.concat([paddle.zeros([tgt_len, past_key_values_length], dtype=dtype), mask], axis=-1)
     return mask[None, None, :, :].expand([bsz, 1, tgt_len, tgt_len + past_key_values_length])
 
 
