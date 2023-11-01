@@ -162,8 +162,19 @@ class ScoreModelMixin:
         return_dict: bool | None = None,
     ) -> ScoreModelOutput:
         """Forward pass of the score model."""
-        # print("=" * 20, hidden_state)
         scores = self.score_head(hidden_state)  # size = (B, L, D)
+
+        if dist.get_rank() == 0:
+            # print("=" * 20, "hidden_state", hidden_state.numpy(), hidden_state.shape,
+            print("=" * 20, "hidden_state", hidden_state, hidden_state.shape, hidden_state.dtype)
+            print("=" * 20, "nonorm_scores", scores, scores.shape, scores.dtype)
+            print(
+                "=" * 20,
+                "head_weight",
+                self.score_head.weight,
+                self.score_head.weight.shape,
+                self.score_head.weight.dtype,
+            )
 
         end_score = []
         for i in range(hidden_state.shape[0]):

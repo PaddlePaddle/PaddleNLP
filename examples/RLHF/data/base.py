@@ -338,7 +338,7 @@ class TokenizedDataset(Dataset):
         data = self.data[index]
         if data is self._SENTINEL:
             raw_sample = self.rawdata[index]
-            data = self.preprocess(raw_sample)
+            data = self.preprocess(raw_sample, index)
             self.data[index] = data
         return data
 

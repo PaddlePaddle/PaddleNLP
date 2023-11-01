@@ -78,7 +78,7 @@ class PreferenceBatch(TypedDict, total=True):
 
 
 class PreferenceDataset(TokenizedDataset):
-    def preprocess(self, raw_sample: RawSample) -> PreferenceSample:
+    def preprocess(self, raw_sample: RawSample, index=0) -> PreferenceSample:
         prompt = format_prompt(input=raw_sample["input"], eos_token=self.tokenizer.eos_token)
         better_answer = raw_sample["answer"]
         worse_answer = raw_sample["other_answer"]
@@ -88,6 +88,11 @@ class PreferenceDataset(TokenizedDataset):
 
         better_input_ids = self.tokenize(prompt + better_answer + self.tokenizer.eos_token)
         worse_input_ids = self.tokenize(prompt + worse_answer + self.tokenizer.eos_token)
+        import paddle.distributed as dist
+
+        if dist.get_rank() == 0:
+            print("=" * 20, index, prompt, better_answer)
+            print("=" * 20, index, prompt, worse_answer)
         if (
             better_input_ids.shape == worse_input_ids.shape
             and np.all(np.equal(better_input_ids, worse_input_ids)).item()
@@ -136,8 +141,8 @@ class PreferenceCollator(CollatorBase):
             input_ids[bs:],
         )
         (better_attention_mask, worse_attention_mask,) = (  # size = (B, L)  # size = (B, L)
-            attention_mask[bs:],
             attention_mask[:bs],
+            attention_mask[bs:],
         )
 
         return {

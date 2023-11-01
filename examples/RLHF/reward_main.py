@@ -46,7 +46,7 @@ os.environ["https_proxy"] = "http://172.19.57.45:3128"
 @dataclass
 class TrainingArguments(TrainingArguments):
     loss_type: Literal["token-wise", "sequence-wise"] = field(
-        default="sequence-wise",
+        default="token-wise",
         metadata={
             "help": "Calculate ranking loss with all token-wise reward outputs in the sequence or the "
             "sequence-wise reward output only (the reward of the last token in each sequence)."
