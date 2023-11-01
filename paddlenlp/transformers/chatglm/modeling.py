@@ -36,11 +36,6 @@ from ..model_outputs import (
 )
 from .configuration import CHATGLM_PRETRAINED_RESOURCE_FILES_MAP, ChatGLMConfig
 
-try:
-    from paddle.nn.functional.flash_attention import flash_attention
-except:
-    flash_attention = None
-
 __all__ = [
     "ChatGLMModel",
     "ChatGLMPretrainedModel",

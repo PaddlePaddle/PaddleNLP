@@ -118,7 +118,6 @@ class ChatGLMTask(Task):
         model_instance = AutoModelForCausalLM.from_pretrained(
             self.model,
             dtype=self._dtype,
-            use_flash_attention=True,
         )
         # Load the model parameter for the predict
         model_instance.eval()
