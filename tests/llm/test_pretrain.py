@@ -31,6 +31,7 @@ from .testing_utils import LLMTest
     ["model_dir"],
     [
         ["llama"],
+        ["qwen"],
     ],
 )
 class PretrainTest(LLMTest, unittest.TestCase):
@@ -41,16 +42,30 @@ class PretrainTest(LLMTest, unittest.TestCase):
         LLMTest.setUp(self)
 
         self.dataset_dir = tempfile.mkdtemp()
-        self.model_codes_dir = os.path.join(self.root_path, self.model_dir)
-        sys.path.insert(0, self.model_codes_dir)
+        if self.model_dir != "qwen":
+            self.model_codes_dir = os.path.join(self.root_path, self.model_dir)
+            sys.path.insert(0, self.model_codes_dir)
+        else:
+            self.model_codes_dir = self.root_path
 
     def tearDown(self) -> None:
         LLMTest.tearDown(self)
 
-        sys.path.remove(self.model_codes_dir)
+        if self.model_dir != "qwen":
+            sys.path.remove(self.model_codes_dir)
+
         shutil.rmtree(self.dataset_dir)
 
     def test_pretrain(self):
+
+        pretrain_flag = False
+        for key, value in sys.modules.items():
+            if "run_pretrain" in key:
+                pretrain_flag = True
+                break
+        if pretrain_flag:
+            del sys.modules["run_pretrain"]
+
         # Run pretrain
         URL = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy"
         URL2 = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz"
@@ -67,5 +82,6 @@ class PretrainTest(LLMTest, unittest.TestCase):
 
             main()
 
-        self.run_predictor({"inference_model": True})
+        if self.model_dir != "qwen":
+            self.run_predictor({"inference_model": True})
         self.run_predictor({"inference_model": False})
