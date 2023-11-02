@@ -651,11 +651,10 @@ class ChatTemplateMixin:
         # encode conversation
         conversation_ids = []
         for index, conversation in enumerate(conversations):
-            conversation_result = self.chat_template.render_conversation(conversation, index=index)
-            user_input, bot_output = conversation_result
+            user_input, bot_output = self.chat_template.render_conversation(conversation, index=index)
             user_ids = self.encode(user_input, add_special_tokens=False)["input_ids"]
             bot_ids = self.encode(bot_output, add_special_tokens=False)["input_ids"]
-            conversation_ids.append(self.encode_chat_inputs_post_process(user_ids, bot_ids, index=index))
+            conversation_ids.append([user_ids, bot_ids])
 
         result["conversations"] = conversation_ids
         return result
