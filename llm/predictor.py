@@ -307,7 +307,7 @@ class InferencePredictorMixin:
             )
 
         self.tgt_generation_mask = np.ones(
-            shape=[config.batch_size, 1, config.max_length, config.max_length],
+            shape=[config.batch_size, 1, 1, config.max_length],
             dtype=self.dtype,
         )
 
