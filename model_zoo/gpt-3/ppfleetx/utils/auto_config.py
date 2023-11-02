@@ -178,6 +178,8 @@ def process_strategy(config):
             config.Model["no_recompute_layers"] = sorted(list(set(config.Model["no_recompute_layers"])))
         recompute = strategy.recompute
         recompute.enable = config.Model.get("use_recompute", False)
+        recompute.sr = config.Model.pop("sr", 0)
+        recompute.refined_ops_patterns = config.Model.pop("refined_ops_patterns", []) # gpt.GPTModelAuto don't need this parameter
         recompute.no_recompute_segments = config.Model.pop("no_recompute_layers", [])
         recompute.enable_tuning = config.get("Tuning", False) and config.Tuning.get("tuning_recompute", False)
 
