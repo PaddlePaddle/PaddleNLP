@@ -73,10 +73,22 @@ def tokenize_example(tokenizer, example, data_args):
 
 
 def tokenize_rounds_example(tokenizer, example, data_args):
+    """tokenize multi-rounds examples with chat_template.json
+
+    Args:
+        tokenizer (PretrainedTokenizer): the instance of tokenizer
+        example (dict[str, str | list[str]]):
+                the example instance, which can be: {"src": "src-sentence", "tgt": "tgt-sentence"}
+                or {"src": ["src-sentence-1", ..., "src-sentence-N"], "tgt": ["tgt-sentence-1", ..., "tgt-sentence-N"]}
+        data_args (DataArgument): the data_argument instance of data processing
+
+    Returns:
+        dict[str, list[int]]: return input_ids and labels fields
+    """
     example["src"] = example["src"] if isinstance(example["src"], list) else [example["src"]]
     example["tgt"] = example["tgt"] if isinstance(example["tgt"], list) else [example["tgt"]]
 
-    assert len(example["src"]) == len(example["tgt"])
+    assert len(example["src"]) == len(example["tgt"]), "the length of `src` and `tgt` field must be same."
 
     conversations = [[src, tgt] for src, tgt in zip(example["src"], example["tgt"])]
 
@@ -84,17 +96,24 @@ def tokenize_rounds_example(tokenizer, example, data_args):
     system_ids = conversation_result.pop("system", []) or []
 
     # truncate conversations
-    input_ids, labels = system_ids, [-100] * len(system_ids)
-    sequence_length = len(input_ids)
+    input_ids, labels, sequence_length = [], [], 0
     conversations_ids = conversation_result.pop("conversations")
+
+    # do truncation based on single round of conversation, refered to:
     for index in range(len(conversations_ids) - 1, -1, -1):
         user_input_ids, bot_input_ids = conversations_ids[index][0], conversations_ids[index][1]
         if len(input_ids) + len(user_input_ids) + len(bot_input_ids) > data_args.max_length:
             break
 
-        input_ids.extend(user_input_ids + bot_input_ids)
-        labels.extend(len(user_input_ids) * [-100] + bot_input_ids)
+        input_ids = user_input_ids + bot_input_ids + input_ids
+        labels = len(user_input_ids) * [-100] + bot_input_ids + labels
+
         sequence_length += len(user_input_ids) + len(bot_input_ids)
+
+    # concat system_ids: if length is larget than data_args.max_length, do not concat system_ids
+    if sequence_length + len(system_ids) <= data_args.max_length:
+        input_ids = system_ids + input_ids
+        labels = [-100] * len(system_ids) + labels
 
     tokenized_source = {"input_ids": input_ids}
     return tokenized_source, labels

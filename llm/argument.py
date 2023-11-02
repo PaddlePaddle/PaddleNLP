@@ -46,7 +46,7 @@ class DataArgument:
     )
     use_chat_template: bool = field(
         default=False,
-        metadata={"help": "whether use `chat_template` to handle inputs & targets"},
+        metadata={"help": "whether use `chat_template` to handle multi-rounds conversation"},
     )
 
 
