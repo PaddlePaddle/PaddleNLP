@@ -65,9 +65,9 @@ def compute_accuracy(eval_pred) -> Dict[str, float]:
     reward_mean = rewards.mean().item()
     reward_std = rewards.std().item()
     return {
-        "eval/accuracy": accuracy,
-        "eval/rewards_mean": reward_mean,
-        "eval/rewards_std": reward_std,
+        "accuracy": accuracy,
+        "rewards_mean": reward_mean,
+        "rewards_std": reward_std,
     }
 
 
@@ -161,17 +161,17 @@ class RewardTrainer(Trainer):
             # print("="*20, "loss:", loss)
             # print("=" * 20, "higher_end_rewards:", higher_end_rewards)
             # print("=" * 20, "lower_end_rewards:", lower_end_rewards)
-            print("=" * 20, better_input_ids, better_input_ids.shape)
-            print("=" * 20, better_attention_mask, better_attention_mask.shape)
-            print("=" * 20, worse_input_ids, worse_input_ids.shape)
-            print("=" * 20, worse_attention_mask, worse_attention_mask.shape)
-            print("=" * 20, "higher_rewards", higher_rewards, higher_rewards.shape)
-            print("=" * 20, "lower_rewards", lower_rewards, lower_rewards.shape)
-            print("=" * 20, "higher_end_rewards", higher_end_rewards, higher_end_rewards.shape)
-            print("=" * 20, "lower_end_rewards", lower_end_rewards, lower_end_rewards.shape)
-            print("=" * 20, "losses", losses)
-            print("=" * 20, "loss", loss, loss.shape)
-            exit(0)
+            # print("=" * 20, better_input_ids, better_input_ids.shape)
+            # print("=" * 20, better_attention_mask, better_attention_mask.shape)
+            # print("=" * 20, worse_input_ids, worse_input_ids.shape)
+            # print("=" * 20, worse_attention_mask, worse_attention_mask.shape)
+            # print("=" * 20, "higher_rewards", higher_rewards, higher_rewards.shape)
+            # print("=" * 20, "lower_rewards", lower_rewards, lower_rewards.shape)
+            # print("=" * 20, "higher_end_rewards", higher_end_rewards, higher_end_rewards.shape)
+            # print("=" * 20, "lower_end_rewards", lower_end_rewards, lower_end_rewards.shape)
+            # print("=" * 20, "losses", losses)
+            # print("=" * 20, "loss", loss, loss.shape)
+            # exit(0)
         elif self.args.loss_type == "sequence-wise":
             loss = -F.log_sigmoid(higher_end_rewards - lower_end_rewards).mean()
 
@@ -231,8 +231,8 @@ class RewardTrainer(Trainer):
                 higher_end_rewards = higher_rewards.end_scores.squeeze(axis=-1)
                 lower_end_rewards = lower_rewards.end_scores.squeeze(axis=-1)
             else:
-                _, higher_end_rewards = higher_rewards
-                _, lower_end_rewards = lower_rewards
+                higher_end_rewards = higher_rewards[-1].squeeze(axis=-1)
+                lower_end_rewards = lower_rewards[-1].squeeze(axis=-1)
         higher_end_rewards = nested_detach(higher_end_rewards)
         lower_end_rewards = nested_detach(lower_end_rewards)
-        return None, higher_end_rewards, lower_end_rewards
+        return None, higher_end_rewards.cast("float32"), lower_end_rewards.cast("float32")

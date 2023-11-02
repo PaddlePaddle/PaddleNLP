@@ -88,11 +88,11 @@ class PreferenceDataset(TokenizedDataset):
 
         better_input_ids = self.tokenize(prompt + better_answer + self.tokenizer.eos_token)
         worse_input_ids = self.tokenize(prompt + worse_answer + self.tokenizer.eos_token)
-        import paddle.distributed as dist
+        # import paddle.distributed as dist
 
-        if dist.get_rank() == 0:
-            print("=" * 20, index, prompt, better_answer)
-            print("=" * 20, index, prompt, worse_answer)
+        # if dist.get_rank() == 0:
+        #     print("=" * 20, index, prompt, better_answer)
+        #     print("=" * 20, index, prompt, worse_answer)
         if (
             better_input_ids.shape == worse_input_ids.shape
             and np.all(np.equal(better_input_ids, worse_input_ids)).item()

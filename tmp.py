@@ -12,6 +12,75 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+import os
+import re
+
+import wandb
+
+os.environ["WANDB_MODE"] = "offline"
+
+log_project = "Safe-RLHF-RM"
+log_run_name = "paddle-1102"
+log_dir = "./paddle-wandb"
+config = {}
+self_wandb = wandb.init(
+    project=log_project,
+    name=log_run_name,
+    dir=log_dir,
+    config=config,
+)
+
+log_path = "/root/paddlejob/workspace/guosheng/share/paddlenlp-rlhf/PaddleNLP/examples/RLHF/log/workerlog.0"
+with open(log_path, "r") as f:
+    global_step = None
+    for line in f.readlines():
+        if "eval_accuracy:" in line:
+            # print(line.strip())
+            pattern = re.compile(
+                r"eval_accuracy: (\d+\.\d+), eval_rewards_mean: -?(\d+\.\d+), eval_rewards_std: (\d+\.\d+),"
+            )
+            rs = re.search(pattern, line)
+            if rs:
+                eval_accuracy = rs.group(1)
+                eval_rewards_mean = rs.group(2)
+                eval_rewards_std = rs.group(3)
+                print(eval_accuracy, eval_rewards_mean, eval_rewards_std)
+                metrics = {
+                    "eval/accuracy": float(eval_accuracy),
+                    "eval/rewards_mean": float(eval_rewards_mean),
+                    "eval/rewards_std": float(eval_rewards_std),
+                }
+                # print(metrics)
+                self_wandb.log(metrics, step=int(global_step))
+        elif " loss: " in line:
+            # print(line.strip())
+            pattern = re.compile(
+                # r"loss: (\d+\.\d+), learning_rate: (\d+\.\d+), global_step: (\d+),.+accuracy: (\d+\.\d+),"
+                r"loss: (\d+\.\d+), learning_rate: (\d+)(\.\d+)?(e-\d+)?, global_step: (\d+),.+accuracy: (\d+\.\d+),"
+            )
+            rs = re.search(pattern, line)
+            if rs:
+                loss = rs.group(1)
+                # print(rs.groups())
+                learning_rate = (
+                    rs.group(2) + (rs.group(3) if rs.group(3) else "") + (rs.group(4) if rs.group(4) else "")
+                )
+                global_step = rs.group(5)
+                accuracy = rs.group(6)
+                # print(loss, accuracy, learning_rate, global_step)
+                metrics = {
+                    "train/loss": float(loss),
+                    "train/accuracy": float(accuracy),
+                    "train/lr": float(learning_rate),
+                }
+                # print(metrics)
+                self_wandb.log(metrics, step=int(global_step))
+                # exit(0)
+self_wandb.finish()
+
+exit(0)
+
 import os
 
 import numpy as np

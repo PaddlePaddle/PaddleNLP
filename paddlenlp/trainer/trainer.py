@@ -943,6 +943,8 @@ class Trainer:
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+                    # if self.state.global_step == 2:
+                    #     exit(0)
                     self._print_timer()
                     step_control = 0
                 else:
@@ -1057,7 +1059,7 @@ class Trainer:
         return DistributedBatchSampler(
             self.train_dataset,
             batch_size=self.args.per_device_train_batch_size,
-            shuffle=False,
+            shuffle=True,
             num_replicas=self.args.dataset_world_size,
             rank=self.args.dataset_rank,
             drop_last=self.args.dataloader_drop_last,
@@ -1099,6 +1101,7 @@ class Trainer:
             logs: Dict[str, float] = {}
 
             # all_gather + mean() to get average loss over all processes
+            # print(self._nested_gather(tr_loss))
             tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
 
             # reset tr_loss to zero
@@ -1124,6 +1127,7 @@ class Trainer:
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
             self._globalstep_last_start_time = time.time()
+            # print(logs)
 
             self.log(logs, **kwargs)
 
@@ -1493,6 +1497,17 @@ class Trainer:
         """
         warmup = (
             self.args.warmup_steps if self.args.warmup_steps > 0 else int(self.args.warmup_ratio * num_training_steps)
+        )
+        print(
+            "=" * 20,
+            "lr setting:",
+            self.args.learning_rate,
+            self.args.lr_scheduler_type,
+            warmup,
+            num_training_steps,
+            self.args.num_cycles,
+            self.args.lr_end,
+            self.args.power,
         )
 
         if self.lr_scheduler is None:
@@ -2377,6 +2392,7 @@ class Trainer:
 
             # Prediction step
             loss, logits, labels = self.prediction_step(model, inputs, prediction_loss_only, ignore_keys=ignore_keys)
+            # print(logits, labels)
 
             # Update containers on host
             if loss is not None:
