@@ -28,6 +28,7 @@ from paddle.nn.quant import weight_only_linear
 
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
+from tmp_ops import get_max_len
 
 if is_paddlenlp_ops_available():
     from paddlenlp_ops import (
@@ -1151,6 +1152,8 @@ class FusedBlockMultiTransformer(Layer):
             assert len(caches) // 2 == len(self.qkv_weights)
         bias_residual_input = src
         ln_out = src
+
+        get_max_len(seq_lens_encoder, seq_lens_decoder)
 
         for i in range(len(caches) // 2):
             # print("i: ", i)

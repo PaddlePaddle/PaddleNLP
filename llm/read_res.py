@@ -11,7 +11,7 @@ if isinstance(tokenizer, LlamaTokenizer) and not tokenizer.pad_token:
 rank_id = 0
 is_blocking = True
 paddle.device.set_device("cpu")
-output_tensor = paddle.full(shape=[128 + 2, 1], fill_value=2, dtype="int64")
+output_tensor = paddle.full(shape=[256 + 2, 1], fill_value=2, dtype="int64")
 while True:
     outputs = []
     while True:

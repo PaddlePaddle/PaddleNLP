@@ -926,6 +926,23 @@ class StaticBlockInferencePredictor(BasePredictor):
         self.inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=False, dtype="bool").cpu()
         self.inputs["stop_flags"] = paddle.full(shape=[config.batch_size, 1], fill_value=True, dtype="bool")
 
+        self.inputs['step_seq_lens_encoder'] = paddle.full(shape=[config.batch_size, 1], fill_value=0, dtype="int32")
+        self.inputs['next_tokens'] = paddle.full(shape=[config.batch_size, 1], fill_value=-1, dtype="int64")
+        self.inputs['is_block_step'] = paddle.full(shape=[config.batch_size], fill_value=False, dtype="bool")
+        free_list = list(range(pre_max_block_num - 1, int(pre_max_block_num * 0.75) -1, -1))
+        self.inputs['encoder_block_lens'] = paddle.full(shape=[config.batch_size], fill_value=0, dtype="int32")
+        self.inputs['step_block_list'] = paddle.full(shape=[config.batch_size], fill_value=-1, dtype="int32")
+        self.inputs['step_lens'] = paddle.full(shape=[1], fill_value=0, dtype="int32")
+        self.inputs['recover_block_list'] = paddle.full(shape=[config.batch_size], fill_value=-1, dtype="int32")
+        self.inputs['recover_lens'] = paddle.full(shape=[1], fill_value=0, dtype="int32")
+        self.inputs['need_block_list'] = paddle.full(shape=[config.batch_size], fill_value=-1, dtype="int32")
+        self.inputs['need_block_len'] = paddle.full(shape=[1], fill_value=0, dtype="int32")
+        self.inputs['used_list_len'] = paddle.full(shape=[config.batch_size], fill_value=0, dtype="int32")
+        self.inputs['free_list'] = paddle.to_tensor(free_list, dtype="int32")
+        self.inputs['free_list_len'] = paddle.full(shape=[1], fill_value=pre_max_block_num * 0.25, dtype="int32")
+
+
+
         for i in range(self.num_layers):
             if self.config.use_cachekv_int8:
                 self.inputs["k_quant_scales_" + str(i)] = self.k_quant_scales[i]
@@ -1025,9 +1042,27 @@ class StaticBlockInferencePredictor(BasePredictor):
         import copy
         seq_lens_this_time = copy.deepcopy(self.inputs["seq_lens_this_time"][:real_bsz])
         self.seq_lens_handle.share_external_data(seq_lens_this_time)
+
+        from paddle import profiler
+        # 创建性能分析器相关的代码
+        def my_on_trace_ready(prof): # 定义回调函数，性能分析器结束采集数据时会被调用
+            callback = profiler.export_chrome_tracing('./profiler_demo') # 创建导出性能数据到profiler_demo文件夹的回调函数
+            callback(prof)  # 执行该导出函数
+            prof.summary(sorted_by=profiler.SortedKeys.GPUTotal) # 打印表单，按GPUTotal排序表单项
+        p = profiler.Profiler(scheduler = [3,4], on_trace_ready=my_on_trace_ready, timer_only=False) # 初始化Profiler对象
+        # p.start()
+        i = 0
+        
         while self.inputs["not_need_stop"]:
             self.predictor.run()
-        print("predict done")
+            # p.step()
+            i += 1
+            if i == 10:
+                s = time.time()
+            #     break
+        # p.stop()
+        paddle.device.cuda.synchronize()
+        print(i, "predict done with {}".format((time.time() - s) * 1000 / (i - 10)))
         # reset free_list
         for i in range(self.config.batch_size):
             self.free_list.extend(self.used_list[i])
@@ -1050,6 +1085,7 @@ class StaticBlockInferencePredictor(BasePredictor):
             self.inputs['top_p'][i:i+1] = self.config.top_p
             self.inputs['temperature'][i:i+1] = self.config.temperature
             self.inputs["seq_lens_this_time"][i : i + 1] = length
+            self.inputs['step_seq_lens_encoder'][i:i+1] = length
             self.inputs["seq_lens_encoder"][i : i + 1] = length
             self.inputs["seq_lens_decoder"][i : i + 1] = 0
             self.inputs["step_idx"][i : i + 1] = 0
@@ -1060,6 +1096,12 @@ class StaticBlockInferencePredictor(BasePredictor):
                 bi_now = self.free_list.pop()
                 self.used_list[i].append(bi_now)
                 self.inputs["block_tables"][i : i + 1, bi] = bi_now
+
+            # encoder_block_num = len(task['block_tables'])
+            self.inputs['encoder_block_lens'][i:i+1] = need_block_nums
+            # self.inputs["block_tables"][i:i+1, :] = -1
+            # self.inputs["block_tables"][i:i+1, :encoder_block_num] = np.array(task['block_tables'], dtype="int32")
+
 
 
 def create_predictor(

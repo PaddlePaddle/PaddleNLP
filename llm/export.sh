@@ -35,15 +35,21 @@ export PYTHONPATH=$(dirname $(pwd)):$PYTHONPATH
 #     --use_cachekv_int8
 
 
-python -m paddle.distributed.launch \
-    --gpus "0" \
+python \
      export_model.py \
-    --model_name_or_path linly-ai/chinese-llama-2-7b \
-    --output_path ./llama-7b_inference_model_bf16_mp1 \
+    --model_name_or_path meta-llama/Llama-2-13b \
+    --output_path ./llama-13b_inference_model_wint8_mp1_52 \
     --dtype float16 \
     --inference_model \
     --block_size 64 \
     --src_length 1024 \
-    --block_attn
+    --block_attn \
+    --quant_type weight_only_int8 
+    
+    
+    
+#     --use_cachekv_int8
+
+
     # --export_precache \
     # --prefix_path "/root/paddlejob/workspace/env_run/lzy/PaddleNLP/llm/ptuning-embedding/8-test/1/task_prompt_embeddings.npy"

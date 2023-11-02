@@ -67,8 +67,8 @@ void GetStopFlagsMultiV2(const paddle::Tensor& topk_ids,
 }
 
 PD_BUILD_OP(set_stop_value_multi_ends_v2)
-    .Inputs({"topk_ids", "stop_flags", "seq_lens", "end_ids"})
-    .Outputs({"topk_ids_out", "stop_flags_out"})
+    .Inputs({"topk_ids", "stop_flags", "seq_lens", "end_ids", "next_tokens"})
+    .Outputs({"topk_ids_out", "stop_flags_out", "next_tokens_out"})
     .SetInplaceMap({{"topk_ids", "topk_ids_out"},
                     {"stop_flags", "stop_flags_out"},
                     {"next_tokens", "next_tokens_out"}})

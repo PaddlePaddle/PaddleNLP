@@ -37,15 +37,15 @@ export FLAGS_fraction_of_gpu_memory_to_use=0.92
 #     --inference_model
 
 python -m paddle.distributed.launch \
-    --gpus "0" \
+    --gpus "4" \
     predictor.py \
-    --model_name_or_path ./llama-7b_inference_model_bf16_mp1_precache \
+    --model_name_or_path ./llama-13b_inference_model_wint8_mp1_52 \
     --dtype float16 \
     --src_length 1024 \
     --max_length 1024 \
     --output_file "infer.json" \
     --mode "static" \
-    --batch_size 2 \
+    --batch_size 1 \
     --block_size 64 \
     --block_attn \
     --inference_model
