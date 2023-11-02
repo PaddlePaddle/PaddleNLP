@@ -65,7 +65,9 @@ def all_gather(input):
     output_shape = input.shape
     output_shape[0] = output_shape[0] * parallelism
     output = paddle.empty(shape=output_shape, dtype=input.dtype)
-    dist.stream.all_gather(output, input, group=group, sync_op=True, use_calc_stream=True)
+    # sync between calc_stream and comm_stream will increase execution time
+    # thus use_calc_stream=False
+    dist.stream.all_gather(output, input, group=group, sync_op=True, use_calc_stream=False)
     return output
 
 
@@ -81,7 +83,9 @@ def reduce_scatter(input):
     )
     output_shape[0] = output_shape[0] // parallelism
     output = paddle.empty(shape=output_shape, dtype=input.dtype)
-    dist.stream.reduce_scatter(output, input, op=dist.ReduceOp.SUM, group=group, sync_op=True, use_calc_stream=True)
+    # sync between calc_stream and comm_stream will increase execution time
+    # thus use_calc_stream=False
+    dist.stream.reduce_scatter(output, input, op=dist.ReduceOp.SUM, group=group, sync_op=True, use_calc_stream=False)
     return output
 
 
