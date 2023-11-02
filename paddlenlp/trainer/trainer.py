@@ -95,7 +95,11 @@ from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
-from .plugins.unified_checkpoint import load_unified_checkpoint, save_unified_checkpoint
+from .plugins.unified_checkpoint import (
+    load_unified_checkpoint,
+    save_unified_checkpoint,
+    save_unified_optimizer,
+)
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -1972,10 +1976,19 @@ class Trainer:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
                 logger.info("Saving optimizer files.")
-                paddle.save(
-                    self.optimizer.state_dict(),
-                    os.path.join(output_dir, optimizer_name),
-                )
+                if self.args.unified_checkpoint:
+                    save_unified_optimizer(
+                        self.args,
+                        self.model,
+                        self.optimizer,
+                        output_dir,
+                        safe_serialization=True,
+                    )
+                else:
+                    paddle.save(
+                        self.optimizer.state_dict(),
+                        os.path.join(output_dir, optimizer_name),
+                    )
 
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:

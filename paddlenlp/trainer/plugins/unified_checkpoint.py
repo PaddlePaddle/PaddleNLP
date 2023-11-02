@@ -63,6 +63,8 @@ SAFE_MASTER_WEIGHTS_INDEX_NAME = "master_weight.safetensors.index.json"
 __all__ = [
     "load_unified_checkpoint",
     "save_unified_checkpoint",
+    "load_unified_optimizer",
+    "save_unified_optimizer",
 ]
 
 
@@ -291,12 +293,11 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
 
     """
     # Split into naive optimizer params and master weights.
-    state_dicts, shard_files, sharded_indexes = unified_optimizer_into_shards(
-        args, optimizer, safe_serialization=safe_serialization
-    )
+    # state_dicts, shard_files, sharded_indexes =
+    unified_optimizer_into_shards(args, model, optimizer, safe_serialization=safe_serialization)
 
-    optim_state, master_weight_state = state_dicts
-    return optim_state, master_weight_state
+    # optim_state, master_weight_state = state_dicts
+    # return optim_state, master_weight_state
 
     # save_directory = output_dir
     # os.makedirs(save_directory, exist_ok=True)
@@ -385,12 +386,12 @@ def unified_optimizer_into_shards(
         index_master_weight_file[key] = shard_master_weight_file
         total_master_weight_size += weight.numel().item() * dtype_byte_size(weight.dtype)
 
-    return (
-        optim_state_dict,
-        master_weights,
-        shard_optimizer_file,
-        shard_master_weight_file,
-    )
+    # return (
+    #    optim_state_dict,
+    #    master_weights,
+    #    shard_optimizer_file,
+    #    shard_master_weight_file,
+    # )
 
 
 def get_sharded_file_name(args, file_name):
