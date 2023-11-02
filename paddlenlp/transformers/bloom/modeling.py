@@ -415,7 +415,7 @@ class BloomAttention(nn.Layer):
                 key_layer = paddle.concat((past_key, key_layer), axis=3)
                 value_layer = paddle.concat((past_value, value_layer), axis=2)
 
-            if use_cache is True:
+            if use_cache:
                 present = (key_layer, value_layer)
             else:
                 present = None
