@@ -443,11 +443,11 @@ def dybatch_preprocess(
         bs = inputs["input_ids"].shape[0]
         max_len = max(map(len, input_ids))
 
-        position_ids = paddle.zeros(shape=[bs, max_length], dtype="int64")
+        position_ids = np.zeros(shape=[bs, max_length], dtype="int64")
 
         for i in range(bs):
-            position_ids[i, : seq_len[i]] = paddle.arange(seq_len[i])
-        inputs["position_ids"] = position_ids
+            position_ids[i, : seq_len[i]] = np.arange(seq_len[i])
+        inputs["position_ids"] = paddle.to_tensor(position_ids)
 
     tgt_ids = [input[-1:] for input in input_ids]
     tgt_pos = []

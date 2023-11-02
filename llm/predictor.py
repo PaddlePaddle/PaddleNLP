@@ -298,17 +298,18 @@ class InferencePredictorMixin:
                 shape=[config.batch_size, 2, 1],
                 dtype="int64",
             )
+        elif "bloom" in self.architectures:
+            self.arange_tensor_encoder = paddle.zeros(shape=(config.batch_size, 1, total_max_length), dtype=self.dtype)
         else:
-            self.attention_mask = paddle.zeros(
+            self.attention_mask = np.zeros(
                 shape=(config.batch_size, 1, config.max_length, config.max_length),
                 dtype=self.dtype,
             )
 
-        self.tgt_generation_mask = paddle.ones(
+        self.tgt_generation_mask = np.ones(
             shape=[config.batch_size, 1, config.max_length, config.max_length],
             dtype=self.dtype,
         )
-        self.arange_tensor_encoder = paddle.zeros(shape=(config.batch_size, 1, total_max_length), dtype=self.dtype)
 
         if config.export_precache:
             if config.prefix_path:
@@ -440,12 +441,12 @@ class InferencePredictorMixin:
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 pad_len = pad_lens[i]
-                padding_mask = paddle.tril(paddle.ones(shape=(length, length), dtype=self.config.dtype))
-                padding_mask[ :, length - pad_len : length] = paddle.zeros(shape=[pad_len], dtype=self.config.dtype)
+                padding_mask = np.tril(np.ones(shape=(length, length), dtype=self.config.dtype))
+                padding_mask[ :, length - pad_len : length] = np.zeros(shape=[pad_len], dtype=self.config.dtype)
 
                 self.attention_mask[i, 0, :length, :length] = padding_mask
 
-                self.tgt_generation_mask[i, 0, :, length - pad_len : length] = paddle.zeros(
+                self.tgt_generation_mask[i, 0, :, length - pad_len : length] = np.zeros(
                     shape=[pad_len], dtype=self.config.dtype)
 
                 # if pre_caches_length > 0:
@@ -474,8 +475,8 @@ class InferencePredictorMixin:
                 #     )
 
         inputs["pre_ids"] = self.pre_ids
-        inputs["attention_mask"] = self.attention_mask
-        inputs["tgt_generation_mask"] = self.tgt_generation_mask
+        inputs["attention_mask"] = paddle.to_tensor(self.attention_mask)
+        inputs["tgt_generation_mask"] = paddle.to_tensor(self.tgt_generation_mask)
 
         if pre_caches_length > 0:
             if self.config.mode == "dynamic":
@@ -524,8 +525,8 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         config.enable_custom_device("npu", device_id)
 
         # config.disable_glog_info()
-        # config.enable_memory_optim()
-        config.enable_save_optim_model(True)
+        config.enable_memory_optim()
+        # config.enable_save_optim_model(True)
         config.set_optim_cache_dir("./optim_cache")
 
         pass_builder = config.pass_builder()
