@@ -870,7 +870,7 @@ class QWenForCausalLM(QWenPretrainedModel):
         if past_key_values:
             input_ids = input_ids[:, -1].unsqueeze(-1)
             if position_ids is not None:
-               position_ids = position_ids[:, -1].unsqueeze(-1)
+                position_ids = position_ids[:, -1].unsqueeze(-1)
 
         if inputs_embeds is not None and past_key_values is None:
             model_inputs = {"inputs_embeds": inputs_embeds}
