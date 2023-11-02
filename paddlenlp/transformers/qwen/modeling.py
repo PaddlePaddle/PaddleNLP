@@ -869,7 +869,8 @@ class QWenForCausalLM(QWenPretrainedModel):
 
         if past_key_values:
             input_ids = input_ids[:, -1].unsqueeze(-1)
-            position_ids = position_ids[:, -1].unsqueeze(-1)
+            if position_ids is not None:
+               position_ids = position_ids[:, -1].unsqueeze(-1)
 
         if inputs_embeds is not None and past_key_values is None:
             model_inputs = {"inputs_embeds": inputs_embeds}
@@ -1005,7 +1006,6 @@ def rotate_half(x):
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None):
 
     if position_ids is None:
-        # Note: Only for LlamaForCausalLMPipe model pretraining
         cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
         sin = sin[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
     else:
