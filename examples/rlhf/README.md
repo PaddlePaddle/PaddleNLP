@@ -70,3 +70,27 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" dpo_main.py ./s
 ```
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" dpo_main.py ./scripts/llama/dpo_argument.json
 ```
+
+
+## 5. 用EB4进行打分
+
+进入`evaluate`目录下，执行命令：
+
+```commandline
+python eval_score.py --problem /path/to/problem.json  --red_corner_answer_path /path/to/red_team_answer.json --blue_corner_answer_path /path/to/red_team_answer.json
+
+```
+
+problem.json样例数据：
+
+```
+{"question": "A few days back, I went for a riverside shoot with my Nikon D5300. Unfortunately, moderate rain soon started. I noticed a few photographers, probably with professional grade cameras, were daring enough to shoot the landscape in such weather. The scenic beauty around at that moment was mesmerizing, but I missed capturing any shots, fearing that a single droplet of water would burn out my DSLR. Before trying out taking pictures in rainy condition with my Nikon D5300, I need to know how weather-proof it is. Any suggestions/authentic information is appreciated."}
+...
+```
+
+red_team_answer.json及blue_team_answer.json格式相同，样例数据如下：
+
+```
+{"question": "A few days back, I went for a riverside shoot with my Nikon D5300. Unfortunately, moderate rain soon started. I noticed a few photographers, probably with professional grade cameras, were daring enough to shoot the landscape in such weather. The scenic beauty around at that moment was mesmerizing, but I missed capturing any shots, fearing that a single droplet of water would burn out my DSLR. Before trying out taking pictures in rainy condition with my Nikon D5300, I need to know how weather-proof it is. Any suggestions/authentic information is appreciated.", "answer": "I have used my D5300 in rain and it works fine. I've had some drops hit the lens and I didn't have any issues with the camera.\n\nHowever, there are a few things you can do to make sure that your camera doesn't get damaged.\n\n1. First of all, don't use your camera in a heavy rain.\n2. Don't leave the lens cap off while taking pictures in rain.\n3. Take the lens cap off when you are not taking pictures.\n4. If you don't have a rain cover, try to keep the lens hood on when you are not taking pictures.\n5. If you have a rain cover, make sure that you put it on before taking the camera out.\n6. Try to keep the camera away from large bodies of water.\n7. If you are using a tripod, try to keep the camera away from the legs of the tripod.\n8. Try to keep the camera away from large bodies of water.\n9. Don't let water get into the camera body.\n10. Don't leave the camera in the rain for a long period of time.\n\nIf you follow these steps, you should be able to use your camera in the rain without any problems."}
+...
+```
