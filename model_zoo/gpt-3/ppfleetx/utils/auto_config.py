@@ -16,8 +16,6 @@ import argparse
 import os
 import sys
 
-from sympy import sequence
-
 import paddle
 import paddle.distributed as dist
 import paddle.distributed.auto_parallel as auto
