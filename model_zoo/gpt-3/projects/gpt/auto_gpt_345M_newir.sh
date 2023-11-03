@@ -16,15 +16,18 @@
 
 export FLAGS_new_executor_micro_batching=True
 export FLAGS_enable_new_ir_in_executor=1
+export FLAGS_enable_prim_in_distribute=True
 
 log_dir=log_newir
 rm -rf $log_dir
 
 # Only dp_degree, mp_degree and pp_degree can be changed
 # Only support pure dp, pure mp and pure pp
-python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3,4,5,6,7" \
+export CUDA_VISIBLE_DEVICES=1,6
+python -m paddle.distributed.launch --log_dir $log_dir --devices "1,6" \
     ./tools/auto.py \
     -c ./ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
+    -o Model.num_layers=4 \
     -o Model.hidden_dropout_prob=0.0 \
     -o Model.attention_probs_dropout_prob=0.0 \
     -o Model.use_recompute=False \
@@ -35,6 +38,6 @@ python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3,4,5,6,
     -o Distributed.pp_degree=1 \
     -o Distributed.sharding.sharding_degree=1 \
     -o Distributed.sharding.sharding_stage=1 \
-    -o Engine.max_steps=5 \
+    -o Engine.max_steps=10000 \
     -o Engine.eval_freq=100000 \
     -o Engine.mix_precision.enable=False \

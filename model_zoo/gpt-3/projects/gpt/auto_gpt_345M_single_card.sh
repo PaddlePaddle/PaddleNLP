@@ -14,6 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+export FLAGS_new_executor_micro_batching=True
+export FLAGS_enable_new_ir_in_executor=1
+export FLAGS_enable_prim_in_distribute=True
+
+log_dir=log_newir
+rm -rf $log_dir
 
 export CUDA_VISIBLE_DEVICES=0
-python ./tools/auto.py -c ./ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml 
+python ./tools/auto.py -c ./ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
+    -o Model.num_layers=4 \
+    -o Global.local_batch_size=4 \
+    -o Global.micro_batch_size=4 \
+    -o Model.hidden_dropout_prob=0.0 \
+    -o Model.attention_probs_dropout_prob=0.0 \
+    -o Model.use_recompute=False \
+    -o Engine.max_steps=10000 \
+    -o Engine.eval_freq=100000 \
+    -o Engine.mix_precision.enable=False \
