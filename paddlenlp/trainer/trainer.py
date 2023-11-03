@@ -2111,10 +2111,6 @@ class Trainer:
             model_meta["parallel_config"] = parallel_config
         sharding_metas = self._gather_sharding_metas()
         if sharding_metas:
-            if DygraphShardingOptimizerV2 is not None:
-                tmp_opt = unwrap_optimizer(self.optimizer, DygraphShardingOptimizerV2)
-                if tmp_opt is not None:
-                    sharding_metas["enable_overlap"] = tmp_opt.pp_overlap
             model_meta["sharding_metas"] = sharding_metas
 
         if dist.get_rank():
@@ -2193,6 +2189,12 @@ class Trainer:
         sharding_meta["param2rank"] = param2rank
         sharding_meta["structure_name_mapping"] = structure_name_mapping
         sharding_meta["sharding_strategy"] = sharding_strategy
+
+        if DygraphShardingOptimizerV2 is not None:
+            tmp_opt = unwrap_optimizer(self.optimizer, DygraphShardingOptimizerV2)
+            if tmp_opt is not None:
+                sharding_meta["enable_overlap"] = tmp_opt.pp_overlap
+
         suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
         sharding_metas[suffix] = sharding_meta
         sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_model_parallel_group())
