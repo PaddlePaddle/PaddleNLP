@@ -31,6 +31,8 @@ from .testing_utils import LLMTest
         ["bloom"],
         ["chatglm"],
         ["chatglm2"],
+        ["qwen"],
+        ["baichuan"],
     ],
 )
 class PrefixTuningTest(LLMTest, unittest.TestCase):
@@ -58,7 +60,7 @@ class PrefixTuningTest(LLMTest, unittest.TestCase):
 
             main()
 
-        if self.model_dir not in ["chatglm2"]:
+        if self.model_dir not in ["chatglm2", "qwen", "baichuan"]:
             self.run_predictor(
                 {
                     "inference_model": True,
