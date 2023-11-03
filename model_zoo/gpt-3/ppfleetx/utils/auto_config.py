@@ -16,6 +16,8 @@ import argparse
 import os
 import sys
 
+from sympy import sequence
+
 import paddle
 import paddle.distributed as dist
 import paddle.distributed.auto_parallel as auto
@@ -41,6 +43,15 @@ def process_dist_configs(config):
 
     mp_degree = configs.setdefault("mp_degree", 1)
     pp_degree = configs.setdefault("pp_degree", 1)
+
+    # disenable sequence parallel is mp_degree < 2.
+    sequence_parallel = config["Model"]["sequence_parallel"]
+    if mp_degree < 2 and sequence_parallel:
+        config["Model"]["sequence_parallel"] = False
+        logger.warning(
+            "sequence_parallel is turn off since mp_degree < 2."
+        )
+
 
     # sharding default
     sharding_config = configs["sharding"]
