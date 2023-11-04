@@ -216,6 +216,7 @@ class QWenAttention(nn.Layer):
         hidden_states,
         layer_past=None,
         attention_mask=None,
+        position_ids=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
         output_attentions=False,
@@ -259,11 +260,11 @@ class QWenAttention(nn.Layer):
                     v=None,
                     sin=sin,
                     cos=cos,
-                    position_ids=None,
+                    position_ids=position_ids,
                     use_neox_rotary_style=False,
                 )
             else:
-                query, key = apply_rotary_pos_emb(query, key, cos, sin)
+                query, key = apply_rotary_pos_emb(query, key, cos, sin, position_ids=position_ids)
 
         if layer_past is not None:
             past_key, past_value = layer_past[0], layer_past[1]
@@ -352,6 +353,7 @@ class QWenBlock(nn.Layer):
         hidden_states,
         layer_past=None,
         attention_mask=None,
+        position_ids=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
         use_cache=False,
@@ -363,6 +365,7 @@ class QWenBlock(nn.Layer):
             layernorm_output,
             layer_past=layer_past,
             attention_mask=attention_mask,
+            position_ids=position_ids,
             use_cache=use_cache,
             output_attentions=output_attentions,
         )
@@ -578,6 +581,7 @@ class QWenModel(QWenPretrainedModel):
         hidden_states,
         layer_past,
         attention_mask,
+        position_ids,
         encoder_hidden_states,
         encoder_attention_mask,
         use_cache,
@@ -594,6 +598,7 @@ class QWenModel(QWenPretrainedModel):
             hidden_states,
             layer_past,
             attention_mask,
+            position_ids,
             encoder_hidden_states,
             encoder_attention_mask,
             use_cache,
@@ -635,6 +640,7 @@ class QWenModel(QWenPretrainedModel):
         input_ids=None,
         past_key_values=None,
         attention_mask=None,
+        position_ids=None,
         inputs_embeds=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
@@ -702,6 +708,7 @@ class QWenModel(QWenPretrainedModel):
                     hidden_states,
                     layer_past=layer_past,
                     attention_mask=attention_mask,
+                    position_ids=position_ids,
                     encoder_hidden_states=encoder_hidden_states,
                     encoder_attention_mask=encoder_attention_mask,
                     use_cache=use_cache,
@@ -712,6 +719,7 @@ class QWenModel(QWenPretrainedModel):
                     hidden_states,
                     layer_past=layer_past,
                     attention_mask=attention_mask,
+                    position_ids=position_ids,
                     encoder_hidden_states=encoder_hidden_states,
                     encoder_attention_mask=encoder_attention_mask,
                     use_cache=use_cache,
@@ -839,6 +847,10 @@ class QWenForCausalLM(QWenPretrainedModel):
             model_kwargs["cache"] = outputs.past_key_values
             model_kwargs["past_key_values"] = outputs.past_key_values
 
+        if "position_ids" in model_kwargs and model_kwargs["position_ids"] is not None:
+            position_ids = model_kwargs["position_ids"]
+            model_kwargs["position_ids"] = paddle.concat([position_ids, position_ids[..., -1:] + 1], axis=-1)
+
         # update attention_mask
         if not is_encoder_decoder and "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]
@@ -852,10 +864,13 @@ class QWenForCausalLM(QWenPretrainedModel):
         return model_kwargs
 
     def prepare_inputs_for_generation(self, input_ids, past_key_values=None, inputs_embeds=None, **kwargs):
+        attention_mask = kwargs.get("attention_mask", None)
+        position_ids = kwargs.get("position_ids", None)
+
         if past_key_values:
             input_ids = input_ids[:, -1].unsqueeze(-1)
-
-        attention_mask = kwargs.get("attention_mask", None)
+            if position_ids is not None:
+                position_ids = position_ids[:, -1].unsqueeze(-1)
 
         if inputs_embeds is not None and past_key_values is None:
             model_inputs = {"inputs_embeds": inputs_embeds}
@@ -867,6 +882,7 @@ class QWenForCausalLM(QWenPretrainedModel):
                 "past_key_values": past_key_values,
                 "use_cache": kwargs.get("use_cache"),
                 "attention_mask": attention_mask,
+                "position_ids": position_ids,
             }
         )
         return model_inputs
@@ -888,6 +904,7 @@ class QWenForCausalLM(QWenPretrainedModel):
         input_ids=None,
         past_key_values=None,
         attention_mask=None,
+        position_ids=None,
         inputs_embeds=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
@@ -904,6 +921,7 @@ class QWenForCausalLM(QWenPretrainedModel):
             input_ids,
             past_key_values=past_key_values,
             attention_mask=attention_mask,
+            position_ids=position_ids,
             inputs_embeds=inputs_embeds,
             encoder_hidden_states=encoder_hidden_states,
             encoder_attention_mask=encoder_attention_mask,
@@ -985,9 +1003,16 @@ def rotate_half(x):
     return paddle.concat([-x2, x1], axis=-1)
 
 
-def apply_rotary_pos_emb(q, k, cos, sin):
-    cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
-    sin = sin[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None):
+
+    if position_ids is None:
+        cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+        sin = sin[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+    else:
+        cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
+        sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
+        cos = cos[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
+        sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
