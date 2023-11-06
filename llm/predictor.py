@@ -34,6 +34,10 @@ from utils import (
 )
 
 from paddlenlp.generation import TextIteratorStreamer
+from paddlenlp.generation.logits_process import (
+    LogitsProcessorList,
+    RepetitionPenaltyLogitsProcessor,
+)
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.trainer import PdArgumentParser
@@ -650,9 +654,10 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
                 inputs[key] = paddle.to_tensor(inputs[key])
 
         inputs["cache_kvs"] = self.cache_kvs
-        self.model.generate(
-            **inputs,
-        )
+        processors = LogitsProcessorList()
+        processors.append(RepetitionPenaltyLogitsProcessor(self.config.repetition_penalty))
+
+        self.model.generate(**inputs, logits_processors=processors)
         return None
 
 

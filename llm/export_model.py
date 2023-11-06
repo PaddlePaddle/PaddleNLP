@@ -22,6 +22,10 @@ from predictor import ModelArgument, PredictorArgument, create_predictor
 from tqdm import tqdm
 from utils import generate_rank_mapping, get_infer_model_path
 
+from paddlenlp.generation.logits_process import (
+    LogitsProcessorList,
+    RepetitionPenaltyLogitsProcessor,
+)
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.utils.log import logger
 
@@ -81,9 +85,16 @@ def main():
     predictor = create_predictor(predictor_args, model_args, tensor_parallel_degree, tensor_parallel_rank)
     predictor.model.eval()
 
+    processors = LogitsProcessorList()
+    processors.append(RepetitionPenaltyLogitsProcessor(predictor_args.repetition_penalty))
+
     predictor.model.to_static(
         get_infer_model_path(export_args.output_path, predictor_args.model_prefix),
-        {"dtype": predictor_args.dtype, "export_precache": predictor_args.export_precache},
+        {
+            "dtype": predictor_args.dtype,
+            "export_precache": predictor_args.export_precache,
+            "logits_processors": processors,
+        },
     )
     predictor.model.config.save_pretrained(export_args.output_path)
     predictor.tokenizer.save_pretrained(export_args.output_path)
