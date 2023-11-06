@@ -224,7 +224,7 @@ def load_torch(path: str, **pickle_load_args):
             metadata = f.metadata()
         if metadata.get("format") not in ["pt"]:
             raise OSError(
-                f"You have open the `convert_from_torch` flag bug the safetensors archive passed at {path} does not contain the 'pt' metadata."
+                f"You have open the `convert_from_torch` flag but the safetensors archive passed at {path} does not contain the 'pt' metadata."
             )
         state_dict = {}
         with safe_open(path, framework="pt") as f:
