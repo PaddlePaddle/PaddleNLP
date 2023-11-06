@@ -192,6 +192,7 @@ def scaled_dot_product_attention(
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
         if alibi is not None:
+            alibi = alibi.reshape([bsz, num_heads, 1, -1])
             attention_mask = attention_mask.cast(alibi.dtype) + alibi
         version = paddle.version.full_version
         if version != "0.0.0" and version <= "2.5.2":
