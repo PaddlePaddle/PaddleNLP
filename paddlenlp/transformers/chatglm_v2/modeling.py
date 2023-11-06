@@ -13,9 +13,7 @@
 # limitations under the License.
 
 import math
-from functools import partial
-from typing import Any, Dict, Optional, Tuple, List
-from ...utils.converter import StateDictNameMapping, init_name_mappings
+from typing import Any, Dict, List, Optional, Tuple
 
 import paddle
 import paddle.nn as nn
@@ -23,6 +21,7 @@ import paddle.nn.functional as F
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import map_structure
 
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -36,6 +35,7 @@ __all__ = [
     "ChatGLMv2PretrainedModel",
     "ChatGLMv2ForCausalLM",
 ]
+
 
 class RotaryEmbedding(nn.Layer):
     def __init__(self, dim, original_impl=False):
@@ -220,7 +220,11 @@ class SelfAttention(nn.Layer):
         self.multi_query_group_num = config.multi_query_group_num
         self.num_attention_heads_per_partition = config.num_attention_heads
 
-        self.query_key_value = nn.Linear(config.hidden_size, config.hidden_size + 2 * self.hidden_size_per_attention_head * config.multi_query_group_num, bias_attr=config.add_bias_linear or config.add_qkv_bias,)
+        self.query_key_value = nn.Linear(
+            config.hidden_size,
+            config.hidden_size + 2 * self.hidden_size_per_attention_head * config.multi_query_group_num,
+            bias_attr=config.add_bias_linear or config.add_qkv_bias,
+        )
         # Output.
         self.dense = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=config.add_bias_linear)
 
@@ -311,8 +315,8 @@ class MLP(nn.Layer):
         # Special Slicing to accomodate Tensor Parallel
         # Even channels is ffc_fc, odd channels is gate
         dim_size = intermediate_parallel.shape[-1]
-        ffn_fc = intermediate_parallel[..., :dim_size // 2]
-        gate = intermediate_parallel[..., dim_size // 2:]
+        ffn_fc = intermediate_parallel[..., : dim_size // 2]
+        gate = intermediate_parallel[..., dim_size // 2 :]
         intermediate_parallel = F.silu(ffn_fc) * gate
         # [s, b, h]
         output = self.dense_4h_to_h(intermediate_parallel)
@@ -609,9 +613,9 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
             if len(mapping) > 1 and mapping[1] is not None:
                 mapping[1] = "chatglm_v2." + mapping[1]
 
-
         init_name_mappings(mappings)
         return [StateDictNameMapping(*mapping) for mapping in mappings]
+
 
 class Embedding(nn.Layer):
     """Language model embeddings."""
