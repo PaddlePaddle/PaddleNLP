@@ -238,8 +238,6 @@ def unified_checkpoint_into_shards(
         config_to_save.tensor_parallel_degree = 1
 
     # build index json file
-    index_file_list = []
-    total_size_list = []
     index_weight_file = {}
     total_size = 0
     weights_name = SAFE_WEIGHTS_NAME if safe_serialization else PADDLE_WEIGHTS_NAME
@@ -249,36 +247,7 @@ def unified_checkpoint_into_shards(
         index_weight_file[key] = shard_file
         total_size += weight.numel().item() * dtype_byte_size(weight.dtype)
 
-    hcg = fleet.get_hybrid_communicate_group()
-
-    tp_group = hcg.get_model_parallel_group()
-    pp_group = hcg.get_pipe_parallel_group()
-
-    logger.info("Unified checkpoint generating sharded_index json files.")
-    if tp_group.nranks > 1:
-        paddle.distributed.all_gather_object(index_file_list, index_weight_file, tp_group)
-        paddle.distributed.all_gather_object(total_size_list, total_size, tp_group)
-    if pp_group.nranks > 1:
-        pp_index_file_list = []
-        pp_total_size_list = []
-        paddle.distributed.all_gather_object(
-            pp_index_file_list, index_file_list if len(index_file_list) > 0 else index_weight_file, pp_group
-        )
-        paddle.distributed.all_gather_object(
-            pp_total_size_list, total_size_list if len(total_size_list) > 0 else total_size, pp_group
-        )
-        if isinstance(pp_total_size_list[0], list):
-            total_size_list = [y for x in pp_total_size_list for y in x]
-            index_file_list = [y for x in pp_index_file_list for y in x]
-        else:
-            index_file_list = pp_index_file_list
-            total_size_list = pp_total_size_list
-
-    # for pure sharding
-    if len(index_file_list) == 0 and len(total_size_list) == 0:
-        index_file_list = [index_weight_file]
-        total_size_list = [total_size]
-
+    index_file_list, total_size_list = gather_sharded_object(index_weight_file, total_size)
     sharded_index = get_sharded_index(
         index_file_list,
         total_size_list,
@@ -299,20 +268,49 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
     """
     # Split into naive optimizer params and master weights.
     # state_dicts, shard_files, sharded_indexes =
-    unified_optimizer_into_shards(args, model, optimizer, safe_serialization=safe_serialization)
+    results = unified_optimizer_into_shards(args, model, optimizer, safe_serialization=safe_serialization)
+    master_weight_state_dict = None
+    if len(results) == 1:
+        optim_state_dict, shard_optim_file, sharded_optim_index = results
+    else:
+        optim_state_dict, shard_optim_file, sharded_optim_index = results[0]
+        master_weight_state_dict, shard_master_weight_file, sharded_master_weight_index = results[1]
 
-    # optim_state, master_weight_state = state_dicts
-    # return optim_state, master_weight_state
+    save_directory = output_dir
+    os.makedirs(save_directory, exist_ok=True)
+    if safe_serialization:
+        for k in list(optim_state_dict.keys()):
+            if isinstance(optim_state_dict[k], paddle.Tensor):
+                optim_state_dict[k] = optim_state_dict.pop(k).cpu().numpy()
+        safe_save_file(optim_state_dict, os.path.join(save_directory, shard_optim_file), metadata={"format": "np"})
+        if master_weight_state_dict is not None:
+            for k in list(master_weight_state_dict.keys()):
+                if isinstance(master_weight_state_dict[k], paddle.Tensor):
+                    master_weight_state_dict[k] = master_weight_state_dict.pop(k).cpu().numpy()
+            safe_save_file(
+                master_weight_state_dict,
+                os.path.join(save_directory, shard_master_weight_file),
+                metadata={"format": "np"},
+            )
+    else:
+        paddle.save(optim_state_dict, os.path.join(save_directory, shard_optim_file))
+        if master_weight_state_dict is not None:
+            paddle.save(master_weight_state_dict, os.path.join(save_directory, shard_master_weight_file))
 
-    # save_directory = output_dir
-    # os.makedirs(save_directory, exist_ok=True)
-    # if safe_serialization:
-    #    for k in list(state_dict.keys()):
-    #        if isinstance(state_dict[k], paddle.Tensor):
-    #            state_dict[k] = state_dict.pop(k).cpu().numpy()
-    #    safe_save_file(state_dict, os.path.join(save_directory, shard_file), metadata={"format": "np"})
-    # else:
-    #    paddle.save(state_dict, os.path.join(save_directory, shard_file))
+    if sharded_optim_index is not None:
+        if not safe_serialization:
+            path = os.path.join(output_dir, PADDLE_OPTIMIZER_INDEX_NAME)
+            master_path = os.path.join(output_dir, PADDLE_MASTER_WEIGHTS_INDEX_NAME)
+        else:
+            path = os.path.join(output_dir, SAFE_OPTIMIZER_INDEX_NAME)
+            master_path = os.path.join(output_dir, SAFE_MASTER_WEIGHTS_INDEX_NAME)
+
+        with open(path, "w") as f:
+            json.dump(sharded_optim_index, f, indent=4)
+
+        if master_weight_state_dict is not None:
+            with open(master_path, "w") as f:
+                json.dump(sharded_master_weight_index, f, indent=4)
 
 
 def load_unified_optimizer():
@@ -370,8 +368,6 @@ def unified_optimizer_into_shards(
     print("merge tp costs: ", time.time() - start_time)
 
     # build index json file
-    # index_file_list = []
-    # total_size_list = []
     index_optimizer_file, index_master_weight_file = {}, {}
     total_optim_size, total_master_weight_size = 0, 0
     optimizer_name = SAFE_OPTIMIZER_NAME if safe_serialization else PADDLE_OPTIMIZER_NAME
@@ -390,18 +386,25 @@ def unified_optimizer_into_shards(
             index_master_weight_file[key] = shard_master_weight_file
             total_master_weight_size += weight.numel().item() * dtype_byte_size(weight.dtype)
 
-    # hcg = fleet.get_hybrid_communicate_group()
-    # tp_group = hcg.get_model_parallel_group()
-    # pp_group = hcg.get_pipe_parallel_group()
+    index_optimizer_filelist, total_optim_size_list = gather_sharded_object(index_optimizer_file, total_optim_size)
+    sharded_optim_index = get_sharded_index(index_optimizer_filelist, total_optim_size_list)
+    if master_weights is not None:
+        index_master_weight_filelist, total_master_weight_size_list = gather_sharded_object(
+            index_master_weight_file, total_master_weight_size
+        )
+        sharded_master_weight_index = get_sharded_index(index_master_weight_filelist, total_master_weight_size_list)
 
-    logger.info("Unified optimizer generating sharded_index json files.")
+    if sharded_optim_index is not None and master_weights is not None:
+        sharded_optim_index["master_weights"] = True
 
-    # return (
-    #    optim_state_dict,
-    #    master_weights,
-    #    shard_optimizer_file,
-    #    shard_master_weight_file,
-    # )
+    if master_weights is None:
+        return (optim_state_dict, shard_optimizer_file, sharded_optim_index)
+    else:
+        return (optim_state_dict, shard_optimizer_file, sharded_optim_index), (
+            master_weights,
+            shard_master_weight_file,
+            sharded_master_weight_index,
+        )
 
 
 def get_sharded_file_name(args, file_name):
@@ -437,6 +440,43 @@ def get_sharded_index(
         return sharded_index_json
 
     return None
+
+
+def gather_sharded_object(index_file, total_size):
+
+    index_file_list, total_size_list = [], []
+
+    hcg = fleet.get_hybrid_communicate_group()
+    tp_group = hcg.get_model_parallel_group()
+    pp_group = hcg.get_pipe_parallel_group()
+
+    logger.info("Unified checkpoint generating sharded_index json files.")
+
+    if tp_group.nranks > 1:
+        paddle.distributed.all_gather_object(index_file_list, index_file, tp_group)
+        paddle.distributed.all_gather_object(total_size_list, total_size, tp_group)
+    if pp_group.nranks > 1:
+        pp_index_file_list = []
+        pp_total_size_list = []
+        paddle.distributed.all_gather_object(
+            pp_index_file_list, index_file_list if len(index_file_list) > 0 else index_file, pp_group
+        )
+        paddle.distributed.all_gather_object(
+            pp_total_size_list, total_size_list if len(total_size_list) > 0 else total_size, pp_group
+        )
+        if isinstance(pp_total_size_list[0], list):
+            total_size_list = [y for x in pp_total_size_list for y in x]
+            index_file_list = [y for x in pp_index_file_list for y in x]
+        else:
+            index_file_list = pp_index_file_list
+            total_size_list = pp_total_size_list
+
+    # for pure sharding
+    if len(index_file_list) == 0 and len(total_size_list) == 0:
+        index_file_list = [index_file]
+        total_size_list = [total_size]
+
+    return index_file_list, total_size_list
 
 
 def generate_bare_static_name(vname):
