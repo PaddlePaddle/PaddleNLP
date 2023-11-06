@@ -461,6 +461,7 @@ def main():
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
+    config.num_hidden_layers = 3
 
     print("Final pre-training config:", config)
 
