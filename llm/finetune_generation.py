@@ -136,6 +136,23 @@ def main():
             config=model_config,
             from_aistudio=model_args.from_aistudio,
         )
+    if training_args.do_train and model_args.neftune:
+        # Inspired by https://github.com/neelsjain/NEFTune
+        if hasattr(model, "get_input_embeddings"):
+
+            def neft_post_hook(module, input, output):
+                if module.training:
+                    mag_norm = model_args.neftune_noise_alpha / paddle.sqrt(
+                        paddle.to_tensor(output.shape[0] * output.shape[1], dtype="float32")
+                    )
+                    output = output + paddle.uniform(
+                        shape=output.shape, dtype=output.dtype, min=-mag_norm, max=mag_norm
+                    )
+                return output
+
+            neft_post_hook_handle = model.get_input_embeddings().register_forward_post_hook(neft_post_hook)
+        else:
+            raise NotImplementedError("Only support neftune for model with get_input_embeddings")
 
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
@@ -350,6 +367,8 @@ def main():
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        if model_args.neftune:
+            neft_post_hook_handle.remove()
         if training_args.benchmark:
             total_effective_tokens = (
                 sum([len(i["input_ids"]) for i in trainer.train_dataset]) * training_args.num_train_epochs
