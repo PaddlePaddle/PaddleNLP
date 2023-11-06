@@ -342,9 +342,11 @@ def unified_optimizer_into_shards(
     start_time = time.time()
     if master_weights is not None:
         filter_master_keys = filter_optim_params(
-            model, master_weights, static2struct_name_mappings, master_weights=True
+            model, master_weights, static2struct_name_mappings, is_master_weights=True
         )
-    filter_optim_keys = filter_optim_params(model, optim_state_dict, static2struct_name_mappings, master_weights=False)
+    filter_optim_keys = filter_optim_params(
+        model, optim_state_dict, static2struct_name_mappings, is_master_weights=False
+    )
     print("filter_params costs: ", time.time() - start_time)
 
     tp_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
@@ -353,7 +355,12 @@ def unified_optimizer_into_shards(
     start_time = time.time()
     if tp_size > 1:
         optim_state_dict = merge_tensor_parallel_for_optimizer(
-            model, optim_state_dict, model.config, filter_optim_keys, static2struct_name_mappings, master_weights=False
+            model,
+            optim_state_dict,
+            model.config,
+            filter_optim_keys,
+            static2struct_name_mappings,
+            is_master_weights=False,
         )
         if master_weights is not None:
             master_weights = merge_tensor_parallel_for_optimizer(
@@ -362,7 +369,7 @@ def unified_optimizer_into_shards(
                 model.config,
                 filter_master_keys,
                 static2struct_name_mappings,
-                master_weights=True,
+                is_master_weights=True,
             )
     print("merge tp costs: ", time.time() - start_time)
 
@@ -499,7 +506,7 @@ def generate_bare_static_name(vname):
         return a, b
 
 
-def filter_optim_params(model_to_save, state_dict, static2struct_name_mappings, master_weights=False):
+def filter_optim_params(model_to_save, state_dict, static2struct_name_mappings, is_master_weights=False):
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
 
@@ -516,7 +523,7 @@ def filter_optim_params(model_to_save, state_dict, static2struct_name_mappings, 
         tensor_bytes_dict = {}
         model_state_dict = model_to_save.state_dict()
         for (k, v) in state_dict.items():
-            if master_weights:
+            if is_master_weights:
                 model_v = model_state_dict[static2struct_name_mappings[k]]
             else:
                 if k == "master_weights" or k == "LR_Scheduler":
@@ -666,7 +673,7 @@ def merge_tensor_parallel_with_shard(model_to_save, state_dict, config, all_filt
 
 
 def merge_tensor_parallel_for_optimizer(
-    model_to_save, state_dict, config, all_filter_keys, static2struct_name_mappings, master_weights=False
+    model_to_save, state_dict, config, all_filter_keys, static2struct_name_mappings, is_master_weights=False
 ):
     logger.info("Unified optimizer tensor parallel in shards")
 
@@ -675,7 +682,7 @@ def merge_tensor_parallel_for_optimizer(
     for key in state_dict.keys():
         if key == "master_weights" or key == "LR_Scheduler":
             continue
-        base_model_key = key if master_weights else generate_bare_static_name(key)[0]
+        base_model_key = key if is_master_weights else generate_bare_static_name(key)[0]
         if key not in model_keys:
             model_keys.append(static2struct_name_mappings[base_model_key])
     tp_actions = model_to_save.get_tensor_parallel_convert_actions(
@@ -691,7 +698,7 @@ def merge_tensor_parallel_for_optimizer(
         is_dst = tp_rank == i
         for key in filter_keys:
             # get base model key
-            model_key = static2struct_name_mappings[key if master_weights else generate_bare_static_name(key)[0]]
+            model_key = static2struct_name_mappings[key if is_master_weights else generate_bare_static_name(key)[0]]
             tensor = state_dict[key]
             if model_key in tp_actions:
                 # for example: beta1, beta2
