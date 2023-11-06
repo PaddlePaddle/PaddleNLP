@@ -191,11 +191,11 @@ def scaled_dot_product_attention(
         # Current Flash Attention doesn't support attn maskt
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
-        if alibi is not None:
-            alibi = alibi.reshape([bsz, num_heads, 1, -1])
-            attention_mask = attention_mask.cast(alibi.dtype) + alibi
+
         version = paddle.version.full_version
         if version != "0.0.0" and version <= "2.5.2":
+            if alibi is not None:
+                raise ValueError("Flash Attention doesn't support alibi")
             attn_output, attn_weights = flash_attention(
                 query_states,
                 key_states,
@@ -204,6 +204,9 @@ def scaled_dot_product_attention(
                 return_softmax=output_attentions,
             )
         else:
+            if alibi is not None:
+                alibi = alibi.reshape([bsz, num_heads, 1, -1])
+                attention_mask = attention_mask.cast(alibi.dtype) + alibi
             attn_output = F.scaled_dot_product_attention(
                 query_states,
                 key_states,
