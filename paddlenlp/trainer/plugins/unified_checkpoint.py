@@ -705,7 +705,7 @@ def merge_tensor_parallel_for_optimizer(
                 if tensor.numel().item() == 1:
                     tensor = tensor.cpu().numpy() if is_dst else None  # Need broadcast when loaded
                 else:
-                    ret = distributed_gather(tensor, dst=i, group=tp_group, offload=True)
+                    ret = distributed_gather(tensor, dst=i, group=tp_group, offload=False)
                     action = tp_actions[model_key]
                     tensor = action(ret) if is_dst else None
             else:
