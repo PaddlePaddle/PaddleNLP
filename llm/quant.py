@@ -43,8 +43,16 @@ from paddleslim.quant.observers.avg import AVGObserverLayer
 from paddleslim.quant.quanters import PACTQuanter
 
 from paddlenlp.peft import PrefixModelForCausalLM
-from paddlenlp.peft.lora import LoRALinear
-from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
+from paddlenlp.peft.lora import (
+    ColumnParallelLoRALinear,
+    LoRALinear,
+    RowParallelLoRALinear,
+)
+from paddlenlp.peft.lora.lora_quant_layers import (
+    ColumnParallelQuantedLoRALinear,
+    QuantedLoRALinear,
+    RowParallelQuantedLoRALinear,
+)
 from paddlenlp.utils.log import logger
 
 
@@ -54,6 +62,8 @@ def create_qat_model(quant_args, model, dtype):
 
     q_config = QuantConfig(activation=None, weight=None)
     q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
+    q_config.add_qat_layer_mapping(RowParallelLoRALinear, RowParallelQuantedLoRALinear)
+    q_config.add_qat_layer_mapping(ColumnParallelLoRALinear, ColumnParallelQuantedLoRALinear)
     if quant_args.quant_type == "a8w8":
         activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
         weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype="float32")
@@ -65,6 +75,9 @@ def create_qat_model(quant_args, model, dtype):
         weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype="float32")
     else:
         raise ValueError("quant_type should be one of ['a8w8', 'weight_only_int4', 'weight_only_int8']")
+
+    q_config.add_type_config(RowParallelLoRALinear, weight=weight, activation=activation)
+    q_config.add_type_config(ColumnParallelLoRALinear, weight=weight, activation=activation)
     q_config.add_type_config(LoRALinear, weight=weight, activation=activation)
     q_config.add_type_config(nn.Linear, weight=weight, activation=activation)
 
