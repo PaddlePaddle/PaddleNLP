@@ -596,12 +596,13 @@ def cached_file_for_hf_hub(
         return resolved_file
     except Exception as e:
         print(e)
-        raise EnvironmentError(
+        logger.info(
             f"{path_or_repo_id} is not a local folder and is not a valid model identifier "
             "listed on 'https://huggingface.co/models'\nIf this is a private repository, make sure to "
             "pass a token having permission to this repo with `use_auth_token` or log in with "
             "`huggingface-cli login` and pass `use_auth_token=True`."
         )
+        return None
 
 
 def get_checkpoint_shard_files(

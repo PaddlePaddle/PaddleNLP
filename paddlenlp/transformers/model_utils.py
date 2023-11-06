@@ -385,7 +385,23 @@ def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conver
         # for local file, we use support_conversion to select paddle or torch weight.
         file_name = PYTORCH_WEIGHTS_NAME if support_conversion else PADDLE_WEIGHTS_NAME
 
-    return cached_file_for_hf_hub(repo_id, file_name, cache_dir, subfolder)
+    file_name_list = [SAFE_WEIGHTS_NAME] + [file_name]
+    resolved_file = None
+    for fn in file_name_list:
+        resolved_file = cached_file_for_hf_hub(
+            repo_id, fn, cache_dir, subfolder, _raise_exceptions_for_missing_entries=False
+        )
+        if resolved_file is not None:
+            break
+
+    if resolved_file is None:
+        str_name_list = ", ".join(file_name_list)
+        raise EnvironmentError(
+            f"{repo_id} does not appear to have a file named {str_name_list}. Checkout "
+            f"'https://huggingface.co/{repo_id}' for available files."
+        )
+
+    return resolved_file
 
 
 def register_base_model(cls):
@@ -2100,19 +2116,16 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # load pt weights early so that we know which dtype to init the model under
         if not is_sharded and state_dict is None:
             # Time to load the checkpoint
-            if resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME):
-                if convert_from_torch:
-                    # try to get the name-mapping info
-                    logger.info(
-                        f"Starting to convert pytorch weight file<{resolved_archive_file}> to "
-                        f"paddle weight file<{os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)}> ..."
-                    )
-                    state_dict = cls.convert(resolved_archive_file, config, cache_dir)
-                else:
-                    raise ValueError(
-                        f"download the {PYTORCH_WEIGHTS_NAME} weight file, but model<{cls}> "
-                        "don't support conversion from pytorch weight file to paddle weight file "
-                    )
+            if convert_from_torch and (
+                resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME)
+                or resolved_archive_file.endswith(SAFE_WEIGHTS_NAME)
+            ):
+                # try to get the name-mapping info
+                logger.info(
+                    f"Starting to convert pytorch weight file<{resolved_archive_file}> to "
+                    f"paddle weight file<{os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)}> ..."
+                )
+                state_dict = cls.convert(resolved_archive_file, config, cache_dir)
             else:
                 # 4. loading non-sharded ckpt from the state dict
                 if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
