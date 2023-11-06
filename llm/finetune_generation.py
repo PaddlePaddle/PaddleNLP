@@ -118,6 +118,7 @@ def main():
             tensor_parallel_rank=training_args.tensor_parallel_rank,
             use_flash_attention=model_args.use_flash_attention,
             dtype=dtype,
+            from_aistudio=model_args.from_aistudio,
         )
     else:
         model_config = AutoConfig.from_pretrained(
@@ -126,16 +127,18 @@ def main():
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             tensor_parallel_rank=training_args.tensor_parallel_rank,
             dtype=dtype,
+            from_aistudio=model_args.from_aistudio,
         )
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
         model = AutoModelForCausalLM.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
+            from_aistudio=model_args.from_aistudio,
         )
 
     # Load tokenizer & dataset
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
     if isinstance(tokenizer, LlamaTokenizer):
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
@@ -355,6 +358,30 @@ def main():
             logger.info(f"Effective_Tokens_per_second: {effective_tokens_per_second} ")
             logger.info("Benchmark done.")
         else:
+            if model_args.save_to_aistudio:
+                kwargs = {}
+                if model_args.aistudio_token is not None:
+                    kwargs["token"] = model_args.aistudio_token
+                # PEFT Model only save PEFT parameters, if pretrained model obtains from aistudio
+                if model_args.from_aistudio and (model_args.lora or model_args.prefix_tuning):
+                    kwargs["base_model"] = model_args.model_name_or_path
+                else:
+                    trainer.tokenizer.save_to_aistudio(
+                        repo_id=model_args.aistudio_repo_id,
+                        private=model_args.aistudio_repo_private,
+                        license=model_args.aistudio_repo_license,
+                        exist_ok=True,
+                        **kwargs,
+                    )
+                trainer.model.save_to_aistudio(
+                    repo_id=model_args.aistudio_repo_id,
+                    private=model_args.aistudio_repo_private,
+                    license=model_args.aistudio_repo_license,
+                    merge_tensor_parallel=training_args.tensor_parallel_degree > 1,
+                    exist_ok=True,
+                    **kwargs,
+                )
+
             trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
             trainer.log_metrics("train", train_result.metrics)
             trainer.save_metrics("train", train_result.metrics)
@@ -396,6 +423,12 @@ def main():
             logger.info(
                 f"Not found quant.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
             )
+        trainer.model.config.quantization_config.quant_type = quant_args.quant_type
+        trainer.model.config.quantization_config.smooth = quant_args.smooth
+        trainer.model.config.quantization_config.shift = quant_args.shift
+        trainer.model.config.quantization_config.shift_smooth_all_linears = (
+            quant_args.smooth_all_linears or quant_args.shift_all_linears
+        )
         ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
         if quant_args.shift or quant_args.smooth:
             ptq_model_config = get_ptq_model_config(trainer.model)

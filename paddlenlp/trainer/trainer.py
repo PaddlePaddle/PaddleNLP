@@ -95,6 +95,7 @@ from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
+from .plugins.unified_checkpoint import load_unified_checkpoint, save_unified_checkpoint
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -124,7 +125,10 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
 )
 from .training_args import TrainingArguments
 from .utils.helper import (  # nested_truncate,
+    broadcast_dp_optimizer,
     distributed_concat,
+    distributed_file,
+    distributed_isfile,
     nested_concat,
     nested_detach,
     nested_numpify,
@@ -447,34 +451,35 @@ class Trainer:
                 `bool` and equals `True`, load the last checkpoint in *args.output_dir* as saved by a previous instance
                 of [`Trainer`]. Only load model state dict.
         """
-        tp_merge = True
-        if isinstance(self.model, LoRAModel):
-            weight_name = LORA_WEIGHTS_NAME
-            if self.model.quantized or self.args.pipeline_parallel_degree > 1:
-                tp_merge = False
-        elif isinstance(self.model, PrefixModelForCausalLM):
-            weight_name = PREFIX_WEIGHTS_NAME
 
-        if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
-            if tp_merge:
-                weights_file = os.path.join(resume_from_checkpoint, weight_name)
-            else:
-                weights_file = os.path.join(
-                    resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
-                )
+        if resume_from_checkpoint is not None:
+            convert_tp = False
+            if isinstance(self.model, LoRAModel):
+                if self.model.quantized or self.args.pipeline_parallel_degree > 1:
+                    weights_file = os.path.join(
+                        resume_from_checkpoint, _add_variant(LORA_WEIGHTS_NAME, self.args.weight_name_suffix)
+                    )
+                else:
+                    weights_file = os.path.join(resume_from_checkpoint, LORA_WEIGHTS_NAME)
+                    if self.model.lora_config.tensor_parallel_degree > 1:
+                        convert_tp = True
+            elif isinstance(self.model, PrefixModelForCausalLM):
+                weights_file = os.path.join(resume_from_checkpoint, PREFIX_WEIGHTS_NAME)
+                if self.model.prefix_config.tensor_parallel_degree > 1:
+                    convert_tp = True
+            if self.args.dataset_rank == 0:
+                logger.info(f"Loading model from {resume_from_checkpoint} .")
 
-            logger.info(f"Loading model from {resume_from_checkpoint} .")
+                if os.path.isfile(weights_file):
+                    # We load the model state dict on the CPU to avoid an OOM error.
+                    state_dict = paddle.load(weights_file, return_numpy=True)
+                    if convert_tp:
+                        state_dict = self.model._convert_tensor_parallel(state_dict)
 
-            if os.path.isfile(weights_file):
-                # We load the model state dict on the CPU to avoid an OOM error.
-                state_dict = paddle.load(weights_file, return_numpy=True)
-                if tp_merge:
-                    state_dict = self.model._convert_tensor_parallel(state_dict)
-
-                # If the model is on the GPU, it still works!
-                self._set_state_dict_in_model(state_dict)
-                # release memory
-                del state_dict
+                    # If the model is on the GPU, it still works!
+                    self._set_state_dict_in_model(state_dict)
+                    # release memory
+                    del state_dict
         elif resume_from_checkpoint is not None:
             logger.info(f"not loading ckpt :{self.args.dataset_rank}")
 
@@ -494,6 +499,16 @@ class Trainer:
             resume_from_checkpoint = get_last_checkpoint(self.args.output_dir)
             if resume_from_checkpoint is None:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
+
+        if self.args.unified_checkpoint:
+            if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
+                load_unified_checkpoint(
+                    self.model,
+                    resume_from_checkpoint,
+                    safe_serialization=True,
+                )
+                logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
+                return
 
         if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
             self._load_from_peft_checkpoint(resume_from_checkpoint)
@@ -580,6 +595,22 @@ class Trainer:
         """
         args = self.args
         self.is_in_train = True
+
+        logger.info(f"Starting training from resume_from_checkpoint : {resume_from_checkpoint}")
+
+        # The resume_from_checkpoint could be None in some machine node.
+        # Here we reset None to temp directory.
+        if args.world_size > 1:
+            is_resume_from_checkpoint = paddle.to_tensor([resume_from_checkpoint is not None])
+            paddle.distributed.all_reduce(is_resume_from_checkpoint)
+            is_resume_from_checkpoint = is_resume_from_checkpoint.item()
+            if is_resume_from_checkpoint > 0 and is_resume_from_checkpoint < paddle.distributed.get_world_size():
+                if resume_from_checkpoint is None:
+                    resume_from_checkpoint = os.path.join(self.args.output_dir, "local_tempdir")
+                    if os.path.exists(resume_from_checkpoint) and self.args.local_rank == 0:
+                        shutil.rmtree(resume_from_checkpoint)
+                    os.makedirs(resume_from_checkpoint, exist_ok=True)
+                    logger.info(f"Reset resume_from_checkpoint to temp directory : {resume_from_checkpoint}")
 
         # memory metrics - must set up as early as possible
         self._memory_tracker.start()
@@ -697,10 +728,21 @@ class Trainer:
         steps_trained_progress_bar = None
 
         # Check if continuing training from a checkpoint
-        if resume_from_checkpoint is not None and os.path.isfile(
+        if resume_from_checkpoint is not None and distributed_isfile(
             os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
         ):
-            self.state = TrainerState.load_from_json(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
+            self.state = TrainerState.load_from_json(
+                distributed_file(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
+            )
+            if self.args.world_size > 1:
+                global_step_list = []
+                paddle.distributed.all_gather(
+                    global_step_list, paddle.to_tensor([self.state.global_step], dtype="int64")
+                )
+                assert (
+                    paddle.sum(paddle.stack(global_step_list) - global_step_list[0]) == 0
+                ), f"Error, get different globel step, please check! step list: {[x.item() for x in global_step_list]}"
+
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:
                 steps_trained_in_current_epoch = self.state.global_step % (num_update_steps_per_epoch)
@@ -900,14 +942,16 @@ class Trainer:
                     )
                     optimizer_was_run = True
                     if self.do_grad_scaling:
-                        scale_before = self.scaler._scale.cpu().numpy()
+                        scale_before = paddle.assign(self.scaler._scale)
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
-                        scale_after = self.scaler._scale.cpu().numpy()
+                        scale_after = self.scaler._scale
                         optimizer_was_run = not self.scaler._cache_founf_inf
                         if not optimizer_was_run:
+                            scale_before_value = scale_before.cpu().numpy()
+                            scale_after_value = scale_after.cpu().numpy()
                             logger.warning(
-                                f"optimizer not run, scale_before: {scale_before[0]}, scale_after: {scale_after[0]}"
+                                f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
                             )
                     elif isinstance(self.optimizer, HybridParallelOptimizer):
                         self.optimizer._step(parameters_list)
@@ -1000,24 +1044,26 @@ class Trainer:
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
     def _load_best_model_from_peft_checkpoint(self):
-        tp_merge = True
+        convert_tp = False
         if isinstance(self.model, LoRAModel):
-            weight_name = LORA_WEIGHTS_NAME
             if self.model.quantized or self.args.pipeline_parallel_degree > 1:
-                tp_merge = False
+                best_model_path = os.path.join(
+                    self.state.best_model_checkpoint, _add_variant(LORA_WEIGHTS_NAME, self.args.weight_name_suffix)
+                )
+            else:
+                best_model_path = os.path.join(self.state.best_model_checkpoint, LORA_WEIGHTS_NAME)
+                if self.model.lora_config.tensor_parallel_degree > 1:
+                    convert_tp = True
+
         elif isinstance(self.model, PrefixModelForCausalLM):
-            weight_name = PREFIX_WEIGHTS_NAME
-        if tp_merge:
-            best_model_path = os.path.join(self.state.best_model_checkpoint, weight_name)
-        else:
-            best_model_path = os.path.join(
-                self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
-            )
+            best_model_path = os.path.join(self.state.best_model_checkpoint, PREFIX_WEIGHTS_NAME)
+            if self.model.prefix_config.tensor_parallel_degree > 1:
+                convert_tp = True
 
         if os.path.exists(best_model_path):
             # We load the model state dict on the CPU to avoid an OOM error.
             state_dict = paddle.load(best_model_path, return_numpy=True)
-            if tp_merge:
+            if convert_tp:
                 state_dict = self.model._convert_tensor_parallel(state_dict)
             # If the model is on the GPU, it still works!
             self._set_state_dict_in_model(state_dict)
@@ -1400,13 +1446,24 @@ class Trainer:
         # if use distributed training
         if self.args.world_size > 1:
             process_index = self.args.process_index
-            rng_file = os.path.join(checkpoint, f"rng_state_{process_index}.pth")
-            if not os.path.isfile(rng_file):
-                logger.info(
-                    f"Didn't find an RNG file for process {process_index}, if you are resuming a training that "
-                    "wasn't launched in a distributed fashion, reproducibility is not guaranteed."
-                )
-                return
+            rng_file_list = [None for x in range(self.args.world_size)]
+            if self.args.should_save:
+                rng_file = os.path.join(checkpoint, f"rng_state_{self.args.world_size}.pth")
+                if os.path.isfile(rng_file):
+                    rng_file_list = paddle.load(rng_file, return_numpy=True)
+            paddle.distributed.broadcast_object_list(rng_file_list, src=0)
+            # if rng_file_list still empty, then use old style rng_state
+            if rng_file_list[0] is None:
+                rng_file = os.path.join(checkpoint, f"rng_state_{process_index}.pth")
+                if not os.path.isfile(rng_file):
+                    logger.info(
+                        f"Didn't find an RNG file for process {process_index}, if you are resuming a training that "
+                        "wasn't launched in a distributed fashion, reproducibility is not guaranteed."
+                    )
+                    return
+                checkpoint_rng_state = paddle.load(rng_file, return_numpy=True)
+            else:
+                checkpoint_rng_state = rng_file_list[process_index]
         else:
             rng_file = os.path.join(checkpoint, "rng_state.pth")
             if not os.path.isfile(rng_file):
@@ -1416,7 +1473,8 @@ class Trainer:
                 )
                 return
 
-        checkpoint_rng_state = paddle.load(rng_file, return_numpy=True)
+            checkpoint_rng_state = paddle.load(rng_file, return_numpy=True)
+
         random.setstate(checkpoint_rng_state["python"])
         np.random.set_state(checkpoint_rng_state["numpy"])
 
@@ -1913,6 +1971,7 @@ class Trainer:
         if self.args.use_hybrid_parallel:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
+                logger.info("Saving optimizer files.")
                 paddle.save(
                     self.optimizer.state_dict(),
                     os.path.join(output_dir, optimizer_name),
@@ -1920,6 +1979,7 @@ class Trainer:
 
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
+                logger.info("Saving optimizer files.")
                 paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
             # FIXME: manybe only save one copy
@@ -1960,21 +2020,19 @@ class Trainer:
                 "hybrid_parallel_rng_state_tracker"
             ] = fleet.meta_parallel.get_rng_state_tracker().get_states_tracker()
 
-        # A process can arrive here before the process 0 has a chance to save the model, in which case output_dir may
-        # not yet exist.
-        os.makedirs(output_dir, exist_ok=True)
-
         if self.args.world_size > 1:
-            # use global process_index to save
-            process_index = self.args.process_index
-            paddle.save(rng_states, os.path.join(output_dir, f"rng_state_{process_index}.pth"))
+            rng_states_list = []
+            paddle.distributed.all_gather_object(rng_states_list, rng_states)
+            if self.args.should_save:
+                os.makedirs(output_dir, exist_ok=True)
+                paddle.save(rng_states_list, os.path.join(output_dir, f"rng_state_{self.args.world_size}.pth"))
         else:
+            os.makedirs(output_dir, exist_ok=True)
             paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
 
         # Maybe delete some older checkpoints.
-        if self.args.should_save_model_state and (
-            True if not self.args.use_hybrid_parallel else self.args.local_rank == 0
-        ):
+        # For hybrid parallel training, the checkpoint files maybe on different node.
+        if self.args.should_save_model_state and self.args.local_rank == 0:
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
 
     def set_optimizer_grouped_parameters(self, optimizer_grouped_parameters=None):
@@ -2044,15 +2102,24 @@ class Trainer:
             shutil.rmtree(checkpoint)
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
-        # If we are executing this function, we are the process zero, so we don't check for that.
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
         logger.info(f"Saving model checkpoint to {output_dir}")
         # Save a trained model and configuration using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
 
-        merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
+        if self.args.should_save:
+            if self.tokenizer is not None:
+                self.tokenizer.save_pretrained(output_dir)
+            # Good practice: save your training arguments together with the trained model
+            paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
 
+        if self.args.unified_checkpoint:
+            save_unified_checkpoint(self.args, self.model, output_dir, safe_serialization=True)
+            return
+
+        merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
+        # peft model
         if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
             self.model.save_pretrained(
                 output_dir,
@@ -2061,6 +2128,7 @@ class Trainer:
                 is_main_process=self.args.should_save,
                 max_shard_size="1024GB",
             )
+        # TODO: @ZHUI unifiy unwrap_model(self.model) and self.model
         elif not isinstance(self.model, PretrainedModel):
             if isinstance(unwrap_model(self.model), PretrainedModel):
                 if self.args.should_save_sharding_stage1_model:
@@ -2121,15 +2189,9 @@ class Trainer:
         if self.args.should_save_sharding_stage1_model:
             self.sharding_io.save_distributed_model_meta(output_dir)
 
-        if self.args.should_save:
-            if self.tokenizer is not None:
-                self.tokenizer.save_pretrained(output_dir)
-
-            # Good practice: save your training arguments together with the trained model
-            paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
-
     def _load_optimizer_and_scheduler(self, checkpoint):
         """If optimizer and scheduler states exist, load them."""
+        # TODO: Support DP broadcast optimizer.
         if checkpoint is None:
             return
 
@@ -2140,20 +2202,28 @@ class Trainer:
             )
         else:
             optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
-            path = os.path.join(checkpoint, optimizer_name)
-            if os.path.isfile(path):
-                opt_state_dict = paddle.load(path)
+            if self.args.data_parallel_rank == 0:
+                path = os.path.join(checkpoint, optimizer_name)
+                if os.path.isfile(path):
+                    opt_state_dict = paddle.load(path)
 
-        if opt_state_dict is not None and os.path.isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
+        # broadcast optimizer state in dp group
+        opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
+
+        if opt_state_dict is not None:
             # Load in optimizer and scheduler states
             self.optimizer.set_state_dict(opt_state_dict)
-
-            self.lr_scheduler.set_state_dict(paddle.load(os.path.join(checkpoint, SCHEDULER_NAME)))
-            if self.do_grad_scaling and os.path.isfile(os.path.join(checkpoint, SCALER_NAME)):
-                self.scaler.load_state_dict(paddle.load(os.path.join(checkpoint, SCALER_NAME), return_numpy=True))
         else:
-            raise ValueError(
-                f"optimizer-state-dict not found, opt:{os.path.join(checkpoint, optimizer_name)} scheduler:{os.path.join(checkpoint, SCHEDULER_NAME)}"
+            raise ValueError(f"optimizer-state-dict not found, opt: {os.path.join(checkpoint, optimizer_name)}.")
+
+        if distributed_isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
+            self.lr_scheduler.set_state_dict(paddle.load(distributed_file(os.path.join(checkpoint, SCHEDULER_NAME))))
+        else:
+            raise ValueError(f"scheduler-file not found, scheduler:{os.path.join(checkpoint, SCHEDULER_NAME)}")
+
+        if self.do_grad_scaling and distributed_isfile(os.path.join(checkpoint, SCALER_NAME)):
+            self.scaler.load_state_dict(
+                paddle.load(distributed_file(os.path.join(checkpoint, SCALER_NAME)), return_numpy=True)
             )
 
     def log(self, logs: Dict[str, float], **kwargs) -> None:
@@ -2483,6 +2553,7 @@ class Trainer:
             test_dataloader,
             description="Prediction",
             ignore_keys=ignore_keys,
+            prediction_loss_only=True if self.compute_metrics is None else None,
             metric_key_prefix=metric_key_prefix,
             max_eval_iters=self.args.max_evaluate_steps,
         )
