@@ -389,13 +389,11 @@ def main():
 
     # QAT
     if quant_args.do_qat:
-        if training_args.tensor_parallel_degree > 1:
-            raise NotImplementedError("Only support qat on single gpu.")
         from quant import create_qat_model
 
         trainer.model = create_qat_model(quant_args, trainer.model, dtype)
         train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
-        trainer.save_model()
+        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
         trainer.log_metrics("qat", train_result.metrics)
         trainer.save_metrics("qat", train_result.metrics)
         trainer.save_state()
