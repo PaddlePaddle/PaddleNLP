@@ -55,10 +55,10 @@ PADDLE_OPTIMIZER_NAME = "optimizer.pdopt"
 PADDLE_OPTIMIZER_INDEX_NAME = "optimizer.pdopt.index.json"
 SAFE_OPTIMIZER_NAME = "optimizer.safetensors"
 SAFE_OPTIMIZER_INDEX_NAME = "optimizer.safetensors.index.json"
-PADDLE_MASTER_WEIGHTS_NAME = "master_weight.pdopt"
-PADDLE_MASTER_WEIGHTS_INDEX_NAME = "master_weight.pdopt.index.json"
-SAFE_MASTER_WEIGHTS_NAME = "master_weight.safetensors"
-SAFE_MASTER_WEIGHTS_INDEX_NAME = "master_weight.safetensors.index.json"
+PADDLE_MASTER_WEIGHTS_NAME = "master_weights.pdopt"
+PADDLE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.pdopt.index.json"
+SAFE_MASTER_WEIGHTS_NAME = "master_weights.safetensors"
+SAFE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.safetensors.index.json"
 
 
 __all__ = [
@@ -260,14 +260,13 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
     """save unified optimizer
 
     Args:
-        args (TraninngArguments): Training Arguments
+        args (TrainingArguments): Training Arguments
         optimizer (Optimizer): optimizer to save
         output_dir (str): Save directory.
         safe_serialization (bool, optional): Whether to use safetensors. Defaults to False.
 
     """
     # Split into naive optimizer params and master weights.
-    # state_dicts, shard_files, sharded_indexes =
     results = unified_optimizer_into_shards(args, model, optimizer, safe_serialization=safe_serialization)
     master_weight_state_dict = None
     if len(results) == 1:
@@ -366,6 +365,15 @@ def unified_optimizer_into_shards(
                 master_weights=True,
             )
     print("merge tp costs: ", time.time() - start_time)
+
+    # rename state_dict key name
+    for key in list(optim_state_dict.keys()):
+        static_name, type_name = generate_bare_static_name(key)
+        new_name = static2struct_name_mappings[static_name] + "/" + type_name
+        optim_state_dict[new_name] = optim_state_dict.pop(key)
+    if master_weights is not None:
+        for key in list(master_weights.keys()):
+            master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
 
     # build index json file
     index_optimizer_file, index_master_weight_file = {}, {}
