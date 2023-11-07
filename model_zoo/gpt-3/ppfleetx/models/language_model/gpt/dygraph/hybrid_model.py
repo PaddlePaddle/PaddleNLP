@@ -59,10 +59,8 @@ try:
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
-try:
-    from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
-except:
-    FusedDropoutAdd = None
+
+FusedDropoutAdd = None
 
 
 def get_attr(layer, name):
@@ -699,6 +697,35 @@ class GPTEmbeddings(nn.Layer):
         return embeddings
 
 
+class GPTOutputEmbeddings(nn.Layer):
+    """
+    Embedding to calculate logits when we don't share the weight with input embedding.
+    """
+
+    def __init__(
+        self,
+        vocab_size,
+        hidden_size=768,
+        initializer_range=0.02,
+        freeze_embedding=False,
+    ):
+        super(GPTOutputEmbeddings, self).__init__()
+
+        self.output_word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
+            vocab_size,
+            hidden_size,
+            mp_group=env.get_hcg().get_model_parallel_group(),
+            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=initializer_range)),
+        )
+
+        if freeze_embedding:
+            self.output_word_embeddings.weight.learning_rate = 0.0
+
+    def forward(self, encoder_outputs=None):
+        logits = parallel_matmul(encoder_outputs, get_attr(self.output_word_embeddings, "weight"), True)
+        return logits
+
+
 class GPTModelHybrid(nn.Layer):
     def __init__(
         self,
@@ -1057,10 +1084,8 @@ class GPTForPretrainingPipe(PipelineLayer):
             )
 
         self.descs.append(
-            SharedLayerDesc(
-                "embed",
+            LayerDesc(
                 EmbeddingPipe,
-                shared_weight_attr="embedding_weight",
                 vocab_size=vocab_size,
                 hidden_size=hidden_size,
                 hidden_dropout_prob=hidden_dropout_prob,
@@ -1110,16 +1135,10 @@ class GPTForPretrainingPipe(PipelineLayer):
             return parallel_matmul(output, embedding.embedding_weight, True)
 
         self.descs.append(
-            SharedLayerDesc(
-                "embed",
-                EmbeddingPipe,
-                forward_func=_logits_helper,
-                shared_weight_attr="embedding_weight",
+            LayerDesc(
+                GPTEmbeddings,
                 vocab_size=vocab_size,
                 hidden_size=hidden_size,
-                hidden_dropout_prob=hidden_dropout_prob,
-                max_position_embeddings=max_position_embeddings,
-                type_vocab_size=type_vocab_size,
                 initializer_range=initializer_range,
             )
         )
