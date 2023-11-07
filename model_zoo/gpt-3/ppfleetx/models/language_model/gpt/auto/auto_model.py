@@ -798,8 +798,9 @@ class GPTModelAuto(nn.Layer):
             use_cache=use_cache,
             cache=cache,
         )
-        
-        return encoder_outputs
+
+        logits = self.output_embeddings(encoder_outputs)
+        return encoder_outputs, logits
 
 
 class GPTForPretrainingAuto(nn.Layer):
