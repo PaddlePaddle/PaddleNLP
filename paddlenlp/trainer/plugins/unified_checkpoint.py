@@ -17,8 +17,8 @@ import gc
 import json
 import os
 import time
+from functools import partial
 
-import numpy as np
 import paddle
 from paddle.distributed import fleet
 from tqdm.auto import tqdm
@@ -31,7 +31,6 @@ from paddlenlp.transformers.model_utils import (
     unwrap_model,
 )
 from paddlenlp.transformers.utils import (
-    device_guard,
     dtype_byte_size,
     get_checkpoint_shard_files,
     is_safetensors_available,
@@ -220,9 +219,7 @@ def unified_checkpoint_into_shards(
 
     state_dict = model_to_save.state_dict()
 
-    start_time = time.time()
     all_filter_keys = filter_params(model_to_save, state_dict)
-    print("ckpt filer params cost: ", time.time() - start_time)
 
     dtype = get_parameter_dtype(model_to_save)
     model_to_save.config.dtype = str(dtype).split(".")[1]
@@ -277,6 +274,8 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
 
     save_directory = output_dir
     os.makedirs(save_directory, exist_ok=True)
+
+    start_time = time.time()
     if safe_serialization:
         for k in list(optim_state_dict.keys()):
             if isinstance(optim_state_dict[k], paddle.Tensor):
@@ -310,6 +309,7 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
         if master_weight_state_dict is not None:
             with open(master_path, "w") as f:
                 json.dump(sharded_master_weight_index, f, indent=4)
+    print("optimzier file to dist: ", time.time() - start_time)
 
 
 def load_unified_optimizer():
@@ -339,7 +339,6 @@ def unified_optimizer_into_shards(
         static2struct_name_mappings[v.name] = k
 
     # filter optimizer param
-    start_time = time.time()
     if master_weights is not None:
         filter_master_keys = filter_optim_params(
             model, master_weights, static2struct_name_mappings, is_master_weights=True
@@ -347,7 +346,6 @@ def unified_optimizer_into_shards(
     filter_optim_keys = filter_optim_params(
         model, optim_state_dict, static2struct_name_mappings, is_master_weights=False
     )
-    print("filter_params costs: ", time.time() - start_time)
 
     tp_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
     tp_size = tp_group.nranks
@@ -375,7 +373,7 @@ def unified_optimizer_into_shards(
 
     # rename state_dict key name
     for key in list(optim_state_dict.keys()):
-        static_name, type_name = generate_bare_static_name(key)
+        static_name, type_name = generate_base_static_name(key)
         new_name = static2struct_name_mappings[static_name] + "/" + type_name
         optim_state_dict[new_name] = optim_state_dict.pop(key)
     if master_weights is not None:
@@ -389,8 +387,6 @@ def unified_optimizer_into_shards(
     master_weights_name = SAFE_MASTER_WEIGHTS_NAME if safe_serialization else PADDLE_MASTER_WEIGHTS_NAME
     shard_optimizer_file = get_sharded_file_name(args, optimizer_name)
     shard_master_weight_file = get_sharded_file_name(args, master_weights_name)
-
-    print(shard_optimizer_file, shard_master_weight_file)
 
     for key, weight in optim_state_dict.items():
         index_optimizer_file[key] = shard_optimizer_file
@@ -494,8 +490,8 @@ def gather_sharded_object(index_file, total_size):
     return index_file_list, total_size_list
 
 
-def generate_bare_static_name(vname):
-    # return bare static name and specific type name, like [embedding_0.w_0, moment1_0]
+def generate_base_static_name(vname):
+    # return base static name and specific type name, like [embedding_0.w_0, moment1_0]
     if "fp32_master_0" in vname:
         vname = vname.split("_fp32_master_0_")
         return vname[0], vname[1]
@@ -528,7 +524,7 @@ def filter_optim_params(model_to_save, state_dict, static2struct_name_mappings, 
             else:
                 if k == "master_weights" or k == "LR_Scheduler":
                     continue
-                model_v = model_state_dict[static2struct_name_mappings[generate_bare_static_name(k)[0]]]
+                model_v = model_state_dict[static2struct_name_mappings[generate_base_static_name(k)[0]]]
             if hasattr(model_v, "is_distributed") and model_v.is_distributed:
                 tensor_bytes_dict[k] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
             else:
@@ -646,21 +642,20 @@ def merge_tensor_parallel_with_shard(model_to_save, state_dict, config, all_filt
                 tp_actions.pop(key)
 
     state_dict_to_save = {}
-    for i, filter_keys in enumerate(all_filter_keys):
-        is_dst = tp_rank == i
-        for key in filter_keys:
+    max_key_len = max([len(_) for _ in all_filter_keys])
+    for i in range(max_key_len):
+        for j, filter_keys in enumerate(all_filter_keys):
+            is_dst = tp_rank == j
+            if i > len(filter_keys) - 1:
+                continue
+            key = filter_keys[i]
             tensor = state_dict[key]
             if key in tp_actions:
-                ret = distributed_gather(tensor, dst=i, group=tp_group, offload=True)
-                action = tp_actions.pop(key)
+                ret = distributed_gather(tensor, dst=j, group=tp_group, offload=False)
+                action = partial(tp_actions.pop(key), return_numpy=False)
                 tensor = action(ret) if is_dst else None
             else:
-                tensor = tensor.cpu().numpy() if is_dst else None
-
-            # keep state dict use paddle.tensor
-            if isinstance(tensor, np.ndarray):
-                with device_guard("cpu"):
-                    tensor = paddle.Tensor(tensor, zero_copy=True)
+                tensor = tensor._copy_to(paddle.CPUPlace(), False) if is_dst else None
 
             if is_dst:
                 state_dict_to_save[key] = tensor
@@ -682,7 +677,7 @@ def merge_tensor_parallel_for_optimizer(
     for key in state_dict.keys():
         if key == "master_weights" or key == "LR_Scheduler":
             continue
-        base_model_key = key if is_master_weights else generate_bare_static_name(key)[0]
+        base_model_key = key if is_master_weights else generate_base_static_name(key)[0]
         if key not in model_keys:
             model_keys.append(static2struct_name_mappings[base_model_key])
     tp_actions = model_to_save.get_tensor_parallel_convert_actions(
@@ -694,28 +689,31 @@ def merge_tensor_parallel_for_optimizer(
     tp_rank = tp_group.rank
 
     state_dict_to_save = {}
-    for i, filter_keys in enumerate(all_filter_keys):
-        is_dst = tp_rank == i
-        for key in filter_keys:
+    max_key_len = max([len(_) for _ in all_filter_keys])
+    for i in range(max_key_len):
+        for j, filter_keys in enumerate(all_filter_keys):
+            is_dst = tp_rank == j
+            if i > len(filter_keys) - 1:
+                continue
             # get base model key
-            model_key = static2struct_name_mappings[key if is_master_weights else generate_bare_static_name(key)[0]]
-            tensor = state_dict[key]
+            model_key = static2struct_name_mappings[
+                filter_keys[i] if is_master_weights else generate_base_static_name(filter_keys[i])[0]
+            ]
+            tensor = state_dict[filter_keys[i]]
             if model_key in tp_actions:
                 # for example: beta1, beta2
                 if tensor.numel().item() == 1:
-                    tensor = tensor.cpu().numpy() if is_dst else None  # Need broadcast when loaded
+                    tensor = (
+                        tensor._copy_to(paddle.CPUPlace(), False) if is_dst else None
+                    )  # Need broadcast when loaded
                 else:
-                    ret = distributed_gather(tensor, dst=i, group=tp_group, offload=False)
-                    action = tp_actions[model_key]
+                    ret = distributed_gather(tensor, dst=j, group=tp_group, offload=False)
+                    action = partial(tp_actions[model_key], return_numpy=False)
                     tensor = action(ret) if is_dst else None
             else:
-                tensor = tensor.cpu().numpy() if is_dst else None
-            # keep state dict use paddle.tensor
-            if isinstance(tensor, np.ndarray):
-                with device_guard("cpu"):
-                    tensor = paddle.Tensor(tensor, zero_copy=True)
+                tensor = tensor._copy_to(paddle.CPUPlace(), False) if is_dst else None
 
             if is_dst:
-                state_dict_to_save[key] = tensor
+                state_dict_to_save[filter_keys[i]] = tensor
 
     return state_dict_to_save

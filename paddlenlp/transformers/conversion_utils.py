@@ -336,7 +336,7 @@ def naive_fuse_split_tp(
     return np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis)
 
 
-def normal_fuse_merge_tp(weight_list, is_column=True):
+def normal_fuse_merge_tp(weight_list, is_column=True, return_numpy=True):
     """
 
     [A1],[A2]  => [A1, A2]
@@ -348,10 +348,17 @@ def normal_fuse_merge_tp(weight_list, is_column=True):
     Returns:
         weight (np.ndarray): the merged weight.
     """
+
     if is_column:
-        return np.concatenate(weight_list, axis=-1)
+        if return_numpy:
+            return np.concatenate(weight_list, axis=-1)
+        else:
+            return paddle.concat(weight_list, axis=-1)._copy_to(paddle.CPUPlace(), False)
     else:
-        return np.concatenate(weight_list, axis=0)
+        if return_numpy:
+            return np.concatenate(weight_list, axis=0)
+        else:
+            return paddle.concat(weight_list, axis=0)._copy_to(paddle.CPUPlace(), False)
 
 
 def normal_fuse_split_tp(weight, tensor_parallel_degree, tensor_parallel_rank=None, is_column=True):
@@ -465,7 +472,15 @@ def splited_qkv_to_tensor_parallel_qkv(weight_list, num_attention_heads):
 
 
 def get_tensor_parallel_merge_func(tensor_parallel_degree, tensor_parallel_rank, num_attention_heads=None):
-    def fn(x, is_column=True, transpose=False, is_old_qkv=False, is_naive_2fuse=False, is_naive_3fuse=False):
+    def fn(
+        x,
+        is_column=True,
+        transpose=False,
+        is_old_qkv=False,
+        is_naive_2fuse=False,
+        is_naive_3fuse=False,
+        return_numpy=True,
+    ):
         if x is None:
             return None
 
@@ -474,7 +489,7 @@ def get_tensor_parallel_merge_func(tensor_parallel_degree, tensor_parallel_rank,
         elif is_naive_3fuse:
             return naive_fuse_merge_tp(x, is_column=is_column, fuse_tensor_parts=3)
         else:
-            x = normal_fuse_merge_tp(x, is_column=is_column)
+            x = normal_fuse_merge_tp(x, is_column=is_column, return_numpy=return_numpy)
 
         if is_old_qkv:
             assert is_column, "QKV tensor should be column parallel linear."
