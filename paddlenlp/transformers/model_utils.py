@@ -2116,16 +2116,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # load pt weights early so that we know which dtype to init the model under
         if not is_sharded and state_dict is None:
             # Time to load the checkpoint
-            if convert_from_torch and (
-                resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME)
-                or resolved_archive_file.endswith(SAFE_WEIGHTS_NAME)
-            ):
-                # try to get the name-mapping info
-                logger.info(
-                    f"Starting to convert pytorch weight file<{resolved_archive_file}> to "
-                    f"paddle weight file<{os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)}> ..."
-                )
-                state_dict = cls.convert(resolved_archive_file, config, cache_dir)
+            if convert_from_torch:
+                if resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME) or resolved_archive_file.endswith(
+                    SAFE_WEIGHTS_NAME
+                ):
+                    # try to get the name-mapping info
+                    logger.info(
+                        f"Starting to convert pytorch weight file<{resolved_archive_file}> to "
+                        f"paddle weight file<{os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)}> ..."
+                    )
+                    state_dict = cls.convert(resolved_archive_file, config, cache_dir)
+                else:
+                    raise ValueError(f"Unexpected file: {resolved_archive_file} for weight conversion.")
             else:
                 # 4. loading non-sharded ckpt from the state dict
                 if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
