@@ -1226,6 +1226,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         exist_ok=True,
         safe_serialization=True,
         subfolder=None,
+        merge_tensor_parallel=False,
         **kwargs
     ):
         """
@@ -1238,6 +1239,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             exist_ok (bool, optional): Whether to override existing repository. Defaults to: True.
             safe_serialization (bool, optional): Whether to save the model in safe serialization way. Defaults to: True.
             subfolder (str, optional): Push to a subfolder of the repo instead of the root
+            merge_tensor_parallel (bool): Whether to merge the tensor parallel weights. Defaults to False.
         """
 
         res = aistudio_sdk.hub.create_repo(repo_id=repo_id, private=private, license=license, **kwargs)
@@ -1264,6 +1266,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 shard_format="pipeline",
                 safe_serialization=(is_safetensors_available() and safe_serialization),
                 max_shard_size="5GB",
+                merge_tensor_parallel=merge_tensor_parallel,
             )
 
             # Upload model and return
@@ -2037,6 +2040,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 return_unused_kwargs=True,
                 **kwargs,
             )
+        if "from_aistudio" in model_kwargs:
+            model_kwargs.pop("from_aistudio")
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
             config.save_pretrained(cache_dir)
 

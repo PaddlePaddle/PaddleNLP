@@ -118,6 +118,7 @@ def main():
             tensor_parallel_rank=training_args.tensor_parallel_rank,
             use_flash_attention=model_args.use_flash_attention,
             dtype=dtype,
+            from_aistudio=model_args.from_aistudio,
         )
     else:
         model_config = AutoConfig.from_pretrained(
@@ -126,16 +127,18 @@ def main():
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             tensor_parallel_rank=training_args.tensor_parallel_rank,
             dtype=dtype,
+            from_aistudio=model_args.from_aistudio,
         )
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
         model = AutoModelForCausalLM.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
+            from_aistudio=model_args.from_aistudio,
         )
 
     # Load tokenizer & dataset
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
     if isinstance(tokenizer, LlamaTokenizer):
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
@@ -355,6 +358,30 @@ def main():
             logger.info(f"Effective_Tokens_per_second: {effective_tokens_per_second} ")
             logger.info("Benchmark done.")
         else:
+            if model_args.save_to_aistudio:
+                kwargs = {}
+                if model_args.aistudio_token is not None:
+                    kwargs["token"] = model_args.aistudio_token
+                # PEFT Model only save PEFT parameters, if pretrained model obtains from aistudio
+                if model_args.from_aistudio and (model_args.lora or model_args.prefix_tuning):
+                    kwargs["base_model"] = model_args.model_name_or_path
+                else:
+                    trainer.tokenizer.save_to_aistudio(
+                        repo_id=model_args.aistudio_repo_id,
+                        private=model_args.aistudio_repo_private,
+                        license=model_args.aistudio_repo_license,
+                        exist_ok=True,
+                        **kwargs,
+                    )
+                trainer.model.save_to_aistudio(
+                    repo_id=model_args.aistudio_repo_id,
+                    private=model_args.aistudio_repo_private,
+                    license=model_args.aistudio_repo_license,
+                    merge_tensor_parallel=training_args.tensor_parallel_degree > 1,
+                    exist_ok=True,
+                    **kwargs,
+                )
+
             trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
             trainer.log_metrics("train", train_result.metrics)
             trainer.save_metrics("train", train_result.metrics)
@@ -362,13 +389,11 @@ def main():
 
     # QAT
     if quant_args.do_qat:
-        if training_args.tensor_parallel_degree > 1:
-            raise NotImplementedError("Only support qat on single gpu.")
         from quant import create_qat_model
 
         trainer.model = create_qat_model(quant_args, trainer.model, dtype)
         train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
-        trainer.save_model()
+        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
         trainer.log_metrics("qat", train_result.metrics)
         trainer.save_metrics("qat", train_result.metrics)
         trainer.save_state()
