@@ -832,11 +832,6 @@ class GPTForPretrainingAuto(nn.Layer):
         if self.sequence_parallel:
             auto.shard_tensor(encoder_outputs, auto_env.get_mesh()[-1], [None, None, None])
 
-        x_dims_mapping = [auto_env.get_mesh().dp_dim] + [None] * (len(encoder_outputs.shape) - 1)
-        w_dims_mapping = [auto_env.get_mesh().mp_dim, None]
-        matmul = auto.shard_op(paddle.matmul, auto_env.get_mesh()[-1], [x_dims_mapping, w_dims_mapping, None])
-        logits = matmul(encoder_outputs, get_attr(self.gpt.embeddings.word_embeddings, "weight"), transpose_y=True)
-
         if use_cache:
             return logits, cached_kvs
         else:
