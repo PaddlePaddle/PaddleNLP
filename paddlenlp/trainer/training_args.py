@@ -809,11 +809,11 @@ class TrainingArguments:
             if (
                 self.pipeline_parallel_degree <= 1
                 and self.tensor_parallel_degree <= 1
-                and (not self.sharding or ShardingOption.FULL_SHARD in self.sharding)
+                and (not self.sharding)
             ):
                 raise ValueError(
                     "Temporarily amp master grad only support for tensor/pipeline/sharding"
-                    " (stage 1 and stage 2) parallel. Please set amp_master_grad to False."
+                    " (stage 1 and stage 2 stage3) parallel. Please set amp_master_grad to False."
                 )
             if not (self.bf16 or self.fp16):
                 logger.warning("set amp_master_grad to false since amp is disabled.")
@@ -991,6 +991,7 @@ class TrainingArguments:
                                 "enable_stage1_tensor_fusion",
                                 "enable_stage1_overlap",
                                 "enable_stage2_overlap",
+                                "split_param",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, "
@@ -1008,12 +1009,16 @@ class TrainingArguments:
                         strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
                             True if "enable_stage1_tensor_fusion" in sharding_parallel_config else False
                         )
+                        if "split_param" in sharding_parallel_config:
+                            strategy.hybrid_configs[
+                                "sharding_configs"
+                            ].accumulate_steps.split_param = True
                         if "enable_stage1_overlap" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].comm_overlap = True
                             strategy.hybrid_configs[
                                 "sharding_configs"
                             ].accumulate_steps = self.gradient_accumulation_steps
-                    except KeyError:
+                    except (KeyError, AttributeError):
                         warnings.warn(
                             "The enable_stage1_tensor_fusion or enable_stage1_overlap is not supported "
                             "by current version of Paddle. Please try latest develop Paddle."
