@@ -56,14 +56,6 @@ __all__ = [
 ]
 
 
-def save_unified_optimizer():
-    pass
-
-
-def load_unified_optimizer():
-    pass
-
-
 def save_unified_checkpoint(args, model, output_dir, safe_serialization=False):
     """save unified checkpoint
 

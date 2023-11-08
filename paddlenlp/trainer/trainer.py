@@ -2188,7 +2188,6 @@ class Trainer:
 
     def _load_optimizer_and_scheduler(self, checkpoint):
         """If optimizer and scheduler states exist, load them."""
-        # TODO: Support DP broadcast optimizer.
         if checkpoint is None:
             return
 
@@ -2200,12 +2199,9 @@ class Trainer:
         else:
             optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             if self.args.data_parallel_rank == 0:
-                if self.args.unified_checkpoint:
-                    path = os.path.join(checkpoint, optimizer_name)
-                    if os.path.isfile(path):
-                        opt_state_dict = paddle.load(path)
-                else:
-                    pass
+                path = os.path.join(checkpoint, optimizer_name)
+                if os.path.isfile(path):
+                    opt_state_dict = paddle.load(path)
 
         # broadcast optimizer state in dp group
         opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
