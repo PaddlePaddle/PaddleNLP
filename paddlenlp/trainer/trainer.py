@@ -819,7 +819,14 @@ class Trainer:
             step_control = 0  # used in loop control, reset to 0 after every step
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
+            for param in model.parameters():
+                print("name:", param.name)
+                print("param:", np.array(param))
+
             for step, inputs in enumerate(epoch_iterator):
+                for name, data in inputs.items():
+                    print("name:", name)
+                    print("data:", data)
                 self.timers and self.timers("read-data").stop()
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
@@ -1818,6 +1825,7 @@ class Trainer:
             labels = None
 
         outputs = model(**inputs)
+        print("outs:", outputs[0])
 
         if self.criterion is not None:
             loss = self.criterion(outputs, labels)
