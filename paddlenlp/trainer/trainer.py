@@ -2198,7 +2198,7 @@ class Trainer:
         opt_state_dict = None
         if self.args.should_load_sharding_stage1_model:
             opt_state_dict = self.sharding_io.load_optimizer_state_with_reshard(
-                checkpoint, base_opt_name=OPTIMIZER_NAME
+                checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
             optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)

@@ -1001,6 +1001,7 @@ class TrainingArguments:
                                 "enable_stage1_tensor_fusion",
                                 "enable_stage1_overlap",
                                 "enable_stage2_overlap",
+                                "split_param",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, "
@@ -1008,6 +1009,9 @@ class TrainingArguments:
                                 )
                     try:
                         if pipeline_parallel_degree == 1:
+                            if "split_param" in sharding_parallel_config:
+                                strategy.hybrid_configs["sharding_configs"].split_param = True
+
                             strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
                                 True if "enable_stage1_tensor_fusion" in sharding_parallel_config else False
                             )
@@ -1016,6 +1020,7 @@ class TrainingArguments:
                                 strategy.hybrid_configs[
                                     "sharding_configs"
                                 ].accumulate_steps = self.gradient_accumulation_steps
+
                         else:
                             warnings.warn(
                                 "For pipeline parallel with sharding, the sharding overlap and tensor fusion "
