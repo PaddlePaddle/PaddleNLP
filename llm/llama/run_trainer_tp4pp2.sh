@@ -15,67 +15,55 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-export FLAGS_embedding_deterministic=1
-export FLAGS_cudnn_deterministic=1
-export NVIDIA_TF32_OVERRIDE=0
-export NCCL_ALGO=Tree
-export Flags_mp_aysnc_allreduce=1
-export Flags_skip_mp_c_identity=1
-export FLAGS_shard_norm_align_dp=0
-export FLAGS_shard_use_reduce=1
-
-
 task_name="llama_hybrid"
-# rm -rf /ssd2/zhonghui03/output/$task_name/
-rm -rf "/ssd2/zhonghui03/output/$task_name""_log"
+rm -rf output/$task_name/
+rm -rf "output/$task_name""_log"
 
 
 PYTHONPATH=../../:$PYTHONPATH  \
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
-    --log_dir "/ssd2/zhonghui03/output/$task_name""_log" \
+    --log_dir "output/$task_name""_log" \
     run_pretrain.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
     --tokenizer_name_or_path "facebook/llama-7b" \
     --input_dir "./data" \
-    --output_dir "/ssd2/zhonghui03/output/$task_name" \
+    --output_dir "output/$task_name" \
     --split 949,50,1 \
     --max_seq_length 2048 \
     --per_device_train_batch_size 1 \
     --gradient_accumulation_steps 4 \
     --per_device_eval_batch_size 4 \
-    --use_flash_attention 0 \
+    --use_flash_attention 1 \
     --use_fused_rms_norm 0 \
     --fp16  \
     --fp16_opt_level "O2"  \
     --scale_loss 512 \
-    --tensor_parallel_degree 1 \
-    --pipeline_parallel_degree 4 \
+    --tensor_parallel_degree 4 \
+    --pipeline_parallel_degree 2 \
     --virtual_pp_degree 1 \
     --sequence_parallel 0 \
     --learning_rate 0.00001 \
     --min_learning_rate 0.000001 \
     --max_steps 10000 \
-    --save_steps 20 \
-    --save_total_limit 2 \
+    --save_steps 5000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
     --max_grad_norm 1.0 \
-    --logging_steps 1 \
+    --logging_steps 10 \
     --dataloader_num_workers 1 \
     --eval_steps 1000 \
     --report_to "visualdl" \
-    --sharding "" \
+    --sharding "stage1" \
     --disable_tqdm true \
-    --continue_training 0 \
-    --recompute 1 \
+    --continue_training 1 \
+    --recompute 0 \
     --recompute_granularity full \
-    --unified_checkpoint 1 \
     --do_train \
     --do_eval \
     --device "gpu" \
-    --distributed_dataloader 0
+    --distributed_dataloader 1
     # --pipeline_parallel_config "disable_partial_send_recv"  # if set sequence_parallel True, please note off this line.
     # reompute settings:
     # --no_recompute_layers 0 1 2 3 4 5 6 7 8 9 10 ... int int
