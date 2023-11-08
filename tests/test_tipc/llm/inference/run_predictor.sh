@@ -23,10 +23,12 @@ fused_model=${fused_model:-false}
 dtype=${dtype:-"float16"}
 inference_model=${inference_model:-"true"}
 decode_strategy=${decode_strategy:-"greedy_search"}
+top_p=${top_p:-"0.0"}
 data_file=${data_file:-"tests/fixtures/llm/zh_query.json"}
+benchmark=${benchmark:-"0"}
 
-common_arguments="--decode_strategy ${decode_strategy} --src_length 300 --max_length 100 --benchmark 1 --dtype ${dtype} --batch_size 2 --inference_model ${inference_model} "
-common_arguments+="--data_file ${data_file}"
+common_arguments="--decode_strategy ${decode_strategy} --src_length 300 --max_length 200 --benchmark ${benchmark} --dtype ${dtype} --batch_size 3 --inference_model ${inference_model} "
+common_arguments+="--data_file ${data_file} --top_p ${top_p}"
 
 echo "pwd -> "
 

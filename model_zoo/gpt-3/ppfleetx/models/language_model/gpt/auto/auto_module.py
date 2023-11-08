@@ -142,7 +142,7 @@ class GPTModuleAuto(LanguageModuleAuto):
         return model
 
     def get_loss_fn(self):
-        return gpt.GPTPretrainingCriterionAuto()
+        return gpt.GPTPretrainingCriterionAuto(sequence_parallel=self.configs.Model.sequence_parallel)
 
 
 class GPTGenerationModuleAuto(BasicModule):
