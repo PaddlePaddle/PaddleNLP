@@ -15,10 +15,9 @@
 import copy
 import os
 import shutil
-import unittest
 
 import numpy as np
-from test_parallel_dygraph_dataparallel import TestMultipleGpus
+from parallel_launch import TestMultipleGpus
 
 environment_variables = {
     "NCCL_ALGO": "Tree",
@@ -118,7 +117,6 @@ class TestModelOnN2C4(TestMultipleGpus):
     def setUp(self):
         os.environ.update(environment_variables)
 
-    @unittest.skipIf(True, "TODO")
     def testTP4PP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
@@ -132,7 +130,6 @@ class TestModelOnN2C4(TestMultipleGpus):
         assert len(res) == 2
         np.testing.assert_allclose(res[0], res[1])
 
-    @unittest.skipIf(True, "TODO")
     def testTP4DP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
@@ -148,7 +145,6 @@ class TestModelOnN2C4(TestMultipleGpus):
         assert len(res) == 2
         np.testing.assert_allclose(res[0], res[1])
 
-    @unittest.skipIf(True, "TODO")
     def testTP4Sharding2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
@@ -164,7 +160,6 @@ class TestModelOnN2C4(TestMultipleGpus):
         assert len(res) == 2
         np.testing.assert_allclose(res[0], res[1])
 
-    @unittest.skipIf(True, "TODO")
     def testTP2PP4(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
@@ -178,7 +173,6 @@ class TestModelOnN2C4(TestMultipleGpus):
         assert len(res) == 2
         np.testing.assert_allclose(res[0], res[1])
 
-    @unittest.skipIf(True, "TODO")
     def testTP2Sharding4(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
@@ -194,7 +188,6 @@ class TestModelOnN2C4(TestMultipleGpus):
         assert len(res) == 2
         np.testing.assert_allclose(res[0], res[1])
 
-    @unittest.skipIf(True, "TODO")
     def testPP8(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
@@ -209,7 +202,6 @@ class TestModelOnN2C4(TestMultipleGpus):
         assert len(res) == 2
         np.testing.assert_allclose(res[0], res[1])
 
-    @unittest.skipIf(True, "TODO")
     def testPP4DP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
@@ -225,7 +217,6 @@ class TestModelOnN2C4(TestMultipleGpus):
         assert len(res) == 2
         np.testing.assert_allclose(res[0], res[1])
 
-    @unittest.skipIf(True, "TODO")
     def testPP4Sharding2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
@@ -241,7 +232,6 @@ class TestModelOnN2C4(TestMultipleGpus):
         assert len(res) == 2
         np.testing.assert_allclose(res[0], res[1])
 
-    @unittest.skipIf(True, "TODO")
     def testSharding8S1(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
@@ -257,7 +247,6 @@ class TestModelOnN2C4(TestMultipleGpus):
         assert len(res) == 2
         np.testing.assert_allclose(res[0], res[1])
 
-    @unittest.skipIf(True, "TODO")
     def testSharding8S2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
@@ -337,7 +326,6 @@ class TestModelOnN2C4(TestMultipleGpus):
         assert len(res) == 2
         np.testing.assert_allclose(res[0], res[1])
 
-    @unittest.skipIf(True, "TODO")
     def testDP8(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])

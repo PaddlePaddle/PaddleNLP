@@ -1225,6 +1225,28 @@ class TrainingArguments:
         return 0
 
     @property
+    def logical_process_index(self):
+        """
+        The index of the current process used.
+        """
+        if self.local_rank != -1:
+            sd_size = max(self.sharding_parallel_degree, 1)
+            pp_size = max(self.pipeline_parallel_degree, 1)
+            tp_size = max(self.tensor_parallel_degree, 1)
+
+            dp_rank = max(self.data_parallel_rank, 0)
+            sd_rank = max(self.sharding_parallel_rank, 0)
+            pp_rank = max(self.pipeline_parallel_rank, 0)
+            tp_rank = max(self.tensor_parallel_rank, 0)
+
+            rank = (
+                dp_rank * (sd_size * pp_size * tp_size) + sd_rank * (pp_size * tp_size) + pp_rank * tp_size + tp_rank
+            )
+
+            return rank
+        return 0
+
+    @property
     def local_process_index(self):
         """
         The index of the local process used.
