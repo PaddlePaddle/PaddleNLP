@@ -328,10 +328,12 @@ def unified_optimizer_into_shards(
         optimizer (Optimizer): optimizer to save.
         safe_serialization (bool, optional): safe serialization using safetensors. Defaults to False.
     """
-    optim_state_dict = optimizer.state_dict()
+    optim_state_dict = nested_copy(optimizer.state_dict())
     master_weights = None
     if "master_weights" in optim_state_dict.keys():
         master_weights = optim_state_dict["master_weights"]
+    optim_state_dict.pop("master_weights")
+    optim_state_dict.pop("LR_Scheduler")
 
     # get optimizer param mappings
     static2struct_name_mappings = {}
@@ -522,8 +524,6 @@ def filter_optim_params(model_to_save, state_dict, static2struct_name_mappings, 
             if is_master_weights:
                 model_v = model_state_dict[static2struct_name_mappings[k]]
             else:
-                if k == "master_weights" or k == "LR_Scheduler":
-                    continue
                 model_v = model_state_dict[static2struct_name_mappings[generate_base_static_name(k)[0]]]
             if hasattr(model_v, "is_distributed") and model_v.is_distributed:
                 tensor_bytes_dict[k] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
@@ -675,8 +675,6 @@ def merge_tensor_parallel_for_optimizer(
     # get tp_actions
     model_keys = []
     for key in state_dict.keys():
-        if key == "master_weights" or key == "LR_Scheduler":
-            continue
         base_model_key = key if is_master_weights else generate_base_static_name(key)[0]
         if key not in model_keys:
             model_keys.append(static2struct_name_mappings[base_model_key])
@@ -717,3 +715,12 @@ def merge_tensor_parallel_for_optimizer(
                 state_dict_to_save[filter_keys[i]] = tensor
 
     return state_dict_to_save
+
+
+def nested_copy(inputs):
+    if isinstance(inputs, dict):
+        outputs = {}
+        for key in list(inputs.keys()):
+            outputs[key] = nested_copy(inputs[key])
+        return outputs
+    return inputs
