@@ -726,12 +726,10 @@ class GPTEmbeddings(nn.Layer):
 
         if self.config.sequence_parallel:
             bs, seq_len, hidden_size = embeddings.shape
-            print(bs, seq_len, hidden_size)
             # [bs, seq_len, dim] -> [bs * seq_len, dim]
             embeddings = paddle.reshape_(embeddings, [bs * seq_len, hidden_size])
             # [bs * seq_len / n, dim] (n is mp parallelism)
             embeddings = ScatterOp.apply(embeddings)
-        print(embeddings.shape)
         embeddings = self.dropout(embeddings)
 
         return embeddings

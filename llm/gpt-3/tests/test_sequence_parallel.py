@@ -25,7 +25,7 @@ from paddlenlp.transformers import GPTConfig, GPTForCausalLM, GPTForCausalLMPipe
 class TestGPT(unittest.TestCase):
     def test_sequence_model(self):
         world_size = paddle.distributed.get_world_size()
-        pp_degree = 1
+        pp_degree = 2
         tp_degree = world_size // pp_degree
         strategy = fleet.DistributedStrategy()
         strategy.hybrid_configs = {
@@ -47,6 +47,18 @@ class TestGPT(unittest.TestCase):
 
         model_name_or_path = "gpt2-medium-en"
 
+        # segment with method: layer:GPTDecoderLayer; result: 0, 13, 27
+        # stage=0, global_rank=0 ,layer_number=13
+        # 0: GPTEmbeddingPipe
+        # 1: GPTDecoderLayerPipe
+        # ......
+        # 12: GPTDecoderLayerPipe
+        # stage=1, global_rank=0 ,layer_number=14
+        # ......
+        # 25: LayerNormPipe
+        # 26: GPTLMHead                  Note: GPTLMHead is not in ckpt!
+        # loss: GPTPretrainingCriterion
+
         seq_len = 1024
         batch_size = 2
 
@@ -65,17 +77,18 @@ class TestGPT(unittest.TestCase):
 
         config.fuse_sequence_parallel_allreduce = False
 
-        # hidden_size = 4096
-        model = model_class.from_pretrained(
-            model_name_or_path,
-            config=config,
-            dtype="float32",
-        )
-
-        model.eval()
-
         input_ids = paddle.arange(100, 100 + batch_size * seq_len, dtype="int64").reshape([batch_size, seq_len])
         labels = paddle.arange(101, 101 + batch_size * seq_len, dtype="int64").reshape([batch_size, seq_len])
+
+        single_model = GPTForCausalLM.from_pretrained(model_name_or_path, config=config, dtype="float32")
+        single_model.eval()
+        ret_single = single_model(input_ids=input_ids, labels=labels)
+        single_model_state_dict = single_model.state_dict()
+
+        # hidden_size = 4096
+        model = model_class.from_pretrained(model_name_or_path, config=config, dtype="float32")
+        model.set_state_dict(single_model_state_dict)
+        model.eval()
 
         if pp_degree > 1:
             pp_model = PipelineParallel(layers=model, hcg=hcg, strategy=strategy)
@@ -84,24 +97,20 @@ class TestGPT(unittest.TestCase):
         else:
             # pp_model = PipelineParallel(layers=model, hcg=hcg, strategy=strategy)
             # pp_model.data = [input_ids, labels]
-            # ret = pp_model._forward_step(None)
+            # ret1 = pp_model._forward_step(None)
             ret = model(input_ids=input_ids, labels=labels)
             ret = ret[0]
 
-        # np.testing.assert_allclose(ret.item(), 10.49988270, atol=1e-7)
         print(f"ret mp{tp_degree} pp{pp_degree}", ret.item())
         ret_mp_pp = ret.item()
 
-        single_model = GPTForCausalLM.from_pretrained(model_name_or_path, config=config)
-        single_model.eval()
-        ret = single_model(input_ids=input_ids, labels=labels)
-        print("ret single", ret[0].item())
+        print("ret single", float(ret_single[0]))
         print(
-            f"diff: {(ret[0].item()- ret_mp_pp)/ret[0].item()}",
+            f"diff: {(float(ret_single[0])- ret_mp_pp)/float(ret_single[0])}",
         )
-        np.testing.assert_allclose(ret[0].item(), ret_mp_pp, rtol=1.5e-7)
+        np.testing.assert_allclose(float(ret_single[0]), ret_mp_pp, rtol=1.5e-7)
 
 
 if __name__ == "__main__":
     TestGPT().test_sequence_model()
-# python  -m paddle.distributed.launch --gpus 0,1,2,3  tests/test_pipeline_parallel.py
+# python -m paddle.distributed.launch --gpus 0,1,2,3  tests/test_pipeline_parallel.py
