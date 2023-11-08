@@ -42,6 +42,15 @@ def process_dist_configs(config):
     mp_degree = configs.setdefault("mp_degree", 1)
     pp_degree = configs.setdefault("pp_degree", 1)
 
+    # disenable sequence parallel is mp_degree < 2.
+    sequence_parallel = config["Model"]["sequence_parallel"]
+    if mp_degree < 2 and sequence_parallel:
+        config["Model"]["sequence_parallel"] = False
+        logger.warning(
+            "sequence_parallel is turn off since mp_degree < 2."
+        )
+
+
     # sharding default
     sharding_config = configs["sharding"]
     sharding_degree = sharding_config.setdefault("sharding_degree", 1)
@@ -70,7 +79,7 @@ def process_global_configs(config):
     # pp_degree = config["Distributed"]["pp_degree"]
     # sharding_degree = config["Distributed"]["sharding"]["sharding_degree"]
 
-    # TODO: support partial_send_recv and sequence_parallel
+    # TODO: support partial_send_recv
     # config["Global"]["enable_partial_send_recv"] = True
     # if config.get("Model", None) is not None and "sequence_parallel" in config["Model"] and pp_degree > 1:
     #     if config["Model"]["sequence_parallel"]:
