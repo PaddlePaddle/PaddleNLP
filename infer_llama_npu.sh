@@ -31,6 +31,8 @@ export FLAGS_use_stream_safe_cuda_allocator=0
 # 使能Lccl
 export LCCL_ENABLE_FALLBACK=1
 export HCCL_OP_BASE_FFTS_MODE_ENABLE=TRUE
+export HCCL_BUFFSIZE=120
+
 # export ATB_PROFILING_ENABLE=1
 
 export FLAGS_eager_delete_tensor_gb=-1.0 
@@ -46,7 +48,7 @@ export FLAGS_allocator_strategy="auto_growth"
 # model_dir="/home/data/dataset/llama-7b/inference-7b-dy-mp8-be61dce"
 # 切换模型注意修改custom op
 # model_dir="/home/data/dataset/llama-65b/inference-65b-dy-be61dce-topp"
- model_dir="/home/data/dataset/llama-65b/inference-65b-dy-be61dce/"
+model_dir="/home/data/dataset/llama-65b/inference-65b-dy-be61dce/"
 
 log_dir=mp8
 rm -rf $log_dir
