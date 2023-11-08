@@ -723,6 +723,15 @@ class GPTEmbeddings(nn.Layer):
 
         position_embeddings = self.position_embeddings(position_ids)
         embeddings = inputs_embeddings + position_embeddings
+
+        if self.config.sequence_parallel:
+            bs, seq_len, hidden_size = embeddings.shape
+            print(bs, seq_len, hidden_size)
+            # [bs, seq_len, dim] -> [bs * seq_len, dim]
+            embeddings = paddle.reshape_(embeddings, [bs * seq_len, hidden_size])
+            # [bs * seq_len / n, dim] (n is mp parallelism)
+            embeddings = ScatterOp.apply(embeddings)
+        print(embeddings.shape)
         embeddings = self.dropout(embeddings)
 
         return embeddings
@@ -880,6 +889,7 @@ class GPTPretrainedModel(PretrainedModel):
                 fleet.meta_parallel.RowParallelLinear,
                 ColumnSequenceParallelLinear,
                 RowSequenceParallelLinear,
+                GPTLMHead,
             ),
         ):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -1149,13 +1159,6 @@ class GPTModel(GPTPretrainedModel):
 
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
-
-        if self.config.sequence_parallel:
-            bs, seq_len, hidden_size = embedding_output.shape
-            # [bs, seq_len, dim] -> [bs * seq_len, dim]
-            embedding_output = paddle.reshape_(embedding_output, [bs * seq_len, hidden_size])
-            # [bs * seq_len / n, dim] (n is mp parallelism)
-            embedding_output = ScatterOp.apply(embedding_output)
 
         outputs = self.decoder(
             embedding_output,
