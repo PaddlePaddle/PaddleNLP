@@ -229,7 +229,7 @@ def load_torch(path: str, **pickle_load_args):
         state_dict = {}
         with safe_open(path, framework="pt") as f:
             for key in f.keys():
-                weight = f.get_slice(key)
-                state_dict[key] = weight[:].numpy()
+                weight = f.get_tensor(key)
+                state_dict[key] = weight.numpy()
 
     return state_dict

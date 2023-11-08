@@ -964,7 +964,6 @@ class BartModelCompatibilityTest(unittest.TestCase):
             ("BartForConditionalGeneration",),
         ]
     )
-    @unittest.skip("model diff exists, need to be fixed")
     @require_package("transformers", "torch")
     def test_bart_classes_from_local_dir(self, class_name, pytorch_class_name=None):
         pytorch_class_name = pytorch_class_name or class_name
@@ -982,7 +981,7 @@ class BartModelCompatibilityTest(unittest.TestCase):
             torch_model_class = getattr(transformers, pytorch_class_name)
             torch_model = torch_model_class.from_pretrained(self.model_id)
             torch_model.eval()
-            torch_model.save_pretrained(tempdir)
+            torch_model.save_pretrained(tempdir, safe_serialization=False)
             torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
 
             # 3. forward the paddle model
