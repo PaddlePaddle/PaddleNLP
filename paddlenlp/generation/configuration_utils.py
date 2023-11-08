@@ -176,6 +176,7 @@ class GenerationConfig:
         # Generation parameters exclusive to encoder-decoder models
         self.use_fast = kwargs.pop("use_fast", False)
         self.use_fp16_decoding = kwargs.pop("use_fp16_decoding", False)
+        self.fast_ptq_sampling = kwargs.pop("fast_ptq_sampling", False)
         self.decoder_start_token_id = kwargs.pop("decoder_start_token_id", None)
         self._from_model_config = kwargs.pop("_from_model_config", False)
         self.paddlenlp_version = kwargs.pop("paddlenlp_version", __version__)
@@ -403,7 +404,7 @@ class GenerationConfig:
         ```"""
         config_file_name = config_file_name if config_file_name is not None else GENERATION_CONFIG_NAME
 
-        subfolder = kwargs.pop("subfolder", "")
+        subfolder = kwargs.pop("subfolder", None)
 
         config_path = os.path.join(pretrained_model_name_or_path, config_file_name)
         config_path = str(config_path)

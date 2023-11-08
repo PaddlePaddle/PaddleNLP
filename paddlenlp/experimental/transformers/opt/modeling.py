@@ -21,7 +21,8 @@ import paddle.nn as nn
 from paddlenlp_ops import get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
-    FusedMultiTransformer,
+    FusedMultiTransformerBase,
+    FusedMultiTransformerConfig,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
@@ -110,7 +111,7 @@ class OPTInferenceModel(OPTPretrainedModel):
             for i in range(config.num_hidden_layers)
         ]
 
-        self.transformer_block = FusedMultiTransformer(
+        transformer_config = FusedMultiTransformerConfig(
             config.hidden_size,
             config.num_attention_heads,
             config.intermediate_size,
@@ -134,6 +135,8 @@ class OPTInferenceModel(OPTPretrainedModel):
             ffn2_bias_attrs=ffn2_bias_attrs,
             epsilon=self.epsilon,
         )
+
+        self.transformer_block = FusedMultiTransformerBase(transformer_config)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings

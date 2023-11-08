@@ -182,7 +182,6 @@ def scaled_dot_product_attention(
     output_attentions,
     alibi=None,
     sequence_parallel=False,
-    is_causal=True,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
@@ -192,22 +191,38 @@ def scaled_dot_product_attention(
         # Current Flash Attention doesn't support attn maskt
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
-        if alibi is not None:
-            raise ValueError("Flash Attention does not support ALiBi yet")
 
-        attn_output, attn_weights = flash_attention(
-            query_states,
-            key_states,
-            value_states,
-            causal=is_causal and query_states.shape[1] != 1,
-            return_softmax=output_attentions,
-        )
+        version = paddle.version.full_version
+        if version != "0.0.0" and version <= "2.5.2":
+            if alibi is not None:
+                raise ValueError("Flash Attention doesn't support alibi")
+            attn_output, attn_weights = flash_attention(
+                query_states,
+                key_states,
+                value_states,
+                causal=True,
+                return_softmax=output_attentions,
+            )
+        else:
+            if alibi is not None:
+                alibi = alibi.reshape([bsz, num_heads, 1, -1])
+                attention_mask = attention_mask.cast(alibi.dtype) + alibi
+            attn_output = F.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=attention_mask,
+                is_causal=attention_mask is None,
+            )
+            attn_weights = None
+
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
             attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
         return (attn_output, attn_weights) if output_attentions else attn_output
     else:
+        #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
         query_states = paddle.transpose(query_states, [0, 2, 1, 3])
         # merge with the next tranpose
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
@@ -257,6 +272,13 @@ def scaled_dot_product_attention(
 def masked_fill(x, mask, value):
     y = paddle.full(x.shape, value, x.dtype)
     return paddle.where(mask, y, x)
+
+
+def is_casual_mask(attention_mask):
+    """
+    Upper triangular of attention_mask equals to attention_mask is casual
+    """
+    return (paddle.triu(attention_mask) == attention_mask).all().item()
 
 
 def _make_causal_mask(input_ids_shape, past_key_values_length):
@@ -364,9 +386,11 @@ class LlamaRotaryEmbedding(nn.Layer):
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
+        cos = self.cos_cached[:, :, :seq_len, ...]
+        sin = self.sin_cached[:, :, :seq_len, ...]
         return (
-            self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
-            self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
+            cos.cast(x.dtype) if cos.dtype != x.dtype else cos,
+            sin.cast(x.dtype) if sin.dtype != x.dtype else sin,
         )
 
 
@@ -426,15 +450,14 @@ class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
         # x: [bs, num_attention_heads, seq_len, head_size]
         if seq_len > self.max_position_embeddings:
             scale_cos, scale_sin = self._scale_cos_sin(seq_len=seq_len)
-            return (
-                scale_cos[:, :, :seq_len, ...].cast(x.dtype),
-                scale_sin[:, :, :seq_len, ...].cast(x.dtype),
-            )
         else:
-            return (
-                self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
-                self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
-            )
+            scale_cos, scale_sin = self.cos_cached, self.sin_cached
+        cos = scale_cos[:, :seq_len, :, ...]
+        sin = scale_sin[:, :seq_len, :, ...]
+        return (
+            cos.cast(x.dtype) if cos.dtype != x.dtype else cos,
+            sin.cast(x.dtype) if sin.dtype != x.dtype else sin,
+        )
 
 
 def rotate_half(x):
@@ -752,7 +775,7 @@ class LlamaAttention(nn.Layer):
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
-        # [bsz, nh, t, hd]
+        # [bs, seq_len, num_head, head_dim]
         if past_key_value is not None:
             # reuse k, v, self_attention
             key_states = paddle.concat([past_key_value[0], key_states], axis=1)
@@ -1243,6 +1266,10 @@ class LlamaModel(LlamaPretrainedModel):
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
+        if self.config.use_flash_attention:
+            is_casual = is_casual_mask(attention_mask)
+            if is_casual and alibi is None:
+                attention_mask = None
         hidden_states = inputs_embeds
 
         # decoder layers
@@ -1480,7 +1507,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
         outputs = self.llama(
             input_ids,  # [bs, seq_len]
             position_ids=position_ids,

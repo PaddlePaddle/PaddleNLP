@@ -48,7 +48,11 @@ MODEL_CLASSES = {
     ),
 }
 
-from paddlenlp.data.causal_dataset import build_train_valid_test_datasets, print_rank_0
+from paddlenlp.data.causal_dataset import (
+    build_train_valid_test_datasets,
+    check_data_split,
+    print_rank_0,
+)
 
 
 def add_start_docstrings(*docstr):
@@ -149,6 +153,12 @@ class ModelArguments:
     )
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
+    continue_training: bool = field(
+        default=True,
+        metadata={
+            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
+        },
+    )
 
 
 def create_pretrained_dataset(
@@ -157,6 +167,8 @@ def create_pretrained_dataset(
     data_file,
     tokenizer,
 ):
+
+    check_data_split(data_args.split, training_args.do_train, training_args.do_eval, training_args.do_predict)
 
     train_val_test_num_samples = [
         training_args.per_device_train_batch_size
@@ -171,9 +183,12 @@ def create_pretrained_dataset(
     ]
 
     print_rank_0(" > datasets target sizes (minimum size):")
-    print_rank_0("    train:      {}".format(train_val_test_num_samples[0]))
-    print_rank_0("    validation: {}".format(train_val_test_num_samples[1]))
-    print_rank_0("    test:       {}".format(train_val_test_num_samples[2]))
+    if training_args.do_train:
+        print_rank_0("    train:      {}".format(train_val_test_num_samples[0]))
+    if training_args.do_eval:
+        print_rank_0("    validation: {}".format(train_val_test_num_samples[1]))
+    if training_args.do_predict:
+        print_rank_0("    test:       {}".format(train_val_test_num_samples[2]))
 
     # Build the datasets.
     train_dataset, valid_dataset, test_dataset = build_train_valid_test_datasets(
@@ -203,17 +218,19 @@ def create_pretrained_dataset(
         tokens = tokens_[:, :-1]
 
         # Attention mask.
-        attention_mask = paddle.ones(tokens.shape, dtype=paddle.int64)
+        # attention_mask = paddle.ones(tokens.shape, dtype=paddle.int64)
 
         return {
             "input_ids": tokens,
-            "attention_mask": attention_mask,
             "labels": labels,
         }
 
-    print_dataset(train_dataset[0])
-    print_dataset(valid_dataset[0])
-    print_dataset(test_dataset[0])
+    if training_args.do_train:
+        print_dataset(train_dataset[0])
+    if training_args.do_eval:
+        print_dataset(valid_dataset[0])
+    if training_args.do_predict:
+        print_dataset(test_dataset[0])
 
     return train_dataset, valid_dataset, test_dataset, _collate_data
 
@@ -394,7 +411,7 @@ def main():
             dtype=dtype,
         )
     else:
-        model = model_class._from_config(config, dtype=dtype)
+        model = model_class.from_config(config, dtype=dtype)
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
