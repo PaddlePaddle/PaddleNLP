@@ -49,6 +49,7 @@ python -u  -m paddle.distributed.launch \
     --per_device_eval_batch_size 1 \
     --tensor_parallel_degree 1 \
     --pipeline_parallel_degree 1 \
+    --sequence_parallel 0 \
     --fuse_attention_qkv 0 \
     --use_flash_attention 0 \
     --fp16  \
@@ -77,29 +78,40 @@ python -u  -m paddle.distributed.launch \
 
 其中参数释义如下：
 
+- `model_type`: 预训练模型基础类型。
 - `model_name_or_path`: 预训练模型内置名称或者模型所在目录，默认为`gpt2-medium-en`。
-- `num_train_epochs`: 要执行的训练 epoch 总数（如果不是整数，将在停止训练之前执行最后一个 epoch
-的小数部分百分比）。
-- `max_steps`: 模型训练步数。
-- `learning_rate`: 参数更新的学习率。
-- `warmup_steps`: 学习率热启的步数。
-- `eval_steps`: 模型评估的间隔步数。
-- `logging_steps`: 训练日志打印的间隔步数。
-- `save_steps`: 模型参数保存的间隔步数。
-- `output_dir`: 模型参数保存目录。
-- `src_length`: 上下文的最大输入长度，默认为128.
-- `tgt_length`: 生成文本的最大长度，默认为160.
-- `gradient_accumulation_steps`: 模型参数梯度累积的步数，可用于扩大 batch size。实际的 batch_size = per_device_train_batch_size * gradient_accumulation_steps。
+- `tokenizer_name_or_path`: tokenizer名称或者tokenizer所在目录，默认为`gpt2-medium-en`。
+- `input_dir`: 预训练数据所在目录。
+- `output_dir`: 模型参数及日志保存目录。
+- `split`: 预训练数据切分比例，默认为949,50,1。
+- `max_seq_length`: 预训练最大序列长度，默认为1024。
+- `per_device_train_batch_size`: 单卡训练batch_size大小，默认为1。
+- `per_device_eval_batch_size`: 单卡评估batch_size大小，默认为1。
+- `tensor_parallel_degree`: 模型并行数量。
+- `pipeline_parallel_degree`: 流水线并行数量。
+- `sequence_parallel`: 序列并行数量。需要当`tensor_parallel_degree>1`时，使用序列并行。注意：当模型规模较小、batch_size较小、sequence_length较小时，不建议使用序列并行。
 - `fuse_attention_qkv`：在MultiHeadAttention中使用qkv线性层融合
-- `use_flash_attention`：使用flash attention技术，注意此处需要在A100机器开启
+- `use_flash_attention`：使用flash attention技术，注意此处需要在A100机器开启, 建议使用cuda11.8环境。
 - `fp16`: 使用 float16 精度进行模型训练和推理。
 - `fp16_opt_level`: float16 精度训练模式，`O2`表示纯 float16 训练。
+- `scale_loss`: float16 精度训练时，损失值的缩放比例。微调时建议使用1024，预训练时建议调大。
+- `learning_rate`: 参数更新的学习率。
+- `min_learning_rate`: 最小学习率。
+- `max_steps`: 模型训练步数。
+- `save_steps`: 模型参数保存的间隔步数。
+- `weight_decay`: 权重衰减系数。
+- `warmup_ratio`: warmup比例。
+- `max_grad_norm`: 梯度裁剪系数。
+- `logging_steps`: 训练日志打印的间隔步数。
+- `continue_training`: 是否继续训练模型。
+- `dataloader_num_workers`: dataloader进程数。
+- `sharding`: sharding切分策略，包含stage1、stage2、stage3。
+- `eval_steps`: 模型评估的间隔步数。
 - `recompute`: 使用重计算策略，开启后可节省训练显存。
+- `gradient_accumulation_steps`: 模型参数梯度累积的步数，可用于扩大 batch size。实际的 batch_size = per_device_train_batch_size * gradient_accumulation_steps。
 - `do_train`: 是否训练模型。
 - `do_eval`: 是否评估模型。
-- `tensor_parallel_degree`: 模型并行数量。
 - `lora`: 是否使用LoRA技术。
-- `task_name`: 内置数据集任务名。
 
 <a name="1"></a>
 
@@ -125,6 +137,7 @@ python -u  -m paddle.distributed.launch \
     --per_device_eval_batch_size 1 \
     --tensor_parallel_degree 1 \
     --pipeline_parallel_degree 1 \
+    --sequence_parallel 0 \
     --fp16  \
     --fp16_opt_level "O2"  \
     --scale_loss 1024 \
@@ -163,6 +176,7 @@ python finetune_generation.py \
     --per_device_eval_batch_size 1 \
     --tensor_parallel_degree 1 \
     --pipeline_parallel_degree 1 \
+    --sequence_parallel 0 \
     --fp16  \
     --fp16_opt_level "O2"  \
     --scale_loss 1024 \
