@@ -618,12 +618,12 @@ function gpt_auto_sp_acc_check() {
         >>${log_path}/$FUNCNAME 2>&1
     
     # loss diff
-    loss=`cat ${log_dir_spTrue}/workerlog.0 |  grep 'loss: ' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=0.0
-    mem=0.0
-    loss_base=`cat ${log_dir_spFalse}/workerlog.0 |  grep 'loss: ' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips_base=0.0
-    mem_base=0.0
+    loss=`cat ${log_dir_spTrue}/workerlog.0 |  grep '30/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    ips=-1
+    mem=-1
+    loss_base=`cat ${log_dir_spFalse}/workerlog.0 |  grep '30/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    ips_base=-1
+    mem_base=-1
     echo "result: loss_spTrue=$loss loss_spFasle=$loss_base"
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
