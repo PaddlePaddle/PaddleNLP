@@ -1271,6 +1271,8 @@ class TrainingArguments:
             order = ["dp", "pp", "mp"]
             degree = [self.data_parallel_degree, pipeline_parallel_degree, tensor_parallel_degree]
             mesh_dims = list(filter(lambda x: x[1] > 1, list(zip(order, degree))))
+            if not mesh_dims:
+                mesh_dims = [("dp", 1)]
             fleet.auto.create_mesh(mesh_dims)
         else:
             world_size = paddle.distributed.get_world_size()
