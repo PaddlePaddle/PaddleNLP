@@ -1,5 +1,3 @@
-#! /bin/bash
-
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-log_dir=log_dp2mp2pp2
-rm -rf $log_dir
-export FLAGS_new_executor_micro_batching=True
 
-# control deterministic if needed
-# export FLAGS_cudnn_deterministic=true
-# export FLAGS_cudnn_deterministic=true
+param="model_name_or_path=chatglm "
+param="model_item=CE_chatglm-6b "
+param+="run_mode=MP1-mbs2 "
+param+="batch_size=2 "
+param+="device_num=N1C1 "
+param+="dtype=fp16 "
 
-python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3,4,5,6,7" \
-    ./tools/auto.py \
-    -c ./ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_6.7B_dp2_mp2_pp2_sharding2.yaml \
+bash ./test_tipc/llm/prepare.sh
+
+bash -c "${param} bash ./test_tipc/llm/run_ce.sh"
+
