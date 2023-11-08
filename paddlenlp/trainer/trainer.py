@@ -371,9 +371,6 @@ class Trainer:
                         )
 
                         if self.args.amp_master_grad:
-                            assert (
-                                ShardingOption.SHARD_GRAD_OP in self.args.sharding
-                            ), "Main grad doesn't support sharding stage 3 for now."
                             mix_precision_utils.MixPrecisionScaler(self.scaler)  # return value has no use
 
                         self.scaler = GroupShardedScaler(self.scaler)
@@ -1697,7 +1694,6 @@ class Trainer:
                     extra_kwargs["exclude_layer"] = ["GroupNorm"]
 
                 if self.args.amp_master_grad:
-                    assert level == "os_g", "Main grad doesn't support sharding stage 3 for now."
                     assert (
                         self.args.data_parallel_degree == 1
                     ), "Sharding stage 2 main grad is not compatible with dp for now."
@@ -1713,11 +1709,17 @@ class Trainer:
                     offload=cpu_offload,
                     **extra_kwargs,
                 )
-                if self.args.amp_master_grad:
-                    assert hasattr(optimizer, "use_main_grad"), (
-                        "Current installed paddle doesn't support sharding stage 2 with main grad, "
-                        "please upgrade your paddle (using nightly version)."
-                    )
+                if level == "os_g":
+                    if self.args.amp_master_grad:
+                        assert hasattr(optimizer, "use_main_grad"), (
+                            "Current installed paddle doesn't support sharding stage 2 with main grad, "
+                            "please upgrade your paddle (using nightly version)."
+                        )
+                if level == "p_g_os":
+                        assert hasattr(model, "use_main_grad"), (
+                            "Current installed paddle doesn't support sharding stage 3 with main grad, "
+                            "please upgrade your paddle (using nightly version)."
+                        )        
 
                 sharding_parallel_config = set(self.args.sharding_parallel_config.split(" "))
                 if level == "os_g" and "enable_stage2_overlap" in sharding_parallel_config:
