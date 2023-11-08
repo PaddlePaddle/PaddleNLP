@@ -820,9 +820,10 @@ class TrainingArguments:
                 self.pipeline_parallel_degree <= 1
                 and self.tensor_parallel_degree <= 1
                 and (not self.sharding or ShardingOption.FULL_SHARD in self.sharding)
+                and self.use_hybrid_parallel
             ):
                 raise ValueError(
-                    "Temporarily amp master grad only support for tensor/pipeline/sharding"
+                    "Temporarily amp master grad only support for data/tensor/pipeline/sharding"
                     " (stage 1 and stage 2) parallel. Please set amp_master_grad to False."
                 )
             if not (self.bf16 or self.fp16):
