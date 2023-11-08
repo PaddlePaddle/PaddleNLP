@@ -1008,9 +1008,9 @@ class TrainingArguments:
                                     f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap."
                                 )
                     try:
+                        if "split_param" in sharding_parallel_config:
+                            strategy.hybrid_configs["sharding_configs"].split_param = True
                         if pipeline_parallel_degree == 1:
-                            if "split_param" in sharding_parallel_config:
-                                strategy.hybrid_configs["sharding_configs"].split_param = True
 
                             strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
                                 True if "enable_stage1_tensor_fusion" in sharding_parallel_config else False

@@ -24,6 +24,13 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
     DygraphShardingOptimizer,
 )
 
+try:
+    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
+        DygraphShardingOptimizerV2,
+    )
+except:
+    DygraphShardingOptimizerV2 = None
+
 from paddlenlp.transformers.model_utils import (
     _add_variant,
     get_parameter_dtype,
@@ -66,10 +73,6 @@ def filter_sharded_params(state_dict, optimizer, sharding_group):
                 continue
             filtered_state_dict[k] = v
     else:
-        from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
-            DygraphShardingOptimizerV2,
-        )
-
         optimizer = unwrap_optimizer(optimizer, DygraphShardingOptimizerV2)
         parameters = optimizer._parameter_list
         filtered_parameters = [p.name for (i, p) in enumerate(parameters) if i % sharding_world_size == sharding_rank]
@@ -193,6 +196,14 @@ class ShardingIO:
                 assert k in optimizer._param2rank
                 if optimizer._param2rank[k] != int(v):
                     return True
+        else:
+            # reshard anyway
+            if "pp_overlap" not in sharding_meta:
+                return True
+            pp_overlap = sharding_meta["pp_overlap"]
+            cur_pp_overlap = unwrap_optimizer(self.optimizer, DygraphShardingOptimizerV2).pp_overlap
+            return pp_overlap != cur_pp_overlap
+
         return False
 
     def load_optimizer_state_with_reshard(self, checkpoint, base_opt_name, model_wrapped):
@@ -446,10 +457,12 @@ class ShardingIO:
 
         sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
         param2rank = {}
-
+        pp_overlap = False
         if sharding_strategy == SHARDING_STRATEGY_V1:
             optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
             param2rank = {k: v for (k, v) in optimizer._param2rank.items()}
+        else:
+            pp_overlap = unwrap_optimizer(self.optimizer, DygraphShardingOptimizerV2).pp_overlap
 
         model = self.model
         structure_name_mapping = {k: v.name for (k, v) in model.state_dict().items()}
@@ -460,6 +473,7 @@ class ShardingIO:
         sharding_meta["param2rank"] = param2rank
         sharding_meta["structure_name_mapping"] = structure_name_mapping
         sharding_meta["sharding_strategy"] = sharding_strategy
+        sharding_meta["pp_overlap"] = pp_overlap
         suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
         sharding_metas[suffix] = sharding_meta
         sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_model_parallel_group())

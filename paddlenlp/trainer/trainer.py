@@ -124,6 +124,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     speed_metrics,
 )
 from .training_args import TrainingArguments
+from .utils import reshard as reshard_util
 from .utils.helper import (  # nested_truncate,
     broadcast_dp_optimizer,
     distributed_concat,
@@ -572,8 +573,9 @@ class Trainer:
             self.model_wrapped = model
         # Should invoke _load_from_checpoint after _load_optimizer_and_scheduler
         # because the _load_from_checkpoint method rely on the optimizer in the shareded mode.
-        self._load_optimizer_and_scheduler(resume_from_checkpoint)
-        self._load_from_checkpoint(resume_from_checkpoint)
+        if resume_from_checkpoint:
+            self._load_optimizer_and_scheduler(resume_from_checkpoint)
+            self._load_from_checkpoint(resume_from_checkpoint)
         return model
 
     def train(
@@ -918,7 +920,7 @@ class Trainer:
 
                         if not enable_dp_comm_overlap:
                             if self.optimizer._sharding_enable:
-                                assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
+                                assert reshard_util.is_sharding_opt(self.optimizer)
                                 self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
                             if self.optimizer._dp_enable:
