@@ -30,6 +30,8 @@ from ..model_outputs import (
     ModelOutput,
 )
 from .configuration import CHATGLM_V2_PRETRAINED_RESOURCE_FILES_MAP, ChatGLMv2Config
+from paddlenlp_ops import  write_cache_kv
+from flash_atten2 import flash_attn_varlen_fwd
 
 __all__ = [
     "ChatGLMv2Model",
@@ -145,7 +147,69 @@ class RMSNorm(nn.Layer):
         #     hidden_states = paddle.cast(hidden_states, self.weight.dtype)
         return output
 
+def kernel_encoder(query_layer,key_layer,value_layer,num_head,num_head_kv,dim_head,seq_lens,attention_mask):
+        #仅定长
 
+        bs = query_layer.shape[1]
+        qs = query_layer.shape[0]
+        kvs = key_layer.shape[0]
+        cu_q = paddle.arange(0, (bs + 1) * qs, qs, dtype='int32')
+        cu_kv = paddle.arange(0, (bs + 1) * kvs, kvs, dtype='int32')
+        query_layer = query_layer.transpose([1, 0, 2, 3])
+        key_layer = key_layer.transpose([1, 0, 2, 3])
+        value_layer = value_layer.transpose([1, 0, 2, 3])
+        qq = paddle.reshape(query_layer, [bs * qs, num_head, dim_head])
+        kk = paddle.reshape(key_layer, [bs * kvs, num_head_kv, dim_head])
+        vv = paddle.reshape(value_layer, [bs * kvs, num_head_kv, dim_head])
+        
+        
+        scale = float(dim_head ** -0.5)
+        zero_tensors = False
+        is_causal = True
+        #import pdb;pdb.set_trace()
+        fmha_out = flash_attn_varlen_fwd(
+            qq,
+            kk, 
+            vv, 
+            cu_q,
+            cu_kv, 
+            paddle.to_tensor([seq_lens]),
+            paddle.to_tensor([seq_lens]), 
+            scale, 
+            zero_tensors, 
+            is_causal)
+        fmha_out = fmha_out.reshape([bs,-1,num_head,dim_head])
+        fmha_out = fmha_out.transpose([1,0,2,3])
+        fmha_out =fmha_out.reshape([fmha_out.shape[0],fmha_out.shape[1],fmha_out.shape[2]*fmha_out.shape[3]])
+        return fmha_out
+def kernel_decoder(q,k,v,num_head,num_head_kv,dim_head,cache_kvs=None,seq_qk=0):
+        from paddle.incubate.nn.functional.masked_multiquery_attention import masked_multiquery_attention
+        output_size = (1, num_head*dim_head)
+        q=q.squeeze(0)
+        k=k.squeeze(0)
+        v=v.squeeze(0)
+        bs=q.shape[0]
+        src_mask=paddle.zeros([bs,1,1,seq_qk]).cast('float16')
+        #import pdb;pdb.set_trace()
+        out = masked_multiquery_attention(
+                query=q,
+                key=k,
+                value=v,
+                cache_kv=cache_kvs,
+                src_mask=src_mask,
+                cum_offsets=None,
+                sequence_lengths=None,
+                rotary_tensor=None,
+                beam_cache_offset=None,
+                out_shift=None,
+                out_smooth=None,
+                seq_len=seq_qk-1,
+                rotary_emb_dims=0,
+                use_neox_rotary_style=False,        
+                )
+        decoder_out=out[0]
+        decoder_out = decoder_out.reshape(output_size)
+        return decoder_out
 class CoreAttention(nn.Layer):
     def __init__(self, config: ChatGLMv2Config, layer_number):
         super(CoreAttention, self).__init__()
@@ -292,7 +356,7 @@ class SelfAttention(nn.Layer):
             bias_attr=config.add_qkv_bias,
         )
 
-    def forward(self, hidden_states, attention_mask, rotary_pos_emb, kv_cache=None, use_cache=True):
+    def forward(self, hidden_states, attention_mask, rotary_pos_emb, kv_cache=None, use_cache=True,cache_kvs=None, cur_seq_len=0, is_first_forward=True):
         seq_length, batch_size, hidden_size = hidden_states.shape
         query_layer = self.query(hidden_states)
         key_layer = self.key(hidden_states)
@@ -309,6 +373,9 @@ class SelfAttention(nn.Layer):
             query_layer = apply_rotary_pos_emb(query_layer, rotary_pos_emb)
             key_layer = apply_rotary_pos_emb(key_layer, rotary_pos_emb)
 
+        kernel_q = query_layer
+        kernel_v = value_layer
+        kernel_k = key_layer
         # adjust key and value for inference
         if use_cache:
             if kv_cache is not None:
@@ -319,27 +386,61 @@ class SelfAttention(nn.Layer):
         else:
             kv_cache = None
 
-        if self.kv_indices is not None:
-            key_layer = paddle.index_select(key_layer, self.kv_indices, axis=2)
-            value_layer = paddle.index_select(value_layer, self.kv_indices, axis=2)
-            multiplier = self.num_attention_heads_per_partition // self.kv_indices.shape[0]
+        self.use_kernel_flash2=True
+        self.use_kernel_mqa=False
+        if is_first_forward:
+            seq_lens=kernel_k.shape[0]
+            k_out=kernel_k.transpose([1,2,0,3]).cast('float16')
+            v_out=kernel_v.transpose([1,2,0,3]).cast('float16')
+            write_cache_kv(k_out, v_out, cache_kvs, paddle.to_tensor([seq_lens]).cast("int32"))
+        if is_first_forward and self.use_kernel_flash2:
+            #encoder
+            seq_lens=kernel_k.shape[0]
+            context_layer = kernel_encoder(
+                    query_layer=kernel_q,
+                    key_layer=kernel_k,
+                    value_layer=kernel_v,
+                    num_head=self.num_attention_heads_per_partition,
+                    num_head_kv=self.num_multi_query_groups_per_partition,
+                    dim_head=self.hidden_size_per_attention_head,
+                    seq_lens=seq_lens,
+                    attention_mask=attention_mask,
+            )
+        elif not is_first_forward and self.use_kernel_mqa:
+            #decoder
+            context_layer = kernel_decoder(
+                q=kernel_q,
+                k=kernel_k,
+                v=kernel_v,
+                num_head=self.num_attention_heads_per_partition,
+                num_head_kv=self.num_multi_query_groups_per_partition,
+                dim_head=self.hidden_size_per_attention_head,
+                cache_kvs=cache_kvs,
+                seq_qk=cur_seq_len
+            )
         else:
-            multiplier = self.num_attention_heads_per_partition // self.num_multi_query_groups_per_partition
+            import pdb;pdb.set_trace()
+            if self.kv_indices is not None:
+                key_layer = paddle.index_select(key_layer, self.kv_indices, axis=2)
+                value_layer = paddle.index_select(value_layer, self.kv_indices, axis=2)
+                multiplier = self.num_attention_heads_per_partition // self.kv_indices.shape[0]
+            else:
+                multiplier = self.num_attention_heads_per_partition // self.num_multi_query_groups_per_partition
 
-        key_layer = key_layer.unsqueeze(-2).tile([1, 1, 1, multiplier, 1])
-        key_layer = key_layer.reshape(
-            key_layer.shape[:2] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
-        )
-        value_layer = value_layer.unsqueeze(-2).tile([1, 1, 1, multiplier, 1])
-        value_layer = value_layer.reshape(
-            value_layer.shape[:2] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
-        )
+            key_layer = key_layer.unsqueeze(-2).tile([1, 1, 1, multiplier, 1])
+            key_layer = key_layer.reshape(
+                key_layer.shape[:2] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
+            )
+            value_layer = value_layer.unsqueeze(-2).tile([1, 1, 1, multiplier, 1])
+            value_layer = value_layer.reshape(
+                value_layer.shape[:2] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
+            )
 
-        # ==================================
-        # core attention computation
-        # ==================================
+            # ==================================
+            # core attention computation
+            # ==================================
 
-        context_layer = self.core_attention(query_layer, key_layer, value_layer, attention_mask)
+            context_layer = self.core_attention(query_layer, key_layer, value_layer, attention_mask)
 
         # =================
         # Output. [seq_length, b, h]
@@ -431,6 +532,9 @@ class GLMBlock(nn.Layer):
         rotary_pos_emb,
         kv_cache=None,
         use_cache=True,
+        cache_kvs=None,
+        cur_seq_len=0,
+        is_first_forward=True,
     ):
         # hidden_states: [s, b, h]
 
@@ -439,8 +543,16 @@ class GLMBlock(nn.Layer):
 
         # Self attention.
         attention_output, kv_cache = self.self_attention(
-            layernorm_output, attention_mask, rotary_pos_emb, kv_cache=kv_cache, use_cache=use_cache
+            layernorm_output,
+            attention_mask,
+            rotary_pos_emb,
+            kv_cache=kv_cache,
+            use_cache=use_cache,
+            cache_kvs=cache_kvs,
+            cur_seq_len=cur_seq_len,
+            is_first_forward=is_first_forward
         )
+
 
         # Residual connection.
         if self.apply_residual_connection_post_layernorm:
@@ -480,6 +592,14 @@ class GLMTransformer(nn.Layer):
 
         # Number of layers.
         self.num_hidden_layers = config.num_hidden_layers
+        
+        self.caches = []
+        self.head_dim = config.kv_channels * config.num_attention_heads//config.num_attention_heads
+        self.num_head = config.num_attention_heads
+        self.num_head_kv=config.multi_query_group_num
+        self.enable_mqa = False
+        self.max_sequence_length = config.max_sequence_length
+        self.cur_seq_len=0
 
         # Transformer layers.
         def build_layer(layer_number):
@@ -530,9 +650,18 @@ class GLMTransformer(nn.Layer):
         kv_caches=None,
         use_cache: Optional[bool] = True,
         output_hidden_states: Optional[bool] = False,
+        is_first_forward=True,
     ):
         if not kv_caches:
             kv_caches = [None for _ in range(self.num_hidden_layers)]
+        if len(self.caches) == 0:
+            paddle.set_default_dtype('float16')
+            self.caches = [paddle.zeros(shape=[2, 1, self.num_head_kv, self.max_sequence_length, self.head_dim],
+                                        dtype=paddle.get_default_dtype()) for _ in range(self.num_hidden_layers)]
+        if is_first_forward:
+            self.cur_seq_len = hidden_states.shape[0]
+        else:
+            self.cur_seq_len = self.cur_seq_len + 1
         presents = () if use_cache else None
         all_self_attentions = None
         all_hidden_states = () if output_hidden_states else None
@@ -540,7 +669,6 @@ class GLMTransformer(nn.Layer):
         zero = paddle.zeros(attention_mask.shape, dtype=hidden_states.dtype)
         neg_inf = paddle.full_like(attention_mask, paddle.finfo(hidden_states.dtype).min, dtype=hidden_states.dtype)
         attention_mask = paddle.where(attention_mask, zero, neg_inf)
-
         for index in range(self.num_hidden_layers):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
@@ -558,7 +686,14 @@ class GLMTransformer(nn.Layer):
                 )
             else:
                 hidden_states, kv_cache = layer(
-                    hidden_states, attention_mask, rotary_pos_emb, kv_cache=kv_caches[index], use_cache=use_cache
+                    hidden_states, 
+                    attention_mask, 
+                    rotary_pos_emb, 
+                    kv_cache=kv_caches[index], 
+                    use_cache=use_cache,
+                    cache_kvs=self.caches[index],
+                    cur_seq_len=self.cur_seq_len,
+                    is_first_forward=True
                 )
 
             if use_cache:
@@ -729,6 +864,7 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         use_cache: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
+        is_first_forward=True,
     ):
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -742,7 +878,6 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
             inputs_embeds = self.embedding(input_ids)
 
         full_attention_mask = self.get_masks(input_ids, past_key_values, padding_mask=attention_mask)
-
         # Rotary positional embeddings
         rotary_pos_emb = self.rotary_pos_emb(self.max_sequence_length)
         if position_ids is not None:
@@ -760,6 +895,7 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
             kv_caches=past_key_values,
             use_cache=use_cache,
             output_hidden_states=output_hidden_states,
+            is_first_forward=is_first_forward,
         )
 
         if not return_dict:
@@ -820,9 +956,11 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
         # only last token for input_ids if past is not None
         if position_ids is None:
             position_ids = self.get_position_ids(input_ids)
+
         if not is_first_forward:
             position_ids = position_ids[..., -1:]
             input_ids = input_ids[:, -1:]
+
         return {
             "input_ids": input_ids,
             "past_key_values": past_key_values,
@@ -830,6 +968,7 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
             "attention_mask": attention_mask,
             "return_last_logit": True,
             "use_cache": True,
+            "is_first_forward": is_first_forward,
         }
 
     def _get_model_inputs_spec(self, dtype: str):
@@ -851,6 +990,7 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         return_last_logit: Optional[bool] = False,
+        is_first_forward=True,
     ):
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
@@ -864,8 +1004,8 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
             use_cache=use_cache,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            is_first_forward=is_first_forward,
         )
-
         hidden_states = transformer_outputs[0]
 
         if return_last_logit:
@@ -890,7 +1030,6 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
 
             lm_logits = lm_logits.astype(hidden_states.dtype)
             loss = loss.astype(hidden_states.dtype)
-
         if not return_dict:
             output = (lm_logits,) + transformer_outputs[1:]
             return ((loss,) + output) if loss is not None else output
@@ -902,3 +1041,4 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
             hidden_states=transformer_outputs.hidden_states,
             attentions=transformer_outputs.attentions,
         )
+
