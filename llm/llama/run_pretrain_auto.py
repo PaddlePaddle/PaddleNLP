@@ -24,7 +24,6 @@ from typing import List, Optional
 import numpy as np
 import paddle
 import paddle.distributed.auto_parallel as auto
-from paddle.distributed.auto_parallel.static.utils import print_program_with_dist_attr
 
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
 from paddlenlp.transformers import (
@@ -520,8 +519,6 @@ def main():
         mode="train",
     )
 
-    print("engine.main_program:")
-    print_program_with_dist_attr(engine.main_program, engine.dist_context)
     train_dataloader = engine.dataloader(
         dataset=train_dataset,
         batch_size=global_batch_size,
