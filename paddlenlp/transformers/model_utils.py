@@ -2161,7 +2161,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             with ContextManagers(quantization_init_contexts):
                 quantization_linear_list = replace_with_quantization_linear(
                     model=model,
-                    quant_algo=config.quantization_config.weight_quantize_algo,
+                    quantization_config=config.quantization_config,
                     llm_int8_threshold=config.quantization_config.llm_int8_threshold,
                 )
 

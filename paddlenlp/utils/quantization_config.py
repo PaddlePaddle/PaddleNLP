@@ -33,6 +33,7 @@ class QuantizationConfig:
         llm_int8_threshold: The threshold for llm.int8 quantization.
         weight_double_quant: Whether quant weight scale.
         weight_blocksize: Block size for weight quantization.
+        weight_double_quant_block_size: Block size for quant_scale of weight quant_scale.
         weight_quant_method: The method for weight quantization.
         act_quant_method: The method for activation quantization.
     """
@@ -47,7 +48,8 @@ class QuantizationConfig:
         quant_round_type=0,
         llm_int8_threshold=6.0,
         weight_double_quant=False,
-        weight_blocksize=0,
+        weight_blocksize=64,
+        weight_double_quant_block_size=256,
         weight_quant_method="abs_max_channel_wise",
         act_quant_method="abs_max",
     ):
@@ -77,6 +79,7 @@ class QuantizationConfig:
         self.weight_blocksize = weight_blocksize
         self.weight_quant_method = weight_quant_method
         self.act_quant_method = quant_inference_mapping[act_quant_method]
+        self.weight_double_quant_block_size = weight_double_quant_block_size
 
     def is_weight_quantize(self):
         if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "nf4", "a8w8"]:
