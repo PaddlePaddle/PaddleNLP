@@ -26,7 +26,7 @@ __global__ void write_cache_k_kernel(T *cache_k,
                                      const int *seq_lens,
                                      const int num_head,
                                      const int dim_head,
-                                     const int seq_len, // seq_len means every batch's seq including padding
+                                     const int seq_len,
                                      const int max_seq_len) {
   const int bi = blockIdx.y;
   const int len = seq_lens ? seq_lens[bi] : seq_len;
@@ -37,15 +37,9 @@ __global__ void write_cache_k_kernel(T *cache_k,
   const int hi = blockIdx.z;
   constexpr int X_ELEMS = VEC_16B / sizeof(T);
 
-  int token_id = 0;
-  for (int i = 0; i < bi; ++i) {
-    token_id += seq_lens[i];
-  }
-
-  // [all batch's seq, num_head, dim_head/x, x]
+  // [bsz, num_head, seq_len, dim_head/x, x]
   auto k_src = reinterpret_cast<const uint4 *>(
-      k + token_id * num_head * dim_head + hi * dim_head);
-  // k_dst is padding.
+      k + bi * num_head * seq_len * dim_head + hi * seq_len * dim_head);
   // [bsz, num_head, dim_head/x, max_seq_len, x]
   auto k_dst = reinterpret_cast<uint4 *>(
       cache_k + bi * num_head * max_seq_len * dim_head +
@@ -66,7 +60,7 @@ __global__ void write_cache_k_kernel(T *cache_k,
   const int k_vec_id = idx % dim_head_div_x;
 
   if (k_seq_len_id < len) {
-    k_dst[out_idx] = k_src[k_seq_len_id * dim_head_div_x * num_head + k_vec_id];
+    k_dst[out_idx] = k_src[k_seq_len_id * dim_head_div_x + k_vec_id];
   }
 }
 
@@ -86,14 +80,9 @@ __global__ void write_cache_v_kernel(T *cache_v,
 
   const int hi = blockIdx.z;
 
-  int token_id = 0;
-  for (int i = 0; i < bi; ++i) {
-    token_id += seq_lens[i];
-  }
-
-  // [all batch's seq, num_head, dim_head/x, x]
+  // [bsz, num_head, seq_len, dim_head/x, x]
   auto v_src = reinterpret_cast<const uint4 *>(
-      v + token_id * num_head * dim_head + hi * dim_head);
+      v + bi * num_head * seq_len * dim_head + hi * seq_len * dim_head);
   // [bsz, num_head, max_seq_len, dim_head/x, x]
   auto v_dst = reinterpret_cast<uint4 *>(
       cache_v + bi * num_head * max_seq_len * dim_head +
@@ -103,17 +92,10 @@ __global__ void write_cache_v_kernel(T *cache_v,
   constexpr int X_ELEMS = VEC_16B / sizeof(T);
   const int dim_head_div_x = dim_head / X_ELEMS;
 
-  int seq_id = idx / dim_head_div_x;
-  int vec_id = idx % dim_head_div_x;
-  
-  // we only need process dim_head_div_x * len output elementes.
   if (idx >= dim_head_div_x * len) return;
 
-  v_dst[idx] = v_src[seq_id * num_head * dim_head_div_x + vec_id];
+  v_dst[idx] = v_src[idx];
 }
-
-// k's shape is [batch seq , kv_num_head, head_dim]
-// v's shape is [batch seq , kv_num_head, head_dim]
 
 template <paddle::DataType D>
 void LaunchWriteCacheKV(const paddle::Tensor& input_k, 
@@ -124,8 +106,8 @@ void LaunchWriteCacheKV(const paddle::Tensor& input_k,
     typedef typename traits_::DataType DataType_;
     typedef typename traits_::data_t data_t;
 
-    const int64_t bsz = sequence_lengths.shape()[0];
-    const int64_t seq_len = 640;
+    const int64_t bsz = input_k.shape()[0];
+    const int64_t seq_len = input_k.shape()[2]; 
     const int64_t cache_bsz = cache_kv.shape()[1]; 
     const int64_t num_head = cache_kv.shape()[2]; 
     const int64_t dim_head = cache_kv.shape()[4]; 
@@ -156,14 +138,14 @@ void LaunchWriteCacheKV(const paddle::Tensor& input_k,
     dim3 grid(div_up(max_size, block_sz), bsz, num_head);
     dim3 grid_v(div_up(size, block_sz), bsz, num_head);
 
-    // transpose [all batch's seq, num_head, dim_head/x, x]->
+    // transpose [bsz, num_head, seq_len, dim_head/x, x]->
     // [bsz, num_head, dim_head/x, max_seq_len, x]
     write_cache_k_kernel<<<grid, block_sz, 0, input_k.stream()>>>(
         cache_k_ptr, k_ptr, sequence_lengths.data<int>(), num_head, dim_head, seq_len, max_seq_len);
 
-    // copy [all batch's seq, num_head, dim_head/x, x]->
+    // copy [bsz, num_head, seq_len, dim_head/x, x]->
     // [bsz, num_head, max_seq_len, dim_head/x, x]
-    write_cache_v_kernel<<<grid, block_sz, 0, input_k.stream()>>>(
+    write_cache_v_kernel<<<grid_v, block_sz, 0, input_k.stream()>>>(
         cache_v_ptr, v_ptr, sequence_lengths.data<int>(), num_head, dim_head, seq_len, max_seq_len);
 }
 

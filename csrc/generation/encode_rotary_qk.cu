@@ -30,16 +30,9 @@ __global__ void NeoXRotaryKernel(const T *input,
   int si = blockIdx.z;
   if (sequence_lengths && si >= sequence_lengths[bi] * rotary_emb_dims) return;
   int half_lastdim = last_dim / 2;
-
-  int token_id = 0;
-  for (int i = 0; i < bi; ++i) {
-    token_id += sequence_lengths[i];
-  }
-  token_id += si;
-
   for (int ti = threadIdx.x; ti < half_lastdim; ti += blockDim.x) {
-    int base_idx = token_id * head_num * last_dim +
-                   hi * last_dim;
+    int base_idx = bi * head_num * seq_len * last_dim +
+                   hi * seq_len * last_dim + si * last_dim;
     int left_idx = base_idx + ti;
     const int right_idx = base_idx + ti + half_lastdim;
     int emb_idx_left = bi * seq_len * last_dim + si * last_dim + ti;
@@ -79,18 +72,11 @@ __global__ void RotaryKernel(const T *input,
   int si = blockIdx.z;
   if (sequence_lengths && si >= sequence_lengths[bi] * rotary_emb_dims) return;
   int half_lastdim = last_dim / 2;
-
-  int token_id = 0;
-  for (int i = 0; i < bi; ++i) {
-    token_id += sequence_lengths[i];
-  }
-  token_id += si;
-
   // Note(ZhenyuLi): Calculate the relevant data at one time, so that no
   // additional space is required.
   for (int ti = threadIdx.x; ti < half_lastdim; ti += blockDim.x) {
-    int base_idx = token_id * head_num * last_dim +
-                   hi * last_dim;
+    int base_idx = bi * head_num * seq_len * last_dim +
+                   hi * seq_len * last_dim + si * last_dim;
     int left_idx = base_idx + 2 * ti;
     const int right_idx = base_idx + 2 * ti + 1;
     int emb_idx = bi * seq_len * last_dim + si * last_dim + 2 * ti;
@@ -104,8 +90,6 @@ __global__ void RotaryKernel(const T *input,
     output[right_idx] = res2;
   }
 }
-// q's shape [batch seqs, num_head, head_dim]
-// kv's shape [batch seqs, kv_num_head, head_dim]
 
 template <paddle::DataType D>
 void LaunchRotaryQK(const paddle::Tensor& q, 
@@ -118,16 +102,14 @@ void LaunchRotaryQK(const paddle::Tensor& q,
     typedef typename traits_::DataType DataType_;
     typedef typename traits_::data_t data_t;
 
-    // seq_lens's shape is [batch ,1]
-    const int32_t batch_size = seq_lens.shape()[0];
+
+    const int32_t batch_size = q.shape()[0];
     const int32_t head_num = q.shape()[1];
-    const int32_t kv_head_num = kv.shape()[1];
-    const int32_t seq_len = rotary_emb.shape()[2];
-    const int32_t dim_head = q.shape()[2];
+    const int32_t seq_len = q.shape()[2];
+    const int32_t dim_head = q.shape()[3];
 
     auto cu_stream = q.stream();
     dim3 grid(batch_size, head_num, seq_len * rotary_emb_dims);
-    dim3 grid_k(batch_size, kv_head_num, seq_len * rotary_emb_dims);
     const int last_dim = dim_head / rotary_emb_dims;
     auto getBlockSize = [](int dim) {
         if (dim > 256) {
@@ -165,7 +147,7 @@ void LaunchRotaryQK(const paddle::Tensor& q,
             head_num,
             seq_len * rotary_emb_dims,
             last_dim);
-
+        dim3 grid_k(batch_size, 2, seq_len * rotary_emb_dims);
         RotaryKernel<<<grid_k, BlockSize, 0, cu_stream>>>(
             k_data,
             cos_emb,
@@ -174,11 +156,11 @@ void LaunchRotaryQK(const paddle::Tensor& q,
             k_out_data,
             rotary_emb_dims,
             batch_size,
-            kv_head_num,
+            2,
             seq_len * rotary_emb_dims,
             last_dim);
     } else {
-        NeoXRotaryKernel<<<grid_k, BlockSize, 0, cu_stream>>>(
+        NeoXRotaryKernel<<<grid, BlockSize, 0, cu_stream>>>(
             q_data,
             cos_emb,
             sin_emb,
@@ -197,7 +179,7 @@ void LaunchRotaryQK(const paddle::Tensor& q,
             k_out_data,
             rotary_emb_dims,
             batch_size,
-            kv_head_num,
+            head_num,
             seq_len * rotary_emb_dims,
             last_dim);
     }
@@ -241,4 +223,4 @@ PD_BUILD_OP(encode_rotary_qk)
     .Outputs({"rotary_q_out", "rotary_kv_out"})
     .SetInplaceMap({{"q", "rotary_q_out"}, {"kv", "rotary_kv_out"}})
     .Attrs({"rotary_emb_dims: int", "use_neox: bool"})
-    .SetKernelFn(PD_KERNEL(RotaryQK)); 
+    .SetKernelFn(PD_KERNEL(RotaryQK));
