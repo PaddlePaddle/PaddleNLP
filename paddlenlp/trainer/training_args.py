@@ -817,8 +817,6 @@ class TrainingArguments:
         ):
             self.use_hybrid_parallel = not self.use_auto_parallel
 
-        print("self.use_auto_parallel:", self.use_auto_parallel)
-
         if self.distributed_dataloader and not (self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1):
             warnings.warn("We set `distributed_dataloader` to False if tp_degree <= 1 and pp_degree <= 1")
             self.distributed_dataloader = False
