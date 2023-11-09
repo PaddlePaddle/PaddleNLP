@@ -65,6 +65,14 @@ class AutoConfigTest(unittest.TestCase):
         config = AutoConfig.from_pretrained("facebook/opt-66b", from_hf_hub=True)
         self.assertEqual(config.hidden_size, 9216)
 
+    def test_from_aistudio(self):
+        config = AutoConfig.from_pretrained("PaddleNLP/tiny-random-bert", from_aistudio=True)
+        self.assertEqual(config.hidden_size, 32)
+
+    def test_subfolder(self):
+        config = AutoConfig.from_pretrained("CompVis/stable-diffusion-v1-4", subfolder="text_encoder")
+        self.assertEqual(config.hidden_size, 768)
+
     def test_load_from_legacy_config(self):
         number = random.randint(0, 10000)
         legacy_config = {"init_class": "BertModel", "hidden_size": number}

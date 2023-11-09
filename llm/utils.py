@@ -29,6 +29,7 @@ from sklearn.metrics import accuracy_score
 from paddlenlp.datasets import InTokensIterableDataset
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
+from paddlenlp.transformers import LlamaForCausalLMPipe
 from paddlenlp.utils.log import logger
 
 
@@ -111,7 +112,7 @@ def get_lora_target_modules(model):
         ]
     elif model.base_model_prefix == "bloom":
         target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
-    elif model.base_model_prefix == "llama":
+    elif model.base_model_prefix == "llama" or isinstance(model, LlamaForCausalLMPipe):
         target_modules = [
             ".*q_proj.*",
             ".*v_proj.*",
@@ -183,7 +184,7 @@ class CausalLMTrainer(Trainer):
         prediction_loss_only: bool,
         ignore_keys=None,
     ):
-        if prediction_loss_only:
+        if prediction_loss_only or self.args.pipeline_parallel_degree > 1:
             return super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
         elif not self.do_generation:
             loss, logits, labels = super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
@@ -293,7 +294,7 @@ class CausalLMTrainer(Trainer):
 
 def get_infer_model_path(input_dir, model_prefix):
     if dist.get_world_size() > 1:
-        local_rank = dist.ParallelEnv().dev_id
+        local_rank = dist.get_rank()
         return os.path.join(input_dir, "rank_{}".format(local_rank), model_prefix)
     else:
         return os.path.join(input_dir, model_prefix)
@@ -395,7 +396,7 @@ def dybatch_preprocess(
 ):
     """Pre-process generation inputs."""
     inputs = {}
-    if "chatglm" in architectures:
+    if "chatglmforcausallm" == architectures.lower():
         input_ids = []
         position_ids = []
 

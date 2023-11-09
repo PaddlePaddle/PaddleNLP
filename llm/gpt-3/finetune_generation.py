@@ -18,7 +18,6 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-from modeling_pp import GPTForCausalLMPipe
 from utils import (
     DataCollatorForSupervisedDataset,
     GPTTrainer,
@@ -34,7 +33,12 @@ from paddlenlp.trainer import (
     get_last_checkpoint,
     set_seed,
 )
-from paddlenlp.transformers import AutoTokenizer, GPTConfig, GPTForCausalLM
+from paddlenlp.transformers import (
+    AutoTokenizer,
+    GPTConfig,
+    GPTForCausalLM,
+    GPTForCausalLMPipe,
+)
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
@@ -149,7 +153,6 @@ def main():
         model_args.model_name_or_path,
         config=config,
         dtype=dtype,
-        load_state_as_np=True,
     )
     if model_args.lora:
         if model_args.lora_path is None:

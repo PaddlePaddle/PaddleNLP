@@ -17,10 +17,13 @@ import paddle
 import paddle.nn.functional as F
 from paddle import nn
 from paddle.distributed import fleet
+from paddle.nn.quant import weight_quantize
 from paddlenlp_ops import get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
-    FusedMultiTransformer,
+    FusedMultiTransformerConfig,
+    FusedMultiTransformerPostLayernorm,
+    FusedMultiTransformerWeightOnlyPostLayernorm,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
@@ -123,6 +126,19 @@ class ChatGLMStackDyBatch(nn.Layer):
         self.current_rank = 0
         self.world_size = 1
 
+        self.use_weight_only = False
+        self.quant_bits = config.quant_bits
+        self.quant_algo = "weight_only_int" + str(self.quant_bits)
+        if self.quant_bits != -1:
+            self.use_weight_only = True
+
+        if self.use_weight_only:
+            assert (
+                self.quant_algo == "weight_only_int8" or self.quant_algo == "weight_only_int4"
+            ), "Expected quant_algo equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
+                self.quant_algo
+            )
+
         try:
             self.current_rank = paddle.distributed.get_rank()
             self.world_size = paddle.distributed.get_world_size()
@@ -160,10 +176,18 @@ class ChatGLMStackDyBatch(nn.Layer):
         self.input_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
         ln_scale_attrs = [paddle.ParamAttr(name="fusemt.{}.ln_scale".format(i)) for i in range(config.num_layers)]
         ln_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ln_bias".format(i)) for i in range(config.num_layers)]
-        qkv_weight_attrs = [paddle.ParamAttr(name="fusemt.{}.qkv_weight".format(i)) for i in range(config.num_layers)]
+        qkv_weight_attrs = [
+            paddle.ParamAttr(
+                name="fusemt.{}.qkv_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(config.num_layers)
+        ]
         qkv_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.qkv_bias".format(i)) for i in range(config.num_layers)]
         linear_weight_attrs = [
-            paddle.ParamAttr(name="fusemt.{}.linear_weight".format(i)) for i in range(config.num_layers)
+            paddle.ParamAttr(
+                name="fusemt.{}.linear_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(config.num_layers)
         ]
         linear_bias_attrs = [
             paddle.ParamAttr(name="fusemt.{}.linear_bias".format(i)) for i in range(config.num_layers)
@@ -175,18 +199,46 @@ class ChatGLMStackDyBatch(nn.Layer):
             paddle.ParamAttr(name="fusemt.{}.ffn_ln_bias".format(i)) for i in range(config.num_layers)
         ]
         ffn1_weight_attrs = [
-            paddle.ParamAttr(name="fusemt.{}.ffn1_weight".format(i)) for i in range(config.num_layers)
+            paddle.ParamAttr(
+                name="fusemt.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(config.num_layers)
         ]
         ffn1_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn1_bias".format(i)) for i in range(config.num_layers)]
         ffn2_weight_attrs = [
-            paddle.ParamAttr(name="fusemt.{}.ffn2_weight".format(i)) for i in range(config.num_layers)
+            paddle.ParamAttr(
+                name="fusemt.{}.ffn2_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(config.num_layers)
         ]
         ffn2_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn2_bias".format(i)) for i in range(config.num_layers)]
+
+        qkv_weight_scale_attrs = None
+        linear_weight_scale_attrs = None
+        ffn1_weight_scale_attrs = None
+        ffn2_weight_scale_attrs = None
+
+        if self.use_weight_only:
+            qkv_weight_scale_attrs = [
+                paddle.ParamAttr(name="fusemt.{}.qkv_weight_scale".format(i)) for i in range(config.num_layers)
+            ]
+            linear_weight_scale_attrs = [
+                paddle.ParamAttr(name="fusemt.{}.linear_weight_scale".format(i)) for i in range(config.num_layers)
+            ]
+            ffn1_weight_scale_attrs = [
+                paddle.ParamAttr(name="fusemt.{}.ffn1_weight_scale".format(i)) for i in range(config.num_layers)
+            ]
+            ffn2_weight_scale_attrs = [
+                paddle.ParamAttr(name="fusemt.{}.ffn2_weight_scale".format(i)) for i in range(config.num_layers)
+            ]
+
         alpha = (2 * self.config.num_hidden_layers) ** 0.5
-        self.transformer_block = FusedMultiTransformer(
+
+        transformer_config = FusedMultiTransformerConfig(
             config.hidden_size,
             config.num_attention_heads,
             4 * config.hidden_size,
+            quant_bits=self.quant_bits,
             activation="gelu",
             num_layers=config.num_layers,
             nranks=config.tensor_parallel_degree,
@@ -194,14 +246,18 @@ class ChatGLMStackDyBatch(nn.Layer):
             ln_scale_attrs=ln_scale_attrs,
             ln_bias_attrs=ln_bias_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
+            qkv_weight_scale_attrs=qkv_weight_scale_attrs,
             qkv_bias_attrs=qkv_bias_attrs,
             linear_weight_attrs=linear_weight_attrs,
+            linear_weight_scale_attrs=linear_weight_scale_attrs,
             linear_bias_attrs=linear_bias_attrs,
             ffn_ln_scale_attrs=ffn_ln_scale_attrs,
             ffn_ln_bias_attrs=ffn_ln_bias_attrs,
             ffn1_weight_attrs=ffn1_weight_attrs,
+            ffn1_weight_scale_attrs=ffn1_weight_scale_attrs,
             ffn1_bias_attrs=ffn1_bias_attrs,
             ffn2_weight_attrs=ffn2_weight_attrs,
+            ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
             ffn2_bias_attrs=ffn2_bias_attrs,
             trans_qkvw=True,
             normalize_before=False,
@@ -209,6 +265,10 @@ class ChatGLMStackDyBatch(nn.Layer):
             norm_type="layernorm",
             use_neox_rotary_style=True,
         )
+        if self.use_weight_only:
+            self.transformer_block = FusedMultiTransformerWeightOnlyPostLayernorm(transformer_config)
+        else:
+            self.transformer_block = FusedMultiTransformerPostLayernorm(transformer_config)
 
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
@@ -227,6 +287,7 @@ class ChatGLMStackDyBatch(nn.Layer):
         use_cache=None,
         cache=None,
         cache_kvs=None,
+        pre_caches=None,
         seq_len_encoder=None,
         seq_len_decoder=None,
         past_key_values=None,
@@ -269,8 +330,8 @@ class ChatGLMStackDyBatch(nn.Layer):
         coses = []
         sines = []
         if self.position_encoding_2d:
-            block_position_ids = position_ids[:, 1, :].transpose([1, 0])
-            position_ids = position_ids[:, 0, :].transpose([1, 0])
+            block_position_ids = position_ids[:batch_size, 1, :].transpose([1, 0])
+            position_ids = position_ids[:batch_size, 0, :].transpose([1, 0])
             coses.append(cos.squeeze(1)[position_ids].unsqueeze(2))
             sines.append(sin.squeeze(1)[position_ids].unsqueeze(2))
 
@@ -292,10 +353,12 @@ class ChatGLMStackDyBatch(nn.Layer):
 
         rotary_embeds = paddle.concat([coses, sines])
 
-        attention_mask = (attention_mask) * -1000000
-
         new_cache = [None]
         hidden_states = self.input_layernorm(hidden_states)
+
+        position_offset = 0
+        if encode_seq_length > 1 and pre_caches is not None:
+            position_offset = 128
 
         with dy2st_nocheck_guard_context():
             hidden_states, new_cache = self.transformer_block(
@@ -305,11 +368,14 @@ class ChatGLMStackDyBatch(nn.Layer):
                 padding_offset=padding_offset,
                 attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
                 caches=cache_kvs,
+                pre_caches=pre_caches,
+                pre_caches_length=position_offset,
                 rotary_embs=paddle.cast(rotary_embeds, "float32"),
                 rotary_emb_dims=2 if self.config.position_encoding_2d else 1,
                 seq_lens=seq_lens,
                 time_step=time_step,
             )
+
         return (hidden_states, new_cache)
 
     @paddle.no_grad()
@@ -351,12 +417,22 @@ class ChatGLMStackDyBatch(nn.Layer):
                 self.transformer_block.ln_biases[idx].set_value(v.astype("float32"))
             elif k.endswith("attention.query_key_value.weight"):
                 # [embed_dim, num_heads, 3, head_dim] -> [embed_dim, 3, num_heads, head_dim]
-                v = (
+                qkv_weight_tensor = (
                     v.reshape([embed_dim, num_attention_heads, 3, head_dim])
                     .transpose([2, 1, 3, 0])
                     .reshape([head_dim * num_attention_heads * 3, embed_dim])
                 )
-                self.transformer_block.qkv_weights[idx].set_value(v.astype(dtype))
+
+                if self.use_weight_only:
+                    qkv_weight_tensor = paddle.transpose(qkv_weight_tensor, perm=[1, 0])
+                    qkv_quanted_weight_tensor, qkv_weight_scale_tensor = weight_quantize(
+                        qkv_weight_tensor, algo=self.quant_algo
+                    )
+                    self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor)
+                    self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor)
+                else:
+                    self.transformer_block.qkv_weights[idx].set_value(qkv_weight_tensor.astype(dtype))
+
             elif k.endswith("attention.query_key_value.bias"):
                 v = (
                     v.reshape([num_attention_heads, 3, head_dim])
@@ -365,15 +441,42 @@ class ChatGLMStackDyBatch(nn.Layer):
                 )
                 self.transformer_block.qkv_biases[idx].set_value(v.astype(dtype))
             elif k.endswith("attention.dense.weight"):
-                self.transformer_block.linear_weights[idx].set_value(v.astype(dtype))
+                linear_weight_tensor = v.astype(dtype)
+                if self.use_weight_only:
+                    linear_quanted_weight_tensor, linear_weight_scale_tensor = weight_quantize(
+                        linear_weight_tensor, algo=self.quant_algo
+                    )
+                    self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor)
+                    self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor)
+                else:
+                    self.transformer_block.linear_weights[idx].set_value(linear_weight_tensor)
+
             elif k.endswith("attention.dense.bias"):
                 self.transformer_block.linear_biases[idx].set_value(v.astype(dtype))
             elif k.endswith("mlp.dense_h_to_4h.weight"):
-                self.transformer_block.ffn1_weights[idx].set_value(v.astype(dtype))
+                ffn1_weight_tensor = v.astype(dtype)
+                if self.use_weight_only:
+                    ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
+                        ffn1_weight_tensor, algo=self.quant_algo
+                    )
+                    self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor)
+                    self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor)
+                else:
+                    self.transformer_block.ffn1_weights[idx].set_value(ffn1_weight_tensor)
+
             elif k.endswith("mlp.dense_h_to_4h.bias"):
                 self.transformer_block.ffn1_biases[idx].set_value(v.astype(dtype))
             elif k.endswith("mlp.dense_4h_to_h.weight"):
-                self.transformer_block.ffn2_weights[idx].set_value(v.astype(dtype))
+                ffn2_weight_tensor = v.astype(dtype)
+                if self.use_weight_only:
+                    ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(
+                        ffn2_weight_tensor, algo=self.quant_algo
+                    )
+                    self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
+                    self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
+                else:
+                    self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight_tensor)
+
             elif k.endswith("mlp.dense_4h_to_h.bias"):
                 self.transformer_block.ffn2_biases[idx].set_value(v.astype(dtype))
             else:
@@ -415,6 +518,7 @@ class ChatGLMModelDyBatch(ChatGLMPretrainedModel):
         inputs_embeds=None,
         use_cache=None,
         cache_kvs=None,
+        pre_caches=None,
         seq_len_encoder=None,
         seq_len_decoder=None,
         past_key_values=None,
@@ -448,6 +552,7 @@ class ChatGLMModelDyBatch(ChatGLMPretrainedModel):
             use_cache=use_cache,
             cache=cache,
             cache_kvs=cache_kvs,
+            pre_caches=pre_caches,
             seq_len_encoder=seq_len_encoder,
             seq_len_decoder=seq_len_decoder,
             past_key_values=past_key_values,
@@ -527,15 +632,17 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
         position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
         cache = kwargs.get("cache", None)
+        pre_caches = kwargs.get("pre_caches", None)
 
         time_step = None
         if cache is not None:
             time_step = self.time_step
             input_ids = tgt_ids
             position_ids = tgt_pos
-            attention_mask = 1 - tgt_generation_mask
+            attention_mask = (1 - tgt_generation_mask) * paddle.finfo(tgt_generation_mask.dtype).min
         else:
             self.time_step = paddle.to_tensor(input_ids.shape[1], dtype="int32", place=paddle.CPUPlace())
+            attention_mask = (1 - attention_mask) * paddle.finfo(tgt_generation_mask.dtype).min
             paddle.increment(self.time_step, -1)
 
         model_inputs = {
@@ -547,6 +654,7 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
             "seq_len_decoder": seq_len_decoder,
             "cache": cache,
             "time_step": time_step,
+            "pre_caches": pre_caches,
         }
         return model_inputs
 
@@ -560,6 +668,7 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
         use_cache=False,
         cache=None,
         cache_kvs=None,
+        pre_caches=None,
         seq_len_encoder=None,
         seq_len_decoder=None,
         past_key_values=None,
@@ -582,6 +691,7 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
             use_cache=use_cache,
             cache=cache,
             cache_kvs=cache_kvs,
+            pre_caches=pre_caches,
             seq_len_encoder=seq_len_encoder,
             seq_len_decoder=seq_len_decoder,
             past_key_values=past_key_values,
@@ -636,5 +746,7 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
-        self.lm_head.weight.set_value(state_dict["transformer.word_embeddings.weight"])
+        self.lm_head.weight.set_value(
+            state_dict["transformer.word_embeddings.weight"].astype(self.lm_head.weight.dtype)
+        )
         self.model.transformer.set_state_dict({k: state_dict[k] for k in state_dict.keys()})

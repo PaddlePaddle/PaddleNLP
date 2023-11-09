@@ -20,17 +20,17 @@ from collections import OrderedDict
 
 from huggingface_hub import hf_hub_download
 
-from paddlenlp import __version__
-from paddlenlp.transformers import *  # noqa
-from paddlenlp.transformers.configuration_utils import is_standard_config
-from paddlenlp.utils.downloader import (
+from ... import __version__
+from ...utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     get_path_from_url_with_filelock,
     hf_file_exists,
     url_file_exists,
 )
-from paddlenlp.utils.log import logger
-
+from ...utils.log import logger
+from .. import *  # noqa
+from ..aistudio_utils import aistudio_download
+from ..configuration_utils import is_standard_config
 from ..utils import resolve_cache_dir
 
 __all__ = [
@@ -43,6 +43,7 @@ __all__ = [
     "AutoModelForMultipleChoice",
     "AutoModelForMaskedLM",
     "AutoModelForCausalLM",
+    "AutoModelForCausalLMPipe",
     "AutoEncoder",
     "AutoDecoder",
     "AutoGenerator",
@@ -140,6 +141,7 @@ MAPPING_TASKS = OrderedDict(
         ("ForMultipleChoice", "AutoModelForMultipleChoice"),
         ("ForMaskedLM", "AutoModelForMaskedLM"),
         ("ForCausalLM", "AutoModelForCausalLM"),
+        ("ForCausalLMPipe", "AutoModelForCausalLMPipe"),
         ("Encoder", "AutoEncoder"),
         ("Decoder", "AutoDecoder"),
         ("Generator", "AutoGenerator"),
@@ -209,9 +211,10 @@ class _BaseAutoModelClass:
 
     # TODO: Refactor into AutoConfig when available
     @classmethod
-    def _get_model_class_from_config(cls, pretrained_model_name_or_path, config_file_path):
-        with io.open(config_file_path, encoding="utf-8") as f:
-            config = json.load(f)
+    def _get_model_class_from_config(cls, pretrained_model_name_or_path, config_file_path, config=None):
+        if config is None:
+            with io.open(config_file_path, encoding="utf-8") as f:
+                config = json.load(f)
 
         # Get class name corresponds to this configuration
         if is_standard_config(config):
@@ -243,37 +246,54 @@ class _BaseAutoModelClass:
             model_class = getattr(import_class, init_class)
             return model_class
         except AttributeError as err:
-            logger.error(err)
-            all_model_classes = import_class.__all__
-            all_tasks = {get_task_name(m) for m in all_model_classes if get_task_name(m) is not None}
-            raise AttributeError(
-                f"module '{import_class.__name__}' only supports the following classes: "
-                + ", ".join(m for m in all_model_classes)
-                + "\n"
-                "Hint: you can use interface "
-                + " or ".join(task + ".from_pretrained" for task in all_tasks)
-                + f" to load '{pretrained_model_name_or_path}'\n"
-            )
+            try:
+                new_import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}")
+                model_class = getattr(new_import_class, init_class)
+                return model_class
+            except AttributeError:
+                logger.error(err)
+                all_model_classes = import_class.__all__
+                all_tasks = {get_task_name(m) for m in all_model_classes if get_task_name(m) is not None}
+                raise AttributeError(
+                    f"module '{import_class.__name__}' only supports the following classes: "
+                    + ", ".join(m for m in all_model_classes)
+                    + "\n"
+                    "Hint: you can use interface "
+                    + " or ".join(task + ".from_pretrained" for task in all_tasks)
+                    + f" to load '{pretrained_model_name_or_path}'\n"
+                )
 
     @classmethod
-    def _from_pretrained(
-        cls, pretrained_model_name_or_path, task=None, from_hf_hub=False, subfolder=None, *model_args, **kwargs
-    ):
+    def from_config(cls, config, **kwargs):
+        model_class = cls._get_model_class_from_config(None, None, config)
+        return model_class._from_config(config, **kwargs)
+
+    @classmethod
+    def _from_pretrained(cls, pretrained_model_name_or_path, task=None, *model_args, **kwargs):
         if task:
             if cls._task_choice:
                 cls._name_mapping = get_name_mapping(task)
             else:
                 print("We only support task choice for AutoModel.")
         cache_dir = kwargs.get("cache_dir", None)
+        from_aistudio = kwargs.get("from_aistudio", False)
+        from_hf_hub = kwargs.get("from_hf_hub", False)
+        subfolder = kwargs.get("subfolder", None)
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
         all_model_names = []
         for pretrained_model_names, model_name in cls._pretrained_model_dict.items():
             for name in pretrained_model_names:
                 all_model_names.append(name)
-
-        # From HF
-        if from_hf_hub:
+        if from_aistudio:
+            config_file = aistudio_download(repo_id=pretrained_model_name_or_path, filename=cls.model_config_file)
+            if os.path.exists(config_file):
+                model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, config_file)
+                logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
+                return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+            else:
+                logger.warning(f"{config_file}  is not a valid path to a model config file")
+        elif from_hf_hub:
             if hf_file_exists(repo_id=pretrained_model_name_or_path, filename=cls.model_config_file):
                 config_file = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
@@ -296,9 +316,7 @@ class _BaseAutoModelClass:
             if os.path.exists(config_file):
                 model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, config_file)
                 logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
-                return model_class.from_pretrained(
-                    pretrained_model_name_or_path, from_hf_hub=from_hf_hub, *model_args, **kwargs
-                )
+                return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
             else:
                 logger.warning(f"{config_file}  is not a valid path to a model config file")
         # From built-in pretrained models
@@ -313,17 +331,23 @@ class _BaseAutoModelClass:
                         try:
                             model_class = getattr(import_class, init_class)
                         except AttributeError as err:
-                            logger.error(err)
-                            all_model_classes = import_class.__all__
-                            all_tasks = {get_task_name(m) for m in all_model_classes if get_task_name(m) is not None}
-                            raise AttributeError(
-                                f"module '{import_class.__name__}' only supports the following classes: "
-                                + ", ".join(m for m in all_model_classes)
-                                + "\n"
-                                "Hint: you can use interface "
-                                + " or ".join(task + ".from_pretrained" for task in all_tasks)
-                                + f" to load '{pretrained_model_name_or_path}'\n"
-                            )
+                            try:
+                                import_class2 = importlib.import_module(f"paddlenlp.transformers.{class_name}")
+                                model_class = getattr(import_class2, init_class)
+                            except AttributeError:
+                                logger.error(err)
+                                all_model_classes = import_class.__all__
+                                all_tasks = {
+                                    get_task_name(m) for m in all_model_classes if get_task_name(m) is not None
+                                }
+                                raise AttributeError(
+                                    f"module '{import_class.__name__}' only supports the following classes: "
+                                    + ", ".join(m for m in all_model_classes)
+                                    + "\n"
+                                    "Hint: you can use interface "
+                                    + " or ".join(task + ".from_pretrained" for task in all_tasks)
+                                    + f" to load '{pretrained_model_name_or_path}'\n"
+                                )
                         logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
                         return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         # From local dir path
@@ -356,7 +380,7 @@ class _BaseAutoModelClass:
                     logger.info("Standard config do not exist, loading from legacy config")
                     resolved_vocab_file = get_path_from_url_with_filelock(legacy_community_url, cache_dir)
                 else:
-                    raise RuntimeError("Neither 'config.json' nro 'model_config.json' exists")
+                    raise RuntimeError("Neither 'config.json' nor 'model_config.json' exists")
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(
@@ -816,6 +840,20 @@ class AutoModelForCausalLM(_BaseAutoModelClass):
                 print(type(model))
                 # <class 'paddlenlp.transformers.gpt.modeling.GPTLMHeadModel'>
         """
+        return cls._from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+
+
+class AutoModelForCausalLMPipe(_BaseAutoModelClass):
+    """
+    Pipeline model for AutoModelForCausalLM.
+    """
+
+    CONFIGURATION_MODEL_MAPPING = get_init_configurations()
+    _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
+    _name_mapping = get_name_mapping("ForCausalLMPipe")
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
 
