@@ -24,6 +24,7 @@ from typing import List, Optional
 import numpy as np
 import paddle
 import paddle.distributed.auto_parallel as auto
+from paddle.distributed.auto_parallel.static.utils import print_program_with_dist_attr
 
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
 from paddlenlp.transformers import (
@@ -371,7 +372,6 @@ def init_seed(seed: int = 1234, args=None):
             if "local_seed" not in tracker.states_:
                 tracker.add("local_seed", local_seed)
         else:
-            print("!!!!!!!!!!!", args.seed)
             random.seed(args.seed)
             np.random.seed(args.seed)
             paddle.seed(args.seed)
@@ -503,12 +503,12 @@ def main():
     optimizer = create_optimizer(model, lr_scheduler, training_args)
 
     def loss_func(loss, outputs):
-        print("loss:", loss)
         return loss
 
     init_seed(args=training_args)
     global_batch_size = training_args.per_device_train_batch_size * training_args.dataset_world_size
     print_config(training_args)
+
     engine = auto.Engine(model, loss_func, optimizer, strategy=training_args.strategy)
     engine.prepare(
         [
@@ -520,11 +520,8 @@ def main():
         mode="train",
     )
 
-    # print("engine.startup_program:")
-    # print_program_with_dist_attr(engine.startup_program, engine.dist_context)
-    # print("engine.main_program:")
-    # print_program_with_dist_attr(engine.main_program, engine.dist_context)
-
+    print("engine.main_program:")
+    print_program_with_dist_attr(engine.main_program, engine.dist_context)
     train_dataloader = engine.dataloader(
         dataset=train_dataset,
         batch_size=global_batch_size,
@@ -546,20 +543,7 @@ def main():
     tr_loss = float(0)
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
-            print("=" * 20)
-            for name, param in engine.main_program.state_dict(mode="param").items():
-                print("name:", name)
-                print("param:", np.sum(np.abs(np.array(param))))
-            for name, data in sorted(inputs[0].items()):
-                print("name:", name)
-                print("data:", np.array(data))
-
-            fetch_list = []  # ["llama_lm_head_auto_0.w_0@GRAD", "transpose_7.tmp_0@GRAD"]
-            outs = engine.run(inputs, fetch_list=fetch_list, mode="train")
-            print("outs:", outs["loss"])
-            # print("fetches:", outs["fetches"])
-            if step == 0:
-                print(engine.main_program)
+            outs = engine.run(inputs, mode="train")
 
             if "loss" in outs:
                 tr_loss_step = np.sum(outs["loss"])

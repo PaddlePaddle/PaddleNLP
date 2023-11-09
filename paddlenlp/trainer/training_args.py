@@ -1046,6 +1046,7 @@ class TrainingArguments:
                         )
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
+
         elif self.use_auto_parallel:
             world_size = paddle.distributed.get_world_size()
             tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
@@ -1066,18 +1067,8 @@ class TrainingArguments:
                 logger.warning("sharding_parallel_degree=1 means no sharding, please set sharding to empty!")
                 self.sharding = []
 
-            # # TODO(liuzhenhai): remove this when framework is ready
-            # if sharding_parallel_degree > 1 and ShardingOption.SHARD_OP in self.sharding:
-            #     assert self.data_parallel_degree == 1, "sharding stage1 can not coexist with dp for now"
-
             if ShardingOption.OFFLOAD in self.sharding:
                 warnings.warn("`offload` is not supported NOW!")
-
-            # if pipeline_parallel_degree > 1:
-            #     if ShardingOption.FULL_SHARD in self.sharding or ShardingOption.SHARD_GRAD_OP in self.sharding:
-            #         raise ValueError(
-            #             "pipeline parallel is not compatible for sharding stage2 or stage3, please using sharding stage1"
-            #         )
 
             strategy = fleet.auto.Strategy()
             if pipeline_parallel_degree > 1:
@@ -1138,60 +1129,11 @@ class TrainingArguments:
                 try:
                     if "enable_mp_async_allreduce" in mp_config:
                         mp_optimization.allreduce_matmul_grad_overlapping = True
-                        # if "enable_mp_skip_c_identity" in mp_config:
-                        #     strategy.hybrid_configs["mp_configs"].mp_skip_c_identity = True
-                        # if "enable_mp_fused_linear_param_grad_add" in mp_config:
-                        #     strategy.hybrid_configs["mp_configs"].mp_fused_linear_param_grad_add = True
-                    # else:
-                    #     if "enable_mp_skip_c_identity" in mp_config:
-                    #         warnings.warn(
-                    #             "enable_mp_skip_c_identity only works with enable_mp_async_allreduce. It will not work."
-                    #         )
-                    #     if "enable_mp_fused_linear_param_grad_add" in mp_config:
-                    #         warnings.warn(
-                    #             "enable_mp_fused_linear_param_grad_add only works with enable_mp_async_allreduce. It will not work."
-                    #         )
                 except:
                     warnings.warn(
                         "The enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add are not supported "
                         "by current version of Paddle. Please try latest develop Paddle."
                     )
-
-            # if self.hybrid_parallel_topo_order is None:
-            #     self.hybrid_parallel_topo_order = "pp_first"
-            # assert self.hybrid_parallel_topo_order in ["pp_first", "sharding_first"]
-
-            # def is_segment_parallel_supported():
-            #     import inspect
-
-            #     members = [name for (name, date) in inspect.getmembers(fleet.HybridCommunicateGroup)]
-            #     return "get_sep_parallel_world_size" in members
-
-            # if self.hybrid_parallel_topo_order == "pp_first":
-            #     if is_segment_parallel_supported():
-            #         order = ["dp", "pp", "sharding", "sep", "mp"]
-            #     else:
-            #         order = ["dp", "pp", "sharding", "mp"]
-            # if self.hybrid_parallel_topo_order == "sharding_first":
-            #     if is_segment_parallel_supported():
-            #         order = ["dp", "sharding", "pp", "sep", "mp"]
-            #     else:
-            #         order = ["dp", "sharding", "pp", "mp"]
-
-            # hybrid_configs = {
-            #     "dp_degree": self.data_parallel_degree,
-            #     "mp_degree": tensor_parallel_degree,
-            #     "pp_degree": pipeline_parallel_degree,
-            #     "sharding_degree": sharding_parallel_degree,
-            #     "order": order,
-            # }
-
-            # if pipeline_parallel_degree > 1:
-            #     hybrid_configs["pp_configs"] = dygraph_pp_configs
-            #     logger.info(f"using pipeline configs:{dygraph_pp_configs}")
-
-            # # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
-            # strategy.hybrid_configs = hybrid_configs
 
             if sharding_parallel_degree > 1:
                 sharding = strategy.sharding
@@ -1221,35 +1163,6 @@ class TrainingArguments:
                         or "enable_stage2_overlap" in sharding_parallel_config
                     ):
                         sharding.reduce_overlap = True
-                # try:
-                #     if pipeline_parallel_degree == 1:
-                #         strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
-                #             True if "enable_stage1_tensor_fusion" in sharding_parallel_config else False
-                #         )
-                #         if "enable_stage1_overlap" in sharding_parallel_config:
-                #             strategy.hybrid_configs["sharding_configs"].comm_overlap = True
-                #             strategy.hybrid_configs[
-                #                 "sharding_configs"
-                #             ].accumulate_steps = self.gradient_accumulation_steps
-                #     else:
-                #         warnings.warn(
-                #             "For pipeline parallel with sharding, the sharding overlap and tensor fusion "
-                #             "should be configured in pipeline_parallel_config."
-                #             '"enable_stage1_tensor_fusion" and "enable_stage1_overlap" in sharding_parallel_config will be ignored.'
-                #         )
-                # except KeyError:
-                #     warnings.warn(
-                #         "The enable_stage1_tensor_fusion or enable_stage1_overlap is not supported "
-                #         "by current version of Paddle. Please try latest develop Paddle."
-                #     )
-                # if "enable_stage2_overlap" in sharding_parallel_config:
-                #     assert (
-                #         ShardingOption.SHARD_GRAD_OP in self.sharding
-                #     ), f"enable_stage2_overlap expects sharding=stage2, but got {self.sharding}."
-                #     assert self.logging_steps > 1, (
-                #         "The logging_steps should be greater than 1 for stage2 overlap, "
-                #         f"but got logging_steps={self.logging_steps}."
-                #     )
 
             if self.bf16 or self.fp16:
                 amp = strategy.amp

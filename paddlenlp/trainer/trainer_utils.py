@@ -79,7 +79,6 @@ def set_seed(seed: int = 1234, args=None):
             if "local_seed" not in tracker.states_:
                 tracker.add("local_seed", local_seed)
         else:
-            print("!!!!!!!!!!!", args.seed)
             random.seed(args.seed)
             np.random.seed(args.seed)
             paddle.seed(args.seed)

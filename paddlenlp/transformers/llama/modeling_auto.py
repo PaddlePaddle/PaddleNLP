@@ -45,7 +45,7 @@ from .configuration import (
     LLAMA_PRETRAINED_RESOURCE_FILES_MAP,
     LlamaConfig,
 )
-from .modeling import (  # _make_causal_mask,
+from .modeling import (
     LlamaDynamicNTKScalingRotaryEmbedding,
     LlamaLinearScalingRotaryEmbedding,
     LlamaNTKScalingRotaryEmbedding,
@@ -87,8 +87,6 @@ def get_dist_attr(shard_specs, pp_idx=0):
             else:
                 new_spec.append(None)
 
-    print("mesh:", mesh)
-    print("new_spec:", new_spec)
     return mesh, new_spec
 
 
@@ -99,7 +97,6 @@ def _make_causal_mask(input_ids_shape, past_key_values_length):
     batch_size, target_length = input_ids_shape  # target_length: seq_len
 
     mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
-    fleet.auto.shard_tensor(mask, *get_dist_attr([None, None]))
 
     if past_key_values_length > 0:
         # [tgt_len, tgt_len + past_len]
@@ -749,6 +746,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                     combined_attention_mask = _make_causal_mask(
                         input_shape, past_key_values_length=past_key_values_length
                     )
+                    # NOTE(zhaoyingli): infer spmd does not support [seq_len, seq_len] --> [batch, 1, seq_len, seq_len] in data_parallel
                     fleet.auto.shard_tensor(combined_attention_mask, *get_dist_attr([None, None, None, None]))
                     expanded_attn_mask = expanded_attn_mask & combined_attention_mask
             # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
@@ -818,6 +816,8 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
         if position_ids is None:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
+            # NOTE(zhaoyingli): infer spmd does not support [seq_len] --> [batch, seq_len] in data_parallel
+            fleet.auto.shard_tensor(position_ids, *get_dist_attr([None, None]))
 
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype

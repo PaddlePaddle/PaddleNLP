@@ -820,13 +820,6 @@ class Trainer:
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
-                print("=" * 20)
-                for param in model.parameters():
-                    print("name:", param.name)
-                    print("param:", np.sum(np.abs(np.array(param))))
-                for name, data in sorted(inputs.items()):
-                    print("name:", name)
-                    print("data:", np.array(data))
                 self.timers and self.timers("read-data").stop()
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
@@ -1825,7 +1818,6 @@ class Trainer:
             labels = None
 
         outputs = model(**inputs)
-        print("outs:", np.array(outputs[0]))
 
         if self.criterion is not None:
             loss = self.criterion(outputs, labels)
