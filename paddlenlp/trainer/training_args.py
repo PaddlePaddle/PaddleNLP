@@ -1263,7 +1263,6 @@ class TrainingArguments:
             if self.recompute:
                 recompute = strategy.recompute
                 recompute.enable = True
-                recompute.no_recompute_segments = self.no_recompute_segments
 
             self.strategy = strategy
             logger.info(self.strategy)

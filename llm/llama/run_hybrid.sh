@@ -14,7 +14,7 @@
 
 set -x
 unset CUDA_VISIBLE_DEVICES
-task_name="llama_hybrid_dp2"
+task_name="llama_hybrid_dp2_rc"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
@@ -24,7 +24,7 @@ export FLAGS_call_stack_level=2
 
 PYTHONPATH=../../:$PYTHONPATH  \
 python -u  -m paddle.distributed.launch \
-    --gpus "2" \
+    --gpus "2,3" \
     --log_dir "output/$task_name""_log" \
     run_pretrain.py \
     --model_type "llama" \
@@ -58,7 +58,8 @@ python -u  -m paddle.distributed.launch \
     --report_to "visualdl" \
     --disable_tqdm true \
     --continue_training 0\
-    --recompute 0 \
+    --recompute 1 \
+    --recompute_granularity full \
     --do_train \
     --do_eval \
     --device "gpu" \

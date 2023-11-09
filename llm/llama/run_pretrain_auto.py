@@ -460,6 +460,14 @@ def main():
 
     model = model_class._from_config(config, dtype=dtype)
 
+    if training_args.recompute:
+
+        def fn(layer):
+            if hasattr(layer, "enable_recompute") and (layer.enable_recompute is False or layer.enable_recompute == 0):
+                layer.enable_recompute = True
+
+        model.apply(fn)
+
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps

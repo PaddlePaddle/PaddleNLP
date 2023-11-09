@@ -14,7 +14,7 @@
 
 set -x
 unset CUDA_VISIBLE_DEVICES
-task_name="llama_auto_dp"
+task_name="llama_auto_dp2_rc"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
@@ -59,7 +59,8 @@ python -u  -m paddle.distributed.launch \
     --report_to "visualdl" \
     --disable_tqdm true \
     --continue_training 0\
-    --recompute 0 \
+    --recompute 1 \
+    --recompute_granularity full \
     --do_train \
     --do_eval \
     --device "gpu" \
