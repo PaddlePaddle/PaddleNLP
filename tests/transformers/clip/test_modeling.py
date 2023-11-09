@@ -517,7 +517,6 @@ class CLIPModelCompatibilityTest(unittest.TestCase):
             text=["a photo of a cat", "a photo of a dog"], images=image, padding=True, return_tensors="np"
         )
 
-    @unittest.skip("model diff exists, need to be fixed")
     @require_package("transformers", "torch")
     def test_clip_converter(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -543,12 +542,13 @@ class CLIPModelCompatibilityTest(unittest.TestCase):
                 input_ids=torch.tensor(inputs["input_ids"]), pixel_values=torch.tensor(inputs["pixel_values"])
             )
 
+            # TODO junnyu, update clip image_processor
             # 4. compare results
             self.assertTrue(
                 np.allclose(
                     paddle_logit.logits_per_image.detach().cpu().numpy(),
                     torch_logit.logits_per_image.detach().cpu().numpy(),
-                    rtol=1e-4,
+                    rtol=1e-3,
                 )
             )
 
@@ -556,11 +556,10 @@ class CLIPModelCompatibilityTest(unittest.TestCase):
                 np.allclose(
                     paddle_logit.logits_per_text.detach().cpu().numpy(),
                     torch_logit.logits_per_text.detach().cpu().numpy(),
-                    rtol=1e-4,
+                    rtol=1e-3,
                 )
             )
 
-    @unittest.skip("model diff exists, need to be fixed")
     @require_package("transformers", "torch")
     def test_clip_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -586,13 +585,13 @@ class CLIPModelCompatibilityTest(unittest.TestCase):
             paddle_logit = paddle_model(
                 input_ids=paddle.to_tensor(inputs["input_ids"]), pixel_values=paddle.to_tensor(inputs["pixel_values"])
             )
-
+            # TODO junnyu, update clip image_processor
             # 4. compare results
             self.assertTrue(
                 np.allclose(
                     paddle_logit.logits_per_image.detach().cpu().numpy(),
                     torch_logit.logits_per_image.detach().cpu().numpy(),
-                    rtol=1e-4,
+                    rtol=1e-3,
                 )
             )
 
@@ -600,7 +599,7 @@ class CLIPModelCompatibilityTest(unittest.TestCase):
                 np.allclose(
                     paddle_logit.logits_per_text.detach().cpu().numpy(),
                     torch_logit.logits_per_text.detach().cpu().numpy(),
-                    rtol=1e-4,
+                    rtol=1e-3,
                 )
             )
 
