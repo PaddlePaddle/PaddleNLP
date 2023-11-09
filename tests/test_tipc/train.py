@@ -25,6 +25,7 @@ from benchmark import options
 from benchmark.modules.benchmark_utils import clone_inputs
 from benchmark.options import LR_SCHEDULER_REGISTRY, MODEL_REGISTRY, OPTIMIZER_REGISTRY
 from benchmark.utils.record import AverageStatistical
+from paddle.fluid import core
 
 from paddlenlp.utils import profiler
 from paddlenlp.utils.log import logger
@@ -223,6 +224,17 @@ def do_train(args):
         input_spec = benchmark_model.create_input_specs()
         model = paddle.jit.to_static(model, input_spec=input_spec)
         logger.info("Successfully to apply @to_static with specs: {}".format(input_spec))
+        # paddle.jit.save(model, "/data/run_model/ernie/ernie", input_spec=input_spec)
+        # composite_program = model.forward.get_concrete_program(**tmp_input_data)[1].train_program
+        # for op in composite_program.block(0).ops:
+        #     print(op)
+        #     #print(op.type)
+        # build_strategy = paddle.static.BuildStrategy()
+        # build_strategy.build_cinn_pass = True
+        # build_strategy.debug_graphviz_path = "/data/run_model/ernie/paddle_to_cinn_graph/"
+        # program = paddle.static.CompiledProgram(composite_program, build_strategy=build_strategy)
+        # program._compile(paddle.fluid.executor.global_scope(), paddle.CUDAPlace(0))
+        # import pdb; pdb.set_trace()
 
     if args.lr_scheduler is not None:
         benchmark_lr_scheduler = LR_SCHEDULER_REGISTRY[args.lr_scheduler]()
@@ -255,6 +267,18 @@ def do_train(args):
         batch_id = 0
         batch_start = time.time()
         for input_data in train_loader:
+            if args.use_nsys:
+                iter_id = step_id
+                if iter_id == 100:
+                    core.nvprof_start()
+                    core.nvprof_enable_record_event()
+                    core.nvprof_nvtx_push(str(iter_id))
+                if iter_id == 110:
+                    core.nvprof_nvtx_pop()
+                    core.nvprof_stop()
+                if iter_id > 100 and iter_id < 110:
+                    core.nvprof_nvtx_pop()
+                    core.nvprof_nvtx_push(str(iter_id))
             train_reader_cost = time.time() - batch_start
 
             if args.use_amp:
