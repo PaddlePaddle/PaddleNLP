@@ -623,8 +623,22 @@ class ChatTemplateMixin:
     def apply_chat_template(
         self, conversation: List[List[str, str]] | str, tokenize: bool = True, **tokenizer_kwargs
     ) -> str | dict[str, numpy.ndarray | paddle.Tensor]:
+        """apply chat_template rules to conversation which should not be batched data
+
+        Args:
+            conversation (List[List[str, str]] | str): the conversation messages between user and bot
+            tokenize (bool, optional): whether do tokenization. Defaults to True.
+
+        Returns:
+            str | dict[str, numpy.ndarray | paddle.Tensor]: return the result of applied data
+        """
         if isinstance(conversation, str):
             conversation = [[conversation]]
+        elif isinstance(conversation, list) and isinstance(conversation[0], str):
+            raise ValueError(
+                "apply_chat_template do not support appling batch conversations, "
+                "so you should apply the conversation one by one."
+            )
 
         query = self.chat_template(conversation)
         if not tokenize:
@@ -646,7 +660,7 @@ class ChatTemplateMixin:
         # encode system
         result = {}
         if self.chat_template.system:
-            result["system_ids"] = self.encode(self.chat_template.system)
+            result["system_ids"] = self.encode(self.chat_template.system, add_special_tokens=False)
 
         # encode conversation
         conversation_ids = []

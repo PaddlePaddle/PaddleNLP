@@ -401,7 +401,7 @@ def dybatch_preprocess(
         position_ids = []
 
         for text in texts:
-            tokens = tokenizer(text, return_tensors="np", padding=True, max_length=src_length)
+            tokens = tokenizer.apply_chat_template(text, return_tensors="np", padding=True, max_length=src_length)
             input_ids.append(tokens["input_ids"][0])
             position_ids.append(tokens["position_ids"][0])
 
@@ -447,7 +447,7 @@ def dybatch_preprocess(
             texts = [texts]
 
         for text in texts:
-            tokens = tokenizer(
+            tokens = tokenizer.apply_chat_template(
                 text,
                 return_tensors="np",
                 padding=False,

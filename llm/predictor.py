@@ -46,6 +46,7 @@ from paddlenlp.transformers import (
     PretrainedTokenizer,
 )
 from paddlenlp.utils.import_utils import import_module, is_paddlenlp_ops_available
+from paddlenlp.utils.log import logger
 
 
 @dataclass
@@ -95,6 +96,10 @@ class PredictorArgument:
     init_fleet_worker: bool = field(
         default=True,
         metadata={"help": "whether use `init_fleet_worker` in inference predictor"},
+    )
+    use_chat_template: bool = field(
+        default=False,
+        metadata={"help": "whether use `chat_template` to handle multi-rounds conversation"},
     )
 
     @property
@@ -157,6 +162,17 @@ class BasePredictor:
         self.model_config.tensor_parallel_rank, self.model_config.tensor_parallel_degree = init_dist_env()
 
     def _preprocess(self, source):
+        if self.config.use_chat_template:
+            if self.tokenizer.chat_template is None:
+                logger.warning(
+                    f"Tokenizer<{self.tokenizer}> doesn't have chat_template field, so it will not use chat_template."
+                    "Or you can customize your tokenizer, please refer to:"
+                    "https://paddlenlp.readthedocs.io/zh/latest/get_started/chat_template.html"
+                )
+            else:
+                source = [source] if isinstance(source, str) else source
+                source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
+
         tokenized_source = self.tokenizer(
             source,
             max_length=self.config.src_length,
@@ -385,6 +401,10 @@ class InferencePredictorMixin:
         self.attention_mask[:] = 0
         self.tgt_generation_mask[:] = 0
         pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
+
+        if self.config.use_chat_template:
+            source = [source] if isinstance(source, str) else source
+            source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
         inputs = dybatch_preprocess(
             self.tokenizer,
             source,
@@ -877,7 +897,7 @@ def predict():
                 source_texts.append(example["src"])
                 target_texts.append(example["tgt"])
     else:
-        source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
+        source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
         target_texts = ["", ""]
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)

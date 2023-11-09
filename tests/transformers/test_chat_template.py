@@ -109,9 +109,6 @@ class ChatTemplateIntegrationTest(unittest.TestCase):
         query = "你好"
         final_query = tokenizer.apply_chat_template(query, tokenize=False)
 
-        import pdb
-
-        pdb.set_trace()
         expected_query = "You are a helpful assistant.\n<|im_start|>user\n你好<|im_end|>\n<|im_start|>assistant\n"
         self.assertEqual(final_query, expected_query)
 
