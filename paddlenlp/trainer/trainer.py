@@ -123,7 +123,7 @@ from .utils.helper import (  # nested_truncate,
     nested_numpify,
     nested_truncate,
 )
-from .utils.reshard import SHARDING_STRATEGY_V1
+from .utils.reshard import SHARDING_STRATEGY_V1, SHARDING_STRATEGY_V2
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
 DEFAULT_PROGRESS_CALLBACK = ProgressCallback
@@ -2200,6 +2200,12 @@ class Trainer:
         sharding_meta["param2rank"] = param2rank
         sharding_meta["structure_name_mapping"] = structure_name_mapping
         sharding_meta["sharding_strategy"] = sharding_strategy
+
+        if DygraphShardingOptimizerV2 is not None:
+            tmp_opt = unwrap_optimizer(self.optimizer, DygraphShardingOptimizerV2)
+            if tmp_opt is not None:
+                sharding_meta["enable_overlap"] = tmp_opt.pp_overlap
+
         suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
         sharding_metas[suffix] = sharding_meta
         sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_model_parallel_group())
@@ -2345,10 +2351,27 @@ class Trainer:
         sharding_strategy = SHARDING_STRATEGY_V1
         if "sharding_strategy" in sharding_meta:
             sharding_strategy = sharding_meta["sharding_strategy"]
+
+        if sharding_strategy == SHARDING_STRATEGY_V2:
+            enable_overlap = sharding_meta.get("enable_overlap", True)
+        else:
+            enable_overlap = None
+
         cur_sharding_degree = self.args.sharding_parallel_degree
         cur_sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
-        if sharding_degree != cur_sharding_degree or sharding_strategy != cur_sharding_strategy:
+        if cur_sharding_strategy == SHARDING_STRATEGY_V2:
+            tmp_opt = unwrap_optimizer(self.optimizer, DygraphShardingOptimizerV2)
+            cur_enable_overlap = tmp_opt.pp_overlap
+        else:
+            cur_enable_overlap = None
+
+        if (
+            sharding_degree != cur_sharding_degree
+            or sharding_strategy != cur_sharding_strategy
+            or enable_overlap != cur_enable_overlap
+        ):
             return True
+
         if sharding_strategy == SHARDING_STRATEGY_V1:
             param2rank = sharding_meta["param2rank"]
             optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
