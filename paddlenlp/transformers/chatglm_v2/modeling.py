@@ -13,16 +13,15 @@
 # limitations under the License.
 
 import math
-from functools import partial
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import paddle
-import paddle.distributed.fleet as fleet
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import map_structure
 
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -36,35 +35,6 @@ __all__ = [
     "ChatGLMv2PretrainedModel",
     "ChatGLMv2ForCausalLM",
 ]
-
-
-def assign_kv_heads(num_kv_heads, num_gpus):
-    # Initialize the assignment list
-    """
-    Assign kv heads to different GPUs in the Tensor Parallel Setup
-
-    Examples:
-        assign_kv_heads(num_kv_heads=1, num_gpus=2): [[0], [0]]
-        assign_kv_heads(num_kv_heads=2, num_gpus=2): [[0], [1]]
-        assign_kv_heads(num_kv_heads=4, num_gpus=2): [[0,1], [2,3]]
-        assign_kv_heads(num_kv_heads=1, num_gpus=4): [[0],[0],[0],[0]]
-        assign_kv_heads(num_kv_heads=2, num_gpus=4): [[0],[0],[1],[1]]
-        assign_kv_heads(num_kv_heads=4, num_gpus=4): [[0],[1],[2],[3]]
-    """
-    assignment_list = [[] for _ in range(num_gpus)]
-    # Case 1: more heads than cards
-    if num_kv_heads > num_gpus:
-        num_heads_per_card = num_kv_heads // num_gpus
-        for i in range(num_gpus):
-            for j in range(num_heads_per_card):
-                assignment_list[i].append(i * num_heads_per_card + j)
-    # Case 2: more cards than heads. each card get only 1 head.
-    else:
-        num_card_per_heads = num_gpus // num_kv_heads
-        for i in range(num_kv_heads):
-            for j in range(num_card_per_heads):
-                assignment_list[i * num_card_per_heads + j].append(i)
-    return assignment_list
 
 
 class RotaryEmbedding(nn.Layer):
@@ -156,10 +126,7 @@ class CoreAttention(nn.Layer):
         if self.apply_query_key_layer_scaling:
             self.attention_softmax_in_fp32 = True
         self.layer_number = max(1, layer_number)
-        if config.tensor_parallel_degree > 1:
-            self.num_attention_heads_per_partition = config.num_attention_heads // config.tensor_parallel_degree
-        else:
-            self.num_attention_heads_per_partition = config.num_attention_heads
+        self.num_attention_heads_per_partition = config.num_attention_heads
         self.hidden_size_per_partition = config.kv_channels * self.num_attention_heads_per_partition
         self.hidden_size_per_attention_head = self.hidden_size_per_partition // self.num_attention_heads_per_partition
 
@@ -250,53 +217,29 @@ class SelfAttention(nn.Layer):
         self.hidden_size_per_attention_head = config.hidden_size // config.num_attention_heads
         self.core_attention = CoreAttention(config, self.layer_number)
         self.num_multi_query_groups_per_partition = config.multi_query_group_num
+        self.multi_query_group_num = config.multi_query_group_num
+        self.num_attention_heads_per_partition = config.num_attention_heads
 
-        if config.tensor_parallel_degree > 1:
-            if config.tensor_parallel_degree > 2:
-                raise ValueError(
-                    "ChatGLM2 does not support `tensor_parallel_degree` > 2. Consider using Sharding stage 3"
-                )
-            self.query = fleet.meta_parallel.ColumnParallelLinear(
-                config.hidden_size,
-                config.hidden_size,
-                has_bias=config.add_bias_linear or config.add_qkv_bias,
-                gather_output=False,
-            )
-            self.dense = fleet.meta_parallel.RowParallelLinear(
-                config.hidden_size, config.hidden_size, input_is_parallel=True, has_bias=config.add_bias_linear
-            )
-            self.num_attention_heads_per_partition = config.num_attention_heads // config.tensor_parallel_degree
-            self.kv_indices = paddle.to_tensor(
-                assign_kv_heads(config.multi_query_group_num, config.tensor_parallel_degree)[
-                    config.tensor_parallel_rank
-                ]
-            )
-        else:
-            self.query = nn.Linear(
-                config.hidden_size,
-                config.hidden_size,
-                bias_attr=config.add_bias_linear or config.add_qkv_bias,
-            )
-            self.dense = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=config.add_bias_linear)
-            self.num_attention_heads_per_partition = config.num_attention_heads
-            self.kv_indices = None
-
-        self.key = nn.Linear(
+        self.query_key_value = nn.Linear(
             config.hidden_size,
-            self.hidden_size_per_attention_head * config.multi_query_group_num,
-            bias_attr=config.add_qkv_bias,
+            config.hidden_size + 2 * self.hidden_size_per_attention_head * config.multi_query_group_num,
+            bias_attr=config.add_bias_linear or config.add_qkv_bias,
         )
-        self.value = nn.Linear(
-            config.hidden_size,
-            self.hidden_size_per_attention_head * config.multi_query_group_num,
-            bias_attr=config.add_qkv_bias,
-        )
+        # Output.
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=config.add_bias_linear)
 
     def forward(self, hidden_states, attention_mask, rotary_pos_emb, kv_cache=None, use_cache=True):
         seq_length, batch_size, hidden_size = hidden_states.shape
-        query_layer = self.query(hidden_states)
-        key_layer = self.key(hidden_states)
-        value_layer = self.value(hidden_states)
+        mixed_x_layer = self.query_key_value(hidden_states)
+
+        (query_layer, key_layer, value_layer) = mixed_x_layer.split(
+            [
+                self.num_attention_heads_per_partition * self.hidden_size_per_attention_head,
+                self.hidden_size_per_attention_head * self.multi_query_group_num,
+                self.hidden_size_per_attention_head * self.multi_query_group_num,
+            ],
+            axis=-1,
+        )
 
         query_layer = query_layer.reshape(
             [seq_length, batch_size, self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
@@ -319,12 +262,7 @@ class SelfAttention(nn.Layer):
         else:
             kv_cache = None
 
-        if self.kv_indices is not None:
-            key_layer = paddle.index_select(key_layer, self.kv_indices, axis=2)
-            value_layer = paddle.index_select(value_layer, self.kv_indices, axis=2)
-            multiplier = self.num_attention_heads_per_partition // self.kv_indices.shape[0]
-        else:
-            multiplier = self.num_attention_heads_per_partition // self.num_multi_query_groups_per_partition
+        multiplier = self.num_attention_heads_per_partition // self.num_multi_query_groups_per_partition
 
         key_layer = key_layer.unsqueeze(-2).tile([1, 1, 1, multiplier, 1])
         key_layer = key_layer.reshape(
@@ -362,34 +300,23 @@ class MLP(nn.Layer):
 
         self.add_bias = config.add_bias_linear
 
-        if config.tensor_parallel_degree > 1:
-            if config.tensor_parallel_degree > 2:
-                raise ValueError(
-                    "ChatGLM2 does not support `tensor_parallel_degree` > 2. Consider using Sharding stage 3"
-                )
-            self.dense_h_to_4h = fleet.meta_parallel.ColumnParallelLinear(
-                config.hidden_size, config.ffn_hidden_size * 2, has_bias=self.add_bias, gather_output=False
-            )
-            self.dense_4h_to_h = fleet.meta_parallel.RowParallelLinear(
-                config.ffn_hidden_size, config.hidden_size, input_is_parallel=True, has_bias=self.add_bias
-            )
-        else:
-            # Project to 4h due to swiglu doubling the output width, see https://arxiv.org/pdf/2002.05202.pdf
-            self.dense_h_to_4h = nn.Linear(config.hidden_size, config.ffn_hidden_size * 2, bias_attr=self.add_bias)
-            # Project back to h.
-            self.dense_4h_to_h = nn.Linear(
-                config.ffn_hidden_size,
-                config.hidden_size,
-                bias_attr=self.add_bias,
-            )
+        # Project to 4h due to swiglu doubling the output width, see https://arxiv.org/pdf/2002.05202.pdf
+        self.dense_h_to_4h = nn.Linear(config.hidden_size, config.ffn_hidden_size * 2, bias_attr=self.add_bias)
+        # Project back to h.
+        self.dense_4h_to_h = nn.Linear(
+            config.ffn_hidden_size,
+            config.hidden_size,
+            bias_attr=self.add_bias,
+        )
 
     def forward(self, hidden_states):
         # [s, b, 4hp]
         intermediate_parallel = self.dense_h_to_4h(hidden_states)
         # Special Slicing to accomodate Tensor Parallel
         # Even channels is ffc_fc, odd channels is gate
-        ffn_fc = intermediate_parallel[..., 0::2]
-        gate = intermediate_parallel[..., 1::2]
+        dim_size = intermediate_parallel.shape[-1]
+        ffn_fc = intermediate_parallel[..., : dim_size // 2]
+        gate = intermediate_parallel[..., dim_size // 2 :]
         intermediate_parallel = F.silu(ffn_fc) * gate
         # [s, b, h]
         output = self.dense_4h_to_h(intermediate_parallel)
@@ -623,41 +550,71 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
         return position_ids
 
     @classmethod
-    def _get_tensor_parallel_mappings(cls, config, is_split=True):
+    def _get_name_mappings(cls, config: ChatGLMv2Config) -> List[StateDictNameMapping]:
+        mappings = [
+            "embedding.word_embeddings.weight",
+            "rotary_pos_emb.inv_freq",
+            "encoder.final_layernorm.weight",
+        ]
 
-        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+        for layer_index in range(config.num_hidden_layers):
+            layer_mappings = [
+                [
+                    f"encoder.layers.{layer_index}.input_layernorm.weight",
+                    f"encoder.layers.{layer_index}.input_layernorm.weight",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.self_attention.query_key_value.weight",
+                    f"encoder.layers.{layer_index}.self_attention.query_key_value.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.self_attention.query_key_value.bias",
+                    f"encoder.layers.{layer_index}.self_attention.query_key_value.bias",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.self_attention.dense.weight",
+                    f"encoder.layers.{layer_index}.self_attention.dense.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.post_attention_layernorm.weight",
+                    f"encoder.layers.{layer_index}.post_attention_layernorm.weight",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.mlp.dense_h_to_4h.weight",
+                    f"encoder.layers.{layer_index}.mlp.dense_h_to_4h.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layers.{layer_index}.mlp.dense_4h_to_h.weight",
+                    f"encoder.layers.{layer_index}.mlp.dense_4h_to_h.weight",
+                    "transpose",
+                ],
+            ]
+            mappings.extend(layer_mappings)
 
-        fn = split_or_merge_func(
-            is_split=is_split,
-            tensor_parallel_degree=config.tensor_parallel_degree,
-            tensor_parallel_rank=config.tensor_parallel_rank,
-            num_attention_heads=config.num_attention_heads,
-        )
+        init_name_mappings(mappings)
 
-        def get_tensor_parallel_split_mappings(num_hidden_layers):
-            final_actions = {}
-            base_actions = {
-                # Column Linear
-                "encoder.layers.0.mlp.dense_h_to_4h.weight": partial(fn, is_column=True),
-                "encoder.layers.0.self_attention.query.bias": partial(fn, is_column=True),
-                "encoder.layers.0.self_attention.query.weight": partial(fn, is_column=True),
-                "output_layer.weight": partial(fn, is_column=True),
-                # Row Linear
-                "embedding.word_embeddings.weight": partial(fn, is_column=False),
-                "encoder.layers.0.self_attention.dense.weight": partial(fn, is_column=False),
-                "encoder.layers.0.mlp.dense_4h_to_h.weight": partial(fn, is_column=False),
-            }
-            for key, action in base_actions.items():
-                if "layers.0." in key:
-                    for i in range(num_hidden_layers):
-                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
-                final_actions[key] = action
+        if config.architectures is not None:
+            if "ChatGLMv2ForCausalLM" in config.architectures:
+                mappings.extend(
+                    [
+                        [
+                            "output_layer.weight",
+                            "output_layer.weight",
+                            "transpose",
+                        ]
+                    ]
+                )
 
-            return final_actions
+        for mapping in mappings:
+            mapping[0] = "transformer." + mapping[0]
+            if len(mapping) > 1 and mapping[1] is not None:
+                mapping[1] = "chatglm_v2." + mapping[1]
 
-        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
-
-        return mappings
+        init_name_mappings(mappings)
+        return [StateDictNameMapping(*mapping) for mapping in mappings]
 
 
 class Embedding(nn.Layer):
@@ -667,10 +624,7 @@ class Embedding(nn.Layer):
         super(Embedding, self).__init__()
 
         self.hidden_size = config.hidden_size
-        if config.tensor_parallel_degree > 1:
-            self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(config.vocab_size, config.hidden_size)
-        else:
-            self.word_embeddings = nn.Embedding(config.padded_vocab_size, self.hidden_size)
+        self.word_embeddings = nn.Embedding(config.padded_vocab_size, self.hidden_size)
         self.fp32_residual_connection = config.fp32_residual_connection
 
     def forward(self, input_ids):
@@ -698,19 +652,7 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         )
         self.rotary_pos_emb = RotaryEmbedding(rotary_dim // 2)
         self.encoder = GLMTransformer(config)
-        if config.tensor_parallel_degree > 1:
-            if config.tensor_parallel_degree > 2:
-                raise ValueError(
-                    "ChatGLM2 does not support `tensor_parallel_degree` > 2. Consider using Sharding stage 3"
-                )
-            self.output_layer = fleet.meta_parallel.ColumnParallelLinear(
-                config.hidden_size,
-                config.padded_vocab_size,
-                has_bias=False,
-                gather_output=not config.tensor_parallel_output,
-            )
-        else:
-            self.output_layer = nn.Linear(config.hidden_size, config.padded_vocab_size, bias_attr=False)
+        self.output_layer = nn.Linear(config.hidden_size, config.padded_vocab_size, bias_attr=False)
 
     def get_input_embeddings(self):
         return self.embedding.word_embeddings
@@ -878,10 +820,7 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
             reshaped_logits = lm_logits.reshape([-1, lm_logits.shape[-1]]).astype("float32")
             reshaped_labels = labels.reshape([-1])
 
-            if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
-                loss_fn = fleet.meta_parallel.ParallelCrossEntropy()
-            else:
-                loss_fn = nn.CrossEntropyLoss(reduction="none")
+            loss_fn = nn.CrossEntropyLoss(reduction="none")
 
             loss_mask = (labels != -100).astype("float32")
             loss = loss_fn(reshaped_logits, reshaped_labels)
