@@ -172,9 +172,15 @@ class FusedMultiTransformerConfig:
         nranks=1,
         trans_qkvw=True,
         ring_id=-1,
+        kv_num_heads=-1,
     ):
         self.embed_dim = embed_dim
         self.num_heads = num_heads
+        if kv_num_heads > 0:
+            self.kv_num_heads = kv_num_heads
+            assert nranks == 1, "nranks should be 1 for kv_num_heads > 0"
+        else:
+            self.kv_num_heads = num_heads
         self.dim_feedforward = dim_feedforward
         self.quant_bits = quant_bits
         self.dropout_rate = dropout_rate
@@ -249,6 +255,7 @@ class FusedMultiTransformerBase(Layer):
         assert config.num_heads % config.nranks == 0
         assert config.dim_feedforward % config.nranks == 0
         num_heads = config.num_heads // config.nranks
+        kv_num_heads = config.kv_num_heads // config.nranks
         dim_feedforward = config.dim_feedforward // config.nranks
         self._dim_feedforward = dim_feedforward
 
@@ -298,7 +305,7 @@ class FusedMultiTransformerBase(Layer):
                     dtype=self._norm_weight_dtype,
                 )
 
-            self.init_weight_shape(num_heads, dim_feedforward, config)
+            self.init_weight_shape(num_heads, kv_num_heads, dim_feedforward, config)
 
             qkv_weight = self.create_parameter(
                 shape=self.qkv_weight_shape,
@@ -310,7 +317,7 @@ class FusedMultiTransformerBase(Layer):
             qkv_bias = None
             if qkv_bias_attr:
                 qkv_bias = self.create_parameter(
-                    shape=[3 * num_heads * self.head_dim],
+                    shape=[(num_heads + 2 * kv_num_heads) * self.head_dim],
                     attr=qkv_bias_attr,
                     dtype=self._dtype,
                     is_bias=True,
@@ -438,11 +445,11 @@ class FusedMultiTransformerBase(Layer):
         assert param.name not in self._parameters
         self._parameters[param.name] = param
 
-    def init_weight_shape(self, num_heads, dim_feedforward, config):
+    def init_weight_shape(self, num_heads, kv_num_heads, dim_feedforward, config):
         self.qkv_weight_shape = (
-            [3 * num_heads * self.head_dim, self.embed_dim]
+            [(num_heads + 2 * kv_num_heads) * self.head_dim, self.embed_dim]
             if config.trans_qkvw
-            else [self.embed_dim * 3 * num_heads, self.head_dim]
+            else [self.embed_dim * (num_heads + 2 * kv_num_heads), self.head_dim]
         )
         self.linear_weight_shape = [num_heads * self.head_dim, self.embed_dim]
         self.ffn1_weight_shape = (
@@ -825,8 +832,8 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
     def get_weight_create_dype(self):
         return "int8"  # If use weightonly int4, params dtype is int8, and one of the dimension will be half.
 
-    def init_weight_shape(self, num_heads, dim_feedforward, config):
-        super().init_weight_shape(num_heads, dim_feedforward, config)
+    def init_weight_shape(self, num_heads, kv_num_heads, dim_feedforward, config):
+        super().init_weight_shape(num_heads, kv_num_heads, dim_feedforward, config)
 
         self.linear_weight_shape = [self.embed_dim, num_heads * self.head_dim]
         self.ffn1_weight_shape = (
