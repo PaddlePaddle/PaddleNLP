@@ -14,15 +14,14 @@
 
 set -x
 unset CUDA_VISIBLE_DEVICES
-
-# export GLOG_v=4
-export FLAGS_call_stack_level=2
-
-task_name="llama_auto_dp2"
+task_name="llama_auto_dp"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
-export SOT_LOG_LEVEL=4
+export FLAGS_embedding_deterministic=1
+export FLAGS_cudnn_deterministic=1
+export FLAGS_call_stack_level=2
+
 PYTHONPATH=../../:$PYTHONPATH  \
 python -u  -m paddle.distributed.launch \
     --gpus "0,1" \
@@ -48,7 +47,7 @@ python -u  -m paddle.distributed.launch \
     --sharding "stage1" \
     --learning_rate 0.0001 \
     --min_learning_rate 0.00001 \
-    --max_steps 10 \
+    --max_steps 50 \
     --save_steps 5000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \

@@ -552,10 +552,10 @@ def main():
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         metrics = train_result.metrics
-        trainer.save_model()
+        # trainer.save_model()
         trainer.log_metrics("train", metrics)
-        trainer.save_metrics("train", metrics)
-        trainer.save_state()
+        # trainer.save_metrics("train", metrics)
+        # trainer.save_state()
 
     if training_args.do_predict:
         test_ret = trainer.predict(test_dataset)

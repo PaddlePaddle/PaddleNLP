@@ -82,7 +82,7 @@ def get_dist_attr(shard_specs, pp_idx=0):
         if not spec:
             new_spec.append(spec)
         else:
-            if mesh.get_dim_size(spec) > 1:
+            if spec in mesh.dim_names:
                 new_spec.append(spec)
             else:
                 new_spec.append(None)
@@ -993,6 +993,8 @@ class LlamaForCausalLMAuto(LlamaPretrainedModelAuto):
         output_hidden_states=None,
         return_dict=None,
     ):
+        input_ids.stop_gradient = True
+        labels.stop_gradient = True
 
         fleet.auto.shard_tensor(input_ids, *get_dist_attr(["dp", None]))
         fleet.auto.shard_tensor(labels, *get_dist_attr(["dp", None]))

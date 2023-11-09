@@ -24,7 +24,6 @@ from typing import List, Optional
 import numpy as np
 import paddle
 import paddle.distributed.auto_parallel as auto
-from paddle.distributed.auto_parallel.static.utils import print_program_with_dist_attr
 
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
 from paddlenlp.transformers import (
@@ -321,6 +320,7 @@ def create_optimizer(model, lr_scheduler, training_args):
         else None,
         **optimizer_kwargs,
     )
+
     return optimizer
 
 
@@ -458,10 +458,6 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
-    print("model_class:", model_class)
-    random.seed(training_args.seed)
-    np.random.seed(training_args.seed)
-    paddle.seed(training_args.seed)
     model = model_class._from_config(config, dtype=dtype)
 
     # Create the learning_rate sheduler and optimizer
@@ -516,10 +512,10 @@ def main():
         mode="train",
     )
 
-    print("engine.startup_program:")
-    print_program_with_dist_attr(engine.startup_program, engine.dist_context)
-    print("engine.main_program:")
-    print_program_with_dist_attr(engine.main_program, engine.dist_context)
+    # print("engine.startup_program:")
+    # print_program_with_dist_attr(engine.startup_program, engine.dist_context)
+    # print("engine.main_program:")
+    # print_program_with_dist_attr(engine.main_program, engine.dist_context)
 
     train_dataloader = engine.dataloader(
         dataset=train_dataset,
@@ -537,33 +533,52 @@ def main():
         training_args.max_steps % num_update_steps_per_epoch > 0
     )
 
-    for param in engine._model.parameters():
-        print("name:", param.name)
-        print("param:", np.array(param))
-
+    global_step = 0
+    globalstep_last_logged = global_step
+    tr_loss = float(0)
     for epoch_idx in range(num_train_epochs):
-        final_loss = None
         for step, inputs in enumerate(train_dataloader):
-
-            for name, data in inputs[0].items():
+            print("=" * 20)
+            for name, param in engine.main_program.state_dict(mode="param").items():
                 print("name:", name)
-                print("data:", data)
-            outs = engine.run(inputs, mode="train")
-            print("outs:", outs)
+                print("param:", np.sum(np.abs(np.array(param))))
+            for name, data in sorted(inputs[0].items()):
+                print("name:", name)
+                print("data:", np.array(data))
+
+            fetch_list = []  # ["llama_lm_head_auto_0.w_0@GRAD", "transpose_7.tmp_0@GRAD"]
+            outs = engine.run(inputs, fetch_list=fetch_list, mode="train")
+            print("outs:", outs["loss"])
+            # print("fetches:", outs["fetches"])
+            if step == 0:
+                print(engine.main_program)
 
             if "loss" in outs:
-                if final_loss is None:
-                    final_loss = np.sum(outs["loss"])
-                else:
-                    final_loss += np.sum(outs["loss"])
+                tr_loss_step = np.sum(outs["loss"])
+            else:
+                tr_loss_step = float(0)
 
-            if final_loss is not None and training_args.gradient_accumulation_steps > 1:
-                final_loss /= training_args.gradient_accumulation_steps
+            if training_args.gradient_accumulation_steps > 1:
+                tr_loss_step /= training_args.gradient_accumulation_steps
+
+            tr_loss += tr_loss_step
 
             if lr_scheduler is not None:
                 engine.optimizer._learning_rate.step()
 
-            print("loss: %.8f, learning rate: %.5e" % (final_loss, engine.optimizer.get_lr()))
+            global_step += 1
+            if (step + 1) % training_args.logging_steps == 0:
+                logs = {}
+                logs["loss"] = round(tr_loss / (global_step - globalstep_last_logged), 8)
+                logs["learning_rate"] = float("{0:.3e}".format(engine.optimizer.get_lr()))
+                logs["global_step"] = int(global_step)
+                logger.info(", ".join(f"{k}: {v}" for k, v in logs.items()))
+
+                globalstep_last_logged = global_step
+                tr_loss = float(0)
+
+            if step >= training_args.max_steps:
+                break
 
 
 if __name__ == "__main__":
