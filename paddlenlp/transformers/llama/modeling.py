@@ -235,7 +235,6 @@ def scaled_dot_product_attention(
             alibi = alibi.reshape([bsz, num_heads, 1, -1])
             attn_weights = attn_weights + alibi
 
-        # breakpoint()
         # if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
         # raise ValueError(
         # f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
@@ -395,7 +394,6 @@ class LlamaRotaryEmbedding(nn.Layer):
             cos.cast(x.dtype) if cos.dtype != x.dtype else cos,
             sin.cast(x.dtype) if sin.dtype != x.dtype else sin,
         )
-
 
 
 class LlamaLinearScalingRotaryEmbedding(LlamaRotaryEmbedding):
