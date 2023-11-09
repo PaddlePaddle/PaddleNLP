@@ -1195,7 +1195,7 @@ class GPTForGenerationAuto(nn.Layer):
 
         attn_mask = model_kwargs["attention_mask"]
         # make the shape of attention_mask = (-1, -1, -1, -1) in dy2static.
-        model_kwargs["attention_mask"] = paddle.reshape(attn_mask, paddle.shape(attn_mask))
+        paddle.jit.dy2static.utils_helper.set_dynamic_shape(model_kwargs["attention_mask"], [-1, -1, -1, -1])
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
         max_length = paddle.to_tensor(max_length)
         while cur_len < max_length:

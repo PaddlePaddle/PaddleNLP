@@ -187,6 +187,8 @@ def process_strategy(config):
             config.Model["no_recompute_layers"] = sorted(list(set(config.Model["no_recompute_layers"])))
         recompute = strategy.recompute
         recompute.enable = config.Model.get("use_recompute", False)
+        recompute.sr = config.Model.pop("sr", 0)
+        recompute.refined_ops_patterns = config.Model.pop("refined_ops_patterns", []) # gpt.GPTModelAuto don't need this parameter
         recompute.no_recompute_segments = config.Model.pop("no_recompute_layers", [])
         recompute.enable_tuning = config.get("Tuning", False) and config.Tuning.get("tuning_recompute", False)
 
@@ -201,6 +203,12 @@ def process_strategy(config):
     amp.custom_white_list = amp_cfg.get("custom_white_list", [])
     amp.use_fp16_guard = amp_cfg.get("use_fp16_guard", False)
     amp.use_bf16_guard = amp_cfg.get("use_bf16_guard", False)
+
+    # mp_optimization config
+    mp_degree = config.Distributed.get("mp_degree", 1)
+    if mp_degree > 1:
+        mp_cfg = config.Distributed.get("mp_optimization", {})
+        strategy.mp_optimization.allreduce_matmul_grad_overlapping = mp_cfg.get("allreduce_matmul_grad_overlapping", False)
 
     # sharding config
     sharding_cfg = config.Distributed.get("sharding", {})
@@ -219,11 +227,14 @@ def process_strategy(config):
     accumulate_steps = config.Engine.get("accumulate_steps", 1)
     if pp_degree > 1 and accumulate_steps > 1:
         # pipeline config
+        pipeline_cfg = config.Distributed.get("pipeline", {})
         pipeline = strategy.pipeline
         pipeline.enable = True
-        pipeline.schedule_mode = config.Distributed.get("schedule_mode", "1F1B")
+        pipeline.enable_send_recv_overlap = pipeline_cfg.get("enable_send_recv_overlap", False)
+        pipeline.schedule_mode = pipeline_cfg.get("schedule_mode", "1F1B")
         pipeline.micro_batch_size = config.Global.micro_batch_size
         pipeline.accumulate_steps = accumulate_steps
+        
     elif accumulate_steps > 1:
         # gradient merge config
         gradient_merge = strategy.gradient_merge
