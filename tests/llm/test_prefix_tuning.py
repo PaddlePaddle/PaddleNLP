@@ -60,7 +60,7 @@ class PrefixTuningTest(LLMTest, unittest.TestCase):
 
             main()
 
-        if self.model_dir not in ["chatglm2", "qwen", "baichuan"]:
+        if self.model_dir not in ["qwen"]:
             self.run_predictor(
                 {
                     "inference_model": True,

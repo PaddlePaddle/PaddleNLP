@@ -513,4 +513,5 @@ class ChatGLMv2ForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMv2Pret
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
+        state_dict = {k: paddle.cast(v, paddle.get_default_dtype()) for k, v in state_dict.items()}
         self.chatglm_v2.set_state_dict(state_dict)

@@ -583,6 +583,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
+        state_dict = {k: paddle.cast(v, paddle.get_default_dtype()) for k, v in state_dict.items()}
         if "lm_head.weight" in state_dict:
             self.lm_head.weight.set_value(state_dict["lm_head.weight"])
         self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
