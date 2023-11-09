@@ -960,6 +960,10 @@ class Trainer:
                                 fused_allreduce_gradients_no_sync(list(parameters_list), self.optimizer._hcg)
                         else:
                             assert not self.args.use_moe, "moe should not `enable_dp_comm_overlap`"
+                            opt_hcg = self.optimizer._hcg
+                            assert (
+                                opt_hcg.get_sharding_parallel_world_size() != opt_hcg.nranks
+                            ), "pure sharding strategy does not support `enable_dp_comm_overlap` yet"
 
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
