@@ -83,8 +83,6 @@ def reduce_scatter(input):
     )
     output_shape[0] = output_shape[0] // parallelism
     output = paddle.empty(shape=output_shape, dtype=input.dtype)
-    # sync between calc_stream and comm_stream will increase execution time
-    # thus use_calc_stream=False
     dist.stream.reduce_scatter(output, input, op=dist.ReduceOp.SUM, group=group, sync_op=True)
     return output
 
