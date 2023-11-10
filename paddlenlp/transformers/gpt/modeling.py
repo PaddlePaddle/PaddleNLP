@@ -308,11 +308,12 @@ class MultiHeadAttention(nn.Layer):
         if not paddle.is_compiled_with_cuda():
             attention_mask = get_triangle_upper_mask(product, attention_mask)
 
-        if attention_mask is not None:
-            product = product + attention_mask
-            weights = F.softmax(product)
-        else:
-            weights = incubate.softmax_mask_fuse_upper_triangle(product)
+        #if attention_mask is not None:
+        #    product = product + attention_mask
+        #    weights = F.softmax(product)
+        #else:
+        #    weights = incubate.softmax_mask_fuse_upper_triangle(product)
+        weights = incubate.softmax_mask_fuse_upper_triangle(product)
 
         if self.config.attention_probs_dropout_prob:
             with seed_guard_context("local_seed"):
