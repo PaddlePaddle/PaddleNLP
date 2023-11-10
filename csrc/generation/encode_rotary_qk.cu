@@ -147,7 +147,8 @@ void LaunchRotaryQK(const paddle::Tensor& q,
             head_num,
             seq_len * rotary_emb_dims,
             last_dim);
-        RotaryKernel<<<grid, BlockSize, 0, cu_stream>>>(
+        dim3 grid_k(batch_size, 2, seq_len * rotary_emb_dims);
+        RotaryKernel<<<grid_k, BlockSize, 0, cu_stream>>>(
             k_data,
             cos_emb,
             sin_emb,
@@ -155,7 +156,7 @@ void LaunchRotaryQK(const paddle::Tensor& q,
             k_out_data,
             rotary_emb_dims,
             batch_size,
-            head_num,
+            2,
             seq_len * rotary_emb_dims,
             last_dim);
     } else {
@@ -222,4 +223,4 @@ PD_BUILD_OP(encode_rotary_qk)
     .Outputs({"rotary_q_out", "rotary_kv_out"})
     .SetInplaceMap({{"q", "rotary_q_out"}, {"kv", "rotary_kv_out"}})
     .Attrs({"rotary_emb_dims: int", "use_neox: bool"})
-    .SetKernelFn(PD_KERNEL(RotaryQK)); 
+    .SetKernelFn(PD_KERNEL(RotaryQK));

@@ -29,9 +29,10 @@ __global__ void fusedQKV_transpose_split_kernel(
     const int token_num,
     const int head_num,
     const int size_per_head) {
-  const int32_t offset = batch_size * max_len_this_time * head_num * size_per_head;
+  // const int32_t offset = batch_size * max_len_this_time * head_num * size_per_head;
   const int32_t hidden_size = head_num * size_per_head;
-  const int32_t fused_hidden_size = 3 * hidden_size;
+  const int32_t fused_hidden_size = hidden_size + 2 * size_per_head + 2 * size_per_head;
+
   int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
   using LoadT = AlignedVector<T, VecSize>;
   LoadT src_vec;
@@ -52,9 +53,13 @@ __global__ void fusedQKV_transpose_split_kernel(
 
     // equal to:
     // const int qkv_id  = (linear_index % fused_hidden_size) / hidden_size;
-    const int32_t qkv_id = bias_idx / hidden_size;
-    const int32_t head_id = (linear_index % hidden_size) / size_per_head;
-    const int32_t size_id = linear_index % size_per_head;
+    const int32_t qkv_id = bias_idx < hidden_size ? 0 : (bias_idx -  hidden_size) / ( 2 * size_per_head) + 1;
+    const int32_t head_id = qkv_id == 0 ? bias_idx / size_per_head : (bias_idx -  hidden_size) / size_per_head % 2;
+    const int32_t size_id = bias_idx % size_per_head;
+
+    // const int32_t qkv_id = bias_idx / hidden_size;
+    // const int32_t head_id = bias_idx / size_per_head;
+    // const int32_t size_id = bias_idx % size_per_head;
 
     if (qkv_id == 0) {
       Store<T, VecSize>(
@@ -65,13 +70,13 @@ __global__ void fusedQKV_transpose_split_kernel(
     } else if (qkv_id == 1) {
       Store<T, VecSize>(
           src_vec,
-          &k_buf[target_batch_id * head_num * max_len_this_time * size_per_head +
+          &k_buf[target_batch_id * 2 * max_len_this_time * size_per_head +
                  head_id * max_len_this_time * size_per_head + seq_id * size_per_head +
                  size_id]);
     } else {
       Store<T, VecSize>(
           src_vec,
-          &v_buf[target_batch_id * head_num * max_len_this_time * size_per_head +
+          &v_buf[target_batch_id * 2 * max_len_this_time * size_per_head +
                  head_id * max_len_this_time * size_per_head + seq_id * size_per_head +
                  size_id]);
     }
@@ -95,10 +100,11 @@ std::vector<paddle::Tensor> qkv_transpose_split(const paddle::Tensor& qkv, // [t
     const int bsz = seq_lens.shape()[0];
     const int max_seq_len = input_ids.shape()[1]; //max_seq_len_tensor.copy_to(paddle::CPUPlace(), false).data<int>()[0];
     auto q_out = paddle::full({bsz, num_head, max_seq_len, head_size}, 0, qkv.dtype(), qkv.place());
-    auto k_out = paddle::full({bsz, num_head, max_seq_len, head_size}, 0, qkv.dtype(), qkv.place());
-    auto v_out = paddle::full({bsz, num_head, max_seq_len, head_size}, 0, qkv.dtype(), qkv.place());
+    auto k_out = paddle::full({bsz, 2, max_seq_len, head_size}, 0, qkv.dtype(), qkv.place());
+    auto v_out = paddle::full({bsz, 2, max_seq_len, head_size}, 0, qkv.dtype(), qkv.place());
     constexpr int PackSize = VEC_16B / sizeof(DataType_);
-    const int elem_cnt = token_num * num_head * head_size * 3;
+    const int elem_cnt = qkv_shape[0] * qkv_shape[1];
+
     const int pack_num = elem_cnt / PackSize;
     const int blocksize = 128;
     const int grid_size = (pack_num + blocksize - 1) / blocksize;

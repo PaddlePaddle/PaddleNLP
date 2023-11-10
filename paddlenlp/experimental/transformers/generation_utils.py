@@ -77,7 +77,7 @@ class GenerationInferenceModel(GenerationMixin):
 
         input_spec = [
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),  # input_ids
-            paddle.static.InputSpec(shape=[None, 1, None, None], dtype=dtype, name="attention_mask"),  # attention_mask
+            paddle.static.InputSpec(shape=[None, 1, None, None], dtype="float32", name="attention_mask"),  # attention_mask
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),  # position_ids
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="penalty_score"),  # penalty_score
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="frequency_score"),  # frequency_score
@@ -94,7 +94,7 @@ class GenerationInferenceModel(GenerationMixin):
             paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="tgt_ids"),  # tgt_ids
             paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="tgt_pos"),  # tgt_pos
             paddle.static.InputSpec(
-                shape=[None, 1, 1, None], dtype=dtype, name="tgt_generation_mask"
+                shape=[None, 1, 1, None], dtype="float32", name="tgt_generation_mask"
             ),  # tgt_generation_mask
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="pre_ids"),  # pre_ids
             paddle.static.InputSpec(shape=[1], dtype="int64", name="stop_nums"),  # stop_nums
@@ -163,6 +163,8 @@ class GenerationInferenceModel(GenerationMixin):
         pre_caches=None,
         **model_kwargs,
     ):
+        attention_mask = paddle.cast(attention_mask, dtype="float16")
+        tgt_generation_mask = paddle.cast(tgt_generation_mask, dtype="float16")
 
         model_kwargs["position_ids"] = position_ids
         model_kwargs["attention_mask"] = attention_mask
@@ -304,6 +306,8 @@ class GenerationInferenceModel(GenerationMixin):
         batch = input_ids.shape[0] if input_ids is not None else inputs_embeds.shape[0]
         next_tokens = paddle.full(shape=[batch, 1], dtype="int32", fill_value=0)
 
+        all_next_tokens = paddle.empty(shape=[batch,0], dtype="int64")
+
         # let inputs_embeds enter into model_kwargs.
         # because the code below directly use the model_kwargs as a parameter without using inputs_embeds.
         model_kwargs["inputs_embeds"] = inputs_embeds
@@ -368,13 +372,13 @@ class GenerationInferenceModel(GenerationMixin):
             else:
                 model_kwargs["all_input_ids"] = paddle.concat([model_kwargs["all_input_ids"], next_tokens], axis=1)
 
-            save_with_output(
-                next_tokens,
-                batch_idx,
-                step_idx_ori,
-                "real_time_save.temp_ids",
-                self.config.tensor_parallel_rank,
-            )
+            # save_with_output(
+            #     next_tokens,
+            #     batch_idx,
+            #     step_idx_ori,
+            #     "real_time_save.temp_ids",
+            #     self.config.tensor_parallel_rank,
+            # )
 
             return next_tokens, model_kwargs
 
@@ -389,9 +393,13 @@ class GenerationInferenceModel(GenerationMixin):
             model_kwargs,
         )
         step_idx_ori += 1
+        all_next_tokens = paddle.concat([all_next_tokens, next_tokens], axis = -1)
 
         # gives it a value, means we will entered into decoder phase.
         model_kwargs["cache"] = 0
+
+        import datetime
+        starttime = datetime.datetime.now()
 
         # decoder
         while paddle.less_than(
@@ -406,11 +414,14 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs,
             )
             step_idx_ori += 1
+            all_next_tokens = paddle.concat([all_next_tokens, next_tokens], axis = -1)
+
+        endtime = datetime.datetime.now()
+        duringtime = endtime - starttime
+        time_ms = duringtime.seconds * 1000 + duringtime.microseconds / 1000.0
+        print("The whoel end to end time : ", time_ms / 1., "ms")
+
 
         return (
-            next_tokens,
-            model_kwargs["step_idx"],
-            paddle.cast(model_kwargs["stop_flags"], "int32"),
-            model_kwargs["seq_len_decoder"],
-            model_kwargs["tgt_pos"],
+            all_next_tokens,
         )

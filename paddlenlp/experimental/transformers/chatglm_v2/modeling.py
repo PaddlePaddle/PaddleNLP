@@ -180,6 +180,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
             epsilon=config.layernorm_epsilon,
             norm_type="rmsnorm",
+            kv_num_heads = 2,
         )
 
         if self.use_weight_only:
@@ -317,27 +318,27 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             k_bias = state_dict.pop(key("encoder.layers.{}.self_attention.key.bias".format(i)))
             v_bias = state_dict.pop(key("encoder.layers.{}.self_attention.value.bias".format(i)))
 
-            k_weight = k_weight.reshape([self.hidden_size, self.multi_query_group_num, 1, self.head_size])
-            k_bias = k_bias.reshape([self.multi_query_group_num, 1, self.head_size])
-            v_weight = v_weight.reshape([self.hidden_size, self.multi_query_group_num, 1, self.head_size])
-            v_bias = v_bias.reshape([self.multi_query_group_num, 1, self.head_size])
+            #k_weight = k_weight.reshape([self.hidden_size, self.multi_query_group_num, 1, self.head_size])
+            #k_bias = k_bias.reshape([self.multi_query_group_num, 1, self.head_size])
+            #v_weight = v_weight.reshape([self.hidden_size, self.multi_query_group_num, 1, self.head_size])
+            #v_bias = v_bias.reshape([self.multi_query_group_num, 1, self.head_size])
 
-            k_weight = np.tile(k_weight, [1, 1, self.num_heads // self.multi_query_group_num, 1])
-            v_weight = np.tile(v_weight, [1, 1, self.num_heads // self.multi_query_group_num, 1])
-            k_bias = np.tile(k_bias, [1, self.num_heads // self.multi_query_group_num, 1])
-            v_bias = np.tile(v_bias, [1, self.num_heads // self.multi_query_group_num, 1])
-            k_weight = k_weight.reshape([self.hidden_size, self.hidden_size])
-            k_bias = k_bias.reshape([self.hidden_size])
-            v_weight = v_weight.reshape([self.hidden_size, self.hidden_size])
-            v_bias = v_bias.reshape([self.hidden_size])
+            # k_weight = np.tile(k_weight, [1, 1, self.num_heads // self.multi_query_group_num, 1])
+            # v_weight = np.tile(v_weight, [1, 1, self.num_heads // self.multi_query_group_num, 1])
+            # k_bias = np.tile(k_bias, [1, self.num_heads // self.multi_query_group_num, 1])
+            # v_bias = np.tile(v_bias, [1, self.num_heads // self.multi_query_group_num, 1])
+            # k_weight = k_weight.reshape([self.hidden_size, self.hidden_size])
+            # k_bias = k_bias.reshape([self.hidden_size])
+            # v_weight = v_weight.reshape([self.hidden_size, self.hidden_size])
+            # v_bias = v_bias.reshape([self.hidden_size])
 
             concated_qkv_weight = np.concatenate([q_weight, k_weight, v_weight], axis=-1)
             concated_qkv_weight = concated_qkv_weight.transpose(1, 0)
-            concated_qkv_weight = concated_qkv_weight.reshape([3 * self.hidden_size, self.hidden_size])
+            concated_qkv_weight = concated_qkv_weight.reshape([-1, self.hidden_size])
             concated_qkv_weight = paddle.to_tensor(concated_qkv_weight)
 
             concated_qkv_bias = np.concatenate([q_bias, k_bias, v_bias], axis=-1)
-            concated_qkv_bias = concated_qkv_bias.reshape([3 * self.hidden_size])
+            concated_qkv_bias = concated_qkv_bias.reshape([-1])
             concated_qkv_bias = paddle.to_tensor(concated_qkv_bias)
 
             out_proj_weight = state_dict.pop(key("encoder.layers.{}.self_attention.dense.weight".format(i)))
@@ -423,7 +424,7 @@ class ChatGLMv2ForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMv2Pret
                 [
                     2,
                     max_batch_size,
-                    config.num_attention_heads // max(config.tensor_parallel_degree, 1),
+                    config.multi_query_group_num,
                     max_length,
                     config.hidden_size // config.num_attention_heads,
                 ]

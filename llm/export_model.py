@@ -16,6 +16,9 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "5"
+os.environ["FLAGS_use_cuda_managed_memory"] = "true"
+
 import paddle
 from paddle.distributed import fleet
 from predictor import ModelArgument, PredictorArgument, create_predictor
