@@ -46,6 +46,7 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.utils.import_utils import import_module, is_paddlenlp_ops_available
 import paddle_custom_device.npu.passes as passes
+from paddle_custom_device.npu import atb_add, atb_muls
 
 @dataclass
 class PredictorArgument:
@@ -301,15 +302,23 @@ class InferencePredictorMixin:
         elif "bloom" in self.architectures:
             self.arange_tensor_encoder = paddle.zeros(shape=(config.batch_size, 1, total_max_length), dtype=self.dtype)
         else:
+            self.attention_mask_tensor = paddle.zeros(
+                shape=(config.batch_size, 1, config.max_length, config.max_length),
+                dtype=self.dtype,
+            )
             self.attention_mask = np.zeros(
                 shape=(config.batch_size, 1, config.max_length, config.max_length),
                 dtype=self.dtype,
             )
-
+        self.tgt_generation_mask_tensor = paddle.ones(
+            shape=[config.batch_size, 1, 1, config.max_length],
+            dtype=self.dtype,
+        )
         self.tgt_generation_mask = np.ones(
             shape=[config.batch_size, 1, 1, config.max_length],
             dtype=self.dtype,
         )
+        self.minus_one_tensor = paddle.to_tensor([-1], dtype='float16')
 
         if config.export_precache:
             if config.prefix_path:
@@ -474,9 +483,14 @@ class InferencePredictorMixin:
                 #         shape=[1, length + pre_caches_length], dtype=self.config.dtype
                 #     )
 
+        self.attention_mask_tensor.get_tensor().set(self.attention_mask, paddle.base.framework._current_expected_place())
+        self.tgt_generation_mask_tensor.get_tensor().set(self.tgt_generation_mask, paddle.base.framework._current_expected_place())
+        self.attention_mask_tensor = atb_muls(atb_add(self.attention_mask_tensor, self.minus_one_tensor), 1e4)
+        self.tgt_generation_mask_tensor = atb_muls(atb_add(self.tgt_generation_mask_tensor, self.minus_one_tensor), 1e4)
+
         inputs["pre_ids"] = self.pre_ids
-        inputs["attention_mask"] = paddle.to_tensor(self.attention_mask)
-        inputs["tgt_generation_mask"] = paddle.to_tensor(self.tgt_generation_mask)
+        inputs["attention_mask"] = self.attention_mask_tensor
+        inputs["tgt_generation_mask"] = self.tgt_generation_mask_tensor
 
         if pre_caches_length > 0:
             if self.config.mode == "dynamic":
