@@ -15,7 +15,6 @@
 
 from typing import Optional
 
-import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
@@ -311,31 +310,20 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         for i in range(self.num_layers):
             ln_scale = state_dict.pop(key("encoder.layers.{}.input_layernorm.weight".format(i)))
 
-            q_weight = state_dict.pop(key("encoder.layers.{}.self_attention.query.weight".format(i)))
-            k_weight = state_dict.pop(key("encoder.layers.{}.self_attention.key.weight".format(i)))
-            v_weight = state_dict.pop(key("encoder.layers.{}.self_attention.value.weight".format(i)))
-            q_bias = state_dict.pop(key("encoder.layers.{}.self_attention.query.bias".format(i)))
-            k_bias = state_dict.pop(key("encoder.layers.{}.self_attention.key.bias".format(i)))
-            v_bias = state_dict.pop(key("encoder.layers.{}.self_attention.value.bias".format(i)))
-
-            concated_qkv_weight = np.concatenate([q_weight, k_weight, v_weight], axis=-1)
-            concated_qkv_weight = concated_qkv_weight.transpose(1, 0)
-            concated_qkv_weight = concated_qkv_weight.reshape([-1, self.hidden_size])
+            concated_qkv_weight = state_dict.pop(
+                key("encoder.layers.{}.self_attention.query_key_value.weight".format(i))
+            )
+            concated_qkv_weight = concated_qkv_weight.transpose([1, 0])
             concated_qkv_weight = paddle.to_tensor(concated_qkv_weight)
 
-            concated_qkv_bias = np.concatenate([q_bias, k_bias, v_bias], axis=-1)
-            concated_qkv_bias = concated_qkv_bias.reshape([-1])
+            concated_qkv_bias = state_dict.pop(key("encoder.layers.{}.self_attention.query_key_value.bias".format(i)))
             concated_qkv_bias = paddle.to_tensor(concated_qkv_bias)
 
             out_proj_weight = state_dict.pop(key("encoder.layers.{}.self_attention.dense.weight".format(i)))
 
             ffn_ln_scale = state_dict.pop(key("encoder.layers.{}.post_attention_layernorm.weight".format(i)))
 
-            # shuffle the column of ffn1's weight for fine grained FM
             ffn1_weight = state_dict.pop(key("encoder.layers.{}.mlp.dense_h_to_4h.weight".format(i)))
-            ffn1_weight_0 = ffn1_weight[..., 0::2]
-            ffn1_weight_1 = ffn1_weight[..., 1::2]
-            ffn1_weight = paddle.concat([ffn1_weight_0, ffn1_weight_1], axis=-1)
             ffn2_weight = state_dict.pop(key("encoder.layers.{}.mlp.dense_4h_to_h.weight".format(i)))
 
             self.transformer_block.ln_scales[i].set_value(ln_scale)
