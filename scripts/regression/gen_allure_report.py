@@ -2,26 +2,40 @@
 # -*- coding: utf-8 -*-
 # encoding=utf-8 vi:ts=4:sw=4:expandtab:ft=python
 
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
-import time
-import platform
-import subprocess
-import zipfile
 import stat
-import wget
+import subprocess
 import tarfile
+import time
+import zipfile
+
+import wget
+
 
 def gen_allure_report():
     """
     generate allure report
-    """   
-    # install allure     
+    """
+    # install allure
     exit_code, output = subprocess.getstatusoutput("allure --version")
     if exit_code == 0:
         print("allure version is:{}".format(output))
         allure_bin = "allure"
     else:
-        sysstr = platform.system()
         if os.path.exists("allure-2.19.0.zip") is False:
             bin_src = "https://xly-devops.bj.bcebos.com/tools/allure-2.19.0.zip"
             bin_file = wget.download(bin_src)
@@ -34,16 +48,16 @@ def gen_allure_report():
         exit_code, output = subprocess.getstatusoutput("java -version")
         if exit_code == 0:
             print("java version is:{}".format(output))
-        else: # install java
+        else:  # install java
             if os.path.exists("java_linux.tar.gz") is False:
                 java_src = "https://paddle-qa.bj.bcebos.com/java/java_linux.tar.gz"
-                java_file = wget.download(java_src)
+                wget.download(java_src)
                 tf = tarfile.open("java_linux.tar.gz")
                 tf.extractall(os.getcwd())
-            os.environ['JAVA_HOME'] = os.path.join(os.getcwd(), "jdk1.8.0_351")
-            os.environ['JRE_HOME'] = os.path.join(os.getenv('JAVA_HOME'), "jre")
-            os.environ['CLASSPATH'] = os.path.join(os.getenv('JAVA_HOME'), "lib")
-            os.environ["PATH"] += os.pathsep + os.path.join(os.getenv('JAVA_HOME'), "bin")
+            os.environ["JAVA_HOME"] = os.path.join(os.getcwd(), "jdk1.8.0_351")
+            os.environ["JRE_HOME"] = os.path.join(os.getenv("JAVA_HOME"), "jre")
+            os.environ["CLASSPATH"] = os.path.join(os.getenv("JAVA_HOME"), "lib")
+            os.environ["PATH"] += os.pathsep + os.path.join(os.getenv("JAVA_HOME"), "bin")
             exit_code, output = subprocess.getstatusoutput("java -version")
             print("java version is:{}".format(output))
     exit_code, output = subprocess.getstatusoutput("%s --version" % allure_bin)
@@ -60,19 +74,17 @@ def gen_allure_report():
         os.environ["REPORT_SERVER"] = os.getenv("REPORT_SERVER")
         job_build_id = os.getenv("AGILE_JOB_BUILD_ID")
         REPORT_SERVER = os.getenv("REPORT_SERVER")
-       
-        cmd = "curl -s {}/report/upload.sh | bash -s ./report {} report".format(
-                REPORT_SERVER, job_build_id)
-        
+
+        cmd = "curl -s {}/report/upload.sh | bash -s ./report {} report".format(REPORT_SERVER, job_build_id)
+
         if job_build_id:
             # upload allure report
-            cmd = "curl -s {}/report/upload.sh | bash -s ./report {} report".format(
-                REPORT_SERVER, job_build_id)
+            cmd = "curl -s {}/report/upload.sh | bash -s ./report {} report".format(REPORT_SERVER, job_build_id)
             print("upload cmd is {}".format(cmd))
             ret = os.system(cmd)
         else:
             print("非流水线任务，请补充9位数字流水线任务id")
-        
+
         if os.path.exists("allure-2.19.0.zip"):
             time.sleep(1)
             try:
