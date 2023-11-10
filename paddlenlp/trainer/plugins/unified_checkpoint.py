@@ -340,14 +340,19 @@ def unified_optimizer_into_shards(
     for k, v in model.state_dict().items():
         static2struct_name_mappings[v.name] = k
 
+    # rename optimizer param
+    for key in list(optim_state_dict.keys()):
+        static_name, type_name = generate_base_static_name(key)
+        new_name = static2struct_name_mappings[static_name] + "/" + type_name
+        optim_state_dict[new_name] = optim_state_dict.pop(key)
+    if master_weights is not None:
+        for key in list(master_weights.keys()):
+            master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
+
     # filter optimizer param
     if master_weights is not None:
-        filter_master_keys = filter_optim_params(
-            model, master_weights, static2struct_name_mappings, is_master_weights=True
-        )
-    filter_optim_keys = filter_optim_params(
-        model, optim_state_dict, static2struct_name_mappings, is_master_weights=False
-    )
+        filter_master_keys = filter_params(model, master_weights, is_optimizer=True)
+    filter_optim_keys = filter_params(model, optim_state_dict, is_optimizer=True)
 
     tp_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
     tp_size = tp_group.nranks
@@ -359,8 +364,6 @@ def unified_optimizer_into_shards(
             optim_state_dict,
             model.config,
             filter_optim_keys,
-            static2struct_name_mappings,
-            is_master_weights=False,
         )
         if master_weights is not None:
             master_weights = merge_tensor_parallel_for_optimizer(
@@ -368,19 +371,8 @@ def unified_optimizer_into_shards(
                 master_weights,
                 model.config,
                 filter_master_keys,
-                static2struct_name_mappings,
-                is_master_weights=True,
             )
     print("merge tp costs: ", time.time() - start_time)
-
-    # rename state_dict key name
-    for key in list(optim_state_dict.keys()):
-        static_name, type_name = generate_base_static_name(key)
-        new_name = static2struct_name_mappings[static_name] + "/" + type_name
-        optim_state_dict[new_name] = optim_state_dict.pop(key)
-    if master_weights is not None:
-        for key in list(master_weights.keys()):
-            master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
 
     # build index json file
     index_optimizer_file, index_master_weight_file = {}, {}
@@ -504,7 +496,7 @@ def generate_base_static_name(vname):
         return a, b
 
 
-def filter_optim_params(model_to_save, state_dict, static2struct_name_mappings, is_master_weights=False):
+def filter_params(model_to_save, state_dict, is_optimizer=False):
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
 
@@ -521,68 +513,8 @@ def filter_optim_params(model_to_save, state_dict, static2struct_name_mappings, 
         tensor_bytes_dict = {}
         model_state_dict = model_to_save.state_dict()
         for (k, v) in state_dict.items():
-            if is_master_weights:
-                model_v = model_state_dict[static2struct_name_mappings[k]]
-            else:
-                model_v = model_state_dict[static2struct_name_mappings[generate_base_static_name(k)[0]]]
+            model_v = model_state_dict[k.split("/")[0]] if is_optimizer else v
             if hasattr(model_v, "is_distributed") and model_v.is_distributed:
-                tensor_bytes_dict[k] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
-            else:
-                tensor_bytes_dict[k] = v.numel().item() * dtype_byte_size(v.dtype)
-
-        filter_tensor_list = []
-        current_block = []
-        current_block_size = 0
-        total_size = 0
-
-        max_shard_size = (sum(tensor_bytes_dict.values()) + tp_size - 1) // tp_size
-
-        for index, (key, weight_size) in enumerate(tensor_bytes_dict.items()):
-            # If this weight is going to tip up over the maximal size, we split.
-            # if current_block_size + weight_size > max_shard_size:
-            if total_size + weight_size > max_shard_size * (len(filter_tensor_list) + 1) or (
-                len(tensor_bytes_dict) - index < (tp_size - len(filter_tensor_list))
-            ):
-                # fix if the first param is large than max_shard_size
-                if len(current_block) > 0:
-                    filter_tensor_list.append(current_block)
-                current_block = []
-                current_block_size = 0
-
-            current_block.append(key)
-            current_block_size += weight_size
-            total_size += weight_size
-
-        filter_tensor_list.append(current_block)
-        assert len(filter_tensor_list) == tp_size, "Error, partition failed!"
-
-    paddle.distributed.broadcast_object_list(
-        filter_tensor_list,
-        src=hcg.get_model_parallel_group_src_rank(),
-        group=tp_group,
-    )
-
-    return filter_tensor_list
-
-
-def filter_params(model_to_save, state_dict):
-    hcg = fleet.get_hybrid_communicate_group()
-    tp_group = hcg.get_model_parallel_group()
-
-    tp_size = tp_group.nranks
-    tp_rank = tp_group.rank
-
-    # for pure sharding or pure pp
-    if tp_size <= 1:
-        return [list(state_dict.keys())]
-
-    filter_tensor_list = [[] for i in range(tp_size)]
-
-    if tp_rank == 0:
-        tensor_bytes_dict = {}
-
-        for (k, v) in state_dict.items():
-            if hasattr(v, "is_distributed") and v.is_distributed:
                 tensor_bytes_dict[k] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
             else:
                 tensor_bytes_dict[k] = v.numel().item() * dtype_byte_size(v.dtype)
@@ -652,7 +584,7 @@ def merge_tensor_parallel_with_shard(model_to_save, state_dict, config, all_filt
             tensor = state_dict[key]
             if key in tp_actions:
                 ret = distributed_gather(tensor, dst=j, group=tp_group, offload=False)
-                action = partial(tp_actions.pop(key), return_numpy=False)
+                action = partial(tp_actions.pop(key))
                 tensor = action(ret) if is_dst else None
             else:
                 tensor = tensor._copy_to(paddle.CPUPlace(), False) if is_dst else None
@@ -667,17 +599,15 @@ def merge_tensor_parallel_with_shard(model_to_save, state_dict, config, all_filt
     return state_dict_to_save
 
 
-def merge_tensor_parallel_for_optimizer(
-    model_to_save, state_dict, config, all_filter_keys, static2struct_name_mappings, is_master_weights=False
-):
+def merge_tensor_parallel_for_optimizer(model_to_save, state_dict, config, all_filter_keys):
     logger.info("Unified optimizer tensor parallel in shards")
 
     # get tp_actions
     model_keys = []
     for key in state_dict.keys():
-        base_model_key = key if is_master_weights else generate_base_static_name(key)[0]
-        if key not in model_keys:
-            model_keys.append(static2struct_name_mappings[base_model_key])
+        base_model_key = key.split("/")[0]
+        if base_model_key not in model_keys:
+            model_keys.append(base_model_key)
     tp_actions = model_to_save.get_tensor_parallel_convert_actions(
         model_to_save.config, model_keys, is_split=False, ignore_error=True
     )
@@ -694,9 +624,7 @@ def merge_tensor_parallel_for_optimizer(
             if i > len(filter_keys) - 1:
                 continue
             # get base model key
-            model_key = static2struct_name_mappings[
-                filter_keys[i] if is_master_weights else generate_base_static_name(filter_keys[i])[0]
-            ]
+            model_key = filter_keys[i].split("/")[0]
             tensor = state_dict[filter_keys[i]]
             if model_key in tp_actions:
                 # for example: beta1, beta2
@@ -706,7 +634,7 @@ def merge_tensor_parallel_for_optimizer(
                     )  # Need broadcast when loaded
                 else:
                     ret = distributed_gather(tensor, dst=j, group=tp_group, offload=False)
-                    action = partial(tp_actions[model_key], return_numpy=False)
+                    action = partial(tp_actions[model_key])
                     tensor = action(ret) if is_dst else None
             else:
                 tensor = tensor._copy_to(paddle.CPUPlace(), False) if is_dst else None

@@ -336,7 +336,7 @@ def naive_fuse_split_tp(
     return np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis)
 
 
-def normal_fuse_merge_tp(weight_list, is_column=True, return_numpy=True):
+def normal_fuse_merge_tp(weight_list, is_column=True):
     """
 
     [A1],[A2]  => [A1, A2]
@@ -350,12 +350,12 @@ def normal_fuse_merge_tp(weight_list, is_column=True, return_numpy=True):
     """
 
     if is_column:
-        if return_numpy:
+        if isinstance(weight_list[0], np.ndarray):
             return np.concatenate(weight_list, axis=-1)
         else:
             return paddle.concat(weight_list, axis=-1)._copy_to(paddle.CPUPlace(), False)
     else:
-        if return_numpy:
+        if isinstance(weight_list[0], np.ndarray):
             return np.concatenate(weight_list, axis=0)
         else:
             return paddle.concat(weight_list, axis=0)._copy_to(paddle.CPUPlace(), False)
@@ -479,7 +479,6 @@ def get_tensor_parallel_merge_func(tensor_parallel_degree, tensor_parallel_rank,
         is_old_qkv=False,
         is_naive_2fuse=False,
         is_naive_3fuse=False,
-        return_numpy=True,
     ):
         if x is None:
             return None
@@ -489,7 +488,7 @@ def get_tensor_parallel_merge_func(tensor_parallel_degree, tensor_parallel_rank,
         elif is_naive_3fuse:
             return naive_fuse_merge_tp(x, is_column=is_column, fuse_tensor_parts=3)
         else:
-            x = normal_fuse_merge_tp(x, is_column=is_column, return_numpy=return_numpy)
+            x = normal_fuse_merge_tp(x, is_column=is_column)
 
         if is_old_qkv:
             assert is_column, "QKV tensor should be column parallel linear."
