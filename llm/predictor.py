@@ -180,7 +180,7 @@ class BasePredictor:
             truncation_side="left",
             return_tensors=self.return_tensors,
             padding=True,
-            add_special_tokens=True,
+            add_special_tokens=not self.config.use_chat_template,
         )
         return tokenized_source
 
@@ -416,6 +416,7 @@ class InferencePredictorMixin:
             temperature=self.config.temperature,
             benchmark=self.config.benchmark,
             pre_caches_length=pre_caches_length,
+            use_chat_template=self.config.use_chat_template,
         )
 
         if "chatglmforcausallm" == self.architectures.lower():

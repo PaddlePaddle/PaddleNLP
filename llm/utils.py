@@ -393,6 +393,7 @@ def dybatch_preprocess(
     temperature: float,
     pre_caches_length: int = 0,
     benchmark: bool = False,
+    use_chat_template: bool = False,
 ):
     """Pre-process generation inputs."""
     inputs = {}
@@ -401,7 +402,13 @@ def dybatch_preprocess(
         position_ids = []
 
         for text in texts:
-            tokens = tokenizer.apply_chat_template(text, return_tensors="np", padding=True, max_length=src_length)
+            tokens = tokenizer.apply_chat_template(
+                text,
+                return_tensors="np",
+                padding=True,
+                max_length=src_length,
+                add_special_tokens=not use_chat_template,
+            )
             input_ids.append(tokens["input_ids"][0])
             position_ids.append(tokens["position_ids"][0])
 
