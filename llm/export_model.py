@@ -40,9 +40,9 @@ def load_inference_model(model_path, model_name, param_name, exe):
         return paddle.static.io.load_inference_model(model_path, exe)
 
 
-def validate_pdmodel(model_path, model_prefix):
+def validate_pdmodel(model_path, rank_id, model_prefix):
     paddle.enable_static()
-    place = paddle.CUDAPlace(0)
+    place = paddle.CustomPlace("npu", rank_id)
     exe = paddle.static.Executor(place)
     scope = paddle.static.Scope()
 
@@ -104,7 +104,7 @@ def main():
     predictor.tokenizer.save_pretrained(export_args.output_path)
     generate_rank_mapping(os.path.join(export_args.output_path, "rank_mapping.csv"))
 
-    validate_pdmodel(export_args.output_path, "model")
+    validate_pdmodel(export_args.output_path, tensor_parallel_rank, "rank_" + str(tensor_parallel_rank) + "/model")
 
 
 if __name__ == "__main__":
