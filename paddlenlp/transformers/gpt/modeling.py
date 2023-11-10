@@ -887,7 +887,6 @@ class GPTPretrainedModel(PretrainedModel):
                 fleet.meta_parallel.RowParallelLinear,
                 ColumnSequenceParallelLinear,
                 RowSequenceParallelLinear,
-                GPTLMHead,
             ),
         ):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,

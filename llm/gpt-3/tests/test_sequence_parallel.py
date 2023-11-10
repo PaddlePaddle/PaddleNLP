@@ -24,6 +24,12 @@ from paddlenlp.transformers import GPTConfig, GPTForCausalLM, GPTForCausalLMPipe
 
 class TestGPT(unittest.TestCase):
     def test_sequence_model(self):
+        model_name_or_path = "gpt2-medium-en"
+        seq_len = 1024
+        batch_size = 2
+        input_ids = paddle.arange(100, 100 + batch_size * seq_len, dtype="int64").reshape([batch_size, seq_len])
+        labels = paddle.arange(101, 101 + batch_size * seq_len, dtype="int64").reshape([batch_size, seq_len])
+
         world_size = paddle.distributed.get_world_size()
         pp_degree = 2
         tp_degree = world_size // pp_degree
@@ -45,23 +51,6 @@ class TestGPT(unittest.TestCase):
         else:
             model_class = GPTForCausalLM
 
-        model_name_or_path = "gpt2-medium-en"
-
-        # segment with method: layer:GPTDecoderLayer; result: 0, 13, 27
-        # stage=0, global_rank=0 ,layer_number=13
-        # 0: GPTEmbeddingPipe
-        # 1: GPTDecoderLayerPipe
-        # ......
-        # 12: GPTDecoderLayerPipe
-        # stage=1, global_rank=0 ,layer_number=14
-        # ......
-        # 25: LayerNormPipe
-        # 26: GPTLMHead                  Note: GPTLMHead is not in ckpt!
-        # loss: GPTPretrainingCriterion
-
-        seq_len = 1024
-        batch_size = 2
-
         config = GPTConfig.from_pretrained(model_name_or_path)
         config.seq_length = seq_len
         config.use_flash_attention = False
@@ -73,42 +62,35 @@ class TestGPT(unittest.TestCase):
         config.tensor_parallel_degree = tp_degree
         config.tensor_parallel_rank = tensor_parallel_rank
         config.tensor_parallel_output = False
+        # when tp_degree > 1, sequence_parallel can be set to True
         config.sequence_parallel = True
-
         config.fuse_sequence_parallel_allreduce = False
 
-        input_ids = paddle.arange(100, 100 + batch_size * seq_len, dtype="int64").reshape([batch_size, seq_len])
-        labels = paddle.arange(101, 101 + batch_size * seq_len, dtype="int64").reshape([batch_size, seq_len])
-
-        single_model = GPTForCausalLM.from_pretrained(model_name_or_path, config=config, dtype="float32")
-        single_model.eval()
-        ret_single = single_model(input_ids=input_ids, labels=labels)
-        single_model_state_dict = single_model.state_dict()
-
-        # hidden_size = 4096
         model = model_class.from_pretrained(model_name_or_path, config=config, dtype="float32")
-        model.set_state_dict(single_model_state_dict)
         model.eval()
 
         if pp_degree > 1:
             pp_model = PipelineParallel(layers=model, hcg=hcg, strategy=strategy)
             pp_model.accumulate_steps = batch_size  # for micro_batch_size * acc_steps == batch_size
-            ret = pp_model.eval_batch(data=[input_ids, labels], compute_loss=True)
+            ret_mp_pp = pp_model.eval_batch(data=[input_ids, labels], compute_loss=True)
         else:
-            # pp_model = PipelineParallel(layers=model, hcg=hcg, strategy=strategy)
-            # pp_model.data = [input_ids, labels]
-            # ret1 = pp_model._forward_step(None)
-            ret = model(input_ids=input_ids, labels=labels)
-            ret = ret[0]
+            ret_mp_pp = model(input_ids=input_ids, labels=labels)[0]
 
-        print(f"ret mp{tp_degree} pp{pp_degree}", ret.item())
-        ret_mp_pp = ret.item()
+        # run model for single device
+        config.tensor_parallel_degree = 1
+        config.tensor_parallel_rank = -1
+        config.sequence_parallel = False
+        single_model = GPTForCausalLM.from_pretrained(model_name_or_path, config=config, dtype="float32")
+        single_model.eval()
+        ret_single = single_model(input_ids=input_ids, labels=labels)[0]
 
-        print("ret single", float(ret_single[0]))
-        print(
-            f"diff: {(float(ret_single[0])- ret_mp_pp)/float(ret_single[0])}",
-        )
-        np.testing.assert_allclose(float(ret_single[0]), ret_mp_pp, rtol=1.5e-7)
+        # output all results
+        print(f"ret mp{tp_degree} pp{pp_degree}", float(ret_mp_pp))
+        print("ret single", float(ret_single))
+
+        diff = (ret_single - ret_mp_pp) / ret_single
+        print(f"diff: {float(diff)}")
+        np.testing.assert_allclose(float(ret_single), ret_mp_pp, rtol=1.5e-7)
 
 
 if __name__ == "__main__":
