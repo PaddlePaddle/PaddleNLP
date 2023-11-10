@@ -34,3 +34,7 @@ Distributed:
   sharding:
     sharding_degree: 2
     sharding_stage: 1
+
+FusedPasses:
+  fused_linear: True
+  fused_adamw: False
