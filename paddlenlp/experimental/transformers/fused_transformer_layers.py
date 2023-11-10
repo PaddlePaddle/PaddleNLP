@@ -53,6 +53,7 @@ __all__ = [
     "FusedMultiTransformerWeightOnly",
     "FusedMultiTransformerWeightOnlyPostLayernorm",
     "FusedBlockMultiTransformer",
+    "FusedBlockMultiTransformerWeightOnly",
 ]
 
 
@@ -823,28 +824,28 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             qkv_weight_scale = self.create_parameter(
                 shape=[3 * config.num_heads * self.head_dim],
                 attr=qkv_weight_scale_attr,
-                dtype=paddle.float32,
+                dtype=self._dtype,
                 is_bias=False,
             )
 
             linear_weight_scale = self.create_parameter(
                 shape=[config.embed_dim],
                 attr=linear_weight_scale_attr,
-                dtype=paddle.float32,
+                dtype=self._dtype,
                 is_bias=False,
             )
 
             ffn1_weight_scale = self.create_parameter(
                 shape=[config.dim_feedforward * 2] if config.activation.endswith("glu") else [config.dim_feedforward],
                 attr=ffn1_weight_scale_attr,
-                dtype=paddle.float32,
+                dtype=self._dtype,
                 is_bias=False,
             )
 
             ffn2_weight_scale = self.create_parameter(
                 shape=[config.embed_dim],
                 attr=ffn2_weight_scale_attr,
-                dtype=paddle.float32,
+                dtype=self._dtype,
                 is_bias=False,
             )
 
@@ -990,3 +991,6 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
 
         return out
 
+class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMultiTransformerWeightOnly):
+    def __init__(self, config: FusedMultiTransformerConfig):
+        super().__init__(config)

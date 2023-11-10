@@ -29,6 +29,7 @@ export CUDA_VISIBLE_DEVICES=0
 model_dir=${1:-"meta-llama/Llama-2-7b-chat"}
 src_len=${2:-2048}
 dec_len=${3:-1024}
+quant_type=${4:-"weight_only_int8"}
 
 total_len=`expr ${src_len} + ${dec_len}`
 
@@ -41,6 +42,7 @@ python predictor.py \
     --mode "dynamic" \
     --batch_size 2 \
     --inference_model \
-    --block_attn &
+    --block_attn \
+    --quant_type ${quant_type} &
 
 python read_res.py --model_name_or_path ${model_dir}
