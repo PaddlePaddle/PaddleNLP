@@ -252,6 +252,7 @@ class MistralAttention(nn.Layer):
         self.num_key_value_groups = self.num_heads // self.num_key_value_heads
         self.max_position_embeddings = config.max_position_embeddings
         self.rope_theta = config.rope_theta
+        self.use_flash_attention = getattr(config, "_flash_attn_2_enabled", False)
 
         if (self.head_dim * self.num_heads) != self.hidden_size:
             raise ValueError(
@@ -367,26 +368,39 @@ class MistralAttention(nn.Layer):
         key_states = repeat_kv(key_states, self.num_key_value_groups)
         value_states = repeat_kv(value_states, self.num_key_value_groups)
 
-        attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) / math.sqrt(self.head_dim)
-        #import numpy as np; np.save('aw_{}'.format(i), attn_weights.astype('float32').numpy())
+        if not self.use_flash_attention:
+            attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) / math.sqrt(self.head_dim)
+            #import numpy as np; np.save('aw_{}'.format(i), attn_weights.astype('float32').numpy())
 
-        if attn_weights.shape != [bsz, self.num_heads, q_len, kv_seq_len]:
-            raise ValueError(
-                f"Attention weights should be of size {[bsz, self.num_heads, q_len, kv_seq_len]}, but is"
-                f" {attn_weights.shape}"
-            )
-
-        if attention_mask is not None:
-            if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
+            if attn_weights.shape != [bsz, self.num_heads, q_len, kv_seq_len]:
                 raise ValueError(
-                    f"Attention mask should be of size {[bsz, 1, q_len, kv_seq_len]}, but is {attention_mask.shape}"
+                    f"Attention weights should be of size {[bsz, self.num_heads, q_len, kv_seq_len]}, but is"
+                    f" {attn_weights.shape}"
                 )
 
-            attn_weights = attn_weights + attention_mask
+            if attention_mask is not None:
+                if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
+                    raise ValueError(
+                        f"Attention mask should be of size {[bsz, 1, q_len, kv_seq_len]}, but is {attention_mask.shape}"
+                    )
 
-        # upcast attention to fp32
-        attn_weights = nn.functional.softmax(attn_weights, axis=-1, dtype=paddle.float32).astype(query_states.dtype)
-        attn_output = paddle.matmul(attn_weights, value_states)
+                attn_weights = attn_weights + attention_mask
+
+            # upcast attention to fp32
+            attn_weights = nn.functional.softmax(attn_weights, axis=-1, dtype=paddle.float32).astype(query_states.dtype)
+            attn_output = paddle.matmul(attn_weights, value_states)
+        else:
+            query_states = query_states.transpose([0,2,1,3])
+            key_states = key_states.transpose([0,2,1,3])
+            value_states = value_states.transpose([0,2,1,3])
+            attn_output = F.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=attention_mask,
+                is_causal=attention_mask is None,
+            )
+            attn_output = attn_output.transpose([0,2,1,3])
 
         if attn_output.shape != [bsz, self.num_heads, q_len, self.head_dim]:
             raise ValueError(
@@ -407,245 +421,245 @@ class MistralAttention(nn.Layer):
         return attn_output, attn_weights, past_key_value
 
 
-class MistralFlashAttention2(MistralAttention):
-    """
-    Mistral flash attention module. This module inherits from `MistralAttention` as the weights of the module stays
-    untouched. The only required change would be on the forward pass where it needs to correctly call the public API of
-    flash attention and deal with padding tokens in case the input contains any of them.
-    """
+#class MistralFlashAttention2(MistralAttention):
+#    """
+#    Mistral flash attention module. This module inherits from `MistralAttention` as the weights of the module stays
+#    untouched. The only required change would be on the forward pass where it needs to correctly call the public API of
+#    flash attention and deal with padding tokens in case the input contains any of them.
+#    """
+#
+#    def forward(
+#        self,
+#        hidden_states: paddle.Tensor,
+#        attention_mask: Optional[paddle.Tensor] = None,
+#        position_ids: Optional[paddle.Tensor] = None,
+#        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
+#        output_attentions: bool = False,
+#        use_cache: bool = False,
+#        padding_mask: Optional[paddle.Tensor] = None,
+#    ):
+#        bsz, q_len, _ = hidden_states.shape
+#
+#        query_states = self.q_proj(hidden_states)
+#        key_states = self.k_proj(hidden_states)
+#        value_states = self.v_proj(hidden_states)
+#
+#        query_states = query_states.reshape([bsz, q_len, self.num_heads, self.head_dim]).transpose([0, 2, 1, 3])
+#        key_states = key_states.reshape([bsz, q_len, self.num_key_value_heads, self.head_dim]).transpose([0, 2, 1, 3])
+#        value_states = value_states.reshape([bsz, q_len, self.num_key_value_heads, self.head_dim]).transpose([0, 2, 1, 3])
+#
+#        kv_seq_len = key_states.shape[-2]
+#        if past_key_value is not None:
+#            kv_seq_len += past_key_value[0].shape[-2]
+#
+#        # Because the input can be padded, the absolute sequence length depends on the max position id.
+#        rotary_seq_len = max(kv_seq_len, position_ids[:, -1].max().item()) + 1
+#        cos, sin = self.rotary_emb(value_states, seq_len=rotary_seq_len)
+#
+#        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+#
+#        use_sliding_windows = (
+#            _flash_supports_window_size
+#            and hasattr(self.config, "sliding_window") is not None
+#            and kv_seq_len > self.config.sliding_window
+#        )
+#
+#        if not _flash_supports_window_size:
+#            logger.warning_once(
+#                "The current flash attention version does not support sliding window attention, for a more memory efficient implementation"
+#                " make sure to upgrade flash-attn library."
+#            )
+#
+#        if past_key_value is not None:
+#            # Activate slicing cache only if the config has a value `sliding_windows` attribute
+#            if hasattr(self.config, "sliding_window") and kv_seq_len > self.config.sliding_window:
+#                slicing_tokens = kv_seq_len - self.config.sliding_window
+#
+#                past_key = past_key_value[0]
+#                past_value = past_key_value[1]
+#
+#                past_key = past_key[:, :, slicing_tokens:, :]
+#                past_value = past_value[:, :, slicing_tokens:, :]
+#
+#                if past_key.shape[-2] != self.config.sliding_window - 1:
+#                    raise ValueError(
+#                        f"past key much have a shape of (`batch_size, num_heads, self.config.sliding_window-1, head_dim`), got"
+#                        f" {past_key.shape}"
+#                    )
+#
+#                past_key_value = (past_key, past_value)
+#
+#                if padding_mask is not None:
+#                    padding_mask = padding_mask[:, slicing_tokens:]
+#                    padding_mask = paddle.concat([padding_mask, paddle.ones_like(padding_mask[:, -1:])], axis=-1)
+#
+#            key_states = paddle.concat([past_key_value[0], key_states], axis=2)
+#            value_states = paddle.concat([past_key_value[1], value_states], axis=2)
+#
+#        past_key_value = (key_states, value_states) if use_cache else None
+#
+#        # repeat k/v heads if n_kv_heads < n_heads
+#        key_states = repeat_kv(key_states, self.num_key_value_groups)
+#        value_states = repeat_kv(value_states, self.num_key_value_groups)
+#
+#        # TODO: Mistral does not have dropout in the config??
+#        # It is recommended to use dropout with FA according to the docs
+#        # when training.
+#        dropout_rate = 0.0  # if not self.training else self.attn_dropout
+#
+#        # Reashape to the expected shape for Flash Attention
+#        query_states = query_states.transpose([0, 2, 1, 3])
+#        key_states = key_states.transpose([0, 2, 1, 3])
+#        value_states = value_states.transpose([0, 2, 1, 3])
+#
+#        attn_output = self._flash_attention_forward(
+#            query_states,
+#            key_states,
+#            value_states,
+#            padding_mask,
+#            q_len,
+#            dropout=dropout_rate,
+#            use_sliding_windows=use_sliding_windows,
+#        )
+#
+#        attn_output = attn_output.reshape([bsz, q_len, self.hidden_size])
+#        attn_output = self.o_proj(attn_output)
+#
+#        if not output_attentions:
+#            attn_weights = None
+#
+#        return attn_output, attn_weights, past_key_value
 
-    def forward(
-        self,
-        hidden_states: paddle.Tensor,
-        attention_mask: Optional[paddle.Tensor] = None,
-        position_ids: Optional[paddle.Tensor] = None,
-        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
-        output_attentions: bool = False,
-        use_cache: bool = False,
-        padding_mask: Optional[paddle.Tensor] = None,
-    ):
-        bsz, q_len, _ = hidden_states.shape
+    #def _flash_attention_forward(
+    #    self,
+    #    query_states,
+    #    key_states,
+    #    value_states,
+    #    padding_mask,
+    #    query_length,
+    #    dropout=0.0,
+    #    softmax_scale=None,
+    #    use_sliding_windows=False,
+    #):
+    #    """
+    #    calls the forward method of Flash Attention - if the input hidden states contain at least one padding token
+    #    first unpad the input, then computes the attention scores and pad the final attention scores.
 
-        query_states = self.q_proj(hidden_states)
-        key_states = self.k_proj(hidden_states)
-        value_states = self.v_proj(hidden_states)
+    #    args:
+    #        query_states (`paddle.Tensor`):
+    #            Input query states to be passed to Flash Attention API
+    #        key_states (`paddle.Tensor`):
+    #            Input key states to be passed to Flash Attention API
+    #        value_states (`paddle.Tensor`):
+    #            Input value states to be passed to Flash Attention API
+    #        padding_mask (`paddle.Tensor`):
+    #            The padding mask - corresponds to a tensor of size `(batch_size, seq_len)` where 0 stands for the
+    #            position of padding tokens and 1 for the position of non-padding tokens.
+    #        dropout (`int`, *optional*):
+    #            Attention dropout
+    #        softmax_scale (`float`, *optional*):
+    #            The scaling of QK^T before applying softmax. Default to 1 / sqrt(head_dim)
+    #        use_sliding_windows (`bool`, *optional*):
+    #            Whether to activate sliding window attention.
+    #    """
+    #    # Contains at least one padding token in the sequence
+    #    if padding_mask is not None:
+    #        batch_size = query_states.shape[0]
+    #        query_states, key_states, value_states, indices_q, cu_seq_lens, max_seq_lens = self._upad_input(
+    #            query_states, key_states, value_states, padding_mask, query_length
+    #        )
 
-        query_states = query_states.reshape([bsz, q_len, self.num_heads, self.head_dim]).transpose([0, 2, 1, 3])
-        key_states = key_states.reshape([bsz, q_len, self.num_key_value_heads, self.head_dim]).transpose([0, 2, 1, 3])
-        value_states = value_states.reshape([bsz, q_len, self.num_key_value_heads, self.head_dim]).transpose([0, 2, 1, 3])
+    #        cu_seqlens_q, cu_seqlens_k = cu_seq_lens
+    #        max_seqlen_in_batch_q, max_seqlen_in_batch_k = max_seq_lens
 
-        kv_seq_len = key_states.shape[-2]
-        if past_key_value is not None:
-            kv_seq_len += past_key_value[0].shape[-2]
+    #        if not use_sliding_windows:
+    #            attn_output_unpad = flash_attn_varlen_func(
+    #                query_states,
+    #                key_states,
+    #                value_states,
+    #                cu_seqlens_q=cu_seqlens_q,
+    #                cu_seqlens_k=cu_seqlens_k,
+    #                max_seqlen_q=max_seqlen_in_batch_q,
+    #                max_seqlen_k=max_seqlen_in_batch_k,
+    #                dropout_p=dropout,
+    #                softmax_scale=softmax_scale,
+    #                causal=True,
+    #            )
+    #        else:
+    #            attn_output_unpad = flash_attn_varlen_func(
+    #                query_states,
+    #                key_states,
+    #                value_states,
+    #                cu_seqlens_q=cu_seqlens_q,
+    #                cu_seqlens_k=cu_seqlens_k,
+    #                max_seqlen_q=max_seqlen_in_batch_q,
+    #                max_seqlen_k=max_seqlen_in_batch_k,
+    #                dropout_p=dropout,
+    #                softmax_scale=softmax_scale,
+    #                causal=True,
+    #                window_size=(self.config.sliding_window, self.config.sliding_window),
+    #            )
 
-        # Because the input can be padded, the absolute sequence length depends on the max position id.
-        rotary_seq_len = max(kv_seq_len, position_ids[:, -1].max().item()) + 1
-        cos, sin = self.rotary_emb(value_states, seq_len=rotary_seq_len)
+    #        attn_output = pad_input(attn_output_unpad, indices_q, batch_size, query_length)
+    #    else:
+    #        if not use_sliding_windows:
+    #            attn_output = flash_attn_func(
+    #                query_states, key_states, value_states, dropout, softmax_scale=softmax_scale, causal=True
+    #            )
+    #        else:
+    #            attn_output = flash_attn_func(
+    #                query_states,
+    #                key_states,
+    #                value_states,
+    #                dropout,
+    #                softmax_scale=softmax_scale,
+    #                causal=True,
+    #                window_size=(self.config.sliding_window, self.config.sliding_window),
+    #            )
 
-        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+    #    return attn_output
 
-        use_sliding_windows = (
-            _flash_supports_window_size
-            and hasattr(self.config, "sliding_window") is not None
-            and kv_seq_len > self.config.sliding_window
-        )
+    #def _upad_input(self, query_layer, key_layer, value_layer, padding_mask, query_length):
+    #    batch_size, kv_seq_len, num_heads, head_dim = key_layer.shape
 
-        if not _flash_supports_window_size:
-            logger.warning_once(
-                "The current flash attention version does not support sliding window attention, for a more memory efficient implementation"
-                " make sure to upgrade flash-attn library."
-            )
+    #    # On the first iteration we need to properly re-create the padding mask
+    #    # by slicing it on the proper place
+    #    if kv_seq_len != padding_mask.shape[-1]:
+    #        padding_mask_num_tokens = padding_mask.shape[-1]
+    #        padding_mask = padding_mask[:, padding_mask_num_tokens - kv_seq_len :]
 
-        if past_key_value is not None:
-            # Activate slicing cache only if the config has a value `sliding_windows` attribute
-            if hasattr(self.config, "sliding_window") and kv_seq_len > self.config.sliding_window:
-                slicing_tokens = kv_seq_len - self.config.sliding_window
+    #    indices_k, cu_seqlens_k, max_seqlen_in_batch_k = _get_unpad_data(padding_mask)
 
-                past_key = past_key_value[0]
-                past_value = past_key_value[1]
+    #    key_layer = index_first_axis(key_layer.reshape([batch_size * kv_seq_len, num_heads, head_dim]), indices_k)
+    #    value_layer = index_first_axis(value_layer.reshape([batch_size * kv_seq_len, num_heads, head_dim]), indices_k)
 
-                past_key = past_key[:, :, slicing_tokens:, :]
-                past_value = past_value[:, :, slicing_tokens:, :]
+    #    if query_length == kv_seq_len:
+    #        query_layer = index_first_axis(
+    #            query_layer.reshape([batch_size * kv_seq_len, num_heads, head_dim]), indices_k
+    #        )
+    #        cu_seqlens_q = cu_seqlens_k
+    #        max_seqlen_in_batch_q = max_seqlen_in_batch_k
+    #        indices_q = indices_k
+    #    elif query_length == 1:
+    #        max_seqlen_in_batch_q = 1
+    #        cu_seqlens_q = paddle.arange(
+    #            batch_size + 1, dtype=paddle.int32
+    #        )  # There is a memcpy here, that is very bad.
+    #        indices_q = cu_seqlens_q[:-1]
+    #        query_layer = query_layer.squeeze(1)
+    #    else:
+    #        # The -q_len: slice assumes left padding.
+    #        padding_mask = padding_mask[:, -query_length:]
+    #        query_layer, indices_q, cu_seqlens_q, max_seqlen_in_batch_q = unpad_input(query_layer, padding_mask)
 
-                if past_key.shape[-2] != self.config.sliding_window - 1:
-                    raise ValueError(
-                        f"past key much have a shape of (`batch_size, num_heads, self.config.sliding_window-1, head_dim`), got"
-                        f" {past_key.shape}"
-                    )
-
-                past_key_value = (past_key, past_value)
-
-                if padding_mask is not None:
-                    padding_mask = padding_mask[:, slicing_tokens:]
-                    padding_mask = paddle.concat([padding_mask, paddle.ones_like(padding_mask[:, -1:])], axis=-1)
-
-            key_states = paddle.concat([past_key_value[0], key_states], axis=2)
-            value_states = paddle.concat([past_key_value[1], value_states], axis=2)
-
-        past_key_value = (key_states, value_states) if use_cache else None
-
-        # repeat k/v heads if n_kv_heads < n_heads
-        key_states = repeat_kv(key_states, self.num_key_value_groups)
-        value_states = repeat_kv(value_states, self.num_key_value_groups)
-
-        # TODO: Mistral does not have dropout in the config??
-        # It is recommended to use dropout with FA according to the docs
-        # when training.
-        dropout_rate = 0.0  # if not self.training else self.attn_dropout
-
-        # Reashape to the expected shape for Flash Attention
-        query_states = query_states.transpose([0, 2, 1, 3])
-        key_states = key_states.transpose([0, 2, 1, 3])
-        value_states = value_states.transpose([0, 2, 1, 3])
-
-        attn_output = self._flash_attention_forward(
-            query_states,
-            key_states,
-            value_states,
-            padding_mask,
-            q_len,
-            dropout=dropout_rate,
-            use_sliding_windows=use_sliding_windows,
-        )
-
-        attn_output = attn_output.reshape([bsz, q_len, self.hidden_size])
-        attn_output = self.o_proj(attn_output)
-
-        if not output_attentions:
-            attn_weights = None
-
-        return attn_output, attn_weights, past_key_value
-
-    def _flash_attention_forward(
-        self,
-        query_states,
-        key_states,
-        value_states,
-        padding_mask,
-        query_length,
-        dropout=0.0,
-        softmax_scale=None,
-        use_sliding_windows=False,
-    ):
-        """
-        Calls the forward method of Flash Attention - if the input hidden states contain at least one padding token
-        first unpad the input, then computes the attention scores and pad the final attention scores.
-
-        Args:
-            query_states (`paddle.Tensor`):
-                Input query states to be passed to Flash Attention API
-            key_states (`paddle.Tensor`):
-                Input key states to be passed to Flash Attention API
-            value_states (`paddle.Tensor`):
-                Input value states to be passed to Flash Attention API
-            padding_mask (`paddle.Tensor`):
-                The padding mask - corresponds to a tensor of size `(batch_size, seq_len)` where 0 stands for the
-                position of padding tokens and 1 for the position of non-padding tokens.
-            dropout (`int`, *optional*):
-                Attention dropout
-            softmax_scale (`float`, *optional*):
-                The scaling of QK^T before applying softmax. Default to 1 / sqrt(head_dim)
-            use_sliding_windows (`bool`, *optional*):
-                Whether to activate sliding window attention.
-        """
-        # Contains at least one padding token in the sequence
-        if padding_mask is not None:
-            batch_size = query_states.shape[0]
-            query_states, key_states, value_states, indices_q, cu_seq_lens, max_seq_lens = self._upad_input(
-                query_states, key_states, value_states, padding_mask, query_length
-            )
-
-            cu_seqlens_q, cu_seqlens_k = cu_seq_lens
-            max_seqlen_in_batch_q, max_seqlen_in_batch_k = max_seq_lens
-
-            if not use_sliding_windows:
-                attn_output_unpad = flash_attn_varlen_func(
-                    query_states,
-                    key_states,
-                    value_states,
-                    cu_seqlens_q=cu_seqlens_q,
-                    cu_seqlens_k=cu_seqlens_k,
-                    max_seqlen_q=max_seqlen_in_batch_q,
-                    max_seqlen_k=max_seqlen_in_batch_k,
-                    dropout_p=dropout,
-                    softmax_scale=softmax_scale,
-                    causal=True,
-                )
-            else:
-                attn_output_unpad = flash_attn_varlen_func(
-                    query_states,
-                    key_states,
-                    value_states,
-                    cu_seqlens_q=cu_seqlens_q,
-                    cu_seqlens_k=cu_seqlens_k,
-                    max_seqlen_q=max_seqlen_in_batch_q,
-                    max_seqlen_k=max_seqlen_in_batch_k,
-                    dropout_p=dropout,
-                    softmax_scale=softmax_scale,
-                    causal=True,
-                    window_size=(self.config.sliding_window, self.config.sliding_window),
-                )
-
-            attn_output = pad_input(attn_output_unpad, indices_q, batch_size, query_length)
-        else:
-            if not use_sliding_windows:
-                attn_output = flash_attn_func(
-                    query_states, key_states, value_states, dropout, softmax_scale=softmax_scale, causal=True
-                )
-            else:
-                attn_output = flash_attn_func(
-                    query_states,
-                    key_states,
-                    value_states,
-                    dropout,
-                    softmax_scale=softmax_scale,
-                    causal=True,
-                    window_size=(self.config.sliding_window, self.config.sliding_window),
-                )
-
-        return attn_output
-
-    def _upad_input(self, query_layer, key_layer, value_layer, padding_mask, query_length):
-        batch_size, kv_seq_len, num_heads, head_dim = key_layer.shape
-
-        # On the first iteration we need to properly re-create the padding mask
-        # by slicing it on the proper place
-        if kv_seq_len != padding_mask.shape[-1]:
-            padding_mask_num_tokens = padding_mask.shape[-1]
-            padding_mask = padding_mask[:, padding_mask_num_tokens - kv_seq_len :]
-
-        indices_k, cu_seqlens_k, max_seqlen_in_batch_k = _get_unpad_data(padding_mask)
-
-        key_layer = index_first_axis(key_layer.reshape([batch_size * kv_seq_len, num_heads, head_dim]), indices_k)
-        value_layer = index_first_axis(value_layer.reshape([batch_size * kv_seq_len, num_heads, head_dim]), indices_k)
-
-        if query_length == kv_seq_len:
-            query_layer = index_first_axis(
-                query_layer.reshape([batch_size * kv_seq_len, num_heads, head_dim]), indices_k
-            )
-            cu_seqlens_q = cu_seqlens_k
-            max_seqlen_in_batch_q = max_seqlen_in_batch_k
-            indices_q = indices_k
-        elif query_length == 1:
-            max_seqlen_in_batch_q = 1
-            cu_seqlens_q = paddle.arange(
-                batch_size + 1, dtype=paddle.int32
-            )  # There is a memcpy here, that is very bad.
-            indices_q = cu_seqlens_q[:-1]
-            query_layer = query_layer.squeeze(1)
-        else:
-            # The -q_len: slice assumes left padding.
-            padding_mask = padding_mask[:, -query_length:]
-            query_layer, indices_q, cu_seqlens_q, max_seqlen_in_batch_q = unpad_input(query_layer, padding_mask)
-
-        return (
-            query_layer,
-            key_layer,
-            value_layer,
-            indices_q,
-            (cu_seqlens_q, cu_seqlens_k),
-            (max_seqlen_in_batch_q, max_seqlen_in_batch_k),
-        )
+    #    return (
+    #        query_layer,
+    #        key_layer,
+    #        value_layer,
+    #        indices_q,
+    #        (cu_seqlens_q, cu_seqlens_k),
+    #        (max_seqlen_in_batch_q, max_seqlen_in_batch_k),
+    #    )
 
 
 class MistralDecoderLayer(nn.Layer):
@@ -654,8 +668,8 @@ class MistralDecoderLayer(nn.Layer):
         self.hidden_size = config.hidden_size
         self.self_attn = (
             MistralAttention(config=config)
-            if not getattr(config, "_flash_attn_2_enabled", False)
-            else MistralFlashAttention2(config)
+            #if not getattr(config, "_flash_attn_2_enabled", False)
+            #else MistralFlashAttention2(config)
         )
         self.mlp = MistralMLP(config)
         self.input_layernorm = MistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
