@@ -111,20 +111,6 @@ class QWenTokenizer(PretrainedTokenizer):
         if "eos_token_id" in kwargs:
             self.eos_token_id = kwargs["eos_token_id"]
 
-    @property
-    def pad_token_id(self) -> Optional[int]:
-        """
-        `Optional[int]`: Id of the padding token in the vocabulary. Returns `None` if the token has not been set.
-        """
-        return self.eod_id
-
-    @property
-    def pad_token(self) -> Optional[int]:
-        """
-        `Optional[int]`: Id of the padding token in the vocabulary. Returns `None` if the token has not been set.
-        """
-        return self.convert_ids_to_tokens([self.pad_token_id])[0]
-
     def __len__(self) -> int:
         return self.tokenizer.n_vocab
 

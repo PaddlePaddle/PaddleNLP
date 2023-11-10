@@ -532,6 +532,7 @@ class ChatTemplate:
         """
         Args:
             conversation_data (list[str]): the conversation data which must be two parts
+            index (int): the index of current conversation
 
         Returns:
             list[str]: the rendered conversation data
@@ -562,7 +563,14 @@ class ChatTemplate:
         template = self._compile_jinja_template(self.query)
         return template.render(query=query, index=index)
 
-    def __call__(self, conversations: list[list[str]] | str):
+    def render_system(self, context_data: Dict[str, Union[int, str]] = {}) -> str:
+        if self.system is None:
+            return ""
+
+        template = self._compile_jinja_template(self.system)
+        return template.render(**context_data)
+
+    def __call__(self, conversations: list[list[str]] | str, context_data: Dict[str, Union[int, str]] = {}) -> str:
         """render the conversations by chat-template
 
         Args:
@@ -575,7 +583,7 @@ class ChatTemplate:
             conversations = [[conversations]]
 
         # [1 ... n-1] conversation
-        final_query = self.system or ""
+        final_query = self.render_system()
         for index, conversation in enumerate(conversations[:-1]):
             final_query += "".join(self.render_conversation(conversation, index=index))
 

@@ -405,6 +405,7 @@ class InferencePredictorMixin:
         if self.config.use_chat_template:
             source = [source] if isinstance(source, str) else source
             source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
+
         inputs = dybatch_preprocess(
             self.tokenizer,
             source,

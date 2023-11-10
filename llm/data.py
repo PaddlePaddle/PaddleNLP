@@ -118,8 +118,12 @@ def tokenize_rounds_example(tokenizer, example, data_args):
     if sequence_length + len(system_ids) <= data_args.max_length:
         input_ids = system_ids + input_ids
         labels = [-100] * len(system_ids) + labels
-
     tokenized_source = {"input_ids": input_ids}
+
+    # 4. construct attention-mask & position_ids
+    tokenized_source["attention_mask"] = np.tri(sequence_length, sequence_length, dtype=bool)
+    tokenized_source["position_ids"] = list(range(sequence_length))
+
     return tokenized_source, labels
 
 
