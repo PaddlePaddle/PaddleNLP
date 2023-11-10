@@ -2112,6 +2112,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             use_safetensors=use_safetensors,
             variant=variant,
         )
+        
 
         # load pt weights early so that we know which dtype to init the model under
         if not is_sharded and state_dict is None:

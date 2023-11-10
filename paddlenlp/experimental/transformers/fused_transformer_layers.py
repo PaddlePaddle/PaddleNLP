@@ -36,6 +36,8 @@ if is_paddlenlp_ops_available():
         rebuild_padding,
         transpose_remove_padding,
         write_cache_kv,
+        get_max_len,
+        rebuild_padding_v2,
     )
 else:
     logger.warning(
@@ -50,6 +52,7 @@ __all__ = [
     "FusedMultiTransformerPostLayernorm",
     "FusedMultiTransformerWeightOnly",
     "FusedMultiTransformerWeightOnlyPostLayernorm",
+    "FusedBlockMultiTransformer",
 ]
 
 
@@ -166,12 +169,15 @@ class FusedMultiTransformerConfig:
         ffn2_weight_attrs=None,
         ffn2_weight_scale_attrs=None,
         ffn2_bias_attrs=None,
+        
         epsilon=1e-5,
         residual_alpha=1.0,
         num_layers=-1,
         nranks=1,
         trans_qkvw=True,
         ring_id=-1,
+
+
     ):
         self.embed_dim = embed_dim
         self.num_heads = num_heads
@@ -205,6 +211,8 @@ class FusedMultiTransformerConfig:
         self.nranks = nranks
         self.trans_qkvw = trans_qkvw
         self.ring_id = ring_id
+
+
 
 
 class FusedMultiTransformerBase(Layer):
@@ -561,6 +569,7 @@ class FusedMultiTransformerBase(Layer):
         pre_caches_length,
         attn_mask,
         i,
+        **kwargs,
     ):
         # fmha compute
         if time_step is None:  # context
@@ -606,6 +615,7 @@ class FusedMultiTransformerBase(Layer):
         return paddle.matmul(ffn1_out, self.ffn2_weights[i])
 
     def compute_bias_residual_layernorm(self, ffn2_out, residual_input, i, num_layers):
+
         if i != num_layers - 1:
             norm_out = self.norm_func(
                 ffn2_out,
@@ -629,6 +639,23 @@ class FusedMultiTransformerBase(Layer):
             )[0]
         return tmp_out, residual_input
 
+    def pre_process(self, **kwargs):
+        pass 
+
+    def post_process(self, **kwargs):
+        time_step = kwargs.get("time_step", None)
+        multi_block_output = kwargs.get("multi_block_output", None)
+        cum_offsets = kwargs.get("cum_offsets", None)
+        seq_lens = kwargs.get("seq_lens", None)
+        input_ids = kwargs.get("input_ids", None)
+
+        if time_step is None:
+            out = rebuild_padding(multi_block_output, cum_offsets, seq_lens, input_ids)
+        else:
+            out = multi_block_output
+
+        return out
+
     def forward(
         self,
         input_ids,
@@ -643,6 +670,7 @@ class FusedMultiTransformerBase(Layer):
         rotary_emb_dims=0,
         seq_lens=None,
         time_step=None,
+        **kwargs,
     ):
         r"""
         Applies multi transformer layers on the input.
@@ -679,11 +707,16 @@ class FusedMultiTransformerBase(Layer):
             tuple (output, caches), which output is the output of
             Transformer layers, caches is inplace with input `caches`.
         """
+        self.pre_process(**kwargs)
+        kwargs["cum_offsets"] = cum_offsets
+
         if caches is not None:
-            assert len(caches) == len(self.qkv_weights)
+            assert len(caches) == len(self.qkv_weights) or len(caches) == 2 * len(self.qkv_weights)
+        
+        assert self.num_layers == len(self.qkv_weights)
 
         residual_input = src
-        for i in range(len(caches)):
+        for i in range(self.num_layers):
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
             out_linear_out = self.compute_attn(
                 time_step,
@@ -698,6 +731,7 @@ class FusedMultiTransformerBase(Layer):
                 pre_caches_length,
                 attn_mask,
                 i,
+                **kwargs
             )
             # all_reduce
             if self.nranks > 1:
@@ -718,13 +752,15 @@ class FusedMultiTransformerBase(Layer):
                 dist.all_reduce(ffn2_out)
 
             # norm + residual_add_bias
-            tmp_out, residual_input = self.compute_bias_residual_layernorm(ffn2_out, residual_input, i, len(caches))
+            tmp_out, residual_input = self.compute_bias_residual_layernorm(ffn2_out, residual_input, i, self.num_layers)
             src = tmp_out
 
-        if time_step is None:
-            out = rebuild_padding(tmp_out, cum_offsets, seq_lens, input_ids)
-        else:
-            out = tmp_out
+        kwargs["time_step"] = time_step
+        kwargs["multi_block_output"] = tmp_out
+        kwargs["seq_lens"] = seq_lens
+        kwargs["input_ids"] = input_ids 
+
+        out = self.post_process(**kwargs)
         return out, caches
 
 
@@ -881,3 +917,76 @@ class FusedMultiTransformerWeightOnlyPostLayernorm(
 ):
     def __init__(self, config: FusedMultiTransformerConfig):
         super().__init__(config)
+
+
+class FusedBlockMultiTransformer(FusedMultiTransformerBase):
+    def __init__(self, config: FusedMultiTransformerConfig):
+        super().__init__(config)
+
+    def compute_attn(
+        self,
+        time_step,
+        qkv_out,
+        padding_offset,
+        seq_lens,
+        input_ids,
+        rotary_embs,
+        rotary_emb_dims,
+        caches,
+        pre_caches,
+        pre_caches_length,
+        attn_mask,
+        i,
+        **kwargs,
+    ):
+        k_quant_scales = kwargs.get("k_quant_scales", None)
+        v_quant_scales = kwargs.get("v_quant_scales", None)
+        k_dequant_scales = kwargs.get("k_dequant_scales", None)
+        v_dequant_scales = kwargs.get("v_dequant_scales", None)
+        fmha_out = paddle.incubate.nn.functional.block_multihead_attention(
+                qkv_out,
+                caches[2 * i],
+                caches[2 * i + 1],
+                kwargs.get("seq_lens_encoder", None),
+                kwargs.get("seq_lens_decoder", None),
+                kwargs.get("seq_lens_this_time", None),
+                kwargs.get("padding_offsets", None),
+                kwargs.get("cum_offsets", None),
+                kwargs.get("cu_seqlens_q", None),
+                kwargs.get("cu_seqlens_k", None),
+                kwargs.get("block_tables", None),
+                pre_caches[2 * i] if pre_caches is not None else None, # pre_key_cache
+                pre_caches[2 * i + 1] if pre_caches is not None else None, # pre_value_cache
+                k_quant_scales[i] if k_quant_scales is not None else None,
+                v_quant_scales[i] if v_quant_scales is not None else None,
+                k_dequant_scales[i] if k_dequant_scales is not None else None,
+                v_dequant_scales[i] if v_dequant_scales is not None else None,
+                rotary_embs,
+                attn_mask,
+                kwargs.get("tgt_mask", None),
+                kwargs.get("max_input_length", -1),
+                kwargs.get("block_size", 64),
+                self.use_neox_rotary_style,
+                True,
+            )[0]
+
+        out_linear_out = self.compute_out_linear(fmha_out, i)
+
+        return out_linear_out
+
+    def pre_process(self, **kwargs):
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
+        get_max_len(seq_lens_encoder, seq_lens_decoder)
+
+    def post_process(self, **kwargs):
+        multi_block_output = kwargs.get("multi_block_output", None)
+        cum_offsets = kwargs.get("cum_offsets", None)
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
+        max_input_length = kwargs.get("max_input_length", -1)
+
+        out = rebuild_padding_v2(multi_block_output, cum_offsets, seq_lens_decoder, seq_lens_encoder, max_input_length)
+
+        return out
+
