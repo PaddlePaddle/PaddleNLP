@@ -71,12 +71,23 @@ public:
   typedef paddle::float16 data_t;
 };
 
+#ifndef DISABLE_BF16
 template <>
 class PDTraits<paddle::DataType::BFLOAT16> {
 public:
+  
   typedef __nv_bfloat16 DataType;
   typedef paddle::bfloat16 data_t;
 };
+#else
+template <>
+class PDTraits<paddle::DataType::BFLOAT16> {
+public:
+  // TODO just fake the datatype as same as half to run it.
+  typedef half DataType;
+  typedef paddle::bfloat16 data_t;
+};
+#endif
 
 template <typename T, int Size>
 struct alignas(sizeof(T) * Size) AlignedVector {

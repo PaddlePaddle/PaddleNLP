@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "helper.h"
 #include "paddle/extension.h"
 
+/*
 template <paddle::DataType D>
 class PDTraits;
 
@@ -37,6 +39,7 @@ public:
   typedef __nv_bfloat16 DataType;
   typedef paddle::bfloat16 data_t;
 };
+*/
 
 template <typename T>
 __global__ void set_value_by_id(const int *seq_lens, const bool *stop_flags, T *output_data, int *sequence_lengths, int bs, int length) {
