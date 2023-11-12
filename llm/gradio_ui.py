@@ -228,7 +228,7 @@ def launch(args):
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
             )
 
-    block.queue(default_enabled=True).launch(server_name="0.0.0.0", server_port=args.port, debug=True)
+    block.queue().launch(server_name="0.0.0.0", server_port=args.port, debug=True)
 
 
 def main(args):

@@ -127,11 +127,20 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 <details><summary>&emsp; 模型参数（ModelArgument） </summary><div>
 
 - `model_name_or_path`: 预训练模型名称或者本地的模型路径，用于热启模型和分词器，默认为None。每个模型**支持模型权重**详见各模型目录。
+- `use_flash_attention`: 模型是否使用FlashAttention2，默认为False。
 - `lora`: 是否开启LoRA微调策略，默认为False。
 - `lora_path`: LoRA参数和配置路径，对LoRA参数进行初始化，默认为None。
 - `lora_rank`: LoRA算法中rank（秩）的值，默认为8。
 - `prefix_tuning`: 是否使用Prefix Tuning策略，默认为False。
 - `num_prefix_tokens`: Prefix Tuning策略中Prefix Token数量，默认为128。
+- `from_aistudio`: 模型权重是否从Aistudio下载，默认为False。
+- `save_to_aistudio`: 模型权重是否保存到Aistudio，默认为False。
+- `aistudio_repo_id`: 模型权重保存到Aistudio的repo id，默认为None。
+- `aistudio_repo_private`: 模型权重保存到Aistudio的repo是否为私有，默认为True。
+- `aistudio_repo_license`: 模型权重保存到Aistudio的repo license，默认为"Apache License 2.0"。
+- `aistudio_token`: 模型权重保存到Aistudio的token，默认为None。如果save_to_aistudio为True，且环境变量没有设置相应token，必须传入。
+- `neftune`: 是否使用[NEFT](https://arxiv.org/abs/2310.05914)，进行微调。默认为False。
+- `neftune_noise_alpha`: NEFT alpha参数，默认为5.0。
 
 </div></details>
 
