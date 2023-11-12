@@ -200,8 +200,47 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, i
     return rounds_inputs
 
 
+def convert_rounds_example_chatglm(example, tokenizer, data_args, is_test=True, intokens=False):
+    tokenized_source, labels = tokenize_rounds_example(tokenizer, example, data_args)
+
+    if is_test:
+        return {
+            **tokenized_source,
+            "labels": labels,
+        }
+    else:
+        # shift input_ids and labels
+        input_ids, labels = tokenized_source["input_ids"][:-1], labels[1:]
+        features = {
+            "input_ids": input_ids,
+            "labels": labels,
+        }
+
+        # TODO(wj-Mcat): to support intoken for chatglm multi-rounds finetune
+        # if intokens:
+        #     seq_length = len(input_ids)
+        #     # attention_mask
+        #     attention_mask = np.tri(seq_length, seq_length, dtype=bool)
+        #     attention_mask[:, :bos_position] = 1
+        #     features["attention_mask"] = attention_mask
+        #     # 2d position_ids
+        #     position_ids = np.arange(seq_length, dtype=np.int64)
+        #     block_position_ids = np.concatenate(
+        #         [
+        #             np.zeros(bos_position, dtype=np.int64),
+        #             np.arange(1, seq_length - bos_position + 1, dtype=np.int64),
+        #         ]
+        #     )
+        #     features["position_ids"] = np.stack([position_ids, block_position_ids], axis=0)
+        return features
+
+
 def convert_example_chatglm(example, tokenizer, data_args, is_test=True, intokens=False):
+    if data_args.chat_template is not None:
+        return convert_rounds_example_chatglm(example, tokenizer, data_args, is_test, intokens)
+
     tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
+
     if is_test:
         return {
             **tokenized_source,
