@@ -592,6 +592,11 @@ class ChatTemplate:
                 "The length of last conversation must be one, eg: [[user-query, bot-answer], [user-query, bot-answer], ..., [user-query]]"
             )
 
+        if len(conversations[-1]) > 1:
+            logger.warning(
+                f"The last conversation is not a single-round, chat-template will skip the conversation: {conversations[-1][1:]}"
+            )
+
         final_query += self.render_query(conversations[-1][0], index=len(conversations) - 1)
         return final_query
 
@@ -652,6 +657,8 @@ class ChatTemplateMixin:
         if not tokenize:
             return query
 
+        # chat_template should not add special tokens
+        tokenizer_kwargs["add_special_tokens"] = False
         return self(query, **tokenizer_kwargs)
 
     def encode_chat_inputs(self, conversations: List[List[str, str]]):
@@ -668,7 +675,7 @@ class ChatTemplateMixin:
         # encode system
         result = {}
         if self.chat_template.system:
-            result["system_ids"] = self.encode(self.chat_template.system, add_special_tokens=False)
+            result["system"] = self.encode(self.chat_template.system, add_special_tokens=False)["input_ids"]
 
         # encode conversation
         conversation_ids = []
@@ -680,44 +687,6 @@ class ChatTemplateMixin:
 
         result["conversations"] = conversation_ids
         return result
-
-    def encode_chat_inputs_post_process(self, user_ids: list[int], bot_ids: list[int], index=0):
-        """Round 0: bos + system + sep + user    bot + eos [there is valid system prompt]
-           Round 0: bos + user                   bot + eos
-           Round t: sep + bos + user             bot + eos
-        Args:
-            user_ids (list[int]): the ids of user query
-            bot_ids (list[int]): the ids of bot answer
-
-        Returns:
-            the final round conversation_ids
-        """
-
-        def concat_ids(obj1: list[int] | int, obj2: list[int] | int):
-            if obj1:
-                if not isinstance(obj1, list):
-                    obj1 = [obj1]
-            else:
-                obj1 = []
-
-            if obj2:
-                if not isinstance(obj2, list):
-                    obj2 = [obj2]
-            else:
-                obj2 = []
-
-            return obj1 + obj2
-
-        if index == 0:
-            if self.chat_template.system:
-                user_ids = concat_ids(self.chat_template_sep_token_id, user_ids)
-            else:
-                user_ids = concat_ids(self.chat_template_bos_token_id, user_ids)
-        else:
-            user_ids = concat_ids(self.chat_template_sep_token_id, user_ids)
-
-        bot_ids = concat_ids(bot_ids, self.chat_template_eos_token_id)
-        return [user_ids, bot_ids]
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):

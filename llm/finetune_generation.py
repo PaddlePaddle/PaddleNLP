@@ -31,6 +31,7 @@ from utils import (
     compute_metrics,
     get_lora_target_modules,
     get_prefix_tuning_params,
+    init_chat_template,
 )
 
 from paddlenlp.data import DataCollatorForSeq2Seq
@@ -136,6 +137,9 @@ def main():
 
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    # init chat_template for tokenizer
+    init_chat_template(tokenizer, model_args.model_name_or_path, data_args.chat_template)
+
     if isinstance(tokenizer, LlamaTokenizer):
         tokenizer.pad_token_id = tokenizer.eos_token_id
 

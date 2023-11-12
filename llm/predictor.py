@@ -97,9 +97,11 @@ class PredictorArgument:
         default=True,
         metadata={"help": "whether use `init_fleet_worker` in inference predictor"},
     )
-    use_chat_template: bool = field(
-        default=False,
-        metadata={"help": "whether use `chat_template` to handle multi-rounds conversation"},
+    chat_template: str = field(
+        default=None,
+        metadata={
+            "help": "the path of `chat_template.json` file to handle multi-rounds conversation. If is None, it will not use `chat_template.json`; If is equal with `model_name_or_path`, it will use the default loading; If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
+        },
     )
 
     @property
@@ -162,7 +164,7 @@ class BasePredictor:
         self.model_config.tensor_parallel_rank, self.model_config.tensor_parallel_degree = init_dist_env()
 
     def _preprocess(self, source):
-        if self.config.use_chat_template:
+        if self.config.chat_template is not None:
             if self.tokenizer.chat_template is None:
                 logger.warning(
                     f"Tokenizer<{self.tokenizer}> doesn't have chat_template field, so it will not use chat_template."
@@ -180,7 +182,8 @@ class BasePredictor:
             truncation_side="left",
             return_tensors=self.return_tensors,
             padding=True,
-            add_special_tokens=not self.config.use_chat_template,
+            # when use chat_template, it should not add special tokens
+            add_special_tokens=self.config.chat_template is None,
         )
         return tokenized_source
 
@@ -402,7 +405,7 @@ class InferencePredictorMixin:
         self.tgt_generation_mask[:] = 0
         pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
 
-        if self.config.use_chat_template:
+        if self.config.chat_template is not None:
             source = [source] if isinstance(source, str) else source
             source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
@@ -416,7 +419,7 @@ class InferencePredictorMixin:
             temperature=self.config.temperature,
             benchmark=self.config.benchmark,
             pre_caches_length=pre_caches_length,
-            use_chat_template=self.config.use_chat_template,
+            chat_template=self.config.chat_template,
         )
 
         if "chatglmforcausallm" == self.architectures.lower():

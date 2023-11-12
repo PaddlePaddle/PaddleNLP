@@ -102,33 +102,47 @@ def tokenize_rounds_example(tokenizer, example, data_args):
     input_ids, labels, sequence_length = [], [], 0
     conversations_ids = conversation_result.pop("conversations")
 
+    assert (
+        len(system_ids) < data_args.max_length
+    ), f"the length of system_ids<{len(system_ids)}> should be smaller than max_length<{data_args.max_length}>."
+    max_length = data_args.max_length - len(system_ids)
+
+    should_break = False
     for index in range(len(conversations_ids) - 1, -1, -1):
         user_input_ids, bot_input_ids = conversations_ids[index][0], conversations_ids[index][1]
 
         # break when the length of current conversations is greater than max_length
-        if len(input_ids) + len(user_input_ids) + len(bot_input_ids) > data_args.max_length:
-            break
+        if len(input_ids) + len(user_input_ids) + len(bot_input_ids) > max_length:
+
+            # when the length of last conversation is lager than max_length, we should not break: at least one round
+            if index < len(conversations_ids) - 1:
+                break
+
+            current_round_max_length = max_length - len(input_ids)
+            if len(user_input_ids) < current_round_max_length:
+                bot_input_ids = bot_input_ids[: current_round_max_length - len(user_input_ids)]
+            else:
+                user_input_ids = user_input_ids[:current_round_max_length]
+                bot_input_ids = []
+
+            should_break = True
 
         input_ids = user_input_ids + bot_input_ids + input_ids
         labels = len(user_input_ids) * [-100] + bot_input_ids + labels
 
         sequence_length += len(user_input_ids) + len(bot_input_ids)
 
-    # 3. concat system_ids: if length is larget than data_args.max_length, do not concat system_ids
-    if sequence_length + len(system_ids) <= data_args.max_length:
-        input_ids = system_ids + input_ids
-        labels = [-100] * len(system_ids) + labels
+        if should_break:
+            break
+
+    input_ids = system_ids + input_ids
+    labels = [-100] * len(system_ids) + labels
     tokenized_source = {"input_ids": input_ids}
-
-    # 4. construct attention-mask & position_ids
-    tokenized_source["attention_mask"] = np.tri(sequence_length, sequence_length, dtype=bool)
-    tokenized_source["position_ids"] = list(range(sequence_length))
-
     return tokenized_source, labels
 
 
 def convert_example_common(example, tokenizer, data_args, is_test=True, intokens=False):
-    if data_args.use_chat_template:
+    if data_args.chat_template is not None:
         return convert_rounds_example_common(example, tokenizer, data_args, is_test, intokens)
 
     tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
@@ -174,7 +188,7 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, i
             "labels": labels,
         }
 
-    input_ids = rounds_inputs["input_ids"]
+    input_ids = rounds_inputs.pop("input_ids")
     # shift input_ids and labels
     input_ids, labels = input_ids[:-1], labels[1:]
     seq_length = len(input_ids)

@@ -87,6 +87,7 @@ class LoraTest(LLMTest, unittest.TestCase):
     ["model_dir"],
     [
         ["llama"],
+        ["qwen"],
     ],
 )
 class LoraChatTemplateTest(LLMTest, unittest.TestCase):
@@ -136,7 +137,7 @@ class LoraChatTemplateTest(LLMTest, unittest.TestCase):
         lora_config = load_test_config(self.config_path, "lora", self.model_dir)
 
         lora_config["dataset_name_or_path"] = self.rounds_data_dir
-        lora_config["use_chat_template"] = True
+        lora_config["chat_template"] = "./tests/fixtures/chat_template.json"
         lora_config["output_dir"] = self.output_dir
 
         with argv_context_guard(lora_config):
