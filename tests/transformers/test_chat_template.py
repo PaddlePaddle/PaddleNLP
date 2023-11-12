@@ -100,7 +100,7 @@ class ChatTemplateIntegrationTest(unittest.TestCase):
         tokenizer = AutoTokenizer.from_pretrained("THUDM/chatglm-6b-v1.1")
         query = [["你好", "您好，我是个人人工智能助手"], ["今天吃啥"]]
         final_query = tokenizer.apply_chat_template(query, tokenize=False)
-        expected_query = "[Round 0]\n问：你好\n答：您好，我是个人人工智能助手\n[Round 1]\n问：今天吃啥\n答："
+        expected_query = "[Round 0]\n问：你好\n答：您好，我是个人人工智能助手\n[Round 1]\n问：今天吃啥\n答：[gMASK]<sop>"
         self.assertEqual(final_query, expected_query)
 
     def test_bloom_bellegroup(self):

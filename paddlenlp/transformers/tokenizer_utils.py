@@ -25,7 +25,7 @@ import re
 import unicodedata
 from collections import OrderedDict
 from dataclasses import asdict, dataclass
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy
 import numpy as np
@@ -528,7 +528,9 @@ class ChatTemplate:
         jinja_env.globals["raise_exception"] = raise_exception
         return jinja_env.from_string(chat_template)
 
-    def render_conversation(self, conversation_data: list[str] | dict[str, str], index: int = 0) -> list[str]:
+    def render_conversation(
+        self, conversation_data: list[str] | dict[str, str], index: int = 0, context_data: Dict[str, Any] = {}
+    ) -> list[str]:
         """
         Args:
             conversation_data (list[str]): the conversation data which must be two parts
@@ -548,6 +550,7 @@ class ChatTemplate:
             ), "Each round/turn of conversation must be two participants, eg: [user-query, bot-query]"
 
             conversation_data = {"user": conversation_data[0], "bot": conversation_data[1], "index": index}
+        conversation_data.update(context_data)
 
         one_turn_conversation = []
         for conversation in self.conversation:
@@ -556,12 +559,12 @@ class ChatTemplate:
             one_turn_conversation.append(result)
         return one_turn_conversation
 
-    def render_query(self, query: str, index: int = 0):
+    def render_query(self, query: str, index: int = 0, context_data: Dict[str, Union[int, str]] = {}):
         if self.query is None:
             return query
 
         template = self._compile_jinja_template(self.query)
-        return template.render(query=query, index=index)
+        return template.render(query=query, index=index, **context_data)
 
     def render_system(self, context_data: Dict[str, Union[int, str]] = {}) -> str:
         if self.system is None:
@@ -583,9 +586,10 @@ class ChatTemplate:
             conversations = [[conversations]]
 
         # [1 ... n-1] conversation
-        final_query = self.render_system()
+        final_query = self.render_system(context_data=context_data)
+        context_data["length"] = len(conversations)
         for index, conversation in enumerate(conversations[:-1]):
-            final_query += "".join(self.render_conversation(conversation, index=index))
+            final_query += "".join(self.render_conversation(conversation, index=index, context_data=context_data))
 
         if not isinstance(conversations[-1], list) and not len(conversations[-1]) != 1:
             raise ValueError(
@@ -597,7 +601,7 @@ class ChatTemplate:
                 f"The last conversation is not a single-round, chat-template will skip the conversation: {conversations[-1][1:]}"
             )
 
-        final_query += self.render_query(conversations[-1][0], index=len(conversations) - 1)
+        final_query += self.render_query(conversations[-1][0], index=len(conversations) - 1, context_data=context_data)
         return final_query
 
     @classmethod
