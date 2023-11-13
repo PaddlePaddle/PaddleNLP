@@ -29,7 +29,7 @@ from paddlenlp_ops import (
 from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList
 
 try:
-    from paddle import top_p_sampling
+    from paddle.tensor import top_p_sampling
 except:
     from paddlenlp_ops import top_p_sampling
 
