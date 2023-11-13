@@ -308,9 +308,9 @@ class ColumnSequenceParallelLinear(Layer):
                     "Please set fuse_matmul_bias=False or use paddle compiled "
                     "with cuda 11.6 or higher."
                 )
-                from paddle.incubate.nn.functional import fused_linear
+            from paddle.incubate.nn.functional import fused_linear
 
-                self.linear = fused_linear
+            self.linear = fused_linear
 
     def forward(self, x):
         # sequence parallelism is same as model parallelism
