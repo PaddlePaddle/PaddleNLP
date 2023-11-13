@@ -18,6 +18,24 @@ import numpy as np
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 
 
+def convert_multi_rounds_to_single_round(example, tokenizer):
+    # 1. convert multi-rounds to single-round data format with chat_template
+    example["src"] = example["src"] if isinstance(example["src"], list) else [example["src"]]
+    example["tgt"] = example["tgt"] if isinstance(example["tgt"], list) else [example["tgt"]]
+
+    src = tokenizer.chat_template.render_system()
+    conversations = list(zip(example["src"], example["tgt"]))
+
+    for index, conversation in enumerate(conversations[:-1]):
+        src += "".join(tokenizer.chat_template.render_conversation(conversation, index=index))
+
+    last_user, last_bot = tokenizer.chat_template.render_conversation(conversations[-1], index=len(conversations) - 1)
+
+    example["src"] = [src + last_user]
+    example["tgt"] = [last_bot]
+    return example
+
+
 def get_convert_example(model):
     if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
         base_model_prefix = model.model.base_model_prefix
@@ -118,12 +136,11 @@ def tokenize_rounds_example(tokenizer, example, data_args):
             if index < len(conversations_ids) - 1:
                 break
 
-            current_round_max_length = max_length - len(input_ids)
-            if len(user_input_ids) < current_round_max_length:
-                bot_input_ids = bot_input_ids[: current_round_max_length - len(user_input_ids)]
+            if len(user_input_ids) < max_length:
+                bot_input_ids = bot_input_ids[: max_length - len(user_input_ids)]
             else:
-                user_input_ids = user_input_ids[:current_round_max_length]
-                bot_input_ids = []
+                user_input_ids = user_input_ids[: data_args.src_length - len(system_ids)]
+                bot_input_ids = bot_input_ids[: data_args.max_length - data_args.src_length]
 
             should_break = True
 
@@ -204,44 +221,10 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, i
     return rounds_inputs
 
 
-def convert_rounds_example_chatglm(example, tokenizer, data_args, is_test=True, intokens=False):
-    tokenized_source, labels = tokenize_rounds_example(tokenizer, example, data_args)
-
-    if is_test:
-        return {
-            **tokenized_source,
-            "labels": labels,
-        }
-    else:
-        # shift input_ids and labels
-        input_ids, labels = tokenized_source["input_ids"][:-1], labels[1:]
-        features = {
-            "input_ids": input_ids,
-            "labels": labels,
-        }
-
-        # TODO(wj-Mcat): to support intoken for chatglm multi-rounds finetune
-        # if intokens:
-        #     seq_length = len(input_ids)
-        #     # attention_mask
-        #     attention_mask = np.tri(seq_length, seq_length, dtype=bool)
-        #     attention_mask[:, :bos_position] = 1
-        #     features["attention_mask"] = attention_mask
-        #     # 2d position_ids
-        #     position_ids = np.arange(seq_length, dtype=np.int64)
-        #     block_position_ids = np.concatenate(
-        #         [
-        #             np.zeros(bos_position, dtype=np.int64),
-        #             np.arange(1, seq_length - bos_position + 1, dtype=np.int64),
-        #         ]
-        #     )
-        #     features["position_ids"] = np.stack([position_ids, block_position_ids], axis=0)
-        return features
-
-
 def convert_example_chatglm(example, tokenizer, data_args, is_test=True, intokens=False):
     if data_args.chat_template is not None:
-        return convert_rounds_example_chatglm(example, tokenizer, data_args, is_test, intokens)
+        # chatglm only support single-round finetune
+        example = convert_multi_rounds_to_single_round(example, tokenizer)
 
     tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
 
@@ -269,6 +252,7 @@ def convert_example_chatglm(example, tokenizer, data_args, is_test=True, intoken
             features["attention_mask"] = attention_mask
             # 2d position_ids
             position_ids = np.arange(seq_length, dtype=np.int64)
+            position_ids[:bos_position] = bos_position - 1
             block_position_ids = np.concatenate(
                 [
                     np.zeros(bos_position, dtype=np.int64),

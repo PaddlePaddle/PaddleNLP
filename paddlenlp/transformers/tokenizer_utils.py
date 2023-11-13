@@ -544,7 +544,7 @@ class ChatTemplate:
                 "The template for multi-turns is invalid, please check `conversation` filed in your chat-template."
             )
 
-        if isinstance(conversation_data, list):
+        if isinstance(conversation_data, (list, tuple)):
             assert (
                 len(conversation_data) == 2
             ), "Each round/turn of conversation must be two participants, eg: [user-query, bot-query]"
