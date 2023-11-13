@@ -951,7 +951,6 @@ class QWenForCausalLM(QWenPretrainedModel):
         # if labels is not None:
         #     loss_fct = nn.CrossEntropyLoss()
         #     loss = loss_fct(lm_logits, labels)
-
         if not return_dict:
             output = (lm_logits,) + transformer_outputs[1:]
             return ((loss,) + output) if loss is not None else output

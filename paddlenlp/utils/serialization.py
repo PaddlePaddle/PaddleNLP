@@ -179,7 +179,6 @@ def load_torch(path: str, **pickle_load_args):
         **pickle_load_args: args of pickle module
     Returns:
     """
-
     if path.endswith(PYTORCH_WEIGHTS_NAME):
         pickle_load_args.update({"encoding": "utf-8"})
 
