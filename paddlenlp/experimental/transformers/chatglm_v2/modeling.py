@@ -80,9 +80,9 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         self.multi_query_group_num = config.multi_query_group_num
 
         self.use_weight_only = False
-        self.quant_bits = config.quant_bits
-        self.quant_algo = "weight_only_int" + str(self.quant_bits)
-        if self.quant_bits != -1:
+        self.weight_only_quant_bits = config.weight_only_quant_bits
+        self.quant_algo = "weight_only_int" + str(self.weight_only_quant_bits)
+        if self.weight_only_quant_bits != -1:
             self.use_weight_only = True
 
         if self.use_weight_only:
@@ -161,7 +161,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             config.num_attention_heads,
             config.ffn_hidden_size,
             dropout_rate=0.0,
-            quant_bits=self.quant_bits,
+            weight_only_quant_bits=self.weight_only_quant_bits,
             activation="swiglu",
             normalize_before=True,
             num_layers=config.num_hidden_layers,

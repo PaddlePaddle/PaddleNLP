@@ -77,9 +77,10 @@ class PredictorArgument:
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     quant_type: str = field(
-        default="None",
-        metadata={"help": "The quant type of inference model, support `weight_only_int8`, `weight_only_int4`."},
+        default=None,
+        metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"},
     )
+
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     benchmark: bool = field(
         default=False,
@@ -578,6 +579,10 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
 
         config.switch_ir_optim(True)
+        # remove `gpu_cpu_map_matmul_v2_to_matmul_pass` to avoid mapping matmul_v2 -> matmul op
+        if predictor_args.dtype == "bfloat16":
+            config.delete_pass("gpu_cpu_map_matmul_v2_to_matmul_pass")
+
         device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
         config.enable_use_gpu(100, device_id)
         # config.disable_glog_info()
@@ -712,16 +717,22 @@ def create_predictor(
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
             config.tensor_parallel_degree = tensor_parallel_degree
             config.tensor_parallel_rank = tensor_parallel_rank
-            config.quant_bits = -1
+            config.weight_only_quant_bits = -1
+            config.quant_type = None
+            config.model_name_or_path = ""
 
-            if predictor_args.quant_type.startswith("weight_only_int"):
-                quant_bits = int(predictor_args.quant_type[-1])
-                config.quant_bits = quant_bits
+            if predictor_args.quant_type is not None and predictor_args.quant_type.startswith("weight_only_int"):
+                weight_only_quant_bits = int(predictor_args.quant_type[-1])
+                config.weight_only_quant_bits = weight_only_quant_bits
+                config.quant_type = predictor_args.quant_type
 
-            config.quant_bits = -1
-            if predictor_args.quant_type.startswith("weight_only_int"):
-                quant_bits = int(predictor_args.quant_type[-1])
-                config.quant_bits = quant_bits
+            if config.quantization_config.quant_type is not None and "a8w8" in config.quantization_config.quant_type:
+                config.model_name_or_path = predictor_args.model_name_or_path
+                config.quant_type = config.quantization_config.quant_type
+
+                # Turn on GEMM int8 kernel tuning
+                paddle.base.core.enable_autotune()
+                paddle.base.core.update_autotune_status()
 
             if "llama" in config.architectures[0].lower():
                 if model_args.model_type == "llama-img2txt":

@@ -930,6 +930,7 @@ class GenerationMixin(object):
                 eos_token_id,
                 stopping_criteria=stopping_criteria,
                 streamer=streamer,
+                fast_ptq_sampling=generation_config.fast_ptq_sampling,
                 **model_kwargs,
             )
 
@@ -950,6 +951,7 @@ class GenerationMixin(object):
                 generation_config.temperature,
                 stopping_criteria=stopping_criteria,
                 streamer=streamer,
+                fast_ptq_sampling=generation_config.fast_ptq_sampling,
                 **model_kwargs,
             )
 
@@ -991,6 +993,7 @@ class GenerationMixin(object):
                     pad_token_id,
                     eos_token_id,
                     stopping_criteria=stopping_criteria,
+                    fast_ptq_sampling=generation_config.fast_ptq_sampling,
                     **model_kwargs,
                 )
             else:
@@ -1016,6 +1019,7 @@ class GenerationMixin(object):
                     pad_token_id,
                     eos_token_id,
                     stopping_criteria=stopping_criteria,
+                    fast_ptq_sampling=generation_config.fast_ptq_sampling,
                     **model_kwargs,
                 )
 
@@ -1028,6 +1032,7 @@ class GenerationMixin(object):
         eos_token_id,
         stopping_criteria=None,
         streamer=None,
+        fast_ptq_sampling=False,
         **model_kwargs
     ):
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
@@ -1096,6 +1101,8 @@ class GenerationMixin(object):
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.config.is_encoder_decoder
             )
+            if fast_ptq_sampling:
+                break
 
         if streamer is not None:
             streamer.end()
@@ -1115,6 +1122,7 @@ class GenerationMixin(object):
         min_tokens_to_keep=1,
         stopping_criteria=None,
         streamer=None,
+        fast_ptq_sampling=False,
         **model_kwargs
     ):
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
@@ -1201,6 +1209,8 @@ class GenerationMixin(object):
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
+            if fast_ptq_sampling:
+                break
 
         if streamer is not None:
             streamer.end()
@@ -1430,6 +1440,7 @@ class GenerationMixin(object):
         pad_token_id,
         eos_token_id,
         stopping_criteria=None,
+        fast_ptq_sampling=False,
         **model_kwargs
     ):
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
@@ -1554,6 +1565,8 @@ class GenerationMixin(object):
             if "past_key_values" in model_kwargs:
                 # reorder the cache
                 model_kwargs["past_key_values"] = self.reorder_cache(model_kwargs["past_key_values"], beam_idx)
+            if fast_ptq_sampling:
+                break
 
         pred_ids, scores = beam_scorer.finalize(
             input_ids,
@@ -1575,6 +1588,7 @@ class GenerationMixin(object):
         pad_token_id,
         eos_token_id,
         stopping_criteria=None,
+        fast_ptq_sampling=False,
         **model_kwargs
     ):
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
@@ -1709,6 +1723,9 @@ class GenerationMixin(object):
                 model_kwargs["past_key_values"] = self.reorder_cache(
                     model_kwargs["past_key_values"], reordering_indices
                 )
+
+            if fast_ptq_sampling:
+                break
 
         pred_ids, scores = beam_scorer.finalize(
             input_ids,
