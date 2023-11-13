@@ -11,17 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import inspect
 import math
 from functools import partial
 from typing import List, Optional, Tuple, Union
 
 import paddle
+import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
 from paddle import nn
-from paddle.distributed.fleet.utils import recompute
-import paddle.distributed.fleet.meta_parallel as mpu
 from paddle.distributed import fleet
+from paddle.distributed.fleet.utils import recompute
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
 from paddlenlp.transformers.conversion_utils import (
@@ -29,41 +28,18 @@ from paddlenlp.transformers.conversion_utils import (
     init_name_mappings,
 )
 from paddlenlp.utils.log import logger
-#i=0
 
 from ..activations import ACT2FN
 from ..model_outputs import (
     BaseModelOutputWithPast,
+    CausalLMOutputWithCrossAttentions,
     CausalLMOutputWithPast,
     SequenceClassifierOutputWithPast,
-    CausalLMOutputWithCrossAttentions,
 )
 from ..model_utils import PretrainedModel
-
-# from ...utils import (
-#    add_start_docstrings,
-#    add_start_docstrings_to_model_forward,
-#    is_flash_attn_2_available,
-#    logging,
-#    replace_return_docstrings,
-# )
 from .configuration import MistralConfig
 
 
-def is_flash_attn_2_available():
-    return False
-
-
-if is_flash_attn_2_available():
-    from flash_attn import flash_attn_func, flash_attn_varlen_func
-    from flash_attn.bert_padding import index_first_axis, pad_input, unpad_input  # noqa
-
-    _flash_supports_window_size = "window_size" in list(inspect.signature(flash_attn_func).parameters)
-
-_CONFIG_FOR_DOC = "MistralConfig"
-
-
-# Copied from transformers.models.llama.modeling_llama._get_unpad_data
 def _get_unpad_data(padding_mask):
     seqlens_in_batch = padding_mask.sum(axis=-1, dtype=paddle.int32)
     indices = paddle.nonzero(padding_mask.flatten(), as_tuple=False).flatten()
@@ -76,7 +52,7 @@ def _get_unpad_data(padding_mask):
     )
 
 
-def _make_sliding_window_causal_mask(
+def _make_causal_mask(
     input_ids_shape: paddle.shape,
     dtype: paddle.dtype,
     past_key_values_length: int = 0,
@@ -98,6 +74,40 @@ def _make_sliding_window_causal_mask(
 
     if past_key_values_length > 0:
         mask = paddle.concat([paddle.zeros([tgt_len, past_key_values_length], dtype=dtype), mask], axis=-1)
+    return mask[None, None, :, :].expand([bsz, 1, tgt_len, tgt_len + past_key_values_length])
+
+
+def _make_sliding_window_causal_mask(
+    input_ids_shape: paddle.shape,
+    dtype: paddle.dtype,
+    past_key_values_length: int = 0,
+    sliding_window: int = 4096,
+):
+    """
+    Make causal mask used for sliding window attention
+    """
+    bsz, tgt_len = input_ids_shape
+    mask = paddle.full(
+        (tgt_len, tgt_len),
+        fill_value=0.0,
+        dtype="float32",
+    )
+    if past_key_values_length > 0:
+        mask = paddle.concat([paddle.zeros([tgt_len, past_key_values_length], dtype="float32"), mask], axis=-1)
+
+    # make sliding window mask
+    # note that: this computation of SWA only modify the mask
+    # to imitate sliding window which has same time complexity
+    # with normal attention calculation, just for test.
+    for qidx in range(tgt_len):
+        q_causal_start = past_key_values_length + qidx - sliding_window
+        q_causal_end = q_causal_start + sliding_window
+        q_causal_start = max(0, q_causal_start)
+        # paddle do not support index operation on bfloat16 tensor temporary
+        mask[qidx, q_causal_start : q_causal_end + 1] = 1.0
+
+    mask = paddle.log(mask).astype(dtype)
+
     return mask[None, None, :, :].expand([bsz, 1, tgt_len, tgt_len + past_key_values_length])
 
 
@@ -144,12 +154,10 @@ class MistralRotaryEmbedding(nn.Layer):
         self.dim = dim
         self.max_position_embeddings = max_position_embeddings
         self.base = base
-        self.inv_freq = 1.0 / (self.base ** (paddle.arange(0, self.dim, 2).astype('float32') / self.dim))
+        self.inv_freq = 1.0 / (self.base ** (paddle.arange(0, self.dim, 2).astype("float32") / self.dim))
 
         # Build here to make `paddle.jit.trace` work.
-        self._set_cos_sin_cache(
-            seq_len=max_position_embeddings, dtype=paddle.get_default_dtype()
-        )
+        self._set_cos_sin_cache(seq_len=max_position_embeddings, dtype=paddle.get_default_dtype())
 
     def _set_cos_sin_cache(self, seq_len, dtype):
         self.max_seq_len_cached = seq_len
@@ -337,19 +345,21 @@ class MistralAttention(nn.Layer):
         padding_mask: Optional[paddle.Tensor] = None,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         bsz, q_len, _ = hidden_states.shape
-        #global i
-        #import numpy as np; np.save('hs_{}'.format(i), hidden_states.astype('float32').numpy())
+        # global i
+        # import numpy as np; np.save('hs_{}'.format(i), hidden_states.astype('float32').numpy())
 
         query_states = self.q_proj(hidden_states)
         key_states = self.k_proj(hidden_states)
         value_states = self.v_proj(hidden_states)
-        #import numpy as np; np.save('q_{}'.format(i), query_states.astype('float32').numpy())
-        #import numpy as np; np.save('k_{}'.format(i), key_states.astype('float32').numpy())
-        #import numpy as np; np.save('v_{}'.format(i), value_states.astype('float32').numpy())
+        # import numpy as np; np.save('q_{}'.format(i), query_states.astype('float32').numpy())
+        # import numpy as np; np.save('k_{}'.format(i), key_states.astype('float32').numpy())
+        # import numpy as np; np.save('v_{}'.format(i), value_states.astype('float32').numpy())
 
         query_states = query_states.reshape([bsz, q_len, self.num_heads, self.head_dim]).transpose([0, 2, 1, 3])
         key_states = key_states.reshape([bsz, q_len, self.num_key_value_heads, self.head_dim]).transpose([0, 2, 1, 3])
-        value_states = value_states.reshape([bsz, q_len, self.num_key_value_heads, self.head_dim]).transpose([0, 2, 1, 3])
+        value_states = value_states.reshape([bsz, q_len, self.num_key_value_heads, self.head_dim]).transpose(
+            [0, 2, 1, 3]
+        )
 
         kv_seq_len = key_states.shape[-2]
         if past_key_value is not None:
@@ -370,7 +380,7 @@ class MistralAttention(nn.Layer):
 
         if not self.use_flash_attention:
             attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) / math.sqrt(self.head_dim)
-            #import numpy as np; np.save('aw_{}'.format(i), attn_weights.astype('float32').numpy())
+            # import numpy as np; np.save('aw_{}'.format(i), attn_weights.astype('float32').numpy())
 
             if attn_weights.shape != [bsz, self.num_heads, q_len, kv_seq_len]:
                 raise ValueError(
@@ -387,12 +397,15 @@ class MistralAttention(nn.Layer):
                 attn_weights = attn_weights + attention_mask
 
             # upcast attention to fp32
-            attn_weights = nn.functional.softmax(attn_weights, axis=-1, dtype=paddle.float32).astype(query_states.dtype)
+            attn_weights = nn.functional.softmax(attn_weights, axis=-1, dtype=paddle.float32).astype(
+                query_states.dtype
+            )
             attn_output = paddle.matmul(attn_weights, value_states)
         else:
-            query_states = query_states.transpose([0,2,1,3])
-            key_states = key_states.transpose([0,2,1,3])
-            value_states = value_states.transpose([0,2,1,3])
+            query_states = query_states.transpose([0, 2, 1, 3])
+            key_states = key_states.transpose([0, 2, 1, 3])
+            value_states = value_states.transpose([0, 2, 1, 3])
+            # print(attention_mask)
             attn_output = F.scaled_dot_product_attention(
                 query_states,
                 key_states,
@@ -400,7 +413,7 @@ class MistralAttention(nn.Layer):
                 attn_mask=attention_mask,
                 is_causal=attention_mask is None,
             )
-            attn_output = attn_output.transpose([0,2,1,3])
+            attn_output = attn_output.transpose([0, 2, 1, 3])
 
         if attn_output.shape != [bsz, self.num_heads, q_len, self.head_dim]:
             raise ValueError(
@@ -412,254 +425,13 @@ class MistralAttention(nn.Layer):
         attn_output = attn_output.reshape([bsz, q_len, self.num_heads * self.head_dim])
 
         attn_output = self.o_proj(attn_output)
-        #import numpy as np; np.save('ao_{}'.format(i), attn_output.astype('float32').numpy())
-        #i += 1
+        # import numpy as np; np.save('ao_{}'.format(i), attn_output.astype('float32').numpy())
+        # i += 1
 
         if not output_attentions:
             attn_weights = None
 
         return attn_output, attn_weights, past_key_value
-
-
-#class MistralFlashAttention2(MistralAttention):
-#    """
-#    Mistral flash attention module. This module inherits from `MistralAttention` as the weights of the module stays
-#    untouched. The only required change would be on the forward pass where it needs to correctly call the public API of
-#    flash attention and deal with padding tokens in case the input contains any of them.
-#    """
-#
-#    def forward(
-#        self,
-#        hidden_states: paddle.Tensor,
-#        attention_mask: Optional[paddle.Tensor] = None,
-#        position_ids: Optional[paddle.Tensor] = None,
-#        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
-#        output_attentions: bool = False,
-#        use_cache: bool = False,
-#        padding_mask: Optional[paddle.Tensor] = None,
-#    ):
-#        bsz, q_len, _ = hidden_states.shape
-#
-#        query_states = self.q_proj(hidden_states)
-#        key_states = self.k_proj(hidden_states)
-#        value_states = self.v_proj(hidden_states)
-#
-#        query_states = query_states.reshape([bsz, q_len, self.num_heads, self.head_dim]).transpose([0, 2, 1, 3])
-#        key_states = key_states.reshape([bsz, q_len, self.num_key_value_heads, self.head_dim]).transpose([0, 2, 1, 3])
-#        value_states = value_states.reshape([bsz, q_len, self.num_key_value_heads, self.head_dim]).transpose([0, 2, 1, 3])
-#
-#        kv_seq_len = key_states.shape[-2]
-#        if past_key_value is not None:
-#            kv_seq_len += past_key_value[0].shape[-2]
-#
-#        # Because the input can be padded, the absolute sequence length depends on the max position id.
-#        rotary_seq_len = max(kv_seq_len, position_ids[:, -1].max().item()) + 1
-#        cos, sin = self.rotary_emb(value_states, seq_len=rotary_seq_len)
-#
-#        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
-#
-#        use_sliding_windows = (
-#            _flash_supports_window_size
-#            and hasattr(self.config, "sliding_window") is not None
-#            and kv_seq_len > self.config.sliding_window
-#        )
-#
-#        if not _flash_supports_window_size:
-#            logger.warning_once(
-#                "The current flash attention version does not support sliding window attention, for a more memory efficient implementation"
-#                " make sure to upgrade flash-attn library."
-#            )
-#
-#        if past_key_value is not None:
-#            # Activate slicing cache only if the config has a value `sliding_windows` attribute
-#            if hasattr(self.config, "sliding_window") and kv_seq_len > self.config.sliding_window:
-#                slicing_tokens = kv_seq_len - self.config.sliding_window
-#
-#                past_key = past_key_value[0]
-#                past_value = past_key_value[1]
-#
-#                past_key = past_key[:, :, slicing_tokens:, :]
-#                past_value = past_value[:, :, slicing_tokens:, :]
-#
-#                if past_key.shape[-2] != self.config.sliding_window - 1:
-#                    raise ValueError(
-#                        f"past key much have a shape of (`batch_size, num_heads, self.config.sliding_window-1, head_dim`), got"
-#                        f" {past_key.shape}"
-#                    )
-#
-#                past_key_value = (past_key, past_value)
-#
-#                if padding_mask is not None:
-#                    padding_mask = padding_mask[:, slicing_tokens:]
-#                    padding_mask = paddle.concat([padding_mask, paddle.ones_like(padding_mask[:, -1:])], axis=-1)
-#
-#            key_states = paddle.concat([past_key_value[0], key_states], axis=2)
-#            value_states = paddle.concat([past_key_value[1], value_states], axis=2)
-#
-#        past_key_value = (key_states, value_states) if use_cache else None
-#
-#        # repeat k/v heads if n_kv_heads < n_heads
-#        key_states = repeat_kv(key_states, self.num_key_value_groups)
-#        value_states = repeat_kv(value_states, self.num_key_value_groups)
-#
-#        # TODO: Mistral does not have dropout in the config??
-#        # It is recommended to use dropout with FA according to the docs
-#        # when training.
-#        dropout_rate = 0.0  # if not self.training else self.attn_dropout
-#
-#        # Reashape to the expected shape for Flash Attention
-#        query_states = query_states.transpose([0, 2, 1, 3])
-#        key_states = key_states.transpose([0, 2, 1, 3])
-#        value_states = value_states.transpose([0, 2, 1, 3])
-#
-#        attn_output = self._flash_attention_forward(
-#            query_states,
-#            key_states,
-#            value_states,
-#            padding_mask,
-#            q_len,
-#            dropout=dropout_rate,
-#            use_sliding_windows=use_sliding_windows,
-#        )
-#
-#        attn_output = attn_output.reshape([bsz, q_len, self.hidden_size])
-#        attn_output = self.o_proj(attn_output)
-#
-#        if not output_attentions:
-#            attn_weights = None
-#
-#        return attn_output, attn_weights, past_key_value
-
-    #def _flash_attention_forward(
-    #    self,
-    #    query_states,
-    #    key_states,
-    #    value_states,
-    #    padding_mask,
-    #    query_length,
-    #    dropout=0.0,
-    #    softmax_scale=None,
-    #    use_sliding_windows=False,
-    #):
-    #    """
-    #    calls the forward method of Flash Attention - if the input hidden states contain at least one padding token
-    #    first unpad the input, then computes the attention scores and pad the final attention scores.
-
-    #    args:
-    #        query_states (`paddle.Tensor`):
-    #            Input query states to be passed to Flash Attention API
-    #        key_states (`paddle.Tensor`):
-    #            Input key states to be passed to Flash Attention API
-    #        value_states (`paddle.Tensor`):
-    #            Input value states to be passed to Flash Attention API
-    #        padding_mask (`paddle.Tensor`):
-    #            The padding mask - corresponds to a tensor of size `(batch_size, seq_len)` where 0 stands for the
-    #            position of padding tokens and 1 for the position of non-padding tokens.
-    #        dropout (`int`, *optional*):
-    #            Attention dropout
-    #        softmax_scale (`float`, *optional*):
-    #            The scaling of QK^T before applying softmax. Default to 1 / sqrt(head_dim)
-    #        use_sliding_windows (`bool`, *optional*):
-    #            Whether to activate sliding window attention.
-    #    """
-    #    # Contains at least one padding token in the sequence
-    #    if padding_mask is not None:
-    #        batch_size = query_states.shape[0]
-    #        query_states, key_states, value_states, indices_q, cu_seq_lens, max_seq_lens = self._upad_input(
-    #            query_states, key_states, value_states, padding_mask, query_length
-    #        )
-
-    #        cu_seqlens_q, cu_seqlens_k = cu_seq_lens
-    #        max_seqlen_in_batch_q, max_seqlen_in_batch_k = max_seq_lens
-
-    #        if not use_sliding_windows:
-    #            attn_output_unpad = flash_attn_varlen_func(
-    #                query_states,
-    #                key_states,
-    #                value_states,
-    #                cu_seqlens_q=cu_seqlens_q,
-    #                cu_seqlens_k=cu_seqlens_k,
-    #                max_seqlen_q=max_seqlen_in_batch_q,
-    #                max_seqlen_k=max_seqlen_in_batch_k,
-    #                dropout_p=dropout,
-    #                softmax_scale=softmax_scale,
-    #                causal=True,
-    #            )
-    #        else:
-    #            attn_output_unpad = flash_attn_varlen_func(
-    #                query_states,
-    #                key_states,
-    #                value_states,
-    #                cu_seqlens_q=cu_seqlens_q,
-    #                cu_seqlens_k=cu_seqlens_k,
-    #                max_seqlen_q=max_seqlen_in_batch_q,
-    #                max_seqlen_k=max_seqlen_in_batch_k,
-    #                dropout_p=dropout,
-    #                softmax_scale=softmax_scale,
-    #                causal=True,
-    #                window_size=(self.config.sliding_window, self.config.sliding_window),
-    #            )
-
-    #        attn_output = pad_input(attn_output_unpad, indices_q, batch_size, query_length)
-    #    else:
-    #        if not use_sliding_windows:
-    #            attn_output = flash_attn_func(
-    #                query_states, key_states, value_states, dropout, softmax_scale=softmax_scale, causal=True
-    #            )
-    #        else:
-    #            attn_output = flash_attn_func(
-    #                query_states,
-    #                key_states,
-    #                value_states,
-    #                dropout,
-    #                softmax_scale=softmax_scale,
-    #                causal=True,
-    #                window_size=(self.config.sliding_window, self.config.sliding_window),
-    #            )
-
-    #    return attn_output
-
-    #def _upad_input(self, query_layer, key_layer, value_layer, padding_mask, query_length):
-    #    batch_size, kv_seq_len, num_heads, head_dim = key_layer.shape
-
-    #    # On the first iteration we need to properly re-create the padding mask
-    #    # by slicing it on the proper place
-    #    if kv_seq_len != padding_mask.shape[-1]:
-    #        padding_mask_num_tokens = padding_mask.shape[-1]
-    #        padding_mask = padding_mask[:, padding_mask_num_tokens - kv_seq_len :]
-
-    #    indices_k, cu_seqlens_k, max_seqlen_in_batch_k = _get_unpad_data(padding_mask)
-
-    #    key_layer = index_first_axis(key_layer.reshape([batch_size * kv_seq_len, num_heads, head_dim]), indices_k)
-    #    value_layer = index_first_axis(value_layer.reshape([batch_size * kv_seq_len, num_heads, head_dim]), indices_k)
-
-    #    if query_length == kv_seq_len:
-    #        query_layer = index_first_axis(
-    #            query_layer.reshape([batch_size * kv_seq_len, num_heads, head_dim]), indices_k
-    #        )
-    #        cu_seqlens_q = cu_seqlens_k
-    #        max_seqlen_in_batch_q = max_seqlen_in_batch_k
-    #        indices_q = indices_k
-    #    elif query_length == 1:
-    #        max_seqlen_in_batch_q = 1
-    #        cu_seqlens_q = paddle.arange(
-    #            batch_size + 1, dtype=paddle.int32
-    #        )  # There is a memcpy here, that is very bad.
-    #        indices_q = cu_seqlens_q[:-1]
-    #        query_layer = query_layer.squeeze(1)
-    #    else:
-    #        # The -q_len: slice assumes left padding.
-    #        padding_mask = padding_mask[:, -query_length:]
-    #        query_layer, indices_q, cu_seqlens_q, max_seqlen_in_batch_q = unpad_input(query_layer, padding_mask)
-
-    #    return (
-    #        query_layer,
-    #        key_layer,
-    #        value_layer,
-    #        indices_q,
-    #        (cu_seqlens_q, cu_seqlens_k),
-    #        (max_seqlen_in_batch_q, max_seqlen_in_batch_k),
-    #    )
 
 
 class MistralDecoderLayer(nn.Layer):
@@ -668,8 +440,8 @@ class MistralDecoderLayer(nn.Layer):
         self.hidden_size = config.hidden_size
         self.self_attn = (
             MistralAttention(config=config)
-            #if not getattr(config, "_flash_attn_2_enabled", False)
-            #else MistralFlashAttention2(config)
+            # if not getattr(config, "_flash_attn_2_enabled", False)
+            # else MistralFlashAttention2(config)
         )
         self.mlp = MistralMLP(config)
         self.input_layernorm = MistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
@@ -764,8 +536,8 @@ class MistralPreTrainedModel(PretrainedModel):
         init_name_mappings(mappings=model_mappings)
         # base-model prefix "LlamaModel"
         for mapping in model_mappings:
-                mapping[0] = "model." + mapping[0]
-                mapping[1] = "model." + mapping[1]
+            mapping[0] = "model." + mapping[0]
+            mapping[1] = "model." + mapping[1]
 
         if "MistralModel" not in config.architectures:
             model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
@@ -853,6 +625,7 @@ class MistralPreTrainedModel(PretrainedModel):
                 factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
                 layer.o_proj.weight.scale_(factor)
 
+
 class MistralModel(MistralPreTrainedModel):
     """
     Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`MistralDecoderLayer`]
@@ -894,9 +667,18 @@ class MistralModel(MistralPreTrainedModel):
     ):
         # create causal mask
         # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
-        combined_attention_mask = None
-        if input_shape[-1] > 1:
+
+        q_length = input_shape[-1]
+        kv_length = q_length + past_key_values_length
+        if kv_length > sliding_window:
             combined_attention_mask = _make_sliding_window_causal_mask(
+                input_shape,
+                inputs_embeds.dtype,
+                past_key_values_length=past_key_values_length,
+                sliding_window=sliding_window,
+            )
+        else:
+            combined_attention_mask = _make_causal_mask(
                 input_shape,
                 inputs_embeds.dtype,
                 past_key_values_length=past_key_values_length,
@@ -955,7 +737,7 @@ class MistralModel(MistralPreTrainedModel):
             )
             position_ids = position_ids.unsqueeze(0).reshape([-1, seq_length])
         else:
-            position_ids = position_ids.reshape([-1, seq_length]).astype('int64')
+            position_ids = position_ids.reshape([-1, seq_length]).astype("int64")
 
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
@@ -964,9 +746,7 @@ class MistralModel(MistralPreTrainedModel):
 
         # embed positions
         if attention_mask is None:
-            attention_mask = paddle.ones(
-                (batch_size, seq_length_with_past), dtype=paddle.bool
-            )
+            attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
         elif paddle.any(attention_mask == 0):
             padding_mask = attention_mask
 
@@ -1063,6 +843,7 @@ class MistralModel(MistralPreTrainedModel):
             attentions=all_self_attns,
         )
 
+
 def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, tensor_parallel_output=True):
     is_fleet_init = True
     tensor_parallel_degree = 1
@@ -1118,6 +899,7 @@ class MistralLMHead(nn.Layer):
         logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         return logits
 
+
 class MistralForCausalLM(MistralPreTrainedModel):
     _tied_weights_keys = ["lm_head.weight"]
 
@@ -1125,7 +907,7 @@ class MistralForCausalLM(MistralPreTrainedModel):
         super().__init__(config)
         self.model = MistralModel(config)
         self.vocab_size = config.vocab_size
-        #self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
+        # self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
         self.lm_head = MistralLMHead(config)
 
     def get_input_embeddings(self):
@@ -1254,14 +1036,14 @@ class MistralForCausalLM(MistralPreTrainedModel):
 
         hidden_states = outputs[0]
         logits = self.lm_head(hidden_states)
-        logits = logits.astype('float32')
-        #import numpy as np; np.save('l', logits.astype('float32').numpy())
+        logits = logits.astype("float32")
+        # import numpy as np; np.save('l', logits.astype('float32').numpy())
 
         loss = None
         if labels is not None:
             loss_fct = CrossEntropyLoss()
-            #logits = logits.reshape([-1, self.config.vocab_size])
-            #labels = labels.reshape([-1])
+            # logits = logits.reshape([-1, self.config.vocab_size])
+            # labels = labels.reshape([-1])
             loss = loss_fct(logits, labels)
 
         if not return_dict:
@@ -1275,6 +1057,7 @@ class MistralForCausalLM(MistralPreTrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+
 
 class MistralForSequenceClassification(MistralPreTrainedModel):
     def __init__(self, config):
@@ -1335,7 +1118,7 @@ class MistralForSequenceClassification(MistralPreTrainedModel):
             sequence_lengths = -1
         else:
             if input_ids is not None:
-                sequence_lengths = (paddle.eq(input_ids, self.config.pad_token_id).long().argmax(-1) - 1)
+                sequence_lengths = paddle.eq(input_ids, self.config.pad_token_id).long().argmax(-1) - 1
             else:
                 sequence_lengths = -1
 
