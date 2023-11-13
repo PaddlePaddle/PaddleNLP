@@ -474,7 +474,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2() {
     echo "=========== $FUNCNAME run  end ==========="
 }
 
-function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2_pri() {
+function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2_pir() {
     echo "=========== $FUNCNAME run begin ==========="
     export FLAGS_enable_pir_in_executor=1
     log_dir=mylog
@@ -550,7 +550,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3() {
 function gpt_auto_sp_acc_check() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=/workspace/PaddleNLP/:$PYTHONPATH
-    export FLAGS_infer_spmd_enable=true  
+    export FLAGS_infer_spmd_enable=true
     export FLAGS_call_stack_level=2
     mp_degree=2
     dp_degree=1
@@ -674,9 +674,38 @@ function check_result() {
     fi
 }
 
+function before_hook() {
+    echo -e "\033[31m ---- Set FLAGS  \033[0m"
+    export FLAGS_new_executor_micro_batching=True  # True：打开新执行器
+    export FLAGS_embedding_deterministic=1         # 1：关闭随机性
+    export FLAGS_cudnn_deterministic=1             # 1：关闭随机性
+    unset CUDA_MODULE_LOADING
+    env | grep FLAGS
+    echo -e "\033[31m ---- Install requirements  \033[0m"
+    export http_proxy=${proxy}
+    export https_proxy=${proxy}
+    python -m pip install -r requirements.txt --force-reinstall
+    
+    python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
+
+    echo -e "\033[31m ---- download data  \033[0m"
+    rm -rf data
+    if [[ -e ${data_path}/data ]]; then
+        echo "data downloaded"
+    else
+        # download data for gpt
+        mkdir ${data_path}/data;
+        wget -O ${data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
+        wget -O ${data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
+    fi
+
+    cp -r ${data_path}/data ${case_path}/
+}
+
 main() {
     echo -e "\033[31m ---- Start executing auto_parallel case \033[0m"
     cd ${case_path}
+    before_hook
     case_list_auto
 }
 
