@@ -23,11 +23,13 @@ from paddleslim.lc.quantizers.quant_func import (
 )
 
 
-def weight_quantize(x, algo, double_quant=False, block_size=64, double_quant_block_size=256):
+def qlora_weight_quantize(
+    weight, algo, double_quant=False, block_size=64, double_quant_block_size=256, linear_name=None
+):
     if algo == "nf4":
-        out, quant_scale = quantize_nf4(x, block_size)
+        quant_weight, quant_scale = quantize_nf4(weight, block_size)
     else:
-        out, quant_scale = quantize_fp4(x, block_size)
+        quant_weight, quant_scale = quantize_fp4(weight, block_size)
 
     if double_quant:
         quant_sacle_offset = quant_scale.mean()
@@ -35,12 +37,23 @@ def weight_quantize(x, algo, double_quant=False, block_size=64, double_quant_blo
         qquant_scale, double_quant_scale = quantize_8bit(
             quant_scale, None, double_quant_block_size, quant_type="dynamic_fp8"
         )
-        return out, (qquant_scale, double_quant_scale, quant_sacle_offset)
+        qquant_scale_name = f"{linear_name}.qquant_scale" if linear_name else "qquant_scale"
+        double_quant_scale_name = f"{linear_name}.double_quant_scale" if linear_name else "double_quant_scale"
+        quant_sacle_offset_name = f"{linear_name}.quant_sacle_offset" if linear_name else "quant_sacle_offset"
+        qlora_state_dict = {
+            qquant_scale_name: qquant_scale,
+            double_quant_scale_name: double_quant_scale,
+            quant_sacle_offset_name: quant_sacle_offset,
+        }
     else:
-        return out, quant_scale
+        quant_scale_name = f"{linear_name}.quant_scale" if linear_name else "quant_scale"
+        qlora_state_dict = {quant_scale_name: quant_scale}
+    quant_weight_name = f"{linear_name}.quant_weight" if linear_name else "quant_weight"
+    qlora_state_dict[quant_weight_name] = quant_weight
+    return qlora_state_dict
 
 
-def weight_dequantize(x, algo, state, double_quant=False, block_size=64, double_quant_block_size=256):
+def qlora_weight_dequantize(x, algo, state, double_quant=False, block_size=64, double_quant_block_size=256):
     if double_quant:
         qquant_scale, double_quant_scale, quant_sacle_offset = state
         quant_scale = dequantize_8bit(
@@ -56,9 +69,11 @@ def weight_dequantize(x, algo, state, double_quant=False, block_size=64, double_
     return out
 
 
-def weight_linear(x, weight, algo, state, double_quant=False, block_size=64, double_quant_block_size=256, bias=None):
+def qlora_weight_linear(
+    x, weight, algo, state, double_quant=False, block_size=64, double_quant_block_size=256, bias=None
+):
     weight = (
-        weight_dequantize(weight, algo, state, double_quant, block_size, double_quant_block_size)
+        qlora_weight_dequantize(weight, algo, state, double_quant, block_size, double_quant_block_size)
         .cast(x.dtype)
         .reshape((x.shape[-1], -1))
     )

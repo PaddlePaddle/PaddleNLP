@@ -28,9 +28,10 @@ from paddle.nn.quant import llm_int8_linear, weight_only_linear, weight_quantize
 from .log import logger
 
 try:
-    from .qlora import weight_linear
+    from .qlora import qlora_weight_linear, qlora_weight_quantize
 except:
-    weight_linear = None
+    qlora_weight_linear = None
+    qlora_weight_quantize = None
 
 
 QuantMapping = {
@@ -89,6 +90,13 @@ class QuantizationLinear(nn.Layer):
                 is_bias=False,
             )
         if self.quant_algo in ["fp4", "nf4"]:
+            if qlora_weight_linear is None:
+                raise ImportError(
+                    "Please run the following commands to install: qlora related package first\n"
+                    "1) git clone https://github.com/PaddlePaddle/PaddleSlim \n"
+                    "2) cd PaddleSlim \n"
+                    "3) python ./csrc/setup_cuda.py install"
+                )
             if self.double_quant:
                 # quantized quant_scale
                 self.qquant_scale = self.create_parameter(
@@ -135,7 +143,7 @@ class QuantizationLinear(nn.Layer):
             elif self.quant_algo in ["llm.int8"]:
                 out = llm_int8_linear(x, self.quant_weight, self.bias, self.quant_scale, self.llm_int8_threshold)
             elif self.quant_algo in ["fp4", "nf4"]:
-                out = weight_linear(
+                out = qlora_weight_linear(
                     x,
                     self.quant_weight.reshape([-1, 1]),
                     self.quant_algo,
@@ -401,7 +409,7 @@ def replace_with_quantization_linear(model, quantization_config, name_prefix="",
             model._sub_layers[name] = QuantizationLinear(
                 child.weight.shape[0],
                 child.weight.shape[1],
-                quantization_config.quant_algo,
+                quantization_config.weight_quantize_algo,
                 child._dtype,
                 bias_attr=bias_attr,
                 llm_int8_threshold=llm_int8_threshold,
@@ -419,7 +427,7 @@ def replace_with_quantization_linear(model, quantization_config, name_prefix="",
             model._sub_layers[name] = ColumnParallelQuantizationLinear(
                 child.weight.shape[0],
                 child.weight.shape[1] * child.world_size,
-                quantization_config.quant_algo,
+                quantization_config.weight_quantize_algo,
                 child._dtype,
                 bias_attr=bias_attr,
                 gather_output=child.gather_output,
@@ -435,7 +443,7 @@ def replace_with_quantization_linear(model, quantization_config, name_prefix="",
             model._sub_layers[name] = RowParallelQuantizationLinear(
                 child.weight.shape[0] * child.world_size,
                 child.weight.shape[1],
-                quantization_config.quant_algo,
+                quantization_config.weight_quantize_algo,
                 child._dtype,
                 bias_attr=bias_attr,
                 input_is_parallel=child.input_is_parallel,
@@ -452,7 +460,7 @@ def replace_with_quantization_linear(model, quantization_config, name_prefix="",
     return quantization_linear_list
 
 
-def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quant_algo, dtype):
+def convert_to_quantize_state_dict_with_check(state_dict, quantization_linear_list, quant_algo, dtype):
     for name in quantization_linear_list:
         weight_name = name + ".weight"
         quant_weight_name = name + ".quant_weight"
@@ -475,6 +483,46 @@ def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quant_a
             del target_weight
         gc.collect()
     return state_dict
+
+
+def convert_to_quantize_state_dict_without_check(state_dict, quantization_linear_list, quantization_config, dtype):
+    if qlora_weight_linear is None:
+        raise ImportError(
+            "Please run the following commands to install qlora related package first: \n"
+            "1) git clone https://github.com/PaddlePaddle/PaddleSlim \n"
+            "2) cd PaddleSlim \n"
+            "3) python ./csrc/setup_cuda.py install"
+        )
+    for name in quantization_linear_list:
+        weight_name = name + ".weight"
+        target_weight = state_dict.pop(weight_name).cast(dtype)
+        qlora_state_dict = qlora_weight_quantize(
+            target_weight,
+            quantization_config.weight_quantize_algo,
+            double_quant=quantization_config.weight_double_quant,
+            block_size=quantization_config.weight_blocksize,
+            double_quant_block_size=quantization_config.weight_double_quant_block_size,
+            linear_name=name,
+        )
+        state_dict.update(qlora_state_dict)
+        del target_weight
+        gc.collect()
+    return state_dict
+
+
+def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quantization_config, dtype):
+    if quantization_config.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8"]:
+        return convert_to_quantize_state_dict_with_check(
+            state_dict, quantization_linear_list, quantization_config.weight_quantize_algo, dtype
+        )
+    elif quantization_config.weight_quantize_algo in ["fp4", "nf4"]:
+        return convert_to_quantize_state_dict_without_check(
+            state_dict, quantization_linear_list, quantization_config, dtype
+        )
+    else:
+        raise NotImplementedError(
+            f"Please check the quantization_config.weight_quantize_algo: {quantization_config.weight_quantize_algo}"
+        )
 
 
 def update_loaded_state_dict_keys(state_dict, quantization_linear_list):
