@@ -16,6 +16,7 @@ import paddle
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import LayerDesc, PipelineLayer
+from paddle.distributed.fleet.utils import recompute
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
 
@@ -124,7 +125,14 @@ class LlamaEmbeddingPipe(nn.Layer):
 class LlamaDecoderLayerPipe(LlamaDecoderLayer):
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
-        hidden_states = super().forward(hidden_states, attention_mask=attention_mask)
+        has_gradient = not hidden_states.stop_gradient
+        if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
+            hidden_states = recompute(
+                super().forward, hidden_states, attention_mask=attention_mask, use_reentrant=False
+            )
+        else:
+            hidden_states = super().forward(hidden_states, attention_mask=attention_mask)
+
         return return_args(hidden_states, attention_mask, position_ids)
 
 
@@ -182,11 +190,6 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self.add_sequential_layer(LayerDesc(LlamaLMHead, config=config), "lm_head")
 
         recompute_interval = 0
-        if self.use_recompute and self.recompute_granularity == "full":
-            assert self.config.pp_recompute_interval <= config.num_hidden_layers // (
-                virtual_pp_degree * get_hcg().topology().get_dim_size("pipe")
-            ), "pp recompute interval should smaller than num layers of each pp chunk"
-            recompute_interval = self.config.pp_recompute_interval
 
         seg_method = "layer:LlamaDecoderLayer"
         if config.num_hidden_layers % get_hcg().topology().get_dim_size("pipe") != 0:
