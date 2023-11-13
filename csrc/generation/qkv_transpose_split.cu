@@ -29,7 +29,7 @@ __global__ void fusedQKV_transpose_split_kernel(
     const int token_num,
     const int head_num,
     const int kv_head_num,
-    const int size_per_head,) {
+    const int size_per_head) {
   // const int32_t offset = batch_size * max_len_this_time * head_num * size_per_head;
   const int32_t hidden_size = head_num * size_per_head;
   const int32_t fused_hidden_size = hidden_size + kv_head_num * size_per_head + kv_head_num * size_per_head;
@@ -97,7 +97,7 @@ std::vector<paddle::Tensor> qkv_transpose_split(const paddle::Tensor& qkv, // [t
     const int bsz = seq_lens.shape()[0];
     const int max_seq_len = input_ids.shape()[1]; //max_seq_len_tensor.copy_to(paddle::CPUPlace(), false).data<int>()[0];
     
-    int64_t fused_hidden_size = qkv.shape[1];
+    int64_t fused_hidden_size = qkv.shape()[1];
     int kv_num_head = (fused_hidden_size - num_head * head_size) / head_size / 2;
 
     auto q_out = paddle::full({bsz, num_head, max_seq_len, head_size}, 0, qkv.dtype(), qkv.place());
@@ -123,6 +123,7 @@ std::vector<paddle::Tensor> qkv_transpose_split(const paddle::Tensor& qkv, // [t
         max_seq_len,
         token_num,
         num_head,
+        kv_num_head,
         head_size);
     return {q_out, k_out, v_out};
 }
