@@ -23,6 +23,7 @@ from paddlenlp.transformers import (  # ChatGLMForCausalLM,
     AutoTokenizer,
     BloomForCausalLM,
     ChatGLMv2ForCausalLM,
+    ChatGLMForCausalLM,
     LlamaForCausalLM,
 )
 from paddlenlp.utils.downloader import (
@@ -39,7 +40,7 @@ from .testing_utils import LLMTest
     [
         ["__internal_testing__/tiny-random-llama", LlamaForCausalLM],
         ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
-        # ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
+        ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
         ["__internal_testing__/tiny-fused-chatglm2", ChatGLMv2ForCausalLM],
     ],
 )
@@ -69,6 +70,7 @@ class PredictorTest(LLMTest, unittest.TestCase):
             count += int(inference_item[: min_length // 2] == no_inference_item[: min_length // 2])
             full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
 
+        import pdb; pdb.set_trace()
         self.assertGreaterEqual(full_match / len(result_0), 0.25)
         self.assertGreaterEqual(count / len(result_0), 0.4)
 
@@ -92,7 +94,12 @@ class PredictorTest(LLMTest, unittest.TestCase):
 
 @parameterized_class(
     ["model_name_or_path", "model_class"],
-    [["__internal_testing__/tiny-random-llama", LlamaForCausalLM]],
+    [
+        ["__internal_testing__/tiny-random-llama", LlamaForCausalLM],
+        ["__internal_testing__/tiny-random-chatglm2", ChatGLMv2ForCausalLM],
+        ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
+        ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
+    ]
 )
 class PredictorPrecacheTest(LLMTest, unittest.TestCase):
     config_path: str = "./tests/fixtures/llm/predictor.yaml"
@@ -134,5 +141,6 @@ class PredictorPrecacheTest(LLMTest, unittest.TestCase):
             count += int(inference_item[: min_length // 2] == no_inference_item[: min_length // 2])
             full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
 
+        import pdb; pdb.set_trace()
         self.assertGreaterEqual(full_match / len(result_0), 0.6)
         self.assertGreaterEqual(count / len(result_0), 0.8)
