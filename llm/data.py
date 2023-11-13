@@ -138,6 +138,10 @@ def tokenize_rounds_example(tokenizer, example, data_args):
     input_ids = system_ids + input_ids
     labels = [-100] * len(system_ids) + labels
     tokenized_source = {"input_ids": input_ids}
+
+    if "position_ids" in tokenizer.model_input_names:
+        tokenized_source["position_ids"] = list(range(sequence_length))
+
     return tokenized_source, labels
 
 
