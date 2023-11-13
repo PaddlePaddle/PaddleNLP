@@ -513,8 +513,8 @@ class MistralPreTrainedModel(PretrainedModel):
     _supports_flash_attn_2 = True
 
     @classmethod
-    def _get_name_mappings(cls, config: MistralConfig) -> list[StateDictNameMapping]:
-        mappings: list[StateDictNameMapping] = []
+    def _get_name_mappings(cls, config: MistralConfig) -> List[StateDictNameMapping]:
+        mappings: List[StateDictNameMapping] = []
         model_mappings = [
             ["embed_tokens.weight"],
             ["norm.weight"],
