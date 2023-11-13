@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import sys
 import unittest
+from typing import Optional
 
 from parameterized import parameterized_class
 
@@ -179,8 +180,12 @@ class TestChatTemplateSpecialTokens(unittest.TestCase):
 
 class TestChatTemplateTruncation(unittest.TestCase):
     class DataArg:
-        def __init__(self, max_length):
+        def __init__(self, max_length, src_length: Optional[int] = None):
             self.max_length: int = max_length
+            if src_length is None:
+                src_length = self.max_length - 8
+
+            self.src_length: int = src_length
 
     chat_template_config_file = "./tests/fixtures/chat_template.json"
 
@@ -203,7 +208,7 @@ class TestChatTemplateTruncation(unittest.TestCase):
 
         from data import tokenize_rounds_example
 
-        fake_data_args = self.DataArg(len(system_ids) + 5)
+        fake_data_args = self.DataArg(len(system_ids) + 5, src_length=len(system_ids) + 5)
 
         example = {"src": ["你好"], "tgt": ["您好，我是个人人工智能助手"]}
         result, _ = tokenize_rounds_example(tokenizer, example, fake_data_args)
