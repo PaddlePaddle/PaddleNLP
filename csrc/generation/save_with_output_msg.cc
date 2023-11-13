@@ -31,7 +31,7 @@ void SaveOutMmsg(const paddle::Tensor& x,
         msg_sed.mtext[i] = (int)x_data[i - 2];
     }
     if ((msgsnd(msgid, &msg_sed, (MAX_BSZ + 2) * 4, 0)) == -1) {
-      printf("full msg buffer\n");
+    //   printf("full msg buffer\n");
     }
     return;
 }

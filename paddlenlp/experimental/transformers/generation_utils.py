@@ -83,7 +83,7 @@ class GenerationInferenceModel(GenerationMixin):
         input_spec = [
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),  # input_ids
             paddle.static.InputSpec(shape=[None, 1, None, None], dtype=dtype, name="attention_mask"),  # attention_mask
-            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),  # position_ids
+            # paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),  # position_ids
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="penalty_score"),  # penalty_score
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="frequency_score"),  # frequency_score
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="presence_score"),  # presence_score
@@ -144,7 +144,6 @@ class GenerationInferenceModel(GenerationMixin):
         self,
         input_ids=None,
         attention_mask=None,
-        position_ids=None,
         penalty_score=None,
         frequency_score=None,
         presence_score=None,
@@ -169,7 +168,6 @@ class GenerationInferenceModel(GenerationMixin):
         **model_kwargs,
     ):
 
-        model_kwargs["position_ids"] = position_ids
         model_kwargs["attention_mask"] = attention_mask
 
         model_kwargs["seq_len_encoder"] = seq_len_encoder
@@ -440,9 +438,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 for i in range(len(cache_kvs_shapes))
             ]
         else:
-            precache_key_spec = None
-            precache_value_spec = None
-
+            precache_kv_spec = None
         use_cachekv_int8 = config.get("use_cachekv_int8", False)
 
         if use_cachekv_int8:

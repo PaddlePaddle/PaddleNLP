@@ -1075,27 +1075,10 @@ class StaticBlockInferencePredictor(BasePredictor):
         import copy
         seq_lens_this_time = copy.deepcopy(self.inputs["seq_lens_this_time"][:real_bsz])
         self.seq_lens_handle.share_external_data(seq_lens_this_time)
-
-        from paddle import profiler
-        # 创建性能分析器相关的代码
-        def my_on_trace_ready(prof): # 定义回调函数，性能分析器结束采集数据时会被调用
-            callback = profiler.export_chrome_tracing('./profiler_demo') # 创建导出性能数据到profiler_demo文件夹的回调函数
-            callback(prof)  # 执行该导出函数
-            prof.summary(sorted_by=profiler.SortedKeys.GPUTotal) # 打印表单，按GPUTotal排序表单项
-        p = profiler.Profiler(scheduler = [3,4], on_trace_ready=my_on_trace_ready, timer_only=False) # 初始化Profiler对象
-        # p.start()
-        i = 0
         
         while self.inputs["not_need_stop"]:
             self.predictor.run()
-            # p.step()
-            i += 1
-            if i == 10:
-                s = time.time()
-            #     break
-        # p.stop()
-        paddle.device.cuda.synchronize()
-        print(i, "predict done with {}".format((time.time() - s) * 1000 / (i - 10)))
+
         # reset free_list
         for i in range(self.config.batch_size):
             self.free_list.extend(self.used_list[i])
@@ -1340,9 +1323,9 @@ def create_predictor(
             else:
                 raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt]")
             if predictor_args.block_attn:
-                predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
-            else:
                 predictor = StaticBlockInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
+            else:
+                predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
         else:
             raise ValueError("the `mode` should be one of [dynamic, static]")
     return predictor

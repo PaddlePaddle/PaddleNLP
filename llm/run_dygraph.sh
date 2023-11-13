@@ -27,9 +27,10 @@ export FLAGS_fraction_of_gpu_memory_to_use=0.92
 export CUDA_VISIBLE_DEVICES=0
 
 model_dir=${1:-"meta-llama/Llama-2-7b-chat"}
-src_len=${2:-2048}
+src_len=${2:-1024}
 dec_len=${3:-1024}
 quant_type=${4:-"weight_only_int8"}
+# quant_type=${4:-"None"}
 
 total_len=`expr ${src_len} + ${dec_len}`
 

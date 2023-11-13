@@ -44,4 +44,3 @@ while True:
         seq = tokenizer.decode(seq)
         print("output: ", seq)
     print("end")
-    exit(0)

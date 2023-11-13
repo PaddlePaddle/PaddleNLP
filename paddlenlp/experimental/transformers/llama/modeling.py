@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import annotations
+from typing_extensions import Self
 
 import numpy as np
+import time
 import paddle
 from paddle import nn
 from paddle.distributed import fleet
@@ -360,6 +362,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 "llama.layers.{}.self_attn.v_proj.weight".format(idx)
             ]
 
+            
             concated_qkv_weight = (
                 np.concatenate(
                     [
@@ -436,6 +439,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
             else:
                 self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight_tensor)
+
 
             self.transformer_block.ln_scales[idx].set_value(
                 paddle.to_tensor(
@@ -696,7 +700,61 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
     ):
         # TODO: Support safetensors loading.
         kwargs["use_safetensors"] = False
-        return super().from_pretrained(pretrained_model_name_or_path, from_hf_hub, subfolder, *args, **kwargs)
+        from paddlenlp.transformers.utils import resolve_cache_dir, is_paddle_support_lazy_init, ContextManagers, is_safetensors_available
+        from paddlenlp.transformers.configuration_utils import PretrainedConfig
+        from paddlenlp.transformers.model_utils import no_init_weights, dtype_guard
+
+        config = kwargs.pop("config", None)
+        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
+        dtype = kwargs.pop("dtype", None)
+        from_aistudio = kwargs.get("from_aistudio", False)
+        subfolder = kwargs.get("subfolder", None)
+        variant = kwargs.pop("variant", None)
+        use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
+        convert_from_torch = kwargs.pop("convert_from_torch", None)
+        cache_dir = kwargs.pop("cache_dir", None)
+
+        model_kwargs = kwargs
+
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+        # if not isinstance(config, PretrainedConfig):
+        #     config_path = config if config is not None else pretrained_model_name_or_path
+        #     config, model_kwargs = cls.config_class.from_pretrained(
+        #         config_path,
+        #         cache_dir=cache_dir,
+        #         return_unused_kwargs=True,
+        #         **kwargs,
+        #     )
+
+        init_contexts = []
+        # if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
+        #     # Instantiate model.
+        #     init_contexts.append(no_init_weights(_enable=True))
+        #     if is_paddle_support_lazy_init():
+        #         init_contexts.append(paddle.LazyGuard())
+        # if dtype:
+        #     init_contexts.append(dtype_guard(dtype))
+
+        init_args = config["init_args"] or ()
+        with ContextManagers(init_contexts):
+            model = cls(config, *init_args, **model_kwargs)
+
+        resolved_archive_file, sharded_metadata, is_sharded = cls._resolve_model_file_path(
+            pretrained_model_name_or_path,
+            cache_dir=cache_dir,
+            subfolder=subfolder,
+            from_hf_hub=from_hf_hub,
+            from_aistudio=from_aistudio,
+            config=config,
+            convert_from_torch=convert_from_torch,
+            use_safetensors=use_safetensors,
+            variant=variant,
+        )
+
+        model.state_dict = paddle.load(resolved_archive_file, return_numpy=True)
+        model.set_state_dict(model.state_dict)
+
+        return model
 
     @classmethod
     def get_cache_kvs_shape(
