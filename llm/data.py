@@ -136,11 +136,8 @@ def tokenize_rounds_example(tokenizer, example, data_args):
             if index < len(conversations_ids) - 1:
                 break
 
-            if len(user_input_ids) < max_length:
-                bot_input_ids = bot_input_ids[: max_length - len(user_input_ids)]
-            else:
-                user_input_ids = user_input_ids[: data_args.src_length - len(system_ids)]
-                bot_input_ids = bot_input_ids[: data_args.max_length - data_args.src_length]
+            user_input_ids = user_input_ids[: data_args.src_length - len(system_ids)]
+            bot_input_ids = bot_input_ids[: max_length - len(user_input_ids)]
 
             should_break = True
 
