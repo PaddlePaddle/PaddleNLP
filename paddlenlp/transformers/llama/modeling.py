@@ -20,6 +20,8 @@ import warnings
 from functools import partial
 from typing import Optional, Tuple
 
+from numpy import float32
+
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
@@ -702,16 +704,17 @@ class LlamaAttention(nn.Layer):
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
-
         if self.fuse_attention_qkv:
-            if self.sequence_parallel:
-                target_shape = [-1, self.seq_length, self.num_heads, 3 * self.head_dim]
-            else:
-                target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
-
             mix_layer = self.qkv_proj(hidden_states)
-            mix_layer = paddle.reshape_(mix_layer, target_shape)
-            query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
+            q, k, v = paddle.split(mix_layer, 3, axis=2)
+
+            query_states = q.reshape([5, hidden_states.shape[1], self.num_heads, self.head_dim])
+            key_states = k.reshape([5, hidden_states.shape[1], self.num_heads, self.head_dim])
+            value_states = v.reshape([5, hidden_states.shape[1], self.num_heads, self.head_dim])
+
+            
+            # mix_layer = paddle.reshape_(self.qkv_proj(hidden_states), target_shape)
+            # query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
         else:
             if self.sequence_parallel:
                 target_query_shape = [-1, self.seq_length, self.num_heads, self.head_dim]
@@ -798,6 +801,7 @@ class LlamaAttention(nn.Layer):
 
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
+
         attn_output = self.o_proj(attn_output)
 
         if not output_attentions:
@@ -857,7 +861,9 @@ class LlamaDecoderLayer(nn.Layer):
         """
 
         # [bs * seq_len, embed_dim] -> [seq_len * bs / n, embed_dim] (sequence_parallel)
+        
         residual = hidden_states
+
         hidden_states = self.input_layernorm(hidden_states)
 
         # Self Attention
@@ -1177,11 +1183,16 @@ class LlamaModel(LlamaPretrainedModel):
         )
         use_cache = use_cache if use_cache is not None else self.config.use_cache
 
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        # return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        # retrieve input_ids and inputs_embeds
-        if input_ids is not None and inputs_embeds is not None:
-            raise ValueError("You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time")
+        past_key_values = kwargs.get("past_key_values", past_key_values)
+        is_decoder = past_key_values is not None
+
+        # if inputs_embeds is not None:
+        if not is_decoder:
+            # print("inputs_embeds----", inputs_embeds.cast("float32"))
+            input_ids = None
+            batch_size, seq_length, _ = inputs_embeds.shape
         elif input_ids is not None:
             batch_size, seq_length = input_ids.shape
         elif inputs_embeds is not None:
@@ -1197,7 +1208,7 @@ class LlamaModel(LlamaPretrainedModel):
         if past_key_values[0] is not None:
             cache_length = paddle.shape(past_key_values[0][0])[1]
             seq_length_with_past += cache_length
-        if inputs_embeds is None:
+        if input_ids is not None:
             inputs_embeds = self.embed_tokens(input_ids)
 
         if self.sequence_parallel:
@@ -1231,6 +1242,10 @@ class LlamaModel(LlamaPretrainedModel):
         if position_ids is None:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
 
+        if is_decoder:
+            position_ids = paddle.arange(seq_length_with_past, dtype="int64").expand((batch_size, seq_length_with_past))[:, -1].unsqueeze(-1)
+
+
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
@@ -1240,7 +1255,7 @@ class LlamaModel(LlamaPretrainedModel):
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
-
+        # import pdb;pdb.set_trace()
         for idx, (decoder_layer) in enumerate(self.layers):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
@@ -1284,7 +1299,11 @@ class LlamaModel(LlamaPretrainedModel):
 
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
+            # print("hidden_states", hidden_states)
+        
 
+        # if is_decoder:
+        #     import pdb;pdb.set_trace()
         hidden_states = self.norm(hidden_states)
 
         # add hidden states from the last decoder layer
@@ -1399,30 +1418,26 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         return self.llama
 
     def prepare_inputs_for_generation(
-        self, input_ids, use_cache=False, past_key_values=None, inputs_embeds=None, **kwargs
+        self, input_ids, use_cache=False, past_key_values=None, **kwargs
     ):
-        batch_size, seq_length = input_ids.shape
-        position_ids = kwargs.get("position_ids", paddle.arange(seq_length).expand((batch_size, seq_length)))
+        position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
-        if past_key_values:
+        inputs_embeds = kwargs.get("inputs_embeds", None)
+        
+        # print("prepare_inputs_for_generation  inputs_embeds", inputs_embeds)
+        if past_key_values is not None:
             input_ids = input_ids[:, -1].unsqueeze(axis=-1)
-            position_ids = position_ids[:, -1].unsqueeze(-1)
+            if position_ids is not None:
+                position_ids = position_ids[:, -1].unsqueeze(-1)
 
-        # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
-        if inputs_embeds is not None and past_key_values is None:
-            model_inputs = {"inputs_embeds": inputs_embeds}
-        else:
-            model_inputs = {"input_ids": input_ids}
-
-        model_inputs.update(
-            {
+        return {
+                "input_ids":input_ids,
+                "inputs_embeds": inputs_embeds,
                 "position_ids": position_ids,
                 "past_key_values": past_key_values,
                 "use_cache": use_cache,
                 "attention_mask": attention_mask,
-            }
-        )
-        return model_inputs
+        }
 
     @staticmethod
     def update_model_kwargs_for_generation(outputs, model_kwargs, is_encoder_decoder=False):
@@ -1484,7 +1499,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         tensor_parallel_output = (
             self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         )
-
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
 
         loss = None

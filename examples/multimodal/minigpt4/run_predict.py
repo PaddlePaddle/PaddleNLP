@@ -22,6 +22,7 @@ os.environ["FLAGS_use_cuda_managed_memory"] = "true"
 import requests
 from PIL import Image
 from paddlenlp.transformers import GPTTokenizer
+from paddlenlp.transformers import LlamaTokenizer
 
 from paddlenlp.transformers import MiniGPT4ForConditionalGeneration, MiniGPT4Processor
 
@@ -43,41 +44,50 @@ def predict(args):
 
 
     import numpy as np
-    path_data = "/root/paddlejob/workspace/env_run/zhengshifeng/vitllm/LAVIS_to_onnx/models_bk/test_data/vit_numpy.npy"
-    vit_data = np.load(path_data, allow_pickle=True).item()
+    path_data = "./vit_numpy.npy"
+    vit_data = np.load(path_data, allow_pickle=True)
     
     # vit_inputs = vit_data["input"]
     # vit_outputs = vit_data["output"]
-    vit_image = vit_data[0]
-    inputs={}
-    inputs["pixel_values"] = paddle.to_tensor(vit_image)
-    inputs["first_input_ids"] = paddle.to_tensor([[50258]])
-    inputs["first_attention_mask"] = paddle.to_tensor([[1]])
-    # inputs["max_len"] = paddle.to_tensor([20])
-    
-    print("inputs", inputs)
+    for i in range(200):
+        vit_image = vit_data[i]
+        inputs={}
+        inputs["pixel_values"] = paddle.to_tensor(vit_image)
+        inputs["first_input_ids"] = paddle.to_tensor([[1]])
+        inputs["first_attention_mask"] = paddle.to_tensor([[1]])
+        # inputs["max_len"] = paddle.to_tensor([20])
+        
+        # print("inputs", inputs)
 
-    # import pdb;pdb.set_trace()
+        # import pdb;pdb.set_trace()
 
-    # generate with MiniGPT4
-    # breakpoint
-    generate_kwargs = {
-        "max_length": 300,
-        "num_beams": 5,
-        "top_p": 0.9,
-        "repetition_penalty": 1.0,
-        "length_penalty": 0,
-        "temperature": 1,
-        "decode_strategy": "beam_search",
-        "eos_token_id": [[199]],
-    }
-    outputs = model.generate_gpt(**inputs, **generate_kwargs)
+        # generate with MiniGPT4
+        # breakpoint
+        generate_kwargs = {
+            "max_length": 300,
+            "num_beams": 5,
+            "top_p": 0.9,
+            "repetition_penalty": 1.0,
+            "length_penalty": 0,
+            "temperature": 1,
+            "decode_strategy": "beam_search",
+            "eos_token_id": [[2]],
+        }
+        outputs = model.generate_gpt(**inputs, **generate_kwargs)
 
-    print("outputs", outputs)
-    tokenizer = GPTTokenizer.from_pretrained("/root/paddlejob/workspace/env_run/zhengshifeng/vitllm/vit_model")
-    msg = tokenizer.convert_ids_to_string(outputs[0].numpy().tolist())
+        # print("outputs", outputs)
+        tokenizer = LlamaTokenizer.from_pretrained("/root/paddlejob/workspace/env_run/zhengshifeng/vitllm/pr/PaddleNLP/examples/multimodal/minigpt4/vit_model")
 
-    print("Inference result: ", msg)
+
+        output = []
+        for i in range(222):
+            if outputs[0][0].numpy()[i] != 2 or outputs[0][0].numpy()[i] != 73:
+                output.append(outputs[0][0].numpy()[i])
+            if outputs[0][0].numpy()[i] == 2 or outputs[0][0].numpy()[i] == 73:
+                break
+        # print(output)
+        msg = tokenizer.convert_tokens_to_string(np.array(output).tolist())
+        print("Inference result: ", msg)
 
 
 if __name__ == "__main__":

@@ -208,7 +208,8 @@ class MiniGPT4VisionEmbeddings(nn.Layer):
         self.ln_pre = nn.LayerNorm(1280, epsilon=config.layer_norm_eps)
 
     def forward(self, pixel_values: paddle.Tensor) -> paddle.Tensor:
-
+        
+        # import pdb;pdb.set_trace()
         
         batch_size = pixel_values.shape[0]
         target_dtype = self.patch_embedding.weight.dtype
@@ -1607,7 +1608,9 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
 
         self.language_projection = nn.Linear(config.qformer_config.hidden_size, config.text_config.hidden_size)
         with dtype_guard("float16"):
-            self.language_model = GPTForCausalLM(config.text_config)
+            # self.language_model = GPTForCausalLM(config.text_config)
+            self.language_model = LlamaForCausalLM(config.text_config)
+
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.embeddings.patch_embedding
@@ -1757,12 +1760,13 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
         # step 1: forward the images through the vision encoder,
         # to get image embeddings of shape (batch_size, seq_len, hidden_size)
 
-        print("88888888888888888")
         pixel_values = paddle.cast(pixel_values, self.vision_model.embeddings.patch_embedding.weight.dtype)
         vision_outputs = self.vision_model(pixel_values, return_dict=True)
         image_embeds = vision_outputs.last_hidden_state
 
         query_outputs = self.resampler(image_embeds.cast("float32"))
+
+        
         inputs_opt = self.opt_proj(query_outputs.squeeze(1))
 
         
@@ -1772,16 +1776,12 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
         batch_size = first_input_ids.shape[0]
 
         
-
-        # import pdb;pdb.set_trace()
-        first_embeds = self.language_model.gpt.embeddings.word_embeddings(first_input_ids)
+        first_embeds = self.language_model.llama.embed_tokens(first_input_ids)
         first_embeds = paddle.concat([inputs_opt, first_embeds.cast("float32")], axis=1)
-        print("first_embeds0---", first_embeds.shape)
+
         
         inputs_embeds = first_embeds.repeat_interleave(5, 0).cast("float16")
         attention_mask = attention_mask.repeat_interleave(5, 0)
-
-        print("inputs_embeds---", inputs_embeds.shape)
 
 
 

@@ -7,7 +7,7 @@ from paddlenlp.transformers import MiniGPT4ForConditionalGeneration
 
 # load MiniGPT4 moel and processor
 # minigpt4_13b_path = "/root/.paddlenlp/models/Salesforce/minigpt4-vicuna-13b"
-minigpt4_13b_path = "/root/paddlejob/workspace/env_run/zhengshifeng/vitllm/vit_model"
+minigpt4_13b_path = "/root/paddlejob/workspace/env_run/zhengshifeng/vitllm/pr/PaddleNLP/examples/multimodal/minigpt4/vit_model"
 model = MiniGPT4ForConditionalGeneration.from_pretrained(minigpt4_13b_path, vit_dtype="float16")
 model.eval()
 #breakpoint()

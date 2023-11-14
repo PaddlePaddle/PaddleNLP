@@ -303,6 +303,8 @@ class MiniGPT4Config(PretrainedConfig):
 
         if text_model_type == "gpt2":
             self.text_config = GPTConfig(**text_config)
+        elif text_model_type == "llama":
+            self.text_config = LlamaConfig(**text_config)
         else:
             raise ValueError("Only llama accepted for model_type, but accepted {}.".format(text_model_type))
 

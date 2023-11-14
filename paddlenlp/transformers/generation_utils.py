@@ -1022,10 +1022,36 @@ class GenerationMixin(object):
                     **model_kwargs,
                 )
             else:
+                # beam_scorer = BeamSearchScorer(
+                #     batch_size=batch_size,
+                #     max_length=max_len,
+                #     num_beams=num_beams,
+                #     length_penalty=length_penalty,
+                #     do_early_stopping=early_stopping,
+                #     num_beam_hyps_to_keep=num_return_sequences,
+                # )
+
+                # input_ids, model_kwargs = self.expand_inputs_for_generation(
+                #     input_ids, expand_size=num_beams, **model_kwargs
+                # )
+
+                # return self.beam_search(
+                #     input_ids,
+                #     beam_scorer,
+                #     logits_processors,
+                #     max_len,
+                #     diversity_rate,
+                #     pad_token_id,
+                #     eos_token_id,
+                #     **model_kwargs,
+                # )
+
                 input_ids, model_kwargs = self.expand_inputs_for_generation(
                     input_ids, expand_size=num_beams, **model_kwargs
                 )
-
+                # print("input_ids input_ids input_ids", input_ids)
+                # print("model_kwargs inputs_embeds", model_kwargs["inputs_embeds"])
+                
                 return self.beam_search_d2s(
                     input_ids,
                     logits_processors,
@@ -1421,6 +1447,146 @@ class GenerationMixin(object):
 
         return input_ids[:, origin_len:], scores
 
+    def reorder_cache(self, cache, beam_idx):
+        cache = map_structure(lambda x: paddle.index_select(x, beam_idx), cache)
+        return cache
+
+    def beam_search(
+        self,
+        input_ids,
+        beam_scorer,
+        logits_processors,
+        max_length,
+        diversity_rate,
+        pad_token_id,
+        eos_token_id,
+        **model_kwargs
+    ):
+        model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
+
+        logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
+
+        batch_size = len(beam_scorer._beam_hyps)
+        num_beams = beam_scorer.num_beams
+        batch_beam_size, cur_len = input_ids.shape
+        origin_len = cur_len
+
+        assert (
+            num_beams * batch_size == batch_beam_size
+        ), "Batch dimension of `input_ids` should be {}, but received {}.".format(
+            num_beams * batch_size, batch_beam_size
+        )
+
+        beam_scores = paddle.zeros((batch_size, num_beams), dtype=paddle.get_default_dtype())
+
+        beam_scores[:, 1:] = get_scale_by_dtype(return_positive=False)
+        beam_scores = paddle.reshape(beam_scores, [-1])
+
+        while cur_len < 20:
+            # prepare model inputs & get model output
+            model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
+
+            outputs = self(**model_inputs)
+
+            if isinstance(outputs, tuple):
+                logits = outputs[0]
+            elif isinstance(outputs, ModelOutput):
+                logits = outputs.logits
+            else:
+                logits = outputs
+
+            # [batch_size, vocab_size]
+            logits = logits[:, -1, :]
+
+            # pre-process distribution
+            logits = self.adjust_logits_during_generation(logits)
+            # beam search
+            # [batch_size * num_beams, vocab_size]
+            next_scores = F.softmax(logits)
+            next_scores = paddle.log(next_scores)
+            next_scores = logits_processors(input_ids, next_scores)
+            next_scores = next_scores + beam_scores.unsqueeze(-1)
+
+            vocab_size = next_scores.shape[-1]
+            print("input_ids",input_ids)
+            if diversity_rate == 0.0:
+                # reshape for beam search
+                next_scores = next_scores.reshape([batch_size, num_beams * vocab_size])
+
+                next_scores, next_tokens = paddle.topk(next_scores, 2 * num_beams, axis=1)
+
+                next_indices = next_tokens // vocab_size
+                next_tokens = next_tokens % vocab_size
+
+
+            else:
+                next_scores, next_tokens = paddle.topk(next_scores, 2 * num_beams, axis=1)
+
+                sibling_score = paddle.arange(1, 2 * num_beams + 1, dtype="int64").unsqueeze(0) * diversity_rate
+
+                diversed_score = next_scores - sibling_score
+
+                next_scores = next_scores.reshape([batch_size, 2 * num_beams * num_beams])
+                next_tokens = next_tokens.reshape([batch_size, 2 * num_beams * num_beams])
+
+                diversed_score = diversed_score.reshape([batch_size, 2 * num_beams * num_beams])
+                diversed_score, diversed_tokens = paddle.topk(diversed_score, 2 * num_beams, axis=1)
+
+                # TODO
+                # Use gather_nd() to select origan token and score
+                next_scores = paddle.stack(
+                    [paddle.index_select(next_scores[i], diversed_tokens[i]) for i in range(next_scores.shape[0])]
+                )
+                next_tokens = paddle.stack(
+                    [paddle.index_select(next_tokens[i], diversed_tokens[i]) for i in range(next_tokens.shape[0])]
+                )
+
+                next_indices = diversed_tokens // (2 * num_beams)
+                
+
+            # stateless
+            beam_outputs = beam_scorer.process(
+                input_ids,
+                next_scores,
+                next_tokens,
+                next_indices,
+                origin_len=origin_len,
+                pad_token_id=pad_token_id,
+                eos_token_id=eos_token_id,
+            )
+            beam_scores = beam_outputs["next_beam_scores"]
+            beam_next_tokens = beam_outputs["next_beam_tokens"]
+            beam_idx = beam_outputs["next_beam_indices"]
+
+            cur_len += 1
+            input_ids = paddle.concat(
+                [paddle.index_select(input_ids, beam_idx), beam_next_tokens.unsqueeze(-1)], axis=-1
+            )
+
+            if beam_scorer.is_done:
+                break
+            model_kwargs = self.update_model_kwargs_for_generation(
+                outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
+            )
+            if "cache" in model_kwargs and model_kwargs["cache"] is not None:
+                # reorder the cache
+                model_kwargs["cache"] = map_structure(
+                    lambda x: paddle.index_select(x, beam_idx), model_kwargs["cache"]
+                )
+
+        pred_ids, scores = beam_scorer.finalize(
+            input_ids,
+            beam_scores,
+            next_tokens,
+            next_indices,
+            origin_len=origin_len,
+            pad_token_id=pad_token_id,
+            eos_token_id=eos_token_id,
+        )
+        return pred_ids[0].unsqueeze(0), scores
+
+
+
     def beam_search_pp(
         self,
         input_ids,
@@ -1467,10 +1633,9 @@ class GenerationMixin(object):
             # prepare model inputs & get model output
             # import pdb;pdb.set_trace()
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
-            # print("input_ids---", input_ids)
             
             outputs = self(**model_inputs)
-            # print("outputs---", outputs[0][0])
+
             if isinstance(outputs, tuple):
                 logits = outputs[0]
             elif isinstance(outputs, ModelOutput):
@@ -1484,26 +1649,11 @@ class GenerationMixin(object):
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits).cast("float32")
             # beam search
-            # [batch_size * num_beams, vocab_size]
-
-            # print("beam_scores pre --- ", beam_scores)
-            # print("sequence_lengths pre ---", sequence_lengths)
-            # print("cache_ids pre ---", cache_ids)
-            # print("beam_cache_offset pre ---", beam_cache_offset)
-            # print("step_ids pre---", step_ids)
-            # print("stop_flags pre---", stop_flags)
 
             ids_this_time, beam_scores, cache_ids, beam_cache_offset, parent_idx, stop_flags, seq_lens_out, step_ids_out = paddle.beam_search_softmax(logits, beam_scores, sequence_lengths, stop_flags, end_ids,  step_ids, cache_ids, beam_cache_offset, num_beams, max_seq_len, max_dec_len, fuse_softmax=True, early_stop=False, length_penalty=0.0, diversity_rate=0.0)
             
             step_ids += 1
             sequence_lengths += 1
-
-            # print("ids_this_time---", ids_this_time)
-            # print("beam_scores---", beam_scores)
-            # print("cache_ids---", cache_ids)
-            # print("beam_cache_offset---", beam_cache_offset)
-            # print("stop_flags---", stop_flags)
-            # print("parent_idx---", parent_idx)
 
             for i in range(5):
                 if ids_this_time[i] == 199:
@@ -1561,8 +1711,13 @@ class GenerationMixin(object):
         sequence_lengths = paddle.to_tensor([origin_len - 1, origin_len - 1, origin_len - 1, origin_len - 1, origin_len - 1], dtype="int32")
         
         stop_flags = paddle.full(shape=[5, 1], dtype="bool", fill_value=False)
-        end_ids = paddle.full(shape=[1], dtype="int32", fill_value=199)
+        end_ids = paddle.full(shape=[1], dtype="int32", fill_value=2)
         step_ids = paddle.zeros([num_beams, batch_size], dtype="int32")
+
+        beam_hyps_score = paddle.full(shape=[5, 1], dtype="float32", fill_value=-1e8)
+        beam_hyps = paddle.full(shape=[5, 100], dtype="int32", fill_value=-1)
+
+
         cache_ids = paddle.fluid.layers.fill_constant_batch_size_like(
                 input=step_ids,
                 value=-1,
@@ -1577,13 +1732,13 @@ class GenerationMixin(object):
 
         def _forward_(**args):
             model_inputs = self.prepare_inputs_for_generation(input_ids, **args, **immutable)
-            # print("input_ids---", input_ids)
+            
             # # paddle.static.Printt(input_ids, message="The input_ids")
             assert "use_cache" in model_inputs
             del model_inputs["use_cache"]
             return self(**model_inputs, **immutable)
 
-        def _post_process_(outputs, input_ids, beam_scores, sequence_lengths, stop_flags, end_ids, step_ids, cache_ids, beam_cache_offset, model_kwargs):
+        def _post_process_(outputs, input_ids, beam_scores, sequence_lengths, stop_flags, end_ids, step_ids, cache_ids, beam_cache_offset, beam_hyps, beam_hyps_score, model_kwargs):
             if isinstance(outputs, tuple): 
                 logits = outputs[0]
             elif isinstance(outputs, ModelOutput):
@@ -1595,102 +1750,62 @@ class GenerationMixin(object):
             logits = logits[:, -1, :]
 
             # pre-process distribution
+            
             logits = self.adjust_logits_during_generation(logits).cast("float32")
-
-            # print("beam_scores pre --- ", beam_scores)
-            # print("sequence_lengths pre ---", sequence_lengths)
-            # print("cache_ids pre ---", cache_ids)
-            # print("beam_cache_offset pre ---", beam_cache_offset)
-            # print("step_ids pre---", step_ids)
-            # print("stop_flags pre---", stop_flags)
-
-            # # paddle.static.Printt(beam_scores.cast("float32"), message="The beam_scores pre")
-            # # paddle.static.Printt(sequence_lengths, message="The sequence_lengths")
-            # # paddle.static.Printt(cache_ids, message="The cache_ids")
-            # # paddle.static.Printt(step_ids, message="The step_ids")
-            # # paddle.static.Printt(stop_flags, message="The stop_flags")
-
-            ids_this_time, beam_scores, cache_ids, beam_cache_offset, parent_idx, stop_flags, seq_lens_out, step_ids_out = paddle.beam_search_softmax(logits, beam_scores, sequence_lengths, stop_flags, end_ids,  step_ids, cache_ids, beam_cache_offset, 5, 100, 100, fuse_softmax=True, early_stop=False)#, length_penalty=0.0, diversity_rate=0.0)
+            
+            ids_this_time, beam_scores, cache_ids, beam_cache_offset, parent_idx, stop_flags, seq_lens_out, step_ids_out, beam_hyps, beam_hyps_score = paddle.beam_search_softmax(logits, beam_scores, sequence_lengths, stop_flags, end_ids,  step_ids, cache_ids, beam_cache_offset, beam_hyps, beam_hyps_score, 5, 100, 100, fuse_softmax=True, early_stop=False, length_penalty=-0.05, diversity_rate=0.0)
 
             step_ids += 1
             sequence_lengths += 1
 
-            # print("ids_this_time---", ids_this_time)
-            # print("beam_scores---", beam_scores)
-            # print("cache_ids---", cache_ids)
-            # print("beam_cache_offset---", beam_cache_offset)
-            # print("stop_flags---", stop_flags)
-            # print("parent_idx---", parent_idx)
-
-            for i in range(5):
-                if ids_this_time[i] == 199:
-                    stop_flags[i] = True
-
-            # import pdb;pdb.set_trace()
-            # print("parent_idx", parent_idx.shape)
-            # print("parent_idx ---- ", parent_idx)
-            # print("input_ids", input_ids.shape)
-
-
-            # # paddle.static.Printt(ids_this_time, message="The ids_this_time")
-            # # paddle.static.Printt(input_ids, message="The input_ids")
-            # # paddle.static.Printt(stop_flags.cast("int64"), message="The stop_flags")
-            # # paddle.static.Printt(parent_idx, message="The parent_idx")
-            
-
-
-            next_tokens = paddle.concat(
-                [paddle.index_select(input_ids, parent_idx), ids_this_time.cast("int64")], axis=-1
-            )
-
-            # # paddle.static.Printt(next_tokens, message="The next_tokens")
-
-            
+            next_tokens = ids_this_time
             
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
             model_kwargs["inputs_embeds"] = None
 
-            if "cache" in model_kwargs and model_kwargs["cache"] is not None:
-                for i in range(len(model_kwargs["cache"])):
-                    model_kwargs["cache"][i].k[:] = paddle.gather(model_kwargs["cache"][i].k, parent_idx, axis=0)
-                    model_kwargs["cache"][i].v[:] = paddle.gather(model_kwargs["cache"][i].v, parent_idx, axis=0)
+            if paddle.all(stop_flags):
+                return next_tokens, beam_scores, cache_ids, beam_cache_offset, stop_flags, sequence_lengths, step_ids, beam_hyps, beam_hyps_score, model_kwargs
+            
+
+            if "past_key_values" in model_kwargs and model_kwargs["past_key_values"] is not None:
+                for i in range(len(model_kwargs["past_key_values"])):
+                    model_kwargs["past_key_values"][i][0][:] = paddle.gather(model_kwargs["past_key_values"][i][0], parent_idx, axis=0)
+                    model_kwargs["past_key_values"][i][1][:] = paddle.gather(model_kwargs["past_key_values"][i][1], parent_idx, axis=0)
 
             
-            return next_tokens, beam_scores, cache_ids, beam_cache_offset, parent_idx, stop_flags, sequence_lengths, step_ids, model_kwargs
+            return next_tokens, beam_scores, cache_ids, beam_cache_offset, stop_flags, sequence_lengths, step_ids, beam_hyps, beam_hyps_score, model_kwargs
             
         # import pdb;pdb.set_trace()
         outputs = _forward_(**model_kwargs)
-        # print("outputs---", outputs[0][0])
-        input_ids, beam_scores, cache_ids, beam_cache_offset, parent_idx, stop_flags, sequence_lengths, step_ids, model_kwargs = _post_process_(
-            outputs, input_ids, beam_scores, sequence_lengths, stop_flags, end_ids, step_ids, cache_ids, beam_cache_offset, model_kwargs
+
+        input_ids, beam_scores, cache_ids, beam_cache_offset, stop_flags, sequence_lengths, step_ids, beam_hyps, beam_hyps_score, model_kwargs = _post_process_(
+            outputs, input_ids, beam_scores, sequence_lengths, stop_flags, end_ids, step_ids, cache_ids, beam_cache_offset, beam_hyps, beam_hyps_score, model_kwargs
         )
 
         paddle.increment(cur_len)
         attn_mask = model_kwargs["attention_mask"]
         # make the shape of attention_mask = (-1, -1, -1, -1) in dy2static.
         model_kwargs["attention_mask"] = paddle.reshape(attn_mask, paddle.shape(attn_mask))
+        model_kwargs["past_key_values"] = outputs[1] if isinstance(outputs, tuple) else None
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
         max_length = paddle.full([1], max_length, dtype="int64")
-
+        # import pdb;pdb.set_trace()
         while cur_len < max_length:
             # # paddle.static.Printt(input_ids, message="The input_ids 1")
-            input_ids, beam_scores, cache_ids, beam_cache_offset, parent_idx, stop_flags, sequence_lengths, step_ids, model_kwargs = _post_process_(
+            input_ids, beam_scores, cache_ids, beam_cache_offset, stop_flags, sequence_lengths, step_ids, beam_hyps, beam_hyps_score, model_kwargs = _post_process_(
                 _forward_(**model_kwargs),
-                input_ids, beam_scores, sequence_lengths, stop_flags, end_ids, step_ids, cache_ids, beam_cache_offset, model_kwargs,
+                input_ids, beam_scores, sequence_lengths, stop_flags, end_ids, step_ids, cache_ids, beam_cache_offset, beam_hyps, beam_hyps_score, model_kwargs,
             )
-            # input_ids = # paddle.static.Printt(input_ids, message="The input_ids 3")
-            # print("input_ids", input_ids.shape)
-            # model_kwargs["input_ids"] = input_ids
-            output = paddle.clone(input_ids)
+
+            output = paddle.clone(beam_hyps)
             
             if paddle.all(stop_flags):
                 break
             paddle.increment(cur_len)
-        # print("slice_--", slice_)
 
-        return output[0, slice_:].unsqueeze(0), beam_scores
+        return output[0].unsqueeze(0), beam_scores
 
     def group_beam_search(
         self, input_ids, beam_scorer, logits_processors, max_length, pad_token_id, eos_token_id, **model_kwargs

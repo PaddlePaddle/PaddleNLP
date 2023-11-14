@@ -17,7 +17,7 @@ import os
 import paddle
 import paddle.distributed as dist
 import paddle.distributed.fleet as fleet
-from paddlenlp.transformers import AutoTokenizer, GPTTokenizer
+from paddlenlp.transformers import AutoTokenizer, GPTTokenizer, LlamaTokenizer
 import numpy as np
 
 def parse_arguments():
@@ -64,7 +64,7 @@ def init_dist_env(world_size, seed=20):
 
 class Predictor(object):
     def __init__(self, args):
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
+        self.tokenizer = LlamaTokenizer.from_pretrained(args.model_dir)
         self.tokenizer.pad_token = self.tokenizer.unk_token
         self.batch_size = args.batch_size
         self.src_length = args.src_length
@@ -80,7 +80,7 @@ class Predictor(object):
         self.predictor = self.create_predictor(args)
 
     def create_predictor(self, args):
-        infer_model_path = "/root/paddlejob/workspace/env_run/zhengshifeng/vitllm/PaddleNLPP/examples/multimodal/minigpt4/checkpoints/infer"
+        infer_model_path = "./checkpoints/infer"
 
         config = paddle.inference.Config(
             infer_model_path + ".pdmodel", infer_model_path + ".pdiparams"
@@ -119,7 +119,7 @@ class Predictor(object):
         )
         inputs={}
         inputs["pixel_values"] = vit_image.astype("float32")
-        inputs["first_input_ids"] = np.array([[50258]]).astype("int64")
+        inputs["first_input_ids"] = np.array([[1]]).astype("int64")
         inputs["first_attention_mask"] = np.array([[1]]).astype("int64")
         # inputs["max_length"] = np.array([20]).astype("int64")
         return inputs
@@ -135,21 +135,28 @@ class Predictor(object):
         output_handle = self.predictor.get_output_handle(output_names[0])
         results = output_handle.copy_to_cpu()
         # import pdb;pdb.set_trace()
-        print("outputs", results)
-        print("results", results.shape)
-        tokenizer = GPTTokenizer.from_pretrained("/root/paddlejob/workspace/env_run/zhengshifeng/vitllm/vit_model")
-        msg = tokenizer.convert_ids_to_string(results[0])
-        print(msg)
+        # print("outputs", results)
+        # print("results", results.shape)
+
+        output = []
+        for i in range(100):
+            if results[0][i] != 2:
+                output.append(results[0][i])
+            if results[0][i] == 2:
+                break
+        # print(output)
+        msg = self.tokenizer.convert_tokens_to_string(np.array(output).tolist())
+        print("Inference result: ", msg)
+
         return results
 
 
 
     def predict(self, texts):
+        path_data = "./vit_numpy.npy"
+        vit_data = np.load(path_data, allow_pickle=True)
         
-        path_data = "/root/paddlejob/workspace/env_run/zhengshifeng/vitllm/LAVIS_to_onnx/models_bk/test_data/vit_numpy.npy"
-        vit_data = np.load(path_data, allow_pickle=True).item()
-        
-        for i in range(50):
+        for i in range(222):
             input_map = self.preprocess(texts, vit_data[i])
             output = self.infer(input_map)
         return output
