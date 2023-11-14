@@ -276,6 +276,11 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     else
         echo -e "\033[32m ---- Unittest Success \033[0m"
     fi
+    cd ${nlp_dir}
+    echo -e "\033[35m ---- Genrate Allure Report  \033[0m"
+    cp scripts/regression/gen_allure_report.py ./
+    python gen_allure_report.py
+    echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
     ####################################
     # run coverage
     # cd ${nlp_dir}/tests/
