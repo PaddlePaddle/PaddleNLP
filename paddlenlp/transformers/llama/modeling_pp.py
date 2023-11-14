@@ -133,8 +133,6 @@ class LlamaEmbeddingPipe(nn.Layer):
                 if attention_mask is not None
                 else paddle.ones((batch_size, seq_length), dtype=paddle.bool)
             )
-            print("mask ashpe", mask.shape)
-            print("self.config.num_attention_heads", self.config.num_attention_heads)
             alibi = build_alibi_tensor(mask, self.config.num_attention_heads, dtype=input_embeds.dtype)
 
             if self.config.tensor_parallel_degree > 1:
@@ -160,8 +158,6 @@ class LlamaEmbeddingPipe(nn.Layer):
             attention_mask = LlamaModel._prepare_decoder_attention_mask(
                 None, (batch_size, seq_length), 0, input_embeds.dtype
             )
-            print("attention_mask", attention_mask.shape)
-            print("alibi", alibi.shape)
             attention_mask.stop_gradient = True
 
         return return_args(input_embeds, attention_mask, position_ids, alibi)
