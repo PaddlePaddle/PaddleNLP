@@ -1380,8 +1380,10 @@ class GenerationMixin(object):
             # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
             # removed after static graphs support inplace and stride.
             with paddle.framework._no_check_dy2st_diff():
-                paddle.increment(cur_len)
-                paddle.increment(cur_len_gpu)
+                cur_len += 1
+                cur_len_gpu += 1
+                # paddle.increment(cur_len)
+                # paddle.increment(cur_len_gpu)
         else:
             paddle.increment(cur_len)
             paddle.increment(cur_len_gpu)

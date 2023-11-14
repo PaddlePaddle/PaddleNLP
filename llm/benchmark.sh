@@ -20,12 +20,13 @@ export FLAGS_allocator_strategy=naive_best_fit
 export FLAGS_fraction_of_gpu_memory_to_use=0.92
 
 python predictor.py \
-    --model_name_or_path ./llama7b-inference_model_fp16 \
+    --model_name_or_path ./inference \
     --dtype float16 \
-    --src_length 300 \
-    --max_length 100 \
+    --src_length 128 \
+    --max_length 15 \
     --output_file "infer.json" \
     --mode "static" \
     --batch_size 1 \
     --benchmark \
-    --inference_model
+    --device "cpu"
+    # --inference_model

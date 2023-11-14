@@ -280,7 +280,9 @@ class StaticGraphPredictor(BasePredictor):
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             inference_config.disable_gpu()
-        inference_config.disable_glog_info()
+            inference_config.enable_mkldnn()
+            inference_config.set_cpu_math_library_num_threads(32)
+        # inference_config.disable_glog_info()
 
         with static_mode_guard():
             self.predictor = paddle.inference.create_predictor(inference_config)
@@ -299,9 +301,17 @@ class StaticGraphPredictor(BasePredictor):
         return inputs
 
     def _infer(self, inputs: dict[str, np.ndarray]):
+        from paddle.inference import Config, DataType
         for name in self.predictor.get_input_names():
-            self.predictor.get_input_handle(name).copy_from_cpu(inputs[name])
-
+            
+            input_tensor = self.predictor.get_input_handle(name)
+            if name in ("input_ids", "attention_mask", "position_ids", "max_new_tokens"):
+                input_tensor.copy_from_cpu(inputs[name].astype(np.int64))
+            else:
+                input_tensor.copy_from_cpu(inputs[name].astype(np.float32))
+                # assert 0
+            # import pdb;pdb.set_trace()
+            # self.predictor.get_input_handle(name).copy_from_cpu(inputs[name])
         self.predictor.run()
         output_names = self.predictor.get_output_names()
         output_handle = self.predictor.get_output_handle(output_names[0])
@@ -599,7 +609,7 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
             dist_config.enable_dist_model(True)
 
             dist_config.set_comm_init_config(os.path.join(predictor_args.model_name_or_path, "rank_mapping.csv"))
-            config.set_dist_config(dist_config)
+            # config.set_dist_config(dist_config)
 
         predictor = paddle.inference.create_predictor(config)
         return predictor
@@ -911,8 +921,8 @@ def benchmark(predictor, predictor_args, model_args):
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
-    warmup_time = 10
-    test_time = 100
+    warmup_time = 3
+    test_time = 10
 
     print("***********Start Warmup**********")
     for _ in range(warmup_time):
