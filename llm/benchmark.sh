@@ -19,6 +19,11 @@ export FLAGS_new_executor_serial_run=1
 export FLAGS_allocator_strategy=naive_best_fit
 export FLAGS_fraction_of_gpu_memory_to_use=0.92
 
+python export_model.py \
+    --model_name_or_path meta-llama/Llama-2-7b-chat \
+    --output_path ./inference \
+    --dtype float16
+    
 python predictor.py \
     --model_name_or_path ./inference \
     --dtype float16 \
