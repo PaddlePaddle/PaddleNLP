@@ -37,7 +37,7 @@ function case_list_auto() {
     gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage1
     gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2
     gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2_pri
+    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2_pir
     gpt_auto_sp_acc_check
 }
 
