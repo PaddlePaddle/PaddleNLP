@@ -179,7 +179,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
             epsilon=config.layernorm_epsilon,
             norm_type="rmsnorm",
-            kv_num_heads=2,
+            kv_num_heads=config.multi_query_group_num,
         )
 
         if self.use_weight_only:

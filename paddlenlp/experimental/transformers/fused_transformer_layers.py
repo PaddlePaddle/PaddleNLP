@@ -822,7 +822,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             ffn2_weight_scale_attr = self.get_attr(config.ffn2_weight_scale_attrs, i)
 
             qkv_weight_scale = self.create_parameter(
-                shape=[3 * config.num_heads * self.head_dim],
+                shape=[(config.num_heads + 2 * config.kv_num_heads) * self.head_dim],
                 attr=qkv_weight_scale_attr,
                 dtype=paddle.float32,
                 is_bias=False,
