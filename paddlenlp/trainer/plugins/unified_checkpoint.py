@@ -16,8 +16,6 @@ import copy
 import gc
 import json
 import os
-import time
-from functools import partial
 
 import paddle
 from paddle.distributed import fleet
@@ -225,10 +223,8 @@ def unified_checkpoint_into_shards(
     model_to_save.config.dtype = str(dtype).split(".")[1]
     config_to_save = copy.deepcopy(model_to_save.config)
 
-    start_time = time.time()
     if config_to_save.tensor_parallel_degree > 1:
         state_dict = merge_tensor_parallel_with_shard(model_to_save, state_dict, config_to_save, all_filter_keys)
-    print("ckpt merge tp cost: ", time.time() - start_time)
 
     if config_to_save.tensor_parallel_degree > 1:
         # do we need to change?
@@ -275,7 +271,6 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
     save_directory = output_dir
     os.makedirs(save_directory, exist_ok=True)
 
-    start_time = time.time()
     if safe_serialization:
         for k in list(optim_state_dict.keys()):
             if isinstance(optim_state_dict[k], paddle.Tensor):
@@ -309,7 +304,6 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
         if master_weight_state_dict is not None:
             with open(master_path, "w") as f:
                 json.dump(sharded_master_weight_index, f, indent=4)
-    print("optimzier file to dist: ", time.time() - start_time)
 
 
 def load_unified_optimizer():
@@ -357,7 +351,6 @@ def unified_optimizer_into_shards(
     tp_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
     tp_size = tp_group.nranks
 
-    start_time = time.time()
     if tp_size > 1:
         optim_state_dict = merge_tensor_parallel_for_optimizer(
             model,
@@ -372,7 +365,6 @@ def unified_optimizer_into_shards(
                 model.config,
                 filter_master_keys,
             )
-    print("merge tp costs: ", time.time() - start_time)
 
     # build index json file
     index_optimizer_file, index_master_weight_file = {}, {}
@@ -584,7 +576,7 @@ def merge_tensor_parallel_with_shard(model_to_save, state_dict, config, all_filt
             tensor = state_dict[key]
             if key in tp_actions:
                 ret = distributed_gather(tensor, dst=j, group=tp_group, offload=False)
-                action = partial(tp_actions.pop(key))
+                action = tp_actions.pop(key)
                 tensor = action(ret) if is_dst else None
             else:
                 tensor = tensor._copy_to(paddle.CPUPlace(), False) if is_dst else None
@@ -634,7 +626,7 @@ def merge_tensor_parallel_for_optimizer(model_to_save, state_dict, config, all_f
                     )  # Need broadcast when loaded
                 else:
                     ret = distributed_gather(tensor, dst=j, group=tp_group, offload=False)
-                    action = partial(tp_actions[model_key])
+                    action = tp_actions[model_key]
                     tensor = action(ret) if is_dst else None
             else:
                 tensor = tensor._copy_to(paddle.CPUPlace(), False) if is_dst else None
