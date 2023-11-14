@@ -21,6 +21,7 @@ from paddle.incubate.nn.functional import (
     fused_rms_norm,
     masked_multihead_attention,
     variable_length_memory_efficient_attention,
+    write_cache_kv,
 )
 from paddle.nn import Layer
 from paddle.nn.initializer import Constant
@@ -37,7 +38,6 @@ if is_paddlenlp_ops_available():
         quant_int8,
         rebuild_padding,
         transpose_remove_padding,
-        write_cache_kv,
     )
 else:
     logger.warning(

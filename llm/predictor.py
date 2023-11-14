@@ -597,7 +597,6 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         import_module("paddlenlp_ops.qkv_transpose_split")
         import_module("paddlenlp_ops.rebuild_padding")
         import_module("paddlenlp_ops.transpose_remove_padding")
-        import_module("paddlenlp_ops.write_cache_kv")
 
         infer_model_path = get_infer_model_path(predictor_args.model_name_or_path, predictor_args.model_prefix)
 
