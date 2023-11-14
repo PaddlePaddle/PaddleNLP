@@ -1711,12 +1711,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 state_dict = convert_to_quantize_state_dict(
                     state_dict,
                     quantization_linear_list,
-                    config.quantization_config.weight_quantize_algo,
+                    config.quantization_config,
                     dtype,
                 )
                 loaded_keys = [k for k in state_dict.keys()]
             else:
-                loaded_keys = update_loaded_state_dict_keys(loaded_keys, quantization_linear_list)
+                loaded_keys = update_loaded_state_dict_keys(
+                    loaded_keys, quantization_linear_list, config.quantization_config
+                )
             if keep_in_fp32_modules is None:
                 keep_in_fp32_modules = ["quant_scale"]
             else:
@@ -1852,7 +1854,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     state_dict = convert_to_quantize_state_dict(
                         state_dict,
                         quantization_linear_list,
-                        config.quantization_config.weight_quantize_algo,
+                        config.quantization_config,
                         dtype,
                     )
 

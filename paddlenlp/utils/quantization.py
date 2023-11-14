@@ -54,7 +54,6 @@ class QuantizationLinear(nn.Layer):
         weight_attr=None,
         scale_attr=None,
         bias_attr=None,
-        llm_int8_threshold=6.0,
         block_size=64,
         double_quant_block_size=256,
         double_quant=False,
@@ -62,6 +61,7 @@ class QuantizationLinear(nn.Layer):
         double_quant_scale_attr=None,
         quant_sacle_offset_attr=None,
         quant_scale_attr=None,
+        llm_int8_threshold=6.0,
     ):
         super().__init__()
         self.in_features = in_features
@@ -94,8 +94,8 @@ class QuantizationLinear(nn.Layer):
                 raise ImportError(
                     "Please run the following commands to install: qlora related package first\n"
                     "1) git clone https://github.com/PaddlePaddle/PaddleSlim \n"
-                    "2) cd PaddleSlim \n"
-                    "3) python ./csrc/setup_cuda.py install"
+                    "2) cd PaddleSlim/csrc \n"
+                    "3) python ./setup_cuda.py install"
                 )
             if self.double_quant:
                 # quantized quant_scale
@@ -415,7 +415,7 @@ def replace_with_quantization_linear(model, quantization_config, name_prefix="",
                 llm_int8_threshold=llm_int8_threshold,
                 block_size=quantization_config.weight_blocksize,
                 double_quant_block_size=quantization_config.weight_double_quant_block_size,
-                double_quant=quantization_config.double_quant,
+                double_quant=quantization_config.weight_double_quant,
             )
             del child
             quantization_linear_list.append(name_prefix + name)
@@ -495,18 +495,20 @@ def convert_to_quantize_state_dict_without_check(state_dict, quantization_linear
         )
     for name in quantization_linear_list:
         weight_name = name + ".weight"
-        target_weight = state_dict.pop(weight_name).cast(dtype)
-        qlora_state_dict = qlora_weight_quantize(
-            target_weight,
-            quantization_config.weight_quantize_algo,
-            double_quant=quantization_config.weight_double_quant,
-            block_size=quantization_config.weight_blocksize,
-            double_quant_block_size=quantization_config.weight_double_quant_block_size,
-            linear_name=name,
-        )
-        state_dict.update(qlora_state_dict)
-        del target_weight
-        gc.collect()
+        if weight_name in state_dict:
+            target_weight = state_dict.pop(weight_name).cast(dtype).cuda()
+            qlora_state_dict = qlora_weight_quantize(
+                target_weight,
+                quantization_config.weight_quantize_algo,
+                double_quant=quantization_config.weight_double_quant,
+                block_size=quantization_config.weight_blocksize,
+                double_quant_block_size=quantization_config.weight_double_quant_block_size,
+                linear_name=name,
+            )
+            state_dict.update(qlora_state_dict)
+            del target_weight
+            gc.collect()
+            paddle.device.cuda.empty_cache()
     return state_dict
 
 
@@ -525,18 +527,26 @@ def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quantiz
         )
 
 
-def update_loaded_state_dict_keys(state_dict, quantization_linear_list):
+def update_loaded_state_dict_keys(state_dict, quantization_linear_list, quantization_config):
     for name in quantization_linear_list:
         weight_name = name + ".weight"
         quant_weight_name = name + ".quant_weight"
         quant_scale_name = name + ".quant_scale"
+        qquant_scale_name = name + ".qquant_scale"
+        double_quant_scale_name = name + ".double_quant_scale"
+        quant_sacle_offset_name = name + ".quant_sacle_offset"
 
         if quant_weight_name in state_dict and quant_scale_name in state_dict:
             continue
         elif weight_name in state_dict:
             state_dict.remove(weight_name)
             state_dict.append(quant_weight_name)
-            state_dict.append(quant_scale_name)
+            if quantization_config.weight_double_quant:
+                state_dict.append(qquant_scale_name)
+                state_dict.append(double_quant_scale_name)
+                state_dict.append(quant_sacle_offset_name)
+            else:
+                state_dict.append(quant_scale_name)
         else:
             logger.warning(
                 f"Cannot find {weight_name} in state_dict or {quant_weight_name}  and {quant_scale_name} in state_dict"

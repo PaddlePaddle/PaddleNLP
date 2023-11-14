@@ -52,6 +52,14 @@ class ModelArgument:
         default=None, metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
+    weight_quantize_algo: str = field(default=None, metadata={"help": "Model weight quantization algorithm."})
+    weight_blocksize: int = field(default=64, metadata={"help": "Block size for weight quantization(ex. nf4, fp4)."})
+    weight_double_quant: bool = field(
+        default=False, metadata={"help": "Whether apply double quant for nf4 or fp4 quant scale."}
+    )
+    weight_double_quant_block_size: int = field(
+        default=256, metadata={"help": "Block size for quant_scale of weight quant_scale."}
+    )
 
     # LoRA related parameters
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})

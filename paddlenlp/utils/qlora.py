@@ -30,7 +30,6 @@ def qlora_weight_quantize(
         quant_weight, quant_scale = quantize_nf4(weight, block_size)
     else:
         quant_weight, quant_scale = quantize_fp4(weight, block_size)
-
     if double_quant:
         quant_sacle_offset = quant_scale.mean()
         quant_scale -= quant_sacle_offset
