@@ -30,6 +30,7 @@ from utils import (
     get_alibi_slopes,
     get_infer_model_path,
     get_prefix_tuning_params,
+    init_chat_template,
     load_real_time_tokens,
 )
 
@@ -682,6 +683,9 @@ def create_predictor(
     tensor_parallel_rank: int = 0,
 ):
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
+    # init chat_template for tokenizer
+    init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
+
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer) and not tokenizer.pad_token:
         tokenizer.pad_token = tokenizer.unk_token

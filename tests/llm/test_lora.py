@@ -77,7 +77,7 @@ class LoraTest(LLMTest, unittest.TestCase):
 
             merge()
 
-        if self.model_dir not in ["chatglm2"]:
+        if self.model_dir not in ["qwen", "baichuan"]:
             self.run_predictor({"inference_model": True})
 
         self.run_predictor({"inference_model": False})

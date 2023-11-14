@@ -50,7 +50,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
 
             main()
 
-        if self.model_dir not in ["opt", "chatglm2", "qwen", "baichuan"]:
+        if self.model_dir not in ["qwen", "baichuan"]:
             self.run_predictor({"inference_model": True})
 
         self.run_predictor({"inference_model": False})
