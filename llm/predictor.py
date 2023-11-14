@@ -89,15 +89,6 @@ class PredictorArgument:
         },
     )
 
-    enable_memory_optim: bool = field(
-        default=True,
-        metadata={"help": "whether use `enable_memory_optim` in inference predictor"},
-    )
-    init_fleet_worker: bool = field(
-        default=True,
-        metadata={"help": "whether use `init_fleet_worker` in inference predictor"},
-    )
-
     @property
     def total_max_length(self):
         return self.src_length + self.max_length
@@ -281,7 +272,10 @@ class StaticGraphPredictor(BasePredictor):
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             inference_config.disable_gpu()
-        inference_config.disable_glog_info()
+        # inference_config.disable_glog_info()
+        inference_config.enable_memory_optim(False)
+        inference_config.switch_ir_optim(False)
+        inference_config.enable_new_executor()
 
         with static_mode_guard():
             self.predictor = paddle.inference.create_predictor(inference_config)
@@ -586,11 +580,11 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
         config.enable_use_gpu(100, device_id)
         # config.disable_glog_info()
-        if predictor_args.enable_memory_optim:
-            config.enable_memory_optim()
+        config.switch_ir_optim(False)
+        # config.enable_memory_optim(True)
+        config.enable_new_executor()
 
-        # Note(zhengzekang): Force to use fleet executor
-        if predictor_args.init_fleet_worker or self.tensor_parallel_degree > 1:
+        if self.tensor_parallel_degree > 1:
             trainer_endpoints = fleet.worker_endpoints()
             current_endpoint = trainer_endpoints[self.tensor_parallel_rank]
 
@@ -863,8 +857,7 @@ def predict():
     paddle.set_default_dtype(predictor_args.dtype)
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
-    # Note(zhengzekang): force to use fleet executor.
-    if predictor_args.init_fleet_worker or tensor_parallel_degree > 1:
+    if tensor_parallel_degree > 1:
         strategy = fleet.DistributedStrategy()
         strategy.hybrid_configs = {
             "dp_degree": 1,
@@ -884,8 +877,17 @@ def predict():
                 source_texts.append(example["src"])
                 target_texts.append(example["tgt"])
     else:
-        source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
-        target_texts = ["", ""]
+        source_texts = [
+            "作一首有关春天的诗。",
+            "作一首有关夏天的诗。",
+            "作一首有关秋天的诗。",
+            "作一首有关冬天的诗。",
+            "作一首有关大海的诗。",
+            "作一首有关森林的诗。",
+            "作一首有关土地的诗。",
+            "作一首有关河流的诗。",
+        ]
+        target_texts = ["", "", "", "", "", "", "", ""]
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
@@ -918,8 +920,8 @@ def benchmark(predictor, predictor_args, model_args):
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
-    warmup_time = 10
-    test_time = 100
+    warmup_time = 5
+    test_time = 20
 
     print("***********Start Warmup**********")
     for _ in range(warmup_time):
