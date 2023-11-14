@@ -117,7 +117,7 @@ def tokenize_rounds_example(tokenizer, example, data_args):
     system_ids = conversation_result.pop("system", []) or []
 
     # 2. truncate conversations based on conversation unit
-    input_ids, labels, sequence_length = [], [], 0
+    input_ids, labels = [], []
     conversations_ids = conversation_result.pop("conversations")
 
     assert (
@@ -144,14 +144,13 @@ def tokenize_rounds_example(tokenizer, example, data_args):
         input_ids = user_input_ids + bot_input_ids + input_ids
         labels = len(user_input_ids) * [-100] + bot_input_ids + labels
 
-        sequence_length += len(user_input_ids) + len(bot_input_ids)
-
         if should_break:
             break
 
     input_ids = system_ids + input_ids
     labels = [-100] * len(system_ids) + labels
     tokenized_source = {"input_ids": input_ids}
+    sequence_length = len(input_ids)
 
     if "position_ids" in tokenizer.model_input_names:
         tokenized_source["position_ids"] = list(range(sequence_length))
@@ -212,7 +211,10 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, i
     seq_length = len(input_ids)
     features = {"input_ids": input_ids, "labels": labels}
     if intokens:
-        features["attention_mask"] = np.tri(seq_length, seq_length, dtype=np.bool)
+        features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
+
+    if "position_ids" in rounds_inputs:
+        rounds_inputs["position_ids"] = rounds_inputs["position_ids"][:-1]
 
     rounds_inputs.update(features)
     return rounds_inputs
