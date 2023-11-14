@@ -223,7 +223,10 @@ class TrainingArguments:
         sharding_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
             following config is support:
-                split_param, use Sharding stage1 V2
+                "split_param, use Sharding stage1 V2\n"
+                "enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation\n"
+                "disable_stage1_opt_fusion, after enable stage 1 tensor fusion, disable the optimizer fusion\n"
+                "enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed\n"
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -836,9 +839,18 @@ class TrainingArguments:
                         if len(x) > 0:
                             if x not in [
                                 "split_param",
+                                "enable_stage1_tensor_fusion",
+                                "disable_stage1_opt_fusion",
+                                "enable_stage1_overlap",
                             ]:
-                                raise ValueError(f"Found unknown pipeline mode config {x},accpet config split_param.")
+                                raise ValueError(
+                                    f"Found unknown pipeline mode config {x},accpet config split_param, "
+                                    f"enable_stage1_tensor_fusion, disable_stage1_opt_fusion, enable_stage1_overlap."
+                                )
                     sharding_split_param = "split_param" in sharding_parallel_config
+                    enable_stage1_tensor_fusion = "enable_stage1_tensor_fusion" in sharding_parallel_config
+                    disable_stage1_opt_fusion = "disable_stage1_opt_fusion" in sharding_parallel_config
+                    enable_stage1_overlap = "enable_stage1_overlap" in sharding_parallel_config
 
                 if tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
@@ -867,6 +879,13 @@ class TrainingArguments:
                 if sharding_parallel_degree > 1:
                     if sharding_split_param:
                         strategy.hybrid_configs["sharding_configs"].split_param = True
+                    if enable_stage1_tensor_fusion:
+                        strategy.hybrid_configs["sharding_configs"].tensor_fusion = True
+                    if disable_stage1_opt_fusion:
+                        strategy.hybrid_configs["sharding_configs"].fuse_optimizer = False
+                    if enable_stage1_overlap:
+                        strategy.hybrid_configs["sharding_configs"].comm_overlap = True
+                        strategy.hybrid_configs["sharding_configs"].accumulate_steps = self.gradient_accumulation_steps
 
                 paddle.device.cuda.synchronize()
                 start_time = time.time()
