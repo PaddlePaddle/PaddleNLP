@@ -199,9 +199,9 @@ class TextFeatureExtractionTask(Task):
         self._tokenizer = AutoTokenizer.from_pretrained(self.model)
         # To limit batch inputs to max sequence length
         if self._static_mode:
-            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="np", max_length=self.max_seq_len)
+            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="np")
         else:
-            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="pd", max_length=self.max_seq_len)
+            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="pd")
 
     def _construct_input_spec(self):
         """
@@ -387,11 +387,10 @@ class SentenceFeatureExtractionTask(Task):
         """
         self._tokenizer = AutoTokenizer.from_pretrained(self.model)
         self.pad_token_id = self._tokenizer.convert_tokens_to_ids(self._tokenizer.pad_token)
-        # To limit batch inputs to max sequence length
         if self._static_mode:
-            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="np", max_length=self.max_seq_len)
+            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="np")
         else:
-            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="pd", max_length=self.max_seq_len)
+            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="pd")
 
     def _construct_input_spec(self):
         """
