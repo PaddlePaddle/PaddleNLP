@@ -386,7 +386,7 @@ def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conver
         # for local file, we use support_conversion to select paddle or torch weight.
         file_name = PYTORCH_WEIGHTS_NAME if support_conversion else PADDLE_WEIGHTS_NAME
 
-    file_name_list = [SAFE_WEIGHTS_NAME] + [file_name] + [PYTORCH_WEIGHTS_INDEX_NAME]
+    file_name_list = [SAFE_WEIGHTS_NAME] + [file_name] + [PYTORCH_WEIGHTS_INDEX_NAME] + [SAFE_WEIGHTS_INDEX_NAME]
     resolved_file = None
     for fn in file_name_list:
         resolved_file = cached_file_for_hf_hub(
@@ -2122,6 +2122,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME)
                     or resolved_archive_file.endswith(PYTORCH_WEIGHTS_INDEX_NAME)
                     or resolved_archive_file.endswith(SAFE_WEIGHTS_NAME)
+                    or resolved_archive_file.endswith(SAFE_WEIGHTS_INDEX_NAME)
                 ):
                     # try to get the name-mapping info
                     logger.info(
