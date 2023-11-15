@@ -150,6 +150,9 @@ def process_engine_configs(config):
     )
     config.Engine["accumulate_steps"] = config.Global.local_batch_size // config.Global.micro_batch_size
 
+def use_pir():
+    is_pir_mode = os.environ.get("FLAGS_enable_pir_in_executor", None)
+    return str(is_pir_mode).lower() not in ('false', 'off', '0', 'none')
 
 def process_strategy(config):
     """
@@ -165,7 +168,10 @@ def process_strategy(config):
         fused_linear = config.FusedPasses.pop("fused_linear", False)
         fused_adamw = config.FusedPasses.pop("fused_adamw", False)
         if fused_linear:
-            fused_passes_list.append("fuse_gemm_epilogue")
+            if use_pir():
+                fused_passes_list.append("fused_gemm_epilogue_pass")
+            else:
+                fused_passes_list.append("fuse_gemm_epilogue")
         if fused_adamw:
             fused_passes_list.append("fuse_adamw")
         fused_passes = strategy.fused_passes

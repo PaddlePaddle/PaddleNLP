@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import csv
 import math
 import time
 from collections import defaultdict
@@ -20,6 +21,8 @@ from datasets import load_dataset
 from mteb.abstasks import AbsTaskRetrieval
 
 from paddlenlp import Taskflow
+
+csv.field_size_limit(500 * 1024 * 1024)
 
 
 class PaddleModel:
@@ -141,7 +144,7 @@ def load_t2ranking_for_retraviel(num_max_passages: float):
     dev_rels_dataset = load_dataset("THUIR/T2Ranking", "qrels.dev")["train"]  # type: ignore
     corpus = {}
     for index in range(min(len(collection_dataset), num_max_passages)):
-        record = collection_dataset.iloc[index, :]
+        record = collection_dataset[index]
         record = cast(dict, record)
         pid: int = record["pid"]
         corpus[str(pid)] = {"text": record["text"]}
