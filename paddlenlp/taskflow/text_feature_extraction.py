@@ -199,9 +199,9 @@ class TextFeatureExtractionTask(Task):
         self._tokenizer = AutoTokenizer.from_pretrained(self.model)
         # Fix windows dtype bug
         if self._static_mode:
-            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="np")
+            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="np", max_length=self.max_seq_len)
         else:
-            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="pd")
+            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="pd", max_length=self.max_seq_len)
 
     def _construct_input_spec(self):
         """
@@ -290,7 +290,7 @@ class TextFeatureExtractionTask(Task):
                     text_features = self._model.get_pooled_embedding(
                         input_ids=batch_inputs["input_ids"], token_type_ids=batch_inputs["token_type_ids"]
                     )
-                    all_feats.append(text_features.numpy())
+                    all_feats.append(text_features.detach().numpy())
         inputs.update({"features": all_feats})
         return inputs
 
@@ -389,9 +389,9 @@ class SentenceFeatureExtractionTask(Task):
         self.pad_token_id = self._tokenizer.convert_tokens_to_ids(self._tokenizer.pad_token)
         # Fix windows dtype bug
         if self._static_mode:
-            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="np")
+            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="np", max_length=self.max_seq_len)
         else:
-            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="pd")
+            self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="pd", max_length=self.max_seq_len)
 
     def _construct_input_spec(self):
         """
@@ -541,7 +541,7 @@ class SentenceFeatureExtractionTask(Task):
                         )
                         input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.shape)
                         token_embeddings[input_mask_expanded == 0] = -1e9
-                        max_over_time = paddle.max(token_embeddings, 1)
+                        max_over_time = paddle.max(token_embeddings, 1).detach().numpy()
                         all_feats.append(max_over_time)
 
                     elif pooling_mode == "mean_tokens" or pooling_mode == "mean_sqrt_len_tokens":
@@ -553,11 +553,13 @@ class SentenceFeatureExtractionTask(Task):
                         sum_mask = input_mask_expanded.sum(1)
                         sum_mask = paddle.clip(sum_mask, min=1e-9)
                         if pooling_mode == "mean_tokens":
-                            all_feats.append(sum_embeddings / sum_mask)
+                            text_features = sum_embeddings / sum_mask
+                            all_feats.append(text_features.detach().numpy())
                         elif pooling_mode == "mean_sqrt_len_tokens":
-                            all_feats.append(sum_embeddings / paddle.sqrt(sum_mask))
+                            text_features = sum_embeddings / paddle.sqrt(sum_mask)
+                            all_feats.append(text_features.detach().numpy())
                     else:
-                        cls_token = token_embeddings[:, 0]
+                        cls_token = token_embeddings[:, 0].detach().numpy()
                         all_feats.append(cls_token)
         inputs.update({"features": all_feats})
         return inputs
@@ -565,7 +567,6 @@ class SentenceFeatureExtractionTask(Task):
     def _postprocess(self, inputs):
         inputs["features"] = np.concatenate(inputs["features"], axis=0)
         inputs["features"] = [inputs["features"][idx] for idx in np.argsort(self.length_sorted_idx)]
-
         if self.return_tensors == "pd":
             inputs["features"] = paddle.to_tensor(inputs["features"])
         return inputs

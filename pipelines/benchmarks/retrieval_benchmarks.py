@@ -27,7 +27,7 @@ csv.field_size_limit(500 * 1024 * 1024)
 
 class PaddleModel:
     def __init__(
-        self, query_model, corpus_model, batch_size=32, max_seq_len=512, sep=" ", pooling_mode="mean_tokens", **kwargs
+        self, query_model, corpus_model, batch_size=16, max_seq_len=512, sep=" ", pooling_mode="mean_tokens", **kwargs
     ):
         self.query_model = Taskflow(
             "feature_extraction",
