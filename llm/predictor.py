@@ -30,7 +30,6 @@ from utils import (
     get_alibi_slopes,
     get_infer_model_path,
     get_prefix_tuning_params,
-    load_real_time_tokens,
 )
 
 from paddlenlp.generation import TextIteratorStreamer
@@ -393,7 +392,7 @@ class InferencePredictorMixin:
 
     def _postprocess(self, predictions):
         if paddle.distributed.get_rank() == 0:
-            tokens: np.ndarray = load_real_time_tokens()
+            tokens = predictions
             decoded_predictions = self.tokenizer.batch_decode(
                 tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
             )
@@ -647,8 +646,8 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
             input_tensor.share_external_data(self.cache_kvs[i])
         input_tensor = self.predictor.get_input_handle("pre_ids")
         input_tensor.share_external_data(self.pre_ids)
-
         self.predictor.run()
+        return self.predictor.get_output_handle(self.predictor.get_output_names()[0]).copy_to_cpu()
 
 
 class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
@@ -676,10 +675,10 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
                 inputs[key] = paddle.to_tensor(inputs[key])
 
         inputs["cache_kvs"] = self.cache_kvs
-        self.model.generate(
+        outputs = self.model.generate(
             **inputs,
         )
-        return None
+        return outputs[0].numpy()
 
 
 def create_predictor(

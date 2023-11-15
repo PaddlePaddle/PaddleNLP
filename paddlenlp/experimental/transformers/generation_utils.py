@@ -19,7 +19,6 @@ import paddle
 import paddle.nn.functional as F
 from paddlenlp_ops import (
     get_token_penalty_multi_scores,
-    save_with_output,
     set_alibi_mask_value,
     set_mask_value,
     set_stop_value_multi_ends,
@@ -298,11 +297,11 @@ class GenerationInferenceModel(GenerationMixin):
         **model_kwargs,
     ):
         step_idx_ori = paddle.full(shape=[1], dtype="int64", fill_value=1)
-        batch_idx = paddle.full(shape=[1], dtype="int32", fill_value=-1)
 
         # fake temp next_tokens
         batch = input_ids.shape[0] if input_ids is not None else inputs_embeds.shape[0]
         next_tokens = paddle.full(shape=[batch, 1], dtype="int32", fill_value=0)
+        all_next_tokens = paddle.empty(shape=[batch, 0], dtype="int64")
 
         # let inputs_embeds enter into model_kwargs.
         # because the code below directly use the model_kwargs as a parameter without using inputs_embeds.
@@ -368,13 +367,13 @@ class GenerationInferenceModel(GenerationMixin):
             else:
                 model_kwargs["all_input_ids"] = paddle.concat([model_kwargs["all_input_ids"], next_tokens], axis=1)
 
-            save_with_output(
-                next_tokens,
-                batch_idx,
-                step_idx_ori,
-                "real_time_save.temp_ids",
-                self.config.tensor_parallel_rank,
-            )
+            # save_with_output(
+            #     next_tokens,
+            #     batch_idx,
+            #     step_idx_ori,
+            #     "real_time_save.temp_ids",
+            #     self.config.tensor_parallel_rank,
+            # )
 
             return next_tokens, model_kwargs
 
@@ -389,6 +388,7 @@ class GenerationInferenceModel(GenerationMixin):
             model_kwargs,
         )
         step_idx_ori += 1
+        all_next_tokens = paddle.concat([all_next_tokens, next_tokens], axis=-1)
 
         # gives it a value, means we will entered into decoder phase.
         model_kwargs["cache"] = 0
@@ -406,8 +406,10 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs,
             )
             step_idx_ori += 1
+            all_next_tokens = paddle.concat([all_next_tokens, next_tokens], axis=-1)
 
         return (
+            all_next_tokens,
             next_tokens,
             model_kwargs["step_idx"],
             paddle.cast(model_kwargs["stop_flags"], "int32"),
