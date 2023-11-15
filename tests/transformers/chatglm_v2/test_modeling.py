@@ -222,7 +222,7 @@ class ChatGLMv2Test(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
 
 
 class ChatGLMV2GenerationD2STest(GenerationD2STestMixin, unittest.TestCase):
-    internal_testing_model = "__internal_testing__/tiny-fused-chatglm2"
+    internal_testing_model = "__internal_testing__/tiny-random-chatglm2"
 
 
 if __name__ == "__main__":
