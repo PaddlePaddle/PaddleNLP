@@ -180,7 +180,7 @@ def load_torch(path: str, **pickle_load_args):
     Returns:
     """
 
-    if path.endswith(PYTORCH_WEIGHTS_NAME):
+    if path.endswith(PYTORCH_WEIGHTS_NAME) or os.path.split(path)[-1].startswith("pytorch_model-"):
         pickle_load_args.update({"encoding": "utf-8"})
 
         prefix_key = read_prefix_key(path)
