@@ -767,7 +767,7 @@ class BloomPreTrainedModel(PretrainedModel):
                     f"h.{i}.input_layernorm.bias",
                     [
                         f"h.{i}.self_attention.query_key_value.weight",
-                        None,
+                        f"h.{i}.self_attention.query_key_value.weight",
                         "transpose",
                     ],
                     f"h.{i}.self_attention.query_key_value.bias",
@@ -775,8 +775,16 @@ class BloomPreTrainedModel(PretrainedModel):
                     f"h.{i}.self_attention.dense.bias",
                     f"h.{i}.post_attention_layernorm.weight",
                     f"h.{i}.post_attention_layernorm.bias",
-                    [f"h.{i}.mlp.dense_h_to_4h.weight", None, "transpose"],
-                    [f"h.{i}.mlp.dense_4h_to_h.weight", None, "transpose"],
+                    [
+                        f"h.{i}.mlp.dense_h_to_4h.weight",
+                        f"h.{i}.mlp.dense_h_to_4h.weight",
+                        "transpose",
+                    ],
+                    [
+                        f"h.{i}.mlp.dense_4h_to_h.weight",
+                        f"h.{i}.mlp.dense_4h_to_h.weight",
+                        "transpose",
+                    ],
                     f"h.{i}.mlp.dense_h_to_4h.bias",
                     f"h.{i}.mlp.dense_4h_to_h.bias",
                 ]
@@ -786,11 +794,6 @@ class BloomPreTrainedModel(PretrainedModel):
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(hard_mapping)]
         model_class_name = config.architectures[0]
-
-        if model_class_name != "BloomModel":
-            for mapping in mappings:
-                mapping.source_name = "transformer." + mapping.source_name
-                mapping.target_name = "bloom." + mapping.target_name
 
         if model_class_name == "BloomForSequenceClassification":
             mappings.append(StateDictNameMapping("score.weight", None, "transpose"))
