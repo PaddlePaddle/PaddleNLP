@@ -915,7 +915,12 @@ class Trainer:
                     enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
 
-                    if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
+                    # Pipeline parallel mode, overlap with dp
+                    if (
+                        args.pipeline_parallel_degree > 1
+                        and isinstance(self.optimizer, HybridParallelOptimizer)
+                        and not self.do_grad_scaling
+                    ):
                         parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
 
                         if not enable_dp_comm_overlap:
@@ -925,10 +930,11 @@ class Trainer:
 
                             if self.optimizer._dp_enable:
                                 fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
+
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
 
-                    # pipeline parallel mode,  handle gradient merge here
+                    # Pipeline parallel mode,  handle gradient merge here
                     if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
                         for p in model._layers.parameters():
                             with paddle.no_grad():
