@@ -283,7 +283,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         if not is_decoder and pre_caches is not None:
             position_offset = 128
         new_rope = fused_get_rotary_embedding(
-            input_ids, position_ids, self.head_dim_shape_tensor, position_offset, True
+            ids_remove_padding, position_ids, self.head_dim_shape_tensor, position_offset, True
         )
 
         with paddle.base.framework._stride_in_no_check_dy2st_diff():
