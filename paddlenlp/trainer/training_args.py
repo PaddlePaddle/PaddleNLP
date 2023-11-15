@@ -1001,12 +1001,16 @@ class TrainingArguments:
                                 "enable_stage1_tensor_fusion",
                                 "enable_stage1_overlap",
                                 "enable_stage2_overlap",
+                                "split_param",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, "
                                     f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap."
                                 )
                     try:
+                        if "split_param" in sharding_parallel_config:
+                            strategy.hybrid_configs["sharding_configs"].split_param = True
+
                         if pipeline_parallel_degree == 1:
                             strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
                                 True if "enable_stage1_tensor_fusion" in sharding_parallel_config else False
@@ -1016,13 +1020,14 @@ class TrainingArguments:
                                 strategy.hybrid_configs[
                                     "sharding_configs"
                                 ].accumulate_steps = self.gradient_accumulation_steps
+
                         else:
                             warnings.warn(
                                 "For pipeline parallel with sharding, the sharding overlap and tensor fusion "
                                 "should be configured in pipeline_parallel_config."
                                 '"enable_stage1_tensor_fusion" and "enable_stage1_overlap" in sharding_parallel_config will be ignored.'
                             )
-                    except KeyError:
+                    except (KeyError, AttributeError):
                         warnings.warn(
                             "The enable_stage1_tensor_fusion or enable_stage1_overlap is not supported "
                             "by current version of Paddle. Please try latest develop Paddle."
