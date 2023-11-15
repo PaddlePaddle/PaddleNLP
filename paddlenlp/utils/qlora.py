@@ -13,23 +13,14 @@
 # limitations under the License.
 
 import paddle
-from paddleslim.lc.quantizers.quant_func import (
-    dequantize_8bit,
-    dequantize_fp4,
-    dequantize_nf4,
-    quantize_8bit,
-    quantize_fp4,
-    quantize_nf4,
-)
+from paddleslim.lc.quantizers.quant_func import dequantize_8bit, quantize_8bit
+from paddleslim_ops import dequant_blockwise, quant_blockwise
 
 
 def qlora_weight_quantize(
-    weight, algo, double_quant=False, block_size=64, double_quant_block_size=256, linear_name=None
+    weight, quant_type, double_quant=False, block_size=64, double_quant_block_size=256, linear_name=None
 ):
-    if algo == "nf4":
-        quant_weight, quant_scale = quantize_nf4(weight, block_size)
-    else:
-        quant_weight, quant_scale = quantize_fp4(weight, block_size)
+    quant_weight, quant_scale = quant_blockwise(weight, None, blocksize=block_size, quant_type=quant_type)
     if double_quant:
         quant_sacle_offset = quant_scale.mean()
         quant_scale -= quant_sacle_offset
@@ -52,7 +43,7 @@ def qlora_weight_quantize(
     return qlora_state_dict
 
 
-def qlora_weight_dequantize(x, algo, state, double_quant=False, block_size=64, double_quant_block_size=256):
+def qlora_weight_dequantize(x, quant_type, state, double_quant=False, block_size=64, double_quant_block_size=256):
     if double_quant:
         qquant_scale, double_quant_scale, quant_sacle_offset = state
         quant_scale = dequantize_8bit(
@@ -61,10 +52,8 @@ def qlora_weight_dequantize(x, algo, state, double_quant=False, block_size=64, d
         quant_scale += quant_sacle_offset
     else:
         quant_scale = state
-    if algo == "nf4":
-        out = dequantize_nf4(x, quant_scale, blocksize=block_size)
-    else:
-        out = dequantize_fp4(x, quant_scale, blocksize=block_size)
+
+    out = dequant_blockwise(x, None, quant_scale, blocksize=block_size, quant_type=quant_type)
     return out
 
 
