@@ -80,6 +80,8 @@ class AutoEngine(BasicEngine):
 
         # Distributed
         self._pp_degree = configs["Distributed"]["pp_degree"]
+        self._job_schedule_profiler_start = int(configs["Distributed"]["pipeline"]["job_schedule_profiler_start"])
+        self._job_schedule_profiler_end = int(configs["Distributed"]["pipeline"]["job_schedule_profiler_end"])
 
         # engine configs
         self._configs = configs["Engine"]
@@ -140,6 +142,9 @@ class AutoEngine(BasicEngine):
         self.memory_stats = configs.get("Profiler_auto", {}).get("memory_stats", False)
         self.nvprof_start = configs.get("Profiler_auto", {}).get("nvprof_start", -1)
         self.nvprof_end = configs.get("Profiler_auto", {}).get("nvprof_end", -1)
+        
+        if (self._job_schedule_profiler_start != -1) and use_new_executor():
+            logger.info("Schedule Profiler start at step {} and end at step {}".format(self._job_schedule_profiler_start, self._job_schedule_profiler_))
 
     def _validate_batch(self, batch):
         if self._pp_degree > 1 or self._accumulate_steps == 1:
@@ -174,6 +179,12 @@ class AutoEngine(BasicEngine):
         self._auto_engine.prepare(mode="train")
 
         for step, batch in enumerate(train_data_loader):
+            if (step == self._job_schedule_profiler_start) and use_new_executor():
+                self._auto_engine.enable_job_schedule_profiler = True
+
+            if (step == self._job_schedule_profiler_end - 1) and use_new_executor():
+                self._auto_engine.enable_job_schedule_profiler = False
+
             if epoch_index == self._load_recovery["epoch"]:
                 if step < self._load_recovery["step"]:
                     continue
