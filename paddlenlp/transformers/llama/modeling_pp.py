@@ -176,7 +176,7 @@ class LlamaDecoderLayerPipe(LlamaDecoderLayer):
         has_gradient = not hidden_states.stop_gradient
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
             hidden_states = recompute(
-                super().forward, hidden_states, attention_mask=attention_mask, use_reentrant=False
+                super().forward, hidden_states, attention_mask=attention_mask, alibi=alibi, use_reentrant=False
             )
         else:
             hidden_states = super().forward(hidden_states, attention_mask=attention_mask, alibi=alibi)
