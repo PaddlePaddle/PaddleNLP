@@ -31,4 +31,70 @@ GLM 130B    |✅|✅|⬜|⬜|❌|⬜|⬜|⬜|⬜|⬜|⬜|🚧|
 * ❌: 暂不支持，Not Supported
 
 
-上表中展示的是部分模型权重，实际上：
+## 模型权重支持列表
+上表中展示的是部分模型权重，支持的所有模型如下：
+
+```
+* LLaMA系列
+  - facebook/llama-7b [英文]
+  - facebook/llama-13b [英文]
+  - facebook/llama-65b [英文]
+  - meta-llama/Llama-2-7b [英文]
+  - meta-llama/Llama-2-7b-chat [英文]
+  - meta-llama/Llama-2-13b [英文]
+  - meta-llama/Llama-2-13b-chat [英文]
+  - meta-llama/Llama-2-70b [英文]
+  - baichuan-inc/Baichuan-7B [中文]
+  - baichuan-inc/Baichuan-13B-Base [中文]
+  - baichuan-inc/Baichuan-13B-Chat [中文]
+  - baichuan-inc/Baichuan2-7B-Base [中文]
+  - baichuan-inc/Baichuan2-7B-Chat [中文]
+  - baichuan-inc/Baichuan2-13B-Base [中文]
+  - baichuan-inc/Baichuan2-13B-Chat [中文]
+  - FlagAlpha/Llama2-Chinese-7b-Chat [中文]
+  - FlagAlpha/Llama2-Chinese-13b-Chat [中文]
+  - idea-ccnl/ziya-llama-13b-v1 [中文]
+  - linly-ai/chinese-llama-2-7b [中文]
+  - linly-ai/chinese-llama-2-13b [中文]
+* ChatGLM系列
+  - THUDM/chatglm-6b-v1.1 [中文]
+  - THUDM/chatglm2-6b [中文]
+* BLOOM系列
+  - bigscience/bloom-7b1 [英文]
+  - bigscience/bloomz-7b1 [多语言]
+  - bigscience/bloomz-7b1-mt [多语言]
+* Qwen系列
+  - qwen/qwen-7b [中文]
+  - qwen/qwen-7b-chat [中文]
+  - qwen/qwen-14b [中文]
+  - qwen/qwen-14b-chat [中文]
+```
+
+
+## 预训练性能
+以下测试结果基于
+
+机器环境： A100 80G * 8, CUDA 11.8, NCCL 2.15
+
+训练配置：单个step, global batch size为4M token.
+
+| 模型 | 序列长度 | 分布式策略 | 速度(per_token_per_card) | 备注
+| :-: | :-: | :-: | :-: | :-: |
+| `facebook/llama-7b` | 2048 | - | - | - |
+| `facebook/llama-13b`| 2048 | - | - | - |
+| `facebook/llama-65b`| 2048 | - | OOM | OOM |
+| `meta-llama/Llama-2-7b`| 4096 | - | - | - |
+| `meta-llama/Llama-2-13b`| 4096 | - | - | - |
+| `meta-llama/Llama-2-70b`| 4096 | - | - | - |
+
+
+`pretrain_llama-7b-tp2sd4-stage2.json`
+`pretrain_llama-13b-tp2sd4-stage2.json`
+`pretrain_llama2-7b-tp2sd4-stage2.json`
+`pretrain_llama2-13b-tp2sd4-stage2.json`
+`pretrain_baichuan2-7b-tp2sd4-stage2.json`
+`pretrain_baichuan2-13b-tp2sd4-stage2.json`
+`pretrain_flagalpha-llama2-7b-tp2sd4-stage2.json`
+`pretrain_flagalpha-llama2-13b-tp2sd4-stage2.json`
+`pretrain_ziya-llama-13b-tp2sd4-stage2.json`
+`pretrain_linly-llama2-7b-tp2sd4-stage2.json`
