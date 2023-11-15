@@ -172,5 +172,6 @@ def load_t2ranking_for_retraviel(num_max_passages: float):
     return corpus, valid_queries, valid_qrels
 
 
-tasks = T2RRetrieval(num_max_passages=10000)
-tasks.evaluate(model_query="moka-ai/m3e-base", model_corpus="moka-ai/m3e-base", split="dev")
+if __name__ == "__main__":
+    tasks = T2RRetrieval(num_max_passages=10000)
+    tasks.evaluate(model_query="moka-ai/m3e-base", model_corpus="moka-ai/m3e-base", split="dev")
