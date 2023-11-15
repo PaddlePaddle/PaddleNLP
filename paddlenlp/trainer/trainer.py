@@ -943,7 +943,11 @@ class Trainer:
                     elif args.use_moe and not args.use_hybrid_parallel:
                         fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
-                    pipeline_parallel_config = set(args.pipeline_parallel_config.split(" "))
+                    pipeline_parallel_config = (
+                        set(args.pipeline_parallel_config.split(" "))
+                        if self.args.pipeline_parallel_degree > 1
+                        else set()
+                    )
                     enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
                     enable_release_grads = "enable_release_grads" in pipeline_parallel_config
