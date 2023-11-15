@@ -42,17 +42,22 @@ document_store_with_docs = BaiduElasticsearchDocumentStore(
     vector_type="bpack_vector",
     index=args.abstract_index_name,
     index_type=args.index_type,
-    ef_construction=200,
+    ef_construction=512,
     m=32,
-    number_of_shard=3,
+    number_of_shard=12,
 )
-if args.model_type == "ernie-embedding-v1":
+if args.model_type in ["ernie-embedding-v1", "openai"]:
     dpr_retriever = EmbeddingRetriever(
         document_store=document_store_with_docs,
         retriever_batch_size=args.retriever_batch_size,
         api_key=args.embedding_api_key,
         embed_title=args.embed_title,
         secret_key=args.embedding_secret_key,
+        embedding_model=args.model_type,
+        api_type="azure",
+        azure_base_url="https://zeyuchen.openai.azure.com/",
+        azure_api_version="2023-07-01-preview",
+        azure_deployment_name="text-embedding-ada",
     )
 else:
     dpr_retriever = DensePassageRetriever(
@@ -86,36 +91,25 @@ single_pipe.add_node(component=ranker, name="Ranker", inputs=["BMRetriever"])
 def search_multi_paper(query, top_k=3):
     parameters = {
         "DenseRetriever": {
-            "top_k": 10,
+            "top_k": 20,
             "index": args.abstract_index_name,
         },
         "Ranker": {"top_k": top_k},
     }
-    for i in range(3):
-        try:
-            prediction = pipeline.run(
-                query=query,
-                params=parameters,
-            )
-        except Exception as e:
-            print(e)
-            gr.Error(f"Connction error, try times {i}")
-            continue
 
-        documents = []
-        for doc in prediction["documents"]:
-            documents.append(
-                {
-                    "document": doc.content,
-                    "key_words": doc.meta["key_words"],
-                    "title": doc.meta["title"],
-                }
-            )
-        if len(documents) > 0:
-            break
-        else:
-            gr.Error(f"Connction error, try times {i}")
-
+    prediction = pipeline.run(
+        query=query,
+        params=parameters,
+    )
+    documents = []
+    for doc in prediction["documents"]:
+        documents.append(
+            {
+                "document": doc.content,
+                "key_words": doc.meta["key_words"],
+                "title": doc.meta["title"],
+            }
+        )
     return {"documents": documents}
 
 
@@ -132,7 +126,7 @@ def search_single_paper(query, title):
         #     "index": args.full_text_index_name,
         #     "filters": filters,
         # },
-        "Ranker": {"top_k": 3},
+        "Ranker": {"top_k": 2},
     }
     for i in range(3):
         try:
@@ -170,7 +164,7 @@ def get_literature_review(history, messages):
     messages = messages[:-1]
     messages.append({"role": "user", "content": literature_text})
 
-    resp_stream = erniebot.ChatCompletion.create(model="ernie-bot-3.5", messages=messages, stream=False)
+    resp_stream = erniebot.ChatCompletion.create(model="ernie-bot-8k", messages=messages, stream=False)
     return {"result": resp_stream["result"]}
 
 
@@ -207,15 +201,16 @@ def prediction(history):
     try:
         while True:
             # Step 1, decide whether we need function call
+            print(messages)
             resp_stream = erniebot.ChatCompletion.create(
-                model="ernie-bot-3.5", messages=messages, functions=functions, stream=True
+                model="ernie-bot-8k", messages=messages, functions=functions, stream=True
             )
-
             # Step 2: execute command
             stream_output = ""
             output_response = ""
             function_flag = False
             for resp in resp_stream:
+                print(resp)
                 if not hasattr(resp, "function_call"):
                     if not function_flag:
                         logs.append("Function Call未触发")
@@ -251,7 +246,7 @@ def prediction(history):
                 if function_call["name"] not in name2function:
                     logs.append(f"Function Call的名称{function_call['name']}不存在")
 
-                    response = erniebot.ChatCompletion.create(model="ernie-bot-3.5", messages=messages, stream=True)
+                    response = erniebot.ChatCompletion.create(model="ernie-bot-8k", messages=messages, stream=True)
                     stream_output = ""
                     for character in response:
                         result = character["result"]
@@ -282,7 +277,7 @@ def prediction(history):
                         }
                     )
     except Exception as e:
-        logs.append(f"Function Call执行异常: {e}")
+        logs.append(f"执行异常: {e}")
         error_text = "当前文心一言服务繁忙，请重试"
 
     if error_text != "":

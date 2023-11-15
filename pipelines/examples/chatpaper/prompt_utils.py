@@ -149,7 +149,7 @@ def get_parse_args():
     parser.add_argument("--serving_port", default=8099, type=int, help="Serving port.")
     parser.add_argument(
         "--model_type",
-        choices=["ernie_search", "ernie", "bert", "neural_search", "ernie-embedding-v1"],
+        choices=["ernie_search", "ernie", "bert", "neural_search", "ernie-embedding-v1", "openai"],
         default="bert",
         help="the ernie model types",
     )

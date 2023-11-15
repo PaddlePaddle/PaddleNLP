@@ -15,7 +15,6 @@
 
 from __future__ import annotations
 
-import typing
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional, Union
 
@@ -25,13 +24,7 @@ except ImportError:
     from typing_extensions import Literal  # type: ignore
 
 
-if typing.TYPE_CHECKING:
-    from dataclasses import dataclass  # type: ignore
-else:
-    # We are using Pydantic dataclasses instead of vanilla Python's
-    # See #1598 for the reasons behind this choice & performance considerations
-    from pydantic.dataclasses import dataclass
-
+# if typing.TYPE_CHECKING:
 import ast
 import json
 import logging
@@ -42,19 +35,29 @@ from uuid import uuid4
 import mmh3
 import numpy as np
 import pandas as pd
-from pydantic import BaseConfig
+
+#     from dataclasses import dataclass  # type: ignore
+# else:
+#     # We are using Pydantic dataclasses instead of vanilla Python's
+#     # See #1598 for the reasons behind this choice & performance considerations
+#     from pydantic.dataclasses import dataclass
+from pydantic.dataclasses import dataclass
 from pydantic.json import pydantic_encoder
 
 logger = logging.getLogger(__name__)
 
-BaseConfig.arbitrary_types_allowed = True
+
+# BaseConfig.arbitrary_types_allowed = True
+class Config:
+    arbitrary_types_allowed = True
+
 
 #: Types of content_types supported
 ContentTypes = Literal["text", "image"]
 FilterType = Dict[str, Union[Dict[str, Any], List[Any], str, int, float, bool]]
 
 
-@dataclass
+@dataclass(config=Config)
 class Document:
     content: Union[str, pd.DataFrame]
     content_type: Literal["text", "table", "image"]
@@ -268,7 +271,7 @@ class Span:
     """
 
 
-@dataclass
+@dataclass(config=Config)
 class Answer:
     answer: str
     type: Literal["generative", "extractive", "other"] = "extractive"

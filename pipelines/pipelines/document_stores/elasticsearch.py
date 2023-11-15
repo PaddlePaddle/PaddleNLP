@@ -2268,7 +2268,8 @@ class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
                 "knn": {
                     self.embedding_field: {
                         "vector": query_emb.tolist(),
-                        "k": 16,
+                        "k": 64,
+                        "linear": False,
                         "ef": self.ef_construction,
                     }
                 }

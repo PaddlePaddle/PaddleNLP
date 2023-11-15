@@ -38,6 +38,7 @@ from pipelines.document_stores import BaseDocumentStore
 from pipelines.nodes.models import SemanticIndexBatchNeg
 from pipelines.nodes.retriever.base import BaseRetriever
 from pipelines.nodes.retriever.ernie_encoder import ErnieEmbeddingEncoder
+from pipelines.nodes.retriever.openai_encoder import OpenAIEmbeddingEncoder
 from pipelines.schema import ContentTypes, Document, FilterType
 from pipelines.utils.common_utils import initialize_device_settings
 
@@ -372,7 +373,10 @@ class DensePassageRetriever(BaseRetriever):
         return embeddings
 
 
-_EMBEDDING_ENCODERS = {"ernie-embedding-v1": ErnieEmbeddingEncoder}
+_EMBEDDING_ENCODERS = {
+    "ernie-embedding-v1": ErnieEmbeddingEncoder,
+    "openai": OpenAIEmbeddingEncoder,
+}
 
 
 class DenseRetriever(BaseRetriever):
@@ -430,6 +434,11 @@ class EmbeddingRetriever(DenseRetriever):
         progress_bar: bool = True,
         embed_meta_fields: Optional[List[str]] = None,
         mode: Literal["snippets", "raw_documents", "preprocessed_documents"] = "preprocessed_documents",
+        azure_api_version: str = "2022-12-01",
+        azure_base_url: Optional[str] = None,
+        azure_deployment_name: Optional[str] = None,
+        api_base: str = "https://api.openai.com/v1",
+        openai_organization: Optional[str] = None,
         **kwargs
     ):
 
@@ -470,6 +479,11 @@ class EmbeddingRetriever(DenseRetriever):
         self.max_seq_len = max_seq_len
         self.embed_meta_fields = embed_meta_fields
         self.scale_score = scale_score
+        self.api_base = api_base
+        self.api_version = azure_api_version
+        self.azure_base_url = azure_base_url
+        self.azure_deployment_name = azure_deployment_name
+        self.openai_organization = openai_organization
         self.embedding_encoder = _EMBEDDING_ENCODERS[self.embedding_model](retriever=self)
 
     def retrieve(
