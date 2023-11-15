@@ -197,7 +197,7 @@ class TextFeatureExtractionTask(Task):
         Construct the tokenizer for the predictor.
         """
         self._tokenizer = AutoTokenizer.from_pretrained(self.model)
-        # Fix windows dtype bug
+        # To limit batch inputs to max sequence length
         if self._static_mode:
             self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="np", max_length=self.max_seq_len)
         else:
@@ -387,7 +387,7 @@ class SentenceFeatureExtractionTask(Task):
         """
         self._tokenizer = AutoTokenizer.from_pretrained(self.model)
         self.pad_token_id = self._tokenizer.convert_tokens_to_ids(self._tokenizer.pad_token)
-        # Fix windows dtype bug
+        # To limit batch inputs to max sequence length
         if self._static_mode:
             self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="np", max_length=self.max_seq_len)
         else:
