@@ -197,7 +197,6 @@ class TextFeatureExtractionTask(Task):
         Construct the tokenizer for the predictor.
         """
         self._tokenizer = AutoTokenizer.from_pretrained(self.model)
-        # To limit batch inputs to max sequence length
         if self._static_mode:
             self._collator = DataCollatorWithPadding(self._tokenizer, return_tensors="np")
         else:
