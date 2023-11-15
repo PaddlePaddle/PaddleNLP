@@ -16,11 +16,9 @@
 ####################################
 export paddle=$1
 export nlp_dir=/workspace/PaddleNLP
-mkdir -p /workspace/PaddleNLP/model_logs
-export log_path=/workspace/PaddleNLP/model_logs
+mkdir -p /workspace/case_logs
+export log_path=/workspace/case_logs
 export case_list=()
-
-cd ${nlp_dir}
 
 ####################################
 # Insatll paddlepaddle-gpu
@@ -47,6 +45,7 @@ install_paddlenlp(){
 }
 ####################################
 get_diff_TO_case(){
+cd ${nlp_dir}
 export FLAGS_paddlenlp=0
 for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
     arr_file_name=(${file_name//// })
@@ -120,7 +119,7 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         fi
     done
     echo -e "\033[31m ---- end run case  \033"
-    cd ${nlp_dir}/model_logs
+    cd ${log_path}
     if [ ! -f *FAIL* ];then
         FF=0
         EXCODE=0

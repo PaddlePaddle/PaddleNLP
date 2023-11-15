@@ -16,8 +16,7 @@
 
 set -e
 
-export nlp_dir=/workspace/PaddleNLP/
-export log_path=/workspace/PaddleNLP/model_logs
+export log_path=/workspace/case_logs
 export case_path=/workspace/PaddleNLP/model_zoo/gpt-3
 export data_path=/fleetx_data
 
