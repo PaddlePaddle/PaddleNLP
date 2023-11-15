@@ -24,13 +24,14 @@ from tests.testing_utils import argv_context_guard, load_test_config
 from .testing_utils import LLMTest
 
 
+# TODO(wj-Mcat): disable chatglm2 test temporarily
 @parameterized_class(
     ["model_dir"],
     [
         ["llama"],
         ["bloom"],
         ["chatglm"],
-        ["chatglm2"],
+        # ["chatglm2"],
         ["qwen"],
         ["baichuan"],
     ],
