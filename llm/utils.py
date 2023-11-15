@@ -455,7 +455,7 @@ def dybatch_preprocess(
             texts = [texts]
 
         for text in texts:
-            tokens = tokenizer.apply_chat_template(
+            tokens = tokenizer(
                 text,
                 return_tensors="np",
                 padding=False,
