@@ -185,9 +185,15 @@ class FusedMultiTransformerConfig:
         nranks=1,
         trans_qkvw=True,
         ring_id=-1,
+        kv_num_heads=-1,
     ):
         self.embed_dim = embed_dim
         self.num_heads = num_heads
+        if kv_num_heads > 0:
+            self.kv_num_heads = kv_num_heads
+            assert nranks == 1, "nranks should be 1 for kv_num_heads > 0"
+        else:
+            self.kv_num_heads = num_heads
         self.dim_feedforward = dim_feedforward
         self.weight_only_quant_bits = weight_only_quant_bits
         self.dropout_rate = dropout_rate
@@ -274,6 +280,7 @@ class FusedMultiTransformerBase(Layer):
         assert config.num_heads % config.nranks == 0
         assert config.dim_feedforward % config.nranks == 0
         self.num_heads = config.num_heads // config.nranks
+        self.kv_num_heads = config.kv_num_heads // config.nranks
         dim_feedforward = config.dim_feedforward // config.nranks
         self.dim_feedforward = dim_feedforward
 
@@ -335,7 +342,7 @@ class FusedMultiTransformerBase(Layer):
             qkv_bias = None
             if qkv_bias_attr:
                 qkv_bias = self.create_parameter(
-                    shape=[3 * self.num_heads * self.head_dim],
+                    shape=[(self.num_heads + 2 * self.kv_num_heads) * self.head_dim],
                     attr=qkv_bias_attr,
                     dtype=self._dtype,
                     is_bias=True,
@@ -467,9 +474,9 @@ class FusedMultiTransformerBase(Layer):
 
     def init_weight_shape(self, config):
         self.qkv_weight_shape = (
-            [3 * self.num_heads * self.head_dim, self.embed_dim]
+            [(self.num_heads + 2 * self.kv_num_heads) * self.head_dim, self.embed_dim]
             if config.trans_qkvw
-            else [self.embed_dim * 3 * self.num_heads, self.head_dim]
+            else [(self.num_heads + 2 * self.kv_num_heads) * self.head_dim, self.embed_dim]
         )
         self.linear_weight_shape = [self.num_heads * self.head_dim, self.embed_dim]
         self.ffn1_weight_shape = (
@@ -815,7 +822,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             ffn2_weight_scale_attr = self.get_attr(config.ffn2_weight_scale_attrs, i)
 
             qkv_weight_scale = self.create_parameter(
-                shape=[3 * config.num_heads * self.head_dim],
+                shape=[(config.num_heads + 2 * config.kv_num_heads) * self.head_dim],
                 attr=qkv_weight_scale_attr,
                 dtype=paddle.float32,
                 is_bias=False,
