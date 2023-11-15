@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import os
 from typing import Dict, List, Optional, Union
@@ -278,3 +279,20 @@ class ChatGLMv2Tokenizer(PretrainedTokenizer):
             encoded_inputs[self.model_input_names[0]] = [self.pad_token_id] * difference + required_input
 
         return encoded_inputs
+
+    def apply_chat_template(self, conversation: List[List[str, str]] | str, tokenize: bool = True, **tokenizer_kwargs):
+        """apply chat_template rules to conversation which should not be batched data
+
+        Args:
+            conversation (List[List[str, str]] | str): the conversation messages between user and bot
+            tokenize (bool, optional): whether do tokenization. Defaults to True.
+
+        Returns:
+            str | dict[str, numpy.ndarray | paddle.Tensor]: return the result of applied data
+        """
+        query = super().apply_chat_template(conversation, tokenize=False)
+        if not tokenize:
+            return query
+
+        # chatglm can add prefix special_tokens to sentence
+        return self(query, **tokenizer_kwargs)
