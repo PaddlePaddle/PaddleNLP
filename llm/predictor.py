@@ -683,6 +683,7 @@ def create_predictor(
     tensor_parallel_rank: int = 0,
 ):
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
+
     # init chat_template for tokenizer
     init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
 
@@ -845,7 +846,15 @@ def create_predictor(
                 cache_kvs_shape = LlamaForCausalLMInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
-            elif "chatglm" in config.architectures[0].lower():
+            elif "chatglmv2forcausallm" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    ChatGLMv2ForCausalLMInferenceModel,
+                )
+
+                cache_kvs_shape = ChatGLMv2ForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
+                )
+            elif "chatglmforcausallm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     ChatGLMForCausalLMInferenceModel,
                 )
