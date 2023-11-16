@@ -972,7 +972,7 @@ class Trainer:
                         fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
                     # pipeline parallel or tensor parallel mode,  handle gradient merge here
-                    if self._enable_delay_scale_loss():
+                    if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss():
                         for p in model._layers.parameters():
                             with paddle.no_grad():
                                 if hasattr(p, "main_grad") and p.main_grad is not None:
