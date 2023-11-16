@@ -253,8 +253,6 @@ class ChatGLMAttention(nn.Layer):
             )
             version_check = False
         if self.config.use_flash_attention and version_check:
-            # Flash Attention now ignore attention mask
-            # Current Flash Attention doesn't support attn maskt
             # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
             # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
             if cache is not None:
