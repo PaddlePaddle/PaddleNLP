@@ -832,7 +832,6 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         if past_key_values[0] is not None:
             cache_length = paddle.shape(past_key_values[0][0])[1]
             seq_length_with_past += cache_length
-
         if inputs_embeds is None:
             fleet.auto.shard_tensor(self.embed_tokens.weight, *get_dist_attr(["mp", None], 0))
             inputs_embeds = self.embed_tokens(input_ids)

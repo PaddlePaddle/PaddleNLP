@@ -1181,9 +1181,7 @@ class TrainingArguments:
             if self.recompute:
                 recompute = strategy.recompute
                 recompute.enable = True
-                recompute.no_recompute_segments = []  # self.no_recompute_segments
 
-            fleet.init(is_collective=True)
             self.strategy = strategy
             logger.info(self.strategy)
             order = ["dp", "pp", "mp"]
