@@ -733,7 +733,7 @@ class MistralModel(MistralPreTrainedModel):
 
         if position_ids is None:
             position_ids = paddle.arange(
-                past_key_values_length, seq_length + past_key_values_length, dtype=paddle.long
+                past_key_values_length, seq_length + past_key_values_length, dtype=paddle.int64
             )
             position_ids = position_ids.unsqueeze(0).reshape([-1, seq_length])
         else:
@@ -905,7 +905,7 @@ class MistralForCausalLM(MistralPreTrainedModel):
 
     def __init__(self, config):
         super().__init__(config)
-        self.model = MistralModel(config)
+        self.mistral = MistralModel(config)
         self.vocab_size = config.vocab_size
         # self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
         self.lm_head = MistralLMHead(config)
@@ -1022,7 +1022,7 @@ class MistralForCausalLM(MistralPreTrainedModel):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
-        outputs = self.model(
+        outputs = self.mistral(
             input_ids=input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -1129,7 +1129,7 @@ class MistralForSequenceClassification(MistralPreTrainedModel):
             if self.config.problem_type is None:
                 if self.num_labels == 1:
                     self.config.problem_type = "regression"
-                elif self.num_labels > 1 and (labels.dtype == paddle.long or labels.dtype == paddle.int):
+                elif self.num_labels > 1 and (labels.dtype == paddle.int64 or labels.dtype == paddle.int):
                     self.config.problem_type = "single_label_classification"
                 else:
                     self.config.problem_type = "multi_label_classification"
