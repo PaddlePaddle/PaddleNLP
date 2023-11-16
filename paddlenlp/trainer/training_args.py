@@ -207,6 +207,10 @@ class TrainingArguments:
             tensor_parallel_degree means split the transformer layer to how many parts.
             default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better proformance.
             Note, this need model support in source code, currently GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM is supported.
+        tensor_parallel_config (`str`, *optional*)(
+           Some additional config it highly affect the usage of tensor parallel, we provide some option to config it.
+           following config is support:
+             enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
         pipeline_parallel_degree (`int`, *optional*, defaults to `-1`)
             Pipeline parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.2 Pipeline Model Parallelism).
             Pipeline parallelism assigns multi-transformer layers to different cards, the micro batch data stream passed between cards like pipelines.
@@ -488,6 +492,16 @@ class TrainingArguments:
                 "tensor_parallel_degree means split the transformer layer to how many parts."
                 "default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better proformance."
                 "Note, this need model support in source code, currently GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM is supported. "
+            )
+        },
+    )
+    tensor_parallel_config: str = field(
+        default="",
+        metadata={
+            "help": (
+                "Some additional config it highly affect the usage of tensor parallel, we provide some option to config it."
+                "following config is support:\n"
+                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
             )
         },
     )
@@ -842,6 +856,15 @@ class TrainingArguments:
 
                 if tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
+                    tensor_parallel_config = set(self.tensor_parallel_config.split(" "))
+                    for x in tensor_parallel_config:
+                        if len(x) > 0:
+                            if x not in ["enable_delay_scale_loss"]:
+                                raise ValueError(f"Found unknown tensor parallel mode config {x} ,accept config enable_delay_scale_loss.")
+                else:
+                    logger.warning("The tensor_parallel_config would be ignored when tensor parallel is not enabled.")
+                    self.tensor_parallel_config = ""
+
                 if self.use_moe:
                     order = ["sharding", "pp", "dp", "mp"]
                 elif tensor_parallel_degree == 1 and sharding_parallel_degree == 1:

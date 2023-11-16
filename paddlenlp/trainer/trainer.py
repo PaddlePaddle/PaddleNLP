@@ -944,7 +944,6 @@ class Trainer:
                         fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
                     pipeline_parallel_config = set(args.pipeline_parallel_config.split(" "))
-                    enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
                     enable_release_grads = "enable_release_grads" in pipeline_parallel_config
 
@@ -972,8 +971,8 @@ class Trainer:
                     if hack_dp_master_grad and not (args.recompute and availiable_no_sync):
                         fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
-                    # pipeline parallel mode,  handle gradient merge here
-                    if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
+                    # pipeline parallel or tensor parallel mode,  handle gradient merge here
+                    if self._enable_delay_scale_loss():
                         for p in model._layers.parameters():
                             with paddle.no_grad():
                                 if hasattr(p, "main_grad") and p.main_grad is not None:
@@ -1000,7 +999,8 @@ class Trainer:
                                 f"optimizer not run, scale_before: {scale_before[0]}, scale_after: {scale_after[0]}"
                             )
                     elif isinstance(self.optimizer, HybridParallelOptimizer):
-                        self.optimizer._step(parameters_list)
+                        if self.optimizer._hcg.get_sharding_parallel_world_size() > 1:
+                            self.optimizer._step(parameters_list)
                     else:
                         self.optimizer.step()
 
@@ -1789,6 +1789,15 @@ class Trainer:
 
         return (loss, outputs) if return_outputs else loss
 
+    def _enable_delay_scale_loss(self):
+        key = "enable_delay_scale_loss"
+        if self.args.pipeline_parallel_degree > 1:
+            return key in self.args.pipeline_parallel_config.split(" ")
+        elif self.args.tensor_parallel_degree > 1:
+            return key in self.args.tensor_parallel_config.split(" ")
+        else:
+            return False
+
     def training_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         """
         Perform a training step on a batch of inputs.
@@ -1814,7 +1823,7 @@ class Trainer:
         inputs = self._prepare_inputs(inputs)
         with self.autocast_smart_context_manager():
             loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
-        if self.args.gradient_accumulation_steps > 1:
+        if self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = map_structure(lambda x: x / self.args.gradient_accumulation_steps, loss)
 
         if isinstance(loss, dict):
