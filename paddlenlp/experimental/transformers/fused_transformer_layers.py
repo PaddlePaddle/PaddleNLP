@@ -1262,3 +1262,80 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
                 residual=residual_input,
             )[0]
         return tmp_out, residual_input
+
+
+
+class FusedBlockMultiTransformer(FusedMultiTransformerBase):
+    def __init__(self, config: FusedMultiTransformerConfig):
+        super().__init__(config)
+
+    def compute_attn(
+        self,
+        time_step,
+        qkv_out,
+        padding_offset,
+        seq_lens,
+        input_ids,
+        rotary_embs,
+        rotary_emb_dims,
+        caches,
+        pre_caches,
+        pre_caches_length,
+        attn_mask,
+        i,
+        **kwargs,
+    ):
+        k_quant_scales = kwargs.get("k_quant_scales", None)
+        v_quant_scales = kwargs.get("v_quant_scales", None)
+        k_dequant_scales = kwargs.get("k_dequant_scales", None)
+        v_dequant_scales = kwargs.get("v_dequant_scales", None)
+        fmha_out = paddle.incubate.nn.functional.block_multihead_attention(
+                qkv_out,
+                caches[2 * i],
+                caches[2 * i + 1],
+                kwargs.get("seq_lens_encoder", None),
+                kwargs.get("seq_lens_decoder", None),
+                kwargs.get("seq_lens_this_time", None),
+                kwargs.get("padding_offsets", None),
+                kwargs.get("cum_offsets", None),
+                kwargs.get("cu_seqlens_q", None),
+                kwargs.get("cu_seqlens_k", None),
+                kwargs.get("block_tables", None),
+                pre_caches[2 * i] if pre_caches is not None else None, # pre_key_cache
+                pre_caches[2 * i + 1] if pre_caches is not None else None, # pre_value_cache
+                k_quant_scales[i] if k_quant_scales is not None else None,
+                v_quant_scales[i] if v_quant_scales is not None else None,
+                k_dequant_scales[i] if k_dequant_scales is not None else None,
+                v_dequant_scales[i] if v_dequant_scales is not None else None,
+                rotary_embs,
+                attn_mask,
+                kwargs.get("tgt_mask", None),
+                kwargs.get("max_input_length", -1),
+                kwargs.get("block_size", 64),
+                self.use_neox_rotary_style,
+                True,
+            )[0]
+
+        out_linear_out = self.compute_out_linear(fmha_out, i)
+
+        return out_linear_out
+
+    def pre_process(self, **kwargs):
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
+        get_max_len(seq_lens_encoder, seq_lens_decoder)
+
+    def post_process(self, **kwargs):
+        multi_block_output = kwargs.get("multi_block_output", None)
+        cum_offsets = kwargs.get("cum_offsets", None)
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
+        max_input_length = kwargs.get("max_input_length", -1)
+
+        out = rebuild_padding_v2(multi_block_output, cum_offsets, seq_lens_decoder, seq_lens_encoder, max_input_length)
+
+        return out
+
+class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMultiTransformerWeightOnly):
+    def __init__(self, config: FusedMultiTransformerConfig):
+        super().__init__(config)
