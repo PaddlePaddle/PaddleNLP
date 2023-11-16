@@ -845,14 +845,21 @@ class TrainingArguments:
                         )
 
                 if sharding_parallel_degree > 1:
-                    sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
+                    sharding_parallel_config = (
+                        set(self.sharding_parallel_config.split(" ")) if self.sharding_parallel_config else set()
+                    )
                     for x in sharding_parallel_config:
                         if len(x) > 0:
                             if x not in [
                                 "split_param",
+                                "shardingv1_comm_overlap",
                             ]:
-                                raise ValueError(f"Found unknown pipeline mode config {x},accpet config split_param.")
+                                raise ValueError(f"Found unknown pipeline mode config {x}, accpet config split_param and shardingv1_comm_overlap.")
                     sharding_split_param = "split_param" in sharding_parallel_config
+                    shardingv1_comm_overlap = True if "shardingv1_comm_overlap" in sharding_parallel_config else False
+                    assert (
+                        not shardingv1_comm_overlap or not sharding_split_param
+                    ), "Currently support shardingv1_comm_overlap in sharding stage1"
 
                 if tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
@@ -890,6 +897,13 @@ class TrainingArguments:
                 if sharding_parallel_degree > 1:
                     if sharding_split_param:
                         strategy.hybrid_configs["sharding_configs"].split_param = True
+                    strategy.hybrid_configs["sharding_configs"].comm_overlap = shardingv1_comm_overlap
+                    if shardingv1_comm_overlap:
+                        strategy.hybrid_configs["sharding_configs"].accumulate_steps = self.gradient_accumulation_steps
+
+                    print(
+                        f"sharding_split_param: {sharding_split_param}; shardingv1_comm_overlap: {shardingv1_comm_overlap}; gradient_accumulation_steps: {self.gradient_accumulation_steps}"
+                    )
 
                 paddle.device.cuda.synchronize()
                 start_time = time.time()
