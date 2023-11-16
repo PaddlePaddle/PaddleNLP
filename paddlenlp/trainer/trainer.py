@@ -999,8 +999,7 @@ class Trainer:
                                 f"optimizer not run, scale_before: {scale_before[0]}, scale_after: {scale_after[0]}"
                             )
                     elif isinstance(self.optimizer, HybridParallelOptimizer):
-                        if self.optimizer._hcg.get_sharding_parallel_world_size() > 1:
-                            self.optimizer._step(parameters_list)
+                        self.optimizer._step(parameters_list)
                     else:
                         self.optimizer.step()
 
