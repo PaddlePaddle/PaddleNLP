@@ -107,7 +107,7 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: ${case} \033"
         if [[ ${case} == "gpt-3" ]];then
             echo -e "\033[31m ---- running case gpt-3 auto \033"
-            bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh
+            bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh case_list_auto
             print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'`
             echo -e "\033[31m ---- running case gpt-3 dynamic \033"
             bash /workspace/PaddleNLP/scripts/distribute/ci_case_dy.sh

@@ -443,7 +443,7 @@ function before_hook() {
         echo "dataset/wikitext_103_en downloaded"
     else
         # download dataset/wikitext_103_en
-        mkdir ${data_path}/dataset/wikitext_103_en;
+        mkdir -p ${data_path}/dataset/wikitext_103_en;
         wget -O ${data_path}/dataset/wikitext_103_en/wikitext-103-en.txt http://fleet.bj.bcebos.com/datasets/gpt/wikitext-103-en.txt
     fi
 
