@@ -378,6 +378,12 @@ def main():
     if data_args.data_cache is not None:
         os.makedirs(data_args.data_cache, exist_ok=True)
 
+    training_args.do_eval = False
+    training_args.do_predict = False
+    training_args.max_steps = 10
+    training_args.skip_memory_metrics = False
+    model_args.continue_training = False
+
     set_seed(training_args)
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
@@ -534,7 +540,8 @@ def main():
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         metrics = train_result.metrics
-        trainer.save_model()
+        if not int(os.getenv("test_ci_no_save_model", 0)):
+            trainer.save_model()
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
         trainer.save_state()
