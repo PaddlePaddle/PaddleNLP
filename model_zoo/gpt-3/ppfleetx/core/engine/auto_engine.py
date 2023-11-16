@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import sys
 import numpy as np
 
 import paddle
@@ -144,7 +145,7 @@ class AutoEngine(BasicEngine):
         self.nvprof_end = configs.get("Profiler_auto", {}).get("nvprof_end", -1)
         
         if (self._job_schedule_profiler_start != -1) and use_new_executor():
-            logger.info("Schedule Profiler start at step {} and end at step {}".format(self._job_schedule_profiler_start, self._job_schedule_profiler_))
+            logger.info("Schedule Profiler start at step {} and end at step {}".format(self._job_schedule_profiler_start, self._job_schedule_profiler_end))
 
     def _validate_batch(self, batch):
         if self._pp_degree > 1 or self._accumulate_steps == 1:
@@ -184,6 +185,7 @@ class AutoEngine(BasicEngine):
 
             if (step == self._job_schedule_profiler_end - 1) and use_new_executor():
                 self._auto_engine.enable_job_schedule_profiler = False
+                sys.exit()
 
             if epoch_index == self._load_recovery["epoch"]:
                 if step < self._load_recovery["step"]:
