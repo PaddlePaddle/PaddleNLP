@@ -690,7 +690,7 @@ def create_predictor(
     tensor_parallel_rank: int = 0,
 ):
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
-    init_chat_template(tokenizer, model_args.model_name_or_path, predictor_args.chat_template)
+    init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer) and not tokenizer.pad_token:
         tokenizer.pad_token = tokenizer.unk_token
