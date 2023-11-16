@@ -14,7 +14,6 @@
 """
 GPT/Llama auto parallel pretraining scripts.
 """
-import math
 import os
 import random
 import sys
@@ -27,7 +26,12 @@ import numpy as np
 import paddle
 import paddle.distributed.auto_parallel as auto
 
-from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments, speed_metrics
+from paddlenlp.trainer import (
+    PdArgumentParser,
+    Trainer,
+    TrainingArguments,
+    speed_metrics,
+)
 from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
@@ -536,7 +540,9 @@ def main():
     num_train_epochs = training_args.max_steps // num_update_steps_per_epoch + int(
         training_args.max_steps % num_update_steps_per_epoch > 0
     )
-    total_train_batch_size = training_args.train_batch_size * training_args.gradient_accumulation_steps * training_args.dataset_world_size
+    total_train_batch_size = (
+        training_args.train_batch_size * training_args.gradient_accumulation_steps * training_args.dataset_world_size
+    )
 
     global_step = 0
     global_step_last_logged = 0
@@ -544,7 +550,6 @@ def main():
     tr_loss = float(0)
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
-            start_time = time.time()
             outs = engine.run(inputs, mode="train")
 
             if "loss" in outs:
@@ -567,12 +572,14 @@ def main():
                 logs["loss"] = round(tr_loss / num_steps, 8)
                 logs["learning_rate"] = float("{0:.3e}".format(engine.optimizer.get_lr()))
                 logs["global_step"] = int(global_step)
-                logs.update(speed_metrics(
-                    split = "interval",
-                    start_time = start_time_last_logged,
-                    num_samples=total_train_batch_size * num_steps, 
-                    num_steps=num_steps
-                ))
+                logs.update(
+                    speed_metrics(
+                        split="interval",
+                        start_time=start_time_last_logged,
+                        num_samples=total_train_batch_size * num_steps,
+                        num_steps=num_steps,
+                    )
+                )
                 logger.info(", ".join(f"{k}: {v}" for k, v in logs.items()))
 
                 global_step_last_logged = global_step
