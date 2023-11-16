@@ -31,6 +31,7 @@ from utils import (
     get_alibi_slopes,
     get_infer_model_path,
     get_prefix_tuning_params,
+    init_chat_template,
     load_real_time_tokens,
 )
 
@@ -47,6 +48,7 @@ from paddlenlp.transformers import (
     PretrainedTokenizer,
 )
 from paddlenlp.utils.import_utils import import_module, is_paddlenlp_ops_available
+from paddlenlp.utils.log import logger
 
 
 @dataclass
@@ -78,9 +80,10 @@ class PredictorArgument:
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     quant_type: str = field(
-        default="None",
-        metadata={"help": "The quant type of inference model, support `weight_only_int8`, `weight_only_int4`."},
+        default=None,
+        metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"},
     )
+
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     benchmark: bool = field(
         default=False,
@@ -102,6 +105,11 @@ class PredictorArgument:
     use_cachekv_int8: bool = field(
         default=False,
         metadata={"help": "If use_cachekv_int8 set as `True`, dynamic cache kv quantization will be applied"},
+    chat_template: str = field(
+        default=None,
+        metadata={
+            "help": "the path of `chat_template.json` file to handle multi-rounds conversation. If is None, it will not use `chat_template.json`; If is equal with `model_name_or_path`, it will use the default loading; If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
+        },
     )
 
     @property
@@ -164,6 +172,17 @@ class BasePredictor:
         self.model_config.tensor_parallel_rank, self.model_config.tensor_parallel_degree = init_dist_env()
 
     def _preprocess(self, source):
+        if self.config.chat_template is not None:
+            if self.tokenizer.chat_template is None:
+                logger.warning(
+                    f"Tokenizer<{self.tokenizer}> doesn't have chat_template field, so it will not use chat_template."
+                    "Or you can customize your tokenizer, please refer to:"
+                    "https://paddlenlp.readthedocs.io/zh/latest/get_started/chat_template.html"
+                )
+            else:
+                source = [source] if isinstance(source, str) else source
+                source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
+
         tokenized_source = self.tokenizer(
             source,
             max_length=self.config.src_length,
@@ -171,7 +190,8 @@ class BasePredictor:
             truncation_side="left",
             return_tensors=self.return_tensors,
             padding=True,
-            add_special_tokens=True,
+            # when use chat_template, it should not add special tokens
+            add_special_tokens=self.config.chat_template is None,
         )
         return tokenized_source
 
@@ -392,6 +412,11 @@ class InferencePredictorMixin:
         self.attention_mask[:] = 0
         self.tgt_generation_mask[:] = 0
         pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
+
+        if self.config.chat_template is not None:
+            source = [source] if isinstance(source, str) else source
+            source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
+
         inputs = dybatch_preprocess(
             self.tokenizer,
             source,
@@ -402,6 +427,7 @@ class InferencePredictorMixin:
             temperature=self.config.temperature,
             benchmark=self.config.benchmark,
             pre_caches_length=pre_caches_length,
+            chat_template=self.config.chat_template,
         )
 
         if "chatglmforcausallm" == self.architectures.lower():
@@ -1125,6 +1151,7 @@ def create_predictor(
     tensor_parallel_rank: int = 0,
 ):
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
+    init_chat_template(tokenizer, model_args.model_name_or_path, predictor_args.chat_template)
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer) and not tokenizer.pad_token:
         tokenizer.pad_token = tokenizer.unk_token
@@ -1178,16 +1205,22 @@ def create_predictor(
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
             config.tensor_parallel_degree = tensor_parallel_degree
             config.tensor_parallel_rank = tensor_parallel_rank
-            config.quant_bits = -1
+            config.weight_only_quant_bits = -1
+            config.quant_type = None
+            config.model_name_or_path = ""
 
-            if predictor_args.quant_type.startswith("weight_only_int"):
-                quant_bits = int(predictor_args.quant_type[-1])
-                config.quant_bits = quant_bits
+            if predictor_args.quant_type is not None and predictor_args.quant_type.startswith("weight_only_int"):
+                weight_only_quant_bits = int(predictor_args.quant_type[-1])
+                config.weight_only_quant_bits = weight_only_quant_bits
+                config.quant_type = predictor_args.quant_type
 
-            config.quant_bits = -1
-            if predictor_args.quant_type.startswith("weight_only_int"):
-                quant_bits = int(predictor_args.quant_type[-1])
-                config.quant_bits = quant_bits
+            if config.quantization_config.quant_type is not None and "a8w8" in config.quantization_config.quant_type:
+                config.model_name_or_path = predictor_args.model_name_or_path
+                config.quant_type = config.quantization_config.quant_type
+
+                # Turn on GEMM int8 kernel tuning
+                paddle.base.core.enable_autotune()
+                paddle.base.core.update_autotune_status()
 
             if "llama" in config.architectures[0].lower():
                 if model_args.model_type == "llama-img2txt":
@@ -1296,7 +1329,15 @@ def create_predictor(
                 cache_kvs_shape = LlamaInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
-            elif "chatglm" in config.architectures[0].lower():
+            elif "chatglmv2forcausallm" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    ChatGLMv2ForCausalLMInferenceModel,
+                )
+
+                cache_kvs_shape = ChatGLMv2ForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
+                )
+            elif "chatglmforcausallm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     ChatGLMForCausalLMInferenceModel,
                 )
@@ -1360,7 +1401,7 @@ def predict():
                 source_texts.append(example["src"])
                 target_texts.append(example["tgt"])
     else:
-        source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
+        source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
         target_texts = ["", ""]
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
