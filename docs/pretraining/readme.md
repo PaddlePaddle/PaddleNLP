@@ -78,23 +78,16 @@ GLM 130B    |✅|✅|⬜|⬜|❌|⬜|⬜|⬜|⬜|⬜|⬜|🚧|
 
 训练配置：单个step, global batch size为4M token.
 
-| 模型 | 序列长度 | 分布式策略 | 速度(per_token_per_card) | 备注
+| 模型 | 序列长度 | 分布式策略 | 速度(per_token_per_card) | 显存占用(MB)
 | :-: | :-: | :-: | :-: | :-: |
-| `facebook/llama-7b` | 2048 | - | - | - |
-| `facebook/llama-13b`| 2048 | - | - | - |
-| `facebook/llama-65b`| 2048 | - | OOM | OOM |
-| `meta-llama/Llama-2-7b`| 4096 | - | - | - |
-| `meta-llama/Llama-2-13b`| 4096 | - | - | - |
-| `meta-llama/Llama-2-70b`| 4096 | - | - | - |
-
-
-`pretrain_llama-7b-tp2sd4-stage2.json`
-`pretrain_llama-13b-tp2sd4-stage2.json`
-`pretrain_llama2-7b-tp2sd4-stage2.json`
-`pretrain_llama2-13b-tp2sd4-stage2.json`
-`pretrain_baichuan2-7b-tp2sd4-stage2.json`
-`pretrain_baichuan2-13b-tp2sd4-stage2.json`
-`pretrain_flagalpha-llama2-7b-tp2sd4-stage2.json`
-`pretrain_flagalpha-llama2-13b-tp2sd4-stage2.json`
-`pretrain_ziya-llama-13b-tp2sd4-stage2.json`
-`pretrain_linly-llama2-7b-tp2sd4-stage2.json`
+| `baichuan-inc/Baichuan2-13B-Base` |4096 | tp2sd4 |    1370
+| `baichuan-inc/Baichuan2-7B-Base` |4096 | tp2sd4 |     2982
+| `facebook/llama-13b` |4096 | tp2sd4 |     1710
+| `facebook/llama-7b` |4096 | tp2sd4 |     3109
+| `FlagAlpha/Llama2-Chinese-13b-Chat` |4096 | tp2sd4 |     1720
+| `FlagAlpha/Llama2-Chinese-7b-Chat` |4096 | tp2sd4 |     3107
+| `idea-ccnl/ziya-llama-13b-v1` |4096 | tp2sd4 |     1711
+| `linly-ai/chinese-llama-2-7b` |4096 | tp2sd4 |     3100
+| `meta-llama/Llama-2-13b` |4096 | tp2sd4 |     1718
+| `meta-llama/Llama-2-13b` |4096 | tp2sd4 |     1731
+| `qwen/qwen-7b` |4096 | sd8 |     2989
