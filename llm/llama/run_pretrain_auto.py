@@ -457,6 +457,9 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
+    # random.seed(training_args.seed)
+    # np.random.seed(training_args.seed)
+    # paddle.seed(training_args.seed)
     model = model_class._from_config(config, dtype=dtype)
 
     if training_args.recompute:
