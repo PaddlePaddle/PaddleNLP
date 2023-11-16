@@ -187,21 +187,32 @@ def scaled_dot_product_attention(
     _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention:
-        # Flash Attention now ignore attention mask
-        # Current Flash Attention doesn't support attn maskt
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
-        if alibi is not None:
-            attention_mask = attention_mask.cast(alibi.dtype) + alibi
 
-        attn_output = F.scaled_dot_product_attention(
-            query_states,
-            key_states,
-            value_states,
-            attn_mask=attention_mask,
-            is_causal=attention_mask is None,
-        )
-        attn_weights = None
+        version = paddle.version.full_version
+        if version != "0.0.0" and version <= "2.5.2":
+            if alibi is not None:
+                raise ValueError("Flash Attention doesn't support alibi")
+            attn_output, attn_weights = flash_attention(
+                query_states,
+                key_states,
+                value_states,
+                causal=True,
+                return_softmax=output_attentions,
+            )
+        else:
+            if alibi is not None:
+                alibi = alibi.reshape([bsz, num_heads, 1, -1])
+                attention_mask = attention_mask.cast(alibi.dtype) + alibi
+            attn_output = F.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=attention_mask,
+                is_causal=attention_mask is None,
+            )
+            attn_weights = None
 
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
