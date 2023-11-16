@@ -394,7 +394,6 @@ class InferencePredictorMixin:
     def _postprocess(self, predictions):
         if paddle.distributed.get_rank() == 0:
             tokens: np.ndarray = load_real_time_tokens()
-            print(tokens)
             decoded_predictions = self.tokenizer.batch_decode(
                 tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
             )
