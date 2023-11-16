@@ -897,13 +897,9 @@ class TrainingArguments:
                 if sharding_parallel_degree > 1:
                     if sharding_split_param:
                         strategy.hybrid_configs["sharding_configs"].split_param = True
-                    strategy.hybrid_configs["sharding_configs"].comm_overlap = shardingv1_comm_overlap
                     if shardingv1_comm_overlap:
+                        strategy.hybrid_configs["sharding_configs"].comm_overlap = True
                         strategy.hybrid_configs["sharding_configs"].accumulate_steps = self.gradient_accumulation_steps
-
-                    print(
-                        f"sharding_split_param: {sharding_split_param}; shardingv1_comm_overlap: {shardingv1_comm_overlap}; gradient_accumulation_steps: {self.gradient_accumulation_steps}"
-                    )
 
                 paddle.device.cuda.synchronize()
                 start_time = time.time()
