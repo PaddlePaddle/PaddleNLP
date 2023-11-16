@@ -914,7 +914,7 @@ class Trainer:
                     tr_loss = map_structure(lambda x: paddle.zeros_like(x), tr_loss_step)
                 map_structure(lambda x, y: x.add_(y), tr_loss, tr_loss_step)
                 if (step + 1) % args.gradient_accumulation_steps == 0:
-                    if self.args.pipeline_parallel_degree == 1 and self._enable_delay_scale_loss():
+                    if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
                         tr_loss /= self.args.gradient_accumulation_steps
 
                     self.timers and self.timers("forward-backward").stop()
