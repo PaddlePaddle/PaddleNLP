@@ -1171,10 +1171,12 @@ class TrainingArguments:
                 amp = strategy.amp
                 amp.enable = True
                 amp.dtype = "bfloat16" if self.bf16 else "float16"
-                amp.level = self.fp16_opt_level
+                amp.level = self.fp16_opt_level.lower()
                 amp.init_loss_scaling = self.scale_loss
-                amp.custom_black_list = self.amp_custom_black_list
-                amp.custom_white_list = self.amp_custom_white_list
+                amp.custom_black_list = self.amp_custom_black_list if self.amp_custom_black_list is not None else []
+                amp.custom_white_list = self.amp_custom_white_list if self.amp_custom_white_list is not None else []
+                amp.use_fp16_guard = False
+                amp.use_bf16_guard = False
 
             if self.recompute:
                 recompute = strategy.recompute
