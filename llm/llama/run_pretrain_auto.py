@@ -580,6 +580,12 @@ def main():
                         num_steps=num_steps,
                     )
                 )
+
+                max_memory_allocated = paddle.device.cuda.max_memory_allocated() / 1024 / 1024
+                max_memory_reserved = paddle.device.cuda.max_memory_reserved() / 1024 / 1024
+                logs["max_memory_allocated"] = round(max_memory_allocated, 2)
+                logs["max_memory_reserved"] = round(max_memory_reserved, 2)
+
                 logger.info(", ".join(f"{k}: {v}" for k, v in logs.items()))
 
                 global_step_last_logged = global_step
