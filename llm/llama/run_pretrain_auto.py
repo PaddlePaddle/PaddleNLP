@@ -299,16 +299,6 @@ def get_train_data_file(args):
     return files
 
 
-def set_seed(args):
-    if args.device == "cpu":
-        idx = 0
-    else:
-        idx = paddle.distributed.get_rank()
-    random.seed(args.seed + idx)
-    np.random.seed(args.seed + idx)
-    paddle.seed(args.seed + idx)
-
-
 def create_optimizer(model, lr_scheduler, training_args):
     decay_parameters = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
 
@@ -400,7 +390,7 @@ def main():
     if data_args.data_cache is not None:
         os.makedirs(data_args.data_cache, exist_ok=True)
 
-    set_seed(training_args)
+    init_seed(args=training_args)
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
@@ -510,7 +500,6 @@ def main():
     def loss_func(loss, outputs):
         return loss
 
-    init_seed(args=training_args)
     global_batch_size = training_args.per_device_train_batch_size * training_args.dataset_world_size
     print_config(training_args)
 
