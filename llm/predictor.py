@@ -30,6 +30,7 @@ from utils import (
     get_alibi_slopes,
     get_infer_model_path,
     get_prefix_tuning_params,
+    init_chat_template,
     load_real_time_tokens,
 )
 
@@ -90,14 +91,6 @@ class PredictorArgument:
         },
     )
 
-    enable_memory_optim: bool = field(
-        default=True,
-        metadata={"help": "whether use `enable_memory_optim` in inference predictor"},
-    )
-    init_fleet_worker: bool = field(
-        default=True,
-        metadata={"help": "whether use `init_fleet_worker` in inference predictor"},
-    )
     chat_template: str = field(
         default=None,
         metadata={
@@ -301,6 +294,8 @@ class StaticGraphPredictor(BasePredictor):
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             inference_config.disable_gpu()
         inference_config.disable_glog_info()
+        inference_config.enable_memory_optim(False)
+        inference_config.enable_new_executor()
 
         with static_mode_guard():
             self.predictor = paddle.inference.create_predictor(inference_config)
@@ -611,11 +606,10 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
         config.enable_use_gpu(100, device_id)
         # config.disable_glog_info()
-        if predictor_args.enable_memory_optim:
-            config.enable_memory_optim()
+        config.enable_memory_optim(False)
+        config.enable_new_executor()
 
-        # Note(zhengzekang): Force to use fleet executor
-        if predictor_args.init_fleet_worker or self.tensor_parallel_degree > 1:
+        if self.tensor_parallel_degree > 1:
             trainer_endpoints = fleet.worker_endpoints()
             current_endpoint = trainer_endpoints[self.tensor_parallel_rank]
 
@@ -689,6 +683,9 @@ def create_predictor(
     tensor_parallel_rank: int = 0,
 ):
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
+    # init chat_template for tokenizer
+    init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
+
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer) and not tokenizer.pad_token:
         tokenizer.pad_token = tokenizer.unk_token
@@ -848,7 +845,15 @@ def create_predictor(
                 cache_kvs_shape = LlamaForCausalLMInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
-            elif "chatglm" in config.architectures[0].lower():
+            elif "chatglmv2forcausallm" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    ChatGLMv2ForCausalLMInferenceModel,
+                )
+
+                cache_kvs_shape = ChatGLMv2ForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
+                )
+            elif "chatglmforcausallm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     ChatGLMForCausalLMInferenceModel,
                 )
@@ -888,8 +893,7 @@ def predict():
     paddle.set_default_dtype(predictor_args.dtype)
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
-    # Note(zhengzekang): force to use fleet executor.
-    if predictor_args.init_fleet_worker or tensor_parallel_degree > 1:
+    if tensor_parallel_degree > 1:
         strategy = fleet.DistributedStrategy()
         strategy.hybrid_configs = {
             "dp_degree": 1,
