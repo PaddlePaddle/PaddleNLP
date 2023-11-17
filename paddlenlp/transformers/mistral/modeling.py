@@ -68,7 +68,6 @@ def _make_causal_mask(
         fill_value=1,
     )
     mask = paddle.tril(tensor, diagonal=0)
-    # make the mask banded to account for sliding window
     mask = paddle.triu(mask, diagonal=-sliding_window)
     mask = paddle.log(mask).astype(dtype)
 
@@ -435,11 +434,7 @@ class MistralDecoderLayer(nn.Layer):
     def __init__(self, config: MistralConfig):
         super().__init__()
         self.hidden_size = config.hidden_size
-        self.self_attn = (
-            MistralAttention(config=config)
-            # if not getattr(config, "_flash_attn_2_enabled", False)
-            # else MistralFlashAttention2(config)
-        )
+        self.self_attn = MistralAttention(config=config)
         self.mlp = MistralMLP(config)
         self.input_layernorm = MistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = MistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
@@ -531,10 +526,9 @@ class MistralPreTrainedModel(PretrainedModel):
             model_mappings.extend(layer_mappings)
 
         init_name_mappings(mappings=model_mappings)
-        # base-model prefix "LlamaModel"
         for mapping in model_mappings:
             mapping[0] = "model." + mapping[0]
-            mapping[1] = "model." + mapping[1]
+            mapping[1] = "mistral." + mapping[1]
 
         if "MistralModel" not in config.architectures:
             model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
@@ -904,7 +898,6 @@ class MistralForCausalLM(MistralPreTrainedModel):
         super().__init__(config)
         self.mistral = MistralModel(config)
         self.vocab_size = config.vocab_size
-        # self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
         self.lm_head = MistralLMHead(config)
 
     def get_input_embeddings(self):
@@ -988,31 +981,6 @@ class MistralForCausalLM(MistralPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
-        r"""
-        Args:
-            labels (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
-                Labels for computing the masked language modeling loss. Indices should either be in `[0, ...,
-                config.vocab_size]` or -100 (see `input_ids` docstring). Tokens with indices set to `-100` are ignored
-                (masked), the loss is only computed for the tokens with labels in `[0, ..., config.vocab_size]`.
-
-        Returns:
-
-        Example:
-
-        ```python
-        >>> from transformers import AutoTokenizer, MistralForCausalLM
-
-        >>> model = MistralForCausalLM.from_pretrained(PATH_TO_CONVERTED_WEIGHTS)
-        >>> tokenizer = AutoTokenizer.from_pretrained(PATH_TO_CONVERTED_TOKENIZER)
-
-        >>> prompt = "Hey, are you conscious? Can you talk to me?"
-        >>> inputs = tokenizer(prompt, return_tensors="pt")
-
-        >>> # Generate
-        >>> generate_ids = model.generate(inputs.input_ids, max_length=30)
-        >>> tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
-        "Hey, are you conscious? Can you talk to me?\nI'm not conscious, but I can talk to you."
-        ```"""
 
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
