@@ -28,12 +28,6 @@ from paddlenlp_ops import (
 
 from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList
 
-try:
-    from paddle import top_p_sampling
-except:
-    from paddlenlp_ops import top_p_sampling
-
-
 __all__ = ["GenerationInferenceModel"]
 
 
@@ -110,7 +104,8 @@ class GenerationInferenceModel(GenerationMixin):
             config.get("logits_processors", None),
             precache_input_spec,
         ]
-        if self.config["model_type"] and "chatglm" in self.config.model_type:
+        # use "==" to distingusih between chatglm and chatglm_v2.
+        if self.config["model_type"] and "chatglm" == self.config.model_type.lower():
             input_spec[2] = paddle.static.InputSpec(
                 shape=[None, None, None], dtype="int64", name="position_ids"
             )  # position_ids
@@ -349,10 +344,10 @@ class GenerationInferenceModel(GenerationMixin):
             # sample
             probs = F.softmax(logits)
 
-            # compute next_tokens, use paddle.top_p_sampling
+            # compute next_tokens, use paddle.tensor.top_p_sampling
             logits = logits / temperature
 
-            _, next_tokens = top_p_sampling(probs, top_p, -1)
+            _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)

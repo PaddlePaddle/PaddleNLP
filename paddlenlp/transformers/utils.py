@@ -596,12 +596,17 @@ def cached_file_for_hf_hub(
         return resolved_file
     except Exception as e:
         print(e)
-        raise EnvironmentError(
-            f"{path_or_repo_id} is not a local folder and is not a valid model identifier "
-            "listed on 'https://huggingface.co/models'\nIf this is a private repository, make sure to "
+        msg = f"""
+            {path_or_repo_id} is not a local folder and is not a valid model identifier "
+            "listed on 'https://huggingface.co/models' If this is a private repository, make sure to "
             "pass a token having permission to this repo with `use_auth_token` or log in with "
-            "`huggingface-cli login` and pass `use_auth_token=True`."
-        )
+            "`huggingface-cli login` and pass `use_auth_token=True`.
+            """
+        if _raise_exceptions_for_missing_entries:
+            raise EnvironmentError(msg)
+        else:
+            logger.info(msg)
+            return None
 
 
 def get_checkpoint_shard_files(
@@ -632,6 +637,12 @@ def get_checkpoint_shard_files(
     sharded_metadata = index["metadata"]
     sharded_metadata["all_checkpoint_keys"] = list(index["weight_map"].keys())
     sharded_metadata["weight_map"] = index["weight_map"].copy()
+
+    file_map = {file: set() for file in shard_filenames}
+    for weight, file in index["weight_map"].items():
+        file_map[file].add(weight)
+
+    sharded_metadata["file_map"] = file_map
 
     # First, let's deal with local folder.
     if os.path.isdir(pretrained_model_name_or_path):

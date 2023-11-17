@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import paddle
 from paddle.utils.cpp_extension import CUDAExtension, setup
+
+
+def get_gencode_flags():
+    prop = paddle.device.cuda.get_device_properties()
+    cc = prop.major * 10 + prop.minor
+    return ["-gencode", "arch=compute_{0},code=sm_{0}".format(cc)]
+
+
+gencode_flags = get_gencode_flags()
 
 setup(
     name="paddlenlp_ops",
@@ -30,8 +40,22 @@ setup(
             "./generation/transpose_removing_padding.cu",
             "./generation/write_cache_kv.cu",
             "./generation/encode_rotary_qk.cu",
-            "./generation/top_p_sampling.cu",
             "./generation/set_alibi_mask_value.cu",
-        ]
+            "./generation/quant_int8.cu",
+            "./generation/dequant_int8.cu",
+        ],
+        extra_compile_args={
+            "cxx": ["-O3"],
+            "nvcc": [
+                "-O3",
+                "-U__CUDA_NO_HALF_OPERATORS__",
+                "-U__CUDA_NO_HALF_CONVERSIONS__",
+                "-U__CUDA_NO_BFLOAT16_OPERATORS__",
+                "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
+                "-U__CUDA_NO_BFLOAT162_OPERATORS__",
+                "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
+            ]
+            + gencode_flags,
+        },
     ),
 )

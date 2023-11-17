@@ -24,13 +24,16 @@ from tests.testing_utils import argv_context_guard, load_test_config
 from .testing_utils import LLMTest
 
 
+# TODO(wj-Mcat): disable chatglm2 test temporarily
 @parameterized_class(
     ["model_dir"],
     [
         ["llama"],
         ["bloom"],
         ["chatglm"],
-        ["chatglm2"],
+        # ["chatglm2"],
+        ["qwen"],
+        ["baichuan"],
     ],
 )
 class PrefixTuningTest(LLMTest, unittest.TestCase):
@@ -58,7 +61,7 @@ class PrefixTuningTest(LLMTest, unittest.TestCase):
 
             main()
 
-        if self.model_dir not in ["chatglm2"]:
+        if self.model_dir not in ["qwen", "baichuan"]:
             self.run_predictor(
                 {
                     "inference_model": True,

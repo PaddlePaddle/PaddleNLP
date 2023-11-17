@@ -24,6 +24,7 @@ function _set_params(){
     model_item=${model_item:-"llama-7b"}
     base_batch_size=${batch_size}
     dtype=${dtype:-"fp16"}
+    benchmark=${benchmark:-0}
 
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递
     model_repo="PaddleNLP"          # (必选) 模型套件的名字
