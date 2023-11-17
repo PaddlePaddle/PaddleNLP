@@ -1079,6 +1079,7 @@ class TrainingArguments:
                 for x in pipeline_parallel_config:
                     if len(x) > 0:
                         if x not in [
+                            "enable_send_recv_overlap",
                             # "disable_p2p_cache_shape",      # no need for auto_parallel
                             # "disable_partial_send_recv",    # no implemenation for auto_parallel
                             # "enable_delay_scale_loss",      # default True in auto_parallel, non-configurable
@@ -1087,11 +1088,12 @@ class TrainingArguments:
                             # "enable_timer",                 # no implemenation for auto_parallel
                         ]:
                             raise ValueError(
-                                f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
+                                f"Found unknown pipeline mode config {x}, accpet config is enable_send_recv_overlap."
                             )
 
                 pipeline = strategy.pipeline
                 pipeline.enable = True
+                pipeline.enable_send_recv_overlap = "enable_send_recv_overlap" in pipeline_parallel_config
                 pipeline.accumulate_steps = self.gradient_accumulation_steps
                 pipeline.micro_batch_size = self.per_device_train_batch_size
                 pipeline.schedule_mode = "1F1B"
