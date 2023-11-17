@@ -787,7 +787,7 @@ class BloomPreTrainedModel(PretrainedModel):
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(hard_mapping)]
         model_class_name = config.architectures[0]
 
-        if model_class_name != "BloomModel":
+        if model_class_name != "BloomModel" and model_class_name != "BloomForCausalLM":
             for mapping in mappings:
                 mapping.source_name = "transformer." + mapping.source_name
                 mapping.target_name = "bloom." + mapping.target_name
