@@ -31,6 +31,7 @@ from paddlenlp.transformers.model_utils import (
 from paddlenlp.transformers.utils import (
     dtype_byte_size,
     get_checkpoint_shard_files,
+    get_optimizer_shard_files,
     is_safetensors_available,
 )
 from paddlenlp.utils.distributed import distributed_gather
@@ -43,8 +44,6 @@ from paddlenlp.utils.env import (
 from paddlenlp.utils.log import logger
 
 if is_safetensors_available():
-
-    # from safetensors.numpy import load_file as safe_load_file
     from safetensors.numpy import save_file as safe_save_file
 
 
@@ -306,8 +305,133 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
                 json.dump(sharded_master_weight_index, f, indent=4)
 
 
-def load_unified_optimizer():
-    pass
+def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serialization=False):
+    """Load potential model checkpoint
+
+    Args:
+        model (PretrainedModel): Your model to load
+        resume_from_checkpoint (str): path of the checkpoint to load
+
+    Returns:
+        None
+    """
+    # init and get optimizer LR_Scheduler
+    returned_optim_state_dict = copy.deepcopy(optimizer.state_dict())
+
+    if not safe_serialization:
+        index_filename, index_filename_master_weights = PADDLE_OPTIMIZER_INDEX_NAME, PADDLE_MASTER_WEIGHTS_INDEX_NAME
+    else:
+        index_filename, index_filename_master_weights = SAFE_OPTIMIZER_INDEX_NAME, SAFE_MASTER_WEIGHTS_INDEX_NAME
+
+    resolved_archive_file, sharded_metadata = get_optimizer_shard_files(
+        optimizer_path=resume_from_checkpoint,
+        index_filename=os.path.join(resume_from_checkpoint, index_filename),
+    )
+
+    model_state_dict = model.state_dict()
+    model_keys = list(model_state_dict.keys())
+    struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}  # get optimizer param mappings
+    expected_keys = []
+    for key in list(sharded_metadata["all_optimizer_keys"]):
+        key_name = key.split("/")
+        if key_name[0] not in struct2static_name_mappings:
+            # this process don't need to load this key
+            continue
+        expected_keys.append(key)
+    expected_keys = set(expected_keys)
+
+    loaded_keys = sharded_metadata["all_optimizer_keys"]
+    missing_keys = expected_keys - set(loaded_keys)
+    if len(missing_keys) > 0:
+        raise ValueError(f"optimizer missing_keys: {missing_keys}")
+
+    # This should always be a list but, just to be sure.
+    if not isinstance(resolved_archive_file, list):
+        resolved_archive_file = [resolved_archive_file]
+    if len(resolved_archive_file) > 1:
+        resolved_archive_file = tqdm(resolved_archive_file, desc="Loading optimizer shards")
+
+    if sharded_metadata["master_weights"]:
+        returned_optim_state_dict["master_weights"] = {}
+
+        resolved_archive_file_mw, sharded_metadata_mw = get_optimizer_shard_files(
+            optimizer_path=resume_from_checkpoint,
+            index_filename=os.path.join(resume_from_checkpoint, index_filename_master_weights),
+        )
+        expected_keys_mw = set(struct2static_name_mappings.keys())
+        loaded_keys_mw = sharded_metadata_mw["all_optimizer_keys"]
+        missing_keys_mw = expected_keys_mw - set(loaded_keys_mw)
+        if len(missing_keys_mw) > 0:
+            raise ValueError(f"optimizer missing_master_weights_keys: {missing_keys_mw}")
+
+        if not isinstance(resolved_archive_file_mw, list):
+            resolved_archive_file_mw = [resolved_archive_file_mw]
+        if len(resolved_archive_file_mw) > 1:
+            resolved_archive_file_mw = tqdm(resolved_archive_file_mw, desc="Loading master weights shards")
+
+    def _remove_unused_keys(
+        state_dict,
+        model_state_dict,
+    ):
+        unused_keys = set(state_dict.keys()) - set(model_state_dict.keys())
+        for unused_key in unused_keys:
+            del state_dict[unused_key]
+        return unused_keys
+
+    def load_resolved_archive_file(
+        resolved_archive_file, sharded_metadata, loaded_keys, expected_keys, is_master_weight=False
+    ):
+        returned_state_dict = {}
+        # load optimizer
+        for shard_file in resolved_archive_file:
+            # TODO: check if no expected_keys in shard_file, then don't load it
+            if expected_keys.isdisjoint(sharded_metadata["file_map"][os.path.split(shard_file)[-1]]):
+                continue
+
+            pre_tensor_parallel_split = False
+            if shard_file.endswith(".safetensors") and model.config.tensor_parallel_degree > 1:
+                pre_tensor_parallel_split = True
+                assert loaded_keys is not None, "loaded_keys is not None."
+                tp_actions = model.get_tensor_parallel_convert_actions(model.config, model_keys, ignore_error=True)
+                if not is_master_weight:
+                    tp_actions = mapping_optimizer_tp_actions(tp_actions, loaded_keys)
+
+            # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
+            state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys)
+
+            if not pre_tensor_parallel_split:
+                # Since we load all keys but we only need one of pipeline stages
+                _ = _remove_unused_keys(state_dict, struct2static_name_mappings)
+
+            returned_state_dict.update(state_dict)
+            # force memory release
+            del state_dict
+            gc.collect()
+        return returned_state_dict
+
+    state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, loaded_keys, expected_keys)
+    if sharded_metadata["master_weights"]:
+        state_dict_master_weight = load_resolved_archive_file(
+            resolved_archive_file_mw, sharded_metadata_mw, loaded_keys_mw, expected_keys_mw, is_master_weight=True
+        )
+
+    # rename optimizer param
+    for key in list(state_dict_optim.keys()):
+        key_name = key.split("/")
+        if sharded_metadata["master_weights"]:
+            key_name = struct2static_name_mappings[key_name[0]] + "_fp32_master_0_" + key_name[1]
+        else:
+            key_name = struct2static_name_mappings[key_name[0]] + key_name[1]
+        returned_optim_state_dict[key_name] = state_dict_optim[key]
+        returned_optim_state_dict[key_name].name = key_name
+
+    if sharded_metadata["master_weights"]:
+        for key in list(state_dict_master_weight.keys()):
+            static_name = struct2static_name_mappings[key]
+            returned_optim_state_dict["master_weights"][static_name] = state_dict_master_weight[key]
+            returned_optim_state_dict["master_weights"][static_name].name = static_name
+
+    return returned_optim_state_dict
 
 
 def unified_optimizer_into_shards(
@@ -326,7 +450,7 @@ def unified_optimizer_into_shards(
     master_weights = None
     if "master_weights" in optim_state_dict.keys():
         master_weights = optim_state_dict["master_weights"]
-    optim_state_dict.pop("master_weights")
+        optim_state_dict.pop("master_weights")
     optim_state_dict.pop("LR_Scheduler")
 
     # get optimizer param mappings
@@ -635,6 +759,27 @@ def merge_tensor_parallel_for_optimizer(model_to_save, state_dict, config, all_f
                 state_dict_to_save[filter_keys[i]] = tensor
 
     return state_dict_to_save
+
+
+def mapping_optimizer_tp_actions(tp_actions, optimizer_loaded_keys):
+    """# conert param.name to
+    param.key/moment1_0
+    or param.key/beta1_XXX
+    or param.key/beta2_XXX
+
+    Args:
+        tp_actions (dict): dictionay of tensor parallel actions {key: action}
+        optimizer_loaded_keys (list or set): [param.key1/moment1_0, param.key2/beta1_XXX, param.key3/beta2_XXX]
+
+    Returns:
+        dict: new dictionay of tensor parallel actions {key: action}
+    """
+    new_actions = {}
+    for key in optimizer_loaded_keys:
+        key_base = key.split("/")[0]
+        if "moment" in key.split("/")[1] and key_base in tp_actions:
+            new_actions[key] = tp_actions[key_base]
+    return new_actions
 
 
 def nested_copy(inputs):
