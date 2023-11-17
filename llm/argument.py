@@ -44,6 +44,12 @@ class DataArgument:
             "help": "Weather to return `MapDataset` or an `IterDataset`.True for `IterDataset`. False for `MapDataset`."
         },
     )
+    chat_template: str = field(
+        default=None,
+        metadata={
+            "help": "the path of `chat_template.json` file to handle multi-rounds conversation. If is None, it will not use `chat_template.json`; If is equal with `model_name_or_path`, it will use the default loading; If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
+        },
+    )
 
 
 @dataclass
