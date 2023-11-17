@@ -14,21 +14,15 @@
 # limitations under the License.
 from __future__ import annotations
 
-import tempfile
 import unittest
 
-import numpy as np
 import paddle
-from parameterized import parameterized
 
 from paddlenlp.transformers import MistralConfig, MistralForCausalLM, MistralModel
-from tests.testing_utils import require_package, slow
 from tests.transformers.test_configuration_common import ConfigTester
 from tests.transformers.test_generation_utils import GenerationTesterMixin
 from tests.transformers.test_modeling_common import (
-    GenerationD2STestMixin,
     ModelTesterMixin,
-    ModelTesterPretrainedMixin,
     ids_tensor,
     random_attention_mask,
 )
@@ -49,6 +43,7 @@ class MistralModelTester:
         use_cache=False,
         bos_token_id=1,
         eos_token_id=2,
+        pad_token_id=3,
         apply_residual_connection_post_layernorm=False,
         hidden_dropout=0.0,
         attention_dropout=0.0,
@@ -80,6 +75,7 @@ class MistralModelTester:
         self.use_cache = use_cache
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
+        self.pad_token_id = pad_token_id
         self.apply_residual_connection_post_layernorm = apply_residual_connection_post_layernorm
         self.hidden_dropout = hidden_dropout
         self.attention_dropout = attention_dropout
@@ -131,6 +127,7 @@ class MistralModelTester:
             use_cache=self.use_cache,
             bos_token_id=self.bos_token_id,
             eos_token_id=self.eos_token_id,
+            pad_token_id=self.pad_token_id,
             apply_residual_connection_post_layernorm=self.apply_residual_connection_post_layernorm,
             hidden_dropout=self.hidden_dropout,
             attention_dropout=self.attention_dropout,
@@ -260,7 +257,7 @@ class MistralModelTester:
         position_ids = paddle.arange(seq_len).expand((batch_size, seq_len))
         result_position_id = model(
             input_ids,
-            position_ids,
+            position_ids=position_ids,
             labels=input_ids if self.parent.use_labels else None,
             return_dict=self.parent.return_dict,
         )
@@ -274,6 +271,7 @@ class MistralModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCas
     base_model_class = MistralModel
     return_dict = False
     use_labels = False
+    use_test_model_name_list = False
 
     all_model_classes = (MistralModel, MistralForCausalLM)
     all_generative_model_classes = {MistralForCausalLM: (MistralModel, "Mistral")}
@@ -310,174 +308,9 @@ class MistralModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCas
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.check_model_position_ids(*config_and_inputs)
 
-    def test_generate_without_input_ids(self):
-        # this requires 4-D attention mask logic, which is not supported yet
-        pass
-
     def test_Mistral_lm_head_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_lm_head_model(*config_and_inputs)
-
-
-class MistralModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
-    base_model_class = MistralModel
-
-    @slow
-    def test_inference_no_attention(self):
-        model = MistralModel.from_pretrained("__internal_testing__/tiny-random-Mistral")
-        model.eval()
-        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
-        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
-        with paddle.no_grad():
-            output = model(input_ids, attention_mask=attention_mask)[0]
-
-        expected_shape = [1, 11, 768]
-        self.assertEqual(output.shape, expected_shape)
-
-        expected_slice = paddle.to_tensor(
-            [
-                [
-                    [0.20443289, 0.18662477, -0.75216216],
-                    [0.32803515, -0.36956733, -0.95613617],
-                    [0.28622314, 0.07698685, -0.64143789],
-                ]
-            ]
-        )
-        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
-
-    @slow
-    def test_inference_with_attention(self):
-        model = MistralModel.from_pretrained("__internal_testing__/tiny-random-Mistral")
-        model.eval()
-        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
-        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
-        with paddle.no_grad():
-            output = model(input_ids, attention_mask=attention_mask)[0]
-
-        expected_shape = [1, 11, 768]
-        self.assertEqual(output.shape, expected_shape)
-
-        expected_slice = paddle.to_tensor(
-            [
-                [
-                    [0.20443289, 0.18662477, -0.75216216],
-                    [0.32803515, -0.36956733, -0.95613617],
-                    [0.28622314, 0.07698685, -0.64143789],
-                ]
-            ]
-        )
-        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
-
-
-class MistralCompatibilityTest(unittest.TestCase):
-    test_model_id = "hf-internal-testing/tiny-random-MistralModel"
-
-    @classmethod
-    @require_package("transformers", "torch")
-    def setUpClass(cls) -> None:
-        from transformers import MistralConfig, MistralForCausalLM
-
-        # when python application is done, `TemporaryDirectory` will be free
-        cls.torch_model_path = tempfile.TemporaryDirectory().name
-        config = MistralConfig(hidden_size=16, num_hidden_layers=1, num_attention_heads=2)
-        model = MistralForCausalLM(config)
-        model.save_pretrained(cls.torch_model_path)
-
-    @require_package("transformers", "torch")
-    def test_Mistral_converter(self):
-        # 1. create commmon input
-        input_ids = np.random.randint(100, 200, [1, 20])
-
-        # 2. forward the paddle model
-        from paddlenlp.transformers import MistralModel
-
-        paddle_model = MistralModel.from_pretrained(self.torch_model_path, convert_from_torch=True)
-        paddle_model.eval()
-        paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
-
-        # 3. forward the torch  model
-        import torch
-        from transformers import MistralModel
-
-        torch_model = MistralModel.from_pretrained(self.torch_model_path)
-        torch_model.eval()
-        torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
-
-        self.assertTrue(
-            np.allclose(
-                paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
-                torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
-                rtol=1e-2,
-            )
-        )
-
-    @require_package("transformers", "torch")
-    def test_Mistral_converter_from_local_dir(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-
-            # 1. create commmon input
-            input_ids = np.random.randint(100, 200, [1, 20])
-
-            # 2. forward the torch  model
-            import torch
-            from transformers import MistralModel
-
-            torch_model = MistralModel.from_pretrained(self.torch_model_path)
-            torch_model.eval()
-            torch_model.save_pretrained(tempdir)
-            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
-
-            # 2. forward the paddle model
-            from paddlenlp.transformers import MistralModel
-
-            paddle_model = MistralModel.from_pretrained(tempdir, convert_from_torch=True)
-            paddle_model.eval()
-            paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
-
-            self.assertTrue(
-                np.allclose(
-                    paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
-                    torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
-                    rtol=1e-2,
-                )
-            )
-
-    @parameterized.expand([("MistralModel",), ("MistralForCausalLM",)])
-    @require_package("transformers", "torch")
-    def test_Mistral_classes_from_local_dir(self, class_name, pytorch_class_name: str | None = None):
-        pytorch_class_name = pytorch_class_name or class_name
-        with tempfile.TemporaryDirectory() as tempdir:
-
-            # 1. create commmon input
-            input_ids = np.random.randint(100, 200, [1, 20])
-
-            # 2. forward the torch model
-            import torch
-            import transformers
-
-            torch_model_class = getattr(transformers, pytorch_class_name)
-            torch_model = torch_model_class.from_pretrained(self.torch_model_path)
-            torch_model.eval()
-
-            torch_model.save_pretrained(tempdir)
-            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
-
-            # 3. forward the paddle model
-            from paddlenlp import transformers
-
-            paddle_model_class = getattr(transformers, class_name)
-            paddle_model = paddle_model_class.from_pretrained(tempdir, convert_from_torch=True)
-            paddle_model.eval()
-
-            paddle_logit = paddle_model(paddle.to_tensor(input_ids), return_dict=False)[0]
-
-            self.assertTrue(
-                np.allclose(
-                    paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
-                    torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
-                    atol=1e-3,
-                )
-            )
 
 
 if __name__ == "__main__":

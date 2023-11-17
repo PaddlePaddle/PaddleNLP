@@ -112,13 +112,20 @@ def _make_sliding_window_causal_mask(
 
 
 def _expand_mask(mask: paddle.Tensor, dtype: paddle.dtype, tgt_len: Optional[int] = None):
-    """
-    Expands attention_mask from `[bsz, seq_len]` to `[bsz, 1, tgt_seq_len, src_seq_len]`.
-    """
-    bsz, src_len = mask.shape
-    tgt_len = tgt_len if tgt_len is not None else src_len
+    expanded_mask = mask
+    if len(mask.shape) == 2:
+        """
+        Expands attention_mask from `[bsz, seq_len]` to `[bsz, 1, tgt_seq_len, src_seq_len]`.
+        """
+        bsz, src_len = mask.shape
+        tgt_len = tgt_len if tgt_len is not None else src_len
 
-    expanded_mask = mask[:, None, None, :].expand([bsz, 1, tgt_len, src_len]).astype(dtype)
+        expanded_mask = mask[:, None, None, :].expand([bsz, 1, tgt_len, src_len]).astype(dtype)
+    elif len(mask.shape) == 3:
+        """
+        Expands attention_mask from `[bsz, tgt_seq_len, seq_len]` to `[bsz, 1, tgt_seq_len, src_seq_len]`.
+        """
+        expanded_mask = mask.unsqueeze(1).astype(dtype)
 
     inverted_mask = 1.0 - expanded_mask
 
@@ -735,7 +742,7 @@ class MistralModel(MistralPreTrainedModel):
             position_ids = paddle.arange(
                 past_key_values_length, seq_length + past_key_values_length, dtype=paddle.int64
             )
-            position_ids = position_ids.unsqueeze(0).reshape([-1, seq_length])
+            position_ids = position_ids.unsqueeze(0).expand((batch_size, seq_length))
         else:
             position_ids = position_ids.reshape([-1, seq_length]).astype("int64")
 
@@ -911,10 +918,10 @@ class MistralForCausalLM(MistralPreTrainedModel):
         self.lm_head = MistralLMHead(config)
 
     def get_input_embeddings(self):
-        return self.model.embed_tokens
+        return self.mistral.embed_tokens
 
     def set_input_embeddings(self, value):
-        self.model.embed_tokens = value
+        self.mistral.embed_tokens = value
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -923,10 +930,10 @@ class MistralForCausalLM(MistralPreTrainedModel):
         self.lm_head = new_embeddings
 
     def set_decoder(self, decoder):
-        self.model = decoder
+        self.mistral = decoder
 
     def get_decoder(self):
-        return self.model
+        return self.mistral
 
     def prepare_inputs_for_generation(
         self, input_ids, use_cache=False, past_key_values=None, inputs_embeds=None, **kwargs
@@ -969,10 +976,12 @@ class MistralForCausalLM(MistralPreTrainedModel):
             model_kwargs["position_ids"] = paddle.concat([position_ids, position_ids[..., -1:] + 1], axis=-1)
 
         if not is_encoder_decoder and "attention_mask" in model_kwargs:
-            attention_mask = model_kwargs["attention_mask"]
-            model_kwargs["attention_mask"] = paddle.concat(
-                [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)], axis=-1
-            )
+            attention_mask = model_kwargs.pop("attention_mask", None)
+
+            if attention_mask is not None and len(attention_mask.shape) == 2:
+                model_kwargs["attention_mask"] = paddle.concat(
+                    [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)], axis=-1
+                )
 
         return model_kwargs
 
