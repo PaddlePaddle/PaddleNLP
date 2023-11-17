@@ -1175,15 +1175,11 @@ class TrainingArguments:
                 amp.init_loss_scaling = self.scale_loss
                 amp.custom_black_list = self.amp_custom_black_list if self.amp_custom_black_list is not None else []
                 amp.custom_white_list = self.amp_custom_white_list if self.amp_custom_white_list is not None else []
-                amp.use_fp16_guard = False
-                amp.use_bf16_guard = False
 
             if self.recompute:
                 recompute = strategy.recompute
                 recompute.enable = True
-                recompute.no_recompute_segments = []  # self.no_recompute_segments
 
-            fleet.init(is_collective=True)
             self.strategy = strategy
             logger.info(self.strategy)
             order = ["dp", "pp", "mp"]

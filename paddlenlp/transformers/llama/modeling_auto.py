@@ -72,14 +72,6 @@ __all__ = [
 ]
 
 
-def get_dim_size(dim_name):
-    mesh = fleet.auto.get_mesh()
-    if dim_name in mesh.dim_names:
-        return mesh.get_dim_size(dim_name)
-    else:
-        return None
-
-
 def get_dist_attr(shard_specs, pp_idx=0):
     mesh = fleet.auto.get_mesh()
     if "pp" in mesh.dim_names:

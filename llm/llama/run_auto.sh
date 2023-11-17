@@ -17,10 +17,9 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-# export GLOG_v=4
 export FLAGS_call_stack_level=2
 
-task_name="llama_auto_dp2"
+task_name="llama_auto_dp2mp2pp2"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
