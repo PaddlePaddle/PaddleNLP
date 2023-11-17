@@ -1050,8 +1050,8 @@ class GenerationMixin(object):
         while True:
 
             # prepare model inputs & get model output
-            model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
+            model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
             outputs = self(**model_inputs)
 
             if isinstance(outputs, tuple):
@@ -1092,7 +1092,6 @@ class GenerationMixin(object):
             # Stop when there is a </s> in all sentences
             if not paddle.any(unfinished_flag) or generate_end:
                 break
-
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.config.is_encoder_decoder
             )

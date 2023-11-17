@@ -998,7 +998,6 @@ class ConversionMixin:
         """
         # FIXME(wj-Mcat): add compatibility with downstream models
         name_mappings = cls._get_name_mappings(config)
-
         state_dict = load_torch(weight_file)
 
         # 3. convert state_dict
