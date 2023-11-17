@@ -97,6 +97,14 @@ class PredictorArgument:
             "help": "the path of `chat_template.json` file to handle multi-rounds conversation. If is None, it will not use `chat_template.json`; If is equal with `model_name_or_path`, it will use the default loading; If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
         },
     )
+    enable_memory_optim: bool = field(
+        default=True,
+        metadata={"help": "whether use `enable_memory_optim` in inference predictor"},
+    )
+    init_fleet_worker: bool = field(
+        default=True,
+        metadata={"help": "whether use `init_fleet_worker` in inference predictor"},
+    )
 
     @property
     def total_max_length(self):
@@ -294,8 +302,6 @@ class StaticGraphPredictor(BasePredictor):
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             inference_config.disable_gpu()
         inference_config.disable_glog_info()
-        inference_config.enable_memory_optim(False)
-        inference_config.enable_new_executor()
 
         with static_mode_guard():
             self.predictor = paddle.inference.create_predictor(inference_config)
@@ -605,11 +611,10 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
 
         device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
         config.enable_use_gpu(100, device_id)
-        # config.disable_glog_info()
-        config.enable_memory_optim(False)
-        config.enable_new_executor()
+        if predictor_args.enable_memory_optim:
+            config.enable_memory_optim()
 
-        if self.tensor_parallel_degree > 1:
+        if predictor_args.init_fleet_worker or self.tensor_parallel_degree > 1:
             trainer_endpoints = fleet.worker_endpoints()
             current_endpoint = trainer_endpoints[self.tensor_parallel_rank]
 
@@ -893,7 +898,7 @@ def predict():
     paddle.set_default_dtype(predictor_args.dtype)
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
-    if tensor_parallel_degree > 1:
+    if predictor_args.init_fleet_worker or tensor_parallel_degree > 1:
         strategy = fleet.DistributedStrategy()
         strategy.hybrid_configs = {
             "dp_degree": 1,
