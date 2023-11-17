@@ -1274,7 +1274,6 @@ class LlamaModel(LlamaPretrainedModel):
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
-
         for idx, (decoder_layer) in enumerate(self.layers):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
@@ -1307,12 +1306,10 @@ class LlamaModel(LlamaPretrainedModel):
                     use_cache,
                     alibi=alibi,
                 )
-
             if type(layer_outputs) is tuple:
                 hidden_states = layer_outputs[0]
             else:
                 hidden_states = layer_outputs
-
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
 
@@ -1526,7 +1523,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         )
 
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
-
         loss = None
         if labels is not None:
             loss = self.criterion(logits, labels)

@@ -998,8 +998,19 @@ class ConversionMixin:
         """
         # FIXME(wj-Mcat): add compatibility with downstream models
         name_mappings = cls._get_name_mappings(config)
+        import pdb
 
-        state_dict = load_torch(weight_file)
+        pdb.set_trace()
+        if weight_file.endswith(".index.json"):
+            import os
+
+            files = [file for file in os.listdir(os.path.dirname(weight_file)) if file.startswith("pytorch_model-")]
+            state_dict = {}
+            for file in files:
+                sub_state_dict = load_torch(os.path.join(os.path.dirname(weight_file), file))
+                state_dict.update(sub_state_dict)
+        else:
+            state_dict = load_torch(weight_file)
 
         # 3. convert state_dict
         all_layer_names = set(state_dict.keys())

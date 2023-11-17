@@ -54,6 +54,7 @@ from paddlenlp.utils.env import (
     LEGACY_CONFIG_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
+    PYTORCH_WEIGHTS_INDEX_NAME,
     PYTORCH_WEIGHTS_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
@@ -385,7 +386,8 @@ def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conver
         # for local file, we use support_conversion to select paddle or torch weight.
         file_name = PYTORCH_WEIGHTS_NAME if support_conversion else PADDLE_WEIGHTS_NAME
 
-    file_name_list = [SAFE_WEIGHTS_NAME] + [file_name]
+    # file_name_list = [SAFE_WEIGHTS_NAME] + [file_name]    #zx
+    file_name_list = [SAFE_WEIGHTS_NAME] + [file_name] + [PYTORCH_WEIGHTS_INDEX_NAME]
     resolved_file = None
     for fn in file_name_list:
         resolved_file = cached_file_for_hf_hub(
@@ -1439,7 +1441,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         """
         is_sharded = False
         sharded_metadata = None
-
         # -1. when it's from HF
         if from_hf_hub or convert_from_torch:
             resolved_archive_file = resolve_weight_file_from_hf_hub(
@@ -2099,7 +2100,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # Keep in fp32 modules
         keep_in_fp32_modules = None
         use_keep_in_fp32_modules = False
-
         # resolve model_weight file
         resolved_archive_file, sharded_metadata, is_sharded = cls._resolve_model_file_path(
             pretrained_model_name_or_path,
@@ -2117,8 +2117,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if not is_sharded and state_dict is None:
             # Time to load the checkpoint
             if convert_from_torch:
-                if resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME) or resolved_archive_file.endswith(
-                    SAFE_WEIGHTS_NAME
+                if (
+                    resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME)
+                    or resolved_archive_file.endswith(PYTORCH_WEIGHTS_INDEX_NAME)
+                    or resolved_archive_file.endswith(SAFE_WEIGHTS_NAME)
                 ):
                     # try to get the name-mapping info
                     logger.info(
@@ -2179,7 +2181,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     quant_algo=config.quantization_config.weight_quantize_algo,
                     llm_int8_threshold=config.quantization_config.llm_int8_threshold,
                 )
-
         model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
             model=model,
             state_dict=state_dict,
