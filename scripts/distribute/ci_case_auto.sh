@@ -873,32 +873,31 @@ function before_hook() {
     export FLAGS_cudnn_deterministic=1             # 1：关闭随机性
     unset CUDA_MODULE_LOADING
     env | grep FLAGS
-    echo -e "\033[31m ---- Install requirements  \033[0m"
-    export http_proxy=${proxy}
-    export https_proxy=${proxy}
-    python -m pip install -r requirements.txt --force-reinstall
-    
-    python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
+    if [[ $FLAGS_before_hook == 0 ]];then
+        echo -e "\033[31m ---- Install requirements  \033[0m"
+        export http_proxy=${proxy}
+        export https_proxy=${proxy}
+        python -m pip install -r requirements.txt --force-reinstall
+        python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
 
-    echo -e "\033[31m ---- download data  \033[0m"
-    rm -rf data
-    if [[ -e ${data_path}/data ]]; then
-        echo "data downloaded"
+        echo -e "\033[31m ---- download data  \033[0m"
+        rm -rf data
+        if [[ -e ${data_path}/data ]]; then
+            echo "data downloaded"
+        else
+            # download data for gpt
+            mkdir ${data_path}/data;
+            wget -O ${data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
+            wget -O ${data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
+        fi
+        cp -r ${data_path}/data ${case_path}/
     else
-        # download data for gpt
-        mkdir ${data_path}/data;
-        wget -O ${data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
-        wget -O ${data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
+        echo -e "\033[31m ---- Skip install requirements and download data \033[0m"
     fi
-
-    cp -r ${data_path}/data ${case_path}/
 }
 
-main() {
-    echo -e "\033[31m ---- Start executing auto_parallel case \033[0m"
-    cd ${case_path}
-    before_hook
-    $1
-}
-
-main$@
+echo -e "\033[31m ---- Start executing gpt-3 $1 \033[0m"
+cd ${case_path}
+export FLAGS_before_hook=$2
+before_hook
+$1
