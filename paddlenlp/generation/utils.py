@@ -26,7 +26,6 @@ from paddle.utils import map_structure
 
 from paddlenlp.transformers.model_outputs import ModelOutput
 from paddlenlp.transformers.utils import get_scale_by_dtype
-from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
 from .configuration_utils import DEFAULT_MAX_NEW_TOKENS, GenerationConfig
@@ -48,9 +47,6 @@ from .stopping_criteria import (
     validate_stopping_criteria,
 )
 from .streamers import BaseStreamer
-
-if is_paddlenlp_ops_available():
-    import paddlenlp_ops
 
 __all__ = [
     "GenerationMixin",
@@ -1340,12 +1336,8 @@ class GenerationMixin(object):
             # compute next_tokens
             if use_top_p:
                 logits = logits / temperature
-                if is_paddlenlp_ops_available():
-                    top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
-                    _, next_tokens = paddlenlp_ops.top_p_sampling(probs, top_ps_tensor, -1)
-                else:
-                    probs = TopPProcess(probs, top_p, min_tokens_to_keep)
-                    next_tokens = paddle.multinomial(probs)
+                top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
+                _, next_tokens = paddle.tensor.top_p_sampling(probs, top_ps_tensor)
             else:
                 probs = TopKProcess(probs, top_k, min_tokens_to_keep)
                 if top_k == 1:
