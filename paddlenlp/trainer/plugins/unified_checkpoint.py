@@ -52,8 +52,8 @@ PADDLE_OPTIMIZER_NAME = "optimizer.pdopt"
 PADDLE_OPTIMIZER_INDEX_NAME = "optimizer.pdopt.index.json"
 SAFE_OPTIMIZER_NAME = "optimizer.safetensors"
 SAFE_OPTIMIZER_INDEX_NAME = "optimizer.safetensors.index.json"
-PADDLE_MASTER_WEIGHTS_NAME = "master_weights.pdopt"
-PADDLE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.pdopt.index.json"
+PADDLE_MASTER_WEIGHTS_NAME = "master_weights.pdparams"
+PADDLE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.pdparams.index.json"
 SAFE_MASTER_WEIGHTS_NAME = "master_weights.safetensors"
 SAFE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.safetensors.index.json"
 
@@ -224,7 +224,10 @@ def unified_checkpoint_into_shards(
     config_to_save = copy.deepcopy(model_to_save.config)
 
     if config_to_save.tensor_parallel_degree > 1:
-        state_dict = merge_tensor_parallel_with_shard(model_to_save, state_dict, config_to_save, all_filter_keys)
+        tp_actions = model_to_save.get_tensor_parallel_convert_actions(
+            model_to_save.config, state_dict.keys(), is_split=False, ignore_error=True
+        )
+        state_dict = merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys)
 
     if config_to_save.tensor_parallel_degree > 1:
         # do we need to change?
@@ -326,8 +329,9 @@ def unified_optimizer_into_shards(
     master_weights = None
     if "master_weights" in optim_state_dict.keys():
         master_weights = optim_state_dict["master_weights"]
-    optim_state_dict.pop("master_weights")
-    optim_state_dict.pop("LR_Scheduler")
+        optim_state_dict.pop("master_weights")
+    if "LR_Scheduler" in optim_state_dict.keys():
+        optim_state_dict.pop("LR_Scheduler")
 
     # get optimizer param mappings
     static2struct_name_mappings = {}
@@ -352,17 +356,24 @@ def unified_optimizer_into_shards(
     tp_size = tp_group.nranks
 
     if tp_size > 1:
+        # get tp_actions
+        model_keys = []
+        for key in optim_state_dict.keys():
+            base_model_key = key.split("/")[0]
+            if base_model_key not in model_keys:
+                model_keys.append(base_model_key)
+        tp_actions = model.get_tensor_parallel_convert_actions(
+            model.config, model_keys, is_split=False, ignore_error=True
+        )
         optim_state_dict = merge_tensor_parallel_for_optimizer(
-            model,
             optim_state_dict,
-            model.config,
+            tp_actions,
             filter_optim_keys,
         )
         if master_weights is not None:
             master_weights = merge_tensor_parallel_for_optimizer(
-                model,
                 master_weights,
-                model.config,
+                tp_actions,
                 filter_master_keys,
             )
 
@@ -546,16 +557,11 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
     return filter_tensor_list
 
 
-def merge_tensor_parallel_with_shard(model_to_save, state_dict, config, all_filter_keys):
+def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
     logger.info("Unified checkpoint merge tensor parallel in shards")
-    tp_actions = model_to_save.get_tensor_parallel_convert_actions(
-        model_to_save.config, state_dict.keys(), is_split=False, ignore_error=True
-    )
 
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
-
-    # tp_size = tp_group.nranks
     tp_rank = tp_group.rank
 
     # filter actions for pipeline mode
@@ -591,18 +597,8 @@ def merge_tensor_parallel_with_shard(model_to_save, state_dict, config, all_filt
     return state_dict_to_save
 
 
-def merge_tensor_parallel_for_optimizer(model_to_save, state_dict, config, all_filter_keys):
+def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys):
     logger.info("Unified optimizer tensor parallel in shards")
-
-    # get tp_actions
-    model_keys = []
-    for key in state_dict.keys():
-        base_model_key = key.split("/")[0]
-        if base_model_key not in model_keys:
-            model_keys.append(base_model_key)
-    tp_actions = model_to_save.get_tensor_parallel_convert_actions(
-        model_to_save.config, model_keys, is_split=False, ignore_error=True
-    )
 
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
