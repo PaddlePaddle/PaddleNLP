@@ -405,7 +405,6 @@ class MistralAttention(nn.Layer):
             query_states = query_states.transpose([0, 2, 1, 3])
             key_states = key_states.transpose([0, 2, 1, 3])
             value_states = value_states.transpose([0, 2, 1, 3])
-            # print(attention_mask)
             attn_output = F.scaled_dot_product_attention(
                 query_states,
                 key_states,
