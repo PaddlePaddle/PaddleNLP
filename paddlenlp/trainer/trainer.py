@@ -2438,6 +2438,7 @@ class Trainer:
             return "_".join(name)
 
         def load_model_slices():
+            state_cache = {}
             for j in range(self.args.pipeline_parallel_rank, pp_degree, cur_pp_degree):
                 cur_sharding_meta = self._load_sharding_meta(checkpoint, j)
                 assert "structure_name_mapping" in cur_sharding_meta
@@ -2448,17 +2449,18 @@ class Trainer:
                     node_model_state_tmp.add_opts(tmp)
                     node_model_state_tmp.pack_keys(structure_name_map)
                     state_cache[(i, j)] = node_model_state_tmp
+            return  state_cache       
 
         def reshard_pp(state_cache):
             state_cache_new = {}
             # pp reshard
             if self._need_reshard_pp(checkpoint):
-                meta = self._load_meta(self.args.src_path)
-                pp_line_context = pp_reshard.build_pipeline_context(meta, 144, 12, 1, self.args.segment_method, 0)
+                meta = self._load_model_meta(checkpoint)
+                pp_line_context = pp_reshard.build_pipeline_context(meta, 16, cur_pp_degree, 1, "layer", 0)
 
                 for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
                     node_states = pp_reshard.convert_pp_in_group(
-                        self.hcg, i, pp_degree, self.args.dst_pp, pp_line_context, state_cache
+                        self.hcg, i, pp_degree, pp_line_context, state_cache
                     )
                     state_cache_new[i] = node_states
             else:

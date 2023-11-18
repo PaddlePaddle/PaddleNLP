@@ -62,6 +62,7 @@ class LayerNameScope:
     prefix_to_template["column_sequence_parallel_linear"] = "column_sequence_parallel_linear_{}"
     prefix_to_template["row_sequence_parallel_linear"] = "row_sequence_parallel_linear_{}"
     prefix_to_template["linear"] = "linear_{}"
+    prefix_to_template["layer_norm_pipe"] = "layer_norm_pipe_{}"
     prefix_to_template["layer_norm"] = "layer_norm_{}"
     prefix_to_template["embedding"] = "embedding_{}"
     prefix_to_template["create_parameter"] = "create_parameter_{}"
@@ -121,14 +122,8 @@ class LayerReNamingManager:
     def __init__(self):
         self.top_layer_name_scope = LayerNameScope(None, None)
 
-    def extract_layer_names(self, full_layer_name):
-        return [full_layer_name]
-
     def get_new_layer_name(self, layer_id: str, old_name: str):
-        layers = self.extract_layer_names(old_name)
-        name_scope = self.top_layer_name_scope
-        for l in layers:
-            name_scope = name_scope.get_sub_scope(l).get_next_scope(layer_id, l)
+        name_scope = self.top_layer_name_scope.get_sub_scope(old_name).get_next_scope(layer_id, old_name)
         return name_scope.get_layer_name()
 
     def get_new_param_name(self, layer_id, old_name: str):
@@ -206,7 +201,7 @@ class PipeLineSegment:
 
     @property
     def layers(self):
-        assert self._cur_index == self._end_index
+        assert self._cur_index <= self._end_index
         return self._layers
 
 
@@ -236,7 +231,7 @@ class PipeLineStage:
                     (param_name, tensor_name) = param
                     # map to a new name
                     n_name = self._rename_mgr.get_new_param_name(layer.name, tensor_name)
-                    logger.info(f"{param_name} {tensor_name}=>{n_name}")
+                    #logger.info(f"{param_name} {tensor_name}=>{n_name}")
                     self._param_to_tname[param_name] = (tensor_name, n_name)
 
     def map_name(self, param_name, t_name):
@@ -247,7 +242,7 @@ class PipeLineStage:
 
     def print_name_mapping(self):
         for (name, mapping) in self._param_to_tname.items():
-            print(f"{name} mapping {mapping[0]} => {mapping[1]}\n")
+            logger.info(f"{name} mapping {mapping[0]} => {mapping[1]}\n")
 
 
 # segment context for pp X sharding
@@ -281,10 +276,10 @@ class PipeLineSegmentContext:
             for seg in stage_seg:
                 pipe_stage.add_segment(seg[0], seg[1])
                 for j in range(*seg):
-                    assert j in self._layer_index_to_name
-                    layer_name = self._layer_index_to_name[j]
-                    assert layer_name in self._param_names_by_layer
-                    pipe_stage.add_layer(j, layer_name, self._param_names_by_layer[layer_name])
+                    if j in self._layer_index_to_name:
+                        layer_name = self._layer_index_to_name[j]
+                        assert layer_name in self._param_names_by_layer
+                        pipe_stage.add_layer(j, layer_name, self._param_names_by_layer[layer_name])
                     self._layer_index_to_stage[j] = i
                     self._layer_name_to_stage[layer_name] = i
 
@@ -300,12 +295,12 @@ class PipeLineSegmentContext:
     @property
     def transformer_layer_num(self):
         if self._transformer_layer_num and self._transformer_layer_num > 0:
-            assert len(self._param_names_by_layer) == self._transformer_layer_num + 3
+            assert len(self._param_names_by_layer) == self._transformer_layer_num + 2, f"len(self._param_names_by_layer) {len(self._param_names_by_layer)} _transformer_layer_num{self._transformer_layer_num}"
             return self._transformer_layer_num
         else:
             # assume model is of the structure below
             # embedding -> n*(transformer layer) -> 2 output layer
-            return len(self._param_names_by_layer) - 3
+            return len(self._param_names_by_layer) - 2
 
     def _segment(self):
         layer_num = self.transformer_layer_num + 3  # ?
@@ -419,12 +414,9 @@ def convert_pp_in_group(hcg, sharding_rank, src_stage_num, pp_line_context, stat
 
     def name_map_func(structure_name, p_name):
         map_name = pp_line_context.map_name(structure_name, p_name)
+        assert map_name == p_name, f"{map_name} = {p_name}"
         return map_name
 
-    node_model_state.map_name(name_map_func)
+    node_model_state.map_names(name_map_func)
 
-    def split_func(name):
-        structure_name = name[0]
-        return pp_line_context.map_name_to_stage(structure_name)
-
-    return node_model_state.split_state(split_func)
+    return node_model_state

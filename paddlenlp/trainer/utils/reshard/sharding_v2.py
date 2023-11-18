@@ -38,7 +38,7 @@ def shard(node_model_state, model, optimizer, hcg):
     def split_func(k, v):
         param_name = k[1]
         opt_name = k[-1]
-        assert param_name in split_infos
+        assert param_name in split_infos, f"param_name {param_name}, split_infos{split_infos}"
         is_beta = is_bata(opt_name)
         index, padded_size, buffer_size, has_slice_grad = split_infos[param_name]
 
