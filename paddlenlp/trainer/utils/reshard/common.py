@@ -382,6 +382,9 @@ class NodeModelState:
         in the dicts of (key, rank)=>tensor, items keys of the same key but different rank are distributed to the
         same worker
         """
+        # sharding degree == 1
+        if group is None or group.nranks < 2:
+            return self
 
         def build_router(state_dict):
             state_keys_list = all_gather_simple_object([(k, v.shape) for (k, v) in state_dict.items()], group)
