@@ -414,7 +414,6 @@ def convert_pp_in_group(hcg, sharding_rank, src_stage_num, pp_line_context, stat
 
     def name_map_func(structure_name, p_name):
         map_name = pp_line_context.map_name(structure_name, p_name)
-        assert map_name == p_name, f"{map_name} = {p_name}"
         return map_name
 
     node_model_state.map_names(name_map_func)
