@@ -17,8 +17,70 @@ import re
 from collections import OrderedDict
 
 from paddle.distributed.fleet.utils.log_util import logger
-
 from .common import NodeModelState
+from paddle.distributed.fleet.model import PipelineParallel
+
+def extract_layer_name(param_name):
+    first_layer_pattern = r"^ernie\.embed_tokens"
+    last_layer_pattern1 = "^ernie\.norm"
+    last_layer_pattern2 = r"^lm_head"
+    pattern = r"^ernie\.layers((\.\d+))"
+
+    # match 1
+    for p in [
+        pattern,
+        first_layer_pattern,
+        last_layer_pattern1,
+        last_layer_pattern2,
+    ]:
+        match = re.search(p, param_name)
+        if match:
+            return match.group()
+    return None
+
+
+def index_layer(layer_name):
+    transformer_layer_num = 16
+    if transformer_layer_num is None:
+        transformer_layer_num = 1000
+    if layer_name == "ernie.embed_tokens":
+        return 0
+    elif layer_name == "ernie.norm":
+        return transformer_layer_num + 1
+    elif layer_name == "lm_head":
+        return transformer_layer_num + 2
+    else:
+        pattern = r"ernie\.layers((\.(\d+)))"
+        match = re.search(pattern, layer_name)
+        assert match
+        return int(match.group(3)) + 1
+
+
+_GLOBAL_EXTRACT_LAYER_NAME_FUNC = None
+def regitser_extract_layer_name_func(func):
+    global _GLOBAL_EXTRACT_LAYER_NAME_FUNC
+    _GLOBAL_EXTRACT_LAYER_NAME_FUNC = func
+
+def get_extract_layer_name_func():
+    global _GLOBAL_EXTRACT_LAYER_NAME_FUNC
+    assert _GLOBAL_EXTRACT_LAYER_NAME_FUNC is not None, "extract layer func is not registered yet"
+    return  _GLOBAL_EXTRACT_LAYER_NAME_FUNC
+
+_GLOBAL_INDEX_LAYER_FUNC = None
+def register_index_layer_func(func):
+    global _GLOBAL_INDEX_LAYER_FUNC
+    _GLOBAL_INDEX_LAYER_FUNC = func
+
+def get_index_layer_func():
+    global _GLOBAL_INDEX_LAYER_FUNC
+    assert _GLOBAL_INDEX_LAYER_FUNC is not None, "index layer func is not registered yet"
+    return _GLOBAL_INDEX_LAYER_FUNC
+
+
+# register 
+regitser_extract_layer_name_func(extract_layer_name)
+register_index_layer_func(index_layer)
+
 
 
 def extract_param_names_groupby_layer(
@@ -37,21 +99,19 @@ def extract_param_names_groupby_layer(
         assert "structure_name_mapping" in sharding_metas[suffix]
         name_mapping = sharding_metas[suffix]["structure_name_mapping"]
         for (k, v) in name_mapping.items():
-            layer_name = extract_layer_name(k)
+            layer_name = get_extract_layer_name_func()(k)
             if layer_name not in param_names_by_layer:
                 param_names_by_layer[layer_name] = []
             param_names_by_layer[layer_name].append((k, v))
     return param_names_by_layer
 
 
-def build_pipeline_context(meta, transformer_layer_num, dst_pp, dst_vpp, segment_method, mp_rank=0):
-    layer_params = extract_param_names_groupby_layer(meta, mp_rank)
+def build_pipeline_context(meta, pp_model):
+    assert isinstance(pp_model, PipelineParallel), type(pp_model)
+    layer_params = extract_param_names_groupby_layer(meta, 0)
     # 2、rename tensor names
     pipeline_context = PipeLineSegmentContext(
-        transformer_layer_num,
-        dst_pp,
-        dst_vpp,
-        segment_method,
+        pp_model,
         layer_params,
     )
     return pipeline_context
@@ -131,41 +191,6 @@ class LayerReNamingManager:
         layer_name = self.get_new_layer_name(layer_id, names[0])
         names[0] = layer_name
         return ".".join(names)
-
-
-def extract_layer_name(param_name):
-    first_layer_pattern = r"^ernie\.embed_tokens"
-    last_layer_pattern1 = "^ernie\.norm"
-    last_layer_pattern2 = r"^lm_head"
-    pattern = r"^ernie\.layers((\.\d+))"
-
-    # match 1
-    for p in [
-        pattern,
-        first_layer_pattern,
-        last_layer_pattern1,
-        last_layer_pattern2,
-    ]:
-        match = re.search(p, param_name)
-        if match:
-            return match.group()
-    return None
-
-
-def index_layer(layer_name, transformer_layer_num=None):
-    if transformer_layer_num is None:
-        transformer_layer_num = 1000
-    if layer_name == "ernie.embed_tokens":
-        return 0
-    elif layer_name == "ernie.norm":
-        return transformer_layer_num + 1
-    elif layer_name == "lm_head":
-        return transformer_layer_num + 2
-    else:
-        pattern = r"ernie\.layers((\.(\d+)))"
-        match = re.search(pattern, layer_name)
-        assert match
-        return int(match.group(3)) + 1
 
 
 class PipeLinelayer:
@@ -249,17 +274,14 @@ class PipeLineStage:
 class PipeLineSegmentContext:
     def __init__(
         self,
-        transformer_layer_num,
-        pp_degree,
-        vpp_degree,
-        segment_method,
+        pp_model,
         param_names_by_layer,
     ):
-        self._transformer_layer_num = transformer_layer_num
-        self._pp_degree = pp_degree
-        self._vpp_degree = vpp_degree
-        self._segment_method = segment_method
+        self._pp_degree = pp_model._layers._num_stages
+        self._vpp_degree = pp_model._layers._num_virtual_pipeline_stages
+        self._segment_method = "layer"
         self._layers = list(param_names_by_layer.keys())
+        self._pp_model = pp_model
         self._stages = []
         self._layer_index_to_stage = {}
         self._layer_name_to_index = {}
@@ -288,66 +310,23 @@ class PipeLineSegmentContext:
 
     def _index_layers(self):
         for layer_name in self._param_names_by_layer.keys():
-            index = index_layer(layer_name, self.transformer_layer_num)
+            index = get_index_layer_func()(layer_name)
             self._layer_name_to_index[layer_name] = index
             self._layer_index_to_name[index] = layer_name
 
-    @property
-    def transformer_layer_num(self):
-        if self._transformer_layer_num and self._transformer_layer_num > 0:
-            assert len(self._param_names_by_layer) == self._transformer_layer_num + 2, f"len(self._param_names_by_layer) {len(self._param_names_by_layer)} _transformer_layer_num{self._transformer_layer_num}"
-            return self._transformer_layer_num
-        else:
-            # assume model is of the structure below
-            # embedding -> n*(transformer layer) -> 2 output layer
-            return len(self._param_names_by_layer) - 2
-
     def _segment(self):
-        layer_num = self.transformer_layer_num + 3  # ?
+        layer_num = self._pp_model._layers._num_layers
         stage_num = self._pp_degree * self._vpp_degree
-
-        # segment by weights
-        def segment_by_layer():
-            # assume model is of the structure below
-            # embedding -> n*(transformer layer) -> 2 output layer
-            # segment index
-            weights = [0 for _ in range(layer_num)]
-            non_zero_layers = range(1, layer_num - 2)
-            for i in non_zero_layers:
-                weights[i] = 1
-
-            part_size = sum(weights) // stage_num
-            result = [0 for _ in range(stage_num + 1)]
-            memory_counter = 0
-            result_idx = 1
-            for idx, weight in enumerate(weights):
-                memory_counter += weight
-                if memory_counter == part_size:
-                    result[result_idx] = idx + 1
-                    result_idx += 1
-                    memory_counter = 0
-            result[stage_num] = layer_num
-            return result
-
-        def segment_uniform():
-            result = [0 for _ in range(stage_num + 1)]
-            part_size = math.floor(layer_num / stage_num)
-            extra_layers = layer_num % stage_num
-            for i in range(1, stage_num):
-                offset = 1 if i > (stage_num - extra_layers) else 0
-                result[i] = int(min(result[i - 1] + part_size + offset, layer_num))
-            result[stage_num] = layer_num
-            return result
-
-        result = segment_uniform() if (self._segment_method == "uniform") else segment_by_layer()
         index_segments = [[] for _ in range(self._pp_degree)]
-        for i in range(stage_num):
-            index_segments[i % self._pp_degree].append((result[i], result[i + 1]))
+        segment_parts = self._pp_model._layers.segment_parts
+        for i in range(self._pp_model._layers._total_stages_with_virtual_stages):
+            stage = i % self._pp_degree
+            index_segments[stage].append((segment_parts[i], segment_parts[i+1]))
         print(f"segment results {index_segments}")
-        return index_segments
+        return  index_segments
 
     def map_name(self, param_name, t_name):
-        layer_name = extract_layer_name(param_name)
+        layer_name = get_extract_layer_name_func()(param_name)
         assert layer_name in self._layer_name_to_index
         layer_index = self._layer_name_to_index[layer_name]
         stage_index = self._layer_index_to_stage[layer_index]
@@ -355,29 +334,12 @@ class PipeLineSegmentContext:
         return stage.map_name(param_name, t_name)
 
     def map_name_to_stage(self, name):
-        layer_name = extract_layer_name(name)
+        layer_name = get_extract_layer_name_func()(name)
         assert layer_name in self._layer_name_to_index
         layer_index = self._layer_name_to_index[layer_name]
         stage_index = self._layer_index_to_stage[layer_index]
         return stage_index
 
-    """
-    def map_name_to_stage(self, param_name):
-        layer_name = extract_layer_name(param_name)
-        assert layer_name in self._layer_name_to_stage
-        stage_index = self._layer_name_to_stage[layer_name]
-        return stage_index
-    """
-
-    def segment_layers(self, layer_names):
-        layer_segments = [[] for _ in range(self._pp_degree)]
-        for layer_name in layer_names:
-            assert layer_name in self._layer_name_to_index
-            layer_index = self._layer_name_to_index[layer_name]
-            stage_index = self._layer_index_to_stage[layer_index]
-            layer_segments[stage_index].append((layer_index, layer_name))
-        layer_segments = [[ee[1] for ee in sorted(e)] for e in layer_segments]
-        return layer_segments
 
     def print_name_mapping(self):
         for (i, stage) in enumerate(self._stages):
@@ -385,7 +347,7 @@ class PipeLineSegmentContext:
             stage.print_name_mapping()
 
 
-def convert_pp_in_group(hcg, sharding_rank, src_stage_num, pp_line_context, state_cache):
+def convert_pp_in_group(hcg, sharding_rank, src_stage_num, pp_context, state_cache):
     pp_degree = hcg.get_pipe_parallel_world_size()
     pp_rank = hcg.get_stage_id()
 
@@ -396,6 +358,7 @@ def convert_pp_in_group(hcg, sharding_rank, src_stage_num, pp_line_context, stat
         cache_key = (sharding_rank, p)
         assert cache_key in state_cache
         tmp_node_model_state = state_cache[cache_key]
+        assert len(tmp_node_model_state.master_weights) > 0
         del state_cache[cache_key]
         node_model_state.add_weights(tmp_node_model_state.model_weights)
         node_model_state.add_opts(tmp_node_model_state.opt_state)
@@ -406,16 +369,32 @@ def convert_pp_in_group(hcg, sharding_rank, src_stage_num, pp_line_context, stat
 
     # all gather
     def filter_func(name):
-        stage_id = pp_line_context.map_name_to_stage(name[0])
+        stage_id = pp_context.map_name_to_stage(name[0])
         assert stage_id < pp_degree
         return stage_id == pp_rank
-
+    
     node_model_state.reshard(group, filter_func)
-
+    assert len(node_model_state.master_weights) > 0
     def name_map_func(structure_name, p_name):
-        map_name = pp_line_context.map_name(structure_name, p_name)
+        map_name = pp_context.map_name(structure_name, p_name)
         return map_name
 
     node_model_state.map_names(name_map_func)
 
     return node_model_state
+
+
+def reshard(state_cache, meta, model, optimizer, hcg):
+    group = hcg.get_sharding_parallel_group()
+    cur_pp_degree = group.nranks
+    pp_rank = group.rank
+
+    assert isinstance(model, PipelineParallel), type(model)
+    vpp = model._layers._num_virtual_pipeline_stages
+    pp_line_context = pp_reshard.build_pipeline_context(meta, 144, model)
+
+    for i in range(self.args.sharding_parallel_rank, src_sharding_degree, cur_sharding_degree):
+        node_states = pp_reshard.convert_pp_in_group(
+                        self.hcg, i, pp_degree, pp_line_context, state_cache
+                    )
+        state_cache_new[i] = node_states
