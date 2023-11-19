@@ -2456,7 +2456,7 @@ class Trainer:
             # pp reshard
             if self._need_reshard_pp(checkpoint):
                 meta = self._load_model_meta(checkpoint)
-                pp_line_context = pp_reshard.build_pipeline_context(meta, 16, cur_pp_degree, 1, "layer", 0)
+                pp_line_context = pp_reshard.build_pipeline_context(meta, 144, cur_pp_degree, 1, "layer", 0)
 
                 for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
                     node_states = pp_reshard.convert_pp_in_group(
