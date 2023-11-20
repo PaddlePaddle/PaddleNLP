@@ -83,7 +83,7 @@ class ChatTemplateContextDataTest(unittest.TestCase):
         return ChatTemplate.from_file(self.chat_template_config_file)
 
     def test_inference_template(self):
-        query = "你好"
+        query = [["你好"]]
         context_data = {
             "system": "<<SYSTEM-MESSAGE>>",
             "instruction": "<<INSTRUCTION-MESSAGE>>",
@@ -275,7 +275,7 @@ class TestChatTemplateTruncation(unittest.TestCase):
             expected_sentence,
         )
 
-    def test_inference_template(self):
+    def test_inference_template_with_context_data(self):
         tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-llama")
         chat_template_config_file = "./tests/fixtures/chat_template_with_context.json"
         tokenizer.init_chat_template(chat_template_config_file)
