@@ -14,7 +14,7 @@
 
 
 # 复现方法：
-# trainer.py 对比中打开/注释 'paddle.jit.to_static'
+# trainer.py 打开/注释 'paddle.jit.to_static' 来对比loss
 # 如下模型配置可能单卡跑不起来，可改小 num_hidden_layers 配置为4
 # /root/.paddlenlp/models/FlagAlpha/Llama2-Chinese-7b-Chat/config.json
 
