@@ -852,14 +852,19 @@ class TrainingArguments:
                         if len(x) > 0:
                             if x not in [
                                 "split_param",
-                                "shardingv1_comm_overlap",
+                                "shardingv1_comm_overlap",  # will remove in next version
+                                "sharding_comm_overlap",
                             ]:
-                                raise ValueError(f"Found unknown pipeline mode config {x}, accpet config split_param and shardingv1_comm_overlap.")
+                                raise ValueError(
+                                    f"Found unknown pipeline mode config {x}, accpet config `split_param` and `shardingv1_comm_overlap`."
+                                )
                     sharding_split_param = "split_param" in sharding_parallel_config
-                    shardingv1_comm_overlap = True if "shardingv1_comm_overlap" in sharding_parallel_config else False
-                    assert (
-                        not shardingv1_comm_overlap or not sharding_split_param
-                    ), "Currently support shardingv1_comm_overlap in sharding stage1"
+                    sharding_comm_overlap_non_pp = (
+                        True
+                        if "shardingv1_comm_overlap" in sharding_parallel_config
+                        or "sharding_comm_overlap" in sharding_parallel_config
+                        else False
+                    )
 
                 if tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
@@ -867,7 +872,9 @@ class TrainingArguments:
                     for x in tensor_parallel_config:
                         if len(x) > 0:
                             if x not in ["enable_delay_scale_loss"]:
-                                raise ValueError(f"Found unknown tensor parallel mode config {x} ,accept config enable_delay_scale_loss.")
+                                raise ValueError(
+                                    f"Found unknown tensor parallel mode config {x} ,accept config enable_delay_scale_loss."
+                                )
                 else:
                     logger.warning("The tensor_parallel_config would be ignored when tensor parallel is not enabled.")
                     self.tensor_parallel_config = ""
@@ -897,7 +904,7 @@ class TrainingArguments:
                 if sharding_parallel_degree > 1:
                     if sharding_split_param:
                         strategy.hybrid_configs["sharding_configs"].split_param = True
-                    if shardingv1_comm_overlap:
+                    if sharding_comm_overlap_non_pp:
                         strategy.hybrid_configs["sharding_configs"].comm_overlap = True
                         strategy.hybrid_configs["sharding_configs"].accumulate_steps = self.gradient_accumulation_steps
 
