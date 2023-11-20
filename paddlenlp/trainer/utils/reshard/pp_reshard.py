@@ -354,12 +354,13 @@ def reshard(node_model_state, reshard_context, hcg):
 
     # all gather
     def filter_func(name):
-        stage_id = reshard_context.map_name_to_stage(name[0])
+        names, rank = name
+        stage_id = reshard_context.map_name_to_stage(names[0])
         assert stage_id < pp_degree
         return stage_id == pp_rank
     
     node_model_state.reshard(group, filter_func)
-    assert len(node_model_state.master_weights) > 0
+    
     def name_map_func(structure_name, p_name):
         map_name = reshard_context.map_name(structure_name, p_name)
         return map_name

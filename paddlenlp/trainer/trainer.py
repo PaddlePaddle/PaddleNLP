@@ -603,7 +603,7 @@ class Trainer:
         if self._need_reshard_pp(checkpoint):
             meta = self._load_model_meta(checkpoint)
             reshard_context = pp_reshard.build_pipeline_context(meta, self.model_wrapped)
-            node_model_state = pp_reshard.reshard(node_model_state, reshard_context, hcg)
+            node_model_state = pp_reshard.reshard(node_model_state, reshard_context, self.hcg)
         
         node_model_state.drop_rank()
         node_model_state.unpack_keys()
@@ -2434,6 +2434,7 @@ class Trainer:
         cur_pp_degree = self.args.pipeline_parallel_degree
         if pp_degree != cur_pp_degree:
             return True
+        # vpp、segment method changes is not auto supported yet
         return self.args.force_reshard_pp
 
     def _load_optimizer_state_with_reshard(self, checkpoint):
@@ -2444,7 +2445,7 @@ class Trainer:
             return self._load_optimizer_state_of_one_shard(checkpoint, self.args.optimizer_name_suffix)
 
         parallel_config = self._load_distributed_strategy(checkpoint)
-        sharding_meta = self._load_sharding_meta(checkpoint)
+        sharding_meta = self._load_sharding_meta(checkpoint, 0)
         pp_degree = parallel_config["pp_degree"]
         mp_degree = parallel_config["mp_degree"]
         sharding_degree = parallel_config["sharding_degree"]
@@ -2496,8 +2497,6 @@ class Trainer:
             return model_state
 
         def reshard_sharding(node_model_state):
-
-            node_model_state = reshard_util.NodeModelState()
             # shard reshard
             restore_func = (
                 reshard_util.sharding_v1.restore
