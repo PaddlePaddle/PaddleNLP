@@ -22,6 +22,9 @@ from zipfile import ZipFile
 
 import numpy as np
 from _io import BufferedReader
+from safetensors import safe_open
+
+from paddlenlp.utils.env import PYTORCH_WEIGHTS_NAME, SAFE_WEIGHTS_NAME
 
 MZ_ZIP_LOCAL_DIR_HEADER_SIZE = 30
 
@@ -176,39 +179,57 @@ def load_torch(path: str, **pickle_load_args):
         **pickle_load_args: args of pickle module
     Returns:
     """
-    pickle_load_args.update({"encoding": "utf-8"})
 
-    prefix_key = read_prefix_key(path)
+    if path.endswith(PYTORCH_WEIGHTS_NAME) or os.path.split(path)[-1].startswith("pytorch_model-"):
+        pickle_load_args.update({"encoding": "utf-8"})
 
-    torch_zip = ZipFile(path, "r")
-    loaded_storages = {}
+        prefix_key = read_prefix_key(path)
 
-    def load_tensor(dtype, numel, key, location):
-        name = f"{prefix_key}/data/{key}"
-        typed_storage = np.frombuffer(torch_zip.open(name).read()[:numel], dtype=dtype)
-        return typed_storage
+        torch_zip = ZipFile(path, "r")
+        loaded_storages = {}
 
-    def persistent_load(saved_id):
-        assert isinstance(saved_id, tuple)
-        typename = _maybe_decode_ascii(saved_id[0])
-        data = saved_id[1:]
+        def load_tensor(dtype, numel, key, location):
+            name = f"{prefix_key}/data/{key}"
+            typed_storage = np.frombuffer(torch_zip.open(name).read()[:numel], dtype=dtype)
+            return typed_storage
 
-        assert typename == "storage", f"Unknown typename for persistent_load, expected 'storage' but got '{typename}'"
-        storage_type, key, location, numel = data
-        dtype = storage_type.dtype
+        def persistent_load(saved_id):
+            assert isinstance(saved_id, tuple)
+            typename = _maybe_decode_ascii(saved_id[0])
+            data = saved_id[1:]
 
-        if key in loaded_storages:
-            typed_storage = loaded_storages[key]
-        else:
-            nbytes = numel * _element_size(dtype)
-            typed_storage = load_tensor(dtype, nbytes, key, _maybe_decode_ascii(location))
-            loaded_storages[key] = typed_storage
+            assert (
+                typename == "storage"
+            ), f"Unknown typename for persistent_load, expected 'storage' but got '{typename}'"
+            storage_type, key, location, numel = data
+            dtype = storage_type.dtype
 
-        return typed_storage
+            if key in loaded_storages:
+                typed_storage = loaded_storages[key]
+            else:
+                nbytes = numel * _element_size(dtype)
+                typed_storage = load_tensor(dtype, nbytes, key, _maybe_decode_ascii(location))
+                loaded_storages[key] = typed_storage
 
-    data_iostream = torch_zip.open(f"{prefix_key}/data.pkl").read()
-    unpickler_stage = UnpicklerWrapperStage(io.BytesIO(data_iostream), **pickle_load_args)
-    unpickler_stage.persistent_load = persistent_load
-    state_dict = unpickler_stage.load()
-    torch_zip.close()
+            return typed_storage
+
+        data_iostream = torch_zip.open(f"{prefix_key}/data.pkl").read()
+        unpickler_stage = UnpicklerWrapperStage(io.BytesIO(data_iostream), **pickle_load_args)
+        unpickler_stage.persistent_load = persistent_load
+        state_dict = unpickler_stage.load()
+        torch_zip.close()
+    elif path.endswith(SAFE_WEIGHTS_NAME) or os.path.split(path)[-1].startswith("model-"):
+        # Check format of the archive
+        with safe_open(path, framework="pt") as f:
+            metadata = f.metadata()
+        if metadata.get("format") not in ["pt"]:
+            raise OSError(
+                f"You have open the `convert_from_torch` flag but the safetensors archive passed at {path} does not contain the 'pt' metadata."
+            )
+        state_dict = {}
+        with safe_open(path, framework="pt") as f:
+            for key in f.keys():
+                weight = f.get_tensor(key)
+                state_dict[key] = weight.numpy()
+
     return state_dict
