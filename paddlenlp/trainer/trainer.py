@@ -1819,6 +1819,7 @@ class Trainer:
         else:
             labels = None
 
+        model = paddle.jit.to_static(model, full_graph=True)
         outputs = model(**inputs)
 
         if self.criterion is not None:
