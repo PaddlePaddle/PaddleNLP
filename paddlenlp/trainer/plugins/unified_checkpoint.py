@@ -316,7 +316,7 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
         None
     """
     # init and get optimizer LR_Scheduler
-    returned_optim_state_dict = copy.deepcopy(optimizer.state_dict())
+    returned_optim_state_dict = nested_copy(optimizer.state_dict())
 
     if not safe_serialization:
         index_filename, index_filename_master_weights = PADDLE_OPTIMIZER_INDEX_NAME, PADDLE_MASTER_WEIGHTS_INDEX_NAME

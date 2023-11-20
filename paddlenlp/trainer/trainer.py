@@ -2217,16 +2217,16 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
-            if self.args.unified_checkpoint:
-                opt_state_dict = load_unified_optimizer(
-                    model=self.model,
-                    optimizer=self.optimizer,
-                    resume_from_checkpoint=checkpoint,
-                    safe_serialization=True,
-                )
-            else:
-                optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
-                if self.args.data_parallel_rank == 0:
+            if self.args.data_parallel_rank == 0:
+                if self.args.unified_checkpoint:
+                    opt_state_dict = load_unified_optimizer(
+                        model=self.model,
+                        optimizer=self.optimizer,
+                        resume_from_checkpoint=checkpoint,
+                        safe_serialization=True,
+                    )
+                else:
+                    optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
                     path = os.path.join(checkpoint, optimizer_name)
                     if os.path.isfile(path):
                         opt_state_dict = paddle.load(path)
