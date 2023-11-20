@@ -638,10 +638,18 @@ class TrainingArguments:
         default=True,
         metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl"},
     )
+
     use_moe: Optional[bool] = field(
         default=False,
         metadata={"help": "开启moe训练"},
     )
+
+    force_reshard_pp: Optional[bool] = field(
+        default=False,
+        metadata={"help": "reshard pp even if pp degree in the model and pp degree in script match"},
+    )
+
+
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))

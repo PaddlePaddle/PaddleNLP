@@ -347,54 +347,23 @@ class PipeLineSegmentContext:
             stage.print_name_mapping()
 
 
-def convert_pp_in_group(hcg, sharding_rank, src_stage_num, pp_context, state_cache):
+def reshard(node_model_state, reshard_context, hcg):
     pp_degree = hcg.get_pipe_parallel_world_size()
     pp_rank = hcg.get_stage_id()
-
-    # the results
-    node_model_state = NodeModelState()
-
-    for p in range(pp_rank, src_stage_num, pp_degree):
-        cache_key = (sharding_rank, p)
-        assert cache_key in state_cache
-        tmp_node_model_state = state_cache[cache_key]
-        assert len(tmp_node_model_state.master_weights) > 0
-        del state_cache[cache_key]
-        node_model_state.add_weights(tmp_node_model_state.model_weights)
-        node_model_state.add_opts(tmp_node_model_state.opt_state)
-        node_model_state.add_master_weights(tmp_node_model_state.master_weights)
-        node_model_state.set_lr_scheduler(tmp_node_model_state.lr_scheduler)
-
     group = hcg.get_pipe_parallel_group()
 
     # all gather
     def filter_func(name):
-        stage_id = pp_context.map_name_to_stage(name[0])
+        stage_id = reshard_context.map_name_to_stage(name[0])
         assert stage_id < pp_degree
         return stage_id == pp_rank
     
     node_model_state.reshard(group, filter_func)
     assert len(node_model_state.master_weights) > 0
     def name_map_func(structure_name, p_name):
-        map_name = pp_context.map_name(structure_name, p_name)
+        map_name = reshard_context.map_name(structure_name, p_name)
         return map_name
 
     node_model_state.map_names(name_map_func)
 
     return node_model_state
-
-
-def reshard(state_cache, meta, model, optimizer, hcg):
-    group = hcg.get_sharding_parallel_group()
-    cur_pp_degree = group.nranks
-    pp_rank = group.rank
-
-    assert isinstance(model, PipelineParallel), type(model)
-    vpp = model._layers._num_virtual_pipeline_stages
-    pp_line_context = pp_reshard.build_pipeline_context(meta, 144, model)
-
-    for i in range(self.args.sharding_parallel_rank, src_sharding_degree, cur_sharding_degree):
-        node_states = pp_reshard.convert_pp_in_group(
-                        self.hcg, i, pp_degree, pp_line_context, state_cache
-                    )
-        state_cache_new[i] = node_states
