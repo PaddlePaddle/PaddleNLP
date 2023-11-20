@@ -24,7 +24,7 @@ from paddle.common_ops_import import convert_dtype
 
 from paddlenlp import __version__
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
-from paddlenlp.transformers.utils import resolve_cache_dir
+from paddlenlp.transformers.utils import cached_file, resolve_cache_dir
 from paddlenlp.utils.log import logger
 
 from ..utils import GENERATION_CONFIG_NAME
@@ -339,6 +339,7 @@ class GenerationConfig:
         config_file_name: Optional[Union[str, os.PathLike]] = None,
         cache_dir: Optional[Union[str, os.PathLike]] = None,
         force_download: bool = False,
+        from_aistudio: bool = False,
         **kwargs,
     ) -> "GenerationConfig":
         r"""
@@ -433,6 +434,16 @@ class GenerationConfig:
         elif from_hf_hub:
             resolved_config_file = resolve_hf_generation_config_path(
                 repo_id=pretrained_model_name_or_path, cache_dir=cache_dir, subfolder=subfolder
+            )
+        elif from_aistudio:
+            cached_file_kwargs = dict(
+                cache_dir=None,
+                subfolder=subfolder,
+                from_aistudio=from_aistudio,
+                _raise_exceptions_for_missing_entries=False,
+            )
+            resolved_config_file = cached_file(
+                pretrained_model_name_or_path, GENERATION_CONFIG_NAME, **cached_file_kwargs
             )
         else:
             community_url = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, GENERATION_CONFIG_NAME])
