@@ -127,8 +127,14 @@ class LlamaDecoderLayerPipe(LlamaDecoderLayer):
         hidden_states, attention_mask, position_ids = parse_args(args)
         has_gradient = not hidden_states.stop_gradient
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
+            # TODO(Xreki): support kwargs for recompute when use_reentrant is True.
+            position_ids = None
             hidden_states = recompute(
-                super().forward, hidden_states, attention_mask=attention_mask, use_reentrant=False
+                super().forward,
+                hidden_states,
+                position_ids,
+                attention_mask,
+                use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
             hidden_states = super().forward(hidden_states, attention_mask=attention_mask)
