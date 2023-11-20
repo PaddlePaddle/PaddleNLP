@@ -22,13 +22,7 @@
 我们提供了模型预训练、精调（SFT、LoRA、Prefix Tuning）、量化、推理、部署全流程脚本，开发者可以根据自己的需求定制化自己的大语言模型。
 
 <div align="center">
-    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/009bbb4e-baee-4c4a-a52e-94ac44c73c90">
-</div>
-
-<div align="center">
-    <font size ="1">
-    LLM全流程工具流程图（上图：PaddleNLP 2.6进展 下图：最终目标）
-     </font>
+    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/a12b8c20-02f3-4a01-8c4b-7020f808b655">
 </div>
 
 # LLM模块特性(Features)
