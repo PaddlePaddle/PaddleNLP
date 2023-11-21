@@ -64,6 +64,8 @@ __all__ = [
     "save_unified_checkpoint",
     "load_unified_optimizer",
     "save_unified_optimizer",
+    "check_unified_checkpoint",
+    "dynamic_load_unified_checkpoint",
 ]
 
 
@@ -414,6 +416,113 @@ def unified_optimizer_into_shards(
             shard_master_weight_file,
             sharded_master_weight_index,
         )
+
+
+def check_unified_checkpoint(model, resume_from_checkpoint, safe_serialization=False):
+    # only dataset_rank == 0 can enter this function.
+    index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+    index_filename = os.path.join(resume_from_checkpoint, index_filename)
+    # 先假定dataset_rank==0的情况下,每台机器都有此文件,后续再考虑如何多机之间传输此文件.
+
+    with open(index_filename, "r") as f:
+        index = json.loads(f.read())
+    all_weight_filenames = sorted(set(index["weight_map"].values()))  # 完整权重名字列表
+
+    hcg = fleet.get_hybrid_communicate_group()
+    tp_group = hcg.get_model_parallel_group()
+    pp_group = hcg.get_pipe_parallel_group()
+
+    existed_filelist = []
+    existed_files = []
+    # 获取每台机器上已有的权重文件列表
+    # 尽管只需要local_rank ==0的worker来获取此信息就好,但为了便于后续扩缩容判断逻辑,这里统一都跑一下这块代码
+    for filename in os.listdir(resume_from_checkpoint):
+        if filename in all_weight_filenames:
+            existed_files.append(filename)
+
+    # 收集模型并行组中所有的existed_files
+    if tp_group.nranks > 1:
+        dist.all_gather_object(existed_filelist, existed_files, tp_group)
+    if pp_group.nranks > 1:
+        pp_existed_filelist = []
+        dist.all_gather_object(
+            pp_existed_filelist, existed_filelist if len(existed_filelist) > 0 else existed_files, pp_group
+        )
+        existed_filelist = pp_existed_filelist
+
+    if len(existed_filelist) == 0:  # for pure sharding
+        existed_filelist = [existed_files]
+    flatten_existed_filelist = flatten_list(existed_filelist)
+    # 取差集, 判断差集是否为空
+    diff_filelist = list(set(all_weight_filenames).difference(set(flatten_existed_filelist)))
+    if len(diff_filelist) != 0:
+        # 这块待优化, 因为用户不清楚dataset_rank = 0的机器是哪些.
+        raise Exception(
+            f"Sorry, the weight file list on `dataset_rank==0` machines is not complete!, missing {diff_filelist}"
+        )
+
+    # 接着判断是否原地load模型权重还是需要走扩缩容的分支.
+    need_filelist = []
+    for key in model.state_dict().keys():
+        filename = index["weight_map"][key]
+        if filename not in need_filelist:
+            need_filelist.append(filename)
+    diff_filelist = list(set(need_filelist).difference(set(existed_files)))
+    num_diff = paddle.to_tensor([len(diff_filelist)])
+    # 获取dataset_rank==0下,各个worker的列表长度max值,如果max不为0,则走扩缩容分支,否则进行原地重启.
+    if tp_group.nranks > 1:
+        dist.reduce(num_diff, dst=tp_group.ranks[0], op=dist.ReduceOp.MAX, group=tp_group)
+        dist.broadcast(num_diff, src=tp_group.ranks[0], group=tp_group)
+    if pp_group.nranks > 1:
+        dist.reduce(num_diff, dst=pp_group.ranks[0], op=dist.ReduceOp.MAX, group=pp_group)
+        dist.broadcast(num_diff, src=pp_group.ranks[0], group=pp_group)
+    if num_diff.item() == 0:
+        return True  # 原地重启
+    return False  # 进入扩缩容分支
+
+
+def create_dispatch_table(model, is_optimizer=False):
+
+    # 对于model参数而言,当前我们仅在dataset_rank==0下获取分发表,当前仅处理非优化器情况
+
+    hcg = fleet.get_hybrid_communicate_group()
+    tp_group = hcg.get_model_parallel_group()
+    pp_group = hcg.get_pipe_parallel_group()
+    tp_rank = tp_group.rank
+
+    dispatch_list = []
+    dispatch_table = {}
+    for (k, v) in model.state_dict().items():
+        if hasattr(v, "is_distributed") and v.is_distributed:
+            dispatch_table[k] = [(dist.get_rank(), tp_rank)]
+        else:
+            dispatch_table[k] = [(dist.get_rank(), -1)]
+
+    # gather 所有worker上的dispatch_table
+    if tp_group.nranks > 1:
+        dist.all_gather_object(dispatch_list, dispatch_table, tp_group)
+    if pp_group.nranks > 1:
+        pp_dispatch_list = []
+        dist.all_gather_object(pp_dispatch_list, dispatch_list if len(dispatch_list) > 0 else dispatch_table, pp_group)
+        if isinstance(pp_dispatch_list[0], list):
+            dispatch_list = [y for x in pp_dispatch_list for y in x]
+        else:
+            dispatch_list = pp_dispatch_list
+    dispatch_table = {}
+    for dis in dispatch_list:  # 相同key,需要将value进行相加.
+        for key, value in dis.items():
+            if key not in dispatch_table:
+                dispatch_table[key] = value
+            else:
+                dispatch_table[key] += value
+    return dispatch_table
+
+
+def dynamic_load_unified_checkpoint(model, resume_from_checkpoint, safe_serialization=False):
+    # 创建tensor分发表
+    dispatch_table = create_dispatch_table(model)
+    print(dispatch_table)
+    # 接下来需要确定哪些tensor由哪些worker负责load
 
 
 def get_sharded_file_name(args, file_name, is_optimizer=False):

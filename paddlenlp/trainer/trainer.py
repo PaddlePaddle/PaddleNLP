@@ -96,6 +96,8 @@ from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
 from .plugins.unified_checkpoint import (
+    check_unified_checkpoint,
+    dynamic_load_unified_checkpoint,
     load_unified_checkpoint,
     save_unified_checkpoint,
     save_unified_optimizer,
@@ -507,11 +509,20 @@ class Trainer:
 
         if self.args.unified_checkpoint:
             if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
-                load_unified_checkpoint(
-                    self.model,
-                    resume_from_checkpoint,
-                    safe_serialization=True,
-                )
+                restart_inplace = check_unified_checkpoint(self.model, resume_from_checkpoint, safe_serialization=True)
+                if restart_inplace:
+                    load_unified_checkpoint(
+                        self.model,
+                        resume_from_checkpoint,
+                        safe_serialization=True,
+                    )
+                else:
+                    # 动态扩缩容分支
+                    dynamic_load_unified_checkpoint(
+                        self.model,
+                        resume_from_checkpoint,
+                        safe_serialization=True,
+                    )
                 logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
                 return
 
