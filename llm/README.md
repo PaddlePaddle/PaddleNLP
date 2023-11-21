@@ -1,6 +1,85 @@
-# 飞桨大语言模型工具链
+# LLM全流程导览图
+我们提供了模型预训练、精调（SFT、LoRA、Prefix Tuning）、量化、推理、部署全流程脚本，开发者可以根据自己的需求定制化自己的大语言模型。
 
-飞桨大语言模型工具链基于飞桨4D分布式并行技术开发，旨在提供高性能、灵活易用大语言模型全流程开发能力，覆盖开发、预训练、精调、压缩、推理、部署的全流程。
+<div align="center">
+    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/a12b8c20-02f3-4a01-8c4b-7020f808b655">
+</div>
+
+# LLM模块特性(Features)
+## 1. 预训练
+### 1.1. 统一全场景分布式 Trainer
+Trainer是PaddleNLP中的一个重要模块，用于实现自然语言处理任务的训练过程。Trainer 对通用训练配置做了封装支持，比如：
+* 开箱即用4D并行配置，涵盖数据并行，张量并行，流水线并行及 Sharding 并行
+* 屏蔽多硬件编程复杂性
+* 预训练、精调、对齐复用
+* 统一日志、打点、监控
+用户输入模型，数据集，就可以使用Trainer API高效快速的实现预训练、微调等任务。为了满足不同用户的需求，Trainer支持通用分布式能力和混合并行分布式能力，以提供更高效、更稳定的训练体验。
+
+<div align="center">
+    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/a2f0261d-7f76-4faf-ae01-cc9d37d5fcc0">
+</div>
+<div align="center">
+    <font size ="1">
+    飞桨与 Megatron 预训练性能比对
+     </font>
+</div>
+
+## 2. 精调
+### 2.1. 全参数微调（SFT）
+对模型的所有参数进行微调的方法。它涉及调整模型中的所有参数，而不仅仅是部分参数。这意味着在微调过程中，每个参数都会根据训练数据的反馈进行更新和调整。它能够充分利用预训练模型的知识，并且通过全面调整参数，有可能实现更好的任务性能。然而，这种方法也可能带来过拟合的风险，特别是当训练数据有限时。
+### 2.2. 分布式低比特PEFT (参数高效微调)
+参数高效微调技术（PEFT）是大模型微调中一个重要组成，可支持 LoRA，Prefix 两种主流精调方法。在此基础上 PEFT 还支持低比特和分布式并行策略。
+
+#### 2.2.1. PEFT低比特策略
+LoRA和PrefixTuning相比于全量参数大大降低了所需的显存资源，但对于百亿级别的模型对训练资源仍然要求很高。在PEFT训练中尤其是百亿参数界别模型，占比最大的是加载模型本身权重所占的资源，为了减少显存资源占用，PEFT中提供将16位浮点数的主干模型转化为4比特或8比特的量化模型，只有当权重参与计算时才将低比特的主干模型反量化为浮点数模型。这在保存原有性能和精度的前提下，有效减少了训练所需资源。对于主干模型位16位浮点数，量化为8比特显存资源占用减少一半，量化为4比特显存资源占用减少3/4。PaddleNLP中提供量化为INT4、INT8、NF4、FP4等多种低比特数据类型。
+
+#### 2.2.2. PEFT中的分布式并行策略
+对于千亿参数级别的模型，PEFT配合低比特策略并不能在单卡训练。PaddleNLP中支持上述所有PEFT策略包含低比特策略使用数据并行（data parallel）、张量并行（tensor parallel）和流水线并行（pipeline parallel）策略。PEFT、低比特策略、分布式能力三者组合，PaddleNLP将模型微调拓展到单机千亿参数级别。
+
+支持的微调算法：
+* 低秩适配矩阵微调（LoRA）：[LORA: LOW-RANK ADAPTATION OF LARGE LANGUAGE MODELS](https://arxiv.org/abs/2106.09685)
+* Prefix Tuning：[Prefix-Tuning: Optimizing Continuous Prompts for Generation](https://aclanthology.org/2021.acl-long.353/)
+* Q-LoRA(低比特): [QLoRA: Efficient Finetuning of Quantized LLMs](https://arxiv.org/pdf/2305.14314.pdf)
+* WINT-LoRA(低比特): Weight Only INT8量化策略和 LoRA 的结合
+
+<div align="center">
+    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/f3a12366-3b7d-428c-9466-90e59ef3a3ed">
+</div>
+<div align="center">
+    <font size ="1">
+    飞桨与 Huggingface Transformers 微调性能比对
+     </font>
+</div>
+
+## 3. 量化
+### 3.1. 模型参数量化 (Quantization)
+飞桨PaddleNLP框架内的量化模块专门为主流大模型提供量化功能。量化是一种将浮点数转换为低精度的整数表示的技术，可以显著减少模型的存储空间和计算资源需求，同时加速模型的推理速度。飞桨内置了两种业界主流的量化算法：GPTQ和SmoothQuant。为了满足更多量化的需求，飞桨还开源了PaddleSlim团队自研的自适应Shift-SmoothQuant算法。该算法解决了SmoothQuant无法处理的某些量化场景。
+* A8W8: SmoothQuant, Shift-SmoothQuant
+* W4: GPTQ
+
+<div align="center">
+    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/969b62db-9692-4d50-b91a-85cff305d153">
+</div>
+<div align="center">
+    <font size ="1">
+    飞桨量化性能比对
+     </font>
+</div>
+
+这些方法根据所需的样本数据和计算资源有所不同，用户可以根据自己的需求选择适合的方法。
+
+## 4. 推理
+### 4.1. Predictor统一推理模块
+飞桨PaddleNLP框架内的Predictor统一推理模块是用于在训练完成后对模型进行推理的模块。Predictor推理模块提供了一套高效、便捷的推理工具，旨在加速模型的部署和推理过程。它隐藏了底层实现的细节，使用户能够轻松地将训练好的模型应用于实际场景中。
+该推理模块支持以下几种推理方式：
+* 动态图推理（Dynamic Graph)
+* 静态图推理（Static Graph）
+* 高性能推理（Inference Model)
+
+# LLM模块性能数据
+
+
+# LLM模型支持工具链
 
 | Model | Pretrain | SFT | LoRA | Prefix Tuning | Generation | Quantization | weight convert |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -11,54 +90,17 @@
 | [GPT-3](./gpt-3) |   ✅  |  ✅  |  ✅  |  🚧  | ✅   | 🚧 | ✅  |
 | [OPT](./opt) | 🚧 | ✅ | ✅ | 🚧 |  ✅ | 🚧 | ✅  |
 | [GLM](./glm) | ❌  | ✅ | ✅ | 🚧 |  ✅ | 🚧 | ✅  |
-| [Qwen](./qwen) | ✅ | ✅ | ✅ | ✅ |  ✅ | 🚧 | ✅  |
+| [Qwen](./qwen) | ✅ | ✅ | ✅ | ✅ |  ✅ | 🚧 | ✅  |j
 
 
 * ✅: Supported
 * 🚧: In Progress
 * ❌: Not Supported
 
-# LLM全流程导览图
-我们提供了模型预训练、精调（SFT、LoRA、Prefix Tuning）、量化、推理、部署全流程脚本，开发者可以根据自己的需求定制化自己的大语言模型。
 
-<div align="center">
-    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/a12b8c20-02f3-4a01-8c4b-7020f808b655">
-</div>
-
-# LLM模块特性(Features)
-## 1.统一全场景分布式 Trainer
-Trainer是PaddleNLP中的一个重要模块，用于实现自然语言处理任务的训练过程。Trainer 对通用训练配置做了封装支持，比如：
-* 开箱即用4D并行配置，涵盖数据并行，张量并行，流水线并行及 Sharding 并行
-* 屏蔽多硬件编程复杂性
-* 预训练、精调、对齐复用
-* 统一日志、打点、监控
-用户输入模型，数据集，就可以使用Trainer API高效快速的实现预训练、微调等任务。为了满足不同用户的需求，Trainer支持通用分布式能力和混合并行分布式能力，以提供更高效、更稳定的训练体验。
-
-## 2.PEFT (参数高效微调)
-参数高效微调技术（PEFT）是大模型微调中一个重要组成，在使用较少的训练步骤和计算资源的情况下实现更好的性能。PaddleNLP将PEFT工作与现有的低比特和飞桨并行策略，对多种主流预训练模型进行适配，满足用户在不同硬件资源对多种尺寸的预训练模型微调、量化需求，有效降低模型训练成本。
-支持的微调算法：
-* 全参数微调（SFT）
-* 低秩适配矩阵微调（LoRA）：[LORA: LOW-RANK ADAPTATION OF LARGE LANGUAGE MODELS](https://arxiv.org/abs/2106.09685)
-* Prefix Tuning：[Prefix-Tuning: Optimizing Continuous Prompts for Generation](https://aclanthology.org/2021.acl-long.353/)
-
-## 3.模型参数量化 (Quantization)
-飞桨PaddleNLP框架内的量化模块专门为主流大模型提供量化功能。量化是一种将浮点数转换为低精度的整数表示的技术，可以显著减少模型的存储空间和计算资源需求，同时加速模型的推理速度。PaddleNLP的量化模块提供了一系列的工具和功能，使用户能够轻松地进行模型量化。它支持不同的量化方法:
-* PTQ
-* GPTQ
-
-这些方法根据所需的样本数据和计算资源有所不同，用户可以根据自己的需求选择适合的方法。
-
-## 4.Predictor推理模块
-飞桨PaddleNLP框架内的Predictor推理模块是用于在训练完成后对模型进行推理的模块。Predictor推理模块提供了一套高效、便捷的推理工具，旨在加速模型的部署和推理过程。它隐藏了底层实现的细节，使用户能够轻松地将训练好的模型应用于实际场景中。
-该推理模块支持以下几种推理方式：
-* 动态图推理（Dynamic Graph)
-* 静态图推理（Static Graph）
-* 融合组网推理（Inference Model)
-
-
-# 开用!
+# 快速开始
 ## 1. 预训练
-[LLaMA v1/v2](./llama)、[GPT-3](./gpt-3)、[Qwen](./qwen) 目录中提供了模型预训练的数据准备和训练细节，整个预训练过程搭载了飞桨统一全场景分布式 Trainer，可实现预训练 4D 并行加速。
+[LLaMA v1/v2](./llama)、[GPT-3](./gpt-3)、[Qwen](./qwen) 目录中提供了模型预训练的数据准备和训练细节，整个预训练过程搭载了飞桨统一全场景分布式 Trainer，可实现预训练 4D 并行加速。具体预训练配置细节[参考](./docs/pretrain.md)
 ```
 # 千问模型预训练启动脚本
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./qwen/pretrain_argument_stage2.json
@@ -66,7 +108,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py
 ```
 
 ## 2. SFT精调
-目前精调统一脚本只已支持大部分主流模型，详见对应模型目录。更多LoRA、Prefix Tuning请参见[PEFT文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/peft.md)。
+目前精调统一脚本只已支持大部分主流模型，详见对应模型目录。更多LoRA、Prefix Tuning请参见[精调文档](./docs/finetune.md)。
 
 ```bash
 # 张量并行分布式训练（常用）
@@ -127,54 +169,12 @@ python merge_lora_params.py \
 
 
 ## 7. 多轮对话精调
+PaddleNLP LLM 模块现已支持多轮对话模式的精调节，用户只需提前准备好 chat_template.json 文件便可一键启动多轮对话模式的 SFT，LoRA，Prefix 精调。具体chat_template.json的配置可看[多轮对话文档](./docs/chat_template.md)
 
-当前开源Chat 类型模型越来越多，PaddleNLP 已经集成了 [Llama](./llama/README.md)、[Qwen](./qwen/README.md)、[ChatGLM](./chatglm/README.md) 等系列模型，也支持[多轮对话 Prompt Template 推理](https://paddlenlp.readthedocs.io/zh/latest/get_started/chat_template.html)，只需要调用`apply_chat_template` 函数即可构造将对话历史和用户最新 query 按照模型指定规则拼接到一起，实现不同模型的定制化 Prompt 规则推理。
-
-此外多轮对话训练精调的应用场景也是越来越多，不同模型的多轮对话模板构造规则都不一致，为了在训练侧标准化前处理上的区别，设计了`chat_template`来解决此问题。
-
-### 7.1 如何构造 `chat_template`
-
-只需要添加一个 chat_template 的配置即可为该模型添加相应的多轮对话精调训练支持，以`qwen-14b-chat`配置文件
-
-> 以下配置参考：https://huggingface.co/Qwen/Qwen-14B-Chat/blob/main/qwen_generation_utils.py#L119
-
-```json
-{
-    "system": "You are a helpful assistant.",
-    "conversation": ["\n<|im_start|>user\n{{user}}<|im_end|>\n<|im_start|>assistant\n", "{{bot}}<|im_end|>"],
-    "query": "\n<|im_start|>user\n{{query}}<|im_end|>\n<|im_start|>assistant\n",
-}
-```
-
-注意点：
-
-1. 配置文件名默认为：`chat_template.json`。
-1. 对于 `chat_template.json`配置文件 `query`和`conversation`字段为必选项，且内容非常类似，主要是为应对推理和训练两种场景设计使用：query 只用于推理，query 和 conversation 用于训练。
-1. 由于训练和推理过程中会在文本中添加 独特token 标记，其中包括 bos_token, eos_token 以及像上述的 <|im_start|> 自定义标记等，故基于 chat_template 的分词是不会添加 special_token，也就是说 tokenizer 中的 `add_special_tokens` 参数始终要设置为 `False`。
-1. `conversation`字段为数组，且必须为两个元素，分别对应着 User 和 Bot 的对话内容，前者在训练过程中不参与 loss 的计算，后者的参与 Loss 的计算。
-1. 在训练过程中，system 文本的长度不可大于 `max_length`，当对话轮次只有一轮时，基于 token 长度来截断，伪代码为：`(system_tokens + conversation_tokens)[:max_length]`；否则将基于对话轮次来截断，详细来说就是在计算训练 token 总长度时，会从后往前计算每一轮的对话长度，如果截止当前的对话（包含 User 和 Bot 的总 tokens 长度）token 长度大于 `max_length`，此时将当前对话轮次给截断，也不计算后续历史对话数据，直接构造训练数据。
-1. 在训练过程中，system 必须存在，不能被截断。
-
-#### 7.2 如何使用 `chat_template` 进行训练
-
-以`qwen-14b-chat`基座模型为例，首先需要调整的是训练数据部分，需要保证如下格式：
-
-```json
-{"src": ["user-1", "user-2", ..., "user-n"], "tgt": ["bot-1", "bot-2", ..., "bot-n"]}
-...
-```
-
-其次就是将构造好的`chat_template.json`文件传入到 `llm/finetune_generation.py` 模块当中：
-
-* 使用模型自带chat-template
-
-> 并不是所有的模型支持chat-template，PaddleNLP 正在全力支持，可根据是否有下载 `chat_template.json` 文件来判断该模型是否支持 chat-template。
-
+* 使用模型权重自带 chat_template
 ```shell
 python finetune_generation.py ... --model_name_or_path qwen/qwen-7b-chat --chat_template qwen/qwen-7b-chat
 ```
-
-此时当 `chat_template` 参数和 `model_name_or_path` 参数一致时，此时将默认使用模型自带的chat_template.json` 文件。
 
 * 使用自定义 chat-template
 
@@ -182,13 +182,9 @@ python finetune_generation.py ... --model_name_or_path qwen/qwen-7b-chat --chat_
 python finetune_generation.py ... --chat_template ./qwen_14b_chat_template.json
 ```
 
-1. 当 `chat_template` 参数和 `model_name_or_path` 参数一致时，此时将默认使用模型自带的 `chat_template.json` 文件。
-1. 当 `chat_template` 参数为文件路径时，此时将使用该文件中的 `chat_template` 配置。
-1. 当 `chat_template` 参数为空时，此时不使用 `chat_template` 配置进行训练。
-
 ## 8. 模型推理
 
-此外 PaddleNLP 还提供了高性能推理模型，从而加速 LLM 模型的部署落地，详细文档请看：[Inference Model](./inference.md)
+此外 PaddleNLP 还提供了高性能推理模型，从而加速 LLM 模型的部署落地，详细文档请看：[Inference Model](./docs/inference.md)
 
 ### 8.1 动态图推理
 
@@ -231,9 +227,9 @@ python predictor.py \
     --mode static
 ```
 
-### 8.3 Inference Model 推理
+### 8.3 Inference Model 高性能推理
 
-此外 PaddleNLP 还提供了高性能推理模型，从而加速 LLM 模型的部署落地，详细文档请看：[Inference Model](./inference.md)
+此外 PaddleNLP 还提供了高性能推理模型，从而加速 LLM 模型的部署落地
 
 支持的模型列表如下所示：
 
@@ -252,7 +248,7 @@ python predictor.py \
 
 ## 9. 量化
 
-量化算法可以将模型权重和激活转为更低比特数值类型表示，能够有效减少显存占用和计算开销。下面我们提供GPTQ和PaddleSlim自研的PTQ策略，分别实现WINT4和W8A8量化。更多技术细节详见[量化策略详细教程](https://github.com/PaddlePaddle/PaddleSlim/blob/develop/docs/zh_cn/tutorials/quant/advanced_quantization.md)
+量化算法可以将模型权重和激活转为更低比特数值类型表示，能够有效减少显存占用和计算开销。下面我们提供GPTQ和PaddleSlim自研的PTQ策略，分别实现WINT4和W8A8量化。更多技术细节详见[量化策略详细教程](./docs/quantization.md)
 
 ### 9.1 环境安装
 - PaddleSlim develop版本
@@ -316,19 +312,5 @@ AutoModelForCausalLM.from_pretrained("/path/to/pytorch/model", convert_from_torc
 > dtype 为转化权重的真实 dtype 数据类型，通常为：float16, bloat16 和 float32。
 
 以上代码可自动加载 pytorch 权重并转化为对应 paddle 权重保存在 `/path/to/pytorch/model` 目录下。
+转换 torch 分片权重等方法具体参考[文档](./docs/torch2paddle.md)
 
-### 11.1 合并 Pytorch 分片权重
-
-当前 PaddleNLP 仅支持转化单个 Pytorch 权重：`pytorch_model.bin`文件。所以当Pytorch 权重为分片权重时，需要将其合并，合并脚本如下所示：
-
-```python
-import torch, os
-state_dict = {}
-
-files = [file for file in os.list("./path/to/pytorch/weight") if file.startswith("pytorch_model-")]
-
-for file in files:
-    state_dict.update(torch.load(file))
-
-torch.save(state_dict, "pytorch_model.bin")
-```
