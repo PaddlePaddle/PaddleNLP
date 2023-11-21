@@ -1156,8 +1156,8 @@ class Trainer:
 
             max_memory_allocated = paddle.device.cuda.max_memory_allocated() / 1024 / 1024
             max_memory_reserved = paddle.device.cuda.max_memory_reserved() / 1024 / 1024
-            logs["max_memory_allocated"] = round(max_memory_allocated, 2)
-            logs["max_memory_reserved"] = round(max_memory_reserved, 2)
+            logs["max_memory_allocated"] = f"{round(max_memory_allocated, 2)} MB"
+            logs["max_memory_reserved"] = f"{round(max_memory_reserved, 2)} MB"
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
