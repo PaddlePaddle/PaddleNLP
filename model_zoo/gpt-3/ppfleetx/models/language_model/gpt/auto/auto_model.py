@@ -49,8 +49,9 @@ try:
 except:
     flash_attention = None
 
-def shard_op_for_sequence_parallel_linear(tgt):
+def shard_op_for_sequence_parallel_linear(tgt, mesh):
     # FIXME Hack to shard op for module (linear)
+    # we only shard the second to the last op (matmul) leave the last op (elementwise_add) un-touched
     last_op = tgt.block.ops[-2]
     assert last_op.type in ["matmul", "matmul_v2"]
     from paddle.distributed.auto_parallel.static.dist_context import get_default_distributed_context
@@ -65,7 +66,11 @@ def shard_op_for_sequence_parallel_linear(tgt):
     dist_op = DistributedOperator(last_op)
     output_tensor = dist_op.get_serial_output(output_var_name)
     tensor_dist_attr = dist_op.dist_attr.get_output_dist_attr(output_var_name)
-    tensor_dist_attr.dims_mapping = [-1] * len(output_tensor.shape)
+    dims_mapping = [-1] * len(output_tensor.shape)
+    # NOTE explicitlly set the dims_mapping for DP since we could not distinguish with "Any" and "Replicated"
+    if auto_env.get_mesh().dp_dim is not None:
+        dims_mapping[1] = auto.static.utils.convert_to_dims_mapping([auto_env.get_mesh().dp_dim], mesh)[0]
+    tensor_dist_attr.dims_mapping = dims_mapping
     tensor_dist_attr.mark_annotated("dims_mapping")
 
 
@@ -313,7 +318,7 @@ class MultiHeadAttention(nn.Layer):
 
         if self.sequence_parallel:
             # FIXME Hack to shard op for module (linear)
-            shard_op_for_sequence_parallel_linear(out)    
+            shard_op_for_sequence_parallel_linear(out, auto_env.get_mesh()[self.ipp])    
 
         outs = [out]
         if self.need_weights:
@@ -370,7 +375,7 @@ class TransformerDecoder(nn.Layer):
             if not self.sequence_parallel: 
                 auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().dp_dim, None, None])
             elif auto_env.get_mesh().dp_dim is not None:
-                auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().tp_dim, auto_env.get_mesh().dp_dim, None])
+                auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().sp_dim, auto_env.get_mesh().dp_dim, None])
             else:
                 pass
 
@@ -501,7 +506,9 @@ class TransformerDecoderLayer(nn.Layer):
             tgt = self.norm1(tgt)
 
         if self.sequence_parallel:
-            auto.shard_tensor(tgt, auto_env.get_mesh()[self.ipp], [None, None, None])
+            # NOTE since we don't support a semantic to distinguish with "Any" and "Replicated" in annotation 
+            # we need to annotate the "DP" expicitly here.
+            auto.shard_tensor(tgt, auto_env.get_mesh()[self.ipp], [None, auto_env.get_mesh().dp_dim, None])
 
         if use_cache is False:
             if self.use_recompute and self.recompute_granularity == "full_attn":
@@ -513,7 +520,7 @@ class TransformerDecoderLayer(nn.Layer):
 
         if self.sequence_parallel:
             # TODO(JZ-LIANG) make sure unsharded annotation would not be changed
-            auto.shard_tensor(tgt, auto_env.get_mesh()[self.ipp], [auto_env.get_mesh().sp_dim, None, None])
+            auto.shard_tensor(tgt, auto_env.get_mesh()[self.ipp], [auto_env.get_mesh().sp_dim, auto_env.get_mesh().dp_dim, None])
 
         if not self.use_fused_dropout_add:
             tgt = residual + self.dropout1(tgt)
@@ -529,13 +536,13 @@ class TransformerDecoderLayer(nn.Layer):
 
         if self.sequence_parallel:
             # Enter TP Region
-            auto.shard_tensor(tgt, auto_env.get_mesh()[0], [None, None, None])
+            auto.shard_tensor(tgt, auto_env.get_mesh()[self.ipp], [None, auto_env.get_mesh().dp_dim, None])
             tgt = self.linear2(self.activation(self.linear1(tgt)))
             # NOTE shard_op to cut off the SP sharding propagation backward.
-            shard_op_for_sequence_parallel_linear(tgt)
+            shard_op_for_sequence_parallel_linear(tgt, auto_env.get_mesh()[self.ipp])
 
             # Enter SP Region
-            auto.shard_tensor(tgt, auto_env.get_mesh()[0], [auto_env.get_mesh().sp_dim, None, None])
+            auto.shard_tensor(tgt, auto_env.get_mesh()[self.ipp], [auto_env.get_mesh().sp_dim, auto_env.get_mesh().dp_dim, None])
             if not self.use_fused_dropout_add:
                 tgt = self.dropout2(tgt)
                 tgt = residual + tgt
@@ -610,10 +617,10 @@ class GPTEmbeddings(nn.Layer):
         # [b, s, h] -> [s, b, h] 
         if self.sequence_parallel:
 
-            auto.shard_tensor(embeddings, auto_env.get_mesh()[0], [None, None, None]) # annotation to prevent unsharded propogation backward
+            auto.shard_tensor(embeddings, auto_env.get_mesh()[0], [auto_env.get_mesh().dp_dim, None, None]) # annotation to prevent unsharded propogation backward
             embeddings = paddle.transpose(embeddings, perm=[1, 0, 2])
             # TODO (JZ-LIANG) only constrain the sharding of seq axis propagate forward from here but not backward.
-            auto.shard_tensor(embeddings, auto_env.get_mesh()[0], [auto_env.get_mesh().sp_dim, None, None])
+            auto.shard_tensor(embeddings, auto_env.get_mesh()[0], [auto_env.get_mesh().sp_dim, auto_env.get_mesh().dp_dim, None])
 
         embeddings = self.dropout(embeddings)
         return embeddings
@@ -794,9 +801,13 @@ class GPTForPretrainingAuto(nn.Layer):
 
         # FIXME should we force the encoder_outputs mesh is the last stage ? 
         if self.sequence_parallel:
-            auto.shard_tensor(encoder_outputs, auto_env.get_mesh()[-1], [None, None, None])
-
-        x_dims_mapping = [auto_env.get_mesh().dp_dim] + [None] * (len(encoder_outputs.shape) - 1)
+            # NOTE Since Two Hard Rule Hack in Completion(line 464) and Reshard(line 1391) by @Aoyulong, the shard_tensor of op output 
+            # might be invalid in some cases. So we need to instead using shard_op for the input of next Op. 
+            # TODO Fix the above two hack in future.
+            # auto.shard_tensor(encoder_outputs, auto_env.get_mesh()[-1], [None, auto_env.get_mesh().dp_dim, None])
+            x_dims_mapping = [None, auto_env.get_mesh().dp_dim] + [None] * (len(encoder_outputs.shape) - 2)
+        else:
+            x_dims_mapping = [auto_env.get_mesh().dp_dim] + [None] * (len(encoder_outputs.shape) - 1)
         w_dims_mapping = [auto_env.get_mesh().mp_dim, None]
         matmul = auto.shard_op(paddle.matmul, auto_env.get_mesh()[-1], [x_dims_mapping, w_dims_mapping, None])
         logits = matmul(encoder_outputs, get_attr(self.gpt.embeddings.word_embeddings, "weight"), transpose_y=True)
@@ -842,14 +853,14 @@ class GPTPretrainingCriterionAuto(nn.Layer):
             loss_mask, auto_env.get_mesh()[-1], [auto_env.get_mesh().dp_dim] + [None] * (len(loss_mask.shape) - 1)
         )
         if self.sequence_parallel:
-            # [b, s, h] --> [s, b, h]
-            masked_lm_labels = masked_lm_labels.transpose([1, 0])
-            loss_mask = loss_mask.transpose([1, 0])
+            # [s, b, h] --> [b, s, h]
+            prediction_scores = prediction_scores.transpose([1, 0, 2])
 
         masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
 
         loss_mask = loss_mask.reshape([-1])
         masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
+
         loss = masked_lm_loss / loss_mask.sum()
         return loss
 
