@@ -180,7 +180,7 @@ def load_torch(path: str, **pickle_load_args):
     Returns:
     """
 
-    if path.endswith(PYTORCH_WEIGHTS_NAME):
+    if path.endswith(PYTORCH_WEIGHTS_NAME) or os.path.split(path)[-1].startswith("pytorch_model-"):
         pickle_load_args.update({"encoding": "utf-8"})
 
         prefix_key = read_prefix_key(path)
@@ -218,7 +218,7 @@ def load_torch(path: str, **pickle_load_args):
         unpickler_stage.persistent_load = persistent_load
         state_dict = unpickler_stage.load()
         torch_zip.close()
-    elif path.endswith(SAFE_WEIGHTS_NAME):
+    elif path.endswith(SAFE_WEIGHTS_NAME) or os.path.split(path)[-1].startswith("model-"):
         # Check format of the archive
         with safe_open(path, framework="pt") as f:
             metadata = f.metadata()

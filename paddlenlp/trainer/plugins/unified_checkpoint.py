@@ -18,6 +18,7 @@ import json
 import os
 
 import paddle
+import paddle.distributed as dist
 from paddle.distributed import fleet
 from tqdm.auto import tqdm
 
@@ -51,8 +52,8 @@ PADDLE_OPTIMIZER_NAME = "optimizer.pdopt"
 PADDLE_OPTIMIZER_INDEX_NAME = "optimizer.pdopt.index.json"
 SAFE_OPTIMIZER_NAME = "optimizer.safetensors"
 SAFE_OPTIMIZER_INDEX_NAME = "optimizer.safetensors.index.json"
-PADDLE_MASTER_WEIGHTS_NAME = "master_weights.pdopt"
-PADDLE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.pdopt.index.json"
+PADDLE_MASTER_WEIGHTS_NAME = "master_weights.pdparams"
+PADDLE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.pdparams.index.json"
 SAFE_MASTER_WEIGHTS_NAME = "master_weights.safetensors"
 SAFE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.safetensors.index.json"
 
@@ -223,7 +224,10 @@ def unified_checkpoint_into_shards(
     config_to_save = copy.deepcopy(model_to_save.config)
 
     if config_to_save.tensor_parallel_degree > 1:
-        state_dict = merge_tensor_parallel_with_shard(model_to_save, state_dict, config_to_save, all_filter_keys)
+        tp_actions = model_to_save.get_tensor_parallel_convert_actions(
+            model_to_save.config, state_dict.keys(), is_split=False, ignore_error=True
+        )
+        state_dict = merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys)
 
     if config_to_save.tensor_parallel_degree > 1:
         # do we need to change?
@@ -393,8 +397,8 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
                 pre_tensor_parallel_split = True
                 assert loaded_keys is not None, "loaded_keys is not None."
                 tp_actions = model.get_tensor_parallel_convert_actions(model.config, model_keys, ignore_error=True)
-                if not is_master_weight:
-                    tp_actions = mapping_optimizer_tp_actions(tp_actions, loaded_keys)
+                # if not is_master_weight: # TODO
+                #     tp_actions = mapping_optimizer_tp_actions(tp_actions, loaded_keys)
 
             # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
             state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys)
@@ -451,7 +455,8 @@ def unified_optimizer_into_shards(
     if "master_weights" in optim_state_dict.keys():
         master_weights = optim_state_dict["master_weights"]
         optim_state_dict.pop("master_weights")
-    optim_state_dict.pop("LR_Scheduler")
+    if "LR_Scheduler" in optim_state_dict.keys():
+        optim_state_dict.pop("LR_Scheduler")
 
     # get optimizer param mappings
     static2struct_name_mappings = {}
@@ -476,17 +481,24 @@ def unified_optimizer_into_shards(
     tp_size = tp_group.nranks
 
     if tp_size > 1:
+        # get tp_actions
+        model_keys = []
+        for key in optim_state_dict.keys():
+            base_model_key = key.split("/")[0]
+            if base_model_key not in model_keys:
+                model_keys.append(base_model_key)
+        tp_actions = model.get_tensor_parallel_convert_actions(
+            model.config, model_keys, is_split=False, ignore_error=True
+        )
         optim_state_dict = merge_tensor_parallel_for_optimizer(
-            model,
             optim_state_dict,
-            model.config,
+            tp_actions,
             filter_optim_keys,
         )
         if master_weights is not None:
             master_weights = merge_tensor_parallel_for_optimizer(
-                model,
                 master_weights,
-                model.config,
+                tp_actions,
                 filter_master_keys,
             )
 
@@ -495,8 +507,8 @@ def unified_optimizer_into_shards(
     total_optim_size, total_master_weight_size = 0, 0
     optimizer_name = SAFE_OPTIMIZER_NAME if safe_serialization else PADDLE_OPTIMIZER_NAME
     master_weights_name = SAFE_MASTER_WEIGHTS_NAME if safe_serialization else PADDLE_MASTER_WEIGHTS_NAME
-    shard_optimizer_file = get_sharded_file_name(args, optimizer_name)
-    shard_master_weight_file = get_sharded_file_name(args, master_weights_name)
+    shard_optimizer_file = get_sharded_file_name(args, optimizer_name, is_optimizer=True)
+    shard_master_weight_file = get_sharded_file_name(args, master_weights_name, is_optimizer=True)
 
     for key, weight in optim_state_dict.items():
         index_optimizer_file[key] = shard_optimizer_file
@@ -528,17 +540,29 @@ def unified_optimizer_into_shards(
         )
 
 
-def get_sharded_file_name(args, file_name):
-    # TODO: fix process_index
-    shard_file = file_name.replace(
-        ".pdparams", f"-{args.process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.pdparams"
-    )
-    shard_file = shard_file.replace(
-        ".safetensors", f"-{args.process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.safetensors"
-    )
-    shard_file = shard_file.replace(
-        ".pdopt", f"-{args.process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.pdopt"
-    )
+def get_sharded_file_name(args, file_name, is_optimizer=False):
+    if not is_optimizer:
+        shard_file = file_name.replace(
+            ".pdparams",
+            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.pdparams",
+        )
+        shard_file = shard_file.replace(
+            ".safetensors",
+            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.safetensors",
+        )
+    else:
+        hcg = fleet.get_hybrid_communicate_group()
+        dp_group = hcg.get_data_parallel_group()
+        shard_file = file_name.replace(
+            ".pdparams", f"-{args.logical_process_index + 1:05d}-of-{args.world_size//dp_group.nranks:05d}.pdparams"
+        )
+        shard_file = shard_file.replace(
+            ".safetensors",
+            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//dp_group.nranks:05d}.safetensors",
+        )
+        shard_file = shard_file.replace(
+            ".pdopt", f"-{args.logical_process_index + 1:05d}-of-{args.world_size//dp_group.nranks:05d}.pdopt"
+        )
     return shard_file
 
 
@@ -574,15 +598,15 @@ def gather_sharded_object(index_file, total_size):
     logger.info("Unified checkpoint generating sharded_index json files.")
 
     if tp_group.nranks > 1:
-        paddle.distributed.all_gather_object(index_file_list, index_file, tp_group)
-        paddle.distributed.all_gather_object(total_size_list, total_size, tp_group)
+        dist.all_gather_object(index_file_list, index_file, tp_group)
+        dist.all_gather_object(total_size_list, total_size, tp_group)
     if pp_group.nranks > 1:
         pp_index_file_list = []
         pp_total_size_list = []
-        paddle.distributed.all_gather_object(
+        dist.all_gather_object(
             pp_index_file_list, index_file_list if len(index_file_list) > 0 else index_file, pp_group
         )
-        paddle.distributed.all_gather_object(
+        dist.all_gather_object(
             pp_total_size_list, total_size_list if len(total_size_list) > 0 else total_size, pp_group
         )
         if isinstance(pp_total_size_list[0], list):
@@ -661,7 +685,7 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
         filter_tensor_list.append(current_block)
         assert len(filter_tensor_list) == tp_size, "Error, partition failed!"
 
-    paddle.distributed.broadcast_object_list(
+    dist.broadcast_object_list(
         filter_tensor_list,
         src=hcg.get_model_parallel_group_src_rank(),
         group=tp_group,
@@ -670,16 +694,11 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
     return filter_tensor_list
 
 
-def merge_tensor_parallel_with_shard(model_to_save, state_dict, config, all_filter_keys):
+def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
     logger.info("Unified checkpoint merge tensor parallel in shards")
-    tp_actions = model_to_save.get_tensor_parallel_convert_actions(
-        model_to_save.config, state_dict.keys(), is_split=False, ignore_error=True
-    )
 
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
-
-    # tp_size = tp_group.nranks
     tp_rank = tp_group.rank
 
     # filter actions for pipeline mode
@@ -715,19 +734,8 @@ def merge_tensor_parallel_with_shard(model_to_save, state_dict, config, all_filt
     return state_dict_to_save
 
 
-def merge_tensor_parallel_for_optimizer(model_to_save, state_dict, config, all_filter_keys):
+def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys):
     logger.info("Unified optimizer tensor parallel in shards")
-
-    # get tp_actions
-    model_keys = []
-    for key in state_dict.keys():
-        base_model_key = key.split("/")[0]
-        if base_model_key not in model_keys:
-            model_keys.append(base_model_key)
-    tp_actions = model_to_save.get_tensor_parallel_convert_actions(
-        model_to_save.config, model_keys, is_split=False, ignore_error=True
-    )
-
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
     tp_rank = tp_group.rank
@@ -761,27 +769,6 @@ def merge_tensor_parallel_for_optimizer(model_to_save, state_dict, config, all_f
     return state_dict_to_save
 
 
-def mapping_optimizer_tp_actions(tp_actions, optimizer_loaded_keys):
-    """# conert param.name to
-    param.key/moment1_0
-    or param.key/beta1_XXX
-    or param.key/beta2_XXX
-
-    Args:
-        tp_actions (dict): dictionay of tensor parallel actions {key: action}
-        optimizer_loaded_keys (list or set): [param.key1/moment1_0, param.key2/beta1_XXX, param.key3/beta2_XXX]
-
-    Returns:
-        dict: new dictionay of tensor parallel actions {key: action}
-    """
-    new_actions = {}
-    for key in optimizer_loaded_keys:
-        key_base = key.split("/")[0]
-        if "moment" in key.split("/")[1] and key_base in tp_actions:
-            new_actions[key] = tp_actions[key_base]
-    return new_actions
-
-
 def nested_copy(inputs):
     if isinstance(inputs, dict):
         outputs = {}
@@ -789,3 +776,13 @@ def nested_copy(inputs):
             outputs[key] = nested_copy(inputs[key])
         return outputs
     return inputs
+
+
+def flatten_list(nested_list):
+    flattened_list = []
+    for item in nested_list:
+        if isinstance(item, list):
+            flattened_list.extend(flatten_list(item))
+        else:
+            flattened_list.append(item)
+    return flattened_list
