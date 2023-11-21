@@ -95,7 +95,11 @@ from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
-from .plugins.unified_checkpoint import load_unified_checkpoint, save_unified_checkpoint
+from .plugins.unified_checkpoint import (
+    load_unified_checkpoint,
+    save_unified_checkpoint,
+    save_unified_optimizer,
+)
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -1978,10 +1982,19 @@ class Trainer:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
                 logger.info("Saving optimizer files.")
-                paddle.save(
-                    self.optimizer.state_dict(),
-                    os.path.join(output_dir, optimizer_name),
-                )
+                if self.args.unified_checkpoint:
+                    save_unified_optimizer(
+                        self.args,
+                        self.model,
+                        self.optimizer,
+                        output_dir,
+                        safe_serialization=True,
+                    )
+                else:
+                    paddle.save(
+                        self.optimizer.state_dict(),
+                        os.path.join(output_dir, optimizer_name),
+                    )
 
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
@@ -2038,7 +2051,16 @@ class Trainer:
 
         # Maybe delete some older checkpoints.
         # For hybrid parallel training, the checkpoint files maybe on different node.
-        if self.args.should_save_model_state and self.args.local_rank == 0:
+        need_to_rotate_checkpoints = False
+        if self.args.use_hybrid_parallel:
+            if self.dp_group.rank <= 0:
+                need_to_rotate_checkpoints = True
+        else:
+            need_to_rotate_checkpoints = self.args.should_save_model_state
+
+        # Delete only by one process
+        need_to_rotate_checkpoints = need_to_rotate_checkpoints and self.args.local_rank == 0
+        if need_to_rotate_checkpoints:
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
 
     def set_optimizer_grouped_parameters(self, optimizer_grouped_parameters=None):
@@ -2197,7 +2219,6 @@ class Trainer:
 
     def _load_optimizer_and_scheduler(self, checkpoint):
         """If optimizer and scheduler states exist, load them."""
-        # TODO: Support DP broadcast optimizer.
         if checkpoint is None:
             return
 

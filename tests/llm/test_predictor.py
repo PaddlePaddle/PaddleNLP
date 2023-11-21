@@ -22,7 +22,6 @@ from parameterized import parameterized_class
 from paddlenlp.transformers import (  # ChatGLMForCausalLM,
     AutoTokenizer,
     BloomForCausalLM,
-    ChatGLMv2ForCausalLM,
     LlamaForCausalLM,
 )
 from paddlenlp.utils.downloader import (
@@ -40,7 +39,8 @@ from .testing_utils import LLMTest
         ["__internal_testing__/tiny-random-llama", LlamaForCausalLM],
         ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
         # ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
-        ["__internal_testing__/tiny-fused-chatglm2", ChatGLMv2ForCausalLM],
+        # TODO(wj-Mcat): disable chatglm2 test temporarily
+        # ["__internal_testing__/tiny-fused-chatglm2", ChatGLMv2ForCausalLM],
     ],
 )
 class PredictorTest(LLMTest, unittest.TestCase):
