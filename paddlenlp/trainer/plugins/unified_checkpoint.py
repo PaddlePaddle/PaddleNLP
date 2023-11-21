@@ -18,6 +18,7 @@ import json
 import os
 
 import paddle
+import paddle.distributed as dist
 from paddle.distributed import fleet
 from tqdm.auto import tqdm
 
@@ -382,8 +383,8 @@ def unified_optimizer_into_shards(
     total_optim_size, total_master_weight_size = 0, 0
     optimizer_name = SAFE_OPTIMIZER_NAME if safe_serialization else PADDLE_OPTIMIZER_NAME
     master_weights_name = SAFE_MASTER_WEIGHTS_NAME if safe_serialization else PADDLE_MASTER_WEIGHTS_NAME
-    shard_optimizer_file = get_sharded_file_name(args, optimizer_name)
-    shard_master_weight_file = get_sharded_file_name(args, master_weights_name)
+    shard_optimizer_file = get_sharded_file_name(args, optimizer_name, is_optimizer=True)
+    shard_master_weight_file = get_sharded_file_name(args, master_weights_name, is_optimizer=True)
 
     for key, weight in optim_state_dict.items():
         index_optimizer_file[key] = shard_optimizer_file
@@ -415,17 +416,29 @@ def unified_optimizer_into_shards(
         )
 
 
-def get_sharded_file_name(args, file_name):
-    # TODO: fix process_index
-    shard_file = file_name.replace(
-        ".pdparams", f"-{args.process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.pdparams"
-    )
-    shard_file = shard_file.replace(
-        ".safetensors", f"-{args.process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.safetensors"
-    )
-    shard_file = shard_file.replace(
-        ".pdopt", f"-{args.process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.pdopt"
-    )
+def get_sharded_file_name(args, file_name, is_optimizer=False):
+    if not is_optimizer:
+        shard_file = file_name.replace(
+            ".pdparams",
+            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.pdparams",
+        )
+        shard_file = shard_file.replace(
+            ".safetensors",
+            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.safetensors",
+        )
+    else:
+        hcg = fleet.get_hybrid_communicate_group()
+        dp_group = hcg.get_data_parallel_group()
+        shard_file = file_name.replace(
+            ".pdparams", f"-{args.logical_process_index + 1:05d}-of-{args.world_size//dp_group.nranks:05d}.pdparams"
+        )
+        shard_file = shard_file.replace(
+            ".safetensors",
+            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//dp_group.nranks:05d}.safetensors",
+        )
+        shard_file = shard_file.replace(
+            ".pdopt", f"-{args.logical_process_index + 1:05d}-of-{args.world_size//dp_group.nranks:05d}.pdopt"
+        )
     return shard_file
 
 
@@ -461,15 +474,15 @@ def gather_sharded_object(index_file, total_size):
     logger.info("Unified checkpoint generating sharded_index json files.")
 
     if tp_group.nranks > 1:
-        paddle.distributed.all_gather_object(index_file_list, index_file, tp_group)
-        paddle.distributed.all_gather_object(total_size_list, total_size, tp_group)
+        dist.all_gather_object(index_file_list, index_file, tp_group)
+        dist.all_gather_object(total_size_list, total_size, tp_group)
     if pp_group.nranks > 1:
         pp_index_file_list = []
         pp_total_size_list = []
-        paddle.distributed.all_gather_object(
+        dist.all_gather_object(
             pp_index_file_list, index_file_list if len(index_file_list) > 0 else index_file, pp_group
         )
-        paddle.distributed.all_gather_object(
+        dist.all_gather_object(
             pp_total_size_list, total_size_list if len(total_size_list) > 0 else total_size, pp_group
         )
         if isinstance(pp_total_size_list[0], list):
@@ -548,7 +561,7 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
         filter_tensor_list.append(current_block)
         assert len(filter_tensor_list) == tp_size, "Error, partition failed!"
 
-    paddle.distributed.broadcast_object_list(
+    dist.broadcast_object_list(
         filter_tensor_list,
         src=hcg.get_model_parallel_group_src_rank(),
         group=tp_group,
@@ -640,3 +653,13 @@ def nested_copy(inputs):
             outputs[key] = nested_copy(inputs[key])
         return outputs
     return inputs
+
+
+def flatten_list(nested_list):
+    flattened_list = []
+    for item in nested_list:
+        if isinstance(item, list):
+            flattened_list.extend(flatten_list(item))
+        else:
+            flattened_list.append(item)
+    return flattened_list
