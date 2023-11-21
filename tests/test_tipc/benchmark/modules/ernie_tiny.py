@@ -15,7 +15,7 @@
 import os
 import sys
 from functools import partial
-
+import paddle
 import paddle.nn as nn
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 
