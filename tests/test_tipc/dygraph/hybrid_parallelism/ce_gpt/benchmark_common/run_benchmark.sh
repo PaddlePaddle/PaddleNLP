@@ -123,7 +123,7 @@ function _train(){
     # 以下为通用执行命令，无特殊可不用修改
     case ${run_mode} in
     DP8-MP1-PP1) echo "run run_mode: ${run_mode}"
-        train_cmd="python3.7 -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
             run_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
@@ -132,8 +132,7 @@ function _train(){
     cd ../llm/gpt-3
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间
-        #${train_cmd} > ${log_file} 2>&1
-        ${train_cmd}
+        ${train_cmd} > ${log_file} 2>&1
     else
         timeout 20m ${train_cmd} > ${log_file} 2>&1
     fi
