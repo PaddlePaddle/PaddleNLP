@@ -829,6 +829,11 @@ class Trainer:
                 # sharding
                 # stage1. the same as ddp
                 # stage2. manualy collect gradient on dp group
+
+                dp_master_grad = self.args.amp_master_grad and not self.args.use_hybrid_parallel
+                if dp_master_grad:
+                    is_no_sync = True
+
                 if is_no_sync:
                     # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
                     with model.no_sync():
@@ -883,6 +888,9 @@ class Trainer:
                                 fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
+
+                    if dp_master_grad and not (args.recompute and availiable_no_sync):
+                        fused_allreduce_gradients(list(model.parameters()), None)
 
                     # pipeline parallel mode,  handle gradient merge here
                     if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
