@@ -12,30 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
-import re
+
 from collections import OrderedDict
 
-from paddle.distributed.fleet.utils.log_util import logger
-from .common import NodeModelState
 from paddle.distributed.fleet.model import PipelineParallel
-
-
+from paddle.distributed.fleet.utils.log_util import logger
 
 _GLOBAL_EXTRACT_LAYER_NAME_FUNC = None
+
+
 def regitser_extract_layer_name_func(func):
     global _GLOBAL_EXTRACT_LAYER_NAME_FUNC
     _GLOBAL_EXTRACT_LAYER_NAME_FUNC = func
 
+
 def get_extract_layer_name_func():
     global _GLOBAL_EXTRACT_LAYER_NAME_FUNC
     assert _GLOBAL_EXTRACT_LAYER_NAME_FUNC is not None, "extract layer func is not registered yet"
-    return  _GLOBAL_EXTRACT_LAYER_NAME_FUNC
+    return _GLOBAL_EXTRACT_LAYER_NAME_FUNC
+
 
 _GLOBAL_INDEX_LAYER_FUNC = None
+
+
 def register_index_layer_func(func):
     global _GLOBAL_INDEX_LAYER_FUNC
     _GLOBAL_INDEX_LAYER_FUNC = func
+
 
 def get_index_layer_func():
     global _GLOBAL_INDEX_LAYER_FUNC
@@ -45,7 +48,7 @@ def get_index_layer_func():
 
 class LayerNameScope:
     registered_layers = []
-    
+
     def __init__(self, prefix, template):
         self.prefix = prefix
         self.last_layer_id = ""
@@ -65,8 +68,7 @@ class LayerNameScope:
     def register_layer_prefix(cls, prefix):
         if prefix not in cls.registered_layers:
             cls.registered_layers.append(prefix)
-            cls.registered_layers.sort(key=lambda x:len(x), reverse=True)
-
+            cls.registered_layers.sort(key=lambda x: len(x), reverse=True)
 
     def get_next_scope(self, layer_id, old_layer_name):
         if old_layer_name != self.last_old_layer_name or layer_id != self.last_layer_id:
@@ -94,56 +96,6 @@ class LayerNameScope:
         scope = LayerNameScope(prefix, layer_template)
         self.sub_scopes[layer_prefix] = scope
         return scope
-
-
-def extract_layer_name(param_name):
-    first_layer_pattern = r"^ernie\.embed_tokens"
-    last_layer_pattern1 = "^ernie\.norm"
-    last_layer_pattern2 = r"^lm_head"
-    pattern = r"^ernie\.layers((\.\d+))"
-
-    # match 1
-    for p in [
-        pattern,
-        first_layer_pattern,
-        last_layer_pattern1,
-        last_layer_pattern2,
-    ]:
-        match = re.search(p, param_name)
-        if match:
-            return match.group()
-    return None
-
-
-def index_layer(layer_name):
-    transformer_layer_num = 16
-    if transformer_layer_num is None:
-        transformer_layer_num = 1000
-    if layer_name == "ernie.embed_tokens":
-        return 0
-    elif layer_name == "ernie.norm":
-        return transformer_layer_num + 1
-    elif layer_name == "lm_head":
-        return transformer_layer_num + 2
-    else:
-        pattern = r"ernie\.layers((\.(\d+)))"
-        match = re.search(pattern, layer_name)
-        assert match
-        return int(match.group(3)) + 1
-
-# register pp reshard info
-regitser_extract_layer_name_func(extract_layer_name)
-register_index_layer_func(index_layer)
-LayerNameScope.register_layer_prefix("column_sequence_parallel_linear")
-LayerNameScope.register_layer_prefix("row_sequence_parallel_linear")
-LayerNameScope.register_layer_prefix("linear")
-LayerNameScope.register_layer_prefix("layer_norm_pipe")
-LayerNameScope.register_layer_prefix("layer_norm")
-LayerNameScope.register_layer_prefix("embedding")
-LayerNameScope.register_layer_prefix("create_parameter")
-LayerNameScope.register_layer_prefix("ernie_lm_head")
-
-
 
 
 def extract_param_names_groupby_layer(
@@ -178,7 +130,6 @@ def build_pipeline_context(meta, pp_model):
         layer_params,
     )
     return pipeline_context
-
 
 
 class LayerReNamingManager:
@@ -259,7 +210,7 @@ class PipeLineStage:
                     (param_name, tensor_name) = param
                     # map to a new name
                     n_name = self._rename_mgr.get_new_param_name(layer.name, tensor_name)
-                    #logger.info(f"{param_name} {tensor_name}=>{n_name}")
+                    # logger.info(f"{param_name} {tensor_name}=>{n_name}")
                     self._param_to_tname[param_name] = (tensor_name, n_name)
 
     def map_name(self, param_name, t_name):
@@ -318,15 +269,13 @@ class PipeLineSegmentContext:
             self._layer_index_to_name[index] = layer_name
 
     def _segment(self):
-        layer_num = self._pp_model._layers._num_layers
-        stage_num = self._pp_degree * self._vpp_degree
         index_segments = [[] for _ in range(self._pp_degree)]
         segment_parts = self._pp_model._layers.segment_parts
         for i in range(self._pp_model._layers._total_stages_with_virtual_stages):
             stage = i % self._pp_degree
-            index_segments[stage].append((segment_parts[i], segment_parts[i+1]))
+            index_segments[stage].append((segment_parts[i], segment_parts[i + 1]))
         print(f"segment results {index_segments}")
-        return  index_segments
+        return index_segments
 
     def map_name(self, param_name, t_name):
         layer_name = get_extract_layer_name_func()(param_name)
@@ -342,7 +291,6 @@ class PipeLineSegmentContext:
         layer_index = self._layer_name_to_index[layer_name]
         stage_index = self._layer_index_to_stage[layer_index]
         return stage_index
-
 
     def print_name_mapping(self):
         for (i, stage) in enumerate(self._stages):
@@ -361,9 +309,9 @@ def reshard(node_model_state, reshard_context, hcg):
         stage_id = reshard_context.map_name_to_stage(names[0])
         assert stage_id < pp_degree
         return stage_id == pp_rank
-    
+
     node_model_state.reshard(group, filter_func)
-    
+
     def name_map_func(structure_name, p_name):
         map_name = reshard_context.map_name(structure_name, p_name)
         return map_name

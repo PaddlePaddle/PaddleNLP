@@ -649,8 +649,6 @@ class TrainingArguments:
         metadata={"help": "reshard pp even if pp degree in the model and pp degree in script match"},
     )
 
-
-
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
         if env_local_rank != -1 and env_local_rank != self.local_rank and paddle.distributed.get_world_size() > 1:
@@ -862,7 +860,9 @@ class TrainingArguments:
                                 "split_param",
                                 "shardingv1_comm_overlap",
                             ]:
-                                raise ValueError(f"Found unknown pipeline mode config {x}, accpet config split_param and shardingv1_comm_overlap.")
+                                raise ValueError(
+                                    f"Found unknown pipeline mode config {x}, accpet config split_param and shardingv1_comm_overlap."
+                                )
                     sharding_split_param = "split_param" in sharding_parallel_config
                     shardingv1_comm_overlap = True if "shardingv1_comm_overlap" in sharding_parallel_config else False
                     assert (
@@ -875,7 +875,9 @@ class TrainingArguments:
                     for x in tensor_parallel_config:
                         if len(x) > 0:
                             if x not in ["enable_delay_scale_loss"]:
-                                raise ValueError(f"Found unknown tensor parallel mode config {x} ,accept config enable_delay_scale_loss.")
+                                raise ValueError(
+                                    f"Found unknown tensor parallel mode config {x} ,accept config enable_delay_scale_loss."
+                                )
                 else:
                     logger.warning("The tensor_parallel_config would be ignored when tensor parallel is not enabled.")
                     self.tensor_parallel_config = ""

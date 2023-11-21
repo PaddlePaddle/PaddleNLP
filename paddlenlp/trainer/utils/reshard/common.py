@@ -169,9 +169,13 @@ class NodeModelState:
             structure_name, t_name, opt_name = key[0] if packed else key
             t_name_new = map_func(structure_name, t_name)
             opt_name_new = t_name_new + opt_name[len(t_name) :]
-            key_new = ((structure_name, t_name_new, opt_name_new), key[1]) if packed else (structure_name, t_name_new, opt_name_new)
+            key_new = (
+                ((structure_name, t_name_new, opt_name_new), key[1])
+                if packed
+                else (structure_name, t_name_new, opt_name_new)
+            )
             return key_new
-        
+
         self._model_weights = map_key(self._model_weights, map_model_state_key)
         self._opt_state = map_key(self._opt_state, map_opt_key)
         self._master_weights = map_key(self._master_weights, map_opt_key)
@@ -485,7 +489,7 @@ class NodeModelState:
         if other.lr_scheduler is not None:
             self.set_lr_scheduler(other.lr_scheduler)
         return self
-        
+
     def get_opt_state_dict(self):
         opt_state_dict = OrderedDict()
         for (k, v) in self.opt_state.items():

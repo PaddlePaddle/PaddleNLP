@@ -567,8 +567,8 @@ class Trainer:
 
         if pp_degree > 1:
             assert cur_pp_degree > 1, "can not reshard from pp to non pp"
-        if pp_degree <=1:
-            assert cur_pp_degree <=1, "can not reshard from non pp to pp"
+        if pp_degree <= 1:
+            assert cur_pp_degree <= 1, "can not reshard from non pp to pp"
 
         assert self.args.tensor_parallel_degree == mp_degree
         cur_sharding_degree = self.args.sharding_parallel_degree
@@ -596,7 +596,7 @@ class Trainer:
                     node_model_state_tmp.add_weights(tmp)
                     node_model_state_tmp.pack_keys(structure_name_map)
                     model_state.merge_from(node_model_state_tmp, i)
-            return  model_state     
+            return model_state
 
         node_model_state = load_model_slices()
 
@@ -604,7 +604,7 @@ class Trainer:
             meta = self._load_model_meta(checkpoint)
             reshard_context = pp_reshard.build_pipeline_context(meta, self.model_wrapped)
             node_model_state = pp_reshard.reshard(node_model_state, reshard_context, self.hcg)
-        
+
         node_model_state.drop_rank()
         node_model_state.unpack_keys()
         state_dict = node_model_state.model_weights
@@ -2456,8 +2456,8 @@ class Trainer:
 
         if pp_degree > 1:
             assert cur_pp_degree > 1, "can not reshard from pp to non pp"
-        if pp_degree <=1:
-            assert cur_pp_degree <=1, "can not reshard from non pp to pp"
+        if pp_degree <= 1:
+            assert cur_pp_degree <= 1, "can not reshard from non pp to pp"
 
         assert self.args.tensor_parallel_degree == mp_degree
         cur_sharding_degree = self.args.sharding_parallel_degree
@@ -2486,7 +2486,7 @@ class Trainer:
                     node_model_state_tmp.add_opts(tmp)
                     node_model_state_tmp.pack_keys(structure_name_map)
                     model_state.merge_from(node_model_state_tmp, i)
-            return  model_state       
+            return model_state
 
         def reshard_pp(model_state):
             # pp reshard
