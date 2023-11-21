@@ -374,7 +374,7 @@ def do_train(args):
                             total_samples / args.logging_steps,
                             args.batch_size / (reader_cost_avg.get_average() + train_cost_avg.get_average()),
                             max_mem_reserved,
-                            max_mem_allocated
+                            max_mem_allocated,
                         )
                     )
                     total_samples = 0

@@ -336,7 +336,7 @@ def do_train(args):
                             batch_ips_avg.get_total_cnt(),
                             batch_ips_avg.get_average_per_sec(),
                             max_mem_reserved,
-                            max_mem_allocated
+                            max_mem_allocated,
                         )
                     )
                 reader_cost_avg.reset()

@@ -15,6 +15,7 @@
 import os
 import sys
 from functools import partial
+
 import paddle
 import paddle.nn as nn
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
@@ -120,6 +121,15 @@ class ErnieTinyBenchmark(BenchmarkBase):
         logger.info(
             "global step %d / %d, loss: %f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, "
             "avg_samples: %.5f, ips: %.5f sequences/sec, max_mem_reserved: %s B, max_mem_allocated: %s B"
-            % (step_id, args.epoch * self.num_batch, loss, reader_cost, batch_cost, num_samples, ips,
-            max_mem_reserved, max_mem_allocated)
+            % (
+                step_id,
+                args.epoch * self.num_batch,
+                loss,
+                reader_cost,
+                batch_cost,
+                num_samples,
+                ips,
+                max_mem_reserved,
+                max_mem_allocated,
+            )
         )

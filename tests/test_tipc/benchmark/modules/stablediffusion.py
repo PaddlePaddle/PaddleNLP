@@ -22,13 +22,13 @@ import paddle.nn.functional as F
 from datasets import DatasetDict, concatenate_datasets
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from paddle.vision import BaseTransform, transforms
+from ppdiffusers.training_utils import main_process_first
+from ppdiffusers.utils import PPDIFFUSERS_CACHE
 
 from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
 from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from paddlenlp.utils.log import logger
 from ppdiffusers import AutoencoderKL, DDPMScheduler, UNet2DConditionModel
-from ppdiffusers.training_utils import main_process_first
-from ppdiffusers.utils import PPDIFFUSERS_CACHE
 
 from .model_base import BenchmarkBase
 
@@ -275,6 +275,15 @@ class StableDiffusionBenchmark(BenchmarkBase):
         logger.info(
             "global step %d / %d, loss: %f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, "
             "avg_samples: %.5f, ips: %.5f sample/sec, max_mem_reserved: %s B, max_mem_allocated: %s B"
-            % (step_id, args.epoch * self.num_batch, loss, reader_cost, batch_cost, num_samples, ips,
-            max_mem_reserved, max_mem_allocated)
+            % (
+                step_id,
+                args.epoch * self.num_batch,
+                loss,
+                reader_cost,
+                batch_cost,
+                num_samples,
+                ips,
+                max_mem_reserved,
+                max_mem_allocated,
+            )
         )
