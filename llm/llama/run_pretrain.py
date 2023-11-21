@@ -11,9 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-GPT/Llama pretraining scripts.
-"""
 import math
 import os
 import random
@@ -25,6 +22,11 @@ from typing import List, Optional
 import numpy as np
 import paddle
 
+from paddlenlp.data.causal_dataset import (
+    build_train_valid_test_datasets,
+    check_data_split,
+    print_rank_0,
+)
 from paddlenlp.trainer import (
     PdArgumentParser,
     Trainer,
@@ -33,30 +35,16 @@ from paddlenlp.trainer import (
     speed_metrics,
 )
 from paddlenlp.transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoModelForCausalLMPipe,
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
-    LlamaConfig,
-    LlamaForCausalLM,
-    LlamaForCausalLMPipe,
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
-
-MODEL_CLASSES = {
-    "llama": (
-        LlamaConfig,
-        LlamaForCausalLM,
-    ),
-}
-
-
-from paddlenlp.data.causal_dataset import (
-    build_train_valid_test_datasets,
-    check_data_split,
-    print_rank_0,
-)
 
 
 def add_start_docstrings(*docstr):
@@ -427,11 +415,8 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    config_class, model_class = MODEL_CLASSES[model_args.model_type]
-
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
-
-    config = config_class.from_pretrained(model_args.model_name_or_path)
+    config = AutoConfig.from_pretrained(model_args.model_name_or_path)
 
     config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
@@ -472,8 +457,9 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
-    if training_args.pipeline_parallel_degree > 1 and model_args.model_type == "llama":
-        model_class = LlamaForCausalLMPipe
+    model_class = AutoModelForCausalLM
+    if training_args.pipeline_parallel_degree > 1:
+        model_class = AutoModelForCausalLMPipe
 
     if model_args.continue_training:
         model = model_class.from_pretrained(
@@ -482,7 +468,7 @@ def main():
             dtype=dtype,
         )
     else:
-        model = model_class._from_config(config, dtype=dtype)
+        model = model_class.from_config(config, dtype=dtype)
 
     if model_args.sequence_parallel:
         register_sequence_parallel_allreduce_hooks(
@@ -495,7 +481,11 @@ def main():
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
-    warmup_steps = training_args.warmup_ratio * training_args.max_steps
+
+    if training_args.warmup_steps > 0:
+        warmup_steps = training_args.warmup_steps
+    else:
+        warmup_steps = training_args.warmup_ratio * training_args.max_steps
 
     lr_scheduler = None
     if training_args.lr_scheduler_type.value == "cosine":
@@ -552,7 +542,8 @@ def main():
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         metrics = train_result.metrics
-        trainer.save_model()
+        if not int(os.getenv("test_ci_no_save_model", 0)):
+            trainer.save_model()
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
         trainer.save_state()

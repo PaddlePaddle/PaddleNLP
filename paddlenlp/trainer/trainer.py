@@ -2193,7 +2193,6 @@ class Trainer:
 
     def _load_optimizer_and_scheduler(self, checkpoint):
         """If optimizer and scheduler states exist, load them."""
-        # TODO: Support DP broadcast optimizer.
         if checkpoint is None:
             return
 
