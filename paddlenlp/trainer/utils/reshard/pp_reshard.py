@@ -20,6 +20,82 @@ from paddle.distributed.fleet.utils.log_util import logger
 from .common import NodeModelState
 from paddle.distributed.fleet.model import PipelineParallel
 
+
+
+_GLOBAL_EXTRACT_LAYER_NAME_FUNC = None
+def regitser_extract_layer_name_func(func):
+    global _GLOBAL_EXTRACT_LAYER_NAME_FUNC
+    _GLOBAL_EXTRACT_LAYER_NAME_FUNC = func
+
+def get_extract_layer_name_func():
+    global _GLOBAL_EXTRACT_LAYER_NAME_FUNC
+    assert _GLOBAL_EXTRACT_LAYER_NAME_FUNC is not None, "extract layer func is not registered yet"
+    return  _GLOBAL_EXTRACT_LAYER_NAME_FUNC
+
+_GLOBAL_INDEX_LAYER_FUNC = None
+def register_index_layer_func(func):
+    global _GLOBAL_INDEX_LAYER_FUNC
+    _GLOBAL_INDEX_LAYER_FUNC = func
+
+def get_index_layer_func():
+    global _GLOBAL_INDEX_LAYER_FUNC
+    assert _GLOBAL_INDEX_LAYER_FUNC is not None, "index layer func is not registered yet"
+    return _GLOBAL_INDEX_LAYER_FUNC
+
+
+class LayerNameScope:
+    registered_layers = []
+    
+    def __init__(self, prefix, template):
+        self.prefix = prefix
+        self.last_layer_id = ""
+        self.last_old_layer_name = ""
+        self.template = template
+        self.index = -1
+        self.sub_scopes = OrderedDict()
+
+    @classmethod
+    def get_layer_prefix(cls, old_layer_name):
+        for k in cls.registered_layers:
+            if old_layer_name.startswith(k):
+                return k
+        return None
+
+    @classmethod
+    def register_layer_prefix(cls, prefix):
+        if prefix not in cls.registered_layers:
+            cls.registered_layers.append(prefix)
+            cls.registered_layers.sort(key=lambda x:len(x), reverse=True)
+
+
+    def get_next_scope(self, layer_id, old_layer_name):
+        if old_layer_name != self.last_old_layer_name or layer_id != self.last_layer_id:
+            self.index = self.index + 1
+            self.last_old_layer_name = old_layer_name
+            self.last_layer_id = layer_id
+            self.sub_scopes = OrderedDict()
+        return self
+
+    def get_layer_name(self):
+        name = ""
+        if self.template:
+            name = self.template.format(self.index)
+        if self.prefix:
+            name = self.prefix + "_" + name
+        return name
+
+    def get_sub_scope(self, sub_layer_name):
+        layer_prefix = self.get_layer_prefix(sub_layer_name)
+        assert layer_prefix, f"{sub_layer_name} invalid, prefix {self.prefix}"
+        if layer_prefix in self.sub_scopes:
+            return self.sub_scopes[layer_prefix]
+        layer_template = f"{layer_prefix}_{{}}"
+        prefix = self.get_layer_name()
+        scope = LayerNameScope(prefix, layer_template)
+        self.sub_scopes[layer_prefix] = scope
+        return scope
+
+
 def extract_layer_name(param_name):
     first_layer_pattern = r"^ernie\.embed_tokens"
     last_layer_pattern1 = "^ernie\.norm"
@@ -55,31 +131,18 @@ def index_layer(layer_name):
         assert match
         return int(match.group(3)) + 1
 
-
-_GLOBAL_EXTRACT_LAYER_NAME_FUNC = None
-def regitser_extract_layer_name_func(func):
-    global _GLOBAL_EXTRACT_LAYER_NAME_FUNC
-    _GLOBAL_EXTRACT_LAYER_NAME_FUNC = func
-
-def get_extract_layer_name_func():
-    global _GLOBAL_EXTRACT_LAYER_NAME_FUNC
-    assert _GLOBAL_EXTRACT_LAYER_NAME_FUNC is not None, "extract layer func is not registered yet"
-    return  _GLOBAL_EXTRACT_LAYER_NAME_FUNC
-
-_GLOBAL_INDEX_LAYER_FUNC = None
-def register_index_layer_func(func):
-    global _GLOBAL_INDEX_LAYER_FUNC
-    _GLOBAL_INDEX_LAYER_FUNC = func
-
-def get_index_layer_func():
-    global _GLOBAL_INDEX_LAYER_FUNC
-    assert _GLOBAL_INDEX_LAYER_FUNC is not None, "index layer func is not registered yet"
-    return _GLOBAL_INDEX_LAYER_FUNC
-
-
-# register 
+# register pp reshard info
 regitser_extract_layer_name_func(extract_layer_name)
 register_index_layer_func(index_layer)
+LayerNameScope.register_layer_prefix("column_sequence_parallel_linear")
+LayerNameScope.register_layer_prefix("row_sequence_parallel_linear")
+LayerNameScope.register_layer_prefix("linear")
+LayerNameScope.register_layer_prefix("layer_norm_pipe")
+LayerNameScope.register_layer_prefix("layer_norm")
+LayerNameScope.register_layer_prefix("embedding")
+LayerNameScope.register_layer_prefix("create_parameter")
+LayerNameScope.register_layer_prefix("ernie_lm_head")
+
 
 
 
@@ -116,66 +179,6 @@ def build_pipeline_context(meta, pp_model):
     )
     return pipeline_context
 
-
-class LayerNameScope:
-    prefix_to_template = OrderedDict()
-    prefix_to_template["column_sequence_parallel_linear"] = "column_sequence_parallel_linear_{}"
-    prefix_to_template["row_sequence_parallel_linear"] = "row_sequence_parallel_linear_{}"
-    prefix_to_template["linear"] = "linear_{}"
-    prefix_to_template["layer_norm_pipe"] = "layer_norm_pipe_{}"
-    prefix_to_template["layer_norm"] = "layer_norm_{}"
-    prefix_to_template["embedding"] = "embedding_{}"
-    prefix_to_template["create_parameter"] = "create_parameter_{}"
-    prefix_to_template["ernie_lm_head"] = "ernie_lm_head_{}"
-
-    def __init__(self, prefix, template):
-        self.prefix = prefix
-        self.last_layer_id = ""
-        self.last_old_layer_name = ""
-        self.template = template
-        self.index = -1
-        self.sub_scopes = OrderedDict()
-
-    @classmethod
-    def create_sub_scope(cls, prefix, old_layer_name):
-        for (k, v) in cls.prefix_to_template.items():
-            if old_layer_name.startswith(k):
-                return LayerNameScope(prefix, v)
-        return None
-
-    @classmethod
-    def get_layer_prefix(cls, old_layer_name):
-        for k in cls.prefix_to_template:
-            if old_layer_name.startswith(k):
-                return k
-        return None
-
-    def get_next_scope(self, layer_id, old_layer_name):
-        if old_layer_name != self.last_old_layer_name or layer_id != self.last_layer_id:
-            self.index = self.index + 1
-            self.last_old_layer_name = old_layer_name
-            self.last_layer_id = layer_id
-            self.sub_scopes = OrderedDict()
-        return self
-
-    def get_layer_name(self):
-        name = ""
-        if self.template:
-            name = self.template.format(self.index)
-        if self.prefix:
-            name = self.prefix + "_" + name
-        return name
-
-    def get_sub_scope(self, sub_layer_name):
-        layer_prefix = self.get_layer_prefix(sub_layer_name)
-        assert layer_prefix, f"{sub_layer_name} invalid, prefix {self.prefix}"
-        if layer_prefix in self.sub_scopes:
-            return self.sub_scopes[layer_prefix]
-        layer_template = self.prefix_to_template[layer_prefix]
-        prefix = self.get_layer_name()
-        scope = LayerNameScope(prefix, layer_template)
-        self.sub_scopes[layer_prefix] = scope
-        return scope
 
 
 class LayerReNamingManager:
