@@ -153,6 +153,18 @@ if is_datasets_available():
     import datasets
 
 
+import hashlib
+
+
+def tensor_hash(tensor):
+    # 将tensor转换为字节数组
+    byte_array = tensor.astype("float32").numpy().tobytes()
+    # 计算MD5哈希
+    hash_object = hashlib.md5(byte_array)
+    hex_dig = hash_object.hexdigest()
+    return hex_dig
+
+
 try:
     from paddle.distributed.fleet.utils import mix_precision_utils
 except:
@@ -943,6 +955,11 @@ class Trainer:
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
                     )
                     optimizer_was_run = True
+
+                    for k, v in self.model.state_dict().items():
+                        print("==== p.name : {} ====".format(k))
+                        print("==== p.grad : {} ====".format(tensor_hash(v.grad)))
+
                     if self.do_grad_scaling:
                         scale_before = paddle.assign(self.scaler._scale)
                         self.scaler.step(self.optimizer)
@@ -964,6 +981,10 @@ class Trainer:
 
                     if optimizer_was_run:
                         self.lr_scheduler.step()
+
+                    # for p in self.model.parameters():
+                    #     print("==== p.name : {} ====".format(p.name))
+                    #     print("==== p.grad : {} ====".format(tensor_hash(p.grad)))
 
                     self.optimizer.clear_grad()
                     self.callback_handler.on_optimizer_end(
@@ -1818,6 +1839,27 @@ class Trainer:
                 labels = inputs["generator_labels"]
         else:
             labels = None
+
+        import os
+
+        run_mode = os.getenv("FLAGS_RUN_MODE", "dygraph")
+
+        if run_mode in ["jit", "new_ir"]:
+            model.llama = paddle.jit.to_static(
+                model.llama,
+                # input_spec=[paddle.static.InputSpec(name="input_ids", shape=[-1, -1], dtype="int64"), # input_ids
+                #             None,  # position_ids
+                #             None,  # attention_mask
+                #             None,  # inputs_embeds
+                #             # paddle.static.InputSpec(name="labels", shape=[-1, -1], dtype="int64"),  # labels
+                #             False,  # use_cache
+                #             None,  # past_key_values
+                #             None,  # output_attentions
+                #             None,  # output_hidden_states
+                #             None,  # return_dict
+                #         ],
+                full_graph=True,
+            )
 
         outputs = model(**inputs)
 
