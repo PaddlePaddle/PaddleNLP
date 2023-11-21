@@ -830,7 +830,9 @@ class Trainer:
                 # stage1. the same as ddp
                 # stage2. manualy collect gradient on dp group
 
-                dp_master_grad = self.args.amp_master_grad and not self.args.use_hybrid_parallel
+                dp_master_grad = (
+                    self.args.world_size > 1 and self.args.amp_master_grad and not self.args.use_hybrid_parallel
+                )
                 if dp_master_grad:
                     is_no_sync = True
 
