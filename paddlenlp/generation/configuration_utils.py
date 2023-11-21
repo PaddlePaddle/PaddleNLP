@@ -363,6 +363,8 @@ class GenerationConfig:
             force_download (`bool`, *optional*, defaults to `False`):
                 Whether or not to force to (re-)download the configuration files and override the cached versions if
                 they exist.
+            from_aistudio (bool, *optional*):
+                load config from aistudio: https://aistudio.baidu.com/
             return_unused_kwargs (`bool`, *optional*, defaults to `False`):
                 If `False`, then this function returns just the final configuration object.
 

@@ -18,10 +18,11 @@ import tempfile
 import unittest
 from typing import Dict, Optional
 
+from paddlenlp.generation import GenerationConfig
 from paddlenlp.transformers import BertConfig
 from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
 from paddlenlp.transformers.model_utils import PretrainedModel
-from paddlenlp.utils import CONFIG_NAME
+from paddlenlp.utils import CONFIG_NAME, GENERATION_CONFIG_NAME
 from paddlenlp.utils.env import LEGACY_CONFIG_NAME
 
 
@@ -193,6 +194,22 @@ class StandardConfigMappingTest(unittest.TestCase):
 
             loaded_config = FakeBertConfig.from_pretrained(tempdir)
             self.assertEqual(loaded_config.fake_field, config.hidden_size)
+
+    def test_generation_config(self):
+        bos_config = GenerationConfig.from_pretrained(
+            "baichuan-inc/Baichuan2-7B-Chat",
+        )
+        aistudio_config = GenerationConfig.from_pretrained("aistudio/Baichuan2-7B-Chat", from_aistudio=True)
+        self.assertEqual(bos_config.max_new_tokens, 2048)
+        self.assertEqual(bos_config, aistudio_config)
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            aistudio_config.save_pretrained(tempdir)
+
+            self.assertTrue(os.path.exists(os.path.join(tempdir, GENERATION_CONFIG_NAME)))
+
+            loaded_config = GenerationConfig.from_pretrained(tempdir)
+            self.assertEqual(loaded_config.max_new_tokens, 2048)
 
 
 class TestTensorParallelConveter(unittest.TestCase):

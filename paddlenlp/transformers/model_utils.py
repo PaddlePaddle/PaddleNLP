@@ -2206,6 +2206,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     cache_dir=cache_dir,
                     force_download=force_download,
                     subfolder=subfolder,
+                    from_aistudio=from_aistudio,
                     **kwargs,
                 )
             except OSError:
