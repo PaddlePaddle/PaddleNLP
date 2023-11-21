@@ -317,11 +317,13 @@ def do_train(args):
                     )
                 else:
                     train_avg_batch_cost = args.print_step / batch_cost_avg.get_total_time()
+                    max_mem_reserved = paddle.device.cuda.max_memory_reserved()
+                    max_mem_allocated = paddle.device.cuda.max_memory_allocated()
                     logger.info(
                         "step_idx: %d, epoch: %d, batch: %d, avg loss: %f, "
                         "normalized loss: %f, ppl: %f, avg_speed: %.2f step/s, "
                         "batch_cost: %.5f sec, reader_cost: %.5f sec, tokens: %d, "
-                        "ips: %.5f words/sec"
+                        "ips: %.5f words/sec, max_mem_reserved: %s B, max_mem_allocated: %s B"
                         % (
                             step_idx,
                             pass_id,
@@ -334,6 +336,8 @@ def do_train(args):
                             reader_cost_avg.get_average(),
                             batch_ips_avg.get_total_cnt(),
                             batch_ips_avg.get_average_per_sec(),
+                            max_mem_reserved,
+                            max_mem_allocated
                         )
                     )
                 reader_cost_avg.reset()

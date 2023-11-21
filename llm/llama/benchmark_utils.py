@@ -90,8 +90,11 @@ class BenchmarkCallback(TrainerCallback):
                 self.batch_start = self.batch_start + (time.time() - self.maybe_log_save_evaluate_start)
                 ips = logs["interval_steps_per_second"] * args.train_batch_size
                 avg_batch_cost = 1 / logs["interval_steps_per_second"]
+                max_mem_reserved = paddle.device.cuda.max_memory_reserved()
+                max_mem_allocated = paddle.device.cuda.max_memory_allocated()
                 logger.info(
-                    "global step %d / %d, loss: %f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sample/sec"
+                    "global step %d / %d, loss: %f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, "
+                    "avg_samples: %.5f, ips: %.5f sample/sec, max_mem_reserved: %s B, max_mem_allocated: %s B"
                     % (
                         state.global_step,
                         state.max_steps,
@@ -100,6 +103,8 @@ class BenchmarkCallback(TrainerCallback):
                         avg_batch_cost,
                         args.train_batch_size,
                         ips,
+                        max_mem_reserved,
+                        max_mem_allocated
                     )
                 )
                 self.reader_cost_avg.reset()
