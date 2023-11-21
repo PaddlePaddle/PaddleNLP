@@ -30,6 +30,7 @@ from paddlenlp.datasets import InTokensIterableDataset
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
 from paddlenlp.transformers import LlamaForCausalLMPipe
+from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -393,6 +394,7 @@ def dybatch_preprocess(
     temperature: float,
     pre_caches_length: int = 0,
     benchmark: bool = False,
+    chat_template: Optional[str] = None,
 ):
     """Pre-process generation inputs."""
     inputs = {}
@@ -401,7 +403,13 @@ def dybatch_preprocess(
         position_ids = []
 
         for text in texts:
-            tokens = tokenizer(text, return_tensors="np", padding=True, max_length=src_length)
+            tokens = tokenizer(
+                text,
+                return_tensors="np",
+                padding=True,
+                max_length=src_length,
+                add_special_tokens=chat_template is None,
+            )
             input_ids.append(tokens["input_ids"][0])
             position_ids.append(tokens["position_ids"][0])
 
@@ -585,3 +593,41 @@ def load_real_time_tokens():
     os.system("rm -f ./real_time_save.temp_ids_rank_*")
     tokens = np.concatenate(tokens, axis=1)
     return tokens
+
+
+def init_chat_template(
+    tokenizer: PretrainedTokenizer, model_name_or_path: str, chat_template_file: Optional[str] = None
+):
+    """init chat template for the given tokenizer.
+
+        If is None, it will not use `chat_template.json`;
+        If is equal with `model_name_or_path`, it will use the default loading;
+        If is directory, it will find the `chat_template.json` under the directory;
+        If is file, it will load it.
+
+    Args:
+        tokenizer (PretrainedTokenizer): the instance of tokenizer
+        model_name_or_path (str): _description_
+        chat_template_file (Optional[str], optional): _description_. Defaults to None.
+    """
+    if chat_template_file is None:
+        # delete the chat_template from tokenizer if not use chat_template.
+        # why do this: it will load the `chat_template.json` file by default
+        tokenizer.chat_template = None
+        return
+
+    # it will load the `chat_template.json` file by default, so do nothing
+    if chat_template_file == model_name_or_path:
+        if tokenizer.chat_template is None:
+            raise ValueError(f"there is not `chat_template.json` file in the `{model_name_or_path}`")
+        return
+
+    if os.path.isdir(chat_template_file):
+        local_chat_template_file_path = os.path.join(chat_template_file, "chat_template.json")
+        if os.path.exists(local_chat_template_file_path):
+            chat_template_file = local_chat_template_file_path
+        else:
+            raise ValueError(f"can not find `chat_template.json` file in the `{chat_template_file}`")
+
+    logger.info(f"loading `chat_template.json` from `{chat_template_file}`")
+    tokenizer.init_chat_template(chat_template_file)
