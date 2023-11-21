@@ -910,9 +910,11 @@ class Trainer:
                         logger.warning("found `no sync` param when `use_moe=False`")
                     fused_allreduce_gradients(nonmoe_list, hcg)
 
-                if tr_loss is None:
-                    tr_loss = map_structure(lambda x: paddle.zeros_like(x), tr_loss_step)
-                map_structure(lambda x, y: x.add_(y), tr_loss, tr_loss_step)
+                if tr_loss_step is not None:
+                    if tr_loss is None:
+                        tr_loss = map_structure(lambda x: paddle.zeros_like(x), tr_loss_step)
+                    map_structure(lambda x, y: x.add_(y), tr_loss, tr_loss_step)
+
                 if (step + 1) % args.gradient_accumulation_steps == 0:
                     if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
                         tr_loss /= self.args.gradient_accumulation_steps
@@ -1867,7 +1869,7 @@ class Trainer:
             self._pp_data_buffer = []
         self._pp_data_buffer.append(inputs)
         if len(self._pp_data_buffer) != self.args.gradient_accumulation_steps:
-            return paddle.zeros([1]), {}
+            return None, {}
 
         # for v in self._pp_data_buffer[0].values():
         #     assert isinstance(v, paddle.Tensor), f"Only support tensor as pipeline mode input, got type {type(v)}"
@@ -1899,35 +1901,32 @@ class Trainer:
 
         with self.autocast_smart_context_manager():
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
-
+        # pp does not support outputs
+        outputs = {}
         model.micro_batch_size, model.accumulate_steps = config_backup
         if not hasattr(model._layers._loss_fn, "info"):
-            return loss.detach(), {}
+            return loss.detach(), outputs
 
         if model.is_pipeline_last_stage():
             buf = [
                 map_structure(
                     lambda v: (v.item() if isinstance(v, paddle.Tensor) else v)
                     / self.args.gradient_accumulation_steps,
-                    model._layers._loss_fn.info,
+                    model._layers._loss_fn.info,  # info 中的内容不会被自动梯度累计。所以在 模型层面 用户需要自己进行累加，然后在此处平均。
                 )
             ]
         else:
             buf = [None]
         hcg = fleet.get_hybrid_communicate_group()
         dist.broadcast_object_list(buf, src=hcg._pp_comm_group.ranks[-1], group=hcg.get_pipe_parallel_group())
-        loss = buf[0]
+        losses = buf[0]
 
         # 当 pipenline 模型需要返回并打印多个 loss 时，需要在组网 `model._layers._loss_fn` 中插入 dict `info`.
         # `info` 中持有需要被打印的 name-tensor 对。
         model._layers._loss_fn.info = {}
-        assert isinstance(loss, dict), f"expect info to dict, got {type(loss)}"
-        loss = map_structure(lambda v: v.detach() if isinstance(v, paddle.Tensor) else v, loss)
-        if isinstance(loss, dict):
-            total_loss = loss["loss"]
-        else:
-            total_loss = loss
-        return total_loss, loss
+        assert isinstance(losses, dict), f"expect info to dict, got {type(losses)}"
+        losses = map_structure(lambda v: paddle.to_tensor(v), losses)
+        return losses, outputs
 
     def save_model(
         self,
