@@ -229,11 +229,16 @@ def unified_checkpoint_into_shards(
 
     # TODO: fix process_index
     shard_file = weights_name.replace(
-        ".pdparams", f"-{args.process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.pdparams"
+        ".pdparams",
+        f"-{args.logical_process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.pdparams",
     )
     shard_file = shard_file.replace(
-        ".safetensors", f"-{args.process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.safetensors"
+        ".safetensors",
+        f"-{args.logical_process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.safetensors",
     )
+    assert (
+        args.logical_process_index < args.world_size // args.dataset_world_size
+    ), f"Error, get unexcepted shard file name: {shard_file}"
 
     for key, weight in state_dict.items():
         index_weight_file[key] = shard_file
