@@ -28,6 +28,7 @@ from .modeling import (
     LlamaPretrainedModel,
     LlamaPretrainingCriterion,
     LlamaRMSNorm,
+    build_alibi_tensor,
 )
 
 
@@ -45,14 +46,18 @@ __all__ = [
 
 def parse_args(args):
     if isinstance(args, tuple):
+        if len(args) == 4:
+            hidden_states, attention_mask, position_ids, alibi = args
         if len(args) == 3:
             hidden_states, attention_mask, position_ids = args
+            alibi = None
         elif len(args) == 2:
             hidden_states, attention_mask = args
             position_ids = None
+            alibi = None
     else:
         hidden_states = args
-        attention_mask, position_ids = None, None
+        attention_mask, position_ids, alibi = None, None, None
 
     if position_ids is not None:
         position_ids.stop_gradient = True
@@ -60,16 +65,22 @@ def parse_args(args):
     if attention_mask is not None:
         attention_mask.stop_gradient = True
 
-    return hidden_states, attention_mask, position_ids
+    if alibi is not None:
+        alibi.stop_gradient = True
+
+    return hidden_states, attention_mask, position_ids, alibi
 
 
-def return_args(hidden_states, attention_mask=None, position_ids=None):
+def return_args(hidden_states, attention_mask=None, position_ids=None, alibi=None):
     ret = (hidden_states,)
 
     if attention_mask is not None:
         ret += (attention_mask.clone(),)
     if position_ids is not None:
         ret += (position_ids.clone(),)
+    if alibi is not None:
+        ret += (alibi.clone(),)
+
     if len(ret) == 1:
         ret = ret[0]
 
@@ -81,6 +92,7 @@ class LlamaEmbeddingPipe(nn.Layer):
 
     def __init__(self, config):
         super(LlamaEmbeddingPipe, self).__init__()
+        self.config = config
         self.sequence_parallel = config.sequence_parallel
         self.hidden_size = config.hidden_size
         if config.tensor_parallel_degree > 1:
@@ -101,7 +113,7 @@ class LlamaEmbeddingPipe(nn.Layer):
         Returns:
             _type_: _description_
         """
-        input_ids, attention_mask, position_ids = parse_args(args)
+        input_ids, attention_mask, position_ids, alibi = parse_args(args)
         input_embeds = self.embed_tokens(input_ids)
         if self.sequence_parallel:
             from paddlenlp.transformers import ScatterOp
@@ -113,32 +125,68 @@ class LlamaEmbeddingPipe(nn.Layer):
             input_embeds = ScatterOp.apply(input_embeds)
 
         batch_size, seq_length = input_ids.shape
+        alibi = None
+        if self.config.alibi:
+            # embed positions
+            mask = (
+                attention_mask
+                if attention_mask is not None
+                else paddle.ones((batch_size, seq_length), dtype=paddle.bool)
+            )
+            alibi = build_alibi_tensor(mask, self.config.num_attention_heads, dtype=input_embeds.dtype)
+
+            if self.config.tensor_parallel_degree > 1:
+                block_size = self.config.num_attention_heads // self.config.tensor_parallel_degree
+                alibi = alibi[
+                    :,
+                    self.config.tensor_parallel_rank
+                    * block_size : (self.config.tensor_parallel_rank + 1)
+                    * block_size,
+                ]
+                alibi = alibi.reshape([batch_size * block_size, 1, seq_length])
+            else:
+                alibi = alibi.reshape([batch_size * self.config.num_attention_heads, 1, seq_length])
+            alibi.stop_gradient = True
+
         if attention_mask is not None:
             attention_mask = LlamaModel._prepare_decoder_attention_mask(
                 attention_mask, (batch_size, seq_length), 0, input_embeds.dtype
             )
             attention_mask.stop_gradient = True
 
-        return return_args(input_embeds, attention_mask, position_ids)
+        if self.config.alibi and attention_mask is None:
+            attention_mask = LlamaModel._prepare_decoder_attention_mask(
+                None, (batch_size, seq_length), 0, input_embeds.dtype
+            )
+            attention_mask.stop_gradient = True
+
+        return return_args(input_embeds, attention_mask, position_ids, alibi)
 
 
 class LlamaDecoderLayerPipe(LlamaDecoderLayer):
     def forward(self, args):
-        hidden_states, attention_mask, position_ids = parse_args(args)
+        hidden_states, attention_mask, position_ids, alibi = parse_args(args)
+        # we can't distinguish
+        # hidden_states, attention_mask, position_ids or
+        # hidden_states, attention_mask, alibi
+        if self.config.alibi and alibi is None and position_ids is not None:
+            alibi = position_ids
+            position_ids = None
+
         has_gradient = not hidden_states.stop_gradient
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
             hidden_states = recompute(
-                super().forward, hidden_states, attention_mask=attention_mask, use_reentrant=False
+                super().forward, hidden_states, attention_mask=attention_mask, alibi=alibi, use_reentrant=False
             )
         else:
-            hidden_states = super().forward(hidden_states, attention_mask=attention_mask)
+            hidden_states = super().forward(hidden_states, attention_mask=attention_mask, alibi=alibi)
 
-        return return_args(hidden_states, attention_mask, position_ids)
+        return return_args(hidden_states, attention_mask, position_ids, alibi)
 
 
 class LlamaRMSNormPipe(LlamaRMSNorm):
     def forward(self, args):
-        hidden_states, attention_mask, position_ids = parse_args(args)
+        hidden_states, attention_mask, position_ids, alibi = parse_args(args)
         return super().forward(hidden_states)
 
 
