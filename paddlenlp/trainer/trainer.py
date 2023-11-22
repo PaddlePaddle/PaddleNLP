@@ -93,7 +93,6 @@ from ..utils.env import (
 )
 from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
-from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
 from .plugins.unified_checkpoint import (
     load_unified_checkpoint,
@@ -326,7 +325,7 @@ class Trainer:
                 model, PipelineLayer
             ), "Only support pipeline parallel mode when model is PipelineLayer!!!"
 
-        default_callbacks = DEFAULT_CALLBACKS + get_reporting_integration_callbacks(self.args.report_to)
+        default_callbacks = DEFAULT_CALLBACKS
         callbacks = default_callbacks if callbacks is None else default_callbacks + callbacks
         self.callback_handler = CallbackHandler(
             callbacks, self.model, self.tokenizer, self.optimizer, self.lr_scheduler
