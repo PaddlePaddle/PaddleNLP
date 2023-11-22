@@ -77,7 +77,7 @@ class QuantizationLinear(nn.Layer):
         # PaddlePaddle dosen't support 4bit data type, one 8bit data represents two 4bit data.
         # paddle.nn.quant.weight_quantize will transpose in_features and out_features.
         self.quant_weight = self.create_parameter(
-            shape=[out_features // 2, in_features] if self.quant_weight_bit == "4" else [out_features, in_features],
+            shape=[out_features // 2, in_features] if self.quant_weight_bit == 4 else [out_features, in_features],
             attr=weight_attr if weight_attr else paddle.nn.initializer.Constant(value=0),
             dtype=self.quant_weight_dtype,
             is_bias=False,
@@ -122,7 +122,7 @@ class QuantizationLinear(nn.Layer):
                 self.quant_scale = self.create_parameter(
                     shape=[in_features * out_features // self.block_size],
                     attr=quant_scale_attr if quant_scale_attr else paddle.nn.initializer.Constant(value=0),
-                    dtype="uint8",
+                    dtype="float32",
                     is_bias=False,
                 )
 

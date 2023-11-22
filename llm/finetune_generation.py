@@ -135,7 +135,7 @@ def main():
             tensor_parallel_rank=training_args.tensor_parallel_rank,
             dtype=dtype,
             from_aistudio=model_args.from_aistudio,
-            # quantization_config=quantization_config
+            quantization_config=quantization_config,
         )
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention

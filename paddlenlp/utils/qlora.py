@@ -18,7 +18,7 @@ from paddleslim_ops import dequant_blockwise, quant_blockwise
 
 
 def qlora_weight_quantize(
-    weight, quant_type, double_quant=False, block_size=64, double_quant_block_size=256, linear_name=None
+    weight, quant_type="nf4", double_quant=False, block_size=64, double_quant_block_size=256, linear_name=None
 ):
     quant_weight, quant_scale = quant_blockwise(weight, None, blocksize=block_size, quant_type=quant_type)
     if double_quant:
@@ -39,7 +39,8 @@ def qlora_weight_quantize(
         quant_scale_name = f"{linear_name}.quant_scale" if linear_name else "quant_scale"
         qlora_state_dict = {quant_scale_name: quant_scale}
     quant_weight_name = f"{linear_name}.quant_weight" if linear_name else "quant_weight"
-    qlora_state_dict[quant_weight_name] = quant_weight
+    if quant_type in ["nf4", "fp4"]:
+        qlora_state_dict[quant_weight_name] = quant_weight.reshape([weight.shape[1] // 2, weight.shape[0]])
     return qlora_state_dict
 
 
