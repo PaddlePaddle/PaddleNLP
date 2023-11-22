@@ -376,9 +376,6 @@ class Trainer:
                         )
 
                         if self.args.amp_master_grad:
-                            assert (
-                                ShardingOption.SHARD_GRAD_OP in self.args.sharding
-                            ), "Main grad doesn't support sharding stage 3 for now."
                             mix_precision_utils.MixPrecisionScaler(self.scaler)  # return value has no use
 
                         self.scaler = GroupShardedScaler(self.scaler)
@@ -877,6 +874,13 @@ class Trainer:
                 # sharding
                 # stage1. the same as ddp
                 # stage2. manualy collect gradient on dp group
+
+                dp_master_grad = (
+                    self.args.world_size > 1 and self.args.amp_master_grad and not self.args.use_hybrid_parallel
+                )
+                if dp_master_grad:
+                    is_no_sync = True
+
                 if is_no_sync:
                     # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
                     with model.no_sync():
@@ -931,6 +935,9 @@ class Trainer:
                                 fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
+
+                    if dp_master_grad and not (args.recompute and availiable_no_sync):
+                        fused_allreduce_gradients(list(model.parameters()), None)
 
                     # pipeline parallel mode,  handle gradient merge here
                     if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
@@ -1600,14 +1607,25 @@ class Trainer:
             else:
                 model, self.optimizer = decorated
 
+        if self.args.world_size == 1:
+            if self.args.amp_master_grad:
+                mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
+                assert self.optimizer is not None, "optimizer is empty!"
+                self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
+
         # Multi-gpu training
         if self.args.world_size > 1 and not self.args.use_hybrid_parallel:
             model = paddle.DataParallel(model)
             # Distributed training (should be after fp16 initialization)
 
+            if self.args.amp_master_grad:
+                mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
+                assert self.optimizer is not None, "optimizer is empty!"
+                self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
+
         in_pipeline_parallel_mode = self.args.pipeline_parallel_degree > 1
         in_sharding_parallel_mode = self.sharding is not None
-        in_tensor_parallel_model = self.args.tensor_parallel_degree > 1
+        in_tensor_parallel_mode = self.args.tensor_parallel_degree > 1
 
         # Pipeline mode
         if in_pipeline_parallel_mode:
@@ -1703,10 +1721,9 @@ class Trainer:
                     extra_kwargs["exclude_layer"] = ["GroupNorm"]
 
                 if self.args.amp_master_grad:
-                    assert level == "os_g", "Main grad doesn't support sharding stage 3 for now."
                     assert (
                         self.args.data_parallel_degree == 1
-                    ), "Sharding stage 2 main grad is not compatible with dp for now."
+                    ), "Sharding stage 2 / Sharding stage 3 main grad is not compatible with dp for now."
                     mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
                     self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
 
@@ -1719,7 +1736,7 @@ class Trainer:
                     offload=cpu_offload,
                     **extra_kwargs,
                 )
-                if self.args.amp_master_grad:
+                if ShardingOption.SHARD_GRAD_OP in self.args.sharding and self.args.amp_master_grad:
                     assert hasattr(optimizer, "use_main_grad"), (
                         "Current installed paddle doesn't support sharding stage 2 with main grad, "
                         "please upgrade your paddle (using nightly version)."
@@ -1733,7 +1750,7 @@ class Trainer:
                 self.optimizer = optimizer
 
         # pure tesnor parallel mode, no pipeline_parallel, no sharding.
-        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and in_tensor_parallel_model:
+        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and in_tensor_parallel_mode:
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
 
