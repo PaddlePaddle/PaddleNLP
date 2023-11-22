@@ -113,7 +113,7 @@ def remove_ckpt(ckpt_dir):
 # [x] 单机，dp8
 
 
-class TestModelOnN2C4(TestMultipleGpus):
+class TestModelOnN1C8(TestMultipleGpus):
     def setUp(self):
         os.environ.update(environment_variables)
 
