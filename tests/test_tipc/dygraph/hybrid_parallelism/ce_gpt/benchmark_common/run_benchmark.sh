@@ -33,7 +33,7 @@ function _set_params(){
     keyword="ips:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
     max_iter=${10:-500}                      # （可选）需保证模型执行时间在5分钟内，需要修改代码提前中断的直接提PR 合入套件；或使用max_epoch参数
-    use_sharding=${11:-""}             
+    use_sharding=${11:-"False"}             
     sharding_degree=${12:-"1"}
     num_workers=0                  # (可选)
     base_batch_size=$global_batch_size
@@ -81,6 +81,14 @@ function _train(){
     else
         bf16=False
     fi
+   
+    if [ "False" = ${use_sharding} ]; then
+        sharding=""
+        sharding_parallel_degree=""
+    else
+        sharding="--sharding ${use_sharding}"
+        sharding_parallel_degree="--sharding_parallel_degree ${sharding_degree}"
+    fi
 
     model_config="gpt2-medium-en"
     train_cmd="--model_type gpt \
@@ -88,8 +96,8 @@ function _train(){
                 --tokenizer_name_or_path ${model_config} \
                 --input_dir ./data\
                 --output_dir output\
-                --sharding ${use_sharding} \
-                --sharding_parallel_degree ${sharding_degree} \
+                ${sharding} \
+                ${sharding_parallel_degree} \
                 --split 949,50,1 \
                 --max_seq_length 1024 \
                 --seed 1234 \
