@@ -31,7 +31,12 @@ from paddle.distributed.fleet.meta_parallel import (
 )
 
 from ...transformers.conversion_utils import ConversionMixin
-from ...transformers.model_utils import PretrainedModel, _add_variant, dtype_guard
+from ...transformers.model_utils import (
+    PipelinePretrainedModel,
+    PretrainedModel,
+    _add_variant,
+    dtype_guard,
+)
 from ...transformers.utils import weight_name_suffix
 from ...utils.distributed import distributed_gather
 from ...utils.env import LORA_WEIGHTS_NAME
@@ -85,7 +90,7 @@ class LoRAModel(nn.Layer):
             self.lora_config.dtype = paddle.get_default_dtype()
         with dtype_guard(self.lora_config.dtype):
             self.model = self.get_lora_model(model, lora_config)
-        if isinstance(self.model, PipelineLayer):
+        if isinstance(self.model, PipelinePretrainedModel):
             self.model._single_to_pp_mapping = None
         if self.lora_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
             self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
@@ -191,7 +196,7 @@ class LoRAModel(nn.Layer):
                 ret = distributed_gather(tensor, group=mp_group, offload=True)
                 action = trainable_name_action_mappings[key]
                 is_collumn = self.lora_split_mapping[key]
-                if '_scale' in key and not is_collumn and is_dst:
+                if "_scale" in key and not is_collumn and is_dst:
                     ret = paddle.to_tensor(ret)
                     tensor = paddle.max(ret, axis=0)
                 else:
@@ -219,6 +224,8 @@ class LoRAModel(nn.Layer):
         return lora_state_dict
 
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
+        if isinstance(self.model, PipelinePretrainedModel):
+            self.model._single_to_pp_mapping = None
         if self.quantized and merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
             merge_tensor_parallel = False
             logger.warning(
