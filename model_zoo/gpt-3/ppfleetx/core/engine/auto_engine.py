@@ -81,9 +81,10 @@ class AutoEngine(BasicEngine):
 
         # Distributed
         self._pp_degree = configs["Distributed"]["pp_degree"]
-        self._job_schedule_profiler_start = int(configs["Distributed"]["pipeline"]["job_schedule_profiler_start"])
-        self._job_schedule_profiler_end = int(configs["Distributed"]["pipeline"]["job_schedule_profiler_end"])
-
+        pipeline_cfg = configs.Distributed.get("pipeline", {})
+        self._job_schedule_profiler_start = pipeline_cfg.get("job_schedule_profiler_start", -1)
+        self._job_schedule_profiler_end = pipeline_cfg.get("job_schedule_profiler_end", -1)
+        
         # engine configs
         self._configs = configs["Engine"]
 
