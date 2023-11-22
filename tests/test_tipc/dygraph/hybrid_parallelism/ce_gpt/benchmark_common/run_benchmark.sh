@@ -33,11 +33,13 @@ function _set_params(){
     keyword="ips:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
     max_iter=${10:-500}                      # （可选）需保证模型执行时间在5分钟内，需要修改代码提前中断的直接提PR 合入套件；或使用max_epoch参数
+    use_sharding=${11:-""}             
+    sharding_degree=${12:-"1"}
     num_workers=0                  # (可选)
     base_batch_size=$global_batch_size
-    virtual_pp_degree=${11:-"2"}  # (可选) virtualpp数据并行度
-    use_recompute=${12:-"True"}    # (可选)是否打开recompute
-    eval_freq=${13:-"25"}         # (可选)模型评估间隔
+    virtual_pp_degree=${13:-"2"}  # (可选) virtualpp数据并行度
+    use_recompute=${14:-"True"}    # (可选)是否打开recompute
+    eval_freq=${15:-"25"}         # (可选)模型评估间隔
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -86,6 +88,8 @@ function _train(){
                 --tokenizer_name_or_path ${model_config} \
                 --input_dir ./data\
                 --output_dir output\
+                --sharding ${use_sharding} \
+                --sharding_parallel_degree ${sharding_degree} \
                 --split 949,50,1 \
                 --max_seq_length 1024 \
                 --seed 1234 \
@@ -122,7 +126,12 @@ function _train(){
     fi
     # 以下为通用执行命令，无特殊可不用修改
     case ${run_mode} in
-    DP8-MP1-PP1) echo "run run_mode: ${run_mode}"
+    DP1-MP1-PP1) echo "run run_mode: ${run_mode}"
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0 ${PADDLE_RANK_OPTION}\
+            run_pretrain.py ${train_cmd}"
+        workerlog_id=0
+        ;;
+    DP8-MP1-PP1|DP1-MP1-PP1-sharding8) echo "run run_mode: ${run_mode}"
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
             run_pretrain.py ${train_cmd}"
         workerlog_id=0
