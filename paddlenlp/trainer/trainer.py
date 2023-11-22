@@ -376,9 +376,6 @@ class Trainer:
                         )
 
                         if self.args.amp_master_grad:
-                            assert (
-                                ShardingOption.SHARD_GRAD_OP in self.args.sharding
-                            ), "Main grad doesn't support sharding stage 3 for now."
                             mix_precision_utils.MixPrecisionScaler(self.scaler)  # return value has no use
 
                         self.scaler = GroupShardedScaler(self.scaler)
@@ -1724,10 +1721,9 @@ class Trainer:
                     extra_kwargs["exclude_layer"] = ["GroupNorm"]
 
                 if self.args.amp_master_grad:
-                    assert level == "os_g", "Main grad doesn't support sharding stage 3 for now."
                     assert (
                         self.args.data_parallel_degree == 1
-                    ), "Sharding stage 2 main grad is not compatible with dp for now."
+                    ), "Sharding stage 2 / Sharding stage 3 main grad is not compatible with dp for now."
                     mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
                     self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
 
@@ -1740,7 +1736,7 @@ class Trainer:
                     offload=cpu_offload,
                     **extra_kwargs,
                 )
-                if self.args.amp_master_grad:
+                if ShardingOption.SHARD_GRAD_OP in self.args.sharding and self.args.amp_master_grad:
                     assert hasattr(optimizer, "use_main_grad"), (
                         "Current installed paddle doesn't support sharding stage 2 with main grad, "
                         "please upgrade your paddle (using nightly version)."
