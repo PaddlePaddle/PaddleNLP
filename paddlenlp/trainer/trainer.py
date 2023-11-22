@@ -922,7 +922,7 @@ class Trainer:
                     if dp_master_grad and not (args.recompute and availiable_no_sync):
                         fused_allreduce_gradients(list(model.parameters()), None)
 
-                    # Pipeline parallel mode,  handle gradient merge here
+                    # Pipeline parallel mode,  handle gradient reduce here to overlap
                     pipeline_parallel_config = (
                         set(args.pipeline_parallel_config.split(" ")) if args.pipeline_parallel_degree > 1 else set()
                     )
