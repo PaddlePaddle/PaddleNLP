@@ -918,7 +918,8 @@ class Trainer:
                     # manualy collect gradient for dp.
                     elif args.recompute and availiable_no_sync:
                         fused_allreduce_gradients(list(model.parameters()), None)
-                        
+
+                    # Case 3: hack dp with master_grad
                     if dp_master_grad and not (args.recompute and availiable_no_sync):
                         fused_allreduce_gradients(list(model.parameters()), None)
 
