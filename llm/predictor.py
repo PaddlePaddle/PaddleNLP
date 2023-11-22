@@ -377,6 +377,9 @@ class InferencePredictorMixin:
             decoded_predictions = self.tokenizer.batch_decode(
                 tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
             )
+
+            print("tokens", tokens.shape)
+            print("tokens", tokens)
             return decoded_predictions
         else:
             return None
@@ -606,6 +609,8 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
 
     @paddle.no_grad()
     def _infer(self, inputs):
+        print(inputs["input_ids"])
+        print(inputs["input_ids"].shape)
         for k, v in inputs.items():
             input_tensor = self.predictor.get_input_handle(k)
 
@@ -621,8 +626,11 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
             input_tensor.share_external_data(self.cache_kvs[i])
         input_tensor = self.predictor.get_input_handle("pre_ids")
         input_tensor.share_external_data(self.pre_ids)
-
-        self.predictor.run()
+        for i in range(10):
+            start = time.perf_counter()
+            self.predictor.run()
+            hf_cost = (time.perf_counter() - start) * 1000
+            print("Speed Paddle:", hf_cost)
 
 
 class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
@@ -650,6 +658,7 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
                 inputs[key] = paddle.to_tensor(inputs[key])
 
         inputs["cache_kvs"] = self.cache_kvs
+
         self.model.generate(
             **inputs,
         )
@@ -877,7 +886,10 @@ def predict():
                 source_texts.append(example["src"])
                 target_texts.append(example["tgt"])
     else:
-        source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
+        source_texts = [
+            "user:请判断下面的问题是否需要执行动作并获得额外信息才能回答，如果是则生成你的思考和动作序列。\n开车去北京\n\nassistant:\n``` 上文出现过的POI \n{}\n```\n``` 上文出现过的路线 \n{}\n```\n"
+        ]
+
         target_texts = ["", ""]
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)

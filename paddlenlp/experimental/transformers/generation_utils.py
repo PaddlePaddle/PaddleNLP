@@ -29,7 +29,7 @@ from paddlenlp_ops import (
 from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList
 
 try:
-    from paddle import top_p_sampling
+    from paddle.tensor import top_p_sampling
 except:
     from paddlenlp_ops import top_p_sampling
 
@@ -353,7 +353,7 @@ class GenerationInferenceModel(GenerationMixin):
             # compute next_tokens, use paddle.top_p_sampling
             logits = logits / temperature
 
-            _, next_tokens = top_p_sampling(probs, top_p, -1)
+            _, next_tokens = top_p_sampling(probs, top_p)
 
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
