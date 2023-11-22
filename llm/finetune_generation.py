@@ -46,7 +46,6 @@ from paddlenlp.transformers import (
     LlamaTokenizer,
 )
 from paddlenlp.utils.log import logger
-from paddlenlp.utils.quantization_config import QuantizationConfig
 
 
 def read_local_dataset(path):
@@ -106,7 +105,7 @@ def main():
             raise ValueError("Please specific dtype: --fp16 or --bf16")
     else:
         dtype = "float32"
-    quantization_config = QuantizationConfig(
+    quantization_config = dict(
         weight_quantize_algo=model_args.weight_quantize_algo,
         weight_blocksize=model_args.weight_blocksize,
         weight_double_quant=model_args.weight_double_quant,

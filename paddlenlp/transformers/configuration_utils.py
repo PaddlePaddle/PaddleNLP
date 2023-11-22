@@ -835,6 +835,10 @@ class PretrainedConfig:
                 )
         to_remove = []
         for key, value in kwargs.items():
+            if key == "quantization_config" and isinstance(value, Dict):
+                for q_key in value:
+                    setattr(config.quantization_config, q_key, value[q_key])
+                continue
             if hasattr(config, key):
                 setattr(config, key, value)
                 if key != "dtype":
