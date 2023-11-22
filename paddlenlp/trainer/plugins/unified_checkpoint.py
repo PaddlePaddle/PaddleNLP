@@ -331,6 +331,7 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
         optimizer_path=resume_from_checkpoint,
         index_filename=os.path.join(resume_from_checkpoint, index_filename),
     )
+    has_master_weights = True if sharded_metadata["master_weights"] else False
 
     model_state_dict = model.state_dict()
     model_keys = list(model_state_dict.keys())
@@ -355,7 +356,7 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
     if len(resolved_archive_file) > 1:
         resolved_archive_file = tqdm(resolved_archive_file, desc="Loading optimizer shards")
 
-    if sharded_metadata["master_weights"]:
+    if has_master_weights:
         returned_optim_state_dict["master_weights"] = {}
 
         resolved_archive_file_mw, sharded_metadata_mw = get_optimizer_shard_files(
@@ -397,8 +398,8 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
                 pre_tensor_parallel_split = True
                 assert loaded_keys is not None, "loaded_keys is not None."
                 tp_actions = model.get_tensor_parallel_convert_actions(model.config, model_keys, ignore_error=True)
-                # if not is_master_weight: # TODO
-                #     tp_actions = mapping_optimizer_tp_actions(tp_actions, loaded_keys)
+                if not is_master_weight:
+                    tp_actions = mapping_optimizer_tp_actions(tp_actions, loaded_keys)
 
             # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
             state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys)
@@ -414,7 +415,7 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
         return returned_state_dict
 
     state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, loaded_keys, expected_keys)
-    if sharded_metadata["master_weights"]:
+    if has_master_weights:
         state_dict_master_weight = load_resolved_archive_file(
             resolved_archive_file_mw, sharded_metadata_mw, loaded_keys_mw, expected_keys_mw, is_master_weight=True
         )
@@ -422,14 +423,14 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
     # rename optimizer param
     for key in list(state_dict_optim.keys()):
         key_name = key.split("/")
-        if sharded_metadata["master_weights"]:
+        if has_master_weights:
             key_name = struct2static_name_mappings[key_name[0]] + "_fp32_master_0_" + key_name[1]
         else:
             key_name = struct2static_name_mappings[key_name[0]] + key_name[1]
         returned_optim_state_dict[key_name] = state_dict_optim[key]
         returned_optim_state_dict[key_name].name = key_name
 
-    if sharded_metadata["master_weights"]:
+    if has_master_weights:
         for key in list(state_dict_master_weight.keys()):
             static_name = struct2static_name_mappings[key]
             returned_optim_state_dict["master_weights"][static_name] = state_dict_master_weight[key]
@@ -736,6 +737,7 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
 
 def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys):
     logger.info("Unified optimizer tensor parallel in shards")
+
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
     tp_rank = tp_group.rank
@@ -767,6 +769,25 @@ def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys)
                 state_dict_to_save[filter_keys[i]] = tensor
 
     return state_dict_to_save
+
+
+def mapping_optimizer_tp_actions(tp_actions, optimizer_loaded_keys):
+    """# conert param.name to
+    param.key/moment1_0
+    or param.key/beta1_XXX
+    or param.key/beta2_XXX
+    Args:
+        tp_actions (dict): dictionay of tensor parallel actions {key: action}
+        optimizer_loaded_keys (list or set): [param.key1/moment1_0, param.key2/beta1_XXX, param.key3/beta2_XXX]
+    Returns:
+        dict: new dictionay of tensor parallel actions {key: action}
+    """
+    new_actions = {}
+    for key in optimizer_loaded_keys:
+        key_base = key.split("/")[0]
+        if "moment" in key.split("/")[1] and key_base in tp_actions:
+            new_actions[key] = tp_actions[key_base]
+    return new_actions
 
 
 def nested_copy(inputs):
