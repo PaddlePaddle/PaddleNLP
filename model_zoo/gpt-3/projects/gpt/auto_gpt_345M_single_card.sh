@@ -15,7 +15,7 @@
 # limitations under the License.
 
 export FLAGS_new_executor_micro_batching=True
-export FLAGS_enable_new_ir_in_executor=1
+export FLAGS_enable_pir_in_executor=1
 export FLAGS_enable_prim_in_distribute=True
 
 log_dir=log_newir
