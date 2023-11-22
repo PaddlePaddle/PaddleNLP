@@ -500,9 +500,11 @@ def main():
     def loss_func(loss, outputs):
         return loss
 
-    total_train_batch_size = training_args.per_device_train_batch_size \
-                             * training_args.gradient_accumulation_steps \
-                             * training_args.data_parallel_degree
+    total_train_batch_size = (
+        training_args.per_device_train_batch_size
+        * training_args.gradient_accumulation_steps
+        * training_args.data_parallel_degree
+    )
     print_config(training_args)
 
     engine = auto.Engine(model, loss_func, optimizer, strategy=training_args.strategy)
@@ -538,8 +540,19 @@ def main():
     global_step_last_logged = 0
     start_time_last_logged = time.time()
     tr_loss = float(0)
+
+    job_schedule_profiler_start = training_args.job_schedule_profiler_start
+    job_schedule_profiler_end = training_args.job_schedule_profiler_end
+
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
+            if (step == job_schedule_profiler_start) and training_args.use_auto_parallel:
+                engine.enable_job_schedule_profiler = True
+
+            if (step == job_schedule_profiler_end) and training_args.use_auto_parallel:
+                engine.enable_job_schedule_profiler = False
+                sys.exit()
+
             outs = engine.run(inputs, mode="train")
 
             if "loss" in outs:
