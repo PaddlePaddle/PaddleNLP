@@ -211,14 +211,14 @@ def create_pretrained_dataset(
 
     train_val_test_num_samples = [
         training_args.per_device_train_batch_size
-        * training_args.dataset_world_size
+        * training_args.data_parallel_degree
         * training_args.max_steps
         * training_args.gradient_accumulation_steps,
         training_args.per_device_eval_batch_size
-        * training_args.dataset_world_size
+        * training_args.data_parallel_degree
         * training_args.eval_iters
         * (training_args.max_steps // training_args.eval_steps + 1),
-        training_args.per_device_eval_batch_size * training_args.dataset_world_size * training_args.test_iters,
+        training_args.per_device_eval_batch_size * training_args.data_parallel_degree * training_args.test_iters,
     ]
 
     print_rank_0(" > datasets target sizes (minimum size):")
@@ -297,16 +297,6 @@ def get_train_data_file(args):
             return ret
 
     return files
-
-
-def set_seed(args):
-    if args.device == "cpu":
-        idx = 0
-    else:
-        idx = paddle.distributed.get_rank()
-    random.seed(args.seed + idx)
-    np.random.seed(args.seed + idx)
-    paddle.seed(args.seed + idx)
 
 
 def create_optimizer(model, lr_scheduler, training_args):
@@ -400,7 +390,7 @@ def main():
     if data_args.data_cache is not None:
         os.makedirs(data_args.data_cache, exist_ok=True)
 
-    set_seed(training_args)
+    init_seed(args=training_args)
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
@@ -510,24 +500,27 @@ def main():
     def loss_func(loss, outputs):
         return loss
 
-    init_seed(args=training_args)
-    global_batch_size = training_args.per_device_train_batch_size * training_args.dataset_world_size
+    total_train_batch_size = training_args.per_device_train_batch_size \
+                             * training_args.gradient_accumulation_steps \
+                             * training_args.data_parallel_degree
     print_config(training_args)
 
     engine = auto.Engine(model, loss_func, optimizer, strategy=training_args.strategy)
     engine.prepare(
         [
             paddle.static.InputSpec(
-                shape=[global_batch_size, data_args.max_seq_length], dtype="int64", name="input_ids"
+                shape=[total_train_batch_size, data_args.max_seq_length], dtype="int64", name="input_ids"
             ),
-            paddle.static.InputSpec(shape=[global_batch_size, data_args.max_seq_length], dtype="int64", name="labels"),
+            paddle.static.InputSpec(
+                shape=[total_train_batch_size, data_args.max_seq_length], dtype="int64", name="labels"
+            ),
         ],
         mode="train",
     )
 
     train_dataloader = engine.dataloader(
         dataset=train_dataset,
-        batch_size=global_batch_size,
+        batch_size=total_train_batch_size,
         steps_per_epoch=training_args.max_steps,
         epochs=training_args.num_train_epochs,
         collate_fn=data_collator,
@@ -539,9 +532,6 @@ def main():
     num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
     num_train_epochs = training_args.max_steps // num_update_steps_per_epoch + int(
         training_args.max_steps % num_update_steps_per_epoch > 0
-    )
-    total_train_batch_size = (
-        training_args.train_batch_size * training_args.gradient_accumulation_steps * training_args.dataset_world_size
     )
 
     global_step = 0
