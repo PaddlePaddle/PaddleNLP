@@ -94,19 +94,22 @@ def launch(args):
             "max_length": max_length,
             "min_length": 1,
         }
-        res = requests.post(f"http://0.0.0.0:{args.flask_port}/api/chat", json=data, stream=True)
+        res = requests.post(f"http://0.0.0.0:{args.base_port}/api/chat", json=data, stream=True)
         for line in res.iter_lines():
             result = json.loads(line)
             bot_response = result["result"]["response"]
 
             # replace \n with br: https://github.com/gradio-app/gradio/issues/4344
             bot_response["utterance"] = bot_response["utterance"].replace("\n", "<br>")
+            # delete <s> : llama use <s> as bos token
+            bot_response["utterance"] = bot_response["utterance"].replace("<s>", "")
 
             if bot_response["utterance"].endswith("[END]"):
                 bot_response["utterance"] = bot_response["utterance"][:-5]
 
             context[-1]["utterance"] += bot_response["utterance"]
             shown_context = get_shown_context(context)
+            print(shown_context)
 
             yield None, shown_context, context, state
 
