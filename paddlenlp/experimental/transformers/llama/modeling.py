@@ -13,9 +13,6 @@
 # limitations under the License.
 from __future__ import annotations
 
-import json
-import os
-
 import numpy as np
 import paddle
 from paddle import nn
@@ -23,7 +20,6 @@ from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
 from paddlenlp_ops import fused_get_rotary_embedding, get_padding_offset
 
-from paddlenlp.experimental.model_utils import ActScalesLoader, WeightScalesLoader
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformerA8W8,
     FusedMultiTransformerBase,
@@ -85,6 +81,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.num_layers = config.num_hidden_layers
         self.epsilon = config.rms_norm_eps
         self.max_position_embeddings = config.max_position_embeddings
+        self.num_key_value_heads = config.num_key_value_heads
         self.quant_type = config.quant_type
 
         self.use_weight_only = False
@@ -135,15 +132,21 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             )
             for i in range(self.num_layers)
         ]
+        qkv_bias_attrs = [paddle.ParamAttr(name="fusellama.{}.qkv_bias".format(i)) for i in range(self.num_layers)]
         out_proj_weight_attrs = [
             paddle.ParamAttr(
                 name="fusellama.{}.out_proj_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
             )
             for i in range(self.num_layers)
         ]
+        out_proj_bias_attrs = [
+            paddle.ParamAttr(name="fusellama.{}.out_proj_bias".format(i)) for i in range(self.num_layers)
+        ]
         ffn_ln_scale_attrs = [
             paddle.ParamAttr(name="fusellama.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
         ]
+        ffn1_bias_attrs = [paddle.ParamAttr(name="fusellama.{}.ffn1_bias".format(i)) for i in range(self.num_layers)]
+        ffn2_bias_attrs = [paddle.ParamAttr(name="fusellama.{}.ffn2_bias".format(i)) for i in range(self.num_layers)]
         ffn1_weight_attrs = [
             paddle.ParamAttr(
                 name="fusellama.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
@@ -156,72 +159,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             )
             for i in range(self.num_layers)
         ]
-
-        qkv_out_scale_attrs = None
-        linear_out_scale_attrs = None
-        ffn1_out_scale_attrs = None
-        ffn2_out_scale_attrs = None
-        linear_shift_attrs = None
-        linear_smooth_attrs = None
-        ffn2_shift_attrs = None
-        ffn2_smooth_attrs = None
-        ln_bias_attrs = None
-        qkv_bias_attrs = None
-        out_proj_bias_attrs = None
-        ffn_ln_bias_attrs = None
-        ffn1_bias_attrs = None
-        ffn2_bias_attrs = None
-
-        if self.quant_type == "a8w8":
-            self.quant_round_type = config.quantization_config.quant_round_type
-
-            qkv_out_scale_attrs = [
-                paddle.ParamAttr(name="fusellama.{}.qkv_out_scale".format(i)) for i in range(self.num_layers)
-            ]
-            linear_out_scale_attrs = [
-                paddle.ParamAttr(name="fusellama.{}.linear_out_scale".format(i)) for i in range(self.num_layers)
-            ]
-            ffn1_out_scale_attrs = [
-                paddle.ParamAttr(name="fusellama.{}.ffn1_out_scale".format(i)) for i in range(self.num_layers)
-            ]
-            ffn2_out_scale_attrs = [
-                paddle.ParamAttr(name="fusellama.{}.ffn2_out_scale".format(i)) for i in range(self.num_layers)
-            ]
-
-            if self.shift_smooth_all_linears:
-                linear_shift_attrs = [
-                    paddle.ParamAttr(name="fusellama.{}.linear_shift".format(i)) for i in range(self.num_layers)
-                ]
-                linear_smooth_attrs = [
-                    paddle.ParamAttr(name="fusellama.{}.linear_smooth".format(i)) for i in range(self.num_layers)
-                ]
-                ffn2_shift_attrs = [
-                    paddle.ParamAttr(name="fusellama.{}.ffn2_shift".format(i)) for i in range(self.num_layers)
-                ]
-                ffn2_smooth_attrs = [
-                    paddle.ParamAttr(name="fusellama.{}.ffn2_smooth".format(i)) for i in range(self.num_layers)
-                ]
-
-            if self.shift:
-                ln_bias_attrs = [
-                    paddle.ParamAttr(name="fusellama.{}.ln_bias".format(i)) for i in range(self.num_layers)
-                ]
-                ffn_ln_bias_attrs = [
-                    paddle.ParamAttr(name="fusellama.{}.ffn_ln_bias".format(i)) for i in range(self.num_layers)
-                ]
-                qkv_bias_attrs = [
-                    paddle.ParamAttr(name="fusellama.{}.qkv_bias".format(i)) for i in range(self.num_layers)
-                ]
-                ffn1_bias_attrs = [
-                    paddle.ParamAttr(name="fusellama.{}.ffn1_bias".format(i)) for i in range(self.num_layers)
-                ]
-                if self.shift_smooth_all_linears:
-                    out_proj_bias_attrs = [
-                        paddle.ParamAttr(name="fusellama.{}.out_proj_bias".format(i)) for i in range(self.num_layers)
-                    ]
-                    ffn2_bias_attrs = [
-                        paddle.ParamAttr(name="fusellama.{}.ffn2_bias".format(i)) for i in range(self.num_layers)
-                    ]
 
         qkv_weight_scale_attrs = None
         out_proj_weight_scale_attrs = None
@@ -253,6 +190,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
+            qkv_bias_attrs=qkv_bias_attrs,
             qkv_weight_scale_attrs=qkv_weight_scale_attrs,
             linear_weight_attrs=out_proj_weight_attrs,
             linear_weight_scale_attrs=out_proj_weight_scale_attrs,
@@ -261,23 +199,13 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             ffn1_weight_scale_attrs=ffn1_weight_scale_attrs,
             ffn2_weight_attrs=ffn2_weight_attrs,
             ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
-            qkv_out_scale_attrs=qkv_out_scale_attrs,
-            linear_out_scale_attrs=linear_out_scale_attrs,
-            ffn1_out_scale_attrs=ffn1_out_scale_attrs,
-            ffn2_out_scale_attrs=ffn2_out_scale_attrs,
-            linear_shift_attrs=linear_shift_attrs,
-            linear_smooth_attrs=linear_smooth_attrs,
-            ffn2_shift_attrs=ffn2_shift_attrs,
-            ffn2_smooth_attrs=ffn2_smooth_attrs,
-            ln_bias_attrs=ln_bias_attrs,
-            qkv_bias_attrs=qkv_bias_attrs,
             linear_bias_attrs=out_proj_bias_attrs,
-            ffn_ln_bias_attrs=ffn_ln_bias_attrs,
             ffn1_bias_attrs=ffn1_bias_attrs,
             ffn2_bias_attrs=ffn2_bias_attrs,
             epsilon=self.epsilon,
             norm_type="rmsnorm",
             use_neox_rotary_style=True,
+            kv_num_heads=self.num_key_value_heads,
         )
 
         if self.use_weight_only:
@@ -407,6 +335,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 rotary_emb_dims=1,
                 time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
             )
+        print("hidden_states -- ", hidden_states)
         hidden_states = self.norm(hidden_states)
 
         if output_hidden_states:
@@ -425,7 +354,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         unfused_state_dict = {}
-        head_size = self.hidden_size // self.num_attention_heads
+        dtype = paddle.get_default_dtype()
+
+        for k, v in state_dict.items():
+            state_dict[k] = v.cast(dtype)
 
         self.embed_tokens.weight.set_value(paddle.to_tensor(state_dict["llama.embed_tokens.weight"]))
         self.norm.weight.set_value(paddle.to_tensor(state_dict["llama.norm.weight"], dtype=self.norm.weight.dtype))
@@ -442,31 +374,81 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 "llama.layers.{}.self_attn.v_proj.weight".format(idx)
             ]
 
-            concated_qkv_weight = (
-                np.concatenate(
-                    [
-                        unfused_state_dict["self_attn.q_proj.weight"],
-                        unfused_state_dict["self_attn.k_proj.weight"],
-                        unfused_state_dict["self_attn.v_proj.weight"],
-                    ],
-                    axis=-1,
-                )
-                .transpose(1, 0)
-                .reshape(
-                    3 * (self.num_attention_heads // self.config.tensor_parallel_degree) * (head_size),
-                    self.hidden_size,
-                )
-            )  # reshape(3, self.num_attention_heself.hidden_sizeads // self.config.tensor_parallel_degree, head_size, )
+            unfused_state_dict["self_attn.q_proj.bias"] = state_dict[
+                "llama.layers.{}.self_attn.q_proj.bias".format(idx)
+            ]
+            unfused_state_dict["self_attn.k_proj.bias"] = state_dict[
+                "llama.layers.{}.self_attn.k_proj.bias".format(idx)
+            ]
+            unfused_state_dict["self_attn.v_proj.bias"] = state_dict[
+                "llama.layers.{}.self_attn.v_proj.bias".format(idx)
+            ]
+            # import pdb;pdb.set_trace()
 
-            unfused_state_dict["mlp.gate_proj.weight"] = state_dict["llama.layers.{}.mlp.gate_proj.weight".format(idx)]
-            unfused_state_dict["mlp.up_proj.weight"] = state_dict["llama.layers.{}.mlp.up_proj.weight".format(idx)]
+            # unfused_state_dict["self_attn.k_proj.weight"] = unfused_state_dict["self_attn.k_proj.weight"].reshape(
+            #     [self.hidden_size, self.num_key_value_heads, 1, head_size]
+            # )
+            # unfused_state_dict["self_attn.k_proj.bias"] = unfused_state_dict["self_attn.k_proj.bias"].reshape(
+            #     [self.num_key_value_heads, 1, head_size]
+            # )
+            # unfused_state_dict["self_attn.v_proj.weight"] = unfused_state_dict["self_attn.v_proj.weight"].reshape(
+            #     [self.hidden_size, self.num_key_value_heads, 1, head_size]
+            # )
+            # unfused_state_dict["self_attn.v_proj.bias"] = unfused_state_dict["self_attn.v_proj.bias"].reshape(
+            #     [self.num_key_value_heads, 1, head_size]
+            # )
 
-            concated_ffn1_weight = np.concatenate(
-                [unfused_state_dict["mlp.gate_proj.weight"], unfused_state_dict["mlp.up_proj.weight"]], axis=-1
+            # unfused_state_dict["self_attn.k_proj.weight"] = np.tile(
+            #     unfused_state_dict["self_attn.k_proj.weight"],
+            #     [1, 1, self.num_attention_heads // self.num_key_value_heads, 1],
+            # )
+            # unfused_state_dict["self_attn.v_proj.weight"] = np.tile(
+            #     unfused_state_dict["self_attn.v_proj.weight"],
+            #     [1, 1, self.num_attention_heads // self.num_key_value_heads, 1],
+            # )
+            # unfused_state_dict["self_attn.k_proj.bias"] = np.tile(
+            #     unfused_state_dict["self_attn.k_proj.bias"],
+            #     [1, self.num_attention_heads // self.num_key_value_heads, 1],
+            # )
+            # unfused_state_dict["self_attn.v_proj.bias"] = np.tile(
+            #     unfused_state_dict["self_attn.v_proj.bias"],
+            #     [1, self.num_attention_heads // self.num_key_value_heads, 1],
+            # )
+
+            # unfused_state_dict["self_attn.k_proj.weight"] = unfused_state_dict["self_attn.k_proj.weight"].reshape(
+            #     [self.hidden_size, self.hidden_size]
+            # )
+            # unfused_state_dict["self_attn.k_proj.bias"] = unfused_state_dict["self_attn.k_proj.bias"].reshape(
+            #     [self.hidden_size]
+            # )
+            # unfused_state_dict["self_attn.v_proj.weight"] = unfused_state_dict["self_attn.v_proj.weight"].reshape(
+            #     [self.hidden_size, self.hidden_size]
+            # )
+            # unfused_state_dict["self_attn.v_proj.bias"] = unfused_state_dict["self_attn.v_proj.bias"].reshape(
+            #     [self.hidden_size]
+            # )
+            # import pdb;pdb.set_trace()
+            concated_qkv_weight = np.concatenate(
+                [
+                    unfused_state_dict["self_attn.q_proj.weight"],
+                    unfused_state_dict["self_attn.k_proj.weight"],
+                    unfused_state_dict["self_attn.v_proj.weight"],
+                ],
+                axis=-1,
+            ).transpose(1, 0)
+            # import pdb;pdb.set_trace()
+
+            concated_qkv_bias = np.concatenate(
+                [
+                    unfused_state_dict["self_attn.q_proj.bias"],
+                    unfused_state_dict["self_attn.k_proj.bias"],
+                    unfused_state_dict["self_attn.v_proj.bias"],
+                ],
+                axis=-1,
             )
-            ffn1_weight_tensor = paddle.to_tensor(concated_ffn1_weight)
 
             qkv_weight_tensor = paddle.to_tensor(concated_qkv_weight)
+            qkv_bias_tensor = paddle.to_tensor(concated_qkv_bias)
             if self.use_weight_only:
                 qkv_weight_tensor = paddle.to_tensor(concated_qkv_weight)
                 qkv_weight_tensor = paddle.transpose(qkv_weight_tensor, perm=[1, 0])
@@ -475,12 +457,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 )
                 self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor)
                 self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor)
-            elif self.quant_type == "a8w8":
-                self.transformer_block.qkv_weights[idx].set_value(
-                    paddle.cast(paddle.to_tensor(concated_qkv_weight), "int8")
-                )
             else:
                 self.transformer_block.qkv_weights[idx].set_value(qkv_weight_tensor)
+
+            self.transformer_block.qkv_biases[idx].set_value(qkv_bias_tensor)
 
             linear_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.weight".format(idx)])
             if self.use_weight_only:
@@ -489,17 +469,27 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 )
                 self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor)
                 self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor)
-            elif self.quant_type == "a8w8":
-                self.transformer_block.linear_weights[idx].set_value(
-                    paddle.cast(
-                        paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.weight".format(idx)]).transpose(
-                            (1, 0)
-                        ),
-                        "int8",
-                    )
-                )
             else:
                 self.transformer_block.linear_weights[idx].set_value(linear_weight_tensor)
+
+            linear_bias_tensor = paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.bias".format(idx)])
+            self.transformer_block.linear_biases[idx].set_value(linear_bias_tensor)
+
+            unfused_state_dict["mlp.gate_proj.weight"] = state_dict["llama.layers.{}.mlp.gate_proj.weight".format(idx)]
+            unfused_state_dict["mlp.up_proj.weight"] = state_dict["llama.layers.{}.mlp.up_proj.weight".format(idx)]
+
+            concated_ffn1_weight = np.concatenate(
+                [unfused_state_dict["mlp.gate_proj.weight"], unfused_state_dict["mlp.up_proj.weight"]], axis=-1
+            )
+
+            unfused_state_dict["mlp.gate_proj.bias"] = state_dict["llama.layers.{}.mlp.gate_proj.bias".format(idx)]
+            unfused_state_dict["mlp.up_proj.bias"] = state_dict["llama.layers.{}.mlp.up_proj.bias".format(idx)]
+
+            concated_ffn1_bias = np.concatenate(
+                [unfused_state_dict["mlp.gate_proj.bias"], unfused_state_dict["mlp.up_proj.bias"]], axis=-1
+            )
+            ffn1_bias_tensor = paddle.to_tensor(concated_ffn1_bias)
+            ffn1_weight_tensor = paddle.to_tensor(concated_ffn1_weight)
 
             if self.use_weight_only:
                 ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
@@ -507,94 +497,22 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 )
                 self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor)
                 self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor)
-            elif self.quant_type == "a8w8":
-                self.transformer_block.ffn1_weights[idx].set_value(
-                    paddle.cast(paddle.to_tensor(concated_ffn1_weight).transpose((1, 0)), "int8")
-                )
             else:
                 self.transformer_block.ffn1_weights[idx].set_value(ffn1_weight_tensor)
 
+            self.transformer_block.ffn1_biases[idx].set_value(ffn1_bias_tensor)
+
             ffn2_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)])
+            ffn2_bias_tensor = paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.bias".format(idx)])
             if self.use_weight_only:
                 ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(
                     ffn2_weight_tensor, algo=self.quant_type
                 )
                 self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
                 self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
-            elif self.quant_type == "a8w8":
-                self.transformer_block.ffn2_weights[idx].set_value(
-                    paddle.cast(
-                        paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)]).transpose(
-                            (1, 0)
-                        ),
-                        "int8",
-                    )
-                )
             else:
                 self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight_tensor)
-
-            if self.quant_type == "a8w8":
-                if self.shift_smooth_all_linears:
-                    self.transformer_block.linear_shifts[idx].set_value(
-                        paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.shift_bias".format(idx)])
-                    )
-                    self.transformer_block.linear_smooths[idx].set_value(
-                        paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.smooth_weight".format(idx)])
-                    )
-                    self.transformer_block.ffn2_shifts[idx].set_value(
-                        paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.shift_bias".format(idx)])
-                    )
-                    self.transformer_block.ffn2_smooths[idx].set_value(
-                        paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.smooth_weight".format(idx)])
-                    )
-
-                if self.shift:
-                    self.transformer_block.ln_biases[idx].set_value(
-                        paddle.to_tensor(state_dict["llama.layers.{}.input_layernorm.bias".format(idx)])
-                    )
-                    self.transformer_block.ffn_ln_biases[idx].set_value(
-                        paddle.to_tensor(state_dict["llama.layers.{}.post_attention_layernorm.bias".format(idx)])
-                    )
-
-                    unfused_state_dict["self_attn.q_proj.bias"] = state_dict[
-                        "llama.layers.{}.self_attn.q_proj.bias".format(idx)
-                    ]
-                    unfused_state_dict["self_attn.k_proj.bias"] = state_dict[
-                        "llama.layers.{}.self_attn.k_proj.bias".format(idx)
-                    ]
-                    unfused_state_dict["self_attn.v_proj.bias"] = state_dict[
-                        "llama.layers.{}.self_attn.v_proj.bias".format(idx)
-                    ]
-
-                    concated_qkv_biases = np.concatenate(
-                        [
-                            unfused_state_dict["self_attn.q_proj.bias"],
-                            unfused_state_dict["self_attn.k_proj.bias"],
-                            unfused_state_dict["self_attn.v_proj.bias"],
-                        ],
-                        axis=-1,
-                    )
-
-                    self.transformer_block.qkv_biases[idx].set_value(paddle.to_tensor(concated_qkv_biases))
-
-                    unfused_state_dict["mlp.gate_proj.bias"] = state_dict[
-                        "llama.layers.{}.mlp.gate_proj.bias".format(idx)
-                    ]
-                    unfused_state_dict["mlp.up_proj.bias"] = state_dict["llama.layers.{}.mlp.up_proj.bias".format(idx)]
-
-                    concated_ffn1_bias = np.concatenate(
-                        [unfused_state_dict["mlp.gate_proj.bias"], unfused_state_dict["mlp.up_proj.bias"]], axis=-1
-                    )
-
-                    self.transformer_block.ffn1_biases[idx].set_value(paddle.to_tensor(concated_ffn1_bias))
-
-                    if self.shift_smooth_all_linears:
-                        self.transformer_block.linear_biases[idx].set_value(
-                            paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.bias".format(idx)])
-                        )
-                        self.transformer_block.ffn2_biases[idx].set_value(
-                            paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.layer.bias".format(idx)])
-                        )
+            self.transformer_block.ffn2_biases[idx].set_value(ffn2_bias_tensor)
 
             self.transformer_block.ln_scales[idx].set_value(
                 paddle.to_tensor(
@@ -609,65 +527,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     dtype=self.transformer_block.ffn_ln_scales[idx].dtype,
                 )
             )
-
-        if self.quant_type == "a8w8":
-            current_work_dir = os.path.dirname(__file__)
-            scale_map_file = (
-                f"{current_work_dir}/ptq_scales_map.json"
-                if not self.shift_smooth_all_linears
-                else f"{current_work_dir}/ptq_scales_map_shift_smooth.json"
-            )
-
-            with open(scale_map_file) as json_file:
-                scale_map_dict = json.load(json_file)
-                act_scale_map_dict = scale_map_dict["act_scale"]
-                weight_scale_map_dict = scale_map_dict["weight_scale"]
-                # TODO(RichardWooSJTU): support multi-cards
-
-                act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
-                weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
-                act_scale_loader = ActScalesLoader(
-                    act_scale_json_path, act_scale_map_dict, num_of_layers=self.config.num_hidden_layers
-                )
-                self.transformer_block.act_scales = act_scale_loader.scale
-
-                weight_scales_loader = WeightScalesLoader(
-                    weight_scale_json_path,
-                    weight_scale_map_dict,
-                    num_of_layers=self.config.num_hidden_layers,
-                    concat_qkv=True,
-                    concat_ffn1=True,
-                )
-                for k, v in weight_scales_loader.scale.items():
-                    if "qkv_" in k:
-                        for i_layer, weight_scale in enumerate(v):
-                            tmp = paddle.to_tensor(
-                                weight_scale / (127.0 * 127.0 * act_scale_loader.scale["qkv_in_scale"][i_layer])
-                            ).reshape([-1])
-                            self.transformer_block.qkv_out_scales[i_layer].set_value(tmp)
-                        pass
-                    elif "out_linear_" in k:
-                        for i_layer, weight_scale in enumerate(v):
-                            self.transformer_block.linear_out_scales[i_layer].set_value(
-                                paddle.to_tensor(
-                                    weight_scale
-                                    / (127.0 * 127.0 * act_scale_loader.scale["out_linear_in_scale"][i_layer])
-                                )
-                            )
-                    elif "ffn1_weight_scale" in k:
-                        for i_layer, weight_scale in enumerate(v):
-                            self.transformer_block.ffn1_out_scales[i_layer].set_value(
-                                paddle.to_tensor(
-                                    weight_scale / (127.0 * 127.0 * act_scale_loader.scale["ffn1_in_scale"][i_layer])
-                                )
-                            )
-                    elif "ffn2" in k:
-                        for i_layer, weight_scale in enumerate(v):
-                            self.transformer_block.ffn2_out_scales[i_layer].set_value(
-                                paddle.to_tensor(
-                                    weight_scale / (127.0 * 127.0 * act_scale_loader.scale["ffn2_in_scale"][i_layer])
-                                )
-                            )
 
 
 class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedModel):
@@ -712,7 +571,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
                 [
                     2,
                     max_batch_size,
-                    config.num_attention_heads // max(config.tensor_parallel_degree, 1),
+                    config.num_key_value_heads,  # config.num_attention_heads // max(config.tensor_parallel_degree, 1),
                     max_length,
                     config.hidden_size // config.num_attention_heads,
                 ]

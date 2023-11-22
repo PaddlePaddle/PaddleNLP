@@ -649,7 +649,11 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         input_tensor = self.predictor.get_input_handle("pre_ids")
         input_tensor.share_external_data(self.pre_ids)
 
-        self.predictor.run()
+        for i in range(10):
+            start = time.perf_counter()
+            self.predictor.run()
+            hf_cost = (time.perf_counter() - start) * 1000
+            print("Speed Paddle:", hf_cost)
 
 
 class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
@@ -690,7 +694,7 @@ def create_predictor(
     tensor_parallel_rank: int = 0,
 ):
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
-    init_chat_template(tokenizer, model_args.model_name_or_path, predictor_args.chat_template)
+    init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer) and not tokenizer.pad_token:
         tokenizer.pad_token = tokenizer.unk_token
@@ -919,7 +923,9 @@ def predict():
                 source_texts.append(example["src"])
                 target_texts.append(example["tgt"])
     else:
-        source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
+        source_texts = [
+            "user:请判断下面的问题是否需要执行动作并获得额外信息才能回答，如果是则生成你的思考和动作序列。\n开车去北京\n\nassistant:\n``` 上文出现过的POI \n{}\n```\n``` 上文出现过的路线 \n{}\n```\n"
+        ]
         target_texts = ["", ""]
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
