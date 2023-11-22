@@ -348,10 +348,17 @@ def normal_fuse_merge_tp(weight_list, is_column=True):
     Returns:
         weight (np.ndarray): the merged weight.
     """
+
     if is_column:
-        return np.concatenate(weight_list, axis=-1)
+        if isinstance(weight_list[0], np.ndarray):
+            return np.concatenate(weight_list, axis=-1)
+        else:
+            return paddle.concat(weight_list, axis=-1)._copy_to(paddle.CPUPlace(), False)
     else:
-        return np.concatenate(weight_list, axis=0)
+        if isinstance(weight_list[0], np.ndarray):
+            return np.concatenate(weight_list, axis=0)
+        else:
+            return paddle.concat(weight_list, axis=0)._copy_to(paddle.CPUPlace(), False)
 
 
 def normal_fuse_split_tp(weight, tensor_parallel_degree, tensor_parallel_rank=None, is_column=True):
@@ -465,7 +472,14 @@ def splited_qkv_to_tensor_parallel_qkv(weight_list, num_attention_heads):
 
 
 def get_tensor_parallel_merge_func(tensor_parallel_degree, tensor_parallel_rank, num_attention_heads=None):
-    def fn(x, is_column=True, transpose=False, is_old_qkv=False, is_naive_2fuse=False, is_naive_3fuse=False):
+    def fn(
+        x,
+        is_column=True,
+        transpose=False,
+        is_old_qkv=False,
+        is_naive_2fuse=False,
+        is_naive_3fuse=False,
+    ):
         if x is None:
             return None
 

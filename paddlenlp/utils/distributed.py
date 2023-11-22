@@ -138,7 +138,7 @@ def distributed_gather(tensor: Any, dst: int = 0, group=None, offload=False) -> 
                     output_tensors = new_output_tensors
 
         else:
-            dist_gather(tensor, output_tensors, dst=dst)
+            dist_gather(tensor, output_tensors, dst=dst, group=group)
 
         return output_tensors
 

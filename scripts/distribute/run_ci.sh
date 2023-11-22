@@ -21,13 +21,12 @@ export log_path=/workspace/case_logs
 export case_list=()
 
 ####################################
-# Insatll paddlepaddle-gpu
 install_paddle(){
     echo -e "\033[31m ---- Install paddlepaddle-gpu  \033"
     python -m pip install --user ${paddle} --force-reinstall --no-dependencies;
     python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
 }
-# Install paddlenlp
+
 install_paddlenlp(){
     echo -e "\033[31m ---- Install paddlenlp  \033"
     cd ${nlp_dir}
@@ -63,7 +62,8 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
             continue
         else
             # model_zoo/gpt-3
-            case_list[${#case_list[*]}]=gpt-3
+            case_list[${#case_list[*]}]=gpt-3_auto
+            case_list[${#case_list[*]}]=gpt-3_dygraph
         fi
     elif [[ ${dir1} =~ "paddlenlp" ]];then
         export FLAGS_paddlenlp=1
@@ -77,7 +77,7 @@ print_info(){
 if [ $1 -ne 0 ];then
     EXCODE=2
     if [ ! -f ${log_path}/$2 ];then
-        echo -e "\033[31m run CI FAIL \033"
+        echo -e "\033[31m run $2 CI FAIL \033"
     else
         mv ${log_path}/$2 ${log_path}/$2_FAIL.log
         echo -e "\033[31m ${log_path}/$2_FAIL \033"
@@ -85,7 +85,7 @@ if [ $1 -ne 0 ];then
     fi
     exit $EXCODE
 else
-    echo -e "\033[32m run CI SUCCESS \033"
+    echo -e "\033[32m run $3 CI SUCCESS \033"
 fi
 }
 ####################################
@@ -94,8 +94,9 @@ case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${case_list[*]}))  # 去重并将结�
 if [[ ${#case_list[*]} -ne 0 ]];then
     echo -e "\033[31m =======CI Check case========= \033"
     echo -e "\033[31m ---- case_list length: ${#case_list[*]}, cases: ${case_list[*]} \033"
+    echo -e "\033[31m ============================= \033"
     set +e
-    echo -e "\033[31m ---- start run case  \033"
+
     # Install paddle
     install_paddle
     if [[ FLAGS_paddlenlp -eq 1 ]];then
@@ -103,15 +104,18 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         install_paddlenlp
     fi
     case_num=1
+    export FLAGS_before_hook=0
     for case in ${case_list[*]};do
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: ${case} \033"
-        if [[ ${case} == "gpt-3" ]];then
-            echo -e "\033[31m ---- running case gpt-3 auto \033"
-            bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh
-            print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'`
-            echo -e "\033[31m ---- running case gpt-3 dynamic \033"
-            bash /workspace/PaddleNLP/scripts/distribute/ci_case_dy.sh
-            print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'`
+        if [[ ${case} == "gpt-3_auto" ]];then
+            bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh case_list_auto $FLAGS_before_hook
+            print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` ${case}
+            export FLAGS_before_hook=1
+            let case_num++
+        elif [[ ${case} == "gpt-3_dygraph" ]];then
+            bash /workspace/PaddleNLP/scripts/distribute/ci_case_dy.sh case_list_dygraph $FLAGS_before_hook
+            print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` ${case}
+            export FLAGS_before_hook=1
             let case_num++
         else
             echo -e "\033[31m ---- no ${case} \033"
@@ -123,7 +127,7 @@ if [[ ${#case_list[*]} -ne 0 ]];then
     if [ ! -f *FAIL* ];then
         FF=0
         EXCODE=0
-        echo -e "\033[32m ---- case Success \033"
+        echo -e "\033[32m ---- all case Success \033"
     else
         FF=`ls *FAIL*|wc -l`
         EXCODE=2
