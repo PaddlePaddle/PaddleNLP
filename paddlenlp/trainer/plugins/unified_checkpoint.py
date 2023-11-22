@@ -397,11 +397,13 @@ def unified_optimizer_into_shards(
             index_master_weight_file[key] = shard_master_weight_file
             total_master_weight_size += weight.numel().item() * dtype_byte_size(weight.dtype)
 
-    index_optimizer_filelist, total_optim_size_list = gather_sharded_object(index_optimizer_file, total_optim_size)
+    index_optimizer_filelist, total_optim_size_list = gather_sharded_object(
+        index_optimizer_file, total_optim_size, is_optimizer=True
+    )
     sharded_optim_index = get_sharded_index(index_optimizer_filelist, total_optim_size_list)
     if master_weights is not None:
         index_master_weight_filelist, total_master_weight_size_list = gather_sharded_object(
-            index_master_weight_file, total_master_weight_size
+            index_master_weight_file, total_master_weight_size, is_optimizer=True
         )
         sharded_master_weight_index = get_sharded_index(index_master_weight_filelist, total_master_weight_size_list)
 
@@ -471,11 +473,9 @@ def check_unified_checkpoint(model, resume_from_checkpoint, safe_serialization=F
     num_diff = paddle.to_tensor([len(diff_filelist)])
     # 获取dataset_rank==0下,各个worker的列表长度max值,如果max不为0,则走扩缩容分支,否则进行原地重启.
     if tp_group.nranks > 1:
-        dist.reduce(num_diff, dst=tp_group.ranks[0], op=dist.ReduceOp.MAX, group=tp_group)
-        dist.broadcast(num_diff, src=tp_group.ranks[0], group=tp_group)
+        dist.allreduce(num_diff, op=dist.ReduceOp.MAX, group=tp_group)
     if pp_group.nranks > 1:
-        dist.reduce(num_diff, dst=pp_group.ranks[0], op=dist.ReduceOp.MAX, group=pp_group)
-        dist.broadcast(num_diff, src=pp_group.ranks[0], group=pp_group)
+        dist.allreduce(num_diff, op=dist.ReduceOp.MAX, group=pp_group)
     if num_diff.item() == 0:
         return True  # 原地重启
     return False  # 进入扩缩容分支
@@ -572,7 +572,7 @@ def get_sharded_index(
     return None
 
 
-def gather_sharded_object(index_file, total_size):
+def gather_sharded_object(index_file, total_size, is_optimizer=False):
 
     index_file_list, total_size_list = [], []
 
@@ -594,17 +594,25 @@ def gather_sharded_object(index_file, total_size):
         dist.all_gather_object(
             pp_total_size_list, total_size_list if len(total_size_list) > 0 else total_size, pp_group
         )
-        if isinstance(pp_total_size_list[0], list):
-            total_size_list = [y for x in pp_total_size_list for y in x]
-            index_file_list = [y for x in pp_index_file_list for y in x]
-        else:
-            index_file_list = pp_index_file_list
-            total_size_list = pp_total_size_list
+        index_file_list = pp_index_file_list
+        total_size_list = pp_total_size_list
+
+    index_file_list = flatten_list(index_file_list)
+    total_size_list = flatten_list(total_size_list)
 
     # for pure sharding
     if len(index_file_list) == 0 and len(total_size_list) == 0:
         index_file_list = [index_file]
         total_size_list = [total_size]
+    if is_optimizer:
+        sharding_index_file_list = []
+        sharding_total_size_list = []
+        sharding_group = hcg.get_sharding_parallel_group()
+        if sharding_group.nranks > 1:
+            dist.all_gather_object(sharding_index_file_list, index_file_list, sharding_group)
+            dist.all_gather_object(sharding_total_size_list, total_size_list, sharding_group)
+            index_file_list = flatten_list(sharding_index_file_list)
+            total_size_list = flatten_list(sharding_total_size_list)
 
     return index_file_list, total_size_list
 
