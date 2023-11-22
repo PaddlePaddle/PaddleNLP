@@ -190,7 +190,12 @@ class LoRAModel(nn.Layer):
             if key in trainable_name_action_mappings:
                 ret = distributed_gather(tensor, group=mp_group, offload=True)
                 action = trainable_name_action_mappings[key]
-                tensor = action(ret) if is_dst else None
+                is_collumn = self.lora_split_mapping[key]
+                if '_scale' in key and not is_collumn and is_dst:
+                    ret = paddle.to_tensor(ret)
+                    tensor = paddle.max(ret, axis=0)
+                else:
+                    tensor = action(ret) if is_dst else None
                 trainable_state_dict[key] = tensor
             else:
                 trainable_state_dict[key] = tensor.cpu().numpy() if is_dst else None
@@ -300,6 +305,11 @@ class LoRAModel(nn.Layer):
                 )
                 # Lora column parallel will spilt lora B matrix
                 self.add_lora_split_mapping(module_name + ".lora_B", is_column=True)
+
+                # for lora qat
+                self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=True)
+                self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
+                self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
             elif isinstance(module, RowParallelLinear):
                 # recover the original output_features
                 lora_module = RowParallelLoRALinear(
@@ -314,6 +324,11 @@ class LoRAModel(nn.Layer):
                 )
                 # Lora column parallel will spilt lora A matrix
                 self.add_lora_split_mapping(module_name + ".lora_A", is_column=False)
+
+                # for lora qat
+                self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=False)
+                self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
+                self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
             elif QuantizationLinear is not None and isinstance(module, QuantizationLinear):
                 lora_module = QuantizationLoRALinear(
                     in_features=module.in_features,
