@@ -19,6 +19,11 @@ export FLAGS_new_executor_serial_run=1
 export FLAGS_allocator_strategy=naive_best_fit
 export FLAGS_fraction_of_gpu_memory_to_use=0.92
 
+export FLAGS_use_autotune=1
+export FLAGS_cublaslt_exhaustive_search_times=10
+export FLAGS_cache_inference_while_scope=1
+
+
 python predictor.py \
     --model_name_or_path ./llama7b-inference_model_fp16 \
     --dtype float16 \
@@ -28,4 +33,4 @@ python predictor.py \
     --mode "static" \
     --batch_size 1 \
     --benchmark \
-    --inference_model
+    --inference_model 

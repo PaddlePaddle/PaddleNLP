@@ -95,7 +95,11 @@ from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
-from .plugins.unified_checkpoint import load_unified_checkpoint, save_unified_checkpoint
+from .plugins.unified_checkpoint import (
+    load_unified_checkpoint,
+    save_unified_checkpoint,
+    save_unified_optimizer,
+)
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -124,6 +128,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     speed_metrics,
 )
 from .training_args import TrainingArguments
+from .utils import reshard as reshard_util
 from .utils.helper import (  # nested_truncate,
     broadcast_dp_optimizer,
     distributed_concat,
@@ -572,8 +577,9 @@ class Trainer:
             self.model_wrapped = model
         # Should invoke _load_from_checpoint after _load_optimizer_and_scheduler
         # because the _load_from_checkpoint method rely on the optimizer in the shareded mode.
-        self._load_optimizer_and_scheduler(resume_from_checkpoint)
-        self._load_from_checkpoint(resume_from_checkpoint)
+        if resume_from_checkpoint:
+            self._load_optimizer_and_scheduler(resume_from_checkpoint)
+            self._load_from_checkpoint(resume_from_checkpoint)
         return model
 
     def train(
@@ -918,7 +924,7 @@ class Trainer:
 
                         if not enable_dp_comm_overlap:
                             if self.optimizer._sharding_enable:
-                                assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
+                                assert reshard_util.is_sharding_opt(self.optimizer)
                                 self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
                             if self.optimizer._dp_enable:
@@ -1972,10 +1978,19 @@ class Trainer:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
                 logger.info("Saving optimizer files.")
-                paddle.save(
-                    self.optimizer.state_dict(),
-                    os.path.join(output_dir, optimizer_name),
-                )
+                if self.args.unified_checkpoint:
+                    save_unified_optimizer(
+                        self.args,
+                        self.model,
+                        self.optimizer,
+                        output_dir,
+                        safe_serialization=True,
+                    )
+                else:
+                    paddle.save(
+                        self.optimizer.state_dict(),
+                        os.path.join(output_dir, optimizer_name),
+                    )
 
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
@@ -2032,7 +2047,16 @@ class Trainer:
 
         # Maybe delete some older checkpoints.
         # For hybrid parallel training, the checkpoint files maybe on different node.
-        if self.args.should_save_model_state and self.args.local_rank == 0:
+        need_to_rotate_checkpoints = False
+        if self.args.use_hybrid_parallel:
+            if self.dp_group.rank <= 0:
+                need_to_rotate_checkpoints = True
+        else:
+            need_to_rotate_checkpoints = self.args.should_save_model_state
+
+        # Delete only by one process
+        need_to_rotate_checkpoints = need_to_rotate_checkpoints and self.args.local_rank == 0
+        if need_to_rotate_checkpoints:
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
 
     def set_optimizer_grouped_parameters(self, optimizer_grouped_parameters=None):
@@ -2191,14 +2215,13 @@ class Trainer:
 
     def _load_optimizer_and_scheduler(self, checkpoint):
         """If optimizer and scheduler states exist, load them."""
-        # TODO: Support DP broadcast optimizer.
         if checkpoint is None:
             return
 
         opt_state_dict = None
         if self.args.should_load_sharding_stage1_model:
             opt_state_dict = self.sharding_io.load_optimizer_state_with_reshard(
-                checkpoint, base_opt_name=OPTIMIZER_NAME
+                checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
             optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
