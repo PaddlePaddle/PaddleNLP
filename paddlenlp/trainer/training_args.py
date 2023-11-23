@@ -836,6 +836,7 @@ class TrainingArguments:
 
             if sharding_parallel_degree > 1 or tensor_parallel_degree > 1 or pipeline_parallel_degree > 1:
                 self.use_hybrid_parallel = True
+                self.sharding_parallel_degree = sharding_parallel_degree
                 self.tensor_parallel_degree = tensor_parallel_degree
                 self.pipeline_parallel_degree = pipeline_parallel_degree
 
