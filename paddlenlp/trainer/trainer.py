@@ -1619,8 +1619,16 @@ class Trainer:
                 assert self.optimizer is not None, "optimizer is empty!"
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
 
+        in_pipeline_parallel_mode = self.args.pipeline_parallel_degree > 1
+        in_sharding_parallel_mode = self.sharding is not None
+        in_tensor_parallel_mode = self.args.tensor_parallel_degree > 1
+
         # Multi-gpu training
-        if self.args.world_size > 1 and not self.args.use_hybrid_parallel:
+        if (
+            self.args.world_size > 1
+            and not self.args.use_hybrid_parallel
+            or not (in_pipeline_parallel_mode or in_sharding_parallel_mode or in_tensor_parallel_mode)
+        ):
             model = paddle.DataParallel(model)
             # Distributed training (should be after fp16 initialization)
 
@@ -1628,10 +1636,6 @@ class Trainer:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
                 assert self.optimizer is not None, "optimizer is empty!"
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
-
-        in_pipeline_parallel_mode = self.args.pipeline_parallel_degree > 1
-        in_sharding_parallel_mode = self.sharding is not None
-        in_tensor_parallel_mode = self.args.tensor_parallel_degree > 1
 
         # Pipeline mode
         if in_pipeline_parallel_mode:
