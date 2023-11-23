@@ -15,9 +15,13 @@ from __future__ import annotations
 
 import json
 from contextlib import closing
+import os
 import socket
 from dataclasses import dataclass, field
 from multiprocessing.shared_memory import SharedMemory
+from time import sleep
+from filelock import FileLock
+from regex import F
 
 import requests
 
@@ -25,8 +29,28 @@ from predictor import BasePredictor, ModelArgument, PredictorArgument, create_pr
 
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.utils.log import logger
+from filelock import FileLock
 
 STOP_SIGNAL = "[END]"
+port_interval = 200
+FILE_PREFIX = "port-info"
+FILE_LOCK = "port-lock"
+
+def find_free_ports(port_l, port_u):
+    def __free_port(port):
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+            try:
+                s.bind(('', port))
+                return port
+            except:
+                return -1
+
+    for port in range(port_l, port_u):
+        port = __free_port(port)
+        if port != -1:
+            return port
+
+    return -1
 
 @dataclass
 class ServerArgument:
@@ -39,12 +63,37 @@ class PredictorServer:
 
         self.predictor = predictor
         self.args = args
-        self.port = args.base_port + predictor.tensor_parallel_rank
+        scan_l, scan_u = self.args.base_port + port_interval * predictor.tensor_parallel_rank, self.args.base_port + port_interval * (predictor.tensor_parallel_rank+1)
 
         if self.predictor.tensor_parallel_rank == 0:
+            # fetch port info
+            self.port = find_free_ports(scan_l, scan_u)
+            print(self.port)
             self.peer_ports = {}
-            for peer_id in range(self.predictor.tensor_parallel_degree):
-                self.peer_ports[peer_id] = self.args.base_port + peer_id
+            while True:
+                if os.path.exists(FILE_PREFIX):
+                    with FileLock(FILE_LOCK):
+                        with open(FILE_PREFIX, 'r') as f:
+                            cnt = 0
+                            for line in f:
+                                data = json.loads(line)
+                                self.peer_ports[data["rank"]] = data["port"]
+                                cnt += 1
+
+                    if cnt == predictor.tensor_parallel_degree - 1:
+                        break
+                    else:
+                        print("waiting for port reach", cnt)
+                sleep(1)
+        else:
+            # save port info
+            self.port = find_free_ports(scan_l, scan_u)
+            data = {"rank": predictor.tensor_parallel_rank, "port": self.port}
+            with FileLock(FILE_LOCK):
+                with open(FILE_PREFIX, 'a') as f:
+                    f.write(json.dumps(data) + '\n')
+            print(predictor.tensor_parallel_rank, " done")
+
 
     def predict(self, input_texts: str | list[str]):
         return self.predictor.stream_predict(input_texts)
@@ -63,7 +112,6 @@ class PredictorServer:
         def _server():
             data = request.get_json()
             logger.info(f"Request: {json.dumps(data, indent=2, ensure_ascii=False)}")
-            print("start to predict under data", data)
 
             if self.predictor.tensor_parallel_rank == 0:
                 self.broadcast_msg(data)
@@ -82,11 +130,9 @@ class PredictorServer:
                 for key, value in generation_args.items():
                     setattr(self.args, key, value)
 
-                print("predict {}".format(self.predictor.tensor_parallel_rank), query)
                 streamer = self.predict(query)
                 if self.predictor.tensor_parallel_rank == 0:
                     for new_text in streamer:
-                        print(new_text)
                         output = {
                             "error_code": 0,
                             "error_msg": "Success",
@@ -111,35 +157,15 @@ class PredictorServer:
         p.daemon = True
         p.start()
 
-def find_free_ports(base_port, num):
-    def __free_port(port):
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-            try:
-                s.bind(('', port))
-                return port
-            except:
-                return -1
-
-    port_set = set()
-    step = 0
-    while True:
-        port = base_port + step
-        port = __free_port(port)
-        if port != -1 and port not in port_set:
-            port_set.add(port)
-
-        if len(port_set) >= num:
-            return port_set
-        
-        step += 1
-        if step > 1000:
-            break
-    return None
-
 if __name__ == "__main__":
 
     parser = PdArgumentParser((PredictorArgument, ModelArgument, ServerArgument))
     predictor_args, model_args, server_args = parser.parse_args_into_dataclasses()
+
+    FILE_PREFIX = os.path.join(os.environ["PADDLE_LOG_DIR"], FILE_PREFIX)
+    if os.path.exists(FILE_PREFIX):
+        os.remove(FILE_PREFIX)
+
     predictor = create_predictor(predictor_args, model_args)
 
     server = PredictorServer(server_args, predictor)
@@ -147,13 +173,5 @@ if __name__ == "__main__":
     if server.predictor.tensor_parallel_rank == 0:
         server.start_ui_service(server_args)
 
-        #from multiprocessing import Process
-
-        #p = Process(
-        #    target=server.start_flask_server,
-        #)
-        #p.daemon = True
-        #p.start()
     server.start_flask_server()
 
-    #main(server_args, server)

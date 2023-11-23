@@ -870,7 +870,7 @@ class GenerationMixin(object):
                     "`streamer` cannot be used with beam search (yet!). Make sure that `num_beams` is set to 1."
                 )
             if self.config.tensor_parallel_rank == 0:
-                #streamer.put(input_ids.cpu())
+                # streamer.put(input_ids.cpu())
                 streamer.put(input_ids.cpu())
 
         if pad_token_id is None and eos_token_id is not None:
@@ -1193,7 +1193,6 @@ class GenerationMixin(object):
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
             if streamer is not None:
                 if self.config.tensor_parallel_rank == 0:
-                    print(next_tokens)
                     streamer.put(next_tokens.cpu())
 
             if stopping_criteria(input_ids, scores):
