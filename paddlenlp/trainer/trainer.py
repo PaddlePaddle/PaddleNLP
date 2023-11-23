@@ -97,6 +97,7 @@ from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
 from .plugins.unified_checkpoint import (
     load_unified_checkpoint,
+    load_unified_optimizer,
     save_unified_checkpoint,
     save_unified_optimizer,
 )
@@ -2246,11 +2247,19 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
-            optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             if self.args.data_parallel_rank == 0:
-                path = os.path.join(checkpoint, optimizer_name)
-                if os.path.isfile(path):
-                    opt_state_dict = paddle.load(path)
+                if self.args.unified_checkpoint:
+                    opt_state_dict = load_unified_optimizer(
+                        model=self.model,
+                        optimizer=self.optimizer,
+                        resume_from_checkpoint=checkpoint,
+                        safe_serialization=True,
+                    )
+                else:
+                    optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+                    path = os.path.join(checkpoint, optimizer_name)
+                    if os.path.isfile(path):
+                        opt_state_dict = paddle.load(path)
 
         # broadcast optimizer state in dp group
         opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
