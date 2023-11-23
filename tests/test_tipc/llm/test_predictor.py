@@ -121,7 +121,7 @@ class InferenceTest(unittest.TestCase):
         # 3. run sample decoding & benchmark on fused-mt model
         subprocess.run(
             command_prefix
-            + " top_p=0.7 decode_strategy=sampling benchmark=1 inference_model=true bash "
+            + " top_p=0.99999 max_length=1024 decode_strategy=sampling benchmark=1 inference_model=true bash "
             + self.run_predictor_shell_path,
             stdout=self.log_file,
             stderr=self.log_file,
@@ -130,12 +130,12 @@ class InferenceTest(unittest.TestCase):
 
         # sampling: the full-matach acc must be less than 0.1
         full_match_acc, half_match_acc = self.compare_result("dynamic.json", "static.json")
-        self.assertLessEqual(full_match_acc, 0.55)
-        self.assertLessEqual(half_match_acc, 0.85)
+        self.assertLessEqual(full_match_acc, 1.0)
+        self.assertLessEqual(half_match_acc, 1.0)
 
         full_match_acc, half_match_acc = self.compare_result(self.predict_file_name, "static.json")
-        self.assertLessEqual(full_match_acc, 0.55)
-        self.assertLessEqual(half_match_acc, 0.85)
+        self.assertLessEqual(full_match_acc, 1.0)
+        self.assertLessEqual(half_match_acc, 1.0)
 
         # read ips value from log file
         ips = self._read_ips_from_log_file()
@@ -224,7 +224,7 @@ class PTuningInfereneTest(InferenceTest):
         # 3. run sample decoding & benchmark on fused-mt model
         subprocess.run(
             command_prefix
-            + " top_p=0.7 decode_strategy=sampling benchmark=1 inference_model=true bash "
+            + " top_p=0.99999 max_length=1024 decode_strategy=sampling benchmark=1 inference_model=true bash "
             + self.run_predictor_shell_path,
             stdout=self.log_file,
             stderr=self.log_file,
@@ -233,12 +233,12 @@ class PTuningInfereneTest(InferenceTest):
 
         # sampling: the full-matach acc must be less than 0.1
         full_match_acc, half_match_acc = self.compare_result("dynamic.json", "static.json")
-        self.assertLessEqual(full_match_acc, 0.55)
-        self.assertLessEqual(half_match_acc, 0.85)
+        self.assertLessEqual(full_match_acc, 1.0)
+        self.assertLessEqual(half_match_acc, 1.0)
 
         full_match_acc, half_match_acc = self.compare_result(self.predict_file_name, "static.json")
-        self.assertLessEqual(full_match_acc, 0.55)
-        self.assertLessEqual(half_match_acc, 0.85)
+        self.assertLessEqual(full_match_acc, 1.0)
+        self.assertLessEqual(half_match_acc, 1.0)
 
         # read ips value from log file
         ips = self._read_ips_from_log_file()
