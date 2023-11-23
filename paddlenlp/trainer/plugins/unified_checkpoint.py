@@ -374,15 +374,6 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
         if len(resolved_archive_file_mw) > 1:
             resolved_archive_file_mw = tqdm(resolved_archive_file_mw, desc="Loading master weights shards")
 
-    def _remove_unused_keys(
-        state_dict,
-        model_state_dict,
-    ):
-        unused_keys = set(state_dict.keys()) - set(model_state_dict.keys())
-        for unused_key in unused_keys:
-            del state_dict[unused_key]
-        return unused_keys
-
     def load_resolved_archive_file(
         resolved_archive_file, sharded_metadata, loaded_keys, expected_keys, is_master_weight=False
     ):
@@ -393,20 +384,18 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
             if expected_keys.isdisjoint(sharded_metadata["file_map"][os.path.split(shard_file)[-1]]):
                 continue
 
-            pre_tensor_parallel_split = False
-            if shard_file.endswith(".safetensors") and model.config.tensor_parallel_degree > 1:
-                pre_tensor_parallel_split = True
-                assert loaded_keys is not None, "loaded_keys is not None."
-                tp_actions = model.get_tensor_parallel_convert_actions(model.config, model_keys, ignore_error=True)
-                if not is_master_weight:
-                    tp_actions = mapping_optimizer_tp_actions(tp_actions, loaded_keys)
+            if shard_file.endswith(".safetensors"):
+                # assert model_keys is not None, "model_keys is None." TODO: correct the assert
+                if model.config.tensor_parallel_degree > 1:
+                    tp_actions = model.get_tensor_parallel_convert_actions(model.config, model_keys, ignore_error=True)
+                    if not is_master_weight:
+                        tp_actions = mapping_optimizer_tp_actions(tp_actions, loaded_keys)
 
-            # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
-            state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys)
-
-            if not pre_tensor_parallel_split:
-                # Since we load all keys but we only need one of pipeline stages
-                _ = _remove_unused_keys(state_dict, struct2static_name_mappings)
+                    # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
+                    state_dict = load_state_dict(shard_file, tp_actions, expected_keys)
+                else:
+                    # for pipeline model, we don't need to use tp_actions
+                    state_dict = load_state_dict(shard_file, None, expected_keys)
 
             returned_state_dict.update(state_dict)
             # force memory release
@@ -423,10 +412,11 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
     # rename optimizer param
     for key in list(state_dict_optim.keys()):
         key_name = key.split("/")
+        static_name = struct2static_name_mappings[key_name[0]]
         if has_master_weights:
-            key_name = struct2static_name_mappings[key_name[0]] + "_fp32_master_0_" + key_name[1]
+            key_name = "_".join([static_name, "fp32_master_0", key_name[1]])
         else:
-            key_name = struct2static_name_mappings[key_name[0]] + key_name[1]
+            key_name = "_".join([static_name, key_name[1]])
         returned_optim_state_dict[key_name] = state_dict_optim[key]
         returned_optim_state_dict[key_name].name = key_name
 
@@ -434,7 +424,7 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
         for key in list(state_dict_master_weight.keys()):
             static_name = struct2static_name_mappings[key]
             returned_optim_state_dict["master_weights"][static_name] = state_dict_master_weight[key]
-            returned_optim_state_dict["master_weights"][static_name].name = static_name
+            returned_optim_state_dict["master_weights"][static_name].name = "_".join([static_name, "fp32_master_0"])
 
     return returned_optim_state_dict
 
@@ -785,7 +775,7 @@ def mapping_optimizer_tp_actions(tp_actions, optimizer_loaded_keys):
     new_actions = {}
     for key in optimizer_loaded_keys:
         key_base = key.split("/")[0]
-        if "moment" in key.split("/")[1] and key_base in tp_actions:
+        if ("moment" in key.split("/")[1] or "velocity" in key.split("/")[1]) and key_base in tp_actions:
             new_actions[key] = tp_actions[key_base]
     return new_actions
 
