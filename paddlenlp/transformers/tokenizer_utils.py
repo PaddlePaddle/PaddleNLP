@@ -638,12 +638,17 @@ class ChatTemplateMixin:
         return self.sep_token_id
 
     def apply_chat_template(
-        self, conversation: List[List[str, str]] | str, tokenize: bool = True, **tokenizer_kwargs
+        self,
+        conversation: List[List[str, str]] | str,
+        tokenize: bool = True,
+        context_data: Dict[str, Any] = {},
+        **tokenizer_kwargs
     ) -> str | dict[str, numpy.ndarray | paddle.Tensor]:
         """apply chat_template rules to conversation which should not be batched data
 
         Args:
             conversation (List[List[str, str]] | str): the conversation messages between user and bot
+            context_data (Dict[str, Any]): the context data for chat_template.json
             tokenize (bool, optional): whether do tokenization. Defaults to True.
 
         Returns:
@@ -657,7 +662,7 @@ class ChatTemplateMixin:
                 "so you should apply the conversation one by one."
             )
 
-        query = self.chat_template(conversation)
+        query = self.chat_template(conversation, context_data=context_data)
         if not tokenize:
             return query
 
