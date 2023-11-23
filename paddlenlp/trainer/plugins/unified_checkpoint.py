@@ -510,11 +510,13 @@ def unified_optimizer_into_shards(
             index_master_weight_file[key] = shard_master_weight_file
             total_master_weight_size += weight.numel().item() * dtype_byte_size(weight.dtype)
 
-    index_optimizer_filelist, total_optim_size_list = gather_sharded_object(index_optimizer_file, total_optim_size)
+    index_optimizer_filelist, total_optim_size_list = gather_sharded_object(
+        index_optimizer_file, total_optim_size, is_optimizer=True
+    )
     sharded_optim_index = get_sharded_index(index_optimizer_filelist, total_optim_size_list)
     if master_weights is not None:
         index_master_weight_filelist, total_master_weight_size_list = gather_sharded_object(
-            index_master_weight_file, total_master_weight_size
+            index_master_weight_file, total_master_weight_size, is_optimizer=True
         )
         sharded_master_weight_index = get_sharded_index(index_master_weight_filelist, total_master_weight_size_list)
 
@@ -578,7 +580,7 @@ def get_sharded_index(
     return None
 
 
-def gather_sharded_object(index_file, total_size):
+def gather_sharded_object(index_file, total_size, is_optimizer=False):
 
     index_file_list, total_size_list = [], []
 
@@ -600,17 +602,25 @@ def gather_sharded_object(index_file, total_size):
         dist.all_gather_object(
             pp_total_size_list, total_size_list if len(total_size_list) > 0 else total_size, pp_group
         )
-        if isinstance(pp_total_size_list[0], list):
-            total_size_list = [y for x in pp_total_size_list for y in x]
-            index_file_list = [y for x in pp_index_file_list for y in x]
-        else:
-            index_file_list = pp_index_file_list
-            total_size_list = pp_total_size_list
+        index_file_list = pp_index_file_list
+        total_size_list = pp_total_size_list
+
+    index_file_list = flatten_list(index_file_list)
+    total_size_list = flatten_list(total_size_list)
 
     # for pure sharding
     if len(index_file_list) == 0 and len(total_size_list) == 0:
         index_file_list = [index_file]
         total_size_list = [total_size]
+    if is_optimizer:
+        sharding_group = hcg.get_sharding_parallel_group()
+        if sharding_group.nranks > 1:
+            sharding_index_file_list = []
+            sharding_total_size_list = []
+            dist.all_gather_object(sharding_index_file_list, index_file_list, sharding_group)
+            dist.all_gather_object(sharding_total_size_list, total_size_list, sharding_group)
+            index_file_list = flatten_list(sharding_index_file_list)
+            total_size_list = flatten_list(sharding_total_size_list)
 
     return index_file_list, total_size_list
 
