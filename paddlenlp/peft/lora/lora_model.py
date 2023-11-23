@@ -90,7 +90,9 @@ class LoRAModel(nn.Layer):
             self.lora_config.dtype = paddle.get_default_dtype()
         with dtype_guard(self.lora_config.dtype):
             self.model = self.get_lora_model(model, lora_config)
-        if isinstance(self.model, PipelinePretrainedModel):
+        self.is_pipelinemodel = False
+        if isinstance(self.model, PipelinePretrainedModel) or issubclass(self.model, PipelineLayer):
+            self.is_pipelinemodel = True
             self.model._single_to_pp_mapping = None
         if self.lora_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
             self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
@@ -224,18 +226,14 @@ class LoRAModel(nn.Layer):
         return lora_state_dict
 
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
-        if isinstance(self.model, PipelinePretrainedModel) or issubclass(self.model, PipelineLayer):
+        if self.is_pipelinemodel:
             self.model._single_to_pp_mapping = None
         if self.quantized and merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
             merge_tensor_parallel = False
             logger.warning(
                 "Quantized strategy does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
             )
-        if (
-            isinstance(self.model, PipelineLayer)
-            and merge_tensor_parallel
-            and self.model.config.tensor_parallel_degree > 1
-        ):
+        if self.is_pipelinemodel and merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
             merge_tensor_parallel = False
             logger.warning(
                 "Pipeline parallism does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
