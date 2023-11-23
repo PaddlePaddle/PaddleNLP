@@ -31,12 +31,7 @@ from paddle.distributed.fleet.meta_parallel import (
 )
 
 from ...transformers.conversion_utils import ConversionMixin
-from ...transformers.model_utils import (
-    PipelinePretrainedModel,
-    PretrainedModel,
-    _add_variant,
-    dtype_guard,
-)
+from ...transformers.model_utils import PretrainedModel, _add_variant, dtype_guard
 from ...transformers.utils import weight_name_suffix
 from ...utils.distributed import distributed_gather
 from ...utils.env import LORA_WEIGHTS_NAME
@@ -91,7 +86,7 @@ class LoRAModel(nn.Layer):
         with dtype_guard(self.lora_config.dtype):
             self.model = self.get_lora_model(model, lora_config)
         self.is_pipelinemodel = False
-        if isinstance(self.model, PipelinePretrainedModel) or issubclass(self.model, PipelineLayer):
+        if issubclass(type(self.model), PipelineLayer):
             self.is_pipelinemodel = True
             self.model._single_to_pp_mapping = None
         if self.lora_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
