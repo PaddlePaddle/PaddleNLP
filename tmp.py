@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+"""
 import os
 import re
 
@@ -80,18 +80,18 @@ with open(log_path, "r") as f:
 self_wandb.finish()
 
 exit(0)
+"""
 
 import os
 
-import numpy as np
+# import numpy as np
 import paddle
 
 # import torch
 import transformers
 
-from paddlenlp.transformers import (  # AutoTokenizer,
+from paddlenlp.transformers import (  # AutoTokenizer,; LlamaForCausalLM,
     LlamaConfig,
-    LlamaForCausalLM,
     LlamaModelForScore,
 )
 from paddlenlp.utils.log import logger
@@ -138,16 +138,20 @@ exit(0)
 # load_dataset("PKU-Alignment/PKU-SafeRLHF", split="30k_train")
 
 # tokenizer = transformers.AutoTokenizer.from_pretrained(
-#     "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced-hf",
+#     # "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced-hf",
+#     "/root/paddlejob/workspace/guosheng/beaver-7b-v1.0-reward-hf",
 #     use_fast=False)
 # tokenizer = transformers.AutoTokenizer.from_pretrained(
-#     "PKU-Alignment/alpaca-7b-reproduced", use_fast=False)
+#     # "PKU-Alignment/alpaca-7b-reproduced", use_fast=False)
+#     "PKU-Alignment/beaver-7b-v1.0-reward", use_fast=False)
 # tokenizer.save_pretrained(
-#     "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced-hf")
+#     # "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced-hf")
+#     "/root/paddlejob/workspace/guosheng/beaver-7b-v1.0-reward-hf")
 # tokenizer = AutoTokenizer.from_pretrained("/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced-saved/")
+# tokenizer = AutoTokenizer.from_pretrained("/root/paddlejob/workspace/guosheng/beaver-7b-v1.0-reward-pd")
 # tokenizer = AutoTokenizer.from_pretrained("facebook/llama-7b")
 # print("="*20, tokenizer.pad_token)
-# tokenizer.save_pretrained("/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced-pd")
+# tokenizer.save_pretrained("/root/paddlejob/workspace/guosheng/beaver-7b-v1.0-reward-saved")
 
 # exit(0)
 # model = LlamaForCausalLM.from_pretrained("facebook/llama-7b")
@@ -158,37 +162,42 @@ exit(0)
 
 
 # for merge LlamaForCausalLM weight and score_head.weight ####
-input_ids = paddle.to_tensor(np.load("/root/paddlejob/workspace/guosheng/share/safe-rlhf/ids.npy"))
-attention_mask = paddle.to_tensor(np.load("/root/paddlejob/workspace/guosheng/share/safe-rlhf/mask.npy"))
-score_head_weight = paddle.to_tensor(
-    np.load(
-        # "/root/paddlejob/workspace/guosheng/share/safe-rlhf/score_head_weight.npy"，
-        "/root/paddlejob/workspace/guosheng/share/safe-rlhf/bf16_score_head_weight.npy"
-    ).transpose(1, 0)
-)
-pd_model = LlamaModelForScore.from_pretrained(
-    "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced", dtype="float32"
-)
-pd_model.score_head.weight.set_value(score_head_weight.cast(pd_model.score_head.weight.dtype))
-pd_model.save_pretrained("/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced-bf16-head-saved")
-with paddle.no_grad():
-    output = pd_model(input_ids, attention_mask=attention_mask, return_dict=True)
-# th_model = transformers.LlamaForCausalLM.from_pretrained(
-#     "PKU-Alignment/alpaca-7b-reproduced")
-print(pd_model.get_decoder().embed_tokens.weight)
-scores = output.scores  # size = (2 * B, L, 1)
-end_scores = output.end_scores  # size = (2 * B, 1)
-print(scores)
-print(end_scores)
-# print(th_model.get_decoder().embed_tokens.weight, th_model.get_decoder().embed_tokens.weight.dtype)
-# state_dict = paddle.load(
-#     "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced/model_state.pdparams")
-# for k, v in state_dict.items():
-#     print(k, v.dtype)
-exit(0)
+# input_ids = paddle.to_tensor(np.load("/root/paddlejob/workspace/guosheng/share/safe-rlhf/ids.npy"))
+# attention_mask = paddle.to_tensor(np.load("/root/paddlejob/workspace/guosheng/share/safe-rlhf/mask.npy"))
+# score_head_weight = paddle.to_tensor(
+#     np.load(
+#         # "/root/paddlejob/workspace/guosheng/share/safe-rlhf/score_head_weight.npy"，
+#         "/root/paddlejob/workspace/guosheng/share/safe-rlhf/bf16_score_head_weight.npy"
+#     ).transpose(1, 0)
+# )
+# pd_model = LlamaModelForScore.from_pretrained(
+#     "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced", dtype="float32"
+# )
+# pd_model.score_head.weight.set_value(score_head_weight.cast(pd_model.score_head.weight.dtype))
+# pd_model.save_pretrained("/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced-bf16-head-saved")
+# with paddle.no_grad():
+#     output = pd_model(input_ids, attention_mask=attention_mask, return_dict=True)
+# # th_model = transformers.LlamaForCausalLM.from_pretrained(
+# #     "PKU-Alignment/alpaca-7b-reproduced")
+# print(pd_model.get_decoder().embed_tokens.weight)
+# scores = output.scores  # size = (2 * B, L, 1)
+# end_scores = output.end_scores  # size = (2 * B, 1)
+# print(scores)
+# print(end_scores)
+# # print(th_model.get_decoder().embed_tokens.weight, th_model.get_decoder().embed_tokens.weight.dtype)
+# # state_dict = paddle.load(
+# #     "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced/model_state.pdparams")
+# # for k, v in state_dict.items():
+# #     print(k, v.dtype)
+# pd_model = LlamaModelForScore.from_pretrained(
+#     "/root/paddlejob/workspace/guosheng/beaver-7b-v1.0-reward/", dtype="float32"
+# )
+# pd_model.save_pretrained(
+#     "/root/paddlejob/workspace/guosheng/beaver-7b-v1.0-reward-saved")
+# exit(0)
 
 
-def convert(cls, weight_file, config, cache_dir: str) -> None:
+def convert(cls, weight_file, config, cache_dir: str, hf_cls=None) -> None:
     """the entry of converting config and converting model file
 
     Args:
@@ -199,7 +208,10 @@ def convert(cls, weight_file, config, cache_dir: str) -> None:
 
     name_mappings = cls._get_name_mappings(config)
 
-    state_dict = transformers.LlamaForCausalLM.from_pretrained(weight_file).state_dict()
+    # state_dict = transformers.LlamaForCausalLM.from_pretrained(weight_file).state_dict()
+    if hf_cls is None:
+        hf_cls = getattr(transformers, cls.__name__)
+    state_dict = hf_cls.from_pretrained(weight_file).state_dict()
     for k, v in state_dict.items():
         state_dict[k] = v.numpy()
 
@@ -220,14 +232,35 @@ def convert(cls, weight_file, config, cache_dir: str) -> None:
         for layer_name in all_layer_names:
             logger.warning(f"--- {layer_name}")
 
+    for name in ["normalizer.var", "normalizer.mean", "normalizer.count"]:
+        print("=" * 20, name, state_dict[name])
     model_weight_file = os.path.join(cache_dir, "model.pdparams")
     paddle.save(state_dict, model_weight_file)
     return state_dict
 
 
-config = LlamaConfig.from_pretrained("./hf_config.json")
-# config.save_pretrained("./")
-convert(LlamaForCausalLM, weight_file="PKU-Alignment/alpaca-7b-reproduced", config=config, cache_dir="./")
+# config = LlamaConfig.from_pretrained("./hf_config.json")
+# # config.save_pretrained("./")
+# convert(LlamaForCausalLM, weight_file="PKU-Alignment/alpaca-7b-reproduced", config=config, cache_dir="./")
+
+# import safe_rlhf
+import safe_rlhf.models.score_model.llama.modeling_llama as modeling_llama
+
+config = LlamaConfig.from_pretrained("hf_beaver-7b-v1.0-reward.json")
+config.save_pretrained("/root/paddlejob/workspace/guosheng/beaver-7b-v1.0-reward/")
+convert(
+    LlamaModelForScore,
+    weight_file="PKU-Alignment/beaver-7b-v1.0-reward",
+    # LlamaForCausalLM,
+    # weight_file="PKU-Alignment/alpaca-7b-reproduced",
+    config=config,
+    cache_dir="/root/paddlejob/workspace/guosheng/beaver-7b-v1.0-reward/",
+    # hf_cls=safe_rlhf.models.score_model.AutoModelForScore)
+    # hf_cls=safe_rlhf.models.score_model.llama.LLamaModelForScore)
+    hf_cls=modeling_llama.LlamaModelForScore,
+)
+# hf_cls=None)
+
 
 # state_dict = paddle.load("model.pdparams")
 # for k, v in state_dict.items():

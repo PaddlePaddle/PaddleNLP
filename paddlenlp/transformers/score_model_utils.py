@@ -26,6 +26,7 @@ import paddle
 import paddle.distributed as dist
 import paddle.nn as nn
 
+from paddlenlp.generation.utils import print
 from paddlenlp.transformers import PretrainedConfig
 from paddlenlp.transformers.model_outputs import ModelOutput
 
@@ -162,7 +163,9 @@ class ScoreModelMixin:
         return_dict: bool | None = None,
     ) -> ScoreModelOutput:
         """Forward pass of the score model."""
+        print("=" * 20, "score hidden", hidden_state)
         scores = self.score_head(hidden_state)  # size = (B, L, D)
+        # print("=" * 20, "after LlamaModelForScore.score_head")
 
         # if dist.get_rank() == 0:
         #     # print("=" * 20, "hidden_state", hidden_state.numpy(), hidden_state.shape,
@@ -192,7 +195,9 @@ class ScoreModelMixin:
 
             if dist.is_initialized():
                 gathered_end_score_list = [paddle.zeros_like(end_score) for _ in range(dist.get_world_size())]
+                # print("=" * 20, "before score all_gather")
                 dist.all_gather(gathered_end_score_list, end_score)
+                print("=" * 20, "after score all_gather")
                 gathered_end_score = paddle.concat(gathered_end_score_list, axis=0)
                 self.normalizer.update(gathered_end_score)
                 # output_shape = end_score.shape
@@ -201,15 +206,17 @@ class ScoreModelMixin:
                 #                                   dtype=end_score.dtype)
                 # group.process_group.all_gather(end_score,
                 #                                gathered_end_score).wait()
-                self.normalizer.update(gathered_end_score)
+                # self.normalizer.update(gathered_end_score)
             else:
                 self.normalizer.update(end_score)
             self.config.mean = self.normalizer.mean.tolist()
             self.config.var = self.normalizer.var.tolist()
+            print("=" * 20, "after normalizer update")
 
         if self.do_normalize:
             scores = self.normalizer.normalize(scores)
             end_score = self.normalizer.normalize(end_score)
+            print("=" * 20, "after do_normalize")
 
         if not return_dict:
             return scores, end_score

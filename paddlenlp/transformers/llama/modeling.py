@@ -1503,11 +1503,15 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         )
 
+        if hidden_states.shape[1] > 1:
+            print("=" * 20, "causalLM hidden", self.lm_head.weight, hidden_states)
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+        # print("=" * 20, "after lm_head")
 
         loss = None
         if labels is not None:
             loss = self.criterion(logits, labels)
+            # print("=" * 20, "after causalLM loss")
 
         if not return_dict:
             output = (logits,) + outputs[1:]
@@ -1607,9 +1611,51 @@ class LlamaModelForScore(ScoreModelMixin, LlamaPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
+        # print("=" * 20, "after LlamaModelForScore.llama")
         hidden_states = outputs[0]  # size = (B, L, E)
         return self.get_score(
             hidden_states,
             attention_mask=attention_mask,
             return_dict=return_dict,
         )
+
+    @classmethod
+    def _get_name_mappings(cls, config: LlamaConfig) -> list[StateDictNameMapping]:
+        mappings: list[StateDictNameMapping] = []
+        model_mappings = [
+            ["embed_tokens.weight"],
+            ["norm.weight"],
+        ]
+        for layer_index in range(config.num_hidden_layers):
+            layer_mappings = [
+                [f"layers.{layer_index}.self_attn.q_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.k_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.v_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.o_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.rotary_emb.inv_freq"],
+                [f"layers.{layer_index}.mlp.gate_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.mlp.down_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.mlp.up_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.input_layernorm.weight"],
+                [f"layers.{layer_index}.post_attention_layernorm.weight"],
+            ]
+            model_mappings.extend(layer_mappings)
+
+        init_name_mappings(mappings=model_mappings)
+        # base-model prefix "LlamaModel"
+        if "LlamaModel" not in config.architectures:
+            for mapping in model_mappings:
+                mapping[0] = "model." + mapping[0]
+                mapping[1] = "llama." + mapping[1]
+            model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
+            model_mappings.extend(
+                [
+                    ["score_head.weight", "score_head.weight", "transpose"],
+                    ["normalizer.var", "normalizer.var"],
+                    ["normalizer.mean", "normalizer.mean"],
+                    ["normalizer.count", "normalizer.count"],
+                ]
+            )
+
+        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
+        return mappings

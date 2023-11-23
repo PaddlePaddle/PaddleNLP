@@ -57,16 +57,16 @@ class SafeRLHFTrainDataset(SafeRLHFDataset):
     NAME: str = "PKU-SafeRLHF/train"
     ALIASES: tuple[str, ...] = ("PKU-Alignment/PKU-SafeRLHF/train",)
     PATH: str = "PKU-Alignment/PKU-SafeRLHF"
-    # SPLIT: str = 'train'
-    SPLIT: str = "30k_train"
+    SPLIT: str = "train"
+    # SPLIT: str = "30k_train"  # dataset has been updated
 
 
 class SafeRLHFTestDataset(SafeRLHFDataset):
     NAME: str = "PKU-SafeRLHF/test"
     ALIASES: tuple[str, ...] = ("PKU-Alignment/PKU-SafeRLHF/test",)
     PATH: str = "PKU-Alignment/PKU-SafeRLHF"
-    # SPLIT: str = 'test'
-    SPLIT: str = "30k_test"
+    SPLIT: str = "test"
+    # SPLIT: str = "30k_test"
 
 
 class SafeRLHF10KTrainDataset(SafeRLHFDataset):

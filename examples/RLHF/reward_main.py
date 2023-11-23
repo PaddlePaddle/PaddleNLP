@@ -15,8 +15,7 @@
 import os
 import sys
 from dataclasses import dataclass, field
-from fractions import Fraction
-from typing import Any
+from typing import Any, Dict, Tuple
 
 import paddle
 
@@ -25,7 +24,7 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-from data.preference import PreferenceDataset
+from data import PreferenceDataset, parse_dataset
 from reward_trainer import RewardTrainer
 
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
@@ -124,50 +123,15 @@ class DataArgument:
         },
     )
 
-    def parse_dataset(self, string: str) -> tuple[str, dict[str, Any]]:
-        """Parse dataset path and its proportion and optionally additional arguments from a string.
-
-        Args:
-            string (str): Dataset string in the format of ``dataset_name[:proportion[:dataset_path]]``.
-        """
-        if string.count(":") > 2:
-            raise ValueError(
-                f"Invalid dataset string `{string}`, "
-                "should be in the format of `dataset_name[:proportion[:dataset_path]]`.",
-            )
-        name, colon, proportion = string.partition(":")
-        if not colon:
-            return name, {"proportion": 1.0}
-        proportion, colon, path = proportion.partition(":")
-        if "/" in proportion:
-            left, right = proportion.split("/")
-            left, right = left.strip(), right.strip()
-            if right == "-1":
-                proportion = Fraction(int(left), -1)
-                if proportion == 0:
-                    proportion = 0.0
-            else:
-                proportion = float(left) / float(right)
-        elif proportion != "":
-            proportion = float(proportion)
-        else:
-            proportion = 1.0
-        if not colon:
-            return name, {"proportion": proportion}
-        if not path:
-            raise ValueError(f"Invalid dataset path `{path}`.")
-        path = os.path.expanduser(path)
-        return name, {"proportion": proportion, "path": path}
-
     @property
-    def parsed_train_datasets(self) -> tuple[str, dict[str, Any]]:
+    def parsed_train_datasets(self) -> Tuple[str, Dict[str, Any]]:
         """Parse dataset path and its proportion and optionally additional arguments from `train_datasets`."""
-        return [self.parse_dataset(string) for string in self.train_datasets.split(",")]
+        return [parse_dataset(string) for string in self.train_datasets.split(",")]
 
     @property
-    def parsed_eval_datasets(self) -> tuple[str, dict[str, Any]]:
+    def parsed_eval_datasets(self) -> Tuple[str, Dict[str, Any]]:
         """Parse dataset path and its proportion and optionally additional arguments from `eval_datasets`."""
-        return [self.parse_dataset(string) for string in self.eval_datasets.split(",")]
+        return [parse_dataset(string) for string in self.eval_datasets.split(",")]
 
 
 def main():
@@ -248,7 +212,12 @@ def main():
         tokenizer=tokenizer,
         data_collator=train_ds.get_collator(),
     )
-    trainer.train()
+    checkpoint = None
+    if training_args.resume_from_checkpoint is not None:
+        checkpoint = training_args.resume_from_checkpoint
+    elif last_checkpoint is not None:
+        checkpoint = last_checkpoint
+    trainer.train(resume_from_checkpoint=checkpoint)
 
 
 if __name__ == "__main__":

@@ -50,6 +50,58 @@ __all__ = [
     "parse_dataset",
 ]
 
+IGNORE_INDEX: int = -100
+PROMPT_BEGIN: str = "BEGINNING OF CONVERSATION: "
+PROMPT_USER: str = "USER: {input} "
+PROMPT_ASSISTANT: str = "ASSISTANT:"  # should not have a space at the end
+PROMPT_INPUT: str = PROMPT_BEGIN + PROMPT_USER + PROMPT_ASSISTANT
+
+
+def format_prompt(
+    input: str | list[str],  # pylint: disable=redefined-builtin
+    eos_token: str,
+) -> str:
+    if isinstance(input, str):
+        input = [input]
+    elif not isinstance(input, list):
+        raise ValueError(f"Unsupported type of `input`: {type(input)}. Expected: str or list[str].")
+
+    if len(input) % 2 != 1:
+        raise ValueError(
+            "The length of `input` must be odd, while `input` must end at the user question.",
+        )
+
+    buffer = [PROMPT_BEGIN]
+    for i, line in enumerate(input):
+        if i % 2 == 0:
+            # User input
+            buffer.extend((PROMPT_USER.format(input=line), PROMPT_ASSISTANT))
+        else:
+            # Assistant response
+            buffer.extend((line, eos_token))
+
+    return "".join(buffer)
+
+
+def left_padding(sequences, padding_value=0):
+    arrs = [np.asarray(seq) for seq in sequences]
+    max_length = max([len(seq) for seq in sequences])
+    bs = len(sequences)
+    data = np.full([bs, max_length], padding_value, dtype=arrs[0].dtype)
+    for i, arr in enumerate(arrs):
+        data[i, -len(arr) :] = arr
+    return data
+
+
+def right_padding(sequences, padding_value=0):
+    arrs = [np.asarray(seq) for seq in sequences]
+    max_length = max([len(seq) for seq in sequences])
+    bs = len(sequences)
+    data = np.full([bs, max_length], padding_value, dtype=arrs[0].dtype)
+    for i, arr in enumerate(arrs):
+        data[i, : len(arr)] = arr
+    return data
+
 
 class ConcatDataset(Dataset):
     r"""Dataset as a concatenation of multiple datasets.
@@ -338,7 +390,7 @@ class TokenizedDataset(Dataset):
         data = self.data[index]
         if data is self._SENTINEL:
             raw_sample = self.rawdata[index]
-            data = self.preprocess(raw_sample, index)
+            data = self.preprocess(raw_sample)
             self.data[index] = data
         return data
 
