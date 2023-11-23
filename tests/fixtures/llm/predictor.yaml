@@ -2,6 +2,7 @@ inference-predict:
   default:
     mode: dynamic 
     max_length: 40
+    pt_max_length: 160
     batch_size: 2
     decode_strategy: greedy_search
     dtype: float16
@@ -18,4 +19,5 @@ inference-infer:
     batch_size: 2
     decode_strategy: greedy_search
     max_length: 40
+    pt_max_length: 160
     data_file: tests/fixtures/llm/data/train.json

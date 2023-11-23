@@ -69,6 +69,9 @@ class LLMTest:
         predict_config["output_file"] = os.path.join(self.output_dir, "predict.json")
         predict_config["model_name_or_path"] = self.output_dir
         predict_config.update(config_params)
+        if hasattr(self, "download_precache_files") and predict_config["inference_model"]:
+            predict_config["max_length"] = predict_config["pt_max_length"]
+        predict_config.pop("pt_max_length")
 
         with argv_context_guard(predict_config):
             from predictor import predict
@@ -95,9 +98,13 @@ class LLMTest:
         config = load_test_config(self.config_path, "inference-infer")
         config["model_name_or_path"] = self.inference_output_dir
         config["output_file"] = os.path.join(self.inference_output_dir, "infer.json")
-
         config_params.pop("model_name_or_path", None)
         config.update(config_params)
+
+        if hasattr(self, "download_precache_files"):
+            config["max_length"] = config["pt_max_length"]
+        config.pop("pt_max_length")
+
         with argv_context_guard(config):
             from predictor import predict
 
