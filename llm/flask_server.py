@@ -70,7 +70,7 @@ class PredictorServer:
             self.port = find_free_ports(scan_l, scan_u)
             print(self.port)
             self.peer_ports = {}
-            while True:
+            while True and self.predictor.tensor_parallel_degree > 1:
                 if os.path.exists(FILE_PREFIX):
                     with FileLock(FILE_LOCK):
                         with open(FILE_PREFIX, 'r') as f:
@@ -162,9 +162,11 @@ if __name__ == "__main__":
     parser = PdArgumentParser((PredictorArgument, ModelArgument, ServerArgument))
     predictor_args, model_args, server_args = parser.parse_args_into_dataclasses()
 
-    FILE_PREFIX = os.path.join(os.environ["PADDLE_LOG_DIR"], FILE_PREFIX)
+    log_dir = os.environ["PADDLE_LOG_DIR"] if hasattr(os.environ, "PADDLE_LOG_DIR") else "./"
+    FILE_PREFIX = os.path.join(log_dir, FILE_PREFIX)
     if os.path.exists(FILE_PREFIX):
         os.remove(FILE_PREFIX)
+
 
     predictor = create_predictor(predictor_args, model_args)
 

@@ -109,7 +109,6 @@ def launch(args):
 
             context[-1]["utterance"] += bot_response["utterance"]
             shown_context = get_shown_context(context)
-            print(shown_context)
 
             yield None, shown_context, context, state
 
