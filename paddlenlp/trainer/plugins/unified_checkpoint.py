@@ -482,30 +482,51 @@ def check_unified_checkpoint(model, resume_from_checkpoint, safe_serialization=F
     return False  # 进入扩缩容分支
 
 
-def create_dispatch_table(args, model, is_optimizer=False):
+def create_dispatch_table(
+    args, model, file_keyname_mappings, file_machine_mappings, resume_from_checkpoint, is_optimizer=False
+):
     # 当前暂时只支持model weight
+    # dispatch table需要包含两个东西: key是由谁发送的, key是由谁接收的
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
     tp_rank = tp_group.rank
 
+    # 创建接收表
     dispatch_list = []
-    dispatch_table = {}
+    recv_table = {}
     if args.dataset_rank == 0:
         for (k, v) in model.state_dict().items():
             if hasattr(v, "is_distributed") and v.is_distributed:
-                dispatch_table[k] = [(dist.get_rank(), tp_rank)]
+                recv_table[k] = [(dist.get_rank(), tp_rank)]
             else:
-                dispatch_table[k] = [(dist.get_rank(), -1)]
+                recv_table[k] = [(dist.get_rank(), -1)]
 
-    dist.all_gather_object(dispatch_list, dispatch_table)  # 全局收集
-    dispatch_table = {}
+    dist.all_gather_object(dispatch_list, recv_table)  # 全局收集
+    recv_table = {}
     for dl in dispatch_list:  # 相同key,需要将value进行相加.
         for key, value in dl.items():
-            if key not in dispatch_table:
-                dispatch_table[key] = value
+            if key not in recv_table:
+                recv_table[key] = value
             else:
-                dispatch_table[key] += value
-    return dispatch_table
+                recv_table[key] += value
+
+    # 创建发送表
+    send_table = {}
+    global_rank = dist.get_rank()
+    local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+    local_device_count = os.getenv("PADDLE_LOCAL_SIZE")
+    for filename, keys in file_keyname_mappings.items():
+        machine = file_machine_mappings[filename][0]
+        is_src = (global_rank // local_device_count) == machine
+        for i, key in enumerate(keys):
+            if is_src and local_rank % i == 0:
+                send_table[key] = global_rank
+    dispatch_list = []
+    dist.all_gather_object(dispatch_list, send_table)  # 全局收集
+    send_table = {}
+    for dl in dispatch_list:
+        send_table.update(dl)
+    return send_table, recv_table
 
 
 def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_serialization=False):
@@ -522,54 +543,55 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
         index = json.loads(f.read())
     all_weight_filenames = sorted(set(index["weight_map"].values()))  # 完整权重名字列表
 
-    file_keyname_mapping = {}
+    file_keyname_mappings = {}
     for k, v in index["weight_map"].items():
-        if v not in file_keyname_mapping:
-            file_keyname_mapping[v] = []
-        file_keyname_mapping[v].append(k)
-    for k in file_keyname_mapping.keys():
-        file_keyname_mapping[k] = sorted(file_keyname_mapping[k])  # 确保全局一致
+        if v not in file_keyname_mappings:
+            file_keyname_mappings[v] = []
+        file_keyname_mappings[v].append(k)
+    for k in file_keyname_mappings.keys():
+        file_keyname_mappings[k] = sorted(file_keyname_mappings[k])  # 确保全局一致
 
+    local_device_count = os.getenv("PADDLE_LOCAL_SIZE")
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
     global_rank = dist.get_rank()
-    local_device_count = os.getenv("PADDLE_LOCAL_SIZE")
-    file_machine_mapping = {}
-    # 收集filename所处的机器位置, 收集完毕后,取list中第一个machine来处理该文件.
-    for filename in all_weight_filenames:
-        if local_rank == 0:
-            if os.path.exists(os.path.join(resume_from_checkpoint, filename)):
-                file_machine_mapping[filename] = global_rank // local_device_count
+    file_machine_mappings = {}
+    for filename in file_keyname_mappings.keys():
+        if local_rank == 0 and os.path.exists(resume_from_checkpoint, filename):
+            file_machine_mappings[filename] = [global_rank // local_device_count]
     file_machine_list = []
-    dist.all_gather_object(file_machine_list, file_machine_mapping)
-    file_machine_mapping = {}
+    dist.all_gather_object(file_machine_list, file_machine_mappings)  # 全局收集
+    file_machine_mappings = {}
     for mappings in file_machine_list:
         for k, v in mappings.items():
-            if k not in file_machine_mapping:
-                file_machine_mapping[k] = v
+            if k not in file_machine_mappings:
+                file_machine_mappings[k] = v
             else:
-                file_machine_mapping[k] += v
+                file_machine_mappings[k] += v
 
-    for filename in file_keyname_mapping.keys():
-        machine = file_machine_mapping[filename][0]  # 取第一个machine上的机器来处理文件
+    send_table, recv_table = create_dispatch_table(
+        args, model, file_keyname_mappings, file_machine_mappings, resume_from_checkpoint
+    )
+
+    state_dict = model.state_dict()
+    for filename in file_keyname_mappings.keys():
+        machine = file_machine_mappings[filename][0]  # 取第一个machine上的机器来处理文件
         is_src = global_rank // local_device_count == machine
         if is_src:
-            fopen = safe_open(os.path.join(resume_from_checkpoint, filename))
+            f = safe_open(os.path.join(resume_from_checkpoint, filename), framework="np")
 
+        for i, key in enumerate(file_keyname_mappings[filename]):
+            recv_info = recv_table[key]
+            recv_ranklist = [a for a, b in recv_info]
 
-#        # 判断对于当前rank而言,这个filename出现在哪一台机器,记录一个列表.
-#        # 之所以写成列表,是为了处理一个文件出现在多台机器上的情况,这个时候就选择其中一个机器进行处理
-#        # 对这个结果进行all-gather,然后开始判断当前worker是否在负责加载的机器上; 在的话,就由这个worker来处理相应的file.
-#
-#        filename_machines = []
-#        if local_rank == 0:
-#            if os.path.exists(resume_from_checkpoint, filename):
-#                filename_machines.append()
-#
-#        is_existed =
-#        if 存在:
-#            with safe_open(filename)
-#        for i, key in enuemrate(key_list):
-#            # tensor发送与接收.
+            if is_src and global_rank == send_table[key]:  # 负责发送相应数据的进程, 需要知道发送给谁
+                # py_safe_slice_ = f.get_slice(key)
+                # send
+                for rank in recv_ranklist:
+                    dist.stream.send(None, dst=rank)
+
+            elif global_rank in recv_ranklist:  # 负责接收相应数据的进程,需要知道是谁发送的
+                # 准备接收文件
+                dist.stream.recv(state_dict["key"], src=send_table[key])
 
 
 def get_sharded_file_name(args, file_name, is_optimizer=False):
