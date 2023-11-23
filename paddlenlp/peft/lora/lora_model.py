@@ -224,7 +224,7 @@ class LoRAModel(nn.Layer):
         return lora_state_dict
 
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
-        if isinstance(self.model, PipelinePretrainedModel):
+        if isinstance(self.model, PipelinePretrainedModel) or issubclass(self.model, PipelineLayer):
             self.model._single_to_pp_mapping = None
         if self.quantized and merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
             merge_tensor_parallel = False
