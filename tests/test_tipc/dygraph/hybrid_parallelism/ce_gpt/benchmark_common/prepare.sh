@@ -26,6 +26,7 @@
 # limitations under the License.
 
 python -m pip install -r ../requirements.txt
+python -m pip install regex
 # get data
 cd ../llm/gpt-3
 rm -rf data
