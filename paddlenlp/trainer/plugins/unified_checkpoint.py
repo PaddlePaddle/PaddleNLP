@@ -46,6 +46,7 @@ from paddlenlp.utils.log import logger
 if is_safetensors_available():
 
     # from safetensors.numpy import load_file as safe_load_file
+    from safetensors import safe_open
     from safetensors.numpy import save_file as safe_save_file
 
 
@@ -452,7 +453,7 @@ def check_unified_checkpoint(model, resume_from_checkpoint, safe_serialization=F
         )
         existed_filelist = pp_existed_filelist
 
-    if len(existed_filelist) == 0:  # for pure sharding
+    if len(existed_filelist) == 0:  # for pure sharding, 如果是optimizer,还需要继续收集
         existed_filelist = [existed_files]
     flatten_existed_filelist = flatten_list(existed_filelist)
     # 取差集, 判断差集是否为空
@@ -481,36 +482,25 @@ def check_unified_checkpoint(model, resume_from_checkpoint, safe_serialization=F
     return False  # 进入扩缩容分支
 
 
-def create_dispatch_table(model, is_optimizer=False):
-
-    # 对于model参数而言,当前我们仅在dataset_rank==0下获取分发表,当前仅处理非优化器情况
-
+def create_dispatch_table(args, model, is_optimizer=False):
+    # 当前暂时只支持model weight
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
-    pp_group = hcg.get_pipe_parallel_group()
     tp_rank = tp_group.rank
 
     dispatch_list = []
     dispatch_table = {}
-    for (k, v) in model.state_dict().items():
-        if hasattr(v, "is_distributed") and v.is_distributed:
-            dispatch_table[k] = [(dist.get_rank(), tp_rank)]
-        else:
-            dispatch_table[k] = [(dist.get_rank(), -1)]
+    if args.dataset_rank == 0:
+        for (k, v) in model.state_dict().items():
+            if hasattr(v, "is_distributed") and v.is_distributed:
+                dispatch_table[k] = [(dist.get_rank(), tp_rank)]
+            else:
+                dispatch_table[k] = [(dist.get_rank(), -1)]
 
-    # gather 所有worker上的dispatch_table
-    if tp_group.nranks > 1:
-        dist.all_gather_object(dispatch_list, dispatch_table, tp_group)
-    if pp_group.nranks > 1:
-        pp_dispatch_list = []
-        dist.all_gather_object(pp_dispatch_list, dispatch_list if len(dispatch_list) > 0 else dispatch_table, pp_group)
-        if isinstance(pp_dispatch_list[0], list):
-            dispatch_list = [y for x in pp_dispatch_list for y in x]
-        else:
-            dispatch_list = pp_dispatch_list
+    dist.all_gather_object(dispatch_list, dispatch_table)  # 全局收集
     dispatch_table = {}
-    for dis in dispatch_list:  # 相同key,需要将value进行相加.
-        for key, value in dis.items():
+    for dl in dispatch_list:  # 相同key,需要将value进行相加.
+        for key, value in dl.items():
             if key not in dispatch_table:
                 dispatch_table[key] = value
             else:
@@ -518,11 +508,68 @@ def create_dispatch_table(model, is_optimizer=False):
     return dispatch_table
 
 
-def dynamic_load_unified_checkpoint(model, resume_from_checkpoint, safe_serialization=False):
-    # 创建tensor分发表
-    dispatch_table = create_dispatch_table(model)
+def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_serialization=False):
+
+    # 创建tensor分发表, 本阶段默认只针对safetensors格式进行处理.
+    dispatch_table = create_dispatch_table(args, model)
     print(dispatch_table)
+
     # 接下来需要确定哪些tensor由哪些worker负责load
+    index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+    index_filename = os.path.join(resume_from_checkpoint, index_filename)
+
+    with open(index_filename, "r") as f:
+        index = json.loads(f.read())
+    all_weight_filenames = sorted(set(index["weight_map"].values()))  # 完整权重名字列表
+
+    file_keyname_mapping = {}
+    for k, v in index["weight_map"].items():
+        if v not in file_keyname_mapping:
+            file_keyname_mapping[v] = []
+        file_keyname_mapping[v].append(k)
+    for k in file_keyname_mapping.keys():
+        file_keyname_mapping[k] = sorted(file_keyname_mapping[k])  # 确保全局一致
+
+    local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+    global_rank = dist.get_rank()
+    local_device_count = os.getenv("PADDLE_LOCAL_SIZE")
+    file_machine_mapping = {}
+    # 收集filename所处的机器位置, 收集完毕后,取list中第一个machine来处理该文件.
+    for filename in all_weight_filenames:
+        if local_rank == 0:
+            if os.path.exists(os.path.join(resume_from_checkpoint, filename)):
+                file_machine_mapping[filename] = global_rank // local_device_count
+    file_machine_list = []
+    dist.all_gather_object(file_machine_list, file_machine_mapping)
+    file_machine_mapping = {}
+    for mappings in file_machine_list:
+        for k, v in mappings.items():
+            if k not in file_machine_mapping:
+                file_machine_mapping[k] = v
+            else:
+                file_machine_mapping[k] += v
+
+    for filename in file_keyname_mapping.keys():
+        machine = file_machine_mapping[filename][0]  # 取第一个machine上的机器来处理文件
+        is_src = global_rank // local_device_count == machine
+        if is_src:
+            fopen = safe_open(os.path.join(resume_from_checkpoint, filename))
+
+
+#        # 判断对于当前rank而言,这个filename出现在哪一台机器,记录一个列表.
+#        # 之所以写成列表,是为了处理一个文件出现在多台机器上的情况,这个时候就选择其中一个机器进行处理
+#        # 对这个结果进行all-gather,然后开始判断当前worker是否在负责加载的机器上; 在的话,就由这个worker来处理相应的file.
+#
+#        filename_machines = []
+#        if local_rank == 0:
+#            if os.path.exists(resume_from_checkpoint, filename):
+#                filename_machines.append()
+#
+#        is_existed =
+#        if 存在:
+#            with safe_open(filename)
+#        for i, key in enuemrate(key_list):
+#            # tensor发送与接收.
 
 
 def get_sharded_file_name(args, file_name, is_optimizer=False):
