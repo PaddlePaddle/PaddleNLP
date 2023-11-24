@@ -33,7 +33,7 @@ from filelock import FileLock
 
 STOP_SIGNAL = "[END]"
 port_interval = 200
-FILE_PREFIX = "port-info"
+PORT_FILE = "port-info"
 FILE_LOCK = "port-lock"
 
 def find_free_ports(port_l, port_u):
@@ -68,19 +68,17 @@ class PredictorServer:
         if self.predictor.tensor_parallel_rank == 0:
             # fetch port info
             self.port = find_free_ports(scan_l, scan_u)
-            print(self.port)
             self.peer_ports = {}
             while True and self.predictor.tensor_parallel_degree > 1:
-                if os.path.exists(FILE_PREFIX):
-                    with FileLock(FILE_LOCK):
-                        with open(FILE_PREFIX, 'r') as f:
-                            cnt = 0
-                            for line in f:
-                                data = json.loads(line)
-                                self.peer_ports[data["rank"]] = data["port"]
-                                cnt += 1
+                if os.path.exists(PORT_FILE):
+                    with FileLock(FILE_LOCK), open(PORT_FILE, 'r') as f:
+                        cnt = 1
+                        for line in f:
+                            data = json.loads(line)
+                            self.peer_ports[data["rank"]] = data["port"]
+                            cnt += 1
 
-                    if cnt == predictor.tensor_parallel_degree - 1:
+                    if cnt == predictor.tensor_parallel_degree:
                         break
                     else:
                         print("waiting for port reach", cnt)
@@ -89,10 +87,9 @@ class PredictorServer:
             # save port info
             self.port = find_free_ports(scan_l, scan_u)
             data = {"rank": predictor.tensor_parallel_rank, "port": self.port}
-            with FileLock(FILE_LOCK):
-                with open(FILE_PREFIX, 'a') as f:
-                    f.write(json.dumps(data) + '\n')
-            print(predictor.tensor_parallel_rank, " done")
+            with FileLock(FILE_LOCK), open(PORT_FILE, 'a') as f:
+                f.write(json.dumps(data) + '\n')
+            print("rank: ", predictor.tensor_parallel_rank, " port info saving done.")
 
 
     def predict(self, input_texts: str | list[str]):
@@ -162,10 +159,10 @@ if __name__ == "__main__":
     parser = PdArgumentParser((PredictorArgument, ModelArgument, ServerArgument))
     predictor_args, model_args, server_args = parser.parse_args_into_dataclasses()
 
-    log_dir = os.environ["PADDLE_LOG_DIR"] if hasattr(os.environ, "PADDLE_LOG_DIR") else "./"
-    FILE_PREFIX = os.path.join(log_dir, FILE_PREFIX)
-    if os.path.exists(FILE_PREFIX):
-        os.remove(FILE_PREFIX)
+    log_dir = os.getenv("PADDLE_LOG_DIR", "./")
+    PORT_FILE = os.path.join(log_dir, PORT_FILE)
+    if os.path.exists(PORT_FILE):
+        os.remove(PORT_FILE)
 
 
     predictor = create_predictor(predictor_args, model_args)

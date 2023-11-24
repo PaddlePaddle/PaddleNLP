@@ -101,8 +101,6 @@ def launch(args):
 
             # replace \n with br: https://github.com/gradio-app/gradio/issues/4344
             bot_response["utterance"] = bot_response["utterance"].replace("\n", "<br>")
-            # delete <s> : llama use <s> as bos token
-            bot_response["utterance"] = bot_response["utterance"].replace("<s>", "")
 
             if bot_response["utterance"].endswith("[END]"):
                 bot_response["utterance"] = bot_response["utterance"][:-5]
