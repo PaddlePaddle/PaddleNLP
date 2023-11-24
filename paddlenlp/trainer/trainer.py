@@ -1171,6 +1171,10 @@ class Trainer:
                 )
             )
 
+            if paddle.device.is_compiled_with_cuda():
+                logs["max_mem_reserved"] = paddle.device.cuda.max_memory_reserved()
+                logs["max_mem_allocated"] = paddle.device.cuda.max_memory_allocated()
+
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
             self._globalstep_last_start_time = time.time()

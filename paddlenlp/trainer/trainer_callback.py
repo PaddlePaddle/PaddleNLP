@@ -530,7 +530,7 @@ class PrinterCallback(TrainerCallback):
         _ = logs.pop("total_flos", None)
         if state.is_local_process_zero:
             if type(logs) is dict:
-                logger.info(", ".join(f"{k}: {v}" for k, v in logs.items()))
+                logger.info(" , ".join(f"{k}: {v}" for k, v in logs.items()))
             else:
                 logger.info(logs)
 
