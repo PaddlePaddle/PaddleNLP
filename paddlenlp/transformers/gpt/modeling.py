@@ -639,7 +639,14 @@ class GPTDecoderLayer(nn.Layer):
         attention_weights = hidden_states[1] if output_attentions else None
         hidden_states = hidden_states[0] if (use_cache or output_attentions) else hidden_states
 
-        with seed_guard_context("global_seed"):
+        # If use sequence_parallel, different input partition in dropout
+        # should use different seed.
+        if self.sequence_parallel:
+            current_seed = "local_seed"
+        else:
+            current_seed = "global_seed"
+
+        with seed_guard_context(current_seed):
             if self.config.use_fused_dropout_add:
                 hidden_states = self.fused_dropout_add1(hidden_states, residual)
             else:
@@ -654,7 +661,7 @@ class GPTDecoderLayer(nn.Layer):
 
         # when sequence_parallel=True:
         # hidden_states => [bs * seq_len / n, embed_dim]
-        with seed_guard_context("global_seed"):
+        with seed_guard_context(current_seed):
             if not self.config.use_fused_dropout_add:
                 hidden_states = residual + self.dropout2(
                     self.linear2(self.activation(self.linear1(hidden_states), approximate=True))
