@@ -707,10 +707,10 @@ def gather_sharded_object(index_file, total_size, is_optimizer=False):
         index_file_list = [index_file]
         total_size_list = [total_size]
     if is_optimizer:
-        sharding_index_file_list = []
-        sharding_total_size_list = []
         sharding_group = hcg.get_sharding_parallel_group()
         if sharding_group.nranks > 1:
+            sharding_index_file_list = []
+            sharding_total_size_list = []
             dist.all_gather_object(sharding_index_file_list, index_file_list, sharding_group)
             dist.all_gather_object(sharding_total_size_list, total_size_list, sharding_group)
             index_file_list = flatten_list(sharding_index_file_list)
