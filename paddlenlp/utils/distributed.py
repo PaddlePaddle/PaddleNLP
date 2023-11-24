@@ -122,7 +122,12 @@ def distributed_gather(tensor: Any, dst: int = 0, group=None, offload=False) -> 
                         paddle.empty_like(slice_tensor) for _ in range(distributed.get_world_size(group=group))
                     ]
                 paddle.distributed.communication.stream.gather(
-                    slice_tensor, slice_output_tensors, dst=dst, group=group, sync_op=True, use_calc_stream=False
+                    slice_tensor,
+                    slice_output_tensors,
+                    dst=group.ranks[dst] if group else dst,
+                    group=group,
+                    sync_op=True,
+                    use_calc_stream=False,
                 )
 
                 if is_dst:
@@ -141,7 +146,12 @@ def distributed_gather(tensor: Any, dst: int = 0, group=None, offload=False) -> 
 
         else:
             paddle.distributed.communication.stream.gather(
-                tensor, output_tensors, dst=dst, group=group, sync_op=True, use_calc_stream=False
+                tensor,
+                output_tensors,
+                dst=group.ranks[dst] if group else dst,
+                group=group,
+                sync_op=True,
+                use_calc_stream=False,
             )
 
         return output_tensors
