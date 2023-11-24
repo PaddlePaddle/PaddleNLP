@@ -24,7 +24,7 @@ from utils import generate_rank_mapping, get_infer_model_path
 
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.utils.log import logger
-
+from paddle_custom_device.npu import atb_transdata
 
 @dataclass
 class ExportArgument:
@@ -40,9 +40,9 @@ def load_inference_model(model_path, model_name, param_name, exe):
         return paddle.static.io.load_inference_model(model_path, exe)
 
 
-def validate_pdmodel(model_path, model_prefix):
+def validate_pdmodel(model_path, rank_id, model_prefix):
     paddle.enable_static()
-    place = paddle.CUDAPlace(0)
+    place = paddle.CustomPlace("npu", rank_id)
     exe = paddle.static.Executor(place)
     scope = paddle.static.Scope()
 
@@ -66,6 +66,8 @@ def transformat_weight(model):
             old_shape = model_dict[k].data.shape
             model_dict[k].data = model_dict[k].data.transpose([1, 0])
             model_dict[k].data = model_dict[k].data.reshape(old_shape)
+            if "ffn2_weight" in k:
+                model_dict[k].data = atb_transdata(model_dict[k].data)
             model_dict[k].data = paddle.incubate._npu_identity(x=model_dict[k].data, format=29)
             # model_dict[k].data = model_dict[k].data.reshape([1, int(old_shape[1]/16), old_shape[0], 16])
 
@@ -104,7 +106,7 @@ def main():
     predictor.tokenizer.save_pretrained(export_args.output_path)
     generate_rank_mapping(os.path.join(export_args.output_path, "rank_mapping.csv"))
 
-    validate_pdmodel(export_args.output_path, "model")
+    validate_pdmodel(export_args.output_path, tensor_parallel_rank, "rank_" + str(tensor_parallel_rank) + "/model")
 
 
 if __name__ == "__main__":
