@@ -641,7 +641,7 @@ class GPTDecoderLayer(nn.Layer):
 
         # If use sequence_parallel, different input partition in dropout
         # should use different seed.
-        if self.sequence_parallel:
+        if self.config.sequence_parallel:
             current_seed = "local_seed"
         else:
             current_seed = "global_seed"
