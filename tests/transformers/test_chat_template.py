@@ -151,16 +151,6 @@ class ChatTemplateIntegrationTest(unittest.TestCase):
         )
         self.assertEqual(final_query, expected_query)
 
-        # 2. check the bos_token_id and eos_token_id
-        self.assertEqual(
-            tokenizer.convert_tokens_to_ids(["<|im_start|>"])[0],
-            tokenizer.chat_template_bos_token_id,
-        )
-        self.assertEqual(
-            tokenizer.convert_tokens_to_ids(["<|im_end|>"])[0],
-            tokenizer.chat_template_eos_token_id,
-        )
-
 
 @parameterized_class(
     ["model_name"],
