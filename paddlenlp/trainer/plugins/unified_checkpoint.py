@@ -30,6 +30,7 @@ from paddlenlp.transformers.model_utils import (
     unwrap_model,
 )
 from paddlenlp.transformers.utils import (
+    device_guard,
     dtype_byte_size,
     get_checkpoint_shard_files,
     is_safetensors_available,
@@ -474,9 +475,9 @@ def check_unified_checkpoint(model, resume_from_checkpoint, safe_serialization=F
     num_diff = paddle.to_tensor([len(diff_filelist)])
     # 获取dataset_rank==0下,各个worker的列表长度max值,如果max不为0,则走扩缩容分支,否则进行原地重启.
     if tp_group.nranks > 1:
-        dist.allreduce(num_diff, op=dist.ReduceOp.MAX, group=tp_group)
+        dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=tp_group)
     if pp_group.nranks > 1:
-        dist.allreduce(num_diff, op=dist.ReduceOp.MAX, group=pp_group)
+        dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=pp_group)
     if num_diff.item() == 0:
         return True  # 原地重启
     return False  # 进入扩缩容分支
@@ -508,40 +509,37 @@ def create_dispatch_table(
             if key not in recv_table:
                 recv_table[key] = value
             else:
-                recv_table[key] += value
+                recv_table[key] += value  # 元素为list
 
     # 创建发送表
     send_table = {}
     global_rank = dist.get_rank()
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
-    local_device_count = os.getenv("PADDLE_LOCAL_SIZE")
+    local_device_count = int(os.getenv("PADDLE_LOCAL_SIZE"))
     for filename, keys in file_keyname_mappings.items():
         machine = file_machine_mappings[filename][0]
         is_src = (global_rank // local_device_count) == machine
         for i, key in enumerate(keys):
-            if is_src and local_rank % i == 0:
-                send_table[key] = global_rank
+            if is_src and local_rank == i % local_device_count:
+                send_table[key] = global_rank  # 元素为单个rank
     dispatch_list = []
     dist.all_gather_object(dispatch_list, send_table)  # 全局收集
     send_table = {}
     for dl in dispatch_list:
         send_table.update(dl)
+
+    # TODO: 增加一些check,例如检查keys是否完整
     return send_table, recv_table
 
 
 def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_serialization=False):
 
-    # 创建tensor分发表, 本阶段默认只针对safetensors格式进行处理.
-    dispatch_table = create_dispatch_table(args, model)
-    print(dispatch_table)
-
-    # 接下来需要确定哪些tensor由哪些worker负责load
+    # 确定哪些tensor由哪些worker负责load
     index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
     index_filename = os.path.join(resume_from_checkpoint, index_filename)
 
     with open(index_filename, "r") as f:
         index = json.loads(f.read())
-    all_weight_filenames = sorted(set(index["weight_map"].values()))  # 完整权重名字列表
 
     file_keyname_mappings = {}
     for k, v in index["weight_map"].items():
@@ -551,12 +549,14 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
     for k in file_keyname_mappings.keys():
         file_keyname_mappings[k] = sorted(file_keyname_mappings[k])  # 确保全局一致
 
-    local_device_count = os.getenv("PADDLE_LOCAL_SIZE")
+    print("file_keyname_mappings: ", file_keyname_mappings)
+
+    local_device_count = int(os.getenv("PADDLE_LOCAL_SIZE"))
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
     global_rank = dist.get_rank()
     file_machine_mappings = {}
     for filename in file_keyname_mappings.keys():
-        if local_rank == 0 and os.path.exists(resume_from_checkpoint, filename):
+        if local_rank == 0 and os.path.exists(os.path.join(resume_from_checkpoint, filename)):
             file_machine_mappings[filename] = [global_rank // local_device_count]
     file_machine_list = []
     dist.all_gather_object(file_machine_list, file_machine_mappings)  # 全局收集
@@ -567,11 +567,27 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
                 file_machine_mappings[k] = v
             else:
                 file_machine_mappings[k] += v
+    print("file_machine_mappings: ", file_machine_mappings)
 
     send_table, recv_table = create_dispatch_table(
         args, model, file_keyname_mappings, file_machine_mappings, resume_from_checkpoint
     )
 
+    print("send_table: ", send_table)
+    print("recv_table: ", recv_table)
+
+    # all_keys可能有不需要tp切分的,还需要看看怎么区分出这些keys?
+    # 根据接收表来区分?
+    all_tp_keys = []
+    for k, v in recv_table.items():
+        if k not in all_tp_keys:
+            if v[0][1] != -1:
+                all_tp_keys.append(k)
+    print("all_tp_keys: ", all_tp_keys)
+
+    config_revise = copy.deepcopy(model.config)
+    config_revise.tensor_parallel_rank = None
+    tp_actions = model.get_tensor_parallel_convert_actions(config_revise, all_tp_keys, ignore_error=True)
     state_dict = model.state_dict()
     for filename in file_keyname_mappings.keys():
         machine = file_machine_mappings[filename][0]  # 取第一个machine上的机器来处理文件
@@ -579,19 +595,36 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
         if is_src:
             f = safe_open(os.path.join(resume_from_checkpoint, filename), framework="np")
 
-        for i, key in enumerate(file_keyname_mappings[filename]):
+        for key in file_keyname_mappings[filename]:
             recv_info = recv_table[key]
-            recv_ranklist = [a for a, b in recv_info]
+            recv_ranklist = [a for (a, b) in recv_info]
 
+            # 这里怎么并行的需要琢磨一下.
             if is_src and global_rank == send_table[key]:  # 负责发送相应数据的进程, 需要知道发送给谁
-                # py_safe_slice_ = f.get_slice(key)
+                py_safe_slice_ = f.get_slice(key)
                 # send
-                for rank in recv_ranklist:
-                    dist.stream.send(None, dst=rank)
+                if key in tp_actions:
+                    weight = tp_actions[key](py_safe_slice_)
 
-            elif global_rank in recv_ranklist:  # 负责接收相应数据的进程,需要知道是谁发送的
-                # 准备接收文件
-                dist.stream.recv(state_dict["key"], src=send_table[key])
+                # 需将weight copy到GPU
+                for j in range(len(weight)):
+                    with device_guard():
+                        weight[j] = paddle.Tensor(weight[j], zero_copy=True)
+                    weight[j] = weight[j]._copy_to(paddle.framework._current_expected_place(), False)
+
+                for recv_rank, split_index in recv_info:
+                    if recv_rank == global_rank:  # 发送方也是接收方
+                        state_dict[key] = weight[split_index]  # 这里是可以直接等于,还是需要copy?
+                        continue
+                    else:
+                        dist.stream.send(weight[split_index], dst=recv_rank)
+
+            if global_rank in recv_ranklist:  # 负责接收相应数据的进程,需要知道是谁发送的
+                # 接收tensor
+                dist.stream.recv(state_dict[key], src=send_table[key])
+
+        if is_src:  # 关闭文件
+            f.__exit__(None, None, None)
 
 
 def get_sharded_file_name(args, file_name, is_optimizer=False):
