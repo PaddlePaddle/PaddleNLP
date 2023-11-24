@@ -172,7 +172,8 @@ void LaunchRotaryQK(const paddle::Tensor& q,
             head_num,
             seq_len * rotary_emb_dims,
             last_dim);
-        NeoXRotaryKernel<<<grid, BlockSize, 0, cu_stream>>>(
+        dim3 grid_k(batch_size, kv_head_num, seq_len * rotary_emb_dims);
+        NeoXRotaryKernel<<<grid_k, BlockSize, 0, cu_stream>>>(
             k_data,
             cos_emb,
             sin_emb,
@@ -180,7 +181,7 @@ void LaunchRotaryQK(const paddle::Tensor& q,
             k_out_data,
             rotary_emb_dims,
             batch_size,
-            head_num,
+            kv_head_num,
             seq_len * rotary_emb_dims,
             last_dim);
     }
