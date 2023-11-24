@@ -265,7 +265,7 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
     results = unified_optimizer_into_shards(args, model, optimizer, safe_serialization=safe_serialization)
     master_weight_state_dict = None
     if len(results) == 1:
-        optim_state_dict, shard_optim_file, sharded_optim_index = results
+        optim_state_dict, shard_optim_file, sharded_optim_index = results[0]
     else:
         optim_state_dict, shard_optim_file, sharded_optim_index = results[0]
         master_weight_state_dict, shard_master_weight_file, sharded_master_weight_index = results[1]
@@ -510,13 +510,12 @@ def unified_optimizer_into_shards(
         sharded_optim_index["master_weights"] = True
 
     if master_weights is None:
-        return (optim_state_dict, shard_optimizer_file, sharded_optim_index)
+        return [(optim_state_dict, shard_optimizer_file, sharded_optim_index)]
     else:
-        return (optim_state_dict, shard_optimizer_file, sharded_optim_index), (
-            master_weights,
-            shard_master_weight_file,
-            sharded_master_weight_index,
-        )
+        return [
+            (optim_state_dict, shard_optimizer_file, sharded_optim_index),
+            (master_weights, shard_master_weight_file, sharded_master_weight_index),
+        ]
 
 
 def get_sharded_file_name(args, file_name, is_optimizer=False):
