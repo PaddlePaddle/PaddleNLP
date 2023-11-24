@@ -20,7 +20,6 @@ import socket
 from dataclasses import dataclass, field
 from time import sleep
 from filelock import FileLock
-from regex import F
 
 import requests
 
