@@ -807,7 +807,8 @@ def get_expected_keys(sharded_metadata, model, optimizer):
 
     expected_keys = []
     for key in list(sharded_metadata["all_optimizer_keys"]):
-        static_name = struct2static_name_mappings.get(key, None)
+        key_name = key.split("/")[0]
+        static_name = struct2static_name_mappings.get(key_name, None)
         params_rank = params2rank.get(static_name, None)
         if params_rank == global_rank:
             expected_keys.append(key)
