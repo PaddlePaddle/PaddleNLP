@@ -516,6 +516,7 @@ class Trainer:
                 else:
                     # 动态扩缩容分支
                     dynamic_load_unified_checkpoint(
+                        self.args,
                         self.model,
                         resume_from_checkpoint,
                         safe_serialization=True,

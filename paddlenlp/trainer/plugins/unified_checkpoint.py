@@ -423,7 +423,7 @@ def unified_optimizer_into_shards(
 
 
 def check_unified_checkpoint(model, resume_from_checkpoint, safe_serialization=False):
-    # only dataset_rank == 0 can enter this function.
+    # only dataset_rank == 0 can enter this function currently.
     index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
     index_filename = os.path.join(resume_from_checkpoint, index_filename)
     # 先假定dataset_rank==0的情况下,每台机器都有此文件,后续再考虑如何多机之间传输此文件.
@@ -590,14 +590,25 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
     tp_actions = model.get_tensor_parallel_convert_actions(config_revise, all_tp_keys, ignore_error=True)
     state_dict = model.state_dict()
     for filename in file_keyname_mappings.keys():
+
+        print(filename)
+
         machine = file_machine_mappings[filename][0]  # 取第一个machine上的机器来处理文件
         is_src = global_rank // local_device_count == machine
+
+        print("is_src: ", is_src)
+
         if is_src:
             f = safe_open(os.path.join(resume_from_checkpoint, filename), framework="np")
 
         for key in file_keyname_mappings[filename]:
             recv_info = recv_table[key]
             recv_ranklist = [a for (a, b) in recv_info]
+
+            print(global_rank, key)
+            print("send: ", send_table[key], " recv: ", recv_table[key])
+            print("send data process: ", is_src and global_rank == send_table[key])
+            print("recv data process: ", global_rank in recv_ranklist)
 
             # 这里怎么并行的需要琢磨一下.
             if is_src and global_rank == send_table[key]:  # 负责发送相应数据的进程, 需要知道发送给谁
@@ -606,22 +617,40 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
                 if key in tp_actions:
                     weight = tp_actions[key](py_safe_slice_)
 
-                # 需将weight copy到GPU
-                for j in range(len(weight)):
+                    # 需将weight copy到GPU
+                    for j in range(len(weight)):
+                        with device_guard():
+                            weight[j] = paddle.Tensor(weight[j], zero_copy=True)
+                        weight[j] = weight[j]._copy_to(paddle.framework._current_expected_place(), False)
+
+                    print("Begin to send")
+
+                    for recv_rank, split_index in recv_info:
+                        if recv_rank == global_rank:  # 发送方也是接收方
+                            print("send to myself, only copy")
+                            state_dict[key] = weight[split_index]
+                        else:
+                            print(f"send to: {recv_rank}, split: {split_index}")
+                            dist.stream.send(weight[split_index], dst=recv_rank)
+
+                    print("Finish send")
+
+                else:
+                    # no need to tp split
+                    weight = py_safe_slice_[:]
                     with device_guard():
-                        weight[j] = paddle.Tensor(weight[j], zero_copy=True)
-                    weight[j] = weight[j]._copy_to(paddle.framework._current_expected_place(), False)
+                        weight = paddle.Tensor(weight, zero_copy=True)
+                    weight = weight._copy_to(paddle.framework._current_expected_place(), False)
+                    for recv_rank, _ in recv_info:
+                        if recv_rank == global_rank:
+                            state_dict[key] = weight
+                        else:
+                            dist.stream.send(weight, dst=recv_rank)
 
-                for recv_rank, split_index in recv_info:
-                    if recv_rank == global_rank:  # 发送方也是接收方
-                        state_dict[key] = weight[split_index]  # 这里是可以直接等于,还是需要copy?
-                        continue
-                    else:
-                        dist.stream.send(weight[split_index], dst=recv_rank)
-
-            if global_rank in recv_ranklist:  # 负责接收相应数据的进程,需要知道是谁发送的
+            if global_rank != send_table[key] and global_rank in recv_ranklist:  # 负责接收相应数据的进程,需要知道是谁发送的
                 # 接收tensor
                 dist.stream.recv(state_dict[key], src=send_table[key])
+                print("Finish recv")
 
         if is_src:  # 关闭文件
             f.__exit__(None, None, None)
