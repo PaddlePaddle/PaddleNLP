@@ -436,7 +436,7 @@ class InferencePredictorMixin:
 
         else:
             pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
-            inputs, pad_lens = dybatch_preprocess(
+            inputs = dybatch_preprocess(
                 self.tokenizer,
                 source,
                 self.config.max_length,
@@ -444,19 +444,12 @@ class InferencePredictorMixin:
                 top_p=self.config.top_p,
                 temperature=self.config.temperature,
                 pre_caches_length=pre_caches_length,
-                return_pad_len=True
             )
 
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
-                pad_len = pad_lens[i]
-                padding_mask = np.tril(np.ones(shape=(length, length), dtype=self.config.dtype))
-                padding_mask[ :, length - pad_len : length] = np.zeros(shape=[pad_len], dtype=self.config.dtype)
 
-                self.attention_mask[i, 0, :length, :length] = padding_mask
-
-                self.tgt_generation_mask[i, 0, :, length - pad_len : length] = np.zeros(
-                    shape=[pad_len], dtype=self.config.dtype)
+                self.attention_mask[i, 0, :length, :length] = np.tril(np.ones(shape=(length, length), dtype=self.config.dtype))
 
                 # if pre_caches_length > 0:
                 #     if self.config.prefix_path is None:
