@@ -434,13 +434,15 @@ def do_train(args):
 
                 if global_step % args.logging_steps == 0:
                     if paddle.distributed.get_rank() == 0:
-                        max_mem_reserved = paddle.device.cuda.max_memory_reserved()
-                        max_mem_allocated = paddle.device.cuda.max_memory_allocated()
+                        max_mem_reserved_msg = ""
+                        max_mem_allocated_msg = ""
+                        if paddle.device.is_compiled_with_cuda():
+                            max_mem_reserved_msg = f"max_mem_reserved: {paddle.device.cuda.max_memory_reserved()} B,"
+                            max_mem_allocated_msg = f"max_mem_allocated: {paddle.device.cuda.max_memory_allocated()} B"
                         logger.info(
                             "global step: %d, epoch: %d, batch: %d, loss: %f, "
                             "avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, "
-                            "avg_samples: %.5f, ips: %.5f sequences/sec, "
-                            "max_mem_reserved: %s B, max_mem_allocated: %s B"
+                            "avg_samples: %.5f, ips: %.5f sequences/sec, %s %s"
                             % (
                                 global_step,
                                 epoch,
@@ -450,8 +452,8 @@ def do_train(args):
                                 train_cost_avg.get_average(),
                                 total_samples / args.logging_steps,
                                 total_samples / (args.logging_steps * train_cost_avg.get_average()),
-                                max_mem_reserved,
-                                max_mem_allocated,
+                                max_mem_reserved_msg,
+                                max_mem_allocated_msg,
                             )
                         )
                     total_samples = 0

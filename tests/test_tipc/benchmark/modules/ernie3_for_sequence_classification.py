@@ -176,11 +176,14 @@ class Ernie3ForSequenceClassificationBenchmark(BenchmarkBase):
         ips=None,
         **kwargs
     ):
-        max_mem_reserved = paddle.device.cuda.max_memory_reserved()
-        max_mem_allocated = paddle.device.cuda.max_memory_allocated()
+        max_mem_reserved_msg = ""
+        max_mem_allocated_msg = ""
+        if paddle.device.is_compiled_with_cuda():
+            max_mem_reserved_msg = f"max_mem_reserved: {paddle.device.cuda.max_memory_reserved()} B,"
+            max_mem_allocated_msg = f"max_mem_allocated: {paddle.device.cuda.max_memory_allocated()} B"
         logger.info(
             "global step %d / %d, loss: %f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, "
-            "avg_samples: %.5f, ips: %.5f words/sec, max_mem_reserved: %s B, max_mem_allocated: %s B"
+            "avg_samples: %.5f, ips: %.5f words/sec, %s %s"
             % (
                 step_id,
                 args.epoch * self.num_batch,
@@ -189,7 +192,7 @@ class Ernie3ForSequenceClassificationBenchmark(BenchmarkBase):
                 batch_cost,
                 num_samples,
                 ips,
-                max_mem_reserved,
-                max_mem_allocated,
+                max_mem_reserved_msg,
+                max_mem_allocated_msg,
             )
         )
