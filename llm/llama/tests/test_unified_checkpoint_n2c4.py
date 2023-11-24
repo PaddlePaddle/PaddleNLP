@@ -19,9 +19,21 @@ import shutil
 import numpy as np
 from parallel_launch import TestMultipleGpus
 
+# export NVIDIA_TF32_OVERRIDE=0
+# export NCCL_IB_GID_INDEX=3
+# export NCCL_SOCKET_IFNAME=xgbe0
+# export NCCL_IB_TIMEOUT=22
+# export NCCL_DEBUG=INFO
+# export NCCL_IB_DISABLE=1
+# export NCCL_IB_GDR_LEVEL=4
+# export NCCL_SOCKET_IFNAME=eth2
+
+
 environment_variables = {
     "NCCL_ALGO": "Tree",
     "NVIDIA_TF32_OVERRIDE": "0",
+    "NCCL_IB_TIMEOUT": "22",
+    "NCCL_DEBUG": "INFO",
     "FLAGS_embedding_deterministic": "1",
     "FLAGS_cudnn_deterministic": "1",
     "Flags_mp_aysnc_allreduce": "1",
@@ -332,7 +344,7 @@ class TestModelOnN2C4(TestMultipleGpus):
         train_args = copy.deepcopy(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 1
         train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding_parallel_degree"] = 2
+        train_args["sharding_parallel_degree"] = 1
         train_args["sharding"] = "stage2"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
 

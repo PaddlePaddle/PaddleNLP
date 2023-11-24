@@ -426,6 +426,10 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
             returned_optim_state_dict["master_weights"][static_name] = state_dict_master_weight[key]
             returned_optim_state_dict["master_weights"][static_name].name = "_".join([static_name, "fp32_master_0"])
 
+    returned_optim_state_dict = nested_copy_place(
+        returned_optim_state_dict, place=paddle.framework._current_expected_place()
+    )
+
     return returned_optim_state_dict
 
 
@@ -796,6 +800,18 @@ def nested_copy(inputs):
         for key in list(inputs.keys()):
             outputs[key] = nested_copy(inputs[key])
         return outputs
+    return inputs
+
+
+def nested_copy_place(inputs, place=None):
+    if isinstance(inputs, dict):
+        outputs = {}
+        for key in list(inputs.keys()):
+            outputs[key] = nested_copy_place(inputs[key], place)
+        return outputs
+    if isinstance(inputs, paddle.Tensor):
+        inputs = inputs._copy_to(place, False)
+
     return inputs
 
 
