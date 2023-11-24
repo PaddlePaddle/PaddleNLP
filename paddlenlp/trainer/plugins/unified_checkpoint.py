@@ -335,19 +335,8 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
     model_state_dict = model.state_dict()
     model_keys = list(model_state_dict.keys())
     struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}  # get optimizer param mappings
-    expected_keys = []
-    for key in list(sharded_metadata["all_optimizer_keys"]):
-        key_name = key.split("/")
-        if key_name[0] not in struct2static_name_mappings:
-            # this process don't need to load this key
-            continue
-        expected_keys.append(key)
-    expected_keys = set(expected_keys)
 
-    loaded_keys = sharded_metadata["all_optimizer_keys"]
-    missing_keys = expected_keys - set(loaded_keys)
-    if len(missing_keys) > 0:
-        raise ValueError(f"optimizer missing_keys: {missing_keys}")
+    expected_keys = get_expected_keys(sharded_metadata, model, optimizer)
 
     # This should always be a list but, just to be sure.
     if not isinstance(resolved_archive_file, list):
@@ -362,20 +351,14 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
             optimizer_path=resume_from_checkpoint,
             index_filename=os.path.join(resume_from_checkpoint, index_filename_master_weights),
         )
-        expected_keys_mw = set(struct2static_name_mappings.keys())
-        loaded_keys_mw = sharded_metadata_mw["all_optimizer_keys"]
-        missing_keys_mw = expected_keys_mw - set(loaded_keys_mw)
-        if len(missing_keys_mw) > 0:
-            raise ValueError(f"optimizer missing_master_weights_keys: {missing_keys_mw}")
 
+        expected_keys_mw = get_expected_keys(sharded_metadata_mw, model, optimizer)
         if not isinstance(resolved_archive_file_mw, list):
             resolved_archive_file_mw = [resolved_archive_file_mw]
         if len(resolved_archive_file_mw) > 1:
             resolved_archive_file_mw = tqdm(resolved_archive_file_mw, desc="Loading master weights shards")
 
-    def load_resolved_archive_file(
-        resolved_archive_file, sharded_metadata, loaded_keys, expected_keys, is_master_weight=False
-    ):
+    def load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys, is_master_weight=False):
         returned_state_dict = {}
         # load optimizer
         for shard_file in resolved_archive_file:
@@ -388,7 +371,7 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
                 if model.config.tensor_parallel_degree > 1:
                     tp_actions = model.get_tensor_parallel_convert_actions(model.config, model_keys, ignore_error=True)
                     if not is_master_weight:
-                        tp_actions = mapping_optimizer_tp_actions(tp_actions, loaded_keys)
+                        tp_actions = mapping_optimizer_tp_actions(tp_actions, expected_keys)
 
                     # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
                     state_dict = load_state_dict(shard_file, tp_actions, expected_keys)
@@ -402,10 +385,10 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
             gc.collect()
         return returned_state_dict
 
-    state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, loaded_keys, expected_keys)
+    state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys)
     if has_master_weights:
         state_dict_master_weight = load_resolved_archive_file(
-            resolved_archive_file_mw, sharded_metadata_mw, loaded_keys_mw, expected_keys_mw, is_master_weight=True
+            resolved_archive_file_mw, sharded_metadata_mw, expected_keys_mw, is_master_weight=True
         )
 
     # rename optimizer param
@@ -809,6 +792,27 @@ def get_optimizer_shard_files(optimizer_path, index_filename):
     if os.path.isdir(optimizer_path):
         shard_filenames = [os.path.join(optimizer_path, f) for f in shard_filenames]
         return shard_filenames, sharded_metadata
+
+
+def get_expected_keys(sharded_metadata, model, optimizer):
+    struct2static_name_mappings = {k: v.name for k, v in model.state_dict().items()}
+    params2rank = optimizer._param2rank
+    global_rank = fleet.get_hybrid_communicate_group().get_global_rank()
+
+    expected_keys = []
+    for key in list(sharded_metadata["all_optimizer_keys"]):
+        static_name = struct2static_name_mappings.get(key, None)
+        params_rank = params2rank.get(static_name, None)
+        if params_rank == global_rank:
+            expected_keys.append(key)
+    expected_keys = set(expected_keys)
+
+    loaded_keys = sharded_metadata["all_optimizer_keys"]
+    missing_keys = expected_keys - set(loaded_keys)
+    if len(missing_keys) > 0:
+        raise ValueError(f"optimizer missing weights keys: {missing_keys}")
+
+    return expected_keys
 
 
 def mapping_optimizer_tp_actions(tp_actions, optimizer_loaded_keys):
