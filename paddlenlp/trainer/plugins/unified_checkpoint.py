@@ -795,9 +795,15 @@ def get_optimizer_shard_files(optimizer_path, index_filename):
 
 
 def get_expected_keys(sharded_metadata, model, optimizer):
+    hcg = fleet.get_hybrid_communicate_group()
+    global_rank = hcg.get_global_rank()
+    sharding_group = hcg.get_sharding_parallel_group()
+    if sharding_group.nranks > 1:
+        params2rank = optimizer._param2rank
+    else:
+        params2rank = {v.name: global_rank for k, v in model.state_dict().items()}
+
     struct2static_name_mappings = {k: v.name for k, v in model.state_dict().items()}
-    params2rank = optimizer._param2rank
-    global_rank = fleet.get_hybrid_communicate_group().get_global_rank()
 
     expected_keys = []
     for key in list(sharded_metadata["all_optimizer_keys"]):
