@@ -97,7 +97,9 @@ from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
 from .plugins.unified_checkpoint import (
     check_unified_checkpoint,
+    check_unified_optimizer,
     dynamic_load_unified_checkpoint,
+    dynamic_load_unified_optimizer,
     load_unified_checkpoint,
     load_unified_optimizer,
     save_unified_checkpoint,
@@ -515,7 +517,6 @@ class Trainer:
                         safe_serialization=True,
                     )
                 else:
-                    # 动态扩缩容分支
                     dynamic_load_unified_checkpoint(
                         self.args,
                         self.model,
@@ -523,7 +524,7 @@ class Trainer:
                         safe_serialization=True,
                     )
                 logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
-                return
+                return  # 这个return的位置需要再确认下是否正确.
 
         if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
             self._load_from_peft_checkpoint(resume_from_checkpoint)
@@ -2265,12 +2266,28 @@ class Trainer:
         else:
             if self.args.data_parallel_rank == 0:
                 if self.args.unified_checkpoint:
-                    opt_state_dict = load_unified_optimizer(
+                    restart_inplace = check_unified_optimizer(
                         model=self.model,
                         optimizer=self.optimizer,
                         resume_from_checkpoint=checkpoint,
                         safe_serialization=True,
                     )
+                    print("restart_inplace: ", restart_inplace)
+                    if restart_inplace:
+                        opt_state_dict = load_unified_optimizer(
+                            model=self.model,
+                            optimizer=self.optimizer,
+                            resume_from_checkpoint=checkpoint,
+                            safe_serialization=True,
+                        )
+                    else:
+                        opt_state_dict = dynamic_load_unified_optimizer(
+                            args=self.args,
+                            model=self.model,
+                            optimizer=self.optimizer,
+                            resume_from_checkpoint=checkpoint,
+                            safe_serialization=True,
+                        )
                 else:
                     optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
                     path = os.path.join(checkpoint, optimizer_name)

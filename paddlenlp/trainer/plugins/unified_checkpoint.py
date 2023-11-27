@@ -65,7 +65,9 @@ __all__ = [
     "load_unified_optimizer",
     "save_unified_optimizer",
     "check_unified_checkpoint",
+    "check_unified_optimizer",
     "dynamic_load_unified_checkpoint",
+    "dynamic_load_unified_optimizer",
 ]
 
 
@@ -510,8 +512,11 @@ def unified_optimizer_into_shards(
         )
         sharded_master_weight_index = get_sharded_index(index_master_weight_filelist, total_master_weight_size_list)
 
-    if sharded_optim_index is not None and master_weights is not None:
-        sharded_optim_index["master_weights"] = True
+    if sharded_optim_index is not None:
+        if master_weights is not None:
+            sharded_optim_index["master_weights"] = True
+        else:
+            sharded_optim_index["master_weights"] = False
 
     if master_weights is None:
         return [(optim_state_dict, shard_optimizer_file, sharded_optim_index)]
@@ -581,6 +586,122 @@ def check_unified_checkpoint(model, resume_from_checkpoint, safe_serialization=F
     if num_diff.item() == 0:
         return True  # 原地重启
     return False  # 进入扩缩容分支
+
+
+def check_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serialization=False):
+    # only data_parallel_rank == 0 can enter this function currently.
+    if not safe_serialization:
+        index_filename, index_filename_master_weights = PADDLE_OPTIMIZER_INDEX_NAME, PADDLE_MASTER_WEIGHTS_INDEX_NAME
+    else:
+        index_filename, index_filename_master_weights = SAFE_OPTIMIZER_INDEX_NAME, SAFE_MASTER_WEIGHTS_INDEX_NAME
+
+    # 先处理非master_weights的情况. 先假设每台机都有这个文件.
+    with open(os.path.join(resume_from_checkpoint, index_filename), "r") as f:
+        index = json.loads(f.read())
+    all_optimizer_filenames = sorted(set(index["weight_map"].values()))
+
+    has_master_weights = index["master_weights"]
+    if has_master_weights:
+        with open(os.path.join(resume_from_checkpoint, index_filename_master_weights), "r") as f:
+            index_mw = json.loads(f.read())
+        all_mw_filenames = sorted(set(index_mw["weight_map"].values()))
+
+    hcg = fleet.get_hybrid_communicate_group()
+    tp_group = hcg.get_model_parallel_group()
+    pp_group = hcg.get_pipe_parallel_group()
+    sharding_group = hcg.get_sharding_parallel_group()
+    sharding_rank = sharding_group.rank
+
+    struct2static_name_mappings = {k: v.name for k, v in model.state_dict().items()}
+    if sharding_group.nranks > 1:
+        param2rank = optimizer._param2rank
+
+    def check_complete(all_filenames):
+        existed_filelist = []
+        existed_files = []
+        for filename in os.listdir(resume_from_checkpoint):
+            if filename in all_filenames:
+                existed_files.append(filename)
+
+        if tp_group.nranks > 1:
+            dist.all_gather_object(existed_filelist, existed_files, tp_group)
+        if pp_group.nranks > 1:
+            pp_existed_filelist = []
+            dist.all_gather_object(
+                pp_existed_filelist, existed_filelist if len(existed_filelist) > 0 else existed_files, pp_group
+            )
+            existed_filelist = pp_existed_filelist
+        if sharding_group.nranks > 1:
+            sharding_existed_filelist = []
+            dist.all_gather_object(
+                sharding_existed_filelist,
+                existed_filelist if len(existed_filelist) > 0 else existed_files,
+                sharding_group,
+            )
+            existed_filelist = sharding_existed_filelist
+
+        if len(existed_filelist) == 0:
+            existed_filelist = [existed_files]
+        flatten_existed_filelist = flatten_list(existed_filelist)
+        diff_filelist = list(set(all_filenames).difference(set(flatten_existed_filelist)))
+        if len(diff_filelist) != 0:
+            raise Exception(
+                f"Sorry, the optimizer file list on `data_parallel_rank==0` machines is not complete!, missing {diff_filelist}"
+            )
+        return existed_files
+
+    def check_dynamic_load(weight_map, existed_files, is_master_weight=False, typename_list=None):
+        need_filelist = []
+        for key in model.state_dict().keys():
+            static_name = struct2static_name_mappings.get(key, None)
+            if sharding_group.nranks > 1:
+                param_rank = param2rank.get(static_name, None)
+                if param_rank != sharding_rank:
+                    continue
+            # get optimizer key
+            if not is_master_weight:
+                for type_name in typename_list:
+                    type_key = key + "/" + type_name
+                    filename = weight_map[type_key]
+                    if filename not in need_filelist:
+                        need_filelist.append(filename)
+            else:
+                filename = weight_map[key]
+                if filename not in need_filelist:
+                    need_filelist.append(filename)
+
+        diff_filelist = list(set(need_filelist).difference(set(existed_files)))
+        num_diff = paddle.to_tensor([len(diff_filelist)])
+        # 获取data_parallel_rank == 0下,各个worker的列表长度max值
+        if tp_group.nranks > 1:
+            dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=tp_group)
+        if pp_group.nranks > 1:
+            dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=pp_group)
+        if sharding_group.nranks > 1:
+            dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=sharding_group)
+
+        if num_diff.item() == 0:
+            return True  # 原地重启
+
+        return False
+
+    # 检验文件完整性
+    existed_files = check_complete(all_optimizer_filenames)
+    if has_master_weights:
+        existed_files_mw = check_complete(all_mw_filenames)
+    # 获取optimizer name的各种param type name, 例如 moment1_0
+    typename_list = []
+    for key in index["weight_map"].keys():
+        _, typename = key.split("/")
+        if typename not in typename_list:
+            typename_list.append(typename)
+    restart_inplace = check_dynamic_load(
+        index["weight_map"], existed_files, is_master_weight=False, typename_list=typename_list
+    )
+    restart_inplace_rw = True
+    if has_master_weights:
+        restart_inplace_rw = check_dynamic_load(index_mw["weight_map"], existed_files_mw, is_master_weight=True)
+    return restart_inplace & restart_inplace_rw
 
 
 def create_dispatch_table(
@@ -663,7 +784,9 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
         if local_rank == 0 and os.path.exists(os.path.join(resume_from_checkpoint, filename)):
             file_machine_mappings[filename] = [global_rank // local_device_count]
     file_machine_list = []
-    dist.all_gather_object(file_machine_list, file_machine_mappings)  # 全局收集
+    dist.all_gather_object(
+        file_machine_list, file_machine_mappings
+    )  # TODO(daisiming): 全局收集, 这块地方可能对于dataset_rank之外的有点问题,需要注意,后续可能需要修改.
     file_machine_mappings = {}
     for mappings in file_machine_list:
         for k, v in mappings.items():
@@ -741,6 +864,10 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
     if len(error_msgs) > 0:
         error_msg = "\n\t".join(error_msgs)
         raise RuntimeError(f"Error(s) in loading dynamic state_dict for {model.__class__.__name__}:\n\t{error_msg}")
+
+
+def dynamic_load_unified_optimizer():
+    pass
 
 
 def get_sharded_file_name(args, file_name, is_optimizer=False):
