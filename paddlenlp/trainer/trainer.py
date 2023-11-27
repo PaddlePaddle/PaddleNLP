@@ -99,6 +99,7 @@ from .plugins.unified_checkpoint import (
     check_unified_checkpoint,
     dynamic_load_unified_checkpoint,
     load_unified_checkpoint,
+    load_unified_optimizer,
     save_unified_checkpoint,
     save_unified_optimizer,
 )
@@ -1630,8 +1631,16 @@ class Trainer:
                 assert self.optimizer is not None, "optimizer is empty!"
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
 
+        in_pipeline_parallel_mode = self.args.pipeline_parallel_degree > 1
+        in_sharding_parallel_mode = self.sharding is not None
+        in_tensor_parallel_mode = self.args.tensor_parallel_degree > 1
+
         # Multi-gpu training
-        if self.args.world_size > 1 and not self.args.use_hybrid_parallel:
+        if (
+            self.args.world_size > 1
+            and not self.args.use_hybrid_parallel
+            or not (in_pipeline_parallel_mode or in_sharding_parallel_mode or in_tensor_parallel_mode)
+        ):
             model = paddle.DataParallel(model)
             # Distributed training (should be after fp16 initialization)
 
@@ -1639,10 +1648,6 @@ class Trainer:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
                 assert self.optimizer is not None, "optimizer is empty!"
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
-
-        in_pipeline_parallel_mode = self.args.pipeline_parallel_degree > 1
-        in_sharding_parallel_mode = self.sharding is not None
-        in_tensor_parallel_mode = self.args.tensor_parallel_degree > 1
 
         # Pipeline mode
         if in_pipeline_parallel_mode:
@@ -2258,11 +2263,19 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
-            optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             if self.args.data_parallel_rank == 0:
-                path = os.path.join(checkpoint, optimizer_name)
-                if os.path.isfile(path):
-                    opt_state_dict = paddle.load(path)
+                if self.args.unified_checkpoint:
+                    opt_state_dict = load_unified_optimizer(
+                        model=self.model,
+                        optimizer=self.optimizer,
+                        resume_from_checkpoint=checkpoint,
+                        safe_serialization=True,
+                    )
+                else:
+                    optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+                    path = os.path.join(checkpoint, optimizer_name)
+                    if os.path.isfile(path):
+                        opt_state_dict = paddle.load(path)
 
         # broadcast optimizer state in dp group
         opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
