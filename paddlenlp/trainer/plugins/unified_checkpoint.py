@@ -549,8 +549,6 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
     for k in file_keyname_mappings.keys():
         file_keyname_mappings[k] = sorted(file_keyname_mappings[k])  # 确保全局一致
 
-    print("file_keyname_mappings: ", file_keyname_mappings)
-
     local_device_count = int(os.getenv("PADDLE_LOCAL_SIZE"))
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
     global_rank = dist.get_rank()
@@ -567,23 +565,16 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
                 file_machine_mappings[k] = v
             else:
                 file_machine_mappings[k] += v
-    print("file_machine_mappings: ", file_machine_mappings)
 
     send_table, recv_table = create_dispatch_table(
         args, model, file_keyname_mappings, file_machine_mappings, resume_from_checkpoint
     )
 
-    print("send_table: ", send_table)
-    print("recv_table: ", recv_table)
-
-    # all_keys可能有不需要tp切分的,还需要看看怎么区分出这些keys?
-    # 根据接收表来区分?
     all_tp_keys = []
     for k, v in recv_table.items():
         if k not in all_tp_keys:
             if v[0][1] != -1:
                 all_tp_keys.append(k)
-    print("all_tp_keys: ", all_tp_keys)
 
     config_revise = copy.deepcopy(model.config)
     config_revise.tensor_parallel_rank = None
@@ -591,13 +582,8 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
     state_dict = model.state_dict()
     for filename in file_keyname_mappings.keys():
 
-        print(filename)
-
         machine = file_machine_mappings[filename][0]  # 取第一个machine上的机器来处理文件
         is_src = global_rank // local_device_count == machine
-
-        print("is_src: ", is_src)
-
         if is_src:
             f = safe_open(os.path.join(resume_from_checkpoint, filename), framework="np")
 
@@ -605,12 +591,6 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
             recv_info = recv_table[key]
             recv_ranklist = [a for (a, b) in recv_info]
 
-            print(global_rank, key)
-            print("send: ", send_table[key], " recv: ", recv_table[key])
-            print("send data process: ", is_src and global_rank == send_table[key])
-            print("recv data process: ", global_rank in recv_ranklist)
-
-            # 这里怎么并行的需要琢磨一下.
             if is_src and global_rank == send_table[key]:  # 负责发送相应数据的进程, 需要知道发送给谁
                 py_safe_slice_ = f.get_slice(key)
                 # send
@@ -623,17 +603,11 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
                             weight[j] = paddle.Tensor(weight[j], zero_copy=True)
                         weight[j] = weight[j]._copy_to(paddle.framework._current_expected_place(), False)
 
-                    print("Begin to send")
-
                     for recv_rank, split_index in recv_info:
                         if recv_rank == global_rank:  # 发送方也是接收方
-                            print("send to myself, only copy")
                             state_dict[key] = weight[split_index]
                         else:
-                            print(f"send to: {recv_rank}, split: {split_index}")
                             dist.stream.send(weight[split_index], dst=recv_rank)
-
-                    print("Finish send")
 
                 else:
                     # no need to tp split
@@ -648,12 +622,15 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
                             dist.stream.send(weight, dst=recv_rank)
 
             if global_rank != send_table[key] and global_rank in recv_ranklist:  # 负责接收相应数据的进程,需要知道是谁发送的
-                # 接收tensor
                 dist.stream.recv(state_dict[key], src=send_table[key])
-                print("Finish recv")
 
         if is_src:  # 关闭文件
             f.__exit__(None, None, None)
+
+    error_msgs = _load_state_dict_into_model(model, state_dict, "")
+    if len(error_msgs) > 0:
+        error_msg = "\n\t".join(error_msgs)
+        raise RuntimeError(f"Error(s) in loading dynamic state_dict for {model.__class__.__name__}:\n\t{error_msg}")
 
 
 def get_sharded_file_name(args, file_name, is_optimizer=False):
