@@ -72,6 +72,7 @@ def set_seed(seed: int = 1234, args=None):
             # local_seed/ global_seed is used to control dropout in ModelParallel
             local_seed = args.seed + 59999 + args.tensor_parallel_rank * 10 + args.pipeline_parallel_rank * 1000
             global_seed = args.seed + 100003 + args.dataset_rank
+                          + args.tensor_parallel_rank * 10 + args.pipeline_parallel_rank * 1000
             tracker = get_rng_state_tracker()
 
             if "global_seed" not in tracker.states_:
@@ -942,7 +943,7 @@ def set_hyrbid_parallel_seed(basic_seed, dataset_rank, tp_rank, pp_rank=0):
 
     # local_seed/ global_seed is used to control dropout in ModelParallel
     local_seed = basic_seed + 59999 + tp_rank * 10 + pp_rank * 1000
-    global_seed = basic_seed + 100003 + dataset_rank
+    global_seed = basic_seed + 100003 + dataset_rank + tp_rank * 10 + pp_rank * 1000
 
     tracker = get_rng_state_tracker()
 
