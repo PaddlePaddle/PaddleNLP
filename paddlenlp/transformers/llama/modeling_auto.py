@@ -685,9 +685,6 @@ class LlamaPretrainedModelAuto(PretrainedModel):
 
         return mappings
 
-    def _init_weights(self, layer):
-        pass
-
 
 @register_base_model
 class LlamaModelAuto(LlamaPretrainedModelAuto):
