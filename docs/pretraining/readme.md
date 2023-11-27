@@ -76,25 +76,25 @@ GLM 130B    |✅|✅|⬜|⬜|❌|⬜|⬜|⬜|⬜|⬜|⬜|🚧|
 
 机器环境： A100 80G * 8, CUDA 11.8, NCCL 2.15
 
-训练配置：单个step, global batch size为4M token.
+训练配置：单个step, global batch size为 256K token.
+```
+paddle commit id              : 9bf5a86f13aa85b38715c015693f973290c8f9da
+paddlenlp commit id           : 0731766c01ae85891b5bbe770eb397eec2287cbb
+```
+| 模型 | 序列长度 | 分布式策略 | 速度(`tokens/card/sec`) | 显存占用(`MB^1`) | 配置文件
+| :-: | :-: | :-: | :-: | :-: |  :-: |
+| `baichuan-inc/Baichuan2-13B-Base` |4096 | sd8 |    1366  | 74767MB | `./llama/pretrain_baichuan2-13b-sd8-stage2.json`
+| `baichuan-inc/Baichuan2-7B-Base` |4096 | tp2sd4 |     3570  |58363MB | `./llama/pretrain_baichuan2-7b-tp2sd4-stage2.json`
+| `facebook/llama-13b` |4096 | tp2sd4 |     1980  | 64402MB | `./llama/pretrain_llama-13b-tp2sd4-stage2.json`
+| `facebook/llama-7b` |4096 | tp2sd4 |     3740  | 52092MB | `./llama/pretrain_llama-7b-tp2sd4-stage2.json`
+| `FlagAlpha/Llama2-Chinese-13b-Chat` |4096 | tp2sd4 |     1978 | 64185MB | `./llama/pretrain_flagalpha-llama2-13b-tp2sd4-stage2.json`
+| `FlagAlpha/Llama2-Chinese-7b-Chat` |4096 | tp2sd4 |     3760 | 52092MB | `./llama/pretrain_flagalpha-llama2-7b-tp2sd4-stage2.json`
+| `idea-ccnl/ziya-llama-13b-v1` |4096 | tp2sd4 |     1973 | 64233MB | `./llama/pretrain_ziya-llama-13b-tp2sd4-stage2.json`
+| `linly-ai/chinese-llama-2-7b` |4096 | tp2sd4 |     3742 | 51751MB | `./llama/pretrain_linly-llama2-7b-tp2sd4-stage2.json`
+| `meta-llama/Llama-2-13b` |4096 | tp2sd4 |     1980 | 64199MB | `./llama/pretrain_llama2-13b-tp2sd4-stage2.json`
+| `meta-llama/Llama-2-7b` |4096 | tp2sd4 |     3756 | 52092MB | `./llama/pretrain_llama2-7b-tp2sd4-stage2.json`
+| `qwen/qwen-7b` |4096 | tp2sd4 |     3602 | 65448MB | `./qwen/pretrain_qwen-7b-tp2sd4-stage2.json`
 
-| 模型 | 序列长度 | 分布式策略 | 速度(per_token_per_card) | 备注
-| :-: | :-: | :-: | :-: | :-: |
-| `facebook/llama-7b` | 2048 | - | - | - |
-| `facebook/llama-13b`| 2048 | - | - | - |
-| `facebook/llama-65b`| 2048 | - | OOM | OOM |
-| `meta-llama/Llama-2-7b`| 4096 | - | - | - |
-| `meta-llama/Llama-2-13b`| 4096 | - | - | - |
-| `meta-llama/Llama-2-70b`| 4096 | - | - | - |
-
-
-`pretrain_llama-7b-tp2sd4-stage2.json`
-`pretrain_llama-13b-tp2sd4-stage2.json`
-`pretrain_llama2-7b-tp2sd4-stage2.json`
-`pretrain_llama2-13b-tp2sd4-stage2.json`
-`pretrain_baichuan2-7b-tp2sd4-stage2.json`
-`pretrain_baichuan2-13b-tp2sd4-stage2.json`
-`pretrain_flagalpha-llama2-7b-tp2sd4-stage2.json`
-`pretrain_flagalpha-llama2-13b-tp2sd4-stage2.json`
-`pretrain_ziya-llama-13b-tp2sd4-stage2.json`
-`pretrain_linly-llama2-7b-tp2sd4-stage2.json`
+注：
+1. 显存占用(MB)使用的是 `max_memory_allocated`, 实际物理显存会占用更多，大约多2-3GB.
+2. 速度会有小幅波动，例如 `facebook/llama-7b` 和 `meta-llama/Llama-2-7b` 是相同训练配置。
