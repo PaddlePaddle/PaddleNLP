@@ -91,9 +91,13 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py
 ```
 
 ### 2. 精调
+#### 2.1. 环境准备
+- paddlepaddle-gpu >= 2.5.1
+- paddlenlp >= 2.6.1
+- tiktoken (仅 Qwen 需要)
 目前精调统一脚本只已支持大部分主流模型，详见对应模型目录。更多LoRA、Prefix Tuning请参见[精调文档](./docs/finetune.md)。除此以外还支持了高效多轮对话模式精调，具体的配置可看[多轮对话文档](./docs/chat_template.md)
 
-#### 2.1. 精调训练数据格式
+#### 2.2. 精调训练数据格式
 
 为了方便用户测试，我们也提供示例数据集[广告生成数据集](https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz)，用户也可以仿照数据集的格式制作自己的数据集进行精调。我们支持的数据格式是每行包含一个字典，每个字典包含以下字段：
 
@@ -107,7 +111,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py
 ```
 
 
-#### 2.2. SFT
+#### 2.3. SFT
 ```bash
 # 张量并行分布式训练（常用）
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py ./llama/sft_argument.json
@@ -119,7 +123,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py 
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py ./llama/sft_pp_argument.json
 ```
 
-#### 2.3. LoRA
+#### 2.4. LoRA
 ```bash
 # 单卡LoRA训练
 python  finetune_generation.py ./llama/lora_argument.json
@@ -130,7 +134,7 @@ python  finetune_generation.py ./llama/lora_argument.json
 python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./llama/lora_argument.json
 ```
 
-#### 2.4. Prefix Tuning
+#### 2.5. Prefix Tuning
 ```bash
 # 单卡训练
 python  finetune_generation.py ./llama/pt_argument.json
@@ -143,13 +147,16 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 
 ### 3. 量化
 量化算法可以将模型权重和激活转为更低比特数值类型表示，能够有效减少显存占用和计算开销。下面我们提供GPTQ和PaddleSlim自研的PTQ策略，分别实现WINT4和W8A8量化。更多技术细节详见[量化文档](./docs/quantization.md)
-#### 3.1 PTQ 量化
+### 3.1 环境安装
+- PaddleSlim develop版本
+- PaddlePaddle develop版本
+#### 3.2 PTQ 量化
 
 ```
 python  finetune_generation.py ./llama/ptq_argument.json
 ```
 
-#### 3.2 GPTQ 量化
+#### 3.3 GPTQ 量化
 
 ```
 python  finetune_generation.py ./llama/gptq_argument.json
