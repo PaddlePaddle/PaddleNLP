@@ -71,8 +71,13 @@ def set_seed(seed: int = 1234, args=None):
 
             # local_seed/ global_seed is used to control dropout in ModelParallel
             local_seed = args.seed + 59999 + args.tensor_parallel_rank * 10 + args.pipeline_parallel_rank * 1000
-            global_seed = args.seed + 100003 + args.dataset_rank
-                          + args.tensor_parallel_rank * 10 + args.pipeline_parallel_rank * 1000
+             global_seed = (
+                 args.seed
+                 + 100003
+                 + args.dataset_rank
+                 + args.tensor_parallel_rank * 10
+                 + args.pipeline_parallel_rank * 1000
+            )
             tracker = get_rng_state_tracker()
 
             if "global_seed" not in tracker.states_:
