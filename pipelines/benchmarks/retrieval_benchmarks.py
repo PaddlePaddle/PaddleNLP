@@ -27,7 +27,7 @@ csv.field_size_limit(500 * 1024 * 1024)
 
 class PaddleModel:
     def __init__(
-        self, query_model, corpus_model, batch_size=32, max_seq_len=512, sep=" ", pooling_mode="mean_tokens", **kwargs
+        self, query_model, corpus_model, batch_size=16, max_seq_len=512, sep=" ", pooling_mode="mean_tokens", **kwargs
     ):
         self.query_model = Taskflow(
             "feature_extraction",
@@ -172,5 +172,6 @@ def load_t2ranking_for_retraviel(num_max_passages: float):
     return corpus, valid_queries, valid_qrels
 
 
-tasks = T2RRetrieval(num_max_passages=10000)
-tasks.evaluate(model_query="moka-ai/m3e-base", model_corpus="moka-ai/m3e-base", split="dev")
+if __name__ == "__main__":
+    tasks = T2RRetrieval(num_max_passages=10000)
+    tasks.evaluate(model_query="moka-ai/m3e-base", model_corpus="moka-ai/m3e-base", split="dev")
