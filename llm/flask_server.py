@@ -14,121 +14,89 @@
 from __future__ import annotations
 
 import json
-import re
-import time
+from contextlib import closing
+import os
+import socket
 from dataclasses import dataclass, field
-from multiprocessing.shared_memory import SharedMemory
+from time import sleep
+from filelock import FileLock
+
+import requests
 
 from predictor import BasePredictor, ModelArgument, PredictorArgument, create_predictor
 
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.utils.log import logger
+from filelock import FileLock
 
+STOP_SIGNAL = "[END]"
+port_interval = 200
+PORT_FILE = "port-info"
+FILE_LOCK = "port-lock"
+
+def find_free_ports(port_l, port_u):
+    def __free_port(port):
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+            try:
+                s.bind(('', port))
+                return port
+            except:
+                return -1
+
+    for port in range(port_l, port_u):
+        port = __free_port(port)
+        if port != -1:
+            return port
+
+    return -1
 
 @dataclass
 class ServerArgument:
     port: int = field(default=8011, metadata={"help": "The port of ui service"})
-    flask_port: int = field(default=8010, metadata={"help": "The port of flask service"})
+    base_port: int = field(default=8010, metadata={"help": "The port of flask service"})
     title: str = field(default="LLM", metadata={"help": "The title of gradio"})
-
-
-def read_shared_memory(memory: SharedMemory):
-    """read content from shared memory
-
-    Args:
-        memory (SharedMemory): the instance of shared Memory
-    """
-    length = int(memory.buf[0]) * 256 + int(memory.buf[1])
-    if length == 0:
-        return ""
-
-    sentence = bytes(memory.buf[2 : length + 2]).decode()
-    return sentence
-
-def append_shared_memory(memory: SharedMemory, block: str):
-    """append content to shared memory
-
-    Args:
-        memory (SharedMemory): the instance of shared Memory
-        sentence (str): the content which must be string
-    """
-    length = int(memory.buf[0]) * 256 + int(memory.buf[1])
-    data = block.encode("utf-8")
-
-    new_length = length + len(data)
-    buffer = bytearray(memory.buf.nbytes)
-    buffer[0:2] = bytearray([new_length // 256, new_length % 256])
-
-    buffer[length + 2 : new_length + 2] = data
-    memory.buf[:] = buffer
-
-def write_shared_memory(memory: SharedMemory, sentence: str):
-    """write content into shared memory
-
-        [0:2]: store the length of sentence
-        [2:]:  store the content of sentence
-
-    Args:
-        memory (SharedMemory): the instance of shared Memory
-        sentence (str): the content which must be string
-    """
-    buffer = bytearray(memory.buf.nbytes)
-    data = sentence.encode("utf-8")
-
-    buffer[0:2] = bytearray([len(data) // 256, len(data) % 256])
-    buffer[2 : len(data) + 2] = data
-    memory.buf[:] = buffer
-
-
-SLEEP_SECOND = 0.05
-STOP_SIGNAL = "[END]"
-SHARED_MEMORY_NAME = "shared_memory"
-
-
-def create_shared_memory(name: int, rank: int):
-    """create shared memory between multi-process
-
-    Args:
-        name (int): the name of memory block
-        rank (int): the rank of current process
-    """
-    file = f"{SHARED_MEMORY_NAME}-{name}"
-    shared_memory = None
-    if rank != 0:
-        while True:
-            try:
-                shared_memory = SharedMemory(file, size=1024 * 100)
-                print("success create shared_memory")
-                break
-            except FileNotFoundError:
-                time.sleep(SLEEP_SECOND)
-                print("sleep for create shared memory")
-    else:
-        shared_memory = SharedMemory(file, create=True, size=1024 * 100)
-    return shared_memory
-
-
-def enforce_stop_tokens(text, stop) -> str:
-    """Code by Langchain"""
-    """Cut off the text as soon as any stop words occur."""
-    return re.split(re.escape(stop), text)[0]
-
 
 class PredictorServer:
     def __init__(self, args: ServerArgument, predictor: BasePredictor):
 
         self.predictor = predictor
         self.args = args
-
-        self.input_shared_memory = create_shared_memory("input", self.predictor.tensor_parallel_rank)
-        self.output_shared_memory = create_shared_memory("output", self.predictor.tensor_parallel_rank)
+        scan_l, scan_u = self.args.base_port + port_interval * predictor.tensor_parallel_rank, self.args.base_port + port_interval * (predictor.tensor_parallel_rank+1)
 
         if self.predictor.tensor_parallel_rank == 0:
-            write_shared_memory(self.input_shared_memory, "")
-            write_shared_memory(self.output_shared_memory, "")
+            # fetch port info
+            self.port = find_free_ports(scan_l, scan_u)
+            self.peer_ports = {}
+            while True and self.predictor.tensor_parallel_degree > 1:
+                if os.path.exists(PORT_FILE):
+                    with FileLock(FILE_LOCK), open(PORT_FILE, 'r') as f:
+                        cnt = 1
+                        for line in f:
+                            data = json.loads(line)
+                            self.peer_ports[data["rank"]] = data["port"]
+                            cnt += 1
+
+                    if cnt == predictor.tensor_parallel_degree:
+                        break
+                    else:
+                        print("waiting for port reach", cnt)
+                sleep(1)
+        else:
+            # save port info
+            self.port = find_free_ports(scan_l, scan_u)
+            data = {"rank": predictor.tensor_parallel_rank, "port": self.port}
+            with FileLock(FILE_LOCK), open(PORT_FILE, 'a') as f:
+                f.write(json.dumps(data) + '\n')
+            print("rank: ", predictor.tensor_parallel_rank, " port info saving done.")
+
 
     def predict(self, input_texts: str | list[str]):
         return self.predictor.stream_predict(input_texts)
+    
+    def broadcast_msg(self, data):
+        for _, peer_port in self.peer_ports.items():
+            if peer_port != self.port:
+                _ = requests.post(f"http://0.0.0.0:{peer_port}/api/chat", json=data)
 
     def start_flask_server(self):
         from flask import Flask, request, stream_with_context
@@ -139,35 +107,40 @@ class PredictorServer:
         def _server():
             data = request.get_json()
             logger.info(f"Request: {json.dumps(data, indent=2, ensure_ascii=False)}")
-            print("start to predict under data", data)
 
-            data = json.dumps(data, ensure_ascii=False)
-            write_shared_memory(self.input_shared_memory, data)
+            if self.predictor.tensor_parallel_rank == 0:
+                self.broadcast_msg(data)
 
-            def streaming():
-                done = False
-                while True:
-                    if done:
-                        break
+            def streaming(data):
+                query = data.pop("context", "")
+                data.pop("extra_info", None)
 
-                    result = read_shared_memory(self.output_shared_memory)
-                    if result:
-                        write_shared_memory(self.output_shared_memory, "")
+                generation_args = data 
+                self.predictor.config.max_length = generation_args["max_length"]
+                self.predictor.config.top_p = generation_args["top_p"]
+                self.predictor.config.temperature = generation_args["temperature"]
+                self.predictor.config.top_k = generation_args["top_k"]
+                self.predictor.config.repetition_penalty = generation_args["repetition_penalty"]
+
+                for key, value in generation_args.items():
+                    setattr(self.args, key, value)
+
+                streamer = self.predict(query)
+                if self.predictor.tensor_parallel_rank == 0:
+                    for new_text in streamer:
                         output = {
                             "error_code": 0,
                             "error_msg": "Success",
-                            "result": {"response": {"role": "bot", "utterance": result}},
+                            "result": {"response": {"role": "bot", "utterance": new_text}},
                         }
                         logger.info(f"Response: {json.dumps(output, indent=2, ensure_ascii=False)}")
-                        if result.endswith(STOP_SIGNAL):
-                            done = True
                         yield json.dumps(output, ensure_ascii=False) + "\n"
+                else:
+                    return "done"
 
-                    time.sleep(SLEEP_SECOND)
+            return app.response_class(stream_with_context(streaming(data))) 
 
-            return app.response_class(stream_with_context(streaming())) 
-
-        app.run(host="0.0.0.0", port=self.args.flask_port)
+        app.run(host="0.0.0.0", port=self.port)
 
     def start_ui_service(self, args):
         # do not support start ui service in one command
@@ -179,42 +152,17 @@ class PredictorServer:
         p.daemon = True
         p.start()
 
-
-def main(args, server: PredictorServer):
-    from time import sleep
-
-    while True:
-        sleep(SLEEP_SECOND)
-        content = read_shared_memory(server.input_shared_memory)
-
-        if content:
-            content = json.loads(content)
-
-            context = content.pop("context", "")
-            content.pop("extra_info", None)
-
-            generation_args = content
-            server.predictor.config.max_length = generation_args["max_length"]
-            server.predictor.config.top_p = generation_args["top_p"]
-            server.predictor.config.temperature = generation_args["temperature"]
-            server.predictor.config.top_k = generation_args["top_k"]
-            server.predictor.config.repetition_penalty = generation_args["repetition_penalty"]
-
-            for key, value in generation_args.items():
-                setattr(server.args, key, value)
-
-            streamer = server.predict(context)
-            for new_text in streamer:
-                append_shared_memory(server.output_shared_memory, new_text)
-                time.sleep(SLEEP_SECOND)
-            append_shared_memory(server.output_shared_memory, STOP_SIGNAL)
-
-            write_shared_memory(server.input_shared_memory, "")
-
 if __name__ == "__main__":
 
     parser = PdArgumentParser((PredictorArgument, ModelArgument, ServerArgument))
     predictor_args, model_args, server_args = parser.parse_args_into_dataclasses()
+
+    log_dir = os.getenv("PADDLE_LOG_DIR", "./")
+    PORT_FILE = os.path.join(log_dir, PORT_FILE)
+    if os.path.exists(PORT_FILE):
+        os.remove(PORT_FILE)
+
+
     predictor = create_predictor(predictor_args, model_args)
 
     server = PredictorServer(server_args, predictor)
@@ -222,12 +170,5 @@ if __name__ == "__main__":
     if server.predictor.tensor_parallel_rank == 0:
         server.start_ui_service(server_args)
 
-        from multiprocessing import Process
+    server.start_flask_server()
 
-        p = Process(
-            target=server.start_flask_server,
-        )
-        p.daemon = True
-        p.start()
-
-    main(server_args, server)

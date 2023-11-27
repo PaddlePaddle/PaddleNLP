@@ -121,7 +121,14 @@ def distributed_gather(tensor: Any, dst: int = 0, group=None, offload=False) -> 
                     slice_output_tensors = [
                         paddle.empty_like(slice_tensor) for _ in range(distributed.get_world_size(group=group))
                     ]
-                dist_gather(slice_tensor, slice_output_tensors, dst=dst, group=group)
+                paddle.distributed.communication.stream.gather(
+                    slice_tensor,
+                    slice_output_tensors,
+                    dst=group.ranks[dst] if group else dst,
+                    group=group,
+                    sync_op=True,
+                    use_calc_stream=False,
+                )
 
                 if is_dst:
                     for i in range(len(output_tensors)):
@@ -138,7 +145,14 @@ def distributed_gather(tensor: Any, dst: int = 0, group=None, offload=False) -> 
                     output_tensors = new_output_tensors
 
         else:
-            dist_gather(tensor, output_tensors, dst=dst)
+            paddle.distributed.communication.stream.gather(
+                tensor,
+                output_tensors,
+                dst=group.ranks[dst] if group else dst,
+                group=group,
+                sync_op=True,
+                use_calc_stream=False,
+            )
 
         return output_tensors
 
@@ -206,47 +220,3 @@ def distributed_allgather(tensor: Any, group=None, offload=False):
 
     except AssertionError:
         raise AssertionError("Not currently using distributed training")
-
-
-def dist_gather(tensor, gather_list=None, dst=0, group=None, async_op=False):
-    """_summary_
-
-    Args:
-        tensor (_type_): _description_
-        gather_list (_type_, optional): _description_. Defaults to None.
-        dst (int, optional): _description_. Defaults to 0.
-        group (_type_, optional): _description_. Defaults to None.
-        async_op (bool, optional): _description_. Defaults to False.
-
-    Returns:
-        _type_: _description_
-    """
-    from paddle.distributed.communication.batch_isend_irecv import _with_batch_p2p_guard
-
-    rank = distributed.get_rank(group=group)
-    nranks = distributed.get_world_size(group=group)
-    task_list = []
-    backend = "NCCL"
-    if paddle.get_device().split(":")[0] == "npu":
-        backend = "HCCL"
-    with _with_batch_p2p_guard(backend):
-        if rank == dst:
-            for src in range(nranks):
-                wait = paddle.distributed.communication.stream.recv(
-                    gather_list[src],
-                    src=group.ranks[src] if group else src,
-                    group=group,
-                    sync_op=False,
-                    use_calc_stream=False,
-                )
-                task_list.append(wait)
-        wait = paddle.distributed.communication.stream.send(
-            tensor,
-            dst=group.ranks[dst] if group else dst,
-            group=group,
-            sync_op=False,
-            use_calc_stream=False,
-        )
-        task_list.append(wait)
-    for task in task_list:
-        task.wait()
