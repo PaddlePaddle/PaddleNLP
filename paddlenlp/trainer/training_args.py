@@ -609,6 +609,10 @@ class TrainingArguments:
             "Only support for networks with transformer blocks."
         },
     )
+    sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
+    refined_ops_patterns: Optional[List[str]] = field(
+        default=None, metadata={"help": "The pattern of refined recompute."}
+    )
 
     scale_loss: float = field(default=2**15, metadata={"help": "The value of initial scale_loss for fp16."})
 
@@ -1176,6 +1180,11 @@ class TrainingArguments:
             if self.recompute:
                 recompute = strategy.recompute
                 recompute.enable = True
+                recompute.sr = self.sr if self.sr is not None else 0
+                recompute.refined_ops_patterns = []
+                if self.refined_ops_patterns is not None:
+                    for pattern in self.refined_ops_patterns:
+                        recompute.refined_ops_patterns.append(eval(pattern))
 
             self.strategy = strategy
             logger.info(self.strategy)
