@@ -164,8 +164,10 @@ except:
     mix_precision_utils = None
 
 try:
+    from paddle.io.dataloader.batch_sampler import _InfiniteIterableSampler
     from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
 except:
+    from paddle.fluid.datalader.batch_sampler import _InfiniteIterableSampler
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
 
 
@@ -831,8 +833,9 @@ class Trainer:
                 # Skip past any already trained steps if resuming training
                 # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
                 # We use consumed_samples to reset the status
-                if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
-                    train_dataloader.batch_sampler, NlpDistributedBatchSampler
+                if isinstance(train_dataloader, paddle.io.DataLoader) and (
+                    isinstance(train_dataloader.batch_sampler, NlpDistributedBatchSampler)
+                    or isinstance(train_dataloader.batch_sampler, _InfiniteIterableSampler)
                 ):
                     if step == 0:
                         if steps_trained_progress_bar is not None:
