@@ -584,8 +584,14 @@ def check_unified_checkpoint(model, resume_from_checkpoint, safe_serialization=F
 
 
 def create_dispatch_table(
-    args, model, file_keyname_mappings, file_machine_mappings, resume_from_checkpoint, is_optimizer=False
+    args, state_dict, file_keyname_mappings, file_machine_mappings, resume_from_checkpoint, is_optimizer=False
 ):
+    """Create dispatch table for dynamically loading state dict.
+
+    Args:
+        args
+    """
+
     # 当前暂时只支持model weight
     # dispatch table需要包含两个东西: key是由谁发送的, key是由谁接收的
     hcg = fleet.get_hybrid_communicate_group()
@@ -596,7 +602,7 @@ def create_dispatch_table(
     dispatch_list = []
     recv_table = {}
     if args.dataset_rank == 0:
-        for (k, v) in model.state_dict().items():
+        for (k, v) in state_dict.items():
             if hasattr(v, "is_distributed") and v.is_distributed:
                 recv_table[k] = [(dist.get_rank(), tp_rank)]
             else:
@@ -666,8 +672,9 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
             else:
                 file_machine_mappings[k] += v
 
+    model_state_dict = model.state_dict()
     send_table, recv_table = create_dispatch_table(
-        args, model, file_keyname_mappings, file_machine_mappings, resume_from_checkpoint
+        args, model_state_dict, file_keyname_mappings, file_machine_mappings, resume_from_checkpoint
     )
 
     all_tp_keys = []
@@ -681,8 +688,8 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
     tp_actions = model.get_tensor_parallel_convert_actions(config_revise, all_tp_keys, ignore_error=True)
     state_dict = model.state_dict()
     for filename in file_keyname_mappings.keys():
-
-        machine = file_machine_mappings[filename][0]  # 取第一个machine上的机器来处理文件
+        # Use the 0th machine that stores this file to process.
+        machine = file_machine_mappings[filename][0]
         is_src = global_rank // local_device_count == machine
         if is_src:
             f = safe_open(os.path.join(resume_from_checkpoint, filename), framework="np")
@@ -691,20 +698,23 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
             recv_info = recv_table[key]
             recv_ranklist = [a for (a, b) in recv_info]
 
-            if is_src and global_rank == send_table[key]:  # 负责发送相应数据的进程, 需要知道发送给谁
+            if is_src and global_rank == send_table[key]:
+                # Use send_table to decide which process is responsible for sending the key.
                 py_safe_slice_ = f.get_slice(key)
                 # send
                 if key in tp_actions:
                     weight = tp_actions[key](py_safe_slice_)
 
-                    # 需将weight copy到GPU
+                    # copy weight to GPU
                     for j in range(len(weight)):
                         with device_guard():
                             weight[j] = paddle.Tensor(weight[j], zero_copy=True)
                         weight[j] = weight[j]._copy_to(paddle.framework._current_expected_place(), False)
 
                     for recv_rank, split_index in recv_info:
-                        if recv_rank == global_rank:  # 发送方也是接收方
+                        if (
+                            recv_rank == global_rank
+                        ):  # The sender is also the receiver, then no need to send, just assign.
                             state_dict[key] = weight[split_index]
                         else:
                             dist.stream.send(weight[split_index], dst=recv_rank)
@@ -721,10 +731,10 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
                         else:
                             dist.stream.send(weight, dst=recv_rank)
 
-            if global_rank != send_table[key] and global_rank in recv_ranklist:  # 负责接收相应数据的进程,需要知道是谁发送的
+            if global_rank != send_table[key] and global_rank in recv_ranklist:
                 dist.stream.recv(state_dict[key], src=send_table[key])
 
-        if is_src:  # 关闭文件
+        if is_src:  # Close the safe file.
             f.__exit__(None, None, None)
 
     error_msgs = _load_state_dict_into_model(model, state_dict, "")
@@ -1041,7 +1051,7 @@ def get_expected_keys(sharded_metadata, model, optimizer):
 
 
 def mapping_optimizer_tp_actions(tp_actions, optimizer_loaded_keys):
-    """# conert param.name to
+    """# convert param.name to
     param.key/moment1_0
     or param.key/beta1_XXX
     or param.key/beta2_XXX
