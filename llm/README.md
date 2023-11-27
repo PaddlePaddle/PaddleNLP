@@ -91,11 +91,11 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py
 ```
 
 ### 2. 精调
+目前精调统一脚本只已支持大部分主流模型，详见对应模型目录。更多LoRA、Prefix Tuning请参见[精调文档](./docs/finetune.md)。除此以外还支持了高效多轮对话模式精调，具体的配置可看[多轮对话文档](./docs/chat_template.md)
 #### 2.1. 环境准备
 - paddlepaddle-gpu >= 2.5.1
 - paddlenlp >= 2.6.1
 - tiktoken (仅 Qwen 需要)
-目前精调统一脚本只已支持大部分主流模型，详见对应模型目录。更多LoRA、Prefix Tuning请参见[精调文档](./docs/finetune.md)。除此以外还支持了高效多轮对话模式精调，具体的配置可看[多轮对话文档](./docs/chat_template.md)
 
 #### 2.2. 精调训练数据格式
 
