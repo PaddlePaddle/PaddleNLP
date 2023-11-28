@@ -64,6 +64,12 @@ try:
 except:
     flash_attention = None
 
+import os
+from paddle_xpu.ops.transformer_engine.xte_meta import *
+from paddle_xpu.ops.transformer_engine.model.llama import LlamaAttention as XPU_LlamaAttention
+from paddle_xpu.ops.transformer_engine.model.llama import LlamaFFN as XPU_LlamaMLP
+from paddle_xpu.ops.transformer_engine.model.llama import LlamaRMSNorm as XPU_LlamaRMSNorm
+
 __all__ = [
     "LlamaModel",
     "LlamaPretrainedModel",
@@ -851,10 +857,50 @@ class LlamaDecoderLayer(nn.Layer):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size
-        self.self_attn = LlamaAttention(config, layerwise_recompute)
-        self.mlp = LlamaMLP(config)
-        self.input_layernorm = LlamaRMSNorm(config)
-        self.post_attention_layernorm = LlamaRMSNorm(config)
+        if os.getenv("XTE_LLAMA") == "ON":
+            self.self_attn = XPU_LlamaAttention(
+                            config.hidden_size,
+                            config.num_attention_heads,
+                            config.num_key_value_heads,
+                            config.max_position_embeddings,
+                            config.seq_length,
+                            tensor_parallel_degree=config.tensor_parallel_degree,
+                            sequence_parallel=config.sequence_parallel,
+                            fuse_attention_qkv=config.fuse_attention_qkv,
+                            layerwise_recompute=layerwise_recompute,
+                            rope=config.rope,
+                            rope_scaling_type=config.rope_scaling_type,
+                            input_dtype=XTEDataType.fp32,
+                            output_dtype=XTEDataType.fp32,
+                            cal_type=XTECalType.cdnn_int31_with_ll,
+                            intermediate_dtype=XTEDataType.scale_fp16,
+                            non_xte_mode=False
+                            )
+            self.mlp = XPU_LlamaMLP(config.hidden_size,
+                                    config.intermediate_size,
+                                    fuse_attention_ffn=config.fuse_attention_ffn,
+                                    tensor_parallel_degree=config.tensor_parallel_degree,
+                                    sequence_parallel=config.sequence_parallel,
+                                    input_dtype=XTEDataType.fp32,
+                                    output_dtype=XTEDataType.fp32,
+                                    cal_type=XTECalType.cdnn_int31_with_ll,
+                                    intermediate_dtype=XTEDataType.scale_fp16,
+                                    non_xte_mode=False,)
+            self.input_layernorm = XPU_LlamaRMSNorm(config.hidden_size,
+                                                    epsilon = config.rms_norm_eps,
+                                                    input_dtype=XTEDataType.fp32,
+                                                    output_dtype=XTEDataType.fp32,
+                                                    non_xte_mode=False,)
+            self.post_attention_layernorm = XPU_LlamaRMSNorm(config.hidden_size,
+                                                    epsilon = config.rms_norm_eps,
+                                                    input_dtype=XTEDataType.fp32,
+                                                    output_dtype=XTEDataType.fp32,
+                                                    non_xte_mode=False,)
+        else:
+            self.self_attn = LlamaAttention(config, layerwise_recompute)
+            self.mlp = LlamaMLP(config)
+            self.input_layernorm = LlamaRMSNorm(config)
+            self.post_attention_layernorm = LlamaRMSNorm(config)
         self.sequence_parallel = config.sequence_parallel
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
         # Enable_recompute defaults to False and is controlled by Trainer
@@ -1078,10 +1124,10 @@ class LlamaPretrainedModel(PretrainedModel):
         # sublayer is init first
         # scale RowParallelLinear weight
         with paddle.no_grad():
-            if isinstance(layer, LlamaMLP):
+            if isinstance(layer, LlamaMLP) or isinstance(layer, XPU_LlamaMLP):
                 factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
                 layer.down_proj.weight.scale_(factor)
-            if isinstance(layer, LlamaAttention):
+            if isinstance(layer, LlamaAttention)or isinstance(layer, XPU_LlamaAttention):
                 factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
                 layer.o_proj.weight.scale_(factor)
 
@@ -1119,7 +1165,14 @@ class LlamaModel(LlamaPretrainedModel):
         self.layers = nn.LayerList(
             [LlamaDecoderLayer(config, i not in self.no_recompute_layers) for i in range(config.num_hidden_layers)]
         )
-        self.norm = LlamaRMSNorm(config)
+        if os.getenv("XTE_LLAMA") == "ON":
+            self.norm = XPU_LlamaRMSNorm(config.hidden_size,
+                                        epsilon = config.rms_norm_eps,
+                                        input_dtype=XTEDataType.fp32,
+                                        output_dtype=XTEDataType.fp32,
+                                        non_xte_mode=False,)
+        else:
+            self.norm = LlamaRMSNorm(config)
 
         self.gradient_checkpointing = False
 

@@ -46,6 +46,8 @@ from paddlenlp.transformers import (
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
+from paddle_xpu.ops.transformer_engine.xte_meta import *
+
 
 def add_start_docstrings(*docstr):
     def docstring_decorator(fn):
@@ -186,6 +188,10 @@ class ModelArguments:
     recompute_use_reentrant: bool = field(
         default=False,
         metadata={"help": "recompute_use_reentrant"},
+    )
+    num_hidden_layers: int = field(
+        default=1,
+        metadata={"help": "Number of hidden layers."},
     )
 
 
@@ -442,6 +448,7 @@ def main():
     config.no_recompute_layers = model_args.no_recompute_layers
     config.pp_recompute_interval = model_args.pp_recompute_interval
     config.recompute_use_reentrant = model_args.recompute_use_reentrant
+    config.num_hidden_layers = model_args.num_hidden_layers
 
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
@@ -537,6 +544,10 @@ def main():
         checkpoint = training_args.resume_from_checkpoint
     elif last_checkpoint is not None:
         checkpoint = last_checkpoint
+
+    if os.getenv("XTE_LLAMA") == "ON":
+        ins = XPUScaleMemoryManager.instance()
+        ins.init(acc_step=training_args.gradient_accumulation_steps,)
 
     # Training
     if training_args.do_train:

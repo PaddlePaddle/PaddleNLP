@@ -168,6 +168,7 @@ try:
 except:
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
 
+from paddle_xpu.ops.transformer_engine.xte_meta import *
 
 def is_dp_group_support_in_group_sharded_parallel():
     return "dp_group" in set(inspect.signature(paddle.distributed.sharding.group_sharded_parallel).parameters.keys())
@@ -891,6 +892,10 @@ class Trainer:
 
                 tr_loss += tr_loss_step
 
+                if os.getenv("XTE_LLAMA") == "ON":
+                    ins = XPUScaleMemoryManager.instance()
+                    ins.micro_step() # update max_value_tensor and return if it contains nan/inf
+
                 if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
                     # last step in epoch but step is always smaller than gradient_accumulation_steps
                     steps_in_epoch <= args.gradient_accumulation_steps
@@ -973,9 +978,26 @@ class Trainer:
                                 f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
                             )
                     elif isinstance(self.optimizer, HybridParallelOptimizer):
-                        self.optimizer._step(parameters_list)
+                        if os.getenv("XTE_LLAMA") == "ON":
+                            is_nan_or_inf = paddle.to_tensor(ins.step(parameters_list), dtype="int32")
+                            paddle.distributed.all_reduce(is_nan_or_inf)
+                            zero_tensor = paddle.to_tensor(0)
+                            if is_nan_or_inf == zero_tensor:
+                                self.optimizer._step(parameters_list)
+                            else:
+                                print("=== found nan_or_inf, skip update optimizer ===")
+                                ins.re_warmup()
+                        else:
+                            self.optimizer._step(parameters_list)
                     else:
-                        self.optimizer.step()
+                        if os.getenv("XTE_LLAMA") == "ON":
+                            if (not ins.step(model.parameters())):
+                                self.optimizer.step()
+                            else:
+                                print("=== found nan_or_inf, skip update optimizer ===")
+                                ins.re_warmup()
+                        else:
+                            self.optimizer.step()
 
                     self.timers and self.timers("optimizer-step").stop()
 
