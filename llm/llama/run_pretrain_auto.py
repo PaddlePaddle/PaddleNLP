@@ -453,7 +453,8 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
-    model = model_class._from_config(config, dtype=dtype)
+    with paddle.LazyGuard():
+        model = model_class._from_config(config, dtype=dtype)
 
     if training_args.recompute:
 
@@ -500,9 +501,11 @@ def main():
     def loss_func(loss, outputs):
         return loss
 
-    total_train_batch_size = training_args.per_device_train_batch_size \
-                             * training_args.gradient_accumulation_steps \
-                             * training_args.data_parallel_degree
+    total_train_batch_size = (
+        training_args.per_device_train_batch_size
+        * training_args.gradient_accumulation_steps
+        * training_args.data_parallel_degree
+    )
     print_config(training_args)
 
     engine = auto.Engine(model, loss_func, optimizer, strategy=training_args.strategy)
