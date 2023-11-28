@@ -21,7 +21,7 @@ __global__ void free_and_dispatch_block(bool *stop_flags,
                                         const int block_size,
                                         const int block_num_per_seq,
                                         const int max_decoder_block_num) {
-    typedef cub::BlockReduce<cub::KeyValuePair<int, int>, 256> BlockReduce;
+    typedef cub::BlockReduce<cub::KeyValuePair<int, int>, 512> BlockReduce;
     __shared__ typename BlockReduce::TempStorage temp_storage;
     const int tid = threadIdx.x;
     if (tid < bsz) {
@@ -228,7 +228,7 @@ void StepPaddle(const paddle::Tensor& stop_flags,
     const int block_num_per_seq = block_tables.shape()[1];
     const int length = input_ids.shape()[1];
     const int pre_id_length = pre_ids.shape()[1];
-    constexpr int BlockSize = 256; // bsz < 256
+    constexpr int BlockSize = 512; // bsz < 256
     const int max_decoder_block_num = pre_id_length / block_size - encoder_decoder_block_num;
 #ifdef DEBUG_STEP
     printf("bsz: %d, block_num_per_seq: %d, length: %d, max_decoder_block_num: %d\n", bsz, block_num_per_seq, length, max_decoder_block_num);

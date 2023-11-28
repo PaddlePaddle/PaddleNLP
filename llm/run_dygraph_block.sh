@@ -18,13 +18,13 @@ export PYTHONPATH=$(dirname $(pwd)):$PYTHONPATH
 
 export FLAGS_call_stack_level=2
 export GLOG_logtostderr=true
-export GLOG_v=0
+export GLOG_v=1
 
 export FLAGS_control_flow_use_new_executor=1
 export FLAGS_new_executor_serial_run=1
 export FLAGS_allocator_strategy=naive_best_fit
 export FLAGS_fraction_of_gpu_memory_to_use=0.92
-export CUDA_VISIBLE_DEVICES=5
+export CUDA_VISIBLE_DEVICES=3
 
 model_dir=${1:-"linly-ai/chinese-llama-2-7b"}
 src_len=${2:-1024}
@@ -43,5 +43,6 @@ python predictor.py \
     --mode "dynamic" \
     --batch_size 2 \
     --inference_model \
+    --block_attn \
     --quant_type ${quant_type} 
 

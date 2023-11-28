@@ -32,6 +32,7 @@ setup(
             "./generation/set_mask_value.cu",
             "./generation/set_value_by_flags.cu",
             "./generation/token_penalty_multi_scores.cu",
+            "./generation/token_penalty_multi_scores_v2.cu",
             "./generation/stop_generation_multi_ends.cu",
             "./generation/fused_get_rope.cu",
             "./generation/get_padding_offset.cu",

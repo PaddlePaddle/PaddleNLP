@@ -104,7 +104,7 @@ class PredictorArgument:
     block_size: int = field(default=64, metadata={"help": "the block size for cache_kvs."})
     use_cachekv_int8: bool = field(
         default=False,
-        metadata={"help": "If use_cachekv_int8 set as `True`, dynamic cache kv quantization will be applied"},
+        metadata={"help": "If use_cachekv_int8 set as `True`, dynamic cache kv quantization will be applied"},)
     chat_template: str = field(
         default=None,
         metadata={
@@ -1151,7 +1151,7 @@ def create_predictor(
     tensor_parallel_rank: int = 0,
 ):
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
-    init_chat_template(tokenizer, model_args.model_name_or_path, predictor_args.chat_template)
+    init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer) and not tokenizer.pad_token:
         tokenizer.pad_token = tokenizer.unk_token
@@ -1208,6 +1208,7 @@ def create_predictor(
             config.weight_only_quant_bits = -1
             config.quant_type = None
             config.model_name_or_path = ""
+            config.use_cachekv_int8 = predictor_args.use_cachekv_int8
 
             if predictor_args.quant_type is not None and predictor_args.quant_type.startswith("weight_only_int"):
                 weight_only_quant_bits = int(predictor_args.quant_type[-1])

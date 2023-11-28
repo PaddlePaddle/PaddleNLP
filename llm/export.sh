@@ -25,10 +25,11 @@ total_len=`expr ${src_len} + ${dec_len}`
 python \
      export_model.py \
     --model_name_or_path ${model_dir} \
-    --output_path ./inference_model/${model_dir} \
+    --output_path ./inference_model/${model_dir}_C8 \
     --dtype float16 \
     --inference_model \
     --block_size 64 \
     --src_length ${total_len} \
     --block_attn \
-    --quant_type ${quant_type} 
+    --quant_type ${quant_type} \
+    --use_cachekv_int8

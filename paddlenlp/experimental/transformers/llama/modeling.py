@@ -39,6 +39,7 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformerWeightOnly,
     FusedBlockMultiTransformer,
     FusedBlockMultiTransformerWeightOnly,
+    FusedBlockMultiTransformerA8W8,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
@@ -100,6 +101,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
         self.use_weight_only = False
         self.weight_only_quant_bits = config.weight_only_quant_bits
+
 
         if self.quant_type is not None and "weight_only_int" in self.quant_type:
             self.use_weight_only = True
@@ -290,6 +292,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             norm_type="rmsnorm",
             use_neox_rotary_style=True,
         )
+
+
+        self.set_transformer_block(transformer_config)
 
         self.norm = FusedLlamaRMSNorm(config)
 
@@ -705,6 +710,8 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
+        elif self.quant_type == "a8w8":
+            self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
         else:
             self.transformer_block = FusedBlockMultiTransformer(transformer_config)
 
