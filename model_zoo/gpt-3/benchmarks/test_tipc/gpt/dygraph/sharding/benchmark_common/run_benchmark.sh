@@ -90,6 +90,7 @@ function _train(){
                -o Distributed.sharding.sharding_degree=${sharding_degree} \
                -o Distributed.sharding.sharding_stage=${sharding_stage} \
                -o Distributed.sharding.sharding_offload=${sharding_offload} \
+               -o Profiler_pretrain.memory_stats=True \
                 "
 
     if [ ${PADDLE_TRAINER_ID} ]

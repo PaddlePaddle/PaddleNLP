@@ -88,6 +88,7 @@ function _train(){
                -o Engine.max_steps=100 \
                -o Engine.eval_freq=100000 \
                -o Distributed.pipeline.schedule_mode=${schedule_mode} \
+               -o Profiler_auto.memory_stats=True \
                -o Engine.verbose=3 \
                -o Engine.logging_freq=1 "
 
@@ -135,6 +136,7 @@ function _train(){
             -o Engine.max_steps=100 \
             -o Engine.eval_freq=100000 \
             -o Distributed.pipeline.schedule_mode=${schedule_mode} \
+            -o Profiler_auto.memory_stats=True \
             -o Engine.verbose=3 \
             -o Engine.logging_freq=1 "
         workerlog_id=0
@@ -158,6 +160,7 @@ function _train(){
             -o Engine.max_steps=100 \
             -o Engine.eval_freq=100000 \
             -o Distributed.pipeline.schedule_mode=${schedule_mode} \
+            -o Profiler_auto.memory_stats=True \
             -o Engine.verbose=3 \
             -o Engine.logging_freq=1 "
         workerlog_id=0

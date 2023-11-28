@@ -99,6 +99,7 @@ function _train(){
                -o Distributed.sharding.sharding_degree=${sharding_degree} \
                -o Distributed.sharding.sharding_stage=${sharding_stage} \
                -o Distributed.sharding.sharding_offload=${sharding_offload} \
+               -o Profiler_pretrain.memory_stats=True \
                -o Optimizer.lr.max_lr=1e-4 \
                -o Optimizer.lr.min_lr=1e-5 "
 

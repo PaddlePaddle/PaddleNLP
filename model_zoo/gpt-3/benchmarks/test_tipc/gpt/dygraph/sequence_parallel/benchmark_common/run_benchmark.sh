@@ -93,6 +93,7 @@ function _train(){
                -o Model.sequence_parallel=${sequence_parallel}  \
                -o Distributed.sharding.reduce_overlap=False \
                -o Distributed.sharding.broadcast_overlap=False \
+               -o Profiler_pretrain.memory_stats=True \
                -o Optimizer.tensor_fusion=False "
 
     if [ ${PADDLE_TRAINER_ID} ]

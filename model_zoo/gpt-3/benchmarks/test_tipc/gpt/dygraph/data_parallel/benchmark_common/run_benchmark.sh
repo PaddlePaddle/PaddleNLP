@@ -83,6 +83,7 @@ function _train(){
                -o Engine.eval_freq=${eval_freq} \
                -o Engine.save_load.save_steps=100000 \
                -o Distributed.dp_degree=${dp_degree} \
+               -o Profiler_pretrain.memory_stats=True \
                "
 
     if [ ${PADDLE_TRAINER_ID} ]
