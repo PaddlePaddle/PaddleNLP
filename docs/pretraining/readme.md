@@ -76,24 +76,25 @@ GLM 130B    |✅|✅|⬜|⬜|❌|⬜|⬜|⬜|⬜|⬜|⬜|🚧|
 
 机器环境： A100 80G * 8, CUDA 11.8, NCCL 2.15
 
-训练配置：单个step, global batch size为 256K token.
 ```
-paddle commit id              : 9bf5a86f13aa85b38715c015693f973290c8f9da
-paddlenlp commit id           : 0731766c01ae85891b5bbe770eb397eec2287cbb
+paddle commit id              : 9b36e53f24ac5f471b20de99e0cc3980f38b44ab
+paddlenlp commit id           : 0b246a609a3062e3c3256d87193b70277b5b07e0
 ```
-| 模型 | 序列长度 | 分布式策略 | 速度(`tokens/card/sec`) | 显存占用(`MB^1`) | 配置文件
-| :-: | :-: | :-: | :-: | :-: |  :-: |
-| `baichuan-inc/Baichuan2-13B-Base` |4096 | sd8 |    1366  | 74767MB | `./llama/pretrain_baichuan2-13b-sd8-stage2.json`
-| `baichuan-inc/Baichuan2-7B-Base` |4096 | tp2sd4 |     3570  |58363MB | `./llama/pretrain_baichuan2-7b-tp2sd4-stage2.json`
-| `facebook/llama-13b` |4096 | tp2sd4 |     1980  | 64402MB | `./llama/pretrain_llama-13b-tp2sd4-stage2.json`
-| `facebook/llama-7b` |4096 | tp2sd4 |     3740  | 52092MB | `./llama/pretrain_llama-7b-tp2sd4-stage2.json`
-| `FlagAlpha/Llama2-Chinese-13b-Chat` |4096 | tp2sd4 |     1978 | 64185MB | `./llama/pretrain_flagalpha-llama2-13b-tp2sd4-stage2.json`
-| `FlagAlpha/Llama2-Chinese-7b-Chat` |4096 | tp2sd4 |     3760 | 52092MB | `./llama/pretrain_flagalpha-llama2-7b-tp2sd4-stage2.json`
-| `idea-ccnl/ziya-llama-13b-v1` |4096 | tp2sd4 |     1973 | 64233MB | `./llama/pretrain_ziya-llama-13b-tp2sd4-stage2.json`
-| `linly-ai/chinese-llama-2-7b` |4096 | tp2sd4 |     3742 | 51751MB | `./llama/pretrain_linly-llama2-7b-tp2sd4-stage2.json`
-| `meta-llama/Llama-2-13b` |4096 | tp2sd4 |     1980 | 64199MB | `./llama/pretrain_llama2-13b-tp2sd4-stage2.json`
-| `meta-llama/Llama-2-7b` |4096 | tp2sd4 |     3756 | 52092MB | `./llama/pretrain_llama2-7b-tp2sd4-stage2.json`
-| `qwen/qwen-7b` |4096 | tp2sd4 |     3602 | 65448MB | `./qwen/pretrain_qwen-7b-tp2sd4-stage2.json`
+
+|模型        |序列长度      |分布式策略     |速度(`tokens/card/sec`)|显存占用(`MB^1`)|配置文件      |测试时间      |
+| :-:      | :-:      | :-:      | :-:      | :-:      | :-:      | :-:      |
+|`FlagAlpha/Llama2-Chinese-13b-Chat`|      4096|`tp2sd4_stage2`|   1980.22|64323MB   |`./llama/pretrain-flagalpha_llama2_13b-tp2sd4_stage2.json`|2023-11-27 21:42:38|
+|`FlagAlpha/Llama2-Chinese-7b-Chat`|      4096|`tp2sd4_stage2`|   3744.62|52092MB   |`./llama/pretrain-flagalpha_llama2_7b-tp2sd4_stage2.json`|2023-11-27 21:44:57|
+|`baichuan-inc/Baichuan2-13B-Base`|      4096|`sd8_stage2`|   1354.99|74767MB   |`./llama/pretrain-baichuan2_13b-sd8_stage2.json`|2023-11-27 21:51:26|
+|`baichuan-inc/Baichuan2-7B-Base`|      4096|`tp2sd4_stage2`|   3542.45|58363MB   |`./llama/pretrain-baichuan2_7b-tp2sd4_stage2.json`|2023-11-27 21:53:58|
+|`facebook/llama-13b`|      4096|`tp2sd4_stage2`|   1969.64|64278MB   |`./llama/pretrain-llama_13b-tp2sd4_stage2.json`| 2023-11-27 21:58:03|
+|`facebook/llama-7b`|      4096|`tp2sd4_stage2`|   3754.73|52092MB   |`./llama/pretrain-llama_7b-tp2sd4_stage2.json`|2023-11-27 22:00:30|
+|`idea-ccnl/ziya-llama-13b-v1`|      4096|`tp2sd4_stage2`|   1968.34|63983MB   |`./llama/pretrain-ziya_llama_13b-tp2sd4_stage2.json`|2023-11-27 22:04:35|
+|`linly-ai/chinese-llama-2-7b`|      4096|`tp2sd4_stage2`|    3732.9|51751MB   |`./llama/pretrain-linly_llama2_7b-tp2sd4_stage2.json`|2023-11-27 22:06:58|
+|`meta-llama/Llama-2-13b`|      4096|`tp2sd4_stage2`|   1975.63|64294MB   |`./llama/pretrain-llama2_13b-tp2sd4_stage2.json`|2023-11-27 22:11:04|
+|`meta-llama/Llama-2-7b`|      4096|`tp2sd4_stage2`|   3755.21|52092MB   |`./llama/pretrain-llama2_7b-tp2sd4_stage2.json`|2023-11-27 22:13:34|
+|`qwen/qwen-7b`|      4096|`tp2sd4_stage2`|   3607.28|65448MB   |`./qwen/pretrain-qwen_7b-tp2sd4_stage2.json`|2023-11-27 22:16:04|
+
 
 注：
 1. 显存占用(MB)使用的是 `max_memory_allocated`, 实际物理显存会占用更多，大约多2-3GB.
