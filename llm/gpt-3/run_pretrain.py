@@ -31,6 +31,7 @@ from paddlenlp.trainer import (
     Trainer,
     TrainingArguments,
     get_last_checkpoint,
+    init_dist_env,
     speed_metrics,
 )
 from paddlenlp.transformers import (
@@ -325,10 +326,21 @@ def main():
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
 
-    set_seed(training_args)
+    if data_args.data_cache is not None:
+        os.makedirs(data_args.data_cache, exist_ok=True)
+
     paddle.set_device(training_args.device)
+
     if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
+        init_dist_env(
+            training_args.tensor_parallel_degree,
+            training_args.sharding_parallel_degree,
+            training_args.pipeline_parallel_degree,
+            training_args.data_parallel_degree,
+            training_args.seed,
+        )
+
+    set_seed(seed=training_args.seed)
 
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
