@@ -175,6 +175,10 @@ def clear_async_save_task_queue():
             if task.is_alive():
                 logger.error("Error: save ckpt process timeout!!!")
                 async_save_queue.append(task)
+            else:
+                exitcode = task.exitcode
+                if exitcode != 0:
+                    logger.error(f"Error: save ckpt process failed with exitcode {exitcode}!!!")
 
 
 def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol=4):
