@@ -43,6 +43,8 @@
 
 
 ```
+# 编译自定义算子
+cd ../model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
 # 千问模型预训练
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./qwen/pretrain_argument_stage2.json
 ```

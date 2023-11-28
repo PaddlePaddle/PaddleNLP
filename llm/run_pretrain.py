@@ -378,12 +378,6 @@ def main():
     if data_args.data_cache is not None:
         os.makedirs(data_args.data_cache, exist_ok=True)
 
-    training_args.do_eval = False
-    training_args.do_predict = False
-    training_args.max_steps = 10
-    training_args.skip_memory_metrics = False
-    model_args.continue_training = False
-
     set_seed(training_args)
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
