@@ -509,8 +509,8 @@ class Trainer:
 
         if self.args.unified_checkpoint:
             if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
-                restart_inplace = check_unified_checkpoint(self.model, resume_from_checkpoint, safe_serialization=True)
-                if restart_inplace:
+                resume_inplace = check_unified_checkpoint(self.model, resume_from_checkpoint, safe_serialization=True)
+                if resume_inplace:
                     load_unified_checkpoint(
                         self.model,
                         resume_from_checkpoint,
@@ -2037,7 +2037,7 @@ class Trainer:
                 logger.info("Saving optimizer files.")
                 paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
-            # FIXME: manybe only save one copy
+            # FIXME: maybe only save one copy
             paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
 
             if self.do_grad_scaling:
@@ -2266,14 +2266,13 @@ class Trainer:
         else:
             if self.args.data_parallel_rank == 0:
                 if self.args.unified_checkpoint:
-                    restart_inplace = check_unified_optimizer(
+                    resume_inplace = check_unified_optimizer(
                         model=self.model,
                         optimizer=self.optimizer,
                         resume_from_checkpoint=checkpoint,
                         safe_serialization=True,
                     )
-                    print("restart_inplace: ", restart_inplace)
-                    if restart_inplace:
+                    if resume_inplace:
                         opt_state_dict = load_unified_optimizer(
                             model=self.model,
                             optimizer=self.optimizer,
