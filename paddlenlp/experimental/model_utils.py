@@ -19,8 +19,9 @@ import json
 import os
 from shutil import copyfile
 
+import numpy as np
 import paddle
-import paddle.fluid.core as core
+from paddle.framework import core
 
 from paddlenlp.transformers import PretrainedModel
 
@@ -29,7 +30,7 @@ from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
 from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
-__all__ = ["FasterPretrainedModel"]
+__all__ = ["FasterPretrainedModel", "ActScalesLoader", "WeightScalesLoader"]
 
 
 def load_vocabulary(filepath):
@@ -326,3 +327,72 @@ class FasterPretrainedModel(PretrainedModel):
             dst_path = os.path.join(save_directory, file_name)
             if src_path and os.path.abspath(src_path) != os.path.abspath(dst_path):
                 copyfile(src_path, dst_path)
+
+
+class ActScalesLoader:
+    def __init__(
+        self,
+        scale_json_file_path="act_scales.json",
+        key_map_dict=None,
+        num_of_layers=None,
+    ):
+        with open(scale_json_file_path) as json_file:
+            self.scale_dict = json.load(json_file)
+        self.key_map = key_map_dict
+        self.scale = {}
+        for scale_type, key_template in self.key_map.items():
+            self.scale[scale_type] = np.full([num_of_layers], fill_value=-1.0)
+            for i in range(num_of_layers):
+                if key_template.replace("#", str(i)) in self.scale_dict.keys():
+                    self.scale[scale_type][i] = 1 / self.scale_dict[key_template.replace("#", str(i))]
+
+
+class WeightScalesLoader:
+    def __init__(
+        self,
+        scale_json_file_path="weight_scales.json",
+        key_map_dict=None,
+        num_of_layers=None,
+        concat_qkv=False,
+        concat_ffn1=False,
+    ):
+        with open(scale_json_file_path) as json_file:
+            self.scale_dict = json.load(json_file)
+        self.key_map = key_map_dict
+        self.scale = {}
+        for scale_type, key_template in self.key_map.items():
+            no_skip_layer_list = []
+            n = 1
+            for i in range(num_of_layers):
+                if key_template.replace("#", str(i)) in self.scale_dict.keys():
+                    no_skip_layer_list.append(key_template.replace("#", str(i)))
+            if len(no_skip_layer_list) > 0:
+                n = len(self.scale_dict[no_skip_layer_list[0]])
+            self.scale[scale_type] = np.full([num_of_layers, n], fill_value=-1.0, dtype="float32")
+            for i in range(num_of_layers):
+                if key_template.replace("#", str(i)) in self.scale_dict.keys():
+                    self.scale[scale_type][i, :] = self.scale_dict[key_template.replace("#", str(i))]
+
+        # concat qkv and ffn1
+        if concat_qkv:
+            self.scale["qkv_weight_scale"] = []
+
+        if concat_ffn1:
+            self.scale["ffn1_weight_scale"] = []
+
+        for i in range(num_of_layers):
+            if concat_qkv:
+                self.scale["qkv_weight_scale"].append(
+                    np.concatenate(
+                        [
+                            self.scale["q_weight_scale"][i, :],
+                            self.scale["k_weight_scale"][i, :],
+                            self.scale["v_weight_scale"][i, :],
+                        ]
+                    )
+                )
+
+            if concat_ffn1:
+                self.scale["ffn1_weight_scale"].append(
+                    np.concatenate([self.scale["ffn1_1_weight_scale"][i, :], self.scale["ffn1_2_weight_scale"][i, :]])
+                )

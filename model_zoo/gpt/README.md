@@ -17,8 +17,6 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 ├── predict.py              # 生成文本示例demo
 ├── README.md               # 文档
 ├── run_eval.py             # 评估入口
-├── run_pretrain.py         # 预训练入口
-├── run_pretrain_static.py  # 混合并行，预训练脚本
 └── scripts/                # 训练脚本
 ```
 
@@ -149,7 +147,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain_traine
 
 1. WikiText数据集评估
 ```bash
-python run_eval.py --model_name gpt2-en \
+python run_eval.py --model_name_or_path gpt2-en \
     --eval_path ./wikitext-103/wiki.valid.tokens \
     --overlapping_eval 32 \
     --init_checkpoint_path ./output/model_100000/model_state.pdparams \
@@ -160,7 +158,7 @@ python run_eval.py --model_name gpt2-en \
 2. LAMBADA数据集评估
 ```bash
 # 覆盖default.yaml中的eval_path配置字段
-python run_eval.py --model_name gpt2-en \
+python run_eval.py --model_name_or_path gpt2-en \
     --eval_path ./lambada_test.jsonl \
     --cloze_eval \
     --init_checkpoint_path ./output/model_100000/model_state.pdparams \

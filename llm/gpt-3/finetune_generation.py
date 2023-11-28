@@ -13,13 +13,11 @@
 # limitations under the License.
 
 import os
+import sys
 from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-from configuration import GPTConfig
-from modeling import GPTForCausalLM
-from modeling_pp import GPTForCausalLMPipe
 from utils import (
     DataCollatorForSupervisedDataset,
     GPTTrainer,
@@ -28,13 +26,19 @@ from utils import (
 )
 
 from paddlenlp.datasets import load_dataset
+from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
     get_last_checkpoint,
     set_seed,
 )
-from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.transformers import (
+    AutoTokenizer,
+    GPTConfig,
+    GPTForCausalLM,
+    GPTForCausalLMPipe,
+)
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
@@ -72,17 +76,28 @@ class ModelArgument:
         default=True, metadata={"help": "Evaluate with generation, instead for calc loss."}
     )
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
+    # lora
+    lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
+    lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
+    lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
+    merge_weights: bool = field(
+        default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
+    )
 
 
 def main():
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    else:
+        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     # data_args.always_pad_to_max_length = False
     data_args.always_pad_to_max_length = training_args.pipeline_parallel_degree > 1
     setattr(training_args, "lr_decay_ratio", model_args.lr_decay_ratio)
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
+    training_args.tgt_length = data_args.tgt_length
     paddle.set_device(training_args.device)
 
     set_seed(args=training_args)
@@ -129,7 +144,6 @@ def main():
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.use_flash_attn = model_args.use_flash_attn
     config.use_recompute = training_args.recompute
-    config.lm_shift_labels = True
 
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
@@ -139,8 +153,31 @@ def main():
         model_args.model_name_or_path,
         config=config,
         dtype=dtype,
-        load_state_as_np=True,
     )
+    if model_args.lora:
+        if model_args.lora_path is None:
+            target_modules = [
+                ".*qkv_proj.*",
+                ".*q_proj.*",
+                ".*k_proj.*",
+                ".*v_proj.*",
+                ".*linear1.*",
+                ".*linear2.*",
+                ".*out_proj.*",
+            ]
+            lora_config = LoRAConfig(
+                target_modules=target_modules,
+                r=model_args.lora_rank,
+                lora_alpha=2 * model_args.lora_rank,
+                merge_weights=model_args.merge_weights,
+                tensor_parallel_degree=training_args.tensor_parallel_degree,
+                dtype=dtype,
+            )
+            model = LoRAModel(model, lora_config)
+        else:
+            model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
+        model.mark_only_lora_as_trainable()
+        model.print_trainable_parameters()
 
     # Load the dataset.
     if training_args.do_train or training_args.do_eval:

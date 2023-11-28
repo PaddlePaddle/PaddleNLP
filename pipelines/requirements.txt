@@ -16,9 +16,7 @@ faiss-cpu>=1.7.2
 opencv-python>=4.4
 opencv-contrib-python-headless
 python-multipart
-st-annotated-text
 click==8.0
-streamlit==1.11.1
 fastapi
 uvicorn
 markdown
@@ -28,5 +26,6 @@ wordcloud==1.8.2.2
 boilerpy3
 events
 sseclient-py==1.7.2
-typing_extensions==4.5
 spacy
+tritonclient[all]
+typing_extensions==4.5.0

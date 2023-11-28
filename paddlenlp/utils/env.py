@@ -68,6 +68,8 @@ SUCCESS_STATUS = 0
 LEGACY_CONFIG_NAME = "model_config.json"
 CONFIG_NAME = "config.json"
 TOKENIZER_CONFIG_NAME = "tokenizer_config.json"
+CHAT_TEMPLATE_CONFIG_NAME = "chat_template.json"
+GENERATION_CONFIG_NAME = "generation_config.json"
 
 
 LORA_CONFIG_NAME = "lora_config.json"

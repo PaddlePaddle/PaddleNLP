@@ -15,16 +15,12 @@ GPT/Llama pretraining scripts.
 """
 import math
 import os
-import random
+import sys
 import time
 from dataclasses import dataclass, field
 from typing import Optional
 
-import numpy as np
 import paddle
-from configuration import GPTConfig
-from modeling import GPTForCausalLM
-from modeling_pp import GPTForCausalLMPipe
 
 from paddlenlp.trainer import (
     PdArgumentParser,
@@ -32,12 +28,17 @@ from paddlenlp.trainer import (
     TrainingArguments,
     get_last_checkpoint,
     init_dist_env,
+    set_seed,
     speed_metrics,
 )
 from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
+    GPTConfig,
+    GPTForCausalLM,
+    GPTForCausalLMPipe,
     LinearAnnealingWithWarmupDecay,
+    register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
@@ -49,7 +50,11 @@ MODEL_CLASSES = {
     ),
 }
 
-from dataset import GPTDataset, get_train_valid_test_split_
+from paddlenlp.data.causal_dataset import (
+    build_train_valid_test_datasets,
+    check_data_split,
+    print_rank_0,
+)
 
 
 def add_start_docstrings(*docstr):
@@ -100,6 +105,13 @@ class DataArguments:
         metadata={"help": "Use share folder for data dir and output dir on multi machine."},
     )
 
+    data_impl: str = field(default="mmap", metadata={"help": "The format of the preprocessed data."})
+    skip_warmup: bool = field(
+        default=True,
+        metadata={"help": "Whether to skip the warmup process of mmap files."},
+    )
+    data_cache: str = field(default=None, metadata={"help": "The path of the cached dataset."})
+
 
 @dataclass
 class ModelArguments:
@@ -117,19 +129,49 @@ class ModelArguments:
     tokenizer_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
-    use_flash_attn: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
-
+    output_attentions: bool = field(default=False, metadata={"help": "Whether output attention weights"})
+    use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
+    virtual_pp_degree: int = field(
+        default=1,
+        metadata={"help": "virtual_pp_degree"},
+    )
+    fused_linear: bool = field(
+        default=False,
+        metadata={"help": "gpt, whether to fuse linear projection"},
+    )
+    fuse_attention_qkv: bool = field(
+        default=False,
+        metadata={"help": "gpt, whether to fuse attention qkv"},
+    )
+    fuse_attention_ffn: bool = field(
+        default=False,
+        metadata={"help": "whether to fuse first up and gate proj in mlp block"},
+    )
+    recompute_granularity: str = field(
+        default="full",
+        metadata={"help": "Choose among ['full', 'core_attn', 'full_attn']"},
+    )
     enable_fuse_transformer: bool = field(
         default=False,
         metadata={"help": "gpt, enable_fuse_transformer"},
     )
-
-    fuse_attention_qkv: bool = field(
-        default=False,
-        metadata={"help": "gpt, fuse_attention_qkv"},
-    )
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
+    continue_training: bool = field(
+        default=False,
+        metadata={
+            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. "
+            + "If set True, the model_name_or_path argument must exist in the paddlenlp models."
+        },
+    )
+    sequence_parallel: bool = field(
+        default=False,
+        metadata={"help": "whether to use sequence parallel"},
+    )
+    fuse_sequence_parallel_allreduce: bool = field(
+        default=False,
+        metadata={"help": "whether to use fuse sequence parallel allreduce"},
+    )
 
 
 def create_pretrained_dataset(
@@ -139,7 +181,9 @@ def create_pretrained_dataset(
     tokenizer,
 ):
 
-    train_valid_test_num_samples = [
+    check_data_split(data_args.split, training_args.do_train, training_args.do_eval, training_args.do_predict)
+
+    train_val_test_num_samples = [
         training_args.per_device_train_batch_size
         * training_args.dataset_world_size
         * training_args.max_steps
@@ -151,72 +195,55 @@ def create_pretrained_dataset(
         training_args.per_device_eval_batch_size * training_args.dataset_world_size * training_args.test_iters,
     ]
 
-    input_prefix = data_file[0]
+    print_rank_0(" > datasets target sizes (minimum size):")
+    if training_args.do_train:
+        print_rank_0("    train:      {}".format(train_val_test_num_samples[0]))
+    if training_args.do_eval:
+        print_rank_0("    validation: {}".format(train_val_test_num_samples[1]))
+    if training_args.do_predict:
+        print_rank_0("    test:       {}".format(train_val_test_num_samples[2]))
 
-    for suffix in ["_ids.npy", "_idx.npz"]:
-        if not os.path.isfile(input_prefix + suffix):
-            raise ValueError("File Not found, %s" % (input_prefix + suffix))
-
-    sample_ids = np.load(input_prefix + "_ids.npy", mmap_mode="r", allow_pickle=True)
-    # All documment ids, extend as 1-D array.
-
-    process_data = np.load(input_prefix + "_idx.npz")
-    # The len(sample_lens) num of docs
-    # The sum(sample_lens) should equal len(sample_ids)
-    sample_lens = process_data["lens"]
-
-    splits = get_train_valid_test_split_(data_args.split, len(sample_lens))
-    assert len(sample_lens) >= splits[-1], "The document nums should larger than max of splits, but %s < %s" % (
-        len(sample_lens),
-        splits[-1],
+    # Build the datasets.
+    train_dataset, valid_dataset, test_dataset = build_train_valid_test_datasets(
+        data_prefix=data_file,
+        data_impl=data_args.data_impl,
+        splits_string=data_args.split,
+        train_val_test_num_samples=train_val_test_num_samples,
+        seq_length=data_args.max_seq_length,
+        seed=training_args.seed,
+        skip_warmup=data_args.skip_warmup,
+        data_cache_path=data_args.data_cache,
     )
 
     def print_dataset(data, mode="train"):
         logger.info(f"Sample data for {mode} mode")
-        input_ids, loss_mask, attention_mask, position_ids, labels = data
-        logger.info(tokenizer._decode(input_ids))
-        # logger.info(tokenizer._decode(labels))
-        # logger.info(tokenizer.convert_ids_to_tokens(input_ids))
+        # input_ids, loss_mask, attention_mask, position_ids, labels = data
+        input_ids = data["text"]
 
-    def build_dataset(index, name):
-        dataset = GPTDataset(
-            file_prefix=input_prefix,
-            build_data_file=training_args.local_process_index == 0,
-            micro_batch_size=training_args.per_device_train_batch_size
-            if name == "train"
-            else training_args.per_device_eval_batch_size,
-            name="gpt_" + name,
-            max_seq_len=data_args.max_seq_length,
-            num_samples=train_valid_test_num_samples[index],
-            documents=np.arange(splits[index], splits[index + 1]),
-            sample_ids=sample_ids,
-            sample_lens=sample_lens,
-            eos_id=tokenizer.eos_token_id,
-            seed=training_args.seed,
-        )
-        print_dataset(dataset[0], name)
-        return dataset
+        logger.info(tokenizer._decode(input_ids))
 
     from paddlenlp.data import Stack
 
     def _collate_data(data, stack_fn=Stack()):
-        num_fields = len(data[0])
-        out = [None] * num_fields
-        # 0:input_ids, 1:loss_mask, 2:attention_mask, 3:position_ids, 4:labels
-        for i in (0, 1, 2, 3, 4):
-            out[i] = stack_fn([x[i] for x in data])
+        tokens_ = stack_fn([x["text"] for x in data])
+
+        labels = tokens_[:, 1:]
+        tokens = tokens_[:, :-1]
+
+        # Attention mask.
+        # attention_mask = paddle.ones(tokens.shape, dtype=paddle.int64)
 
         return {
-            "input_ids": out[0],
-            "attention_mask": out[2],
-            "labels": out[4],
+            "input_ids": tokens,
+            "labels": labels,
         }
 
-    # Note, data should be broardcast to all devices.
-    # for train, valid, test, the distinct data num is data_world_size
-    train_dataset = build_dataset(0, "train")
-    valid_dataset = build_dataset(1, "valid")
-    test_dataset = build_dataset(2, "test")
+    if training_args.do_train:
+        print_dataset(train_dataset[0])
+    if training_args.do_eval:
+        print_dataset(valid_dataset[0])
+    if training_args.do_predict:
+        print_dataset(test_dataset[0])
 
     return train_dataset, valid_dataset, test_dataset, _collate_data
 
@@ -229,9 +256,10 @@ def get_train_data_file(args):
         files = [
             os.path.join(args.input_dir, f)
             for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz" in str(f))
+            if (os.path.isfile(os.path.join(args.input_dir, f)) and ("_idx.npz" in str(f) or ".idx" in str(f)))
         ]
         files = [x.replace("_idx.npz", "") for x in files]
+        files = [x.replace(".idx", "") for x in files]
 
         if len(files) > 1:
             ret = []
@@ -243,16 +271,6 @@ def get_train_data_file(args):
             return ret
 
     return files
-
-
-def set_seed(args):
-    if args.device == "cpu":
-        idx = 0
-    else:
-        idx = paddle.distributed.get_rank()
-    random.seed(args.seed + idx)
-    np.random.seed(args.seed + idx)
-    paddle.seed(args.seed + idx)
 
 
 class PretrainingTrainer(Trainer):
@@ -322,7 +340,10 @@ class PretrainingTrainer(Trainer):
 
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    else:
+        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
 
@@ -370,15 +391,28 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
 
     config = config_class.from_pretrained(model_args.model_name_or_path)
+    # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
+    if not model_args.continue_training:
+        config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
+
+    if not model_args.continue_training:
+        config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
+        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
+    config.seq_length = data_args.max_seq_length
+    config.use_flash_attention = model_args.use_flash_attention
+    config.fuse_attention_qkv = model_args.fuse_attention_qkv
+    config.fuse_attention_ffn = model_args.fuse_attention_ffn
+    config.virtual_pp_degree = model_args.virtual_pp_degree
+    config.sequence_parallel = model_args.sequence_parallel
+    config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
+    config.output_attentions = model_args.output_attentions
     config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
     config.hidden_dropout_prob = model_args.hidden_dropout_prob
     config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
     config.enable_fuse_transformer = model_args.enable_fuse_transformer
-    config.fuse_attention_qkv = model_args.fuse_attention_qkv
-    config.use_recompute = training_args.recompute
-    config.use_flash_attn = model_args.use_flash_attn
-    config.lm_shift_labels = False
 
+    config.recompute_granularity = model_args.recompute_granularity
+    config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
 
@@ -395,12 +429,22 @@ def main():
     if training_args.pipeline_parallel_degree > 1:
         model_class = GPTForCausalLMPipe
 
-    model = model_class.from_pretrained(
-        model_args.model_name_or_path,
-        config=config,
-        dtype=dtype,
-        load_state_as_np=True,
-    )
+    if model_args.continue_training:
+        model = model_class.from_pretrained(
+            model_args.model_name_or_path,
+            config=config,
+            dtype=dtype,
+        )
+    else:
+        model = model_class.from_config(config, dtype=dtype)
+
+    if model_args.sequence_parallel:
+        register_sequence_parallel_allreduce_hooks(
+            model, training_args.gradient_accumulation_steps, model_args.fuse_sequence_parallel_allreduce
+        )
+
+    if training_args.recompute:
+        model.recompute_enable()
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
@@ -445,7 +489,6 @@ def main():
         checkpoint = training_args.resume_from_checkpoint
     elif last_checkpoint is not None:
         checkpoint = last_checkpoint
-    checkpoint = None
 
     # Training
     if training_args.do_train:

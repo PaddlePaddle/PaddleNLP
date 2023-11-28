@@ -25,7 +25,6 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.distributed import fleet
-from paddle.fluid import layers
 from paddle.nn import Layer
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
@@ -111,18 +110,18 @@ class MultiHeadAttention(nn.Layer):
         self.head_dim = config.hidden_size // self.num_heads
 
         # get the `num_heads`
-        assert self.num_heads % config.mp_degree == 0
-        self.num_heads = self.num_heads // config.mp_degree
+        assert self.num_heads % config.tensor_parallel_degree == 0
+        if config.tensor_parallel_degree > 0:
+            self.num_heads = self.num_heads // config.tensor_parallel_degree
+            assert (
+                self.head_dim * self.num_heads * config.tensor_parallel_degree == config.hidden_size
+            ), "hidden_size must be divisible by num_heads"
 
         self.dropout = config.attention_probs_dropout_prob
         self.need_weights = need_weights
         self.fuse_attention_qkv = config.fuse_attention_qkv
 
-        assert (
-            self.head_dim * self.num_heads * config.mp_degree == config.hidden_size
-        ), "hidden_size must be divisible by num_heads"
-
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             if self.fuse_attention_qkv:
                 self.qkv_proj = fleet.meta_parallel.ColumnParallelLinear(
                     config.hidden_size,
@@ -236,12 +235,8 @@ class MultiHeadAttention(nn.Layer):
             k, v = self.compute_kv(key, value)
             return self.StaticCache(k, v)
         elif value is None:  # incremental_state
-            k = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_heads, 0, self.head_dim], dtype=key.dtype, value=0
-            )
-            v = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_heads, 0, self.head_dim], dtype=key.dtype, value=0
-            )
+            k = paddle.full(shape=[key.shape[0], self.num_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0)
+            v = paddle.full(shape=[key.shape[0], self.num_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0)
             return self.Cache(k, v)
         else:
             # incremental_state with initial value, mainly for usage like UniLM
@@ -320,22 +315,22 @@ class TransformerDecoderLayer(nn.Layer):
         bias_attrs = _convert_param_attr_to_list(bias_attr, 3)
 
         self.self_attn = MultiHeadAttention(config, need_weights=True)
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.linear1 = fleet.meta_parallel.ColumnParallelLinear(
                 d_model,
                 dim_feedforward,
                 gather_output=False,
-                has_bias=False,
+                has_bias=True,
             )
         else:
             self.linear1 = nn.Linear(d_model, dim_feedforward, weight_attrs[2], bias_attr=bias_attrs[2])
 
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.linear2 = fleet.meta_parallel.RowParallelLinear(
                 dim_feedforward,
                 d_model,
                 input_is_parallel=True,
-                has_bias=False,
+                has_bias=True,
             )
         else:
             self.linear2 = nn.Linear(dim_feedforward, d_model, weight_attrs[2], bias_attr=bias_attrs[2])
@@ -395,7 +390,7 @@ class TransformerDecoder(Layer):
         super(TransformerDecoder, self).__init__()
 
         if config.word_embed_proj_dim != config.hidden_size:
-            if config.mp_degree > 1:
+            if config.tensor_parallel_degree > 1:
                 self.project_out = fleet.meta_parallel.ColumnParallelLinear(
                     config.hidden_size,
                     config.word_embed_proj_dim,
@@ -540,7 +535,7 @@ class OPTEmbeddings(Layer):
 
     def __init__(self, config: OPTConfig):
         super(OPTEmbeddings, self).__init__()
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
                 config.vocab_size,
                 config.word_embed_proj_dim,
@@ -559,7 +554,7 @@ class OPTEmbeddings(Layer):
             )
 
         if config.word_embed_proj_dim != config.hidden_size:
-            if config.mp_degree > 1:
+            if config.tensor_parallel_degree > 1:
                 self.project_in = fleet.meta_parallel.ColumnParallelLinear(
                     config.word_embed_proj_dim,
                     config.hidden_size,
@@ -580,7 +575,7 @@ class OPTEmbeddings(Layer):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, input_ids=None, attention_mask=None, input_embeddings=None, past_key_values_length=None):
-        if input_ids is not None:
+        if input_ids is not None and input_embeddings is None:
             input_embeddings = self.word_embeddings(input_ids)
 
         if self.project_in:
@@ -620,16 +615,20 @@ class OPTPretrainedModel(PretrainedModel):
             num_attention_heads=config.num_attention_heads,
         )
         actions = {
-            "word_embeddings.weight": partial(fn, is_column=False),
+            "embeddings.word_embeddings.weight": partial(fn, is_column=False),
         }
         for layer_index in range(config.num_hidden_layers):
             actions.update(
                 {
                     # Column Linear
                     f"decoder.layers.{layer_index}.self_attn.q_proj.weight": partial(fn, is_column=True),
+                    f"decoder.layers.{layer_index}.self_attn.q_proj.bias": partial(fn, is_column=True),
                     f"decoder.layers.{layer_index}.self_attn.k_proj.weight": partial(fn, is_column=True),
+                    f"decoder.layers.{layer_index}.self_attn.k_proj.bias": partial(fn, is_column=True),
                     f"decoder.layers.{layer_index}.self_attn.v_proj.weight": partial(fn, is_column=True),
+                    f"decoder.layers.{layer_index}.self_attn.v_proj.bias": partial(fn, is_column=True),
                     f"decoder.layers.{layer_index}.linear1.weight": partial(fn, is_column=True),
+                    f"decoder.layers.{layer_index}.linear1.bias": partial(fn, is_column=True),
                     # Row Linear
                     f"decoder.layers.{layer_index}.linear2.weight": partial(fn, is_column=False),
                     f"decoder.layers.{layer_index}.self_attn.out_proj.weight": partial(fn, is_column=False),
@@ -761,7 +760,7 @@ class OPTModel(OPTPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -954,10 +953,16 @@ class OPTModel(OPTPretrainedModel):
 
 
 class OPTLMHead(Layer):
-    def __init__(self, hidden_size: int, vocab_size: int, embedding_weights=None):
+    def __init__(self, config: OPTConfig, embedding_weights=None):
         super(OPTLMHead, self).__init__()
+        self.config = config
         self.decoder_weight = (
-            self.create_parameter(shape=[vocab_size, hidden_size], dtype=paddle.get_default_dtype(), is_bias=True)
+            self.create_parameter(
+                default_initializer=paddle.nn.initializer.Uniform(low=-0.1, high=0.1),
+                shape=[config.vocab_size, config.hidden_size],
+                dtype=config.dtype,
+                is_bias=True,
+            )
             if embedding_weights is None
             else embedding_weights
         )
@@ -965,8 +970,7 @@ class OPTLMHead(Layer):
     def forward(self, hidden_states):
         if isinstance(hidden_states, BaseModelOutputWithPastAndCrossAttentions):
             hidden_states = hidden_states["last_hidden_state"]
-
-        logits = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True)
+        logits = paddle.tensor.matmul(hidden_states, self.decoder_weight.cast(hidden_states.dtype), transpose_y=True)
         return logits
 
 
@@ -984,10 +988,13 @@ class OPTForCausalLM(OPTPretrainedModel):
         super(OPTForCausalLM, self).__init__(config)
         self.opt = OPTModel(config)
         self.lm_head = OPTLMHead(
-            hidden_size=self.opt.config.hidden_size,
-            vocab_size=self.opt.config.vocab_size,
-            embedding_weights=self.opt.embeddings.word_embeddings.weight,
+            config,
         )
+
+    def _get_model_inputs_spec(self, dtype: str):
+        return {
+            "input_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+        }
 
     def forward(
         self,
@@ -1073,17 +1080,7 @@ class OPTForCausalLM(OPTPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.config.lm_shift_labels:
-                # Shift so that tokens < n predict n
-                shift_logits = logits[:, :-1, :]
-                shift_labels = labels[:, 1:]
-            else:
-                shift_logits = logits
-                shift_labels = labels
-
-            # Flatten the tokens
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(shift_logits.reshape((-1, shift_logits.shape[-1])), shift_labels.reshape((-1,)))
+            loss = nn.functional.cross_entropy(logits, labels)
 
         if not return_dict:
             if not use_cache:

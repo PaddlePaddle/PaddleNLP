@@ -14,13 +14,12 @@
 
 set -x
 unset CUDA_VISIBLE_DEVICES
-
-task_name="llama_hybid"
+task_name="llama_hybrid"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
 
-PYTHONPATH=../../../:$PYTHONPATH  \
+PYTHONPATH=../../:$PYTHONPATH  \
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "output/$task_name""_log" \
@@ -56,4 +55,5 @@ python -u  -m paddle.distributed.launch \
     --recompute 1 \
     --do_train \
     --do_eval \
-    --device "gpu"
+    --device "gpu" \
+    --data_impl "mmap"

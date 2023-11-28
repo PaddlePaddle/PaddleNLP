@@ -23,7 +23,11 @@ CHATGLM_V2_PRETRAINED_RESOURCE_FILES_MAP = {
 
 class ChatGLMv2Config(PretrainedConfig):
     model_type = "chatglm_v2"
-    attribute_map = {"num_layers": "num_hidden_layers", "padded_vocab_size": "vocab_size"}
+    attribute_map = {
+        "num_layers": "num_hidden_layers",
+        "padded_vocab_size": "vocab_size",
+        "seq_length": "max_sequence_length",
+    }
 
     def __init__(
         self,
@@ -51,6 +55,7 @@ class ChatGLMv2Config(PretrainedConfig):
         fp32_residual_connection=False,
         eos_token_id=2,
         pad_token_id=0,
+        use_flash_attention=False,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, eos_token_id=eos_token_id, **kwargs)
@@ -75,3 +80,4 @@ class ChatGLMv2Config(PretrainedConfig):
         self.apply_query_key_layer_scaling = apply_query_key_layer_scaling
         self.attention_softmax_in_fp32 = attention_softmax_in_fp32
         self.fp32_residual_connection = fp32_residual_connection
+        self.use_flash_attention = use_flash_attention

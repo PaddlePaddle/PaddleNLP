@@ -11,20 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-GPT/Llama pretraining scripts.
-"""
 import math
 import os
 import random
 import sys
 import time
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import List, Optional
 
 import numpy as np
 import paddle
 
+from paddlenlp.data.causal_dataset import (
+    build_train_valid_test_datasets,
+    check_data_split,
+    print_rank_0,
+)
 from paddlenlp.trainer import (
     PdArgumentParser,
     Trainer,
@@ -33,24 +35,16 @@ from paddlenlp.trainer import (
     speed_metrics,
 )
 from paddlenlp.transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoModelForCausalLMPipe,
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
-    LlamaConfig,
-    LlamaForCausalLM,
+    register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
-
-MODEL_CLASSES = {
-    "llama": (
-        LlamaConfig,
-        LlamaForCausalLM,
-    ),
-}
-
-from dataset import GPTDataset, get_train_valid_test_split_
-from modeling_pp import LlamaForCausalLMPipe
 
 
 def add_start_docstrings(*docstr):
@@ -72,6 +66,12 @@ class PreTrainingArguments(TrainingArguments):
         default=None,
         metadata={
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
+        },
+    )
+    enable_linear_fused_grad_add: bool = field(
+        default=False,
+        metadata={
+            "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
     )
 
@@ -100,6 +100,13 @@ class DataArguments:
         default=False,
         metadata={"help": "Use share folder for data dir and output dir on multi machine."},
     )
+
+    data_impl: str = field(default="mmap", metadata={"help": "The format of the preprocessed data."})
+    skip_warmup: bool = field(
+        default=True,
+        metadata={"help": "Whether to skip the warmup process of mmap files."},
+    )
+    data_cache: str = field(default=None, metadata={"help": "The path of the cached dataset."})
 
 
 @dataclass
@@ -133,23 +140,52 @@ class ModelArguments:
         metadata={"help": "llama, use_fused_rms_norm"},
     )
     fuse_attention_qkv: bool = field(
-        default=True,
-        metadata={"help": "gpt, fuse_attention_qkv"},
+        default=False,
+        metadata={"help": "whether to fuse attention qkv"},
+    )
+    fuse_attention_ffn: bool = field(
+        default=False,
+        metadata={"help": "whether to fuse first up and gate proj in mlp block"},
     )
     recompute_granularity: str = field(
         default="full",
-        metadata={"help": "full core_attn"},
+        metadata={"help": "Choose among ['full', 'core_attn', 'full_attn']"},
     )
     virtual_pp_degree: int = field(
         default=1,
         metadata={"help": "virtual_pp_degree"},
     )
-
     continue_training: bool = field(
         default=False,
         metadata={
-            "help": "Pre-training from existing paddlenlp model weights. Default Fasle and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
+            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
         },
+    )
+    sequence_parallel: bool = field(
+        default=False,
+        metadata={"help": "whether to use sequence parallel"},
+    )
+    fuse_sequence_parallel_allreduce: bool = field(
+        default=False,
+        metadata={"help": "whether to use fuse sequence parallel allreduce"},
+    )
+    use_fused_rope: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable rope fusion or not."},
+    )
+    no_recompute_layers: Optional[List[int]] = field(
+        default=None,
+        metadata={"help": "Specify the full transformer layers that should not be recomputed."},
+    )
+    pp_recompute_interval: int = field(
+        default=1,
+        metadata={
+            "help": "The interval for the number of layers at which recomputation occurs. A value of 0 indicates no recomputation. Default is 0."
+        },
+    )
+    recompute_use_reentrant: bool = field(
+        default=False,
+        metadata={"help": "recompute_use_reentrant"},
     )
 
 
@@ -158,9 +194,12 @@ def create_pretrained_dataset(
     training_args,
     data_file,
     tokenizer,
+    need_data=True,
 ):
 
-    train_valid_test_num_samples = [
+    check_data_split(data_args.split, training_args.do_train, training_args.do_eval, training_args.do_predict)
+
+    train_val_test_num_samples = [
         training_args.per_device_train_batch_size
         * training_args.dataset_world_size
         * training_args.max_steps
@@ -172,74 +211,55 @@ def create_pretrained_dataset(
         training_args.per_device_eval_batch_size * training_args.dataset_world_size * training_args.test_iters,
     ]
 
-    input_prefix = data_file[0]
+    print_rank_0(" > datasets target sizes (minimum size):")
+    if training_args.do_train:
+        print_rank_0("    train:      {}".format(train_val_test_num_samples[0]))
+    if training_args.do_eval:
+        print_rank_0("    validation: {}".format(train_val_test_num_samples[1]))
+    if training_args.do_predict:
+        print_rank_0("    test:       {}".format(train_val_test_num_samples[2]))
 
-    for suffix in ["_ids.npy", "_idx.npz"]:
-        if not os.path.isfile(input_prefix + suffix):
-            raise ValueError("File Not found, %s" % (input_prefix + suffix))
-
-    sample_ids = np.load(input_prefix + "_ids.npy", mmap_mode="r", allow_pickle=True)
-    # All documment ids, extend as 1-D array.
-
-    process_data = np.load(input_prefix + "_idx.npz")
-    # The len(sample_lens) num of docs
-    # The sum(sample_lens) should equal len(sample_ids)
-    sample_lens = process_data["lens"]
-
-    splits = get_train_valid_test_split_(data_args.split, len(sample_lens))
-    assert len(sample_lens) >= splits[-1], "The document nums should larger than max of splits, but %s < %s" % (
-        len(sample_lens),
-        splits[-1],
+    # Build the datasets.
+    train_dataset, valid_dataset, test_dataset = build_train_valid_test_datasets(
+        data_prefix=data_file,
+        data_impl=data_args.data_impl,
+        splits_string=data_args.split,
+        train_val_test_num_samples=train_val_test_num_samples,
+        seq_length=data_args.max_seq_length,
+        seed=training_args.seed,
+        skip_warmup=data_args.skip_warmup,
+        share_folder=data_args.share_folder,
+        data_cache_path=data_args.data_cache,
+        need_data=need_data,
     )
 
     def print_dataset(data, mode="train"):
-        logger.info(f"Sample data for {mode} mode")
-        input_ids, loss_mask, attention_mask, position_ids, labels = data
-        logger.info(tokenizer._decode(input_ids))
-        # logger.info(tokenizer._decode(labels))
-        # logger.info(tokenizer.convert_ids_to_tokens(input_ids))
+        logger.info(f"Sample data for {mode} mode.")
+        # input_ids, loss_mask, attention_mask, position_ids, labels = data
+        input_ids = data["text"]
 
-    def build_dataset(index, name):
-        dataset = GPTDataset(
-            file_prefix=input_prefix,
-            build_data_file=training_args.local_process_index == 0,
-            micro_batch_size=training_args.per_device_train_batch_size
-            if name == "train"
-            else training_args.per_device_eval_batch_size,
-            name="gpt_" + name,
-            max_seq_len=data_args.max_seq_length,
-            num_samples=train_valid_test_num_samples[index],
-            documents=np.arange(splits[index], splits[index + 1]),
-            sample_ids=sample_ids,
-            sample_lens=sample_lens,
-            eos_id=tokenizer.eos_token_id,
-            seed=training_args.seed,
-        )
-        print_dataset(dataset[0], name)
-        return dataset
+        logger.info(tokenizer._decode(input_ids))
 
     from paddlenlp.data import Stack
 
     def _collate_data(data, stack_fn=Stack()):
-        num_fields = len(data[0])
-        out = [None] * num_fields
-        # 0:input_ids, 1:loss_mask, 2:attention_mask, 3:position_ids, 4:labels
-        for i in (0, 1, 2, 3, 4):
-            out[i] = stack_fn([x[i] for x in data])
+        tokens_ = stack_fn([x["text"] for x in data])
+
+        labels = tokens_[:, 1:]
+        tokens = tokens_[:, :-1]
 
         return {
-            "input_ids": out[0],
-            # "token_type_ids": out[1],
-            # "attention_mask": out[2],
-            # "loss_mask": out[3],
-            "labels": out[4],
+            "input_ids": tokens,
+            "labels": labels,
         }
 
-    # Note, data should be broardcast to all devices.
-    # for train, valid, test, the distinct data num is data_world_size
-    train_dataset = build_dataset(0, "train")
-    valid_dataset = build_dataset(1, "valid")
-    test_dataset = build_dataset(2, "test")
+    if need_data:
+        if training_args.do_train:
+            print_dataset(train_dataset[0], "train")
+        if training_args.do_eval:
+            print_dataset(valid_dataset[0], "valid")
+        if training_args.do_predict:
+            print_dataset(test_dataset[0], "test")
 
     return train_dataset, valid_dataset, test_dataset, _collate_data
 
@@ -252,9 +272,10 @@ def get_train_data_file(args):
         files = [
             os.path.join(args.input_dir, f)
             for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz" in str(f))
+            if (os.path.isfile(os.path.join(args.input_dir, f)) and ("_idx.npz" in str(f) or ".idx" in str(f)))
         ]
         files = [x.replace("_idx.npz", "") for x in files]
+        files = [x.replace(".idx", "") for x in files]  # add
 
         if len(files) > 1:
             ret = []
@@ -350,8 +371,16 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
+    if training_args.enable_linear_fused_grad_add:
+        from fused_layers import mock_layers
+
+        mock_layers()
+
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
+
+    if data_args.data_cache is not None:
+        os.makedirs(data_args.data_cache, exist_ok=True)
 
     set_seed(training_args)
     paddle.set_device(training_args.device)
@@ -386,12 +415,10 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    config_class, model_class = MODEL_CLASSES[model_args.model_type]
-
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
+    config = AutoConfig.from_pretrained(model_args.model_name_or_path)
 
-    config = config_class.from_pretrained(model_args.model_name_or_path)
-
+    config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
     if not model_args.continue_training:
         config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
@@ -400,14 +427,23 @@ def main():
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
         logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
 
-    config.lm_shift_labels = False
+    if model_args.no_recompute_layers is not None:
+        model_args.no_recompute_layers.sort()
+
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
+    config.fuse_attention_ffn = model_args.fuse_attention_ffn
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
-    config.use_recompute = training_args.recompute
+    config.sequence_parallel = model_args.sequence_parallel
+    config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
+    config.use_fused_rope = model_args.use_fused_rope
+    config.no_recompute_layers = model_args.no_recompute_layers
+    config.pp_recompute_interval = model_args.pp_recompute_interval
+    config.recompute_use_reentrant = model_args.recompute_use_reentrant
 
+    config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
 
@@ -421,23 +457,35 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
-    if training_args.pipeline_parallel_degree > 1 and model_args.model_type == "llama":
-        model_class = LlamaForCausalLMPipe
+    model_class = AutoModelForCausalLM
+    if training_args.pipeline_parallel_degree > 1:
+        model_class = AutoModelForCausalLMPipe
 
     if model_args.continue_training:
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=config,
             dtype=dtype,
-            load_state_as_np=True,
         )
     else:
-        model = model_class._from_config(config, dtype=dtype)
+        model = model_class.from_config(config, dtype=dtype)
+
+    if model_args.sequence_parallel:
+        register_sequence_parallel_allreduce_hooks(
+            model, training_args.gradient_accumulation_steps, model_args.fuse_sequence_parallel_allreduce
+        )
+
+    if training_args.recompute:
+        model.recompute_enable()
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
-    warmup_steps = training_args.warmup_ratio * training_args.max_steps
+
+    if training_args.warmup_steps > 0:
+        warmup_steps = training_args.warmup_steps
+    else:
+        warmup_steps = training_args.warmup_ratio * training_args.max_steps
 
     lr_scheduler = None
     if training_args.lr_scheduler_type.value == "cosine":
@@ -459,7 +507,19 @@ def main():
 
     data_file = get_train_data_file(data_args)
     train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(
-        data_args, training_args, data_file, tokenizer
+        data_args,
+        training_args,
+        data_file,
+        tokenizer,
+        need_data=training_args.should_load_dataset,
+    )
+
+    total_effective_tokens = (
+        training_args.per_device_train_batch_size
+        * training_args.dataset_world_size
+        * training_args.max_steps
+        * training_args.gradient_accumulation_steps
+        * data_args.max_seq_length
     )
 
     trainer = PretrainingTrainer(
@@ -482,7 +542,8 @@ def main():
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         metrics = train_result.metrics
-        trainer.save_model()
+        if not int(os.getenv("test_ci_no_save_model", 0)):
+            trainer.save_model()
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
         trainer.save_state()
@@ -490,6 +551,11 @@ def main():
     if training_args.do_predict:
         test_ret = trainer.predict(test_dataset)
         trainer.log_metrics("test", test_ret.metrics)
+
+    if training_args.should_load_dataset:
+        effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
+        print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
+        print(f"ips: {effective_tokens_per_second:.2f} tokens/s")
 
 
 if __name__ == "__main__":

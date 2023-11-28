@@ -1,0 +1,40 @@
+_base_: ./pretrain_gpt_base.yaml
+
+Global:
+  global_batch_size: 
+  local_batch_size: 2
+  micro_batch_size: 1
+
+
+Model:
+  vocab_size: 50304
+  hidden_size: 4096
+  num_layers: 32
+  num_attention_heads: 32
+  ffn_hidden_size: 
+  hidden_dropout_prob: 0.1
+  attention_probs_dropout_prob: 0.1
+  max_position_embeddings: 1024
+  type_vocab_size: 16
+  initializer_range: 0.02
+  fuse_attn_qkv: True
+  use_recompute: True
+  recompute_granularity:
+  sr: 0
+  refined_ops_patterns:
+    - {main_ops: [matmul_v2, elementwise_add], num: 0, pre_ops: [], suf_ops: []}
+    - {main_ops: [flash_attn], num: 0, pre_ops: [], suf_ops: []}
+  no_recompute_layers:
+
+
+Distributed:
+  dp_degree: 2
+  mp_degree: 2
+  pp_degree: 2
+  sharding:
+    sharding_degree: 2
+    sharding_stage: 1
+
+FusedPasses:
+  fused_linear: True
+  fused_adamw: False
