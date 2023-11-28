@@ -1070,16 +1070,15 @@ class LlamaPretrainedModel(PretrainedModel):
             if isinstance(layer.weight, paddle.Tensor):
                 if layer.weight.is_distributed:
                     with rng_tracker():
-                        dtype = paddle.get_default_dtype()
-                        paddle.set_default_dtype("float32")
                         layer.weight.set_value(
-                            paddle.randn(layer.weight.shape, dtype=dtype).scale(
-                                self.config.initializer_range
+                            paddle.tensor.normal(
+                                mean=0.0,
+                                std=self.config.initializer_range
                                 if hasattr(self.config, "initializer_range")
                                 else self.llama.config.initializer_range,
+                                shape=layer.weight.shape,
                             )
                         )
-                        paddle.set_default_dtype(dtype)
                 else:
                     layer.weight.set_value(
                         paddle.tensor.normal(
