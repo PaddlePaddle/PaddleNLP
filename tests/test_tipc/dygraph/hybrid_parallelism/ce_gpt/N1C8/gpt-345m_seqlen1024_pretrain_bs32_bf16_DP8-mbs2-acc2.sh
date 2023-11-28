@@ -18,7 +18,7 @@ mp_degree=1
 pp_degree=1
 bs_item=32
 fp_item=bf16
-run_mode=DP8-MP1-PP1
+run_mode=DP8-mbs2-acc2
 device_num=N1C8
 max_iter=50000
 

@@ -20,7 +20,7 @@ sharding_degree=8
 sharding=stage1
 bs_item=32
 fp_item=bf16
-run_mode=DP1-MP1-PP1-SD8-stage1
+run_mode=SD8-stage1-mbs2-acc2
 device_num=N1C8
 max_iter=50000
 
