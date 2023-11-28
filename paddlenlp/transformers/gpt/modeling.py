@@ -879,8 +879,6 @@ class GPTPretrainedModel(PretrainedModel):
         """Initialization hook"""
         if self.config.tensor_parallel_degree > 1:
             rng_tracker = get_rng_state_tracker().rng_state
-        else:
-            rng_tracker = contextlib.nullcontext
         if isinstance(
             layer,
             (
@@ -895,17 +893,16 @@ class GPTPretrainedModel(PretrainedModel):
         ):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
-            if isinstance(layer.weight, paddle.Tensor): 
-                if layer.weight.is_distributed :
+            if isinstance(layer.weight, paddle.Tensor):
+                if layer.weight.is_distributed:
                     with rng_tracker():
-                            dtype = paddle.get_default_dtype()
-                            paddle.set_default_dtype('float32') #在defualt dtype为bfloat16的情况下调用randn会报错，实际上randn已经支
- bfloat16了      API检测层面的错误。
-                            layer.weight.set_value(
-                                paddle.randn(layer.weight.shape, dtype=dtype).scale(self.config.initializer_range)
-                            )
-                            paddle.set_default_dtype(dtype)
-                else :
+                        dtype = paddle.get_default_dtype()
+                        paddle.set_default_dtype("float32")
+                        layer.weight.set_value(
+                            paddle.randn(layer.weight.shape, dtype=dtype).scale(self.config.initializer_range)
+                        )
+                        paddle.set_default_dtype(dtype)
+                else:
                     layer.weight.set_value(
                         paddle.tensor.normal(
                             mean=0.0,
