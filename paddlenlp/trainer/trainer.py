@@ -127,6 +127,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     has_length,
     set_seed,
     speed_metrics,
+    init_dist_env,
 )
 from .training_args import TrainingArguments
 from .utils import reshard as reshard_util
@@ -1770,7 +1771,7 @@ class Trainer:
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
 
-        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and not in_tensor_parallel_model:
+        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and not in_tensor_parallel_mode:
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
                 if self.optimizer is not None:
