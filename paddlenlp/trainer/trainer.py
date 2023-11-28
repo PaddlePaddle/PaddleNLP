@@ -164,6 +164,12 @@ def _save_func(obj, path, saved_signal_path, protocol):
         f.write("1")
 
 
+def check_exitcode(task):
+    exitcode = task.exitcode
+    if exitcode != 0:
+        print(f"Error: save ckpt process failed with exitcode {exitcode}!!!")
+
+
 def clear_async_save_task_queue():
     """
     wait until all async save task to be done.
@@ -175,6 +181,10 @@ def clear_async_save_task_queue():
             if task.is_alive():
                 logger.error("Error: save ckpt process timeout!!!")
                 async_save_queue.append(task)
+            else:
+                check_exitcode(task)
+        else:
+            check_exitcode(task)
 
 
 def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol=4):
