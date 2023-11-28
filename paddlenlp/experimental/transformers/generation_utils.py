@@ -29,6 +29,7 @@ from paddlenlp_ops import (
     set_value_by_flags_and_idx_v2,
     get_token_penalty_multi_scores,
     update_inputs,
+    get_token_penalty_multi_scores_v2,
 )
 
 from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList
@@ -440,6 +441,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
         else:
             precache_kv_spec = None
         use_cachekv_int8 = config.get("use_cachekv_int8", False)
+        print("use_cachekv_int8", use_cachekv_int8)
 
         if use_cachekv_int8:
             cachekv_dtype = "uint8"
@@ -659,7 +661,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             logits = paddle.cast(outputs, paddle.float32)
 
             # pre-process distribution
-            logits = get_token_penalty_multi_scores(
+            logits = get_token_penalty_multi_scores_v2(
                 model_kwargs["pre_ids"],
                 logits,
                 penalty_score,

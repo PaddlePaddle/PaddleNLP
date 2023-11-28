@@ -32,6 +32,7 @@ setup(
             "./generation/set_mask_value.cu",
             "./generation/set_value_by_flags.cu",
             "./generation/token_penalty_multi_scores.cu",
+            "./generation/token_penalty_multi_scores_v2.cu",
             "./generation/stop_generation_multi_ends.cu",
             "./generation/fused_get_rope.cu",
             "./generation/get_padding_offset.cu",
@@ -53,6 +54,8 @@ setup(
             "./generation/write_int8_cache_kv.cu",
             "./generation/step.cu",
             "./generation/get_max_len.cu",
+            "./generation/quant_int8.cu",
+            "./generation/dequant_int8.cu",
         ],
         extra_compile_args={
             "cxx": ["-O3"],
