@@ -710,6 +710,23 @@ class TrainingArguments:
         metadata={"help": "Whether to unify hybrid parallel checkpoint."},
     )
 
+    unified_checkpoint_config: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": (
+                "Configs to unify hybrid parallel checkpoint.\n"
+                "Following options are supports:\n"
+                "- ignore_data_type_error: ignore the data type and convert to fp16, bf16 or fp32\n"
+                "- ignore_save_model_weight: do not save model weight when the master weight exits\n"
+                "- master_weight_compatible: 1. if the master weight exits, only load when needed\n"
+                "                            2. if master weight does not exit, convert model weight to master weight when needed\n"
+                "- checkpoint_compatible: enable loading old checkpoints, new checkpoint will be saved with aunified checkpoint type\n"
+                "- async_save_to_disk: enable asynchronous saving checkpoints to disk\n"
+                "- enable_all_options: enable all optimization configurations\n"
+            )
+        },
+    )
+
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
         if env_local_rank != -1 and env_local_rank != self.local_rank and paddle.distributed.get_world_size() > 1:

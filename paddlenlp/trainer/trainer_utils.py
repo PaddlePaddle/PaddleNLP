@@ -181,6 +181,24 @@ class ShardingOption(ExplicitEnum):
     OFFLOAD = "offload"
 
 
+class UnifiedCkptOption(ExplicitEnum):
+    """
+    "- ignore_data_type_error: ignore the data type and convert to fp16, bf16 or fp32"
+    "- ignore_save_model_weight: do not save model weight when the master weight exits"
+    "- master_weight_compatible: 1. if the master weight exits, only load when needed; 2. if master weight does not exit, convert model weight to master weight when needed"
+    "- checkpoint_compatible: enable loading old checkpoints, new checkpoint will be saved with aunified checkpoint type"
+    "- async_save_to_disk: enable asynchronous saving checkpoints to disk"
+    "- enable_all_options: enable all optimization configurations."
+    """
+
+    IGNORE_DATA_TYPE_ERROR = "ignore_data_type_error"
+    IGNORE_SAVE_MODEL_WEIGHT = "ignore_save_model_weight"
+    MASTER_WEIGHT_COMPATIBLE = "master_weight_compatible"
+    CHECKPOINT_COMPATIBLE = "checkpoint_compatible"
+    ASYNC_SAVE_TO_DISK = "async_save_to_disk"
+    ENABLE_ALL_OPTIONS = "enable_all_options"
+
+
 def is_main_process(local_rank):
     """
     Whether or not the current process is the local process, based on `xm.get_ordinal()` (for TPUs) first, then on
