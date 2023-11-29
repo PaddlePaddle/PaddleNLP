@@ -610,6 +610,10 @@ def check_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_seria
     tp_group = hcg.get_model_parallel_group()
     pp_group = hcg.get_pipe_parallel_group()
     sharding_group = hcg.get_sharding_parallel_group()
+    sharding_rank = sharding_group.rank
+    struct2static_name_mappings = {k: v.name for k, v in model.state_dict().items()}
+    if sharding_group.nranks > 1:
+        param2rank = optimizer._param2rank
 
     def check_complete(all_filenames):
         existed_filelist = []
@@ -648,6 +652,12 @@ def check_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_seria
     def check_dynamic_load(weight_map, existed_files, is_master_weights=False, typename_list=None):
         need_filelist = []
         for key in model.state_dict().keys():
+            if sharding_group.nranks > 1:
+                static_name = struct2static_name_mappings.get(key, None)
+                param_rank = param2rank.get(static_name, None)
+                if param_rank != sharding_rank:
+                    continue
+
             if not is_master_weights:
                 for type_name in typename_list:
                     type_key = key + "/" + type_name
@@ -738,11 +748,16 @@ def create_optimizer_dispatch_table(
     file_keyname_mappings,
     file_machine_mappings,
     resume_from_checkpoint,
+    struct2static_name_mappings,
     is_master_weights=False,
     typename_list=None,
 ):
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
+    sharding_group = hcg.get_sharding_parallel_group()
+    sharding_rank = sharding_group.rank
+    if sharding_group.nranks > 1:
+        param2rank = optimizer._param2rank
     tp_rank = tp_group.rank
 
     # 创建接收表
@@ -750,6 +765,11 @@ def create_optimizer_dispatch_table(
     recv_table = {}
     if args.data_parallel_rank == 0:
         for (k, v) in model.state_dict().items():
+            if sharding_group.nranks > 1:
+                static_name = struct2static_name_mappings[k]
+                param_rank = param2rank.get(static_name, None)
+                if param_rank != sharding_rank:
+                    continue
             if is_master_weights:
                 if hasattr(v, "is_distributed") and v.is_distributed:
                     recv_table[k] = [(dist.get_rank(), tp_rank)]
@@ -854,6 +874,7 @@ def dynamic_load_unified_optimizer(args, model, optimizer, resume_from_checkpoin
         file_keyname_mappings,
         file_machine_mappings,
         resume_from_checkpoint,
+        struct2static_name_mappings,
         is_master_weights=False,
         typename_list=typename_list,
     )
@@ -865,12 +886,22 @@ def dynamic_load_unified_optimizer(args, model, optimizer, resume_from_checkpoin
             file_keyname_mappings_mw,
             file_machine_mappings_mw,
             resume_from_checkpoint,
+            struct2static_name_mappings,
             is_master_weights=True,
         )
 
     # Initialize optimizer state dict.
+    hcg = fleet.get_hybrid_communicate_group()
+    sharding_group = hcg.get_sharding_parallel_group()
+    if sharding_group.nranks > 1:
+        param2rank = optimizer._param2rank
     optim_state_dict_mw = {}
     for k, v in model.state_dict().items():
+        if sharding_group.nranks > 1:
+            static_name = struct2static_name_mappings[k]
+            param_rank = param2rank.get(static_name, None)
+            if param_rank != sharding_group.rank:
+                continue
         for typename in typename_list:
             new_k = k + "/" + typename
             if "beta" in typename:  # 这里的判断逻辑需要再想想.
