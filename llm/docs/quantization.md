@@ -1,28 +1,61 @@
-## 6. 量化
+# 大模型量化教程
 
-量化算法可以将模型权重和激活转为更低比特数值类型表示，能够有效减少显存占用和计算开销。下面我们提供GPTQ和PaddleSlim自研的PTQ策略，分别实现WINT4和W8A8量化。更多技术细节详见[量化策略详细教程](https://github.com/PaddlePaddle/PaddleSlim/blob/develop/docs/zh_cn/tutorials/quant/advanced_quantization.md)
+## 1.算法介绍
 
-### 6.1 环境安装
-- PaddleSlim develop版本
-- PaddlePaddle develop版本
+大模型量化将16位、32位浮点数的模型参数或激活量化为4位或8位整数能够有效降低模型存储空间和计算资源需求，同时加速推理速度。工具链量化算法包含：
+- **PTQ**。PaddleSlim 团队自研的自适应Shift-SmoothQuant量化算法，在[SmoothQuant](https://arxiv.org/abs/2211.10438)和[Outlier Suppression+](https://arxiv.org/abs/2304.09145)基础上
+新增PieceWiseSearch参数搜索算法并将算法扩展至**所有线性层**，对模型权重和激活分布进行调整，减少后续A8W8 PTQ量化损失。
 
-### 6.2 数据准备
 
-量化中默认使用训练集作为校正（Calibartion）数据集，开发集作为评估数据集。如果希望使用其他数据作为校正数据集，则在数据目录下新增`quant.json`文件，文件格式请参照精调训练数据格式。
+- **GPTQ**。[GPTQ](https://arxiv.org/abs/2210.17323)是业界主流的权重量化算法，可以将大模型权重进行4位整数无损量化，提高模型推理速度。
 
-### 6.3 PTQ 量化
+<div align="center">
+    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/fe8f941b-4b35-48ca-814f-96533d7e24ce">
+</div>
+<div align="center">
+    <font size ="1">
+    飞桨大模型量化算法
+     </font>
+</div>
+
+更多PaddleSlim实现细节详见[量化策略详细教程](https://github.com/PaddlePaddle/PaddleSlim/blob/develop/docs/zh_cn/tutorials/quant/advanced_quantization.md)
+
+
+
+## 2. 快速开始
+
+### 2.1 环境准备
+
+- PaddleSlim >= 2.4.1
+- PaddlePaddle >= 2.5.2
+
+### 2.2 数据准备
+
+量化中默认使用训练集作为校正（Calibartion）数据集，开发集作为评估数据集。为了方便用户测试，我们也提供示例数据集[广告生成数据集](https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz)。如果希望使用其他数据作为校正数据集，则在数据目录下新增`quant.json`文件，用户也可以仿照数据集的格式制作自己的数据集进行精调。我们支持的数据格式是每行包含一个字典，每个字典包含以下字段：
+
+- `src` : `str, List(str)`, 模型的输入指令（instruction）、提示（prompt），模型应该执行的任务。
+- `tgt` : `str, List(str)`, 模型的输出。
+
+样例数据：
+```
+{"src": "类型#裙*颜色#蓝色*风格#清新*图案#蝴蝶结", "tgt": "裙身处采用立体蝴蝶结装饰辅以蓝色条带点缀，令衣身造型饱满富有层次的同时为其注入一丝甜美气息。将女孩清新娇俏的一面衬托而出。"}
+...
+```
+
+
+### 2.3 PTQ 量化
 
 ```
 python  finetune_generation.py ./llama/ptq_argument.json
 ```
 
-### 6.4 GPTQ 量化
+### 2.4 GPTQ 量化
 
 ```
 python  finetune_generation.py ./llama/gptq_argument.json
 ```
 
-### 6.5 量化参数介绍
+### 2.5 量化参数介绍
 
 <summary>&emsp; 量化参数（QuantArgument）</summary><div>
 
@@ -49,6 +82,6 @@ python  finetune_generation.py ./llama/gptq_argument.json
 
 - `per_device_train_batch_size`: 量化前向批大小，默认为8。量化过程只有模型前向，相比于普通训练需要显存较少。
 
-- 更多参数详见精调参数介绍。
+更多参数详见[精调文档](./finetune.md)中精调参数介绍。
 
 </div>

@@ -1,4 +1,4 @@
-# 多轮对话精调
+# 多轮对话精调教程
 
 当前开源Chat 类型模型越来越多，PaddleNLP 已经集成了 [Llama](./llama/README.md)、[Qwen](./qwen/README.md)、[ChatGLM](./chatglm/README.md) 等系列模型，也支持[多轮对话 Prompt Template 推理](https://paddlenlp.readthedocs.io/zh/latest/get_started/chat_template.html)，只需要调用`apply_chat_template` 函数即可构造将对话历史和用户最新 query 按照模型指定规则拼接到一起，实现不同模型的定制化 Prompt 规则推理。
 

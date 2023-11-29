@@ -1,208 +1,128 @@
-# 高性能推理
+# 大模型推理教程
+
+PaddleNLP除了提供常用模型推理外，还提供了高性能推理，内置动态插入和全环节算子融合策略，极大加快并行推理的速度。
+
+## 1. 常用模型推理
+PaddleNLP 提供了动态图推理和静态图推理两种方式，方便用户快速验证模型推理效果（包含LoRA、PrefixTuning）
+
+### 1.1 动态图推理
+```shell
+# 动态图模型推理命令参考
+python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --data_file ./data/dev.json --dtype float16
+```
+对于LoRA、PrefixTuning 模型只需额外传入相应的lora_path或prefix_path即可，如：`--lora_path ./checkpoints/llama_lora_ckpts`或`--prefix_path ./checkpoints/llama_prefix_ckpts`，详见推理参数减少。
+
+### 1.2 静态图推理
+
+```shell
+# 静态图模型推理命令参考， LoRA需要先合并参数，Prefix Tuning暂不支持
+# step1 : 静态图导出
+python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --output_path ./inference --dtype float16
+# step2: 静态图推理
+python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --output_path ./inference --dtype float16
+```
+
+## 2. 高性能模型推理
+
+### 2.1 支持模型
 
 PaddleNLP 中已经添加高性能推理模型相关实现，支持：
 
 | Model                       | Inference Model | PTuning | Wint8 | PTQ |
 |-----------------------------|-----------------|---------|-------|-----|
-| [LLaMA1/2](./llama)         | ✅               | ✅       | ✅     | 🚧   |
-| [ChatGLM](./chatglm)        | ✅               | ✅       | ✅     | ❌   |
-| [ChatGLM2](./chatglm2)      | ✅               | ❌       | ❌     | ❌   |
-| [Bloom](./bloom)            | ✅               | ✅       | ✅     | ❌   |
-| [GPT-3](./gpt-3)            | ✅               | ❌       | ❌     | ❌   |
-| [Qwen](./qwen)              | ❌               | ❌       | ❌     | ❌   |
-| [BaiChuan1](./baichuan)     | ✅               | ✅       | ✅     | 🚧   |
-| [BaiChuan2-7B](./baichuan)  | ✅               | ✅       | ✅     | 🚧   |
-| [BaiChuan2-13B](./baichuan) | ❌               | ❌       | ❌     | ❌   |
+| [LLaMA1/2](../llama)         | ✅               | ✅       | ✅     | 🚧   |
+| [ChatGLM](../chatglm)        | ✅               | ✅       | ✅     | ❌   |
+| [ChatGLM2](../chatglm2)      | ✅               | ❌       | ❌     | ❌   |
+| [Bloom](../bloom)            | ✅               | ✅       | ✅     | ❌   |
+| [GPT-3](../gpt-3)            | ✅               | ❌       | ❌     | ❌   |
+| [Qwen](../qwen)              | ❌               | ❌       | ❌     | ❌   |
+| [BaiChuan-7B](../llama)     | ✅               | ✅       | ✅     | 🚧   |
+| [BaiChuan-13B](../llama) | ❌               | ❌       | ❌     | ❌   |
 
-[TOC]
+* ✅: Supported
+* 🚧: In Progress
+* ❌: Not Supported
 
-## 安装自定义算子库
+### 2.2 环境准备
 
-PaddleNLP 针对于Transformer 系列编写了高性能自定义算子，提升模型在推理和解码过程中的性能。
+- PaddleNLP develop
+- PaddlePaddle develop
+
+PaddleNLP 针对于Transformer 系列编写了高性能自定义算子，提升模型在推理和解码过程中的性能，使用之前需要预先安装自定义算子库：
 
 ```shell
 git clone https://github.com/PaddlePaddle/PaddleNLP
 cd ./paddlenlp/csrc && python setup_cuda.py install
 ```
 
-## 预训练 & SFT 模型 & Lora 推理
-
-> Lora 模型在推理之前是需要合并参数，详细可见：[合并 Lora 参数](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#37-lora-%E5%8F%82%E6%95%B0%E5%90%88%E5%B9%B6)。
-
-预训练模型和 SFT 模型在结构上一样，推理功能包含：
-
-* 动态图推理
-* 静态图推理
-
-### 动态图推理
-
-```python
-python predictor.py \
-    --model_name_or_path meta-llama/Llama-2-7b-chat \
-    --inference_model \
-    --dtype float16
-```
-
-### 静态图推理
-
-在静态图推理之前需要执行动转静，将模型转化为静态图，命令如下：
-
-* 动转静
-
-```python
-python export_model.py \
-    --model_name_or_path meta-llama/Llama-2-7b-chat \
-    --inference_model \
-    --output_path ./inference \
-    --dtype float16
-```
-
-* 静态图推理
-
-```python
-python predictor.py \
-    --model_name_or_path ./inference \
-    --inference_model \
-    --dtype "float16" \
-    --mode "static"
-```
-
-## PTuning 模型推理
-
-PTuning 模型和非 PTuning 模型推理非常类似，区别在于前者会添加 pre_caches.npy 的输入，动静推理命令可见：
-
-### 动态图推理
-
-```python
-python predictor.py \
-    --model_name_or_path meta-llama/Llama-2-7b-chat \
-    --inference_model \
-    --export_precache true \
-    --prefix_path /path/to/pre_caches \
-    --dtype float16
-```
-
-### 静态图推理
-
-在静态图推理之前需要执行动转静，将模型转化为静态图，命令如下：
-
-* 动转静
-
-```python
-python export_model.py \
-    --model_name_or_path meta-llama/Llama-2-7b-chat \
-    --inference_model \
-    --export_precache true \
-    --output_path ./inference_ptuning \
-    --dtype float16
-```
-
-* 静态图推理
-
-```python
-python predictor.py \
-    --model_name_or_path ./inference_ptuning \
-    --inference_model \
-    --dtype "float16" \
-    --export_precache true \
-    --prefix_path /path/to/pre_caches \
-    --mode "static"
-```
-
-## Weight Only Int8/4 推理
-
-Weight Only Int8/4 的推理脚本相比SFT 模型推理仅增加了：`quant_type`参数，值为：`weight_only_int8`和 `weight_only_int4`。
-
-> 当前 weight_only_int8/4 仅支持A100，V100 上的 weight only int8/4 存在精度问题。
-
-### 动态图推理
-
-```python
-python predictor.py \
-    --model_name_or_path meta-llama/Llama-2-7b-chat \
-    --inference_model \
-    --quant_type weight_only_int8 \
-    --dtype float16
-```
-
-### 静态图推理
-
-在静态图推理之前需要执行动转静，将模型转化为静态图，命令如下：
-
-* 动转静
-
-```python
-python export_model.py \
-    --model_name_or_path meta-llama/Llama-2-7b-chat \
-    --inference_model \
-    --quant_type weight_only_int8 \
-    --output_path ./inference \
-    --dtype float16
-```
-
-* 静态图推理
-
-```python
-python predictor.py \
-    --model_name_or_path ./inference \
-    --inference_model \
-    --quant_type weight_only_int8 \
-    --dtype "float16" \
-    --mode "static"
-```
-
-## PTQ Int8 推理
-
-这一步依赖PTQ校准产出的量化模型，无须额外设置相关参数。
-### 动态图推理
-```shell
-python predictor.py \
-    --model_name_or_path checkpoints/llama_ptq_ckpts \
-    --dtype float16 \
-    --max_length 1024 \
-    --mode "dynamic" \
-    --inference_model
-```
-
-
-### 静态图推理
-在静态图推理之前需要执行动转静，将模型转化为静态图，命令如下：
-
-* 动转静
+### 2.3 高性能动态图推理
 
 ```shell
-python export_model.py \
-    --model_name_or_path checkpoints/llama_ptq_ckpts \
-    --output_path ./inference_ptq \
-    --dtype float16 \
-    --inference_model
+# 动态图模型推理命令参考
+python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16
+
+# PrefixTuning动态图推理参考
+python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --export_precache true --prefix_path ./checkpoints/llama_prefix_ckpts
+
+# Weight Only Int8 动态图推理参考
+python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --quant_type weight_only_int8
+
+# PTQ-A8W8推理命令参考
+python predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --dtype float16
 ```
+**Note**：
+1. LoRA 模型在推理之前是需要合并参数，详细可见：[合并 LoRA 参数](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/merge_lora_params.py)。
+2. PrefixTuning推理需要传入相应的pre_cache，需要额外设置`export_precache`为`true`，并且传入对应的PrefixTuning参数保存路径`prefix_path`。
+3. 使用Weight Only Int8 推理需要额外传入 `quant_type`。
 
-* 静态图推理
-
+### 2.4 高性能静态图推理
+**step1：动转静**
 ```shell
+# 动转静命令参考
+python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16
+
+# PrefixTuning动转静命令参考
+python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --export_precache true
+
+# Weight Only Int8 动转静命令参考
+python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --quant_type weight_only_int8
+
+# PTQ-A8W8动转静命令参考
+python export_model.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --output_path ./inference --dtype float16
+```
+**Note**：
+1. LoRA 模型在推理之前是需要合并参数，详细可见：[合并 LoRA 参数](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/merge_lora_params.py)。
+2. PrefixTuning推理需要传入相应的pre_cache，需要额外设置`export_precache`为`true`。
+3. 使用Weight Only Int8 推理需要额外传入 `quant_type`。
+4. A8W8推理传入的 `model_name_or_path` 为PTQ校准产出的量化模型。
+
+**step2：静态图推理**
+```shell
+# 静态图推理命令参考
+python predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static"
+
+# PrefixTuning静态图推理命令参考
+python predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static" --export_precache true --prefix_path ./checkpoints/llama_prefix_ckpts
+
+# Weight Only Int8 静态图推理命令参考
+python predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static" --quant_type weight_only_int8
+
+# PTQ-A8W8静态图推理命令参考
 # 以下环境变量用于开启int8矩阵乘的算法选择以获得更快的推理速度，打开之后第一次执行会执行算法选择从而导致速度较慢。
 export FLAGS_use_autotune=1
 export FLAGS_cublaslt_exhaustive_search_times=10
 export FLAGS_cache_inference_while_scope=1
 
-python predictor.py \
-    --model_name_or_path ./inference_ptq \
-    --dtype float16 \
-    --max_length 1024 \
-    --mode "static" \
-    --inference_model
+python predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static"
 ```
+**Note**：
+1. LoRA 模型在推理之前是需要合并参数，详细可见：[合并 LoRA 参数](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/merge_lora_params.py)。
+2. PrefixTuning推理需要传入相应的pre_cache，需要额外设置`export_precache`为`true`，并且传入对应的PrefixTuning参数保存路径`prefix_path`。
+3. 使用Weight Only Int8 推理需要额外传入 `quant_type`。
+4. A8W8推理传入的 `model_name_or_path` 为PTQ校准产出的量化模型。
 
-## 多卡推理
 
-TODO: 未来将支持更多多卡推理文档说明
-
-## FastLLMDeploy 部署
-
-TODO: 未来将联合 [FastLLMDeploy](https://github.com/PaddlePaddle/FastDeploy) 给出更多生产环境下的高性能推理模型部署解决方案。
-
-## 参数介绍
+## 3. 推理参数介绍
 
 - `model_name_or_path`: 必须，预训练模型名称或者本地的模型路径，用于热启模型和分词器，默认为None。
 - `batch_size`: 批处理大小，默认为8。该参数越大，占用显存越高；该参数越小，占用显存越低。
