@@ -512,6 +512,7 @@ class Trainer:
                 resume_inplace = check_unified_checkpoint(self.model, resume_from_checkpoint, safe_serialization=True)
                 if resume_inplace:
                     load_unified_checkpoint(
+                        self.args,
                         self.model,
                         resume_from_checkpoint,
                         safe_serialization=True,

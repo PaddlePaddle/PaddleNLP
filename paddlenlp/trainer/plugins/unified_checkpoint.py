@@ -22,6 +22,7 @@ import paddle.distributed as dist
 from paddle.distributed import fleet
 from tqdm.auto import tqdm
 
+from paddlenlp import Trainer
 from paddlenlp.transformers.model_utils import (
     PretrainedModel,
     _load_state_dict_into_model,
@@ -90,6 +91,11 @@ def save_unified_checkpoint(args, model, output_dir, safe_serialization=False):
     else:
         raise ValueError("Unified checkpoint only supports PretrainedModel")
 
+    optimizer_cls, _ = Trainer.get_optimizer_cls_and_kwargs(args)
+    if hasattr(optimizer_cls, "_create_master_weight"):
+        if "ignore_save_model_weight" in args.unified_checkpoint_config:
+            return
+
     config_to_save = None
     state_dict, config_to_save, shard_file, sharded_index = unified_checkpoint_into_shards(
         args, model_to_save, safe_serialization=safe_serialization
@@ -121,7 +127,7 @@ def save_unified_checkpoint(args, model, output_dir, safe_serialization=False):
             json.dump(sharded_index, f, indent=4)
 
 
-def load_unified_checkpoint(model, resume_from_checkpoint: str, safe_serialization=False) -> None:
+def load_unified_checkpoint(args, model, resume_from_checkpoint: str, safe_serialization=False) -> None:
     """Load potential model checkpoint
 
     Args:
@@ -133,6 +139,13 @@ def load_unified_checkpoint(model, resume_from_checkpoint: str, safe_serializati
     """
 
     index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+
+    optimizer_cls, _ = Trainer.get_optimizer_cls_and_kwargs(args)
+    if hasattr(optimizer_cls, "_create_master_weight"):
+        if "ignore_save_model_weight" in args.unified_checkpoint_config:
+            index_filename = (
+                PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
+            )
 
     resolved_archive_file, sharded_metadata = get_checkpoint_shard_files(
         pretrained_model_name_or_path=resume_from_checkpoint,
