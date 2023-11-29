@@ -2,15 +2,60 @@
 
 ## 1.精调算法介绍
 
+- **InTokens策略**
+
+模型的输入是定长序列数据，每个文本的序列长度不一样，所以是变长的序列，一般的做法是使用pad token进行填充，通常会占训练token 50%或更多。InTokens策略提出在单条数据中拼接多个文本为长文本，通常使用InTokens策略时会将batch size设为1，训练过程中没有pad token参与计算，有效提高模型训练效率。精调训练只需要添加一个`intokens`为`True`的配置，即可开启intokens训练。
 
 
+<div align="center">
+    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/fe1090f4-e4ed-4e4c-b029-d4f8672f8df2">
+</div>
+<div align="center">
+    <font size ="1">
+    Intokens策略图示意，能够有效减少无效Pad Token进行训练
+     </font>
+</div>
 
+- **Prefix Tuning**
 
-## 精调
+受提示学习（Prompt learning）的影响，[Prefix Tuning](https://arxiv.org/abs/2101.00190)提出加入的一部分 Prefix Embedding 作为连续型提示进行训练。Prefix Embedding是由专门的 Prefix Encoder 网络生成的数个张量被插入到语言模型每一层的key和value之前。
 
-接下来我们将以**Llama 2**为例介绍如何使用统一脚本进行SFT、LoRA、Prefix Tuning。更多LoRA、Prefix Tuning请参见[PEFT文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/peft.md)。
+<div align="center">
+    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/8baf6943-4540-4c02-8540-35f977acc077">
+</div>
 
-### 精调训练数据格式
+- **LoRA**
+
+Transformer模型中包含许多Linear层需要进行密集的矩阵乘法计算，而这些通常具有全秩(full rank)特性。[LoRA](https://arxiv.org/abs/2106.09685)提出冻结预训练的权重矩阵, 通过引入两个低 rank 矩阵 $AB$(图中橙色的两个矩阵) 来近似权重的更新过程 $W_0+\Delta W=W_0+B A$ , 其中 $B \in \mathbb{R}^{d \times r}, A \in \mathbb{R}^{r \times k}$，实验表明将输入表达随机投影到较小的子空间模型仍然可以有效地学习下游任务，并大幅降低计算的显存需求。
+<div align="center">
+    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/63d56558-247a-4a8d-a6ca-121c820f7534">
+</div>
+
+- **PEFT结合低比特和分布式策略**
+
+LoRA和PrefixTuning相比于全量参数大大降低了所需的显存资源，但对于百亿级别的模型对训练资源仍然要求很高。为了减少显存资源占用，PEFT中提供将16位浮点数的主干模型转化为4比特或8比特的量化模型，只有当权重参与计算时才将低比特的主干模型反量化为浮点数模型。PaddleNLP中提供量化为INT4、INT8、NF4、FP4等多种低比特数据类型。
+
+对于千亿参数级别的模型，PEFT配合低比特策略并不能在单卡训练。PaddleNLP中支持上述所有PEFT策略包含低比特策略使用数据并行（data parallel）、张量并行（tensor parallel）和流水线并行（pipeline parallel）策略。PEFT、低比特策略、分布式能力三者组合，PaddleNLP将模型微调拓展到**单机千亿参数级别**。
+<div align="center">
+    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/698ef0b3-4424-4a23-942f-1bcc88be812e">
+</div>
+
+- **Chat Template**
+
+当前开源Chat 类型模型越来越多，PaddleNLP 已经集成了 [LLaMA/LLaMA2](../llama)、[Baichuan/Baichuan2](../llama)、[ChatGLM](../chatglm)、[ChatGLM2/ChatGLM3](./chatglm2) 等系列模型，也支持[多轮对话 Prompt Template 推理](https://paddlenlp.readthedocs.io/zh/latest/get_started/chat_template.html)，只需要调用`apply_chat_template` 函数即可构造将对话历史和用户最新 query 按照模型指定规则拼接到一起，实现不同模型的定制化 Prompt 规则推理。
+
+此外多轮对话训练精调的应用场景也是越来越多，不同模型的多轮对话模板构造规则都不一致，为了在训练侧标准化前处理上的区别，设计了`chat_template`来解决此问题。只需要添加一个`chat_template` 的配置即可为该模型添加相应的多轮对话精调训练支持，具体的配置可看[多轮对话文档](./chat_template.md)。
+
+## 2. 快速开始
+
+接下来我们将以**Llama 2**为例介绍如何使用统一脚本进行SFT、LoRA、Prefix Tuning。
+### 2.1 环境准备
+
+- PaddlePaddle develop
+- PaddleNLP  develop
+- PaddleSlim develop
+
+### 2.2 精调数据准备
 
 为了方便用户测试，我们也提供示例数据集[广告生成数据集](https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz)，用户也可以仿照数据集的格式制作自己的数据集进行精调。我们支持的数据格式是每行包含一个字典，每个字典包含以下字段：
 
@@ -23,16 +68,9 @@
 ...
 ```
 
+### 2.3 SFT
 
-
-### SFT
-
-SFT（Supervised Fine-Tuning）依托飞桨提出的[4D混合分布式并行](https://ai.baidu.com/forum/topic/show/987996)能力，支持使用Trainer API轻松切换数据并行(DP)、[张量并行（TP, Tensor Parallelism）](https://arxiv.org/abs/1909.08053)、[流水线并行（PP, Pipeline Parallelism）](https://arxiv.org/abs/1811.06965)（目前仅支持Llama）等多种分布式训练策略。
-
-4D 混合并行策略的最佳配置实践如图下所示，在单机内使用通信量较大，适合使用机器内卡间通信的张量并行（张量并行又称模型并行，MP）和分组参数切片（Sharding）的2D组合策略；训练千亿规模模型时，叠加流水线并行策略使用多台机器共同分担；同时叠加数据并行来增加并发数量，提升训练速度。
-<div align="center">
-    <img src="https://ai.bdstatic.com/file/63F5EBB1E188457ABAFD311CFC1D8658" width=50% height=50%>
-</div>
+SFT（Supervised Fine-Tuning）模型全参微调依托飞桨提出的[4D混合分布式并行](https://ai.baidu.com/forum/topic/show/987996)能力，支持使用Trainer API轻松切换数据并行(DP)、[张量并行（TP, Tensor Parallelism）](https://arxiv.org/abs/1909.08053)、[流水线并行（PP, Pipeline Parallelism）](https://arxiv.org/abs/1811.06965)（目前仅支持Llama）等多种分布式训练策略。
 
 ```
 # 张量并行分布式训练（常用）
@@ -45,19 +83,13 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py 
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py ./llama/sft_pp_argument.json
 ```
 
-### LoRA
+1. `intokens`设为True有助于提高训练效率。建议将`per_device_train_batch_size`设为1，使用`gradient_accumulation_steps`控制batch size，适当调整`max_length`取值。
+2. 建议使用Paddle develop，设置`use_flash_attention`为True使用FlashAttention2。
 
-Transformer模型中包含许多Linear层需要进行密集的矩阵乘法计算，而这些通常具有全秩(full rank)特性。[LoRA](https://arxiv.org/abs/2106.09685)提出冻结预训练的权重矩阵, 通过引入两个低 rank 矩阵 $AB$(图中橙色的两个矩阵) 来近似权重的更新过程 $W_0+\Delta W=W_0+B A$ , 其中 $B \in \mathbb{R}^{d \times r}, A \in \mathbb{R}^{r \times k}$，实验表明将输入表达随机投影到较小的子空间模型仍然可以有效地学习下游任务，并大幅降低计算的显存需求。
-
-
-<div align="center">
-<img src=https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/63d56558-247a-4a8d-a6ca-121c820f7534 width=50% height=50% />
-</div>
+### 2.4 LoRA
 
 
 PaddleNLP LoRA API支持数据并行、张量并行等多种分布式训练策略，可以通过控制`tensor_parallel_degree` 调整并行训练策略。LoRA策略默认应用在所有Linear层，可拓展至**单机LoRA微调千亿模型**。
-
-
 ```
 # 单卡训练
 python  finetune_generation.py ./llama/lora_argument.json
@@ -67,14 +99,13 @@ python  finetune_generation.py ./llama/lora_argument.json
 python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./llama/lora_argument.json
 ```
 
+**Note:**
+1. `intokens`设为True有助于提高训练效率。建议将`per_device_train_batch_size`设为1，使用`gradient_accumulation_steps`控制batch size，适当调整`max_length`取值。
+2. LoRA策略默认应用在所有Linear层
+3. 可以通过设置`weight_quantize_algo`将主干模型量化低比特，例如'weight_only_int4','weight_only_int8'，'nf4'或'fp4'。具体参考精调参数介绍
+4. 建议使用Paddle develop，设置`use_flash_attention`为True使用FlashAttention2。
 
-### Prefix Tuning
-
-[Prefix Tuning](https://arxiv.org/abs/2101.00190)受提示学习（Prompt learning）的影响，加入的一部分 Prefix Embedding 作为连续型提示进行训练。Prefix Embedding是由专门的 Prefix Encoder 网络生成的数个张量，会以 `past_key_value` 的方式被插入到语言模型每一层的 hidden_state 之前。
-
-<div align="center">
-<img src=https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/8baf6943-4540-4c02-8540-35f977acc077 width=40% height=40% />
-</div>
+### 2.5 Prefix Tuning
 
 PaddleNLP Prefix Tuning API支持数据并行（DP）、张量并行（TP）等多种分布式训练策略，可以通过控制`tensor_parallel_degree` 调整并行训练策略。
 ```
@@ -85,7 +116,14 @@ python  finetune_generation.py ./llama/pt_argument.json
 # 将pt_argument.json中tensor_parallel_degree修改为2
 python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./llama/pt_argument.json
 ```
-### 精调参数介绍
+
+**Note:**
+1. `intokens`设为True有助于提高训练效率。建议将`per_device_train_batch_size`设为1，使用`gradient_accumulation_steps`控制batch size，适当调整`max_length`取值。
+2. 可以通过设置`weight_quantize_algo`将主干模型量化低比特，例如'weight_only_int4','weight_only_int8'，'nf4'或'fp4'。具体参考精调参数介绍
+3. 建议使用Paddle develop，设置`use_flash_attention`为True使用FlashAttention2。
+
+
+## 3.精调参数介绍
 <summary>&emsp; 模型参数（ModelArgument） </summary><div>
 
 - `model_name_or_path`: 预训练模型名称或者本地的模型路径，用于热启模型和分词器，默认为None。每个模型**支持模型权重**详见各模型目录。

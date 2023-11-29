@@ -26,8 +26,9 @@
 
 ### 2.1 环境准备
 
-- PaddleSlim >= 2.4.1
-- PaddlePaddle >= 2.5.2
+- PaddleSlim develop
+- PaddlePaddle develop
+- PaddleNLP  develop
 
 ### 2.2 数据准备
 
