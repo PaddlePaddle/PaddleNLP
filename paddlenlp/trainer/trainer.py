@@ -96,6 +96,7 @@ from ..utils.log import logger
 from .plugins.timer import get_timers, set_timers
 from .plugins.unified_checkpoint import (
     load_unified_checkpoint,
+    load_unified_optimizer,
     save_unified_checkpoint,
     save_unified_optimizer,
 )
@@ -918,10 +919,18 @@ class Trainer:
                     elif args.recompute and availiable_no_sync:
                         fused_allreduce_gradients(list(model.parameters()), None)
 
-                    pipeline_parallel_config = set(args.pipeline_parallel_config.split(" "))
+                    # Case 3: hack dp with master_grad
+                    if dp_master_grad and not (args.recompute and availiable_no_sync):
+                        fused_allreduce_gradients(list(model.parameters()), None)
+
+                    # Pipeline parallel mode,  handle gradient reduce here to overlap
+                    pipeline_parallel_config = (
+                        set(args.pipeline_parallel_config.split(" ")) if args.pipeline_parallel_degree > 1 else set()
+                    )
                     enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
 
+                    # Pipeline parallel mode, overlap with dp
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
                         parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
 
@@ -932,13 +941,10 @@ class Trainer:
 
                             if self.optimizer._dp_enable:
                                 fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
+
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
 
-                    if dp_master_grad and not (args.recompute and availiable_no_sync):
-                        fused_allreduce_gradients(list(model.parameters()), None)
-
-                    # pipeline parallel mode,  handle gradient merge here
                     if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
                         for p in model._layers.parameters():
                             with paddle.no_grad():
@@ -1617,8 +1623,16 @@ class Trainer:
                 assert self.optimizer is not None, "optimizer is empty!"
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
 
+        in_pipeline_parallel_mode = self.args.pipeline_parallel_degree > 1
+        in_sharding_parallel_mode = self.sharding is not None
+        in_tensor_parallel_mode = self.args.tensor_parallel_degree > 1
+
         # Multi-gpu training
-        if self.args.world_size > 1 and not self.args.use_hybrid_parallel:
+        if (
+            self.args.world_size > 1
+            and not self.args.use_hybrid_parallel
+            or not (in_pipeline_parallel_mode or in_sharding_parallel_mode or in_tensor_parallel_mode)
+        ):
             model = paddle.DataParallel(model)
             # Distributed training (should be after fp16 initialization)
 
@@ -1626,10 +1640,6 @@ class Trainer:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
                 assert self.optimizer is not None, "optimizer is empty!"
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
-
-        in_pipeline_parallel_mode = self.args.pipeline_parallel_degree > 1
-        in_sharding_parallel_mode = self.sharding is not None
-        in_tensor_parallel_mode = self.args.tensor_parallel_degree > 1
 
         # Pipeline mode
         if in_pipeline_parallel_mode:
@@ -2245,11 +2255,19 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
-            optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             if self.args.data_parallel_rank == 0:
-                path = os.path.join(checkpoint, optimizer_name)
-                if os.path.isfile(path):
-                    opt_state_dict = paddle.load(path)
+                if self.args.unified_checkpoint:
+                    opt_state_dict = load_unified_optimizer(
+                        model=self.model,
+                        optimizer=self.optimizer,
+                        resume_from_checkpoint=checkpoint,
+                        safe_serialization=True,
+                    )
+                else:
+                    optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+                    path = os.path.join(checkpoint, optimizer_name)
+                    if os.path.isfile(path):
+                        opt_state_dict = paddle.load(path)
 
         # broadcast optimizer state in dp group
         opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
