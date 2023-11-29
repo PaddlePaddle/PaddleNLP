@@ -1,20 +1,50 @@
-# 飞桨大模型全流程工具链
-
+#  飞桨大模型全流程工具链
 
 飞桨大模型套件秉承了一站式体验、性能极致、生态兼容的设计理念，旨在提供业界主流大模型预训练、精调（含SFT、PEFT）、量化、推理等全流程统一工具链， 帮助开发者低成本、低门槛、快速实现大语言模型定制化。
 
 <div align="center">
-    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/72c5b613-dca2-4f99-9a35-4dee089ee71c">
-</div>
-<div align="center">
-    <font size ="1">
-    飞桨大模型工具链流程图
-     </font>
+    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/17710a9a-d972-4772-9bf4-19ff938b5fe9">
 </div>
 
-##  🚣‍♂️ 全流程工具链特性 🚣‍♂️
 
-1. **飞桨4D并行分布式策略**。 PaddleNLP Trainer 封装支持了飞桨4D并行配置（数据并行、张量并行、流水线并行、Sharding 并行），屏蔽多硬件编程复杂性，用户可以修改Trainer配置组合多种预训练或精调过程的分布式策略，获得更高效、更稳定的训练体验。
+##  🚣‍♂️ 飞桨大模型工具链特性 🚣‍♂️
+
+-  **飞桨4D并行分布式策略**。 PaddleNLP Trainer 封装支持了飞桨4D并行配置（数据并行、张量并行、流水线并行、Sharding 并行），屏蔽多硬件编程复杂性，用户可以修改Trainer配置组合多种预训练或精调过程的分布式策略，获得更高效、更稳定的训练体验。
+
+-  **高效精调策略**。飞桨大模型套件提供SFT、PEFT等多种精调策略，搭载自研Intokens策略有效减少了pad token的占比，提高模型训练效率。独创PEFT结合低比特和分布式并行策略，大幅降低大模型精调硬件门槛。
+
+
+- **大模型无损量化**。工具链内置了PaddleSlim 团队自研的自适应Shift-SmoothQuant的A8W8量化算法和业界主流GPTQ的W4量化算法，实现了主流大模型的无损量化，有效加速模型推理。
+
+
+- **高性能推理**。工具链高性能推理模块内置动态插入和全环节算子融合策略，极大加快并行推理的速度。同时隐藏了底层实现的细节，实现高性能推理开箱即用。
+
+
+##  🧨 支持模型列表 🧨
+
+| Model | Pretrain | SFT | LoRA | Prefix Tuning |  Quantization | weight convert |
+| --- | --- | --- | --- | --- | --- |  --- |
+| [LLaMA/LLaMA2](./llama) | ✅  | ✅ | ✅ | ✅ | ✅  | ✅  |
+| [Baichuan/Baichuan2](./llama) | ✅  | ✅ | ✅ | ✅ | ✅  | ✅  |
+| [ChatGLM-6B](./chatglm) |  ❌  |  ✅  |    ✅  |  ✅  |  ✅  | ❌  |
+| [ChatGLM2/ChatGLM3](./chatglm2) |  ❌  |    ✅  |  ✅  |  ✅  |  ✅  | ✅  |
+| [Qwen](./qwen) | ✅ | ✅ | ✅ | ✅ |  🚧 | ✅  |j
+| [Bloom](./bloom) | ❌  | ✅ | ✅ |  ✅ | ✅ | ✅  |
+| [GPT-3](./gpt-3) |   ✅  |  ✅  |    🚧  | 🚧  | 🚧 | ✅  |
+| [OPT](./opt) | 🚧 | ✅ | ✅ | 🚧 |  🚧 | ✅  |
+| [GLM](./glm) | ❌  | ✅ | ✅ | 🚧 |   🚧 | ✅  |
+
+* ✅: Supported
+* 🚧: In Progress
+* ❌: Not Supported
+
+
+##  🚀 快速开始 🚀
+
+
+
+### 1. 预训练
+PaddleNLP将飞桨4D并行策略加入到Trainer API中， 用户只需修改Trainer配置即可使用不同的分布式策略。目前工具链提供[LLaMA/LLaMA2](./llama)、[GPT-3](./gpt-3)、[Qwen](./qwen) 等模型预训练功能，更多模型支持持续更新中。
 
 <div align="center">
     <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/a2f0261d-7f76-4faf-ae01-cc9d37d5fcc0">
@@ -25,8 +55,15 @@
      </font>
 </div>
 
-2. **高效精调策略**。飞桨大模型套件提供SFT、PEFT（LoRA、Prefix Tuning）等多种精调策略，搭载自研Intokens策略有效减少了pad token的占比，提高模型训练效率。独创PEFT结合低比特和分布式并行策略，大幅降低大模型精调硬件门槛。
+单机8卡qwen预训练启动命令参考：
+```
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./qwen/pretrain_argument_stage2.json
+```
+更多模型预训练数据准备、环境准备、参数配置细节请参考[预训练文档](./docs/pretrain.md)。
 
+
+### 2. 精调
+目前精调统一脚本只已支持大部分主流模型，详见对应模型目录。更多LoRA、Prefix Tuning请参见[精调文档](./docs/finetune.md)。除此以外还支持了高效多轮对话模式精调，具体的配置可看[多轮对话文档](./docs/chat_template.md)
 
 <div align="center">
     <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/b2b4db4f-0cf3-4d28-989c-e3c00d24f397">
@@ -37,62 +74,6 @@
      </font>
 </div>
 
-3. **大模型无损量化**。大模型量化将16位、32位浮点数的模型参数或激活量化为4位或8位整数能够有效降低模型存储空间和计算资源需求，同时加速推理速度。工具链内置了PaddleSlim 团队自研的自适应Shift-SmoothQuant的A8W8量化算法和业界主流GPTQ-R的W4量化算法，实现了主流大模型的无损量化。
-
-<div align="center">
-    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/969b62db-9692-4d50-b91a-85cff305d153">
-</div>
-<div align="center">
-    <font size ="1">
-    飞桨量化算法效果展示
-     </font>
-</div>
-
-
-4. **高性能推理**。工具链高性能推理模块内置动态插入和全环节算子融合策略，极大加快并行推理的速度。同时隐藏了底层实现的细节，实现高性能推理开箱即用。
-
-<div align="center">
-    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/fb248224-0ad1-4d6a-a1ca-3a8dd765c41d">
-</div>
-<div align="center">
-    <font size ="1">
-    推理部署性能业界领先
-     </font>
-</div>
-
-
-
-##  🚀 快速开始 🚀
-
-模型支持列表：
-
-| Model | Pretrain | SFT | LoRA | Prefix Tuning | Generation | Quantization | weight convert |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| [LLaMA/LLaMA2](./llama) | ✅  | ✅ | ✅ | ✅ | ✅ | ✅  | ✅  |
-| [Baichuan/Baichuan2](./llama) | ✅  | ✅ | ✅ | ✅ | ✅ | ✅  | ✅  |
-| [ChatGLM-6B](./chatglm) |  ❌  |  ✅  |  ✅  |  ✅  |  ✅  |  ✅  | ❌  |
-| [ChatGLM2/ChatGLM3](./chatglm2) |  ❌  |  ✅  |  ✅  |  ✅  |  ✅  |  ✅  | ✅  |
-| [Qwen](./qwen) | ✅ | ✅ | ✅ | ✅ |  ✅ | 🚧 | ✅  |j
-| [Bloom](./bloom) | ❌  | ✅ | ✅ | ✅ | ✅ | ✅ | ✅  |
-| [GPT-3](./gpt-3) |   ✅  |  ✅  |  ✅  |  🚧  | ✅   | 🚧 | ✅  |
-| [OPT](./opt) | 🚧 | ✅ | ✅ | 🚧 |  ✅ | 🚧 | ✅  |
-| [GLM](./glm) | ❌  | ✅ | ✅ | 🚧 |  ✅ | 🚧 | ✅  |
-
-
-* ✅: Supported
-* 🚧: In Progress
-* ❌: Not Supported
-
-### 1. 预训练
-[LLaMA v1/v2](./llama)、[GPT-3](./gpt-3)、[Qwen](./qwen) 目录中提供了模型预训练的数据准备和训练细节，整个预训练过程搭载了飞桨统一全场景分布式 Trainer，可实现预训练 4D 并行加速。具体预训练配置细节[参考](./docs/pretrain.md)
-```
-# 千问模型预训练启动脚本
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./qwen/pretrain_argument_stage2.json
-
-```
-
-### 2. 精调
-目前精调统一脚本只已支持大部分主流模型，详见对应模型目录。更多LoRA、Prefix Tuning请参见[精调文档](./docs/finetune.md)。除此以外还支持了高效多轮对话模式精调，具体的配置可看[多轮对话文档](./docs/chat_template.md)
 #### 2.1. 环境准备
 - paddlepaddle-gpu >= 2.5.1
 - paddlenlp >= 2.6.1
@@ -110,6 +91,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py
 {"src": "类型#裙*颜色#蓝色*风格#清新*图案#蝴蝶结", "tgt": "裙身处采用立体蝴蝶结装饰辅以蓝色条带点缀，令衣身造型饱满富有层次的同时为其注入一丝甜美气息。将女孩清新娇俏的一面衬托而出。"}
 ...
 ```
+
 
 
 #### 2.3. SFT
@@ -147,21 +129,33 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 ```
 
 ### 3. 量化
-量化算法可以将模型权重和激活转为更低比特数值类型表示，能够有效减少显存占用和计算开销。下面我们提供GPTQ和PaddleSlim自研的PTQ策略，分别实现WINT4和W8A8量化。更多技术细节详见[量化文档](./docs/quantization.md)
-### 3.1 环境安装
-- PaddleSlim develop版本
-- PaddlePaddle develop版本
-#### 3.2 PTQ 量化
+大模型量化将16位、32位浮点数的模型参数或激活量化为4位或8位整数能够有效降低模型存储空间和计算资源需求，同时加速推理速度。工具链量化算法包含：
+- **PTQ**。PaddleSlim 团队自研的自适应Shift-SmoothQuant量化算法，在[SmoothQuant](https://arxiv.org/abs/2211.10438)和[Outlier Suppression+](https://arxiv.org/abs/2304.09145)基础上
+新增PieceWiseSearch参数搜索算法，对模型权重和激活分布进行调整，减少后续A8W8 PTQ量化损失。
+
+
+- **GPTQ**。[GPTQ](https://arxiv.org/abs/2210.17323)是业界主流的权重量化算法，可以将大模型权重进行4位整数无损量化，提高模型推理速度。
+
+<div align="center">
+    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/969b62db-9692-4d50-b91a-85cff305d153">
+</div>
+<div align="center">
+    <font size ="1">
+    飞桨量化算法效果展示
+     </font>
+</div>
+
 
 ```
+# PTQ 量化启动命令参考
+python  finetune_generation.py ./llama/ptq_argument.json
+
+# GPTQ 量化启动命令参考
 python  finetune_generation.py ./llama/ptq_argument.json
 ```
 
-#### 3.3 GPTQ 量化
+更多技术细节和模型量化使用详见[量化文档](./docs/quantization.md)。
 
-```
-python  finetune_generation.py ./llama/gptq_argument.json
-```
 
 ### 4. 模型推理
 
@@ -209,6 +203,16 @@ python predictor.py \
 ```
 
 #### 4.3 Inference Model 高性能推理
+
+<div align="center">
+    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/fb248224-0ad1-4d6a-a1ca-3a8dd765c41d">
+</div>
+<div align="center">
+    <font size ="1">
+    推理部署性能业界领先
+     </font>
+</div>
+
 
 此外 PaddleNLP 还提供了高性能推理模型，从而加速 LLM 模型的部署落地
 
