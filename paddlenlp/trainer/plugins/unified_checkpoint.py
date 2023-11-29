@@ -327,7 +327,7 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
                 json.dump(sharded_master_weight_index, f, indent=4)
 
 
-def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serialization=False):
+def load_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
     """Load potential model checkpoint
 
     Args:
@@ -344,6 +344,16 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
         index_filename, index_filename_master_weights = PADDLE_OPTIMIZER_INDEX_NAME, PADDLE_MASTER_WEIGHTS_INDEX_NAME
     else:
         index_filename, index_filename_master_weights = SAFE_OPTIMIZER_INDEX_NAME, SAFE_MASTER_WEIGHTS_INDEX_NAME
+
+    should_load_master_weights = False
+    if hasattr(optimizer, "_create_master_weight"):
+        should_load_master_weights = True
+
+    if not os.path.isexit(os.path.join(resume_from_checkpoint, index_filename_master_weights)):
+        if should_load_master_weights:
+            index_filename_master_weights = (
+                PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+            )
 
     resolved_archive_file, sharded_metadata = get_optimizer_shard_files(
         optimizer_path=resume_from_checkpoint,
@@ -421,7 +431,7 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
         returned_optim_state_dict[key_name] = state_dict_optim[key]
         returned_optim_state_dict[key_name].name = key_name
 
-    if has_master_weights:
+    if has_master_weights and should_load_master_weights:
         for key in list(state_dict_master_weight.keys()):
             static_name = struct2static_name_mappings[key]
             returned_optim_state_dict["master_weights"][static_name] = state_dict_master_weight[key]
