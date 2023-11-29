@@ -91,6 +91,12 @@ class PredictorArgument:
         },
     )
 
+    chat_template: str = field(
+        default=None,
+        metadata={
+            "help": "the path of `chat_template.json` file to handle multi-rounds conversation. If is None, it will not use `chat_template.json`; If is equal with `model_name_or_path`, it will use the default loading; If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
+        },
+    )
     enable_memory_optim: bool = field(
         default=True,
         metadata={"help": "whether use `enable_memory_optim` in inference predictor"},
@@ -98,12 +104,6 @@ class PredictorArgument:
     init_fleet_worker: bool = field(
         default=True,
         metadata={"help": "whether use `init_fleet_worker` in inference predictor"},
-    )
-    chat_template: str = field(
-        default=None,
-        metadata={
-            "help": "the path of `chat_template.json` file to handle multi-rounds conversation. If is None, it will not use `chat_template.json`; If is equal with `model_name_or_path`, it will use the default loading; If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
-        },
     )
 
     @property
@@ -263,7 +263,7 @@ class DygraphPredictor(BasePredictor):
         return result
 
     def stream_predict(self, inputs: dict[str, paddle.Tensor]):
-        text_streamer = TextIteratorStreamer(self.tokenizer)
+        text_streamer = TextIteratorStreamer(self.tokenizer, skip_special_tokens=True)
         input_features = self._preprocess(inputs)
         generation_kwargs = dict(
             **input_features,
@@ -611,11 +611,9 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
 
         device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
         config.enable_use_gpu(100, device_id)
-        # config.disable_glog_info()
         if predictor_args.enable_memory_optim:
             config.enable_memory_optim()
 
-        # Note(zhengzekang): Force to use fleet executor
         if predictor_args.init_fleet_worker or self.tensor_parallel_degree > 1:
             trainer_endpoints = fleet.worker_endpoints()
             current_endpoint = trainer_endpoints[self.tensor_parallel_rank]
@@ -690,7 +688,9 @@ def create_predictor(
     tensor_parallel_rank: int = 0,
 ):
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
-    init_chat_template(tokenizer, model_args.model_name_or_path, predictor_args.chat_template)
+    # init chat_template for tokenizer
+    init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
+
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer) and not tokenizer.pad_token:
         tokenizer.pad_token = tokenizer.unk_token
@@ -898,7 +898,6 @@ def predict():
     paddle.set_default_dtype(predictor_args.dtype)
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
-    # Note(zhengzekang): force to use fleet executor.
     if predictor_args.init_fleet_worker or tensor_parallel_degree > 1:
         strategy = fleet.DistributedStrategy()
         strategy.hybrid_configs = {
