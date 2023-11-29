@@ -197,7 +197,7 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 </div>
 
 
-### 张量并行参数合并
+## 4.张量并行参数合并
 
 我们使用张量并行（TP，Tensor Parallelism）训练过程中，为了节省TP参数合并时间通常在中间checkpoint将参数存储为多个TP参数分片，可以使用提供的分片合并参数脚本进行参数合并。
 
@@ -211,7 +211,7 @@ python merge_tp_params.py \
 - `device`: 运行环境，默认为gpu。
 </div>
 
-### LoRA 参数合并
+## 5.LoRA 参数合并
 
 为了后续的**压缩**和**静态图推理**方便，我们提供LoRA参数合并脚本，可以将LoRA参数合并到主干模型并保存相应的权重。
 ```
