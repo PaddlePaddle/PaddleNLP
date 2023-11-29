@@ -129,6 +129,19 @@ class TestModelOnN2C4(TestMultipleGpus):
     def setUp(self):
         os.environ.update(environment_variables)
 
+    def testTP8(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+        train_args = copy.deepcopy(pretrain_arguments)
+        train_args["tensor_parallel_degree"] = 8
+        train_args["pipeline_parallel_degree"] = 1
+
+        self.run_n2c4("run_pretrain.py", **train_args)
+        self.run_n2c4("run_pretrain.py", **train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
+
     def testTP4PP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
