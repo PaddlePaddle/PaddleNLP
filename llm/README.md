@@ -1,18 +1,20 @@
-# LLM全流程工具链
-我们提供了模型预训练、精调（SFT、LoRA、Prefix Tuning）、量化、推理、部署全流程通用脚本，开发者可以根据自己的需求定制化自己的大语言模型。
+# 飞桨大模型全流程工具链
+
+
+飞桨大模型套件秉承了一站式体验、性能极致、生态兼容的设计理念，旨在提供业界主流大模型预训练、精调（含SFT、PEFT）、量化、推理等全流程统一工具链， 帮助开发者低成本、低门槛、快速实现大语言模型定制化。
 
 <div align="center">
     <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/72c5b613-dca2-4f99-9a35-4dee089ee71c">
 </div>
+<div align="center">
+    <font size ="1">
+    飞桨大模型工具链流程图
+     </font>
+</div>
 
-## 工具链特性
-### 1. 飞桨 4D 并行
-飞桨 4D 并行是PaddleNLP中搭载的一个重要模块，用于实现多卡多机训练大语言模型。PaddleNLP 中的全场景 Trainer 对分布式训练配置做了封装支持，比如：
-* 开箱即用4D并行配置，涵盖数据并行，张量并行，流水线并行及 Sharding 并行
-* 屏蔽多硬件编程复杂性
-* 预训练、精调、对齐复用
-* 统一日志、打点、监控
-用户输入模型，数据集，就可以使用Trainer API高效快速的实现多卡预训练、微调等任务,以提供更高效、更稳定的训练体验。
+##  🚣‍♂️ 全流程工具链特性 🚣‍♂️
+
+1. **飞桨4D并行分布式策略**。 PaddleNLP Trainer 封装支持了飞桨4D并行配置（数据并行、张量并行、流水线并行、Sharding 并行），屏蔽多硬件编程复杂性，用户可以修改Trainer配置组合多种预训练或精调过程的分布式策略，获得更高效、更稳定的训练体验。
 
 <div align="center">
     <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/a2f0261d-7f76-4faf-ae01-cc9d37d5fcc0">
@@ -23,18 +25,11 @@
      </font>
 </div>
 
-### 2. 高效精调
-* 高效精调（PEFT）是大模型微调中一个重要组成，可支持 LoRA，Prefix 两种主流精调方法。在此基础上 PEFT 还支持低比特和分布式并行策略。PEFT中提供将16位浮点数的主干模型转化为4比特或8比特的量化模型。
-* Intokens 策略：高效精调模块还搭载了 Intokens 策略，对变长数据流做了比较极致的优化，大大减少了pad token的占比，从而提升了有效token率和训练的效率。
+2. **高效精调策略**。飞桨大模型套件提供SFT、PEFT（LoRA、Prefix Tuning）等多种精调策略，搭载自研Intokens策略有效减少了pad token的占比，提高模型训练效率。独创PEFT结合低比特和分布式并行策略，大幅降低大模型精调硬件门槛。
 
-支持的微调算法：
-* [低秩适配矩阵微调（LoRA）](https://arxiv.org/abs/2106.09685)
-* [Prefix Tuning](https://aclanthology.org/2021.acl-long.353/)
-* [Q-LoRA(低比特)](https://arxiv.org/pdf/2305.14314.pdf)
-* WINT-LoRA(低比特): Weight Only INT8量化策略和 LoRA 的结合
 
 <div align="center">
-    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/f3a12366-3b7d-428c-9466-90e59ef3a3ed">
+    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/b2b4db4f-0cf3-4d28-989c-e3c00d24f397">
 </div>
 <div align="center">
     <font size ="1">
@@ -42,28 +37,34 @@
      </font>
 </div>
 
-### 3. 模型参数量化 (Quantization)
-飞桨PaddleNLP框架内的量化模块专门为主流大模型提供量化功能。量化是一种将浮点数转换为低精度的整数表示的技术，可以显著减少模型的存储空间和计算资源需求，同时加速模型的推理速度。飞桨内置了两种业界主流的量化算法：GPTQ和SmoothQuant。为了满足更多量化的需求，飞桨还开源了PaddleSlim团队自研的自适应Shift-SmoothQuant算法。该算法解决了SmoothQuant无法处理的某些量化场景。
-* A8W8: SmoothQuant, Shift-SmoothQuant
-* W4: GPTQ
+3. **大模型无损量化**。大模型量化将16位、32位浮点数的模型参数或激活量化为4位或8位整数能够有效降低模型存储空间和计算资源需求，同时加速推理速度。工具链内置了PaddleSlim 团队自研的自适应Shift-SmoothQuant的A8W8量化算法和业界主流GPTQ-R的W4量化算法，实现了主流大模型的无损量化。
 
 <div align="center">
-    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/969b62db-9692-4d50-b91a-85cff305d153">
+    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/969b62db-9692-4d50-b91a-85cff305d153">
 </div>
 <div align="center">
     <font size ="1">
-    飞桨量化性能比对
+    飞桨量化算法效果展示
      </font>
 </div>
 
-这些方法根据所需的样本数据和计算资源有所不同，用户可以根据自己的需求选择适合的方法。
 
-### 4. 高性能推理 
-飞桨PaddleNLP框架高性能推理模块，相比与普通的静态图导出推理方式，有更高的吞吐。同时它隐藏了底层实现的细节，使用户能够开箱即用。高性能推理模块主要包含：
-* 算子融合策略将大模型的transformer结构上做了全环节的算子融合， 比如每个大模型都不可或缺的Self-Attetnion层，FeedForward层，甚至最后的Optimizer都做了融合。
-* 动态插入策略在推理时能及时换出推理结束的样本并插入还未推理的样本，极大加快并行推理的速度。
+4. **高性能推理**。工具链高性能推理模块内置动态插入和全环节算子融合策略，极大加快并行推理的速度。同时隐藏了底层实现的细节，实现高性能推理开箱即用。
 
-## 快速开始
+<div align="center">
+    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/fb248224-0ad1-4d6a-a1ca-3a8dd765c41d">
+</div>
+<div align="center">
+    <font size ="1">
+    推理部署性能业界领先
+     </font>
+</div>
+
+
+
+##  🚀 快速开始 🚀
+
+模型支持列表：
 
 | Model | Pretrain | SFT | LoRA | Prefix Tuning | Generation | Quantization | weight convert |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -270,4 +271,3 @@ AutoModelForCausalLM.from_pretrained("/path/to/pytorch/model", convert_from_torc
 
 以上代码可自动加载 pytorch 权重并转化为对应 paddle 权重保存在 `/path/to/pytorch/model` 目录下。
 转换 torch 分片权重等方法具体参考[文档](./docs/torch2paddle.md)
-
