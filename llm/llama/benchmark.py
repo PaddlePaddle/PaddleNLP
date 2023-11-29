@@ -252,15 +252,14 @@ def main():
     if model_args.qat:
         from paddle import nn
         from paddle.quantization import QAT, QuantConfig
-
-        # FakeQuanterChannelWiseAbsMaxObserver not yet merge in Paddle develop
-        from paddle.quantization.quanters import FakeQuanterChannelWiseAbsMaxObserver
         from paddle.quantization.quanters.abs_max import (
             FakeQuanterWithAbsMaxObserverLayer,
         )
-        from paddleslim.quant.quanters import PACTQuanter
+        from paddleslim.quant.quanters import (
+            FakeQuanterChannelWiseAbsMaxObserver,
+            PACTQuanter,
+        )
 
-        # from paddle.quantization.quanters import FakeQuanterWithAbsMaxObserver
         from paddlenlp.peft.lora import LoRALinear
         from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
 
