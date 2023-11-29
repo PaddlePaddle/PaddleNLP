@@ -86,6 +86,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.epsilon = config.rms_norm_eps
         self.max_position_embeddings = config.max_position_embeddings
         self.quant_type = config.quant_type
+        self.num_key_value_heads = config.num_key_value_heads
 
         self.use_weight_only = False
         self.weight_only_quant_bits = config.weight_only_quant_bits
@@ -420,6 +421,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         unfused_state_dict = {}
+        dtype = paddle.get_default_dtype()
+
+        for k, v in state_dict.items():
+            state_dict[k] = v.cast(dtype)
 
         self.embed_tokens.weight.set_value(paddle.to_tensor(state_dict["llama.embed_tokens.weight"]))
         self.norm.weight.set_value(paddle.to_tensor(state_dict["llama.norm.weight"], dtype=self.norm.weight.dtype))
@@ -731,7 +736,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
                 [
                     2,
                     max_batch_size,
-                    config.num_attention_heads // max(config.tensor_parallel_degree, 1),
+                    config.num_key_value_heads,
                     max_length,
                     config.hidden_size // config.num_attention_heads,
                 ]
