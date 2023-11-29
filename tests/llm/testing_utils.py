@@ -60,9 +60,6 @@ class LLMTest:
         if config_params is None:
             config_params = {}
 
-        config_params["init_fleet_worker"] = False
-        config_params["enable_memory_optim"] = False
-
         # to avoid the same parameter
         self.disable_static()
         predict_config = load_test_config(self.config_path, "inference-predict")
