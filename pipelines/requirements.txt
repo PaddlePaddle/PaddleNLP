@@ -25,3 +25,4 @@ sseclient-py==1.7.2
 spacy
 tritonclient[all]
 typing_extensions==4.5.0
+aistudio_sdk
