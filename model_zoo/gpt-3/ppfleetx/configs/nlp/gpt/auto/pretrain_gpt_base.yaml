@@ -20,7 +20,7 @@ Engine:
     dtype: "float16"
     level: "o2"
     scale_loss: 32768.0
-    custom_black_list: ["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div"]
+    custom_black_list: ["reduce_sum", "softmax_with_cross_entropy", "elementwise_div"]
     custom_white_list: ["lookup_table", "lookup_table_v2"]
   save_load:
     output_dir: ./output

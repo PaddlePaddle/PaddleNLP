@@ -820,6 +820,76 @@ function gpt_auto_sp_acc_check() {
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
+
+function gpt_auto_parallel_cross_entropy_acc_check() {
+    echo "=========== $FUNCNAME run begin ==========="
+    export PYTHONPATH=/workspace/PaddleNLP/:$PYTHONPATH
+    export FLAGS_infer_spmd_enable=true
+    export FLAGS_call_stack_level=2
+    mp_degree=4
+    dp_degree=2
+    pp_degree=1
+    local_batch_size=8
+
+    # parallel cross entropy off
+    ori_log_dir=./ori_mp${mp_degree}_dp${dp_degree}_pp${pp_degree}
+    rm -rf $ori_log_dir 
+    PARALLEL_CROSS_ENTROPY=false python -m paddle.distributed.launch --log_dir=$ori_log_dir --devices=$devices --rank 0 tools/auto.py \
+        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
+        -o Model.hidden_dropout_prob=0 \
+        -o Model.attention_probs_dropout_prob=0 \
+        -o Model.use_recompute=True \
+        -o Global.local_batch_size=$(($local_batch_size / $dp_degree)) \
+        -o Global.micro_batch_size=$(($local_batch_size / $dp_degree)) \
+        -o Distributed.dp_degree=${dp_degree} \
+        -o Distributed.mp_degree=${mp_degree} \
+        -o Distributed.pp_degree=${pp_degree} \
+        -o Distributed.sharding.sharding_degree=1 \
+        -o Distributed.sharding.sharding_stage=1 \
+        -o Distributed.schedule_mode=FThenB \
+        -o Engine.mix_precision.enable=False \
+        -o Engine.mix_precision.level=o0 \
+        -o Engine.max_steps=10 \
+        -o Engine.eval_freq=100000 \
+        -o Engine.verbose=3 \
+        -o Engine.logging_freq=1 \
+        -o Engine.save_load.output_dir="" 2>&1 | tee log.txt
+    
+    # parallel cross entropy on
+    par_log_dir=./par_mp${mp_degree}_dp${dp_degree}_pp${pp_degree}
+    rm -rf $par_log_dir 
+    PARALLEL_CROSS_ENTROPY=true python -m paddle.distributed.launch --log_dir=$par_log_dir --devices=$devices --rank 0 tools/auto.py \
+        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
+        -o Model.hidden_dropout_prob=0 \
+        -o Model.attention_probs_dropout_prob=0 \
+        -o Model.use_recompute=True \
+        -o Global.local_batch_size=$(($local_batch_size / $dp_degree)) \
+        -o Global.micro_batch_size=$(($local_batch_size / $dp_degree)) \
+        -o Distributed.dp_degree=${dp_degree} \
+        -o Distributed.mp_degree=${mp_degree} \
+        -o Distributed.pp_degree=${pp_degree} \
+        -o Distributed.sharding.sharding_degree=1 \
+        -o Distributed.sharding.sharding_stage=1 \
+        -o Distributed.schedule_mode=FThenB \
+        -o Engine.mix_precision.enable=False \
+        -o Engine.mix_precision.level=o0 \
+        -o Engine.max_steps=10 \
+        -o Engine.eval_freq=100000 \
+        -o Engine.verbose=3 \
+        -o Engine.logging_freq=1 \
+        -o Engine.save_load.output_dir="" 2>&1 | tee log.txt
+    
+    # loss diff
+    loss=`cat ${par_log_dir}/workerlog.7 |  grep '10/10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    ips=-1
+    mem=-1
+    loss_base=`cat ${ori_log_dir}/workerlog.7 |  grep '10/10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    ips_base=-1
+    mem_base=-1
+    echo "result: loss_spTrue=$loss loss_spFasle=$loss_base"
+    check_result $FUNCNAME ${loss_base:0:8} ${loss:0:8} ${ips_base} ${ips} ${mem_base} ${mem}
+    echo "=========== $FUNCNAME run  end ==========="
+}
 ############ case end ############
 
 function check_result() {
