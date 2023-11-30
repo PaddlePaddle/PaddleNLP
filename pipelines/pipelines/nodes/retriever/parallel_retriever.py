@@ -33,7 +33,6 @@ from tritonclient.http import InferenceServerClient, InferInput, InferRequestedO
 from pipelines.document_stores import BaseDocumentStore
 from pipelines.nodes.retriever.base import BaseRetriever
 from pipelines.schema import ContentTypes, Document
-from pipelines.utils.common_utils import initialize_device_settings
 
 logger = logging.getLogger(__name__)
 
@@ -211,10 +210,6 @@ class ParallelRetriever(BaseRetriever):
             progress_bar=progress_bar,
         )
 
-        self.devices, _ = initialize_device_settings(use_cuda=use_gpu, multi_gpu=True)
-        if batch_size < len(self.devices):
-            logger.warning("Batch size is less than the number of devices. All gpus will not be utilized.")
-
         self.document_store = document_store
         self.batch_size = batch_size
         self.progress_bar = progress_bar
@@ -223,6 +218,7 @@ class ParallelRetriever(BaseRetriever):
         self.mode = mode
         self.url = url
         self.num_process = num_process
+        self.model_name = kwargs.get("model_name", "m3e")
 
         if document_store is None:
             logger.warning("DensePassageRetriever initialized without a document store. ")
@@ -325,7 +321,11 @@ class ParallelRetriever(BaseRetriever):
     def run_indexing(self, documents: List[dict], **kwargs):
         time1 = time.time()
         documents_list = embeddings_multi_doc(
-            documents, batch_size=self.batch_size, num_process=self.num_process, url=self.url
+            documents,
+            batch_size=self.batch_size,
+            num_process=self.num_process,
+            url=self.url,
+            model_name=self.model_name,
         )
         documents = []
         for i in documents_list:
