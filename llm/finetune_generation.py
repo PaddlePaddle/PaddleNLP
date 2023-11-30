@@ -174,7 +174,7 @@ def main():
         or os.path.exists(os.path.join(data_args.dataset_name_or_path, "dev.json"))
         or os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json"))
     ):
-        if training_args.do_train or training_args.do_qat:
+        if training_args.do_train or quant_args.do_qat:
             train_ds = load_dataset(
                 "json",
                 data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
@@ -190,7 +190,7 @@ def main():
             )[0]
         else:
             dev_ds = None
-        if training_args.do_ptq or training_args.do_gptq:
+        if quant_args.do_ptq or quant_args.do_gptq:
             if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
                 ptq_ds = load_dataset(
                     "json",
@@ -219,7 +219,7 @@ def main():
     ):
         import glob
 
-        if training_args.do_train or training_args.do_qat:
+        if training_args.do_train or quant_args.do_qat:
             train_ds = load_dataset(
                 "json",
                 data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "train", "*.json")),
@@ -235,7 +235,7 @@ def main():
             )[0]
         else:
             dev_ds = None
-        if training_args.do_ptq or training_args.do_gptq:
+        if quant_args.do_ptq or quant_args.do_gptq:
             if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant")):
                 ptq_ds = load_dataset(
                     "json",
@@ -256,7 +256,7 @@ def main():
         else:
             ptq_ds = None
     else:
-        if training_args.do_train or training_args.do_qat:
+        if training_args.do_train or quant_args.do_qat:
             train_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
         else:
             train_ds = None
@@ -264,7 +264,7 @@ def main():
             dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["dev"])[0]
         else:
             dev_ds = None
-        if training_args.do_ptq or training_args.do_gptq:
+        if quant_args.do_ptq or quant_args.do_gptq:
             ptq_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
             logger.info("Set train dataset as PTQ calibration dataset.")
         else:
