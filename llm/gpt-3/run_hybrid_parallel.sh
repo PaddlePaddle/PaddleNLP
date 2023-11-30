@@ -20,7 +20,7 @@ command1="python3.7 -u -m paddle.distributed.launch \
     --log_dir ${log_dir1} \
     run_pretrain.py \
     --model_type "gpt" \
-    --model_name_or_path gpt2-medium-en \
+    --model_name_or_path output/hot_launch_ckpt \
     --tokenizer_name_or_path gpt2-medium-en \
     --input_dir "./data" \
     --output_dir "output/$task_name1" \
@@ -39,13 +39,13 @@ command1="python3.7 -u -m paddle.distributed.launch \
     --amp_master_grad 1 \
     --learning_rate 0.00001 \
     --min_learning_rate 0.000005 \
-    --max_steps 50000 \
+    --max_steps 1000 \
     --save_steps 500000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
     --max_grad_norm 1.0 \
     --logging_steps 1 \
-    --continue_training 0 \
+    --continue_training 1 \
     --dataloader_num_workers 1 \
     --eval_steps 1000 \
     --report_to "visualdl" \
@@ -58,14 +58,14 @@ command1="python3.7 -u -m paddle.distributed.launch \
     --max_grad_norm 0.0 \
     --device "gpu"
 "
-$command1
+# $command1
 
 command2="python3.7 -u  -m paddle.distributed.launch \
     --gpus "3" \
     --log_dir ${log_dir2} \
     run_pretrain.py \
     --model_type "gpt" \
-    --model_name_or_path gpt2-medium-en \
+    --model_name_or_path output/hot_launch_ckpt \
     --tokenizer_name_or_path gpt2-medium-en \
     --input_dir "./data" \
     --output_dir "output/$task_name2" \
@@ -80,13 +80,13 @@ command2="python3.7 -u  -m paddle.distributed.launch \
     --amp_master_grad 1 \
     --learning_rate 0.00001 \
     --min_learning_rate 0.000005 \
-    --max_steps 50000 \
+    --max_steps 1000 \
     --save_steps 500000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
     --max_grad_norm 1.0 \
     --logging_steps 1\
-    --continue_training 0 \
+    --continue_training 1 \
     --dataloader_num_workers 1 \
     --eval_steps 1000 \
     --report_to "visualdl" \
@@ -99,4 +99,48 @@ command2="python3.7 -u  -m paddle.distributed.launch \
     --max_grad_norm 0.0 \
     --device "gpu"
 "
-# $command2
+$command2
+
+# log_dir0='hot_launch_ckpt'
+# task_name0="hot_launch_ckpt"
+
+# command3="python3.7 -u  -m paddle.distributed.launch \
+#     --gpus "3" \
+#     --log_dir ${log_dir0} \
+#     run_pretrain.py \
+#     --model_type "gpt" \
+#     --model_name_or_path gpt2-medium-en \
+#     --tokenizer_name_or_path gpt2-medium-en \
+#     --input_dir "./data" \
+#     --output_dir "output/$task_name0" \
+#     --split 949,50,1 \
+#     --max_seq_length 1024 \
+#     --per_device_train_batch_size 4 \
+#     --seed 1234 \
+#     --fuse_attention_qkv 1 \
+#     --use_flash_attention 0 \
+#     --bf16  \
+#     --fp16_opt_level "O2"  \
+#     --amp_master_grad 1 \
+#     --learning_rate 0.00001 \
+#     --min_learning_rate 0.000005 \
+#     --max_steps 2 \
+#     --save_steps 500000 \
+#     --weight_decay 0.01 \
+#     --warmup_ratio 0.01 \
+#     --max_grad_norm 1.0 \
+#     --logging_steps 1\
+#     --continue_training 0 \
+#     --dataloader_num_workers 1 \
+#     --eval_steps 1000 \
+#     --report_to "visualdl" \
+#     --disable_tqdm true \
+#     --recompute 0 \
+#     --gradient_accumulation_steps 2 \
+#     --do_train \
+#     --attention_probs_dropout_prob 0 \
+#     --hidden_dropout_prob 0 \
+#     --max_grad_norm 0.0 \
+#     --device "gpu"
+# "
+# $command3
