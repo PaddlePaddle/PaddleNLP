@@ -17,26 +17,26 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-export FLAGS_call_stack_level=2
-
 task_name="llama_auto_dp2mp2pp2"
-rm -rf output/$task_name/
-rm -rf "output/$task_name""_log"
+rm -rf log_newir/$task_name/
+rm -rf "log_newir/$task_name""_log"
 
+export FLAGS_call_stack_level=2
 export SOT_LOG_LEVEL=4
 PYTHONPATH=../../:$PYTHONPATH  \
+export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 python -u  -m paddle.distributed.launch \
-    --gpus "0,1,2,3,4,5,6,7" \
-    --log_dir "output/$task_name""_log" \
+    --devices "0,1,2,3" \
+    --log_dir "log_newir/$task_name""_log" \
     run_pretrain_auto.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
     --tokenizer_name_or_path "facebook/llama-7b" \
     --input_dir "./data" \
-    --output_dir "output/$task_name" \
+    --output_dir "log_newir/$task_name" \
     --split 949,50,1 \
-    --max_seq_length 2048 \
+    --max_seq_length 256 \
     --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 4 \
@@ -63,7 +63,7 @@ python -u  -m paddle.distributed.launch \
     --report_to "visualdl" \
     --disable_tqdm true \
     --continue_training 0\
-    --recompute 1 \
+    --recompute 0 \
     --do_train \
     --do_eval \
     --device "gpu" \
