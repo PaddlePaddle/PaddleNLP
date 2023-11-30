@@ -65,8 +65,8 @@ def transformat_weight(model):
             print(f"[INFO]transformat_weight={k}; shape={model_dict[k].data.shape}")
             old_shape = model_dict[k].data.shape
             model_dict[k].data = model_dict[k].data.transpose([1, 0])
-            if "ffn2_weight" in k:
-                model_dict[k].data = atb_transdata(model_dict[k].data)
+            # if "ffn2_weight" in k:
+            #     model_dict[k].data = atb_transdata(model_dict[k].data)
             model_dict[k].data = model_dict[k].data.reshape(old_shape)
             # model_dict[k].data = model_dict[k].data.reshape([1, int(old_shape[1]/16), old_shape[0], 16])
 
