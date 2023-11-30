@@ -107,7 +107,7 @@ def remove_ckpt(ckpt_dir):
         shutil.rmtree(ckpt_dir)
 
 
-class TestModelOnN1C8(TestMultipleGpus):
+class TestModelOnN2C4(TestMultipleGpus):
     def setUp(self):
         os.environ.update(environment_variables)
         self.configs = get_pretrain_arguments(pretrain_arguments)
