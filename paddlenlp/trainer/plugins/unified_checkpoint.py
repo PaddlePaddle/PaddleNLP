@@ -16,6 +16,7 @@ import copy
 import gc
 import json
 import os
+import random
 
 import paddle
 import paddle.distributed as dist
@@ -855,6 +856,8 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
 
 def dynamic_load_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
     optim_state_dict = nested_copy(optimizer.state_dict())
+    if "master_weights" in optim_state_dict.keys():
+        optim_state_dict.pop("master_weights")
 
     if safe_serialization:
         index_filename, index_filename_mw = SAFE_OPTIMIZER_INDEX_NAME, SAFE_MASTER_WEIGHTS_INDEX_NAME
@@ -1019,7 +1022,7 @@ def create_send_table(file_keyname_mappings, file_machine_mappings):
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
     local_device_count = int(os.getenv("PADDLE_LOCAL_SIZE"))
     for filename, keys in file_keyname_mappings.items():
-        machine = file_machine_mappings[filename][0]
+        machine = random.choice(file_machine_mappings[filename])
         is_src = (global_rank // local_device_count) == machine
         for i, key in enumerate(keys):
             if is_src and local_rank == i % local_device_count:
