@@ -1701,7 +1701,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # Weight quantization if not yet quantized & update loaded_keys
         if config.quantization_config.is_weight_quantize():
             try:
-                from ..utils.quantization import (
+                from ..quantization.quantization_utils import (
                     convert_to_quantize_state_dict,
                     update_loaded_state_dict_keys,
                 )
@@ -2054,7 +2054,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         if config.quantization_config.is_weight_quantize():
             try:
-                from ..utils.quantization import replace_with_quantization_linear
+                from ..quantization.quantization_utils import (
+                    replace_with_quantization_linear,
+                )
             except ImportError:
                 raise ImportError("You need to install paddlepaddle >= 2.5.2")
 
@@ -2146,7 +2148,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 if not isinstance(state_dict[k], paddle.Tensor):
                     with device_guard():
                         state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
-
         # 3. init the model
         init_args = config["init_args"] or ()
         with ContextManagers(init_contexts):
