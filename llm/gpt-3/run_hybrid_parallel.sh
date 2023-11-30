@@ -12,7 +12,6 @@ rm -rf $task_name1 $task_name1
 rm -rf $log_dir1 
 rm -rf $log_dir2
 
-
 export FLAGS_cudnn_deterministic=1
 export FLAGS_embedding_deterministic=1
 
