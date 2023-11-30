@@ -40,7 +40,6 @@ from paddleslim.quant.observers.abs_max_weight import (
     AbsMaxChannelWiseWeightObserverLayer,
 )
 from paddleslim.quant.observers.avg import AVGObserverLayer
-from paddleslim.quant.quanters import PACTQuanter
 
 from paddlenlp.peft import PrefixModelForCausalLM
 from paddlenlp.peft.lora import (
@@ -57,8 +56,10 @@ from paddlenlp.utils.log import logger
 
 
 def create_qat_model(quant_args, model, dtype):
-    # FakeQuanterChannelWiseAbsMaxObserver not yet merge in Paddle develop
-    from paddle.quantization.quanters import FakeQuanterChannelWiseAbsMaxObserver
+    from paddleslim.quant.quanters import (
+        FakeQuanterChannelWiseAbsMaxObserver,
+        PACTQuanter,
+    )
 
     q_config = QuantConfig(activation=None, weight=None)
     q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)

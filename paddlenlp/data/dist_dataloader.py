@@ -159,7 +159,7 @@ class DistDataLoader(paddle.io.DataLoader):
 
         # Broadcast data keys size.
         if self._data_keys_size is None:
-            if self.mp_group is not None and self.pp_rank == 0:
+            if self.mp_group.nranks > 1 and self.pp_rank == 0:
                 paddle.distributed.broadcast_object_list(data_keys_size, src=self.mp_src_rank, group=self.mp_group)
             if self._pp_data_group is not None:
                 paddle.distributed.broadcast_object_list(
@@ -172,7 +172,7 @@ class DistDataLoader(paddle.io.DataLoader):
 
         # Broadcast data keys name.
         if self._data_keys_list is None:
-            if self.mp_group is not None and self.pp_rank == 0:
+            if self.mp_group.nranks > 1 and self.pp_rank == 0:
                 paddle.distributed.broadcast_object_list(data_keys_list, src=self.mp_src_rank, group=self.mp_group)
             if self._pp_data_group is not None:
                 paddle.distributed.broadcast_object_list(
@@ -184,7 +184,7 @@ class DistDataLoader(paddle.io.DataLoader):
         if not self._need_data:
             data_list = [[None for i in range(keys_size)] for keys_size in self._data_keys_size]
 
-        if self.mp_group is not None and self.pp_rank == 0:
+        if self.mp_group.nranks > 1 and self.pp_rank == 0:
             for i, dtype in enumerate(self.dtype_list):
                 if self._data_keys_size[i] > 0:
                     data_list[i] = broadcast_data_list(

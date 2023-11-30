@@ -609,6 +609,10 @@ class TrainingArguments:
             "Only support for networks with transformer blocks."
         },
     )
+    sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
+    refined_ops_patterns: Optional[List[str]] = field(
+        default=None, metadata={"help": "The pattern of refined recompute."}
+    )
 
     scale_loss: float = field(default=2**15, metadata={"help": "The value of initial scale_loss for fp16."})
 
@@ -784,6 +788,7 @@ class TrainingArguments:
         self.optim = OptimizerNames(self.optim)
 
         self.use_hybrid_parallel = False
+        self.use_auto_parallel = False
 
         if isinstance(self.sharding, bool):
             self.sharding = "stage1" if self.sharding else ""
@@ -806,36 +811,18 @@ class TrainingArguments:
         if len(self.sharding) == 0 and self.sharding_parallel_degree > 0:
             warnings.warn("`--sharding_parallel_degree` is useful only when `--sharding` is specified.")
 
-        if paddle.distributed.get_world_size() > 1 and (
-            len(self.sharding) > 0 or self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1
-        ):
-            self.use_hybrid_parallel = True
+        try:
+            self.use_auto_parallel = self.parallel_mode == "auto"
+        except:
+            pass
 
-        if self.distributed_dataloader and not (self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1):
-            warnings.warn("We set `distributed_dataloader` to False if tp_degree <= 1 and pp_degree <= 1")
-            self.distributed_dataloader = False
-
-        if self.amp_master_grad:
-            if (
-                self.pipeline_parallel_degree <= 1
-                and self.tensor_parallel_degree <= 1
-                and (not self.sharding or ShardingOption.FULL_SHARD in self.sharding)
-            ):
-                raise ValueError(
-                    "Temporarily amp master grad only support for tensor/pipeline/sharding"
-                    " (stage 1 and stage 2) parallel. Please set amp_master_grad to False."
-                )
-            if not (self.bf16 or self.fp16):
-                logger.warning("set amp_master_grad to false since amp is disabled.")
-                self.amp_master_grad = False
-
-        if self.use_hybrid_parallel:
+        if paddle.distributed.get_world_size() > 1:
             world_size = paddle.distributed.get_world_size()
             tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
             pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
 
             assert (
-                world_size % (tensor_parallel_degree * pipeline_parallel_degree) == 0
+                world_size % (self.tensor_parallel_degree * self.pipeline_parallel_degree) == 0
             ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
 
             if self.sharding_parallel_degree == -1:
@@ -847,23 +834,42 @@ class TrainingArguments:
                 logger.warning("sharding_parallel_degree=1 means no sharding, please set sharding to empty!")
                 self.sharding = []
 
-            assert world_size % (sharding_parallel_degree * tensor_parallel_degree * pipeline_parallel_degree) == 0, (
-                "The world size for workers should be divided by sharding_parallel_degree, tensor_parallel_degree, and pipeline_parallel_degree, "
-                "sharding_parallel_degree:{sharding_parallel_degree}, tensor_parallel_degree:{tensor_parallel_degree}, "
-                "pipeline_parallel_degree:{pipeline_parallel_degree}, "
-                " world_size:{world_size}"
-            )
             self.data_parallel_degree = world_size // (
                 sharding_parallel_degree * tensor_parallel_degree * pipeline_parallel_degree
             )
-            # TODO(liuzhenhai): remove this when framework is ready
-            if sharding_parallel_degree > 1 and ShardingOption.SHARD_OP in self.sharding:
-                assert self.data_parallel_degree == 1, "sharding stage1 can not coexist with dp for now"
+
+            if sharding_parallel_degree > 1 or tensor_parallel_degree > 1 or pipeline_parallel_degree > 1:
+                self.use_hybrid_parallel = True
+                self.sharding_parallel_degree = sharding_parallel_degree
+                self.tensor_parallel_degree = tensor_parallel_degree
+                self.pipeline_parallel_degree = pipeline_parallel_degree
+
+            if not self.use_hybrid_parallel:
+                self.sharding = []
+                self.sharding_parallel_degree = -1
+                self.tensor_parallel_degree = -1
+                self.pipeline_parallel_degree = -1
+
+        if self.use_hybrid_parallel and self.use_auto_parallel:
+            self.use_hybrid_parallel = False
+
+        if self.distributed_dataloader and not (self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1):
+            warnings.warn("We set `distributed_dataloader` to False if tp_degree <= 1 and pp_degree <= 1")
+            self.distributed_dataloader = False
+
+        if self.amp_master_grad:
+            if not (self.bf16 or self.fp16):
+                logger.warning("set amp_master_grad to false since amp is disabled.")
+                self.amp_master_grad = False
+
+        # use_hybrid_parallel
+        if self.use_hybrid_parallel:
+            world_size = paddle.distributed.get_world_size()
 
             if ShardingOption.OFFLOAD in self.sharding:
                 warnings.warn("`offload` is not supported NOW!")
 
-            if pipeline_parallel_degree > 1:
+            if self.pipeline_parallel_degree > 1:
                 if ShardingOption.FULL_SHARD in self.sharding or ShardingOption.SHARD_GRAD_OP in self.sharding:
                     raise ValueError(
                         "pipeline parallel is not compatible for sharding stage2 or stage3, please using sharding stage1"
@@ -872,7 +878,7 @@ class TrainingArguments:
             # TODO use paddle.distributed.is_initialized() after paddle 2.4rc
             if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized():
                 strategy = fleet.DistributedStrategy()
-                if pipeline_parallel_degree > 1:
+                if self.pipeline_parallel_degree > 1:
                     pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
                     for x in pipeline_parallel_config:
                         if len(x) > 0:
@@ -916,7 +922,7 @@ class TrainingArguments:
                             "Please set per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
                         )
 
-                if tensor_parallel_degree > 1:
+                if self.tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
 
                     if " " in self.tensor_parallel_config:
@@ -980,20 +986,20 @@ class TrainingArguments:
 
                 hybrid_configs = {
                     "dp_degree": self.data_parallel_degree,
-                    "mp_degree": tensor_parallel_degree,
-                    "pp_degree": pipeline_parallel_degree,
-                    "sharding_degree": sharding_parallel_degree,
+                    "mp_degree": self.tensor_parallel_degree,
+                    "pp_degree": self.pipeline_parallel_degree,
+                    "sharding_degree": self.sharding_parallel_degree,
                     "order": order,
                 }
 
-                if pipeline_parallel_degree > 1:
+                if self.pipeline_parallel_degree > 1:
                     hybrid_configs["pp_configs"] = dygraph_pp_configs
                     logger.info(f"using pipeline configs:{dygraph_pp_configs}")
 
                 # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
                 strategy.hybrid_configs = hybrid_configs
 
-                if sharding_parallel_degree > 1:
+                if self.sharding_parallel_degree > 1:
                     sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
                     for x in sharding_parallel_config:
                         if len(x) > 0:
@@ -1001,13 +1007,17 @@ class TrainingArguments:
                                 "enable_stage1_tensor_fusion",
                                 "enable_stage1_overlap",
                                 "enable_stage2_overlap",
+                                "split_param",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, "
                                     f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap."
                                 )
                     try:
-                        if pipeline_parallel_degree == 1:
+                        if "split_param" in sharding_parallel_config:
+                            strategy.hybrid_configs["sharding_configs"].split_param = True
+
+                        if self.pipeline_parallel_degree == 1:
                             strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
                                 True if "enable_stage1_tensor_fusion" in sharding_parallel_config else False
                             )
@@ -1016,13 +1026,14 @@ class TrainingArguments:
                                 strategy.hybrid_configs[
                                     "sharding_configs"
                                 ].accumulate_steps = self.gradient_accumulation_steps
+
                         else:
                             warnings.warn(
                                 "For pipeline parallel with sharding, the sharding overlap and tensor fusion "
                                 "should be configured in pipeline_parallel_config."
                                 '"enable_stage1_tensor_fusion" and "enable_stage1_overlap" in sharding_parallel_config will be ignored.'
                             )
-                    except KeyError:
+                    except (KeyError, AttributeError):
                         warnings.warn(
                             "The enable_stage1_tensor_fusion or enable_stage1_overlap is not supported "
                             "by current version of Paddle. Please try latest develop Paddle."
@@ -1037,17 +1048,168 @@ class TrainingArguments:
                         )
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
+
+        elif self.use_auto_parallel:
+            world_size = paddle.distributed.get_world_size()
+            tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
+            pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
+
+            assert (
+                world_size % (tensor_parallel_degree * pipeline_parallel_degree) == 0
+            ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
+
+            self.data_parallel_degree = world_size // (tensor_parallel_degree * pipeline_parallel_degree)
+
+            if self.sharding_parallel_degree == -1:
+                if len(self.sharding) > 0:
+                    self.sharding_parallel_degree = self.data_parallel_degree
+
+            sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
+            if sharding_parallel_degree == 1 and len(self.sharding) > 0:
+                logger.warning("sharding_parallel_degree=1 means no sharding, please set sharding to empty!")
+                self.sharding = []
+
+            if ShardingOption.OFFLOAD in self.sharding:
+                warnings.warn("`offload` is not supported NOW!")
+
+            strategy = fleet.auto.Strategy()
+            if pipeline_parallel_degree > 1:
+                pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
+                for x in pipeline_parallel_config:
+                    if len(x) > 0:
+                        if x not in [
+                            "enable_send_recv_overlap",
+                            # "disable_p2p_cache_shape",      # no need for auto_parallel
+                            # "disable_partial_send_recv",    # no implemenation for auto_parallel
+                            # "enable_delay_scale_loss",      # default True in auto_parallel, non-configurable
+                            # "enable_dp_comm_overlap",       # no implemenation for auto_parallel
+                            # "enable_sharding_comm_overlap", # no implemenation for auto_parallel
+                            # "enable_timer",                 # no implemenation for auto_parallel
+                        ]:
+                            raise ValueError(
+                                f"Found unknown pipeline mode config {x}, accpet config is enable_send_recv_overlap."
+                            )
+
+                pipeline = strategy.pipeline
+                pipeline.enable = True
+                pipeline.enable_send_recv_overlap = "enable_send_recv_overlap" in pipeline_parallel_config
+                pipeline.accumulate_steps = self.gradient_accumulation_steps
+                pipeline.micro_batch_size = self.per_device_train_batch_size
+                pipeline.schedule_mode = "1F1B"
+
+                if self.amp_master_grad:
+                    warnings.warn("`amp_master_grad` is not supported NOW in AutoParallel!")
+                    self.amp_master_grad = False
+                logger.info(f"PP configs:{strategy.pipeline}, use master_grad: {self.amp_master_grad}")
+
+                if self.do_eval:
+                    assert (
+                        self.per_device_train_batch_size * self.gradient_accumulation_steps
+                        == self.per_device_eval_batch_size
+                    ), (
+                        "In pipeline model, the evaluation also shares same setting with training. "
+                        "Please set per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
+                    )
+
+            if tensor_parallel_degree > 1:
+                mp_optimization = strategy.mp_optimization
+
+                if " " in self.tensor_parallel_config:
+                    mp_config = set(self.tensor_parallel_config.split(" "))
+                else:
+                    mp_config = set(self.tensor_parallel_config.split(","))
+
+                for x in mp_config:
+                    if len(x) > 0:
+                        if x not in [
+                            "enable_mp_async_allreduce",  # allreduce_matmul_grad_overlapping in auto_parallel
+                            # "enable_mp_skip_c_identity",
+                            # "enable_mp_fused_linear_param_grad_add",
+                        ]:
+                            raise ValueError(
+                                f"Found unknown tensor parallell config {x}, "
+                                f"accept config is enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add"
+                            )
+                try:
+                    if "enable_mp_async_allreduce" in mp_config:
+                        mp_optimization.allreduce_matmul_grad_overlapping = True
+                except:
+                    warnings.warn(
+                        "The enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add are not supported "
+                        "by current version of Paddle. Please try latest develop Paddle."
+                    )
+
+            if sharding_parallel_degree > 1:
+                sharding = strategy.sharding
+                sharding.enable = True
+                sharding.degree = sharding_parallel_degree
+                if ShardingOption.SHARD_OP in self.sharding:
+                    sharding.stage = 1
+                elif ShardingOption.SHARD_GRAD_OP in self.sharding:
+                    sharding.stage = 2
+                elif ShardingOption.FULL_SHARD in self.sharding:
+                    sharding.stage = 3
+
+                sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
+                for x in sharding_parallel_config:
+                    if len(x) > 0:
+                        if x not in [
+                            # "enable_stage1_tensor_fusion",
+                            # "enable_stage1_overlap",
+                            # "enable_stage2_overlap",
+                        ]:
+                            raise ValueError(
+                                f"Found unknown pipeline mode config {x}, " f"accpet config is reduce_overlap."
+                            )
+
+                    if (
+                        "enable_stage1_overlap" in sharding_parallel_config
+                        or "enable_stage2_overlap" in sharding_parallel_config
+                    ):
+                        sharding.reduce_overlap = True
+
+            if self.bf16 or self.fp16:
+                amp = strategy.amp
+                amp.enable = True
+                amp.dtype = "bfloat16" if self.bf16 else "float16"
+                amp.level = self.fp16_opt_level.lower()
+                amp.init_loss_scaling = self.scale_loss
+                amp.custom_black_list = self.amp_custom_black_list if self.amp_custom_black_list is not None else []
+                amp.custom_white_list = self.amp_custom_white_list if self.amp_custom_white_list is not None else []
+
+            if self.recompute:
+                recompute = strategy.recompute
+                recompute.enable = True
+                recompute.sr = self.sr if self.sr is not None else 0
+                recompute.refined_ops_patterns = []
+                if self.refined_ops_patterns is not None:
+                    for pattern in self.refined_ops_patterns:
+                        recompute.refined_ops_patterns.append(eval(pattern))
+
+            self.strategy = strategy
+            logger.info(self.strategy)
+            order = ["dp", "pp", "mp"]
+            degree = [self.data_parallel_degree, pipeline_parallel_degree, tensor_parallel_degree]
+            mesh_dims = list(filter(lambda x: x[1] > 1, list(zip(order, degree))))
+            if not mesh_dims:
+                mesh_dims = [("dp", 1)]
+            fleet.auto.create_mesh(mesh_dims)
         else:
             world_size = paddle.distributed.get_world_size()
             if world_size > 1:
                 if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized():
-                    paddle.distributed.init_parallel_env()
+                    if self.unified_checkpoint:
+                        self.use_hybrid_parallel = True
+                        strategy = fleet.DistributedStrategy()
+                        fleet.init(is_collective=True, strategy=strategy)
+                    else:
+                        paddle.distributed.init_parallel_env()
 
-        if self.unified_checkpoint and not self.use_hybrid_parallel:
-            logger.warning(
-                "The unified_checkpoint only avaliable for hybrid_parallel. Set unified_checkpoint to False for not using hybrid_parallel."
-            )
-            self.unified_checkpoint = False
+        # if self.unified_checkpoint and not self.use_hybrid_parallel:
+        #     logger.warning(
+        #         "The unified_checkpoint only avaliable for hybrid_parallel. Set unified_checkpoint to False for not using hybrid_parallel."
+        #     )
+        #     self.unified_checkpoint = False
 
         if self.report_to is None:
             logger.info(
@@ -1075,6 +1237,11 @@ class TrainingArguments:
 
         if self.flatten_param_grads and self.device != "npu":
             raise ValueError("flatten_param_grads can only be used on npu devices in temporary.")
+
+        if self.world_size != paddle.distributed.get_world_size():
+            raise ValueError(
+                f"The local_ran: {self.local_rank} should be consistent with the world size: {paddle.distributed.get_world_size()}."
+            )
 
     def __str__(self):
         self_as_dict = asdict(self)
@@ -1220,6 +1387,28 @@ class TrainingArguments:
         """
         if self.local_rank != -1:
             return paddle.distributed.get_rank()
+        return 0
+
+    @property
+    def logical_process_index(self):
+        """
+        The index of the current process used.
+        """
+        if self.local_rank != -1:
+            sd_size = max(self.sharding_parallel_degree, 1)
+            pp_size = max(self.pipeline_parallel_degree, 1)
+            tp_size = max(self.tensor_parallel_degree, 1)
+
+            dp_rank = max(self.data_parallel_rank, 0)
+            sd_rank = max(self.sharding_parallel_rank, 0)
+            pp_rank = max(self.pipeline_parallel_rank, 0)
+            tp_rank = max(self.tensor_parallel_rank, 0)
+
+            rank = (
+                dp_rank * (sd_size * pp_size * tp_size) + sd_rank * (pp_size * tp_size) + pp_rank * tp_size + tp_rank
+            )
+
+            return rank
         return 0
 
     @property

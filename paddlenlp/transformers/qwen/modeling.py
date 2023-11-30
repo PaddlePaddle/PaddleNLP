@@ -39,6 +39,7 @@ from .configuration import QWenConfig
 __all__ = [
     "QWenBlock",
     "QWenForCausalLM",
+    "QWenLMHeadModel",
     "QWenPretrainedModel",
     "QWenModel",
     "QWenLMHead",
@@ -495,7 +496,7 @@ class QWenPretrainedModel(PretrainedModel):
                 mapping[1] = "qwen." + mapping[1]
 
         if config.architectures is not None:
-            if "QWenForCausalLM" in config.architectures:
+            if "QWenForCausalLM" or "QWenLMHeadModel" in config.architectures:
                 mappings.extend(
                     [
                         [
@@ -1043,3 +1044,6 @@ class QWenRMSNorm(nn.Layer):
 
         output = self._norm(x.astype(paddle.float32)).astype(x.dtype)
         return output * self.weight
+
+
+QWenLMHeadModel = QWenForCausalLM
