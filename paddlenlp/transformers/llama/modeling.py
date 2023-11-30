@@ -24,6 +24,7 @@ import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
 from paddle import Tensor, nn
+from paddle.autograd import PyLayer
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
@@ -1351,7 +1352,7 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         self.config = config
         self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
 
-        if self.enable_parallel_cross_entropy:  # and False: # and lm_head is distributed
+        if self.enable_parallel_cross_entropy and False:  # and False: # and lm_head is distributed
             self.loss_func = mpu.ParallelCrossEntropy(ignore_index=self.ignore_index)
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
@@ -1365,12 +1366,40 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
                 self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
         with paddle.amp.auto_cast(False):
+
+            hcg = fleet.get_hybrid_communicate_group()
+            mp_group = hcg.get_model_parallel_group()
+
+            if mp_group.nranks > 1:
+                prediction_scores = ConcatSoftmaxInput.apply(prediction_scores.astype("float32"), mp_group)
+            else:
+                prediction_scores = prediction_scores.astype("float32")
+
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
             # skip ignore_index which loss == 0
             masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
             loss = paddle.mean(masked_lm_loss)
 
         return loss
+
+
+class ConcatSoftmaxInput(PyLayer):
+    @staticmethod
+    def forward(ctx, inp, group=None):
+        inputs = []
+        paddle.distributed.all_gather(inputs, inp, group=group)
+        with paddle.no_grad():
+            cat = paddle.concat(inputs, axis=-1)
+        ctx.cat_args = group
+        return cat
+
+    @staticmethod
+    def backward(ctx, grad):
+        group = ctx.cat_args
+        with paddle.no_grad():
+            grads = paddle.split(grad, paddle.distributed.get_world_size(group), axis=-1)
+        grad = grads[paddle.distributed.get_rank(group)]
+        return grad
 
 
 class LlamaLMHead(nn.Layer):

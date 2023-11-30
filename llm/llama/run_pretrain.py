@@ -21,6 +21,8 @@ from typing import List, Optional
 
 import numpy as np
 import paddle
+import paddle.distributed as dist
+from paddle.distributed import fleet
 
 from paddlenlp.data.causal_dataset import (
     build_train_valid_test_datasets,
@@ -305,6 +307,68 @@ def set_seed(args):
     paddle.seed(args.seed + idx)
 
 
+def init_model(model, config):
+
+    hcg = fleet.get_hybrid_communicate_group()
+    mp_rank = hcg.get_model_parallel_rank()
+    orig_rng_state = paddle.get_rng_state()
+    paddle.seed(1234 + mp_rank)
+
+    rank = paddle.distributed.get_rank()
+    pp_group = hcg.get_pipe_parallel_group()
+    pp_size = pp_group.nranks
+
+    if pp_size > 1:
+        metas = []
+        params = []
+        for name, p in model.named_parameters():
+            tmp = [name, p.shape, p.dtype, rank]
+            metas.append(tmp)
+            params.append(p)
+        all_metas = []
+        dist.all_gather_object(all_metas, metas, group=pp_group)
+        tmp_all_metas = []
+        for metas in all_metas:
+            for meta in metas:
+                tmp_all_metas.append(meta)
+        all_metas = tmp_all_metas
+    else:
+        all_metas = []
+        params = []
+        for name, p in model.named_parameters():
+            tmp = [name, p.shape, p.dtype, rank]
+            all_metas.append(tmp)
+            params.append(p)
+
+    pp_src_rank = min(pp_group.ranks)
+    p_cnt = 0
+    for meta in all_metas:
+        print("meta :", meta)
+        name, shape, dtype, cur_rank = meta
+        tmp = paddle.empty(shape=shape, dtype=dtype)
+
+        print("name :", name)
+
+        if ("norm" in name and "weight" in name) or name == "{}.weight".format(config.num_hidden_layers + 1):
+            init = paddle.nn.initializer.Constant(value=1.0)
+        elif "bias" in name:
+            init = paddle.nn.initializer.Constant(value=0.0)
+        else:
+            init = paddle.nn.initializer.XavierNormal()
+        init(tmp)
+        if pp_size > 1:
+            paddle.distributed.broadcast(tmp, src=pp_src_rank, group=pp_group)
+        paddle.device.cuda.synchronize()
+        if cur_rank == rank:
+            assert p_cnt < len(params)
+            params[p_cnt].set_value(tmp)
+            p_cnt += 1
+
+    assert p_cnt == len(params)
+
+    paddle.set_rng_state(orig_rng_state)
+
+
 class PretrainingTrainer(Trainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -478,6 +542,9 @@ def main():
         init_contexts.append(no_init_weights(_enable=model_args.skip_post_init_weights))
         with ContextManagers(init_contexts):
             model = model_class._from_config(config, dtype=dtype)
+
+    if training_args.tensor_parallel_degree > 1 or training_args.pipeline_parallel_degree > 1:
+        init_model(model, config)
 
     if model_args.sequence_parallel:
         register_sequence_parallel_allreduce_hooks(
