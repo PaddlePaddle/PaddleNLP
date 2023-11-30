@@ -37,6 +37,7 @@ function case_list_auto() {
     gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2
     gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3
     gpt_auto_sp_acc_check
+    gpt_auto_parallel_cross_entropy_acc_check
 }
 
 function case_list_auto_pir() {
@@ -846,7 +847,7 @@ function gpt_auto_parallel_cross_entropy_acc_check() {
         -o Distributed.pp_degree=${pp_degree} \
         -o Distributed.sharding.sharding_degree=1 \
         -o Distributed.sharding.sharding_stage=1 \
-        -o Distributed.schedule_mode=FThenB \
+        -o Distributed.pipline.schedule_mode=FThenB \
         -o Engine.mix_precision.enable=False \
         -o Engine.mix_precision.level=o0 \
         -o Engine.max_steps=10 \
@@ -870,7 +871,7 @@ function gpt_auto_parallel_cross_entropy_acc_check() {
         -o Distributed.pp_degree=${pp_degree} \
         -o Distributed.sharding.sharding_degree=1 \
         -o Distributed.sharding.sharding_stage=1 \
-        -o Distributed.schedule_mode=FThenB \
+        -o Distributed.pipline.schedule_mode=FThenB \
         -o Engine.mix_precision.enable=False \
         -o Engine.mix_precision.level=o0 \
         -o Engine.max_steps=10 \
