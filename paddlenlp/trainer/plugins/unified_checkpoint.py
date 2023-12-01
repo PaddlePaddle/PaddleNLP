@@ -836,7 +836,10 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
 
     config_revise = copy.deepcopy(model.config)
     config_revise.tensor_parallel_rank = None
-    tp_actions = model.get_tensor_parallel_convert_actions(config_revise, all_tp_keys, ignore_error=True)
+    if len(all_tp_keys) == 0:
+        tp_actions = {}
+    else:
+        tp_actions = model.get_tensor_parallel_convert_actions(config_revise, all_tp_keys, ignore_error=True)
     state_dict = distributed_send_recv(
         config_revise,
         model.state_dict(),
@@ -934,7 +937,10 @@ def dynamic_load_unified_optimizer(args, model, optimizer, resume_from_checkpoin
 
     config_revise = copy.deepcopy(model.config)
     config_revise.tensor_parallel_rank = None
-    tp_actions = model.get_tensor_parallel_convert_actions(config_revise, all_tp_keys, ignore_error=True)
+    if len(all_tp_keys) == 0:
+        tp_actions = {}
+    else:
+        tp_actions = model.get_tensor_parallel_convert_actions(config_revise, all_tp_keys, ignore_error=True)
     optimizer_keys = list(index["weight_map"].keys())
     optimizer_tp_actions = mapping_optimizer_tp_actions(tp_actions, optimizer_keys)
     if has_master_weights:

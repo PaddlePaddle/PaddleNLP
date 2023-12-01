@@ -94,7 +94,7 @@ def get_pretrain_arguments(pretrain_arguments):
     train_args["sharding_parallel_degree"] = 4
     train_args["sharding"] = "stage1"
     train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-    configs["testSharding4S1DP2"] = train_args
+    configs["Sharding4S1DP2"] = train_args
 
     train_args = copy.deepcopy(pretrain_arguments)
     train_args["tensor_parallel_degree"] = 1
