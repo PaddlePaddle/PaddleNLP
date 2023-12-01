@@ -793,7 +793,7 @@ class CLIPTextTransformer(nn.Layer):
         attention_mask.stop_gradient = True
 
         encoder_outputs = self.transformer(
-            embedding_output.astype(self.transformer.dtype),
+            embedding_output,
             src_mask=attention_mask,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
