@@ -78,3 +78,4 @@ Optimizer:
 FusedPasses:
   fused_linear: False
   fused_adamw: False
+  fused_linear_promotion: False
