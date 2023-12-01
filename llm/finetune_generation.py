@@ -567,7 +567,7 @@ def main():
         )[0]
 
         test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
-        if data_args.intokens and eval_intokens:
+        if eval_intokens:
             test_ds = intoken_dataset(
                 test_ds,
                 tokenizer=tokenizer,
