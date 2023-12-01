@@ -896,8 +896,9 @@ class TrainingArguments:
                     "pp_degree": pipeline_parallel_degree,
                     "order": order,
                     "sharding_degree": sharding_parallel_degree,
-                    "enable_optimizer_timer": self.enable_optimizer_timer,
                 }
+                if self.enable_optimizer_timer:
+                    hybrid_configs["enable_optimizer_timer"] = True
 
                 if pipeline_parallel_degree > 1:
                     hybrid_configs["pp_configs"] = dygraph_pp_configs
