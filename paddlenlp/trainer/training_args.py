@@ -642,6 +642,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "开启moe训练"},
     )
+    enable_optimizer_timer: Optional[bool] = field(
+        default=False,
+        metadata={"help": "是否开启Optimzier的timer"},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -892,6 +896,7 @@ class TrainingArguments:
                     "pp_degree": pipeline_parallel_degree,
                     "order": order,
                     "sharding_degree": sharding_parallel_degree,
+                    "enable_optimizer_timer": self.enable_optimizer_timer,
                 }
 
                 if pipeline_parallel_degree > 1:
