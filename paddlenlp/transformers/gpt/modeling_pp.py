@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import paddle
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import (
@@ -22,6 +22,7 @@ from paddle.distributed.fleet.meta_parallel import (
 from paddle.distributed.fleet.utils import recompute
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
+from paddlenlp.transformers.sequence_parallel_utils import GatherOp
 
 from .modeling import (
     GPTConfig,
@@ -84,6 +85,12 @@ def return_args(hidden_states, attention_mask=None, position_ids=None):
 class GPTEmbeddingPipe(GPTEmbeddings):
     """Extends GPTEmbeddings to forward attention_mask through the pipeline."""
 
+    def __init__(self, config):
+        super(GPTEmbeddingPipe, self).__init__(config)
+        self.bias = paddle.tril(
+            paddle.ones([1, 1, config.max_position_embeddings, config.max_position_embeddings], dtype="int64")
+        )
+
     @property
     def embedding_weight(self):
         return get_attr(self.word_embeddings, "weight")
@@ -92,7 +99,19 @@ class GPTEmbeddingPipe(GPTEmbeddings):
         input_ids, attention_mask, position_ids = parse_args(args)
         input_ids.stop_gradient = True
         embeddings = super().forward(input_ids=input_ids, position_ids=position_ids)
-        return embeddings
+
+        batch_size, seq_length = input_ids.shape
+        causal_mask = self.bias[:, :, 0:seq_length, :seq_length]
+        if attention_mask is not None:
+            if attention_mask.dtype != paddle.int64:
+                attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
+            if len(attention_mask.shape) == 2:
+                attention_mask = attention_mask[:, None, None, :]
+            attention_mask = (1.0 - (attention_mask & causal_mask)) * -1e4
+        else:
+            attention_mask = (1.0 - causal_mask) * -1e4
+
+        return return_args(embeddings, attention_mask, position_ids)
 
 
 class GPTDecoderLayerPipe(GPTDecoderLayer):
@@ -114,6 +133,29 @@ class LayerNormPipe(nn.LayerNorm):
         hidden_states, attention_mask, position_ids = parse_args(args)
         hidden_states = super().forward(hidden_states)
         return hidden_states
+
+
+class GPTLMHeadPipe(GPTEmbeddings):
+    def __init__(self, config):
+        super(GPTLMHeadPipe, self).__init__(config)
+
+    @property
+    def embedding_weight(self):
+        return get_attr(self.word_embeddings, "weight")
+
+    def forward(self, output):
+        if self.config.sequence_parallel:
+            output = GatherOp.apply(output)
+            output = paddle.reshape_(output, [-1, self.config.seq_length, self.config.hidden_size])
+
+        tensor_parallel_output = False if self.config.tensor_parallel_degree > 1 else True
+        output = parallel_matmul(
+            output,
+            self.embedding_weight,
+            transpose_y=True,
+            tensor_parallel_output=tensor_parallel_output,
+        )
+        return output
 
 
 class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
@@ -160,18 +202,8 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             )
 
         self.add_sequential_layer(LayerDesc(LayerNormPipe, config=config), "gpt.decoder.norm")
-
-        def _logits_helper(embedding, output):
-            return parallel_matmul(output, embedding.embedding_weight, True)
-
         self.add_sequential_layer(
-            SharedLayerDesc(
-                "gpt",
-                GPTEmbeddingPipe,
-                forward_func=_logits_helper,
-                shared_weight_attr="embedding_weight",
-                config=config,
-            ),
+            SharedLayerDesc("gpt", GPTLMHeadPipe, shared_weight_attr="embedding_weight", config=config),
             "gpt.embeddings",
         )
 

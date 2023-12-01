@@ -4,15 +4,15 @@ PaddleNLP 中已经添加高性能推理模型相关实现，支持：
 
 | Model                       | Inference Model | PTuning | Wint8 | PTQ |
 |-----------------------------|-----------------|---------|-------|-----|
-| [LLaMA1/2](./llama)         | ✅               | ✅       | ✅     | ✅   |
+| [LLaMA1/2](./llama)         | ✅               | ✅       | ✅     | 🚧   |
 | [ChatGLM](./chatglm)        | ✅               | ✅       | ✅     | ❌   |
 | [ChatGLM2](./chatglm2)      | ✅               | ❌       | ❌     | ❌   |
-| [BaiChuan1](./baichuan)     | ✅               | ✅       | ✅     | ✅   |
-| [BaiChuan2-7B](./baichuan)  | ❌               | ❌       | ❌     | ❌   |
-| [BaiChuan2-13B](./baichuan) | ✅               | ✅       | ✅     | ✅   |
 | [Bloom](./bloom)            | ✅               | ✅       | ✅     | ❌   |
 | [GPT-3](./gpt-3)            | ✅               | ❌       | ❌     | ❌   |
 | [Qwen](./qwen)              | ❌               | ❌       | ❌     | ❌   |
+| [BaiChuan1](./baichuan)     | ✅               | ✅       | ✅     | 🚧   |
+| [BaiChuan2-7B](./baichuan)  | ✅               | ✅       | ✅     | 🚧   |
+| [BaiChuan2-13B](./baichuan) | ❌               | ❌       | ❌     | ❌   |
 
 [TOC]
 
@@ -149,6 +149,49 @@ python predictor.py \
     --quant_type weight_only_int8 \
     --dtype "float16" \
     --mode "static"
+```
+
+## PTQ Int8 推理
+
+这一步依赖PTQ校准产出的量化模型，无须额外设置相关参数。
+### 动态图推理
+```shell
+python predictor.py \
+    --model_name_or_path checkpoints/llama_ptq_ckpts \
+    --dtype float16 \
+    --max_length 1024 \
+    --mode "dynamic" \
+    --inference_model
+```
+
+
+### 静态图推理
+在静态图推理之前需要执行动转静，将模型转化为静态图，命令如下：
+
+* 动转静
+
+```shell
+python export_model.py \
+    --model_name_or_path checkpoints/llama_ptq_ckpts \
+    --output_path ./inference_ptq \
+    --dtype float16 \
+    --inference_model
+```
+
+* 静态图推理
+
+```shell
+# 以下环境变量用于开启int8矩阵乘的算法选择以获得更快的推理速度，打开之后第一次执行会执行算法选择从而导致速度较慢。
+export FLAGS_use_autotune=1
+export FLAGS_cublaslt_exhaustive_search_times=10
+export FLAGS_cache_inference_while_scope=1
+
+python predictor.py \
+    --model_name_or_path ./inference_ptq \
+    --dtype float16 \
+    --max_length 1024 \
+    --mode "static" \
+    --inference_model
 ```
 
 ## 多卡推理

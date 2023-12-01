@@ -183,27 +183,39 @@ def scaled_dot_product_attention(
     output_attentions,
     alibi=None,
     sequence_parallel=False,
-    is_causal=True,
     reshard_layer=None,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention:
-        # Flash Attention now ignore attention mask
-        # Current Flash Attention doesn't support attn maskt
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
-        assert attention_mask is None, "Do not build attention mask for Flash Attention"
-        if alibi is not None:
-            raise ValueError("Flash Attention does not support ALiBi yet")
-        attn_output, attn_weights = flash_attention(
-            query_states,
-            key_states,
-            value_states,
-            causal=is_causal and query_states.shape[1] != 1,
-            return_softmax=output_attentions,
-        )
+
+        version = paddle.version.full_version
+        if version != "0.0.0" and version <= "2.5.2":
+            if alibi is not None:
+                raise ValueError("Flash Attention doesn't support alibi")
+            attn_output, attn_weights = flash_attention(
+                query_states,
+                key_states,
+                value_states,
+                causal=True,
+                return_softmax=output_attentions,
+            )
+        else:
+            if alibi is not None:
+                alibi = alibi.reshape([bsz, num_heads, 1, -1])
+                attention_mask = attention_mask.cast(alibi.dtype) + alibi
+            attn_output = F.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=attention_mask,
+                is_causal=attention_mask is None,
+            )
+            attn_weights = None
+
         if reshard_layer is not None:
             # attn_output shape: [bs, seqlen, num_head/sep, head_dim]
             attn_output = reshard_layer(
@@ -217,6 +229,7 @@ def scaled_dot_product_attention(
             ), f"q_len:{q_len}, config.sep_parallel_degree:{config.sep_parallel_degree}"
             q_len = q_len // config.sep_parallel_degree
             num_heads = num_heads * config.sep_parallel_degree
+
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
@@ -284,6 +297,13 @@ def scaled_dot_product_attention(
 def masked_fill(x, mask, value):
     y = paddle.full(x.shape, value, x.dtype)
     return paddle.where(mask, y, x)
+
+
+def is_casual_mask(attention_mask):
+    """
+    Upper triangular of attention_mask equals to attention_mask is casual
+    """
+    return (paddle.triu(attention_mask) == attention_mask).all().item()
 
 
 def _make_causal_mask(input_ids_shape, past_key_values_length):
@@ -457,8 +477,8 @@ class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
             scale_cos, scale_sin = self._scale_cos_sin(seq_len=seq_len)
         else:
             scale_cos, scale_sin = self.cos_cached, self.sin_cached
-        cos = scale_cos[:, :, :seq_len, ...]
-        sin = scale_sin[:, :, :seq_len, ...]
+        cos = scale_cos[:, :seq_len, :, ...]
+        sin = scale_sin[:, :seq_len, :, ...]
         return (
             cos.cast(x.dtype) if cos.dtype != x.dtype else cos,
             sin.cast(x.dtype) if sin.dtype != x.dtype else sin,
@@ -1299,33 +1319,35 @@ class LlamaModel(LlamaPretrainedModel):
 
         # embed positions
         alibi = None
-        if not (self.config.use_flash_attention and flash_attention):
-            if attention_mask is None:
-                # [bs, seq_len]
-                attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
-            if self.config.alibi:
-                alibi = build_alibi_tensor(attention_mask, self.config.num_attention_heads, dtype=inputs_embeds.dtype)
-                if self.config.tensor_parallel_degree > 1:
-                    block_size = self.config.num_attention_heads // self.config.tensor_parallel_degree
-                    alibi = alibi[
-                        :,
-                        self.config.tensor_parallel_rank
-                        * block_size : (self.config.tensor_parallel_rank + 1)
-                        * block_size,
-                    ]
-                    alibi = alibi.reshape([batch_size * block_size, 1, seq_length_with_past])
-                else:
-                    alibi = alibi.reshape([batch_size * self.config.num_attention_heads, 1, seq_length_with_past])
+        if attention_mask is None:
+            # [bs, seq_len]
+            attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
+        if self.config.alibi:
+            alibi = build_alibi_tensor(attention_mask, self.config.num_attention_heads, dtype=inputs_embeds.dtype)
+            if self.config.tensor_parallel_degree > 1:
+                block_size = self.config.num_attention_heads // self.config.tensor_parallel_degree
+                alibi = alibi[
+                    :,
+                    self.config.tensor_parallel_rank
+                    * block_size : (self.config.tensor_parallel_rank + 1)
+                    * block_size,
+                ]
+                alibi = alibi.reshape([batch_size * block_size, 1, seq_length_with_past])
             else:
-                alibi = None
-
-            attention_mask = self._prepare_decoder_attention_mask(
-                attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
-            )  # [bs, 1, seq_len, seq_len]
+                alibi = alibi.reshape([batch_size * self.config.num_attention_heads, 1, seq_length_with_past])
+        else:
+            alibi = None
 
         if position_ids is None:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
 
+        attention_mask = self._prepare_decoder_attention_mask(
+            attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
+        )  # [bs, 1, seq_len, seq_len]
+        if self.config.use_flash_attention:
+            is_casual = is_casual_mask(attention_mask)
+            if is_casual and alibi is None:
+                attention_mask = None
         hidden_states = inputs_embeds
 
         # decoder layers

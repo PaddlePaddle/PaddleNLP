@@ -40,34 +40,45 @@ from paddleslim.quant.observers.abs_max_weight import (
     AbsMaxChannelWiseWeightObserverLayer,
 )
 from paddleslim.quant.observers.avg import AVGObserverLayer
-from paddleslim.quant.quanters import PACTQuanter
 
 from paddlenlp.peft import PrefixModelForCausalLM
-from paddlenlp.peft.lora import LoRALinear
-from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
+from paddlenlp.peft.lora import (
+    ColumnParallelLoRALinear,
+    LoRALinear,
+    RowParallelLoRALinear,
+)
+from paddlenlp.peft.lora.lora_quant_layers import (
+    ColumnParallelQuantedLoRALinear,
+    QuantedLoRALinear,
+    RowParallelQuantedLoRALinear,
+)
 from paddlenlp.utils.log import logger
 
 
 def create_qat_model(quant_args, model, dtype):
-    # FakeQuanterChannelWiseAbsMaxObserver not yet merge in Paddle develop
-    from paddle.quantization.quanters import FakeQuanterChannelWiseAbsMaxObserver
+    from paddleslim.quant.quanters import (
+        FakeQuanterChannelWiseAbsMaxObserver,
+        PACTQuanter,
+    )
 
     q_config = QuantConfig(activation=None, weight=None)
     q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
-    if quant_args.quant_type == "A8W8":
+    q_config.add_qat_layer_mapping(RowParallelLoRALinear, RowParallelQuantedLoRALinear)
+    q_config.add_qat_layer_mapping(ColumnParallelLoRALinear, ColumnParallelQuantedLoRALinear)
+    if quant_args.quant_type == "a8w8":
         activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
         weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype="float32")
-    elif quant_args.quant_type == "WINT4":
+    elif quant_args.quant_type == "weight_only_int4":
         activation = None
         weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
-    elif quant_args.quant_type == "WINT8":
+    elif quant_args.quant_type == "weight_only_int8":
         activation = None
         weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype="float32")
-    elif quant_args.quant_type == "A8W4":
-        activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
-        weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
     else:
-        raise ValueError("quant_type should be one of ['A8W8', 'WINT4', 'WINT8']")
+        raise ValueError("quant_type should be one of ['a8w8', 'weight_only_int4', 'weight_only_int8']")
+
+    q_config.add_type_config(RowParallelLoRALinear, weight=weight, activation=activation)
+    q_config.add_type_config(ColumnParallelLoRALinear, weight=weight, activation=activation)
     q_config.add_type_config(LoRALinear, weight=weight, activation=activation)
     q_config.add_type_config(nn.Linear, weight=weight, activation=activation)
 
@@ -97,6 +108,7 @@ def apply_shift(quant_args, trainer, ptq_dataloader, ptq_model_config):
 
 
 def apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config):
+
     logger.info("***** Running Smooth *****")
     smooth_sampler = MultiStepSampler() if quant_args.smooth_sampler == "multi_step" else None
     if quant_args.smooth_piecewise_search:
@@ -136,17 +148,17 @@ def apply_ptq(quant_args, trainer, ptq_dataloader):
     logger.info("***** Running PTQ *****")
     q_config = QuantConfig(activation=None, weight=None)
 
-    if quant_args.quant_type == "A8W8":
+    if quant_args.quant_type == "a8w8":
         activation = AVGObserver(quant_bits=8)
         weight = AbsMaxChannelWiseWeightObserver(quant_bits=8)
-    elif quant_args.quant_type == "WINT4":
+    elif quant_args.quant_type == "weight_only_int4":
         activation = None
         weight = AbsMaxChannelWiseWeightObserver(quant_bits=4)
-    elif quant_args.quant_type == "WINT8":
+    elif quant_args.quant_type == "weight_only_int8":
         activation = None
         weight = AbsMaxChannelWiseWeightObserver(quant_bits=8)
     else:
-        raise ValueError("quant_type should be one of ['A8W8', 'WINT4', 'WINT8']")
+        raise ValueError("quant_type should be one of ['a8w8', 'weight_only_int4', 'weight_only_int8']")
 
     q_config.add_qat_layer_mapping(ColumnParallelLinear, QuantizedColumnParallelLinear)
     q_config.add_qat_layer_mapping(RowParallelLinear, QuantizedRowParallelLinear)

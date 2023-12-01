@@ -16,24 +16,35 @@ model_name=${model_name:-"facebook/llama-7b"}
 output_path=${output_path:-"./llm-inference-output"}
 fused_model=${fused_model:-false}
 dtype=${dtype:-"float16"}
+data_file=${data_file:-"tests/fixtures/llm/zh_query.json"}
+decode_strategy=${decode_strategy:-"greedy_search"}
+prefix_path=${prefix_path:-"./llm-inference-output"}
+export_precache=${export_precache:-"./llm-inference-output"}
+top_p=${top_p:-"0.0"}
+benchmark=${benchmark:-"0"}
 
 
-common_arguments="--greedy_search  --src_length 512 --max_length 512 --dtype ${dtype} --batch_size 2"
+common_arguments="--decode_strategy ${decode_strategy} --src_length 300 --max_length 200 --dtype ${dtype} --batch_size 1 --prefix_path ${prefix_path} --export_precache ${export_precache}"
 if [ $fused_model ]; then
-    common_arguments+=" --inference_model"
-done
+    common_arguments+=" --inference_model "
+fi
+common_arguments+="--data_file ${data_file} --top_p ${top_p} --benchmark ${benchmark}"
+
+cd ..
+echo "precache ing"
+set -x
 
 echo "==============================run-dynamic-predictor=============================="
-python predictor.py --model_name_or_path ${model_name} --mode dynamic --output_file ./${output_path}/dynamic.json ${common_arguments}
+python ./llm/predictor.py --model_name_or_path ${model_name} --mode dynamic --output_file ${output_path}/dynamic.json ${common_arguments}
 
 echo "==============================run-export-predictor=============================="
-python export_model.py --model_name_or_path ${model_name} --output_path ${output_path} ${common_arguments}
+python ./llm/export_model.py --model_name_or_path ${model_name} --output_path ${output_path} ${common_arguments}
 
 echo "==============================run-static-predictor=============================="
-python predictor.py --model_name_or_path ${model_name} --mode static --output_file ./${output_path}/static.json ${common_arguments}
+python ./llm/predictor.py --model_name_or_path ${output_path} --mode static --output_file ${output_path}/static.json ${common_arguments}
 
 
 echo "==============================dynamic result=============================="
-cat ./${output_path}/dynamic.json
+cat ${output_path}/dynamic.json
 echo "==============================static result=============================="
-cat ./${output_path}/static.json
+cat ${output_path}/static.json

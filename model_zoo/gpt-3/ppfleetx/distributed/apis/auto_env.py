@@ -77,6 +77,11 @@ class Mesh:
     def mp_degree(self):
         return self._mp_degree
 
+    # TODO(JZ-LIANG) Support SP as an independent mesh axis
+    @property
+    def sp_degree(self):
+        return self._mp_degree
+
     @property
     def pp_degree(self):
         return self._pp_degree
@@ -87,6 +92,11 @@ class Mesh:
 
     @property
     def mp_dim(self):
+        return self._mp_dim
+
+    # TODO(JZ-LIANG) Support SP as an independent mesh axis
+    @property
+    def sp_dim(self):
         return self._mp_dim
 
     def __getitem__(self, idx):

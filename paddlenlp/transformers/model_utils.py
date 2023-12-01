@@ -28,6 +28,7 @@ from functools import partial
 # from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
 
+import aistudio_sdk
 import numpy as np
 import paddle
 import paddle.nn as nn
@@ -53,6 +54,7 @@ from paddlenlp.utils.env import (
     LEGACY_CONFIG_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
+    PYTORCH_WEIGHTS_INDEX_NAME,
     PYTORCH_WEIGHTS_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
@@ -384,7 +386,23 @@ def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conver
         # for local file, we use support_conversion to select paddle or torch weight.
         file_name = PYTORCH_WEIGHTS_NAME if support_conversion else PADDLE_WEIGHTS_NAME
 
-    return cached_file_for_hf_hub(repo_id, file_name, cache_dir, subfolder)
+    file_name_list = [SAFE_WEIGHTS_NAME] + [file_name] + [PYTORCH_WEIGHTS_INDEX_NAME] + [SAFE_WEIGHTS_INDEX_NAME]
+    resolved_file = None
+    for fn in file_name_list:
+        resolved_file = cached_file_for_hf_hub(
+            repo_id, fn, cache_dir, subfolder, _raise_exceptions_for_missing_entries=False
+        )
+        if resolved_file is not None:
+            break
+
+    if resolved_file is None:
+        str_name_list = ", ".join(file_name_list)
+        raise EnvironmentError(
+            f"{repo_id} does not appear to have a file named {str_name_list}. Checkout "
+            f"'https://huggingface.co/{repo_id}' for available files."
+        )
+
+    return resolved_file
 
 
 def register_base_model(cls):
@@ -962,6 +980,17 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         return model
 
+    @classmethod
+    def from_config(cls, config, **kwargs):
+        """
+        All context managers that the model should be initialized under go here.
+
+        Args:
+            dtype (`paddle.dtype`, *optional*):
+                Override the default `paddle.dtype` and load the model under this dtype.
+        """
+        return cls._from_config(config, **kwargs)
+
     @property
     def base_model(self):
         """
@@ -1205,6 +1234,70 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 revision=revision,
                 create_pr=create_pr,
             )
+
+    def save_to_aistudio(
+        self,
+        repo_id,
+        private=True,
+        license="Apache License 2.0",
+        exist_ok=True,
+        safe_serialization=True,
+        subfolder=None,
+        merge_tensor_parallel=False,
+        **kwargs
+    ):
+        """
+        Uploads all elements of this model to a new AiStudio Hub repository.
+        Args:
+            repo_id (str): Repository name for your model/tokenizer in the Hub.
+            token (str): Your token for the Hub.
+            private (bool, optional): Whether the model/tokenizer is set to private. Defaults to True.
+            license (str): The license of your model/tokenizer. Defaults to: "Apache License 2.0".
+            exist_ok (bool, optional): Whether to override existing repository. Defaults to: True.
+            safe_serialization (bool, optional): Whether to save the model in safe serialization way. Defaults to: True.
+            subfolder (str, optional): Push to a subfolder of the repo instead of the root
+            merge_tensor_parallel (bool): Whether to merge the tensor parallel weights. Defaults to False.
+        """
+
+        res = aistudio_sdk.hub.create_repo(repo_id=repo_id, private=private, license=license, **kwargs)
+        if "error_code" in res:
+            if res["error_code"] == 10003 and exist_ok:
+                logger.info(
+                    f"Repo {repo_id} already exists, it will override files with the same name. To avoid this, please set exist_ok=False"
+                )
+            else:
+                logger.error(
+                    f"Failed to create repo {repo_id}, error_code: {res['error_code']}, error_msg: {res['error_msg']}"
+                )
+        else:
+            logger.info(f"Successfully created repo {repo_id}")
+
+        with tempfile.TemporaryDirectory() as root_dir:
+            if subfolder is not None:
+                save_dir = os.path.join(root_dir, subfolder)
+            else:
+                save_dir = root_dir
+            # save model
+            self.save_pretrained(
+                save_dir,
+                shard_format="pipeline",
+                safe_serialization=(is_safetensors_available() and safe_serialization),
+                max_shard_size="5GB",
+                merge_tensor_parallel=merge_tensor_parallel,
+            )
+
+            # Upload model and return
+            logger.info(f"Pushing to the {repo_id}. This might take a while")
+            for filename in os.listdir(save_dir):
+                res = aistudio_sdk.hub.upload(
+                    repo_id=repo_id, path_or_fileobj=os.path.join(save_dir, filename), path_in_repo=filename, **kwargs
+                )
+                if "error_code" in res:
+                    logger.error(
+                        f"Failed to upload {filename}, error_code: {res['error_code']}, error_msg: {res['error_msg']}"
+                    )
+                else:
+                    logger.info(f"{filename}: {res['message']}")
 
     def resize_token_embeddings(self, new_num_tokens: Optional[int] = None) -> nn.Embedding:
         """
@@ -1574,7 +1667,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         low_cpu_mem_usage=False,
         dtype=None,
         keep_in_fp32_modules=None,
-        quantization_config=None,
         quantization_linear_list=None,
     ) -> Tuple[List[str]]:
         """load the state_dict into model, and do the following things:
@@ -1624,7 +1716,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 quantization_linear_list = [".".join([prefix, s]) for s in quantization_linear_list]
 
         # Weight quantization if not yet quantized & update loaded_keys
-        if quantization_config is not None:
+        if config.quantization_config.is_weight_quantize():
             try:
                 from ..utils.quantization import (
                     convert_to_quantize_state_dict,
@@ -1636,7 +1728,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 state_dict = convert_to_quantize_state_dict(
                     state_dict,
                     quantization_linear_list,
-                    config.quantization_config["quant_algo"],
+                    config.quantization_config.weight_quantize_algo,
                     dtype,
                 )
                 loaded_keys = [k for k in state_dict.keys()]
@@ -1730,9 +1822,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 remove_prefix_from_model,
                 ignore_mismatched_sizes,
             )
-            if quantization_config is None:
-                error_msgs = _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
-            else:
+
+            if config.quantization_config.is_weight_quantize():
                 error_msgs = _load_state_dict_into_meta_model(
                     model_to_load,
                     state_dict,
@@ -1743,6 +1834,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     is_safetensors=is_safetensors,
                     keep_in_fp32_modules=keep_in_fp32_modules,
                 )
+            else:
+                error_msgs = _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
         else:
             # Sharded checkpoint or whole but low_cpu_mem_usage==True
 
@@ -1770,13 +1863,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 state_dict = load_state_dict(
                     shard_file,
                     tp_actions if pre_tensor_parallel_split else None,
-                    set(expected_keys) if quantization_config is None else None,
+                    None if config.quantization_config.is_weight_quantize() else set(expected_keys),
                 )
-                if quantization_config is not None:
+                if config.quantization_config.is_weight_quantize():
                     state_dict = convert_to_quantize_state_dict(
                         state_dict,
                         quantization_linear_list,
-                        quantization_config["quant_algo"],
+                        config.quantization_config.weight_quantize_algo,
                         dtype,
                     )
 
@@ -1799,7 +1892,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
                     logger.info("Converted state_dict to Tensor Parallel Format")
 
-                if low_cpu_mem_usage or quantization_config is not None:
+                if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
                     new_error_msgs = _load_state_dict_into_meta_model(
                         model_to_load,
                         state_dict,
@@ -1964,6 +2057,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 return_unused_kwargs=True,
                 **kwargs,
             )
+        if "from_aistudio" in model_kwargs:
+            model_kwargs.pop("from_aistudio")
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
             config.save_pretrained(cache_dir)
 
@@ -1971,7 +2066,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         convert_from_torch = cls.support_conversion(config) and convert_from_torch
         if dtype is None:
             dtype = config.dtype
-        if config.quantization_config is not None:
+
+        if config.quantization_config.is_weight_quantize():
             try:
                 from ..utils.quantization import replace_with_quantization_linear
             except ImportError:
@@ -1985,7 +2081,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config.dtype = dtype
 
         init_contexts = []
-        if low_cpu_mem_usage or config.quantization_config is not None:
+        if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
             # Instantiate model.
             init_contexts.append(no_init_weights(_enable=True))
             if is_paddle_support_lazy_init():
@@ -1995,7 +2091,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             init_contexts.append(dtype_guard(dtype))
 
         # Quantization method requires empty init to avoid unnecessary GPU allocation
-        if config.quantization_config is not None:
+        if config.quantization_config.is_weight_quantize():
             quantization_init_contexts = []
             quantization_init_contexts.append(no_init_weights(_enable=True))
             if is_paddle_support_lazy_init():
@@ -2021,8 +2117,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # load pt weights early so that we know which dtype to init the model under
         if not is_sharded and state_dict is None:
             # Time to load the checkpoint
-            if resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME):
-                if convert_from_torch:
+            if convert_from_torch:
+                if (
+                    resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME)
+                    or resolved_archive_file.endswith(PYTORCH_WEIGHTS_INDEX_NAME)
+                    or resolved_archive_file.endswith(SAFE_WEIGHTS_NAME)
+                    or resolved_archive_file.endswith(SAFE_WEIGHTS_INDEX_NAME)
+                ):
                     # try to get the name-mapping info
                     logger.info(
                         f"Starting to convert pytorch weight file<{resolved_archive_file}> to "
@@ -2030,10 +2131,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
                     state_dict = cls.convert(resolved_archive_file, config, cache_dir)
                 else:
-                    raise ValueError(
-                        f"download the {PYTORCH_WEIGHTS_NAME} weight file, but model<{cls}> "
-                        "don't support conversion from pytorch weight file to paddle weight file "
-                    )
+                    raise ValueError(f"Unexpected file: {resolved_archive_file} for weight conversion.")
             else:
                 # 4. loading non-sharded ckpt from the state dict
                 if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
@@ -2078,9 +2176,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             keep_in_fp32_modules = []
 
         quantization_linear_list = None
-        if config.quantization_config is not None:
+        if config.quantization_config.is_weight_quantize():
             with ContextManagers(quantization_init_contexts):
-                quantization_linear_list = replace_with_quantization_linear(model, **config.quantization_config)
+                quantization_linear_list = replace_with_quantization_linear(
+                    model=model,
+                    quant_algo=config.quantization_config.weight_quantize_algo,
+                    llm_int8_threshold=config.quantization_config.llm_int8_threshold,
+                )
 
         model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
             model=model,
@@ -2093,7 +2195,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             low_cpu_mem_usage=low_cpu_mem_usage,
             dtype=dtype,
             keep_in_fp32_modules=keep_in_fp32_modules,
-            quantization_config=config.quantization_config,
             quantization_linear_list=quantization_linear_list,
         )
 
@@ -2189,9 +2290,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if state_dict is None:
             state_dict = model_to_save.state_dict()
             if config_to_save.tensor_parallel_degree > 1:
-                if config_to_save.quantization_config is not None and merge_tensor_parallel:
+                if not config_to_save.quantization_config.is_support_merge_tensor_parallel() and merge_tensor_parallel:
                     logger.warning(
-                        "Quantization strategy does not support merge tensor parallel, thus we set merge_tensor_parallel to False."
+                        f"Quantization strategy: {config_to_save.quantization_config.weight_quantize_algo} does not support merge tensor parallel, thus we set merge_tensor_parallel to False."
                     )
                     merge_tensor_parallel = False
                 if merge_tensor_parallel:

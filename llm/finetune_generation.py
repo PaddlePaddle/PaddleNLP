@@ -31,6 +31,7 @@ from utils import (
     compute_metrics,
     get_lora_target_modules,
     get_prefix_tuning_params,
+    init_chat_template,
 )
 
 from paddlenlp.data import DataCollatorForSeq2Seq
@@ -80,6 +81,10 @@ def main():
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
 
+    # if using chat_template, data_args.eval_with_do_generation must be false
+    if data_args.chat_template is not None:
+        data_args.eval_with_do_generation = False
+
     # Detecting last checkpoint.
     last_checkpoint = None
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
@@ -118,6 +123,7 @@ def main():
             tensor_parallel_rank=training_args.tensor_parallel_rank,
             use_flash_attention=model_args.use_flash_attention,
             dtype=dtype,
+            from_aistudio=model_args.from_aistudio,
         )
     else:
         model_config = AutoConfig.from_pretrained(
@@ -126,16 +132,38 @@ def main():
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             tensor_parallel_rank=training_args.tensor_parallel_rank,
             dtype=dtype,
+            from_aistudio=model_args.from_aistudio,
         )
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
         model = AutoModelForCausalLM.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
+            from_aistudio=model_args.from_aistudio,
         )
+    if training_args.do_train and model_args.neftune:
+        # Inspired by https://github.com/neelsjain/NEFTune
+        if hasattr(model, "get_input_embeddings"):
+
+            def neft_post_hook(module, input, output):
+                if module.training:
+                    mag_norm = model_args.neftune_noise_alpha / paddle.sqrt(
+                        paddle.to_tensor(output.shape[0] * output.shape[1], dtype="float32")
+                    )
+                    output = output + paddle.uniform(
+                        shape=output.shape, dtype=output.dtype, min=-mag_norm, max=mag_norm
+                    )
+                return output
+
+            neft_post_hook_handle = model.get_input_embeddings().register_forward_post_hook(neft_post_hook)
+        else:
+            raise NotImplementedError("Only support neftune for model with get_input_embeddings")
 
     # Load tokenizer & dataset
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
+    # init chat_template for tokenizer
+    init_chat_template(tokenizer, model_args.model_name_or_path, data_args.chat_template)
+
     if isinstance(tokenizer, LlamaTokenizer):
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
@@ -347,6 +375,8 @@ def main():
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        if model_args.neftune:
+            neft_post_hook_handle.remove()
         if training_args.benchmark:
             total_effective_tokens = (
                 sum([len(i["input_ids"]) for i in trainer.train_dataset]) * training_args.num_train_epochs
@@ -355,6 +385,30 @@ def main():
             logger.info(f"Effective_Tokens_per_second: {effective_tokens_per_second} ")
             logger.info("Benchmark done.")
         else:
+            if model_args.save_to_aistudio:
+                kwargs = {}
+                if model_args.aistudio_token is not None:
+                    kwargs["token"] = model_args.aistudio_token
+                # PEFT Model only save PEFT parameters, if pretrained model obtains from aistudio
+                if model_args.from_aistudio and (model_args.lora or model_args.prefix_tuning):
+                    kwargs["base_model"] = model_args.model_name_or_path
+                else:
+                    trainer.tokenizer.save_to_aistudio(
+                        repo_id=model_args.aistudio_repo_id,
+                        private=model_args.aistudio_repo_private,
+                        license=model_args.aistudio_repo_license,
+                        exist_ok=True,
+                        **kwargs,
+                    )
+                trainer.model.save_to_aistudio(
+                    repo_id=model_args.aistudio_repo_id,
+                    private=model_args.aistudio_repo_private,
+                    license=model_args.aistudio_repo_license,
+                    merge_tensor_parallel=training_args.tensor_parallel_degree > 1,
+                    exist_ok=True,
+                    **kwargs,
+                )
+
             trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
             trainer.log_metrics("train", train_result.metrics)
             trainer.save_metrics("train", train_result.metrics)
@@ -362,13 +416,11 @@ def main():
 
     # QAT
     if quant_args.do_qat:
-        if training_args.tensor_parallel_degree > 1:
-            raise NotImplementedError("Only support qat on single gpu.")
         from quant import create_qat_model
 
         trainer.model = create_qat_model(quant_args, trainer.model, dtype)
         train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
-        trainer.save_model()
+        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
         trainer.log_metrics("qat", train_result.metrics)
         trainer.save_metrics("qat", train_result.metrics)
         trainer.save_state()
@@ -398,6 +450,12 @@ def main():
             logger.info(
                 f"Not found quant.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
             )
+        trainer.model.config.quantization_config.quant_type = quant_args.quant_type
+        trainer.model.config.quantization_config.smooth = quant_args.smooth
+        trainer.model.config.quantization_config.shift = quant_args.shift
+        trainer.model.config.quantization_config.shift_smooth_all_linears = (
+            quant_args.smooth_all_linears or quant_args.shift_all_linears
+        )
         ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
         if quant_args.shift or quant_args.smooth:
             ptq_model_config = get_ptq_model_config(trainer.model)

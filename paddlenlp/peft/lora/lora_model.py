@@ -15,10 +15,12 @@
 import math
 import os
 import re
+import tempfile
 from collections import OrderedDict
 from functools import partial
 from typing import Dict, List, Union
 
+import aistudio_sdk
 import numpy as np
 import paddle
 import paddle.nn as nn
@@ -83,7 +85,9 @@ class LoRAModel(nn.Layer):
             self.lora_config.dtype = paddle.get_default_dtype()
         with dtype_guard(self.lora_config.dtype):
             self.model = self.get_lora_model(model, lora_config)
-        if isinstance(self.model, PipelineLayer):
+        self.is_pipelinemodel = False
+        if issubclass(type(self.model), PipelineLayer):
+            self.is_pipelinemodel = True
             self.model._single_to_pp_mapping = None
         if self.lora_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
             self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
@@ -188,7 +192,12 @@ class LoRAModel(nn.Layer):
             if key in trainable_name_action_mappings:
                 ret = distributed_gather(tensor, group=mp_group, offload=True)
                 action = trainable_name_action_mappings[key]
-                tensor = action(ret) if is_dst else None
+                is_collumn = self.lora_split_mapping[key]
+                if "_scale" in key and not is_collumn and is_dst:
+                    ret = paddle.to_tensor(ret)
+                    tensor = paddle.max(ret, axis=0)
+                else:
+                    tensor = action(ret) if is_dst else None
                 trainable_state_dict[key] = tensor
             else:
                 trainable_state_dict[key] = tensor.cpu().numpy() if is_dst else None
@@ -212,16 +221,14 @@ class LoRAModel(nn.Layer):
         return lora_state_dict
 
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
+        if self.is_pipelinemodel:
+            self.model._single_to_pp_mapping = None
         if self.quantized and merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
             merge_tensor_parallel = False
             logger.warning(
                 "Quantized strategy does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
             )
-        if (
-            isinstance(self.model, PipelineLayer)
-            and merge_tensor_parallel
-            and self.model.config.tensor_parallel_degree > 1
-        ):
+        if self.is_pipelinemodel and merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
             merge_tensor_parallel = False
             logger.warning(
                 "Pipeline parallism does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
@@ -298,6 +305,11 @@ class LoRAModel(nn.Layer):
                 )
                 # Lora column parallel will spilt lora B matrix
                 self.add_lora_split_mapping(module_name + ".lora_B", is_column=True)
+
+                # for lora qat
+                self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=True)
+                self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
+                self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
             elif isinstance(module, RowParallelLinear):
                 # recover the original output_features
                 lora_module = RowParallelLoRALinear(
@@ -312,6 +324,11 @@ class LoRAModel(nn.Layer):
                 )
                 # Lora column parallel will spilt lora A matrix
                 self.add_lora_split_mapping(module_name + ".lora_A", is_column=False)
+
+                # for lora qat
+                self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=False)
+                self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
+                self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
             elif QuantizationLinear is not None and isinstance(module, QuantizationLinear):
                 lora_module = QuantizationLoRALinear(
                     in_features=module.in_features,
@@ -560,3 +577,58 @@ class LoRAModel(nn.Layer):
         for layer in self.model.sublayers():
             layer.training = False
             layer.eval()
+
+    def save_to_aistudio(
+        self,
+        repo_id,
+        private=True,
+        license="Apache License 2.0",
+        exist_ok=True,
+        subfolder=None,
+        merge_tensor_parallel=False,
+        **kwargs
+    ):
+        """
+        Uploads all elements of this model to a new AiStudio Hub repository.
+        Args:
+            repo_id (str): Repository name for your model/tokenizer in the Hub.
+            token (str): Your token for the Hub.
+            private (bool, optional): Whether the model/tokenizer is set to private. Defaults to True.
+            license (str): The license of your model/tokenizer. Defaults to: "Apache License 2.0".
+            exist_ok (bool, optional): Whether to override existing repository. Defaults to: True.
+            subfolder (str, optional): Push to a subfolder of the repo instead of the root
+            merge_tensor_parallel (bool): Whether to merge the tensor parallel weights. Defaults to False.
+        """
+        res = aistudio_sdk.hub.create_repo(repo_id=repo_id, private=private, license=license, **kwargs)
+        if "error_code" in res:
+            if res["error_code"] == 10003 and exist_ok:
+                logger.info(
+                    f"Repo {repo_id} already exists, it will override files with the same name. To avoid this, please set exist_ok=False"
+                )
+            else:
+                logger.error(
+                    f"Failed to create repo {repo_id}, error_code: {res['error_code']}, error_msg: {res['error_msg']}"
+                )
+        else:
+            logger.info(f"Successfully created repo {repo_id}")
+
+        with tempfile.TemporaryDirectory() as root_dir:
+            if subfolder is not None:
+                save_dir = os.path.join(root_dir, subfolder)
+            else:
+                save_dir = root_dir
+            # save model
+            self.save_pretrained(save_dir, merge_tensor_parallel=merge_tensor_parallel)
+
+            # Upload model and return
+            logger.info(f"Pushing to the {repo_id}. This might take a while")
+            for filename in os.listdir(save_dir):
+                res = aistudio_sdk.hub.upload(
+                    repo_id=repo_id, path_or_fileobj=os.path.join(save_dir, filename), path_in_repo=filename, **kwargs
+                )
+                if "error_code" in res:
+                    logger.error(
+                        f"Failed to upload {filename}, error_code: {res['error_code']}, error_msg: {res['error_msg']}"
+                    )
+                else:
+                    logger.info(f"{filename}: {res['message']}")

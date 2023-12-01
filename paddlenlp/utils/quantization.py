@@ -36,7 +36,15 @@ QuantDtypeMapping = {
 
 class QuantizationLinear(nn.Layer):
     def __init__(
-        self, in_features, out_features, quant_algo, dtype, weight_attr=None, scale_attr=None, bias_attr=None, **kwargs
+        self,
+        in_features,
+        out_features,
+        quant_algo,
+        dtype,
+        weight_attr=None,
+        scale_attr=None,
+        bias_attr=None,
+        llm_int8_threshold=6.0,
     ):
         super().__init__()
         self.in_features = in_features
@@ -44,8 +52,7 @@ class QuantizationLinear(nn.Layer):
         self.quant_algo = quant_algo
         self.quant_dtype = QuantDtypeMapping[self.quant_algo]
         self._dtype = dtype
-        if self.quant_algo == "llm.int8":
-            self.llm_int8_threshold = kwargs.pop("llm_int8_threshold", 6.0)
+        self.llm_int8_threshold = llm_int8_threshold
 
         # PaddlePaddle dosen't support Int4 data type, one Int8 data represents two Int4 data.
         # paddle.nn.quant.weight_quantize will transpose in_features and out_features.
@@ -101,7 +108,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
         bias_attr=None,
         gather_output=True,
         mp_group=None,
-        **kwargs
+        llm_int8_threshold=6.0,
     ):
         super().__init__()
         self.in_features = in_features
@@ -109,8 +116,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
         self.quant_algo = quant_algo
         self.quant_dtype = QuantDtypeMapping[self.quant_algo]
         self._dtype = dtype
-        if self.quant_algo == "llm.int8":
-            self.llm_int8_threshold = kwargs.pop("llm_int8_threshold", 6.0)
+        self.llm_int8_threshold = llm_int8_threshold
 
         self.model_parallel_group = (
             tp._HYBRID_PARALLEL_GROUP.get_model_parallel_group() if mp_group is None else mp_group
@@ -214,7 +220,7 @@ class RowParallelQuantizationLinear(nn.Layer):
         bias_attr=None,
         input_is_parallel=False,
         mp_group=None,
-        **kwargs
+        llm_int8_threshold=6.0,
     ):
         super().__init__()
         self.in_features = in_features
@@ -222,8 +228,7 @@ class RowParallelQuantizationLinear(nn.Layer):
         self.quant_algo = quant_algo
         self.quant_dtype = QuantDtypeMapping[self.quant_algo]
         self._dtype = dtype
-        if self.quant_algo == "llm.int8":
-            self.llm_int8_threshold = kwargs.pop("llm_int8_threshold", 6.0)
+        self.llm_int8_threshold = llm_int8_threshold
 
         self.model_parallel_group = (
             tp._HYBRID_PARALLEL_GROUP.get_model_parallel_group() if mp_group is None else mp_group
@@ -321,7 +326,7 @@ class RowParallelQuantizationLinear(nn.Layer):
         return output
 
 
-def replace_with_quantization_linear(model, quant_algo, name_prefix="", **kwargs):
+def replace_with_quantization_linear(model, quant_algo, name_prefix="", llm_int8_threshold=6.0):
     quantization_linear_list = []
     for name, child in model.named_children():
         if isinstance(child, nn.Linear):
@@ -331,7 +336,12 @@ def replace_with_quantization_linear(model, quant_algo, name_prefix="", **kwargs
                 bias_attr = None
 
             model._sub_layers[name] = QuantizationLinear(
-                child.weight.shape[0], child.weight.shape[1], quant_algo, child._dtype, bias_attr=bias_attr, **kwargs
+                child.weight.shape[0],
+                child.weight.shape[1],
+                quant_algo,
+                child._dtype,
+                bias_attr=bias_attr,
+                llm_int8_threshold=llm_int8_threshold,
             )
             del child
             quantization_linear_list.append(name_prefix + name)
@@ -347,7 +357,7 @@ def replace_with_quantization_linear(model, quant_algo, name_prefix="", **kwargs
                 child._dtype,
                 bias_attr=bias_attr,
                 gather_output=child.gather_output,
-                **kwargs,
+                llm_int8_threshold=llm_int8_threshold,
             )
             del child
             quantization_linear_list.append(name_prefix + name)
@@ -363,13 +373,13 @@ def replace_with_quantization_linear(model, quant_algo, name_prefix="", **kwargs
                 child._dtype,
                 bias_attr=bias_attr,
                 input_is_parallel=child.input_is_parallel,
-                **kwargs,
+                llm_int8_threshold=llm_int8_threshold,
             )
             del child
             quantization_linear_list.append(name_prefix + name)
         else:
             quantization_linear_list += replace_with_quantization_linear(
-                child, quant_algo, name_prefix + name + ".", **kwargs
+                child, quant_algo, name_prefix + name + ".", llm_int8_threshold
             )
 
     gc.collect()

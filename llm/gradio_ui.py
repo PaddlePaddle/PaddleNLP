@@ -94,7 +94,7 @@ def launch(args):
             "max_length": max_length,
             "min_length": 1,
         }
-        res = requests.post(f"http://0.0.0.0:{args.flask_port}/api/chat", json=data, stream=True)
+        res = requests.post(f"http://0.0.0.0:{args.base_port}/api/chat", json=data, stream=True)
         for line in res.iter_lines():
             result = json.loads(line)
             bot_response = result["result"]["response"]
@@ -228,7 +228,7 @@ def launch(args):
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
             )
 
-    block.queue(default_enabled=True).launch(server_name="0.0.0.0", server_port=args.port, debug=True)
+    block.queue().launch(server_name="0.0.0.0", server_port=args.port, debug=True)
 
 
 def main(args):

@@ -44,6 +44,12 @@ class DataArgument:
             "help": "Weather to return `MapDataset` or an `IterDataset`.True for `IterDataset`. False for `MapDataset`."
         },
     )
+    chat_template: str = field(
+        default=None,
+        metadata={
+            "help": "the path of `chat_template.json` file to handle multi-rounds conversation. If is None, it will not use `chat_template.json`; If is equal with `model_name_or_path`, it will use the default loading; If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
+        },
+    )
 
 
 @dataclass
@@ -62,11 +68,21 @@ class ModelArgument:
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
     num_prefix_tokens: int = field(default=128, metadata={"help": "Number of prefix tokens"})
 
+    from_aistudio: bool = field(default=False, metadata={"help": "Whether to load model from aistudio"})
+    save_to_aistudio: bool = field(default=False, metadata={"help": "Whether to save model to aistudio"})
+    aistudio_repo_id: str = field(default=None, metadata={"help": "The id of aistudio repo"})
+    aistudio_repo_private: bool = field(default=True, metadata={"help": "Whether to create a private repo"})
+    aistudio_repo_license: str = field(default="Apache License 2.0", metadata={"help": "The license of aistudio repo"})
+    aistudio_token: str = field(default=None, metadata={"help": "The token of aistudio"})
+    neftune: bool = field(default=False, metadata={"help": "Whether to apply NEFT"})
+    neftune_noise_alpha: float = field(default=5.0, metadata={"help": "NEFT noise alpha"})
+
 
 @dataclass
 class QuantArgument:
     quant_type: str = field(
-        default="A8W8", metadata={"help": "Quantization type. Supported values: A8W8, WINT4,WINT8"}
+        default="a8w8",
+        metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"},
     )
 
     # QAT related parameters

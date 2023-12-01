@@ -24,7 +24,7 @@ from utils import CustomTrainer, ProfilerCallback
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import InTokensMapDataset
 from paddlenlp.peft import LoRAConfig, LoRAModel
-from paddlenlp.trainer import PdArgumentParser, TrainingArguments
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments, set_seed
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, GPTForCausalLM
 
 """
@@ -71,7 +71,7 @@ class ModelArguments:
 def main():
     parser = PdArgumentParser((ModelArguments, TrainingArguments))
     model_args, training_args = parser.parse_args_into_dataclasses()
-
+    set_seed(args=training_args)
     # Set the dtype for loading model
     dtype = None
     if training_args.fp16_opt_level == "O2":

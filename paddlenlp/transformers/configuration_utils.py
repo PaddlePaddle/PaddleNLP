@@ -32,7 +32,7 @@ from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import EntryNotFoundError
 
 from .. import __version__
-from ..utils import CONFIG_NAME, LEGACY_CONFIG_NAME
+from ..utils import CONFIG_NAME, LEGACY_CONFIG_NAME, QuantizationConfig
 from ..utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     get_path_from_url_with_filelock,
@@ -452,7 +452,10 @@ class PretrainedConfig:
         self.output_hidden_states = kwargs.pop("output_hidden_states", False)
         self.output_attentions = kwargs.pop("output_attentions", False)
         self.use_cache = kwargs.pop("use_cache", False)
-        self.quantization_config = kwargs.pop("quantization_config", None)
+        if "quantization_config" in kwargs and isinstance(kwargs["quantization_config"], Dict):
+            kwargs["quantization_config"] = QuantizationConfig.from_dict(kwargs["quantization_config"])
+        self.quantization_config = kwargs.pop("quantization_config", QuantizationConfig())
+        self.use_flash_attention = kwargs.pop("use_flash_attention", False)
 
         self.pruned_heads = kwargs.pop("pruned_heads", {})
         self.tie_word_embeddings = kwargs.pop(
@@ -894,6 +897,11 @@ class PretrainedConfig:
 
         # only serialize values that differ from the default config
         for key, value in config_dict.items():
+            if key == "quantization_config":
+                quantization_diff_dict = self.quantization_config.to_diff_dict()
+                if len(quantization_diff_dict) > 0:
+                    serializable_config_dict[key] = quantization_diff_dict
+                continue
             if (
                 key not in default_config_dict
                 or key == "paddlenlp_version"
@@ -916,6 +924,8 @@ class PretrainedConfig:
             output["model_type"] = self.__class__.model_type
         if "_auto_class" in output:
             del output["_auto_class"]
+
+        output["quantization_config"] = self.quantization_config.to_dict()
 
         return output
 

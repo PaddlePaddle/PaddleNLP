@@ -127,9 +127,9 @@ class ChatGLMStackDyBatch(nn.Layer):
         self.world_size = 1
 
         self.use_weight_only = False
-        self.quant_bits = config.quant_bits
-        self.quant_algo = "weight_only_int" + str(self.quant_bits)
-        if self.quant_bits != -1:
+        self.weight_only_quant_bits = config.weight_only_quant_bits
+        self.quant_algo = "weight_only_int" + str(self.weight_only_quant_bits)
+        if self.weight_only_quant_bits != -1:
             self.use_weight_only = True
 
         if self.use_weight_only:
@@ -238,7 +238,7 @@ class ChatGLMStackDyBatch(nn.Layer):
             config.hidden_size,
             config.num_attention_heads,
             4 * config.hidden_size,
-            quant_bits=self.quant_bits,
+            weight_only_quant_bits=self.weight_only_quant_bits,
             activation="gelu",
             num_layers=config.num_layers,
             nranks=config.tensor_parallel_degree,
