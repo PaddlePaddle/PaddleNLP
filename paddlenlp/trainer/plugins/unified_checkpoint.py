@@ -16,6 +16,7 @@ import copy
 import gc
 import json
 import os
+import random
 
 import paddle
 import paddle.distributed as dist
@@ -349,7 +350,7 @@ def load_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe_
     else:
         index_filename, index_filename_master_weights = SAFE_OPTIMIZER_INDEX_NAME, SAFE_MASTER_WEIGHTS_INDEX_NAME
 
-    should_load_master_weights = True
+    # should_load_master_weights = True
     # if hasattr(optimizer, "_create_master_weight"):
     #     should_load_master_weights = True
 
@@ -459,12 +460,6 @@ def load_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe_
             state_dict_master_weight = load_resolved_archive_file(
                 resolved_archive_file_mw, sharded_metadata_mw, expected_keys_mw, is_master_weights=True
             )
-
-    if has_master_weights and should_load_master_weights:
-        for key in list(state_dict_master_weight.keys()):
-            static_name = struct2static_name_mappings[key]
-            returned_optim_state_dict["master_weights"][static_name] = state_dict_master_weight[key]
-            returned_optim_state_dict["master_weights"][static_name].name = "_".join([static_name, "fp32_master_0"])
 
         # rename optimizer param
         for key in list(state_dict_optim.keys()):
@@ -910,6 +905,8 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
 
 def dynamic_load_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
     optim_state_dict = nested_copy(optimizer.state_dict())
+    if "master_weights" in optim_state_dict.keys():
+        optim_state_dict.pop("master_weights")
 
     if safe_serialization:
         index_filename, index_filename_mw = SAFE_OPTIMIZER_INDEX_NAME, SAFE_MASTER_WEIGHTS_INDEX_NAME
@@ -1074,7 +1071,7 @@ def create_send_table(file_keyname_mappings, file_machine_mappings):
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
     local_device_count = int(os.getenv("PADDLE_LOCAL_SIZE"))
     for filename, keys in file_keyname_mappings.items():
-        machine = file_machine_mappings[filename][0]
+        machine = random.choice(file_machine_mappings[filename])
         is_src = (global_rank // local_device_count) == machine
         for i, key in enumerate(keys):
             if is_src and local_rank == i % local_device_count:
