@@ -88,18 +88,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             ), "Expected quant_algo equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
                 self.quant_algo
             )
-
-        if config.tensor_parallel_degree > 1:
-            self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
-                self.vocab_size,
-                self.hidden_size,
-                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
-            )
-        else:
-            self.embed_tokens = nn.Embedding(
-                self.vocab_size,
-                self.hidden_size,
-            )
+        self.embed_tokens = nn.Embedding(
+            self.vocab_size,
+            self.hidden_size,
+        )
 
         # get ring_id
         ring_id = -1
