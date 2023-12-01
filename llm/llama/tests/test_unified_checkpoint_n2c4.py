@@ -107,24 +107,6 @@ def remove_ckpt(ckpt_dir):
         shutil.rmtree(ckpt_dir)
 
 
-# [x] 双机，tp8 暂不支持
-# [ ] 双机，tp4pp2
-# [ ] 双机，tp4dp2
-# [ ] 双机，tp4 shard2 stage1
-# [ ] 双机，tp2 pp4
-# [ ] 双机，tp2 shard4 stage2
-# [ ] 双机，pp8
-# [ ] 双机，pp4dp2
-# [ ] 双机，pp4shard2  stage1
-# [ ] 双机，pp2dp2shard2  stage1
-# [ ] 双机，shard8, stage1
-# [ ] 双机，shard8, stage2
-# [ ] 双机，shard4dp2 stage1
-# [ ] 双机，shard4dp2 stage2
-# [ ] 双机，shard2dp4 stage1
-# [ ] 双机，dp8
-
-
 class TestModelOnN2C4(TestMultipleGpus):
     def setUp(self):
         os.environ.update(environment_variables)

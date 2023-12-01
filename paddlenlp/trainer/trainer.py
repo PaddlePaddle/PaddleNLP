@@ -96,10 +96,6 @@ from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
 from .plugins.unified_checkpoint import (
-    check_unified_checkpoint,
-    check_unified_optimizer,
-    dynamic_load_unified_checkpoint,
-    dynamic_load_unified_optimizer,
     load_unified_checkpoint,
     load_unified_optimizer,
     save_unified_checkpoint,
@@ -508,24 +504,15 @@ class Trainer:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
         if self.args.unified_checkpoint:
-            if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
-                resume_inplace = check_unified_checkpoint(self.model, resume_from_checkpoint, safe_serialization=True)
-                if resume_inplace:
-                    load_unified_checkpoint(
-                        self.args,
-                        self.model,
-                        resume_from_checkpoint,
-                        safe_serialization=True,
-                    )
-                else:
-                    dynamic_load_unified_checkpoint(
-                        self.args,
-                        self.model,
-                        resume_from_checkpoint,
-                        safe_serialization=True,
-                    )
+            if resume_from_checkpoint is not None:
+                load_unified_checkpoint(
+                    self.args,
+                    self.model,
+                    resume_from_checkpoint,
+                    safe_serialization=True,
+                )
                 logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
-                return  # 这个return的位置需要再确认下是否正确.
+                return
 
         if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
             self._load_from_peft_checkpoint(resume_from_checkpoint)
@@ -2265,35 +2252,22 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
-            if self.args.data_parallel_rank == 0:
-                if self.args.unified_checkpoint:
-                    resume_inplace = check_unified_optimizer(
-                        model=self.model,
-                        optimizer=self.optimizer,
-                        resume_from_checkpoint=checkpoint,
-                        safe_serialization=True,
-                    )
-                    if resume_inplace:
-                        opt_state_dict = load_unified_optimizer(
-                            args=self.args,
-                            model=self.model,
-                            optimizer=self.optimizer,
-                            resume_from_checkpoint=checkpoint,
-                            safe_serialization=True,
-                        )
-                    else:
-                        opt_state_dict = dynamic_load_unified_optimizer(
-                            args=self.args,
-                            model=self.model,
-                            optimizer=self.optimizer,
-                            resume_from_checkpoint=checkpoint,
-                            safe_serialization=True,
-                        )
-                else:
+            if not self.args.unified_checkpoint:
+                if self.args.data_parallel_rank == 0:
                     optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
                     path = os.path.join(checkpoint, optimizer_name)
                     if os.path.isfile(path):
                         opt_state_dict = paddle.load(path)
+                else:
+                    opt_state_dict = None
+            else:
+                opt_state_dict = load_unified_optimizer(
+                    args=self.args,
+                    model=self.model,
+                    optimizer=self.optimizer,
+                    resume_from_checkpoint=checkpoint,
+                    safe_serialization=True,
+                )
 
         # broadcast optimizer state in dp group
         opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
