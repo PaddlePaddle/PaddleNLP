@@ -110,7 +110,12 @@ def main():
             raise ValueError("Please specific dtype: --fp16 or --bf16")
     else:
         dtype = "float32"
-
+    quantization_config = dict(
+        weight_quantize_algo=model_args.weight_quantize_algo,
+        weight_blocksize=model_args.weight_blocksize,
+        weight_double_quant=model_args.weight_double_quant,
+        weight_double_quant_block_size=model_args.weight_double_quant_block_size,
+    )
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
             raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
@@ -124,6 +129,7 @@ def main():
             use_flash_attention=model_args.use_flash_attention,
             dtype=dtype,
             from_aistudio=model_args.from_aistudio,
+            quantization_config=quantization_config,
         )
     else:
         model_config = AutoConfig.from_pretrained(
@@ -133,6 +139,7 @@ def main():
             tensor_parallel_rank=training_args.tensor_parallel_rank,
             dtype=dtype,
             from_aistudio=model_args.from_aistudio,
+            quantization_config=quantization_config,
         )
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
