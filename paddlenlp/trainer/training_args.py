@@ -1297,14 +1297,14 @@ class TrainingArguments:
 
     @property
     def dataset_rank(self):
-        if self.use_hybrid_parallel:
+        if self.use_hybrid_parallel or self.use_auto_parallel:
             return max(self.sharding_parallel_degree, 1) * self.data_parallel_rank + self.sharding_parallel_rank
         else:
             return paddle.distributed.get_rank()
 
     @property
     def dataset_world_size(self):
-        if self.use_hybrid_parallel:
+        if self.use_hybrid_parallel or self.use_auto_parallel:
             return max(self.sharding_parallel_degree, 1) * max(self.data_parallel_degree, 1)
         else:
             return paddle.distributed.get_world_size()

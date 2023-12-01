@@ -51,12 +51,12 @@ from .modeling import (
     LlamaNTKScalingRotaryEmbedding,
     LlamaRotaryEmbedding,
     _expand_2d_mask,
-    apply_rotary_pos_emb,
     build_alibi_tensor,
     get_triangle_upper_mask,
     is_casual_mask,
     repeat_kv,
     rms_norm_fused,
+    rotate_half,
 )
 
 try:
@@ -104,6 +104,30 @@ def _make_causal_mask(input_ids_shape, past_key_values_length):
 
     # [bs, 1, tgt_len, tgt_len + past_len]
     return mask[None, None, :, :].expand([batch_size, 1, target_length, target_length + past_key_values_length])
+
+
+def apply_rotary_pos_emb(q, k, cos, sin, position_ids, ipp):
+
+    if position_ids is None:
+        # Note: Only for LlamaForCausalLMPipe model pretraining
+        cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+        sin = sin[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+    else:
+        cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
+        sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
+
+        # fleet.auto.shard_tensor(cos, *get_dist_attr([None, None], ipp))
+        # fleet.auto.shard_tensor(sin, *get_dist_attr([None, None], ipp))
+
+        cos = cos[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
+        sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
+
+        # fleet.auto.shard_tensor(cos, *get_dist_attr(["dp", None, None, None], ipp))
+        # fleet.auto.shard_tensor(sin, *get_dist_attr(["dp", None, None, None], ipp))
+
+    q_embed = (q * cos) + (rotate_half(q) * sin)
+    k_embed = (k * cos) + (rotate_half(k) * sin)
+    return q_embed, k_embed
 
 
 def scaled_dot_product_attention(
@@ -412,7 +436,9 @@ class LlamaAttentionAuto(nn.Layer):
                 )
             else:
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-                query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+                query_states, key_states = apply_rotary_pos_emb(
+                    query_states, key_states, cos, sin, position_ids, self.ipp
+                )
 
         # [bs, seq_len, num_head, head_dim]
         if past_key_value is not None:
@@ -961,10 +987,9 @@ class LlamaForCausalLMAuto(LlamaPretrainedModelAuto):
         super().__init__(config)
         self.config = config
 
-        with paddle.LazyGuard():
-            self.llama = LlamaModelAuto(config)
-            self.lm_head = LlamaLMHeadAuto(config)
-            self.criterion = LlamaPretrainingCriterionAuto(config)
+        self.llama = LlamaModelAuto(config)
+        self.lm_head = LlamaLMHeadAuto(config)
+        self.criterion = LlamaPretrainingCriterionAuto(config)
 
     def get_input_embeddings(self):
         return self.llama.embed_tokens
