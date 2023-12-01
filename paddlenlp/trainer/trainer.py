@@ -1147,11 +1147,9 @@ class Trainer:
         """print timer and clear states"""
         paddle_timer_info = ""
         try:
-            paddle_pipeline_timers = paddle_get_timers()
-            for name, timer in paddle_pipeline_timers.timers.items():
-                elapsed_time = timer.elapsed(reset=False) * 1000.0
+            for name, timer in paddle_get_timers().timers.items():
+                elapsed_time = timer.elapsed(reset=True) * 1000.0
                 paddle_timer_info += f" | {name}: {elapsed_time:.2f}"
-            paddle_pipeline_timers.log(paddle_pipeline_timers.timers.keys(), reset=True)
         except AssertionError:
             pass
 
