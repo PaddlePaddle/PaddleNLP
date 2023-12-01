@@ -22,7 +22,6 @@ import paddle.distributed as dist
 from paddle.distributed import fleet
 from tqdm.auto import tqdm
 
-from paddlenlp import Trainer
 from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
 from paddlenlp.transformers.model_utils import (
     PretrainedModel,
@@ -88,10 +87,13 @@ def save_unified_checkpoint(args, model, output_dir, safe_serialization=False):
     else:
         raise ValueError("Unified checkpoint only supports PretrainedModel")
 
-    optimizer_cls, _ = Trainer.get_optimizer_cls_and_kwargs(args)
-    if hasattr(optimizer_cls, "_create_master_weight"):
-        if "ignore_save_model_weight" in args.unified_checkpoint_config:
-            return
+    should_save_model_weight = True
+    if "ignore_save_model_weight" in args.unified_checkpoint_config:
+        if args.fp16_opt_level == "O2":
+            should_save_model_weight = False
+
+    if not should_save_model_weight:
+        return
 
     config_to_save = None
     state_dict, config_to_save, shard_file, sharded_index = unified_checkpoint_into_shards(
@@ -141,19 +143,13 @@ def load_unified_checkpoint(args, model, resume_from_checkpoint: str, safe_seria
         dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_serialization)
         return
 
-    optimizer_cls, _ = Trainer.get_optimizer_cls_and_kwargs(args)
-    if hasattr(optimizer_cls, "_create_master_weight"):
-        if "ignore_save_model_weight" in args.unified_checkpoint_config:
-            index_filename = (
-                PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
-            )
-
-    resolved_archive_file, sharded_metadata = get_checkpoint_shard_files(
-        pretrained_model_name_or_path=resume_from_checkpoint,
-        index_filename=os.path.join(resume_from_checkpoint, index_filename),
-    )
     if args.dataset_rank == 0:
         index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+        if "ignore_save_model_weight" in args.unified_checkpoint_config:
+            if args.fp16_opt_level == "O2":
+                index_filename = (
+                    PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
+                )
 
         resolved_archive_file, sharded_metadata = get_checkpoint_shard_files(
             pretrained_model_name_or_path=resume_from_checkpoint,
@@ -353,15 +349,15 @@ def load_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe_
     else:
         index_filename, index_filename_master_weights = SAFE_OPTIMIZER_INDEX_NAME, SAFE_MASTER_WEIGHTS_INDEX_NAME
 
-    should_load_master_weights = False
-    if hasattr(optimizer, "_create_master_weight"):
-        should_load_master_weights = True
+    should_load_master_weights = True
+    # if hasattr(optimizer, "_create_master_weight"):
+    #     should_load_master_weights = True
 
-    if not os.path.isexit(os.path.join(resume_from_checkpoint, index_filename_master_weights)):
-        if should_load_master_weights:
-            index_filename_master_weights = (
-                PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
-            )
+    # if not os.path.isexit(os.path.join(resume_from_checkpoint, index_filename_master_weights)):
+    #     if should_load_master_weights:
+    #         index_filename_master_weights = (
+    #             PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+    #         )
 
     resolved_archive_file, sharded_metadata = get_optimizer_shard_files(
         optimizer_path=resume_from_checkpoint,
@@ -605,6 +601,12 @@ def unified_optimizer_into_shards(
 
 def check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serialization=False):
     index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+    if "ignore_save_model_weight" in args.unified_checkpoint_config:
+        if args.fp16_opt_level == "O2":
+            index_filename = (
+                PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
+            )
+
     index_filename = os.path.join(resume_from_checkpoint, index_filename)
 
     if distributed_isfile(index_filename):
