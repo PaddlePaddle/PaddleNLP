@@ -24,6 +24,7 @@ import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
 from paddle import Tensor, nn
+from paddle.autograd import PyLayer
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
@@ -255,11 +256,13 @@ def scaled_dot_product_attention(
                 f" {attn_weights.shape}"
             )
 
+        # In sep mode, the attenion mask should be created in the runtime.
+        if reshard_layer is not None:
+            attention_mask = None
+
         # NOTE: we only call get_triangle_upper_mask under PP setup
         # FIXME ZHUI when we use pipeline parallel, the attention_mask can be None
         # we just make it triangle_upper_mask
-        if reshard_layer is not None:
-            attention_mask = None
         if attention_mask is None:
             attention_mask = get_triangle_upper_mask(attn_weights)
         attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
@@ -1210,7 +1213,6 @@ class LlamaModel(LlamaPretrainedModel):
 
     @staticmethod
     def _prepare_decoder_attention_mask(attention_mask, input_shape, past_key_values_length, dtype):
-        logger.info(f"input_shape:{input_shape}, attention_mask shape:{attention_mask.shape}")
         if attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
             if len(attention_mask.shape) == 2:
@@ -1318,7 +1320,6 @@ class LlamaModel(LlamaPretrainedModel):
             inputs_embeds = ScatterOp.apply(inputs_embeds)
 
         # embed positions
-        alibi = None
         if attention_mask is None:
             # [bs, seq_len]
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
@@ -1354,8 +1355,6 @@ class LlamaModel(LlamaPretrainedModel):
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
-
-        # self.timers("between_emd_attn").stop()
 
         for idx, (decoder_layer) in enumerate(self.layers):
             if output_hidden_states:
@@ -1457,9 +1456,6 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
             loss = paddle.mean(masked_lm_loss)
 
         return loss
-
-
-from paddle.autograd import PyLayer
 
 
 class ConcatSePMaskedLoss(PyLayer):

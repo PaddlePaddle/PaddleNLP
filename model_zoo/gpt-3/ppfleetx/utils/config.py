@@ -51,7 +51,7 @@ def process_dist_config(configs):
     reduce_overlap = sharding_config.setdefault("reduce_overlap", False)
     broadcast_overlap = sharding_config.setdefault("broadcast_overlap", False)
 
-    other_degree =sep_degree * mp_degree * pp_degree * sharding_degree
+    other_degree = sep_degree * mp_degree * pp_degree * sharding_degree
 
     assert nranks % other_degree == 0, "unreasonable config of dist_strategy."
     dp_degree = config.setdefault("dp_degree", nranks // other_degree)

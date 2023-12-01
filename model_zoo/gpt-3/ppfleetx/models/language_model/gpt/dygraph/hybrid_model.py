@@ -59,10 +59,9 @@ from .sequence_parallel_utils import (
 from paddlenlp.transformers.segment_parallel_utils  import ReshardLayer
 
 try:
-    from paddle.nn.functional.flash_attention import flash_attention, flash_attn_unpadded
+    from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
-    flash_attn_unpadded = None
 try:
     from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 except:
@@ -215,8 +214,6 @@ class MultiHeadAttention(nn.Layer):
         self.sep_parallel_degree = env.get_hcg().get_sep_parallel_world_size()
         if self.sep_parallel_degree > 1:
             self.reshard_layer = ReshardLayer()
-        from paddlenlp.trainer.plugins.timer import _Timer
-        self._timer = _Timer("flash_attn")
 
     def _fuse_prepare_qkv(self, query, use_cache=False, cache=None):
         mix_layer = self.qkv_proj(query)
@@ -323,7 +320,7 @@ class MultiHeadAttention(nn.Layer):
         return (out, weights) if self.need_weights else out
 
     def core_attn(self, q, k, v, attn_mask=None):
-        assert self.reshard_layer is None
+        assert self.reshard_layer is None, f"core_attn is not supported with sep"
         perm = [1, 2, 0, 3] if self.sequence_parallel else [0, 2, 1, 3]
         q = tensor.transpose(x=q, perm=perm)
         k = tensor.transpose(x=k, perm=perm)

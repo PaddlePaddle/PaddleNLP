@@ -48,8 +48,6 @@ unset PADDLE_ELASTIC_TIMEOUT
 # export FLAGS_flash_attn_version=v1
 # export USE_FAST_LN=0
 
-export FLAGS_use_flash_attn_unpadded="true"
-
 export PYTHONPATH=../../:$PYTHONPATH
 
 mode="dp"

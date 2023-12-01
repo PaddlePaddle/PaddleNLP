@@ -720,9 +720,10 @@ class Trainer:
                     all_reduce_dtype = "float32"
                 trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
                 paddle.distributed.all_reduce(trainable_numel_tensor)
-                trainable_numel = (
-                    int(trainable_numel_tensor.item()) // self.args.dataset_world_size // self.args.sep_parallel_degree
-                )
+                trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
+                if self.args.sep_parallel_degree > 0:
+                    trainable_numel = trainable_numel // self.args.sep_parallel_degree
+            else:
                 # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
                 # so, the trainable numel is a little bigger than real.
                 logger.info(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
@@ -1769,7 +1770,11 @@ class Trainer:
                 self.optimizer = optimizer
 
         # pure tesnor parallel mode, no pipeline_parallel, no sharding.
-        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and (in_tensor_parallel_mode or in_sep_parallel_mode):
+        if (
+            not in_pipeline_parallel_mode
+            and not in_sharding_parallel_mode
+            and (in_tensor_parallel_mode or in_sep_parallel_mode)
+        ):
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
 
