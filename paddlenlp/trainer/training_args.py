@@ -325,10 +325,6 @@ class TrainingArguments:
             Whether skip profile timer, timer will record time usage of forward/ backward/ step, etc.
         distributed_dataloader (`bool`, *optional*):
             Whether to use distributed dataloader. Default is `False`.
-        job_schedule_profiler_start (`int`, *optional*):
-            The start step of job schedule profiler. Default is `-1`.
-        job_schedule_profiler_end (`int`, *optional*):
-            The end step of job schedule profiler. Default is `-1`.
     """
 
     output_dir: str = field(
@@ -710,16 +706,6 @@ class TrainingArguments:
         metadata={"help": "Whether to unify hybrid parallel checkpoint."},
     )
 
-    job_schedule_profiler_start: Optional[int] = field(
-        default=-1,
-        metadata={"help": "The start step of job schedule profiler."},
-    )
-
-    job_schedule_profiler_end: Optional[int] = field(
-        default=-1,
-        metadata={"help": "The end step of job schedule profiler."},
-    )
-
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
         if env_local_rank != -1 and env_local_rank != self.local_rank and paddle.distributed.get_world_size() > 1:
@@ -1099,8 +1085,6 @@ class TrainingArguments:
                 pipeline.accumulate_steps = self.gradient_accumulation_steps
                 pipeline.micro_batch_size = self.per_device_train_batch_size
                 pipeline.schedule_mode = "1F1B"
-                pipeline.job_schedule_profiler_start = self.job_schedule_profiler_start
-                pipeline.job_schedule_profiler_end = self.job_schedule_profiler_end
 
                 if self.amp_master_grad:
                     warnings.warn("`amp_master_grad` is not supported NOW in AutoParallel!")
