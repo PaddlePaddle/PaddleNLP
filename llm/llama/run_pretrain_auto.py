@@ -451,8 +451,6 @@ def main():
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
 
-    config.num_hidden_layers = 4
-
     print("Final pre-training config:", config)
 
     # Set the dtype for loading model
