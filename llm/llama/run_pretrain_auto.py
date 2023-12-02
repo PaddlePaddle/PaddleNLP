@@ -83,6 +83,14 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
     )
+    job_schedule_profiler_start: int = field(
+        default=-1,
+        metadata={"help": "The step to start job_schedule_profiler."},
+    )
+    job_schedule_profiler_end: int = field(
+        default=-1,
+        metadata={"help": "The step to end job_schedule_profiler."},
+    )
     parallel_mode: str = field(default="hybrid", metadata={"help": ""})
 
 
@@ -443,6 +451,8 @@ def main():
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
 
+    config.num_hidden_layers = 4
+
     print("Final pre-training config:", config)
 
     # Set the dtype for loading model
@@ -546,10 +556,10 @@ def main():
 
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
-            if (step == job_schedule_profiler_start) and training_args.use_auto_parallel:
+            if step == job_schedule_profiler_start:
                 engine.enable_job_schedule_profiler = True
 
-            if (step == job_schedule_profiler_end) and training_args.use_auto_parallel:
+            if step == job_schedule_profiler_end:
                 engine.enable_job_schedule_profiler = False
                 sys.exit()
 
