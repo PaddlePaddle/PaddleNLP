@@ -25,6 +25,7 @@ from typing import List, Optional
 import numpy as np
 import paddle
 import paddle.distributed.auto_parallel as auto
+from paddle.utils.profiler import profiler_range
 
 from paddlenlp.trainer import (
     PdArgumentParser,
@@ -554,12 +555,8 @@ def main():
 
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
-            if step == job_schedule_profiler_start:
-                engine.enable_job_schedule_profiler = True
-
-            if step == job_schedule_profiler_end:
-                engine.enable_job_schedule_profiler = False
-                sys.exit()
+            with profiler_range(step, job_schedule_profiler_start, job_schedule_profiler_end) as enable_profiler:
+                engine.enable_job_schedule_profiler = enable_profiler
 
             outs = engine.run(inputs, mode="train")
 
