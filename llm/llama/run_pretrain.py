@@ -43,6 +43,8 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     register_sequence_parallel_allreduce_hooks,
 )
+from paddlenlp.transformers.model_utils import no_init_weights
+from paddlenlp.transformers.utils import ContextManagers
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
@@ -186,6 +188,10 @@ class ModelArguments:
     recompute_use_reentrant: bool = field(
         default=False,
         metadata={"help": "recompute_use_reentrant"},
+    )
+    skip_post_init_weights: bool = field(
+        default=False,
+        metadata={"help": "skip post_init_weights"},
     )
 
 
@@ -468,7 +474,10 @@ def main():
             dtype=dtype,
         )
     else:
-        model = model_class.from_config(config, dtype=dtype)
+        init_contexts = []
+        init_contexts.append(no_init_weights(_enable=model_args.skip_post_init_weights))
+        with ContextManagers(init_contexts):
+            model = model_class._from_config(config, dtype=dtype)
 
     if model_args.sequence_parallel:
         register_sequence_parallel_allreduce_hooks(

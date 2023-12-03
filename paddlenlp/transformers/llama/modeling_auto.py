@@ -961,10 +961,9 @@ class LlamaForCausalLMAuto(LlamaPretrainedModelAuto):
         super().__init__(config)
         self.config = config
 
-        with paddle.LazyGuard():
-            self.llama = LlamaModelAuto(config)
-            self.lm_head = LlamaLMHeadAuto(config)
-            self.criterion = LlamaPretrainingCriterionAuto(config)
+        self.llama = LlamaModelAuto(config)
+        self.lm_head = LlamaLMHeadAuto(config)
+        self.criterion = LlamaPretrainingCriterionAuto(config)
 
     def get_input_embeddings(self):
         return self.llama.embed_tokens
