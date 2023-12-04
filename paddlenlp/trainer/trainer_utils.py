@@ -36,9 +36,10 @@ import numpy as np
 import paddle
 from paddle.io import IterableDataset
 from paddle.optimizer.lr import LambdaDecay
-
+from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from ..transformers.tokenizer_utils_base import BatchEncoding
 from ..utils.import_utils import is_paddle_cuda_available, is_psutil_available
+from paddle.distributed import fleet
 from ..utils.log import logger
 
 __all__ = [
@@ -52,37 +53,161 @@ __all__ = [
     "get_last_checkpoint",
     "get_scheduler",
     "set_hyrbid_parallel_seed",
+    "init_dist_env"
 ]
 
 
-def set_seed(seed: int = 1234, args=None):
+
+_hcg = None
+
+
+def set_hcg(hcg):
+    global _hcg
+    _hcg = hcg
+
+
+def get_hcg():
+    global _hcg
+    return _hcg
+
+
+def set_seed(seed: int=1234, args=None):
+    # NOTE(shenliang03): For parameter init seed:
+    # seed: dp/mp_undistributed_paramter/sharding is same; others is different
+    # For compute seed(dropout):
+    # global seed: only mp group is same.
+    # local seed: all groups are different
     if args is None:
         random.seed(seed)
         np.random.seed(seed)
         paddle.seed(seed)
+    else:
+        hcg = get_hcg()
+        if paddle.distributed.get_world_size() > 1:
+            # obtain rank message of hybrid parallel
+            if hcg is None:
+                assert False
 
-    if args is not None:
-        if args.use_hybrid_parallel:
-            from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+            mp_rank = hcg.get_model_parallel_rank()
+            mp_size = hcg.get_model_parallel_world_size()
 
-            random.seed(args.seed + args.dataset_rank)
-            np.random.seed(args.seed + args.dataset_rank)
-            paddle.seed(args.seed + args.dataset_rank)
+            pp_rank = hcg.get_stage_id()
+            pp_size = hcg.get_pipe_parallel_world_size()
 
-            # local_seed/ global_seed is used to control dropout in ModelParallel
-            local_seed = args.seed + 59999 + args.tensor_parallel_rank * 10 + args.pipeline_parallel_rank * 1000
-            global_seed = args.seed + 100003 + args.dataset_rank
-            tracker = get_rng_state_tracker()
+            dp_rank = hcg.get_data_parallel_rank()
+            dp_size = hcg.get_data_parallel_world_size()
 
-            if "global_seed" not in tracker.states_:
-                tracker.add("global_seed", global_seed)
-            if "local_seed" not in tracker.states_:
-                tracker.add("local_seed", local_seed)
+            sharding_rank = hcg.get_sharding_parallel_rank()
+            # sharding_size = hcg.get_sharding_parallel_world_size()
         else:
-            random.seed(args.seed)
-            np.random.seed(args.seed)
-            paddle.seed(args.seed)
+            mp_rank, mp_size = 0, 1
+            pp_rank, pp_size = 0, 1
+            dp_rank, dp_size = 0, 1
+            sharding_rank, _ = 0, 1
 
+        # NOTE: the commented seeds are set only for precision validation
+        # seed += 100 * pp_rank
+        random.seed(seed + 100 * pp_rank)
+        np.random.seed(seed + 100 * pp_rank)
+
+        # seed = mp_rank +
+        #        pp_rank * (mp_size) +
+        #        dp_rank * (mp_size * pp_size) +
+        #        sharding_rank * (mp_size * pp_size * dp_size)
+        # seed offset is order to avoid conflicts with the parameter initialization seed
+
+        seed_offset = seed + 1024 + paddle.distributed.get_world_size()
+        global_seed = (
+            seed_offset
+            + pp_rank * (mp_size)
+            + dp_rank * (mp_size * pp_size)
+            + sharding_rank * (mp_size * pp_size * dp_size)
+        )
+
+        seed_offset += paddle.distributed.get_world_size()
+        local_seed = (
+            seed_offset
+            + mp_rank
+            + pp_rank * (mp_size)
+            + dp_rank * (mp_size * pp_size)
+            + sharding_rank * (mp_size * pp_size * dp_size)
+        )
+
+        tracker = get_rng_state_tracker()
+        tracker.add("global_seed", global_seed)
+        tracker.add("local_seed", local_seed)
+
+        paddle.seed(global_seed)
+
+        logger.info("The global seed is set to {} and local seed is set to {}.".format(global_seed, local_seed))
+
+
+def create_hcg(strategy, hcg_name="HybridCommunicateGroup"):
+    if hcg_name == "HybridCommunicateGroup":
+        fleet.init(is_collective=True, strategy=strategy)
+        hcg = fleet.get_hybrid_communicate_group()
+    else:
+        dist.init_parallel_env()
+        hcg = eval("{}".format(hcg_name))(strategy)
+    print("asdfasdf hcg", hcg)
+    return hcg
+
+
+def init_dist_env(
+    tensor_parallel_degree=1, sharding_parallel_degree=1, pipeline_parallel_degree=1, data_parallel_degree=1, seed=1
+):
+
+    strategy = fleet.DistributedStrategy()
+
+    def is_segment_parallel_supported():
+        import inspect
+
+        members = [name for (name, date) in inspect.getmembers(fleet.HybridCommunicateGroup)]
+        return "get_sep_parallel_world_size" in members
+
+    if tensor_parallel_degree == 1 and sharding_parallel_degree == 1:
+        if is_segment_parallel_supported():
+            order = ["pp", "dp", "sharding", "sep", "mp"]
+        else:
+            order = ["pp", "dp", "sharding", "mp"]
+    else:
+        if is_segment_parallel_supported():
+            order = ["dp", "pp", "sharding", "sep", "mp"]
+        else:
+            order = ["dp", "pp", "sharding", "mp"]
+
+    strategy.hybrid_configs = {
+        "dp_degree": data_parallel_degree,
+        "mp_degree": tensor_parallel_degree,
+        "pp_degree": pipeline_parallel_degree,
+        "sharding_degree": sharding_parallel_degree,
+        "order": order,
+    }
+
+    # TODO(wawltor) The inference parallel do not support the pipeline mode
+
+    """
+    if pipeline_parallel_degree > 1:
+        if "sequence_parallel" in config.Model:
+            if config.Model.sequence_parallel:
+                assert config.Global.enable_partial_send_recv is False, (
+                    "if config.Distributed.pp_degree > 1 and config.Model.sequence_parallel is True, "
+                    "config.Global.enable_partial_send_recv should be set False."
+                )
+
+    strategy.pipeline_configs = {
+        "accumulate_steps": config.Global.local_batch_size // config.Global.micro_batch_size,
+        "micro_batch_size": config.Global.micro_batch_size,
+        "enable_partial_send_recv": config.Global.enable_partial_send_recv,
+    }
+    """
+
+    # set control in tensor parallel
+    print("init_dist_env asdfasdfasdf  niuliling")
+    strategy.tensor_parallel_configs = {"tensor_init_seed": seed}
+
+    hcg = create_hcg(strategy)
+    set_hcg(hcg)
 
 class ExplicitEnum(Enum):
     """
@@ -934,19 +1059,4 @@ class RemoveColumnsCollator:
 
 
 def set_hyrbid_parallel_seed(basic_seed, dataset_rank, tp_rank, pp_rank=0):
-    from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
-
-    random.seed(basic_seed + dataset_rank)
-    np.random.seed(basic_seed + dataset_rank)
-    paddle.seed(basic_seed + dataset_rank)
-
-    # local_seed/ global_seed is used to control dropout in ModelParallel
-    local_seed = basic_seed + 59999 + tp_rank * 10 + pp_rank * 1000
-    global_seed = basic_seed + 100003 + dataset_rank
-
-    tracker = get_rng_state_tracker()
-
-    if "global_seed" not in tracker.states_:
-        tracker.add("global_seed", global_seed)
-    if "local_seed" not in tracker.states_:
-        tracker.add("local_seed", local_seed)
+    set_seed(basic_seed)

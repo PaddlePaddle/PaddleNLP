@@ -41,13 +41,6 @@ from ..model_outputs import (
     TokenClassifierOutput,
 )
 from ..model_utils import dy2st_nocheck_guard_context
-from ..sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    GatherOp,
-    RowSequenceParallelLinear,
-    ScatterOp,
-    mark_as_sequence_parallel_parameter,
-)
 from .configuration import (
     GPT_PRETRAINED_INIT_CONFIGURATION,
     GPT_PRETRAINED_RESOURCE_FILES_MAP,
@@ -183,19 +176,12 @@ class MultiHeadAttention(nn.Layer):
 
         self.num_attention_heads = config.num_attention_heads  # default, without tensor parallel
 
-        if config.sequence_parallel:
-            ColumnParallelLinear = ColumnSequenceParallelLinear
-            RowParallelLinear = RowSequenceParallelLinear
-        else:
-            ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-            RowParallelLinear = fleet.meta_parallel.RowParallelLinear
-
         if config.tensor_parallel_degree > 1:
             assert config.num_attention_heads % config.tensor_parallel_degree == 0
             self.num_attention_heads = config.num_attention_heads // config.tensor_parallel_degree
 
             if config.fuse_attention_qkv:
-                self.qkv_proj = ColumnParallelLinear(
+                self.qkv_proj = fleet.meta_parallel.ColumnParallelLinear(
                     config.hidden_size,
                     3 * config.hidden_size,
                     has_bias=True,
@@ -203,7 +189,7 @@ class MultiHeadAttention(nn.Layer):
                     fuse_matmul_bias=config.fused_linear,
                 )
             else:
-                self.q_proj = ColumnParallelLinear(
+                self.q_proj = fleet.meta_parallel.ColumnParallelLinear(
                     config.hidden_size,
                     config.hidden_size,
                     has_bias=True,
@@ -211,7 +197,7 @@ class MultiHeadAttention(nn.Layer):
                     fuse_matmul_bias=config.fused_linear,
                 )
 
-                self.k_proj = ColumnParallelLinear(
+                self.k_proj = fleet.meta_parallel.ColumnParallelLinear(
                     config.hidden_size,
                     config.hidden_size,
                     has_bias=True,
@@ -219,7 +205,7 @@ class MultiHeadAttention(nn.Layer):
                     fuse_matmul_bias=config.fused_linear,
                 )
 
-                self.v_proj = ColumnParallelLinear(
+                self.v_proj = fleet.meta_parallel.ColumnParallelLinear(
                     config.hidden_size,
                     config.hidden_size,
                     has_bias=True,
@@ -227,7 +213,7 @@ class MultiHeadAttention(nn.Layer):
                     fuse_matmul_bias=config.fused_linear,
                 )
 
-            self.out_proj = RowParallelLinear(
+            self.out_proj = fleet.meta_parallel.RowParallelLinear(
                 config.hidden_size,
                 config.hidden_size,
                 has_bias=True,
@@ -245,16 +231,10 @@ class MultiHeadAttention(nn.Layer):
             self.out_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
 
     def _fuse_prepare_qkv(self, query, use_cache=False, past_key_value=None):
-        if self.config.sequence_parallel:
-            # [bs, seq_len, num_head * head_dim] -> [bs / n, seq_len, num_head, head_dim] (n is model parallelism)
-            target_shape = [-1, self.config.seq_length, self.num_attention_heads, 3 * self.head_dim]
-        else:
-            target_shape = [0, 0, self.num_attention_heads, 3 * self.head_dim]
-
         # bs, seq_len, num_head * 3*head_dim
         mix_layer = self.qkv_proj(query)
         # bs, seq_len, num_head, 3*head_dim
-        mix_layer = paddle.reshape_(mix_layer, target_shape)
+        mix_layer = paddle.reshape_(mix_layer, [0, 0, self.num_attention_heads, 3 * self.head_dim])
         # query_states, key_states, value_states => bs, seq_len, num_head, head_dim
         query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
 
@@ -276,23 +256,17 @@ class MultiHeadAttention(nn.Layer):
         to reduce redundant calculations.
 
         """
-        if self.config.sequence_parallel:
-            # [bs, seq_len, num_head * head_dim] -> [bs/n, seq_len, num_head * head_dim] (n is model parallelism)
-            target_shape = [-1, self.config.seq_length, self.num_attention_heads, self.head_dim]
-        else:
-            target_shape = [0, 0, self.num_attention_heads, self.head_dim]
-
         query_states = self.q_proj(query)
         # [bs, seq_len, num_head, head_dim]
-        query_states = tensor.reshape(x=query_states, shape=target_shape)
+        query_states = tensor.reshape(x=query_states, shape=[0, 0, self.num_attention_heads, self.head_dim])
 
         key_states = self.k_proj(key)
         # [bs, seq_len, num_head, head_dim]
-        key_states = tensor.reshape(x=key_states, shape=target_shape)
+        key_states = tensor.reshape(x=key_states, shape=[0, 0, self.num_attention_heads, self.head_dim])
 
         value_states = self.v_proj(value)
         # [bs, seq_len, num_head, head_dim]
-        value_states = tensor.reshape(x=value_states, shape=target_shape)
+        value_states = tensor.reshape(x=value_states, shape=[0, 0, self.num_attention_heads, self.head_dim])
 
         # [bs, seq_len, num_head, head_dim]
         if past_key_value is not None:
@@ -334,11 +308,12 @@ class MultiHeadAttention(nn.Layer):
         if not paddle.is_compiled_with_cuda():
             attention_mask = get_triangle_upper_mask(product, attention_mask)
 
-        if attention_mask is not None:
-            product = product + attention_mask
-            weights = F.softmax(product)
-        else:
-            weights = incubate.softmax_mask_fuse_upper_triangle(product)
+        #if attention_mask is not None:
+        #    product = product + attention_mask
+        #    weights = F.softmax(product)
+        #else:
+        #    weights = incubate.softmax_mask_fuse_upper_triangle(product)
+        weights = incubate.softmax_mask_fuse_upper_triangle(product)
 
         if self.config.attention_probs_dropout_prob:
             with seed_guard_context("local_seed"):
@@ -394,17 +369,8 @@ class MultiHeadAttention(nn.Layer):
         else:
             out = outputs
 
-        # if sequence_parallel is true, out shape are [bs, seq_len, num_head * head_dim / n]
-        # else their shape are [bs, q_len, num_head * head_dim / n], n is mp parallelism.
-
-        if self.config.sequence_parallel:
-            bs, seq_len, dim = out.shape
-            out = out.reshape([bs * seq_len, dim])  # [bs, seq_len, dim / n] => [bs * seq_len, dim / n]
-
         # project to output
         out = self.out_proj(out)
-        # if sequence_parallel is true, out shape are [bs * seq_len / n, dim]
-        # else their shape are [bs, seq_len, dim], n is mp parallelism.
 
         outs = [out]
         if output_attentions:
@@ -426,12 +392,7 @@ class TransformerDecoder(nn.Layer):
         self.layers = decoder_layers
         self.norm = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
 
-        if config.sequence_parallel:
-            mark_as_sequence_parallel_parameter(self.norm.weight)
-            mark_as_sequence_parallel_parameter(self.norm.bias)
-
-        # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
-        # Enable_recompute defaults to False and is controlled by Trainer
+        # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
 
     @paddle.jit.not_to_static
@@ -479,9 +440,6 @@ class TransformerDecoder(nn.Layer):
         provided, also applies layer normalization on the output of last decoder
         layer.
         """
-
-        # [bs * seq_len, embed_dim] -> [seq_len * bs / n, embed_dim] (sequence_parallel)
-
         output = hidden_states
         all_self_attentions = () if output_attentions else None
         all_hidden_states = () if output_hidden_states else None
@@ -490,7 +448,7 @@ class TransformerDecoder(nn.Layer):
         for i, mod in enumerate(self.layers):
             has_gradient = not output.stop_gradient
             # def forward(self, hidden_states, attention_mask=None, use_cache=False, past_key_value=None, output_attentions=False):
-            if self.enable_recompute and has_gradient and self.config.recompute_granularity == "full_attn":
+            if self.enable_recompute and has_gradient:
                 outputs = self.recompute_training(
                     layer_module=mod,
                     hidden_states=output,
@@ -555,23 +513,15 @@ class GPTDecoderLayer(nn.Layer):
 
         self.self_attn = MultiHeadAttention(config=config)
 
-        if config.sequence_parallel:
-            ColumnParallelLinear = ColumnSequenceParallelLinear
-            RowParallelLinear = RowSequenceParallelLinear
-        else:
-            ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-            RowParallelLinear = fleet.meta_parallel.RowParallelLinear
-
-        # TODO:config.fuse_attention_ffn @DrownFish19
         if config.tensor_parallel_degree > 1:
-            self.linear1 = ColumnParallelLinear(
+            self.linear1 = fleet.meta_parallel.ColumnParallelLinear(
                 config.hidden_size,
                 config.intermediate_size,
                 gather_output=False,
                 has_bias=True,
                 fuse_matmul_bias=self.config.fused_linear,
             )
-            self.linear2 = RowParallelLinear(
+            self.linear2 = fleet.meta_parallel.RowParallelLinear(
                 config.intermediate_size,
                 config.hidden_size,
                 input_is_parallel=True,
@@ -584,11 +534,6 @@ class GPTDecoderLayer(nn.Layer):
 
         self.norm1 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
         self.norm2 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
-        if config.sequence_parallel:
-            mark_as_sequence_parallel_parameter(self.norm1.weight)
-            mark_as_sequence_parallel_parameter(self.norm1.bias)
-            mark_as_sequence_parallel_parameter(self.norm2.weight)
-            mark_as_sequence_parallel_parameter(self.norm2.bias)
 
         if config.use_fused_dropout_add:
             self.fused_dropout_add1 = FusedDropoutAdd(config.attention_probs_dropout_prob, mode="upscale_in_train")
@@ -605,8 +550,6 @@ class GPTDecoderLayer(nn.Layer):
     def forward(
         self, hidden_states, attention_mask=None, use_cache=False, past_key_value=None, output_attentions=False
     ):
-        # when sequence_parallel=True:
-        # hidden_states => [bs * seq_len / n, embed_dim]
         residual = hidden_states
 
         if self.config.normalize_before:
@@ -633,8 +576,6 @@ class GPTDecoderLayer(nn.Layer):
             hidden_states = self.self_attn(
                 hidden_states, None, None, attention_mask, use_cache, past_key_value, output_attentions
             )
-        # when sequence_parallel=True:
-        # hidden_states => [bs * seq_len / n, embed_dim]
         incremental_cache = hidden_states[-1] if use_cache else None
         attention_weights = hidden_states[1] if output_attentions else None
         hidden_states = hidden_states[0] if (use_cache or output_attentions) else hidden_states
@@ -652,8 +593,6 @@ class GPTDecoderLayer(nn.Layer):
         if self.config.normalize_before:
             hidden_states = self.norm2(hidden_states)
 
-        # when sequence_parallel=True:
-        # hidden_states => [bs * seq_len / n, embed_dim]
         with seed_guard_context("global_seed"):
             if not self.config.use_fused_dropout_add:
                 hidden_states = residual + self.dropout2(
@@ -723,13 +662,6 @@ class GPTEmbeddings(nn.Layer):
 
         position_embeddings = self.position_embeddings(position_ids)
         embeddings = inputs_embeddings + position_embeddings
-
-        if self.config.sequence_parallel:
-            bs, seq_len, hidden_size = embeddings.shape
-            # [bs, seq_len, dim] -> [bs * seq_len, dim]
-            embeddings = paddle.reshape_(embeddings, [bs * seq_len, hidden_size])
-            # [bs * seq_len / n, dim] (n is mp parallelism)
-            embeddings = ScatterOp.apply(embeddings)
         embeddings = self.dropout(embeddings)
 
         return embeddings
@@ -877,6 +809,10 @@ class GPTPretrainedModel(PretrainedModel):
 
     def _init_weights(self, layer):
         """Initialization hook"""
+        if self.config.tensor_parallel_degree > 1:
+            rng_tracker = get_rng_state_tracker().rng_state
+        else:
+            rng_tracker = contextlib.nullcontext
         if isinstance(
             layer,
             (
@@ -885,20 +821,27 @@ class GPTPretrainedModel(PretrainedModel):
                 fleet.meta_parallel.VocabParallelEmbedding,
                 fleet.meta_parallel.ColumnParallelLinear,
                 fleet.meta_parallel.RowParallelLinear,
-                ColumnSequenceParallelLinear,
-                RowSequenceParallelLinear,
             ),
         ):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
-            if isinstance(layer.weight, paddle.Tensor):
-                layer.weight.set_value(
-                    paddle.tensor.normal(
-                        mean=0.0,
-                        std=self.config.initializer_range,
-                        shape=layer.weight.shape,
+            if isinstance(layer.weight, paddle.Tensor): 
+                if layer.weight.is_distributed :
+                    with rng_tracker():
+                            dtype = paddle.get_default_dtype()
+                            paddle.set_default_dtype('float32') #在defualt dtype为bfloat16的情况下调用randn会报错，实际上randn已经支bfloat16了      API检测层面的错误。
+                            layer.weight.set_value(
+                                paddle.randn(layer.weight.shape, dtype=dtype).scale(self.config.initializer_range)
+                            )
+                            paddle.set_default_dtype(dtype)
+                else :
+                    layer.weight.set_value(
+                        paddle.tensor.normal(
+                            mean=0.0,
+                            std=self.config.initializer_range,
+                            shape=layer.weight.shape,
+                        )
                     )
-                )
         # Layer.apply is DFS https://github.com/PaddlePaddle/Paddle/blob/a6f5021fcc58b21f4414bae6bf4731ef6971582c/python/paddle/nn/layer/layers.py#L527-L530
         # sublayer is init first
         # scale RowParallelLinear weight
@@ -1106,9 +1049,6 @@ class GPTModel(GPTPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         """
-
-        if self.config.sequence_parallel and use_cache:
-            raise ValueError("We currently only support sequence parallel without cache.")
 
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
@@ -1341,10 +1281,6 @@ class GPTLMHead(nn.Layer):
                 self.weight.split_axis = 0
 
     def forward(self, hidden_states, tensor_parallel_output=None):
-        if self.config.sequence_parallel:
-            hidden_states = GatherOp.apply(hidden_states)
-            hidden_states = paddle.reshape_(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
-
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
