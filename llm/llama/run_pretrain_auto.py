@@ -25,6 +25,9 @@ from typing import List, Optional
 import numpy as np
 import paddle
 import paddle.distributed.auto_parallel as auto
+from paddle.io import DataLoader, BatchSampler, DistributedBatchSampler 
+from paddle.distributed import fleet
+import paddle.distributed as dist
 
 from paddlenlp.trainer import (
     PdArgumentParser,
@@ -371,6 +374,14 @@ def init_seed(seed: int = 1234, args=None):
             np.random.seed(args.seed)
             paddle.seed(args.seed)
 
+def get_mesh(pp_idx=0):
+    mesh = fleet.auto.get_mesh()
+    if "pp" in mesh.dim_names:
+        mesh = mesh.get_mesh_with_dim("pp")[pp_idx]
+    return mesh
+
+def shard_fn(layer, mesh_idx, placements):
+    layer.weight = dist.shard_tensor(layer.weight, get_mesh(mesh_idx), placements)
 
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
@@ -455,13 +466,27 @@ def main():
 
     model = model_class._from_config(config, dtype=dtype)
 
-    if training_args.recompute:
+    # add shard_layer here
+    pp_stage = 0
+    for name, layer in model.named_sublayers(include_self=False):
+        print(name, "==>", type(layer))
 
-        def fn(layer):
-            if hasattr(layer, "enable_recompute") and (layer.enable_recompute is False or layer.enable_recompute == 0):
-                layer.enable_recompute = True
+        if hasattr(layer, "ipp"):
+            pp_stage = layer.ipp
+        if "embed_tokens" in name:
+            # embedding only support column split now. it will update in the future
+            shard_fn(layer, 0, [dist.Replicate(), dist.Shard(1)])
+        for n in ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.qkv_proj", "gate_proj", "up_proj", "gate_up_fused_proj"]:
+            if n in name:
+                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(1)])
+                break
+        for n in ["self_attn.o_proj", "down_proj"]:
+            if n in name:
+                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(0)])
+                break
 
-        model.apply(fn)
+        if "lm_head" in name:
+            shard_fn(layer, -1, [dist.Replicate(), dist.Shard(1)])
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
@@ -505,28 +530,24 @@ def main():
                              * training_args.data_parallel_degree
     print_config(training_args)
 
-    engine = auto.Engine(model, loss_func, optimizer, strategy=training_args.strategy)
-    engine.prepare(
-        [
-            paddle.static.InputSpec(
-                shape=[total_train_batch_size, data_args.max_seq_length], dtype="int64", name="input_ids"
-            ),
-            paddle.static.InputSpec(
-                shape=[total_train_batch_size, data_args.max_seq_length], dtype="int64", name="labels"
-            ),
-        ],
-        mode="train",
-    )
+    # create sampler and dataloader
+    # each rank read (training_args.per_device_train_batch_size * training_args.data_parallel_degree) samples
+    print("dp_rank: ", dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree))
+    train_sampler = DistributedBatchSampler(
+            train_dataset,
+            batch_size=training_args.per_device_train_batch_size,
+            shuffle=True,
+            num_replicas=training_args.data_parallel_degree,
+            rank=dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree),
+            drop_last=training_args.dataloader_drop_last,
+        )
 
-    train_dataloader = engine.dataloader(
-        dataset=train_dataset,
-        batch_size=total_train_batch_size,
-        steps_per_epoch=training_args.max_steps,
-        epochs=training_args.num_train_epochs,
-        collate_fn=data_collator,
-        num_workers=training_args.dataloader_num_workers,
-        mode="train",
-    )
+    train_dataloader = DataLoader(
+            train_dataset,
+            batch_sampler=train_sampler,
+            collate_fn=data_collator,
+            num_workers=training_args.dataloader_num_workers,
+        )
 
     num_update_steps_per_epoch = len(train_dataloader) // training_args.gradient_accumulation_steps
     num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
@@ -538,8 +559,41 @@ def main():
     global_step_last_logged = 0
     start_time_last_logged = time.time()
     tr_loss = float(0)
+
+    model.train()
+    optimizer = dist.shard_optimizer(optimizer)
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
+            print(inputs.keys())
+            input_ids, labels = inputs["input_ids"], inputs["labels"]
+            res = model(input_ids, labels=labels)
+
+            # add criterion in the future.
+            tr_loss_step = res[0] 
+            
+            if training_args.gradient_accumulation_steps > 1:
+                tr_loss_step /= training_args.gradient_accumulation_steps
+
+            # do backward every micro step.
+            tr_loss_step.backward()
+
+            tr_loss += tr_loss_step
+
+            if global_step > 0 and global_step % training_args.gradient_accumulation_steps == 0:
+                optimizer.step()
+                lr_scheduler.step()
+                optimizer.clear_grad()
+                tr_loss = 0
+
+            global_step += 1
+            if global_step // training_args.gradient_accumulation_steps >= 10:
+                sys.exit(0)
+
+    '''
+    for epoch_idx in range(num_train_epochs):
+        for step, inputs in enumerate(train_dataloader):
+            print(inputs.keys())
+            print(1/0)
             outs = engine.run(inputs, mode="train")
 
             if "loss" in outs:
@@ -578,6 +632,7 @@ def main():
 
             if step >= training_args.max_steps:
                 break
+    '''
 
 
 if __name__ == "__main__":
