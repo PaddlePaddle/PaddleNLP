@@ -196,9 +196,9 @@ def load_unified_checkpoint(args, model, resume_from_checkpoint: str, safe_seria
             state_dict = model.convert_tensor_parallel(
                 None, model.config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
             )
-        if "ignore_save_model_weight" in args.unified_checkpoint_config:
-            # confirm parameter cast is executed on the same device as model
-            state_dict = nested_copy_place(state_dict, place=paddle.framework._current_expected_place())
+
+        # confirm parameter cast is executed on the same device as model
+        state_dict = nested_copy_place(state_dict, place=paddle.framework._current_expected_place())
         error_msgs += _load_state_dict_into_model(model, state_dict, "")
 
         # force memory release
@@ -360,8 +360,9 @@ def load_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe_
     if len(resolved_archive_file) > 1:
         resolved_archive_file = tqdm(resolved_archive_file, desc="Loading optimizer shards")
 
+    need_master_weights = args.fp16_opt_level == "O2"
     if "master_weight_compatible" in args.unified_checkpoint_config:
-        if args.fp16_opt_level == "O2":
+        if need_master_weights:
             if has_master_weights:
                 pass
             else:
