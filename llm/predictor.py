@@ -177,6 +177,7 @@ class BasePredictor:
                 source = [source] if isinstance(source, str) else source
                 source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
+        print(source)
         tokenized_source = self.tokenizer(
             source,
             max_length=self.config.src_length,
@@ -689,7 +690,11 @@ def create_predictor(
 ):
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
     # init chat_template for tokenizer
-    init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
+    if predictor_args.chat_template is not None:
+        if predictor_args.chat_template == "None":
+            tokenizer.chat_template = None
+        else:
+            init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
 
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer) and not tokenizer.pad_token:
