@@ -25,6 +25,7 @@ import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
+from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 
 try:
@@ -1049,6 +1050,8 @@ class LlamaPretrainedModel(PretrainedModel):
 
     def _init_weights(self, layer):
         """Initialization hook"""
+        if self.config.tensor_parallel_degree > 1:
+            rng_tracker = get_rng_state_tracker().rng_state
         if isinstance(
             layer,
             (
@@ -1065,15 +1068,27 @@ class LlamaPretrainedModel(PretrainedModel):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
-                layer.weight.set_value(
-                    paddle.tensor.normal(
-                        mean=0.0,
-                        std=self.config.initializer_range
-                        if hasattr(self.config, "initializer_range")
-                        else self.llama.config.initializer_range,
-                        shape=layer.weight.shape,
+                if layer.weight.is_distributed:
+                    with rng_tracker():
+                        layer.weight.set_value(
+                            paddle.tensor.normal(
+                                mean=0.0,
+                                std=self.config.initializer_range
+                                if hasattr(self.config, "initializer_range")
+                                else self.llama.config.initializer_range,
+                                shape=layer.weight.shape,
+                            )
+                        )
+                else:
+                    layer.weight.set_value(
+                        paddle.tensor.normal(
+                            mean=0.0,
+                            std=self.config.initializer_range
+                            if hasattr(self.config, "initializer_range")
+                            else self.llama.config.initializer_range,
+                            shape=layer.weight.shape,
+                        )
                     )
-                )
         # Layer.apply is DFS https://github.com/PaddlePaddle/Paddle/blob/a6f5021fcc58b21f4414bae6bf4731ef6971582c/python/paddle/nn/layer/layers.py#L527-L530
         # sublayer is init first
         # scale RowParallelLinear weight
