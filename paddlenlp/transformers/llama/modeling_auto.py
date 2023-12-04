@@ -54,7 +54,6 @@ from .modeling import (
     apply_rotary_pos_emb,
     build_alibi_tensor,
     get_triangle_upper_mask,
-    is_casual_mask,
     repeat_kv,
     rms_norm_fused,
 )
@@ -823,9 +822,8 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
         if self.config.use_flash_attention:
-            is_casual = is_casual_mask(attention_mask)
-            if is_casual and alibi is None:
-                attention_mask = None
+            # attention_mask in flash_attn is always None for pretrain
+            attention_mask = None
         hidden_states = inputs_embeds
 
         # decoder layers
