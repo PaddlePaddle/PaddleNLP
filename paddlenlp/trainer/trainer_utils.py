@@ -136,10 +136,10 @@ def set_seed(seed: int = 1234, args=None):
         )
 
         tracker = get_rng_state_tracker()
-        if "global_seed" not in self.states_:
+        if "global_seed" not in tracker.states_:
             tracker.add("global_seed", global_seed)
 
-        if "local_seed" not in self.states_:
+        if "local_seed" not in tracker.states_:
             tracker.add("local_seed", local_seed)
 
         paddle.seed(global_seed)
@@ -1065,4 +1065,19 @@ class RemoveColumnsCollator:
 
 
 def set_hyrbid_parallel_seed(basic_seed, dataset_rank, tp_rank, pp_rank=0):
-    set_seed(basic_seed)
+    from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+
+    random.seed(basic_seed + dataset_rank)
+    np.random.seed(basic_seed + dataset_rank)
+    paddle.seed(basic_seed + dataset_rank)
+
+    # local_seed/ global_seed is used to control dropout in ModelParallel
+    local_seed = basic_seed + 59999 + tp_rank * 10 + pp_rank * 1000
+    global_seed = basic_seed + 100003 + dataset_rank
+
+    tracker = get_rng_state_tracker()
+
+    if "global_seed" not in tracker.states_:
+        tracker.add("global_seed", global_seed)
+    if "local_seed" not in tracker.states_:
+        tracker.add("local_seed", local_seed)
