@@ -107,7 +107,8 @@ class DistributedBatchSampler(paddle.io.BatchSampler):
 
         self.consumed_samples = consumed_samples
         if self.dataset is None:
-            self.num_samples = 1
+            # In pre-training mode when using distributed dataloader, the input dataset can be None. We should handle this situation.
+            self.num_samples = 0
         else:
             self.num_samples = int(math.ceil(len(self.dataset) * 1.0 / self.nranks))
         self.total_size = self.num_samples * self.nranks
