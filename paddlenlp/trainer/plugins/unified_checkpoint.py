@@ -850,6 +850,7 @@ def dynamic_load_unified_checkpoint(args, model, resume_from_checkpoint, safe_se
         file_keyname_mappings,
         file_machine_mappings,
     )
+    dist.barrier()
 
     error_msgs = _load_state_dict_into_model(model, state_dict, "")
     if len(error_msgs) > 0:
@@ -957,6 +958,7 @@ def dynamic_load_unified_optimizer(args, model, optimizer, resume_from_checkpoin
         file_keyname_mappings,
         file_machine_mappings,
     )
+    dist.barrier()
     if has_master_weights:
         optim_state_dict_mw = distributed_send_recv(
             config_revise,
@@ -968,6 +970,7 @@ def dynamic_load_unified_optimizer(args, model, optimizer, resume_from_checkpoin
             file_keyname_mappings_mw,
             file_machine_mappings_mw,
         )
+        dist.barrier()
 
     # rename optimizer.
     for key in list(optim_state_dict.keys()):
@@ -1051,6 +1054,7 @@ def distributed_send_recv(
     file_keyname_mappings,
     file_machine_mappings,
 ):
+
     local_device_count = int(os.getenv("PADDLE_LOCAL_SIZE"))
     global_rank = dist.get_rank()
     for filename in file_keyname_mappings.keys():
