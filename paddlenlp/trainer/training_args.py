@@ -1238,6 +1238,8 @@ class TrainingArguments:
                             f"Found unknown unified_checkpoint config {x}, accpet config is ignore_data_type_error, ignore_save_model_weight, "
                             + "master_weight_compatible, checkpoint_compatible, async_save_to_disk, enable_all_options."
                         )
+            if "enable_all_options" in unified_checkpoint_config:
+                self.unified_checkpoint_config = "ignore_data_type_error ignore_save_model_weight master_weight_compatible checkpoint_compatible async_save_to_disk"
 
         if self.report_to is None:
             logger.info(
