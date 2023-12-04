@@ -82,6 +82,7 @@ def set_seed(seed: int = 1234, args=None):
         random.seed(seed)
         np.random.seed(seed)
         paddle.seed(seed)
+
     else:
         hcg = get_hcg()
         if paddle.distributed.get_world_size() > 1:
@@ -135,8 +136,11 @@ def set_seed(seed: int = 1234, args=None):
         )
 
         tracker = get_rng_state_tracker()
-        tracker.add("global_seed", global_seed)
-        tracker.add("local_seed", local_seed)
+        if "global_seed" not in self.states_:
+            tracker.add("global_seed", global_seed)
+
+        if "local_seed" not in self.states_:
+            tracker.add("local_seed", local_seed)
 
         paddle.seed(global_seed)
 
