@@ -15,6 +15,7 @@
 import copy
 import gc
 import json
+import multiprocessing
 import os
 
 import paddle
@@ -64,6 +65,8 @@ __all__ = [
     "save_unified_optimizer",
 ]
 
+async_save_queue = []
+
 
 def save_unified_checkpoint(args, model, output_dir, safe_serialization=False):
     """save unified checkpoint
@@ -99,13 +102,13 @@ def save_unified_checkpoint(args, model, output_dir, safe_serialization=False):
 
     save_directory = output_dir
     os.makedirs(save_directory, exist_ok=True)
-    if safe_serialization:
-        for k in list(state_dict.keys()):
-            if isinstance(state_dict[k], paddle.Tensor):
-                state_dict[k] = state_dict.pop(k).cpu().numpy()
-        safe_save_file(state_dict, os.path.join(save_directory, shard_file), metadata={"format": "np"})
-    else:
-        paddle.save(state_dict, os.path.join(save_directory, shard_file))
+
+    is_sync_save = True
+    if "async_save_to_disk" in args.unified_checkpoint_config:
+        is_sync_save = False
+    file_save_async_or_sync(
+        state_dict, os.path.join(save_directory, shard_file), safe_serialization, is_sync=is_sync_save
+    )
 
     # Attach architecture to the config
     config_to_save.architectures = [model_to_save.__class__.__name__]
@@ -289,24 +292,20 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
     save_directory = output_dir
     os.makedirs(save_directory, exist_ok=True)
 
-    if safe_serialization:
-        for k in list(optim_state_dict.keys()):
-            if isinstance(optim_state_dict[k], paddle.Tensor):
-                optim_state_dict[k] = optim_state_dict.pop(k).cpu().numpy()
-        safe_save_file(optim_state_dict, os.path.join(save_directory, shard_optim_file), metadata={"format": "np"})
-        if master_weight_state_dict is not None:
-            for k in list(master_weight_state_dict.keys()):
-                if isinstance(master_weight_state_dict[k], paddle.Tensor):
-                    master_weight_state_dict[k] = master_weight_state_dict.pop(k).cpu().numpy()
-            safe_save_file(
-                master_weight_state_dict,
-                os.path.join(save_directory, shard_master_weight_file),
-                metadata={"format": "np"},
-            )
-    else:
-        paddle.save(optim_state_dict, os.path.join(save_directory, shard_optim_file))
-        if master_weight_state_dict is not None:
-            paddle.save(master_weight_state_dict, os.path.join(save_directory, shard_master_weight_file))
+    is_sync_save = True
+    if "async_save_to_disk" in args.unified_checkpoint_config:
+        is_sync_save = False
+
+    file_save_async_or_sync(
+        optim_state_dict, os.path.join(save_directory, shard_optim_file), safe_serialization, is_sync=is_sync_save
+    )
+    if master_weight_state_dict is not None:
+        file_save_async_or_sync(
+            master_weight_state_dict,
+            os.path.join(save_directory, shard_master_weight_file),
+            safe_serialization,
+            is_sync=is_sync_save,
+        )
 
     if sharded_optim_index is not None:
         if not safe_serialization:
@@ -905,3 +904,53 @@ def flatten_list(nested_list):
         else:
             flattened_list.append(item)
     return flattened_list
+
+
+def check_exitcode(task):
+    exitcode = task.exitcode
+    if exitcode != 0:
+        logger.info(f"Error: save ckpt process failed with exitcode {exitcode}!!!")
+    else:
+        logger.info(f"Success: save ckpt process with exitcode {exitcode}!!!")
+
+
+def clear_async_save_task_queue():
+    """
+    wait until all async save task to be done.
+    """
+    while len(async_save_queue) > 0:
+        task = async_save_queue.pop()
+        if task and task.is_alive():
+            task.join(timeout=60)
+            if task.is_alive():
+                logger.error("Error: save ckpt process timeout!!!")
+                async_save_queue.append(task)
+            else:
+                check_exitcode(task)
+        else:
+            check_exitcode(task)
+
+
+def file_save_async_or_sync(state_dict, path, safe_serialization, is_sync=True):
+    if safe_serialization:
+        for k in list(state_dict.keys()):
+            if isinstance(state_dict[k], paddle.Tensor):
+                state_dict[k] = state_dict.pop(k).cpu().numpy()
+
+    if is_sync:
+        # 同步
+        if safe_serialization:
+            safe_save_file(state_dict, path, metadata={"format": "np"})
+        else:
+            paddle.save(state_dict, path)
+
+    else:
+        # 异步
+        clear_async_save_task_queue()
+        if safe_serialization:
+            p = multiprocessing.Process(target=safe_save_file, args=(state_dict, path, {"format": "np"}))
+        else:
+            p = multiprocessing.Process(target=paddle.save, args=(state_dict, path))
+        logger.info(f"Async save {path}")
+        p.start()
+        async_save_queue.append(p)
