@@ -324,7 +324,7 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
                 json.dump(sharded_master_weight_index, f, indent=4)
 
 
-def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serialization=False):
+def load_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
     """Load potential model checkpoint
 
     Args:
@@ -359,6 +359,21 @@ def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serial
         resolved_archive_file = [resolved_archive_file]
     if len(resolved_archive_file) > 1:
         resolved_archive_file = tqdm(resolved_archive_file, desc="Loading optimizer shards")
+
+    if "ignore_save_model_weight" in args.unified_checkpoint_config:
+        if hasattr(optimizer, "_create_master_weight"):
+            if has_master_weights:
+                pass
+            else:
+                index_filename_master_weights = (
+                    PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+                )
+                has_master_weights = True
+        else:
+            if has_master_weights:
+                has_master_weights = False
+            else:
+                pass
 
     if has_master_weights:
         returned_optim_state_dict["master_weights"] = {}

@@ -2255,6 +2255,7 @@ class Trainer:
             if self.args.data_parallel_rank == 0:
                 if self.args.unified_checkpoint:
                     opt_state_dict = load_unified_optimizer(
+                        args=self.args,
                         model=self.model,
                         optimizer=self.optimizer,
                         resume_from_checkpoint=checkpoint,
