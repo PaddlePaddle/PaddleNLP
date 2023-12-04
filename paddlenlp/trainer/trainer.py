@@ -504,7 +504,9 @@ class Trainer:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
         if self.args.unified_checkpoint:
-            if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
+            if "checkpoint_compatible" in self.args.unified_checkpoint_config:
+                pass
+            elif resume_from_checkpoint is not None and self.args.dataset_rank == 0:
                 load_unified_checkpoint(
                     self.args,
                     self.model,
@@ -1516,9 +1518,17 @@ class Trainer:
                     core.default_custom_device_generator(i).manual_seed(checkpoint_rng_state["cuda"][i])
 
         if self.args.use_hybrid_parallel:
-            fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
-                checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
-            )
+            if self.args.unified_checkpoint and "checkpoint_compatible" in self.args.unified_checkpoint_config:
+                try:
+                    fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
+                        checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
+                    )
+                except:
+                    logger.info("hybrid_parallel_rng_state_tracker not in rng_state")
+            else:
+                fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
+                    checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
+                )
 
     @staticmethod
     def get_optimizer_cls_and_kwargs(args: TrainingArguments) -> Tuple[Any, Any]:
@@ -2253,7 +2263,7 @@ class Trainer:
             )
         else:
             if self.args.data_parallel_rank == 0:
-                if self.args.unified_checkpoint:
+                if self.args.unified_checkpoint and "checkpoint_compatible" not in self.args.unified_checkpoint_config:
                     opt_state_dict = load_unified_optimizer(
                         args=self.args,
                         model=self.model,
