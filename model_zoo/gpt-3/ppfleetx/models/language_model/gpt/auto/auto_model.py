@@ -619,6 +619,36 @@ class GPTEmbeddings(nn.Layer):
         return embeddings
 
 
+class GPTOutputEmbeddings(nn.Layer):
+    """
+    Embedding to calculate logits when we don't share the weight with input embedding.
+    """
+
+    def __init__(
+        self,
+        vocab_size,
+        hidden_size=768,
+        initializer_range=0.02,
+        freeze_embedding=False,
+    ):
+        super(GPTOutputEmbeddings, self).__init__()
+
+        self.output_word_embeddings = nn.Embedding(
+            vocab_size,
+            hidden_size,
+            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=initializer_range)),
+        )
+
+        if freeze_embedding:
+            self.output_word_embeddings.weight.learning_rate = 0.0
+
+
+    def forward(self, encoder_outputs=None):
+        auto.shard_tensor(self.output_word_embeddings.weight, auto_env.get_mesh()[-1], [auto_env.get_mesh().mp_dim, None])
+        logits = paddle.matmul(encoder_outputs, get_attr(self.output_word_embeddings, "weight"), transpose_y=True)
+        return logits
+
+
 class GPTModelAuto(nn.Layer):
     def __init__(
         self,
@@ -718,6 +748,13 @@ class GPTModelAuto(nn.Layer):
             sequence_parallel=sequence_parallel,
         )
 
+        self.output_embeddings = GPTOutputEmbeddings(
+            vocab_size,
+            hidden_size,
+            self.initializer_range,
+            freeze_embedding,
+        )
+
     def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None):
 
         if position_ids is None:
@@ -761,8 +798,9 @@ class GPTModelAuto(nn.Layer):
             use_cache=use_cache,
             cache=cache,
         )
-        
-        return encoder_outputs
+
+        logits = self.output_embeddings(encoder_outputs)
+        return encoder_outputs, logits
 
 
 class GPTForPretrainingAuto(nn.Layer):
@@ -784,22 +822,15 @@ class GPTForPretrainingAuto(nn.Layer):
         self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
     ):
 
-        outputs = self.gpt(
+        outputs, logits = self.gpt(
             input_ids, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
         )
         if use_cache:
-            encoder_outputs, cached_kvs = outputs[:2]
-        else:
-            encoder_outputs = outputs
+            _, cached_kvs = outputs[:2]
 
         # FIXME should we force the encoder_outputs mesh is the last stage ? 
         if self.sequence_parallel:
             auto.shard_tensor(encoder_outputs, auto_env.get_mesh()[-1], [None, None, None])
-
-        x_dims_mapping = [auto_env.get_mesh().dp_dim] + [None] * (len(encoder_outputs.shape) - 1)
-        w_dims_mapping = [auto_env.get_mesh().mp_dim, None]
-        matmul = auto.shard_op(paddle.matmul, auto_env.get_mesh()[-1], [x_dims_mapping, w_dims_mapping, None])
-        logits = matmul(encoder_outputs, get_attr(self.gpt.embeddings.word_embeddings, "weight"), transpose_y=True)
 
         if use_cache:
             return logits, cached_kvs

@@ -40,4 +40,4 @@ Distributed:
 
 
 Optimizer:
-  tensor_fusion: True
+  {}
