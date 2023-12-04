@@ -177,7 +177,6 @@ class BasePredictor:
                 source = [source] if isinstance(source, str) else source
                 source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
-        print(source)
         tokenized_source = self.tokenizer(
             source,
             max_length=self.config.src_length,

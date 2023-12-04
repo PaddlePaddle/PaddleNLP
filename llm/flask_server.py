@@ -127,7 +127,7 @@ class PredictorServer:
                     for idx in range(0, len(history), 2):
                         chat_query.append(["", ""])
                         chat_query[-1][0], chat_query[-1][1] = history[idx]["utterance"], history[idx + 1]["utterance"]
-                    chat_query = [chat_query]
+                    query = [chat_query]
 
                 generation_args = data
                 self.predictor.config.max_length = generation_args["max_length"]
@@ -139,7 +139,6 @@ class PredictorServer:
                 for key, value in generation_args.items():
                     setattr(self.args, key, value)
 
-                print(query)
                 streamer = self.predict(query)
                 if self.predictor.tensor_parallel_rank == 0:
                     for new_text in streamer:
