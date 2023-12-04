@@ -27,7 +27,6 @@ from paddlenlp.trainer import (
     Trainer,
     TrainingArguments,
     get_last_checkpoint,
-    init_dist_env,
     set_seed,
     speed_metrics,
 )
@@ -351,15 +350,6 @@ def main():
         os.makedirs(data_args.data_cache, exist_ok=True)
 
     paddle.set_device(training_args.device)
-
-    if paddle.distributed.get_world_size() > 1:
-        init_dist_env(
-            training_args.tensor_parallel_degree,
-            training_args.sharding_parallel_degree,
-            training_args.pipeline_parallel_degree,
-            training_args.data_parallel_degree,
-            training_args.seed,
-        )
 
     set_seed(seed=training_args.seed)
 

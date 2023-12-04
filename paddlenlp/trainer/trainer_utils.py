@@ -34,7 +34,6 @@ from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 import paddle
-import paddle.distributed as dist
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.io import IterableDataset
@@ -55,21 +54,7 @@ __all__ = [
     "get_last_checkpoint",
     "get_scheduler",
     "set_hyrbid_parallel_seed",
-    "init_dist_env",
 ]
-
-
-_hcg = None
-
-
-def set_hcg(hcg):
-    global _hcg
-    _hcg = hcg
-
-
-def get_hcg():
-    global _hcg
-    return _hcg
 
 
 def set_seed(seed: int = 1234, args=None):
@@ -84,7 +69,7 @@ def set_seed(seed: int = 1234, args=None):
         paddle.seed(seed)
 
     else:
-        hcg = get_hcg()
+        hcg = fleet.get_hybrid_communicate_group()
         if paddle.distributed.get_world_size() > 1:
             # obtain rank message of hybrid parallel
             if hcg is None:
@@ -145,74 +130,6 @@ def set_seed(seed: int = 1234, args=None):
         paddle.seed(global_seed)
 
         logger.info("The global seed is set to {} and local seed is set to {}.".format(global_seed, local_seed))
-
-
-def create_hcg(strategy, hcg_name="HybridCommunicateGroup"):
-    if hcg_name == "HybridCommunicateGroup":
-        fleet.init(is_collective=True, strategy=strategy)
-        hcg = fleet.get_hybrid_communicate_group()
-    else:
-        dist.init_parallel_env()
-        hcg = eval("{}".format(hcg_name))(strategy)
-    print("asdfasdf hcg", hcg)
-    return hcg
-
-
-def init_dist_env(
-    tensor_parallel_degree=1, sharding_parallel_degree=1, pipeline_parallel_degree=1, data_parallel_degree=1, seed=1
-):
-
-    strategy = fleet.DistributedStrategy()
-
-    def is_segment_parallel_supported():
-        import inspect
-
-        members = [name for (name, date) in inspect.getmembers(fleet.HybridCommunicateGroup)]
-        return "get_sep_parallel_world_size" in members
-
-    if tensor_parallel_degree == 1 and sharding_parallel_degree == 1:
-        if is_segment_parallel_supported():
-            order = ["pp", "dp", "sharding", "sep", "mp"]
-        else:
-            order = ["pp", "dp", "sharding", "mp"]
-    else:
-        if is_segment_parallel_supported():
-            order = ["dp", "pp", "sharding", "sep", "mp"]
-        else:
-            order = ["dp", "pp", "sharding", "mp"]
-
-    strategy.hybrid_configs = {
-        "dp_degree": data_parallel_degree,
-        "mp_degree": tensor_parallel_degree,
-        "pp_degree": pipeline_parallel_degree,
-        "sharding_degree": sharding_parallel_degree,
-        "order": order,
-    }
-
-    # TODO(wawltor) The inference parallel do not support the pipeline mode
-
-    """
-    if pipeline_parallel_degree > 1:
-        if "sequence_parallel" in config.Model:
-            if config.Model.sequence_parallel:
-                assert config.Global.enable_partial_send_recv is False, (
-                    "if config.Distributed.pp_degree > 1 and config.Model.sequence_parallel is True, "
-                    "config.Global.enable_partial_send_recv should be set False."
-                )
-
-    strategy.pipeline_configs = {
-        "accumulate_steps": config.Global.local_batch_size // config.Global.micro_batch_size,
-        "micro_batch_size": config.Global.micro_batch_size,
-        "enable_partial_send_recv": config.Global.enable_partial_send_recv,
-    }
-    """
-
-    # set control in tensor parallel
-    print("init_dist_env asdfasdfasdf  niuliling")
-    strategy.tensor_parallel_configs = {"tensor_init_seed": seed}
-
-    hcg = create_hcg(strategy)
-    set_hcg(hcg)
 
 
 class ExplicitEnum(Enum):
