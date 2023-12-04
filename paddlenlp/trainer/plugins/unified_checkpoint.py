@@ -360,8 +360,8 @@ def load_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe_
     if len(resolved_archive_file) > 1:
         resolved_archive_file = tqdm(resolved_archive_file, desc="Loading optimizer shards")
 
-    if "ignore_save_model_weight" in args.unified_checkpoint_config:
-        if hasattr(optimizer, "_create_master_weight"):
+    if "master_weight_compatible" in args.unified_checkpoint_config:
+        if args.fp16_opt_level == "O2":
             if has_master_weights:
                 pass
             else:
