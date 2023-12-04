@@ -84,6 +84,14 @@ def save_unified_checkpoint(args, model, output_dir, safe_serialization=False):
     else:
         raise ValueError("Unified checkpoint only supports PretrainedModel")
 
+    should_save_model_weight = True
+    if "ignore_save_model_weight" in args.unified_checkpoint_config:
+        if args.fp16_opt_level == "O2":
+            should_save_model_weight = False
+
+    if not should_save_model_weight:
+        return
+
     config_to_save = None
     state_dict, config_to_save, shard_file, sharded_index = unified_checkpoint_into_shards(
         args, model_to_save, safe_serialization=safe_serialization
@@ -115,7 +123,7 @@ def save_unified_checkpoint(args, model, output_dir, safe_serialization=False):
             json.dump(sharded_index, f, indent=4)
 
 
-def load_unified_checkpoint(model, resume_from_checkpoint: str, safe_serialization=False) -> None:
+def load_unified_checkpoint(args, model, resume_from_checkpoint: str, safe_serialization=False) -> None:
     """Load potential model checkpoint
 
     Args:
@@ -127,6 +135,11 @@ def load_unified_checkpoint(model, resume_from_checkpoint: str, safe_serializati
     """
 
     index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+    if "ignore_save_model_weight" in args.unified_checkpoint_config:
+        if args.fp16_opt_level == "O2":
+            index_filename = (
+                PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
+            )
 
     resolved_archive_file, sharded_metadata = get_checkpoint_shard_files(
         pretrained_model_name_or_path=resume_from_checkpoint,
@@ -183,6 +196,9 @@ def load_unified_checkpoint(model, resume_from_checkpoint: str, safe_serializati
             state_dict = model.convert_tensor_parallel(
                 None, model.config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
             )
+        if "ignore_save_model_weight" in args.unified_checkpoint_config:
+            # confirm parameter cast is executed on the same device as model
+            state_dict = nested_copy_place(state_dict, place=paddle.framework._current_expected_place())
         error_msgs += _load_state_dict_into_model(model, state_dict, "")
 
         # force memory release

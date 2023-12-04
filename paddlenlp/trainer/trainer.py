@@ -506,6 +506,7 @@ class Trainer:
         if self.args.unified_checkpoint:
             if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
                 load_unified_checkpoint(
+                    self.args,
                     self.model,
                     resume_from_checkpoint,
                     safe_serialization=True,

@@ -108,14 +108,20 @@ def remove_ckpt(ckpt_dir):
         shutil.rmtree(ckpt_dir)
 
 
-class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
+def add_ignore_save_model_weight(pretrain_arguments):
+    train_args = copy.deepcopy(pretrain_arguments)
+    train_args["unified_checkpoint_config"] = "ignore_save_model_weight"
+    return train_args
+
+
+class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
     def setUp(self):
         os.environ.update(environment_variables)
 
     def testTP8(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
+        train_args = add_ignore_save_model_weight(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 8
         train_args["pipeline_parallel_degree"] = 1
 
@@ -128,9 +134,10 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
     def testTP4PP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
+        train_args = add_ignore_save_model_weight(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 4
         train_args["pipeline_parallel_degree"] = 2
+        train_args["unified_checkpoint_config"] = "ignore_save_model_weight"
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -141,7 +148,7 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
     def testTP4DP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
+        train_args = add_ignore_save_model_weight(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 4
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding"] = ""
@@ -156,7 +163,7 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
     def testTP4Sharding2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
+        train_args = add_ignore_save_model_weight(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 4
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding"] = "stage1"
@@ -171,7 +178,7 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
     def testTP2PP4(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
+        train_args = add_ignore_save_model_weight(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 2
         train_args["pipeline_parallel_degree"] = 4
 
@@ -184,7 +191,7 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
     def testTP2Sharding4(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
+        train_args = add_ignore_save_model_weight(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 2
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding"] = "stage1"
@@ -200,7 +207,7 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
 
-        train_args = copy.deepcopy(pretrain_arguments)
+        train_args = add_ignore_save_model_weight(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 1
         train_args["pipeline_parallel_degree"] = 8
 
@@ -213,7 +220,7 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
     def testPP4DP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
+        train_args = add_ignore_save_model_weight(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 1
         train_args["pipeline_parallel_degree"] = 4
         train_args["sharding"] = ""
@@ -228,7 +235,7 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
     def testPP4Sharding2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
+        train_args = add_ignore_save_model_weight(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 1
         train_args["pipeline_parallel_degree"] = 4
         train_args["sharding"] = "stage1"
@@ -243,7 +250,7 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
     def testSharding8S1(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
+        train_args = add_ignore_save_model_weight(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 1
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding"] = "stage1"
@@ -258,7 +265,7 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
     def testSharding8S2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
+        train_args = add_ignore_save_model_weight(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 1
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding"] = "stage2"
@@ -273,7 +280,7 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
     def testSharding4S1DP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
+        train_args = add_ignore_save_model_weight(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 1
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding_parallel_degree"] = 4
@@ -289,7 +296,7 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
     def testSharding4S2DP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
+        train_args = add_ignore_save_model_weight(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 1
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding_parallel_degree"] = 4
@@ -305,7 +312,7 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
     def testSharding2S1DP4(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
+        train_args = add_ignore_save_model_weight(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 1
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding_parallel_degree"] = 2
@@ -321,7 +328,7 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
     def testSharding2S2DP4(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
+        train_args = add_ignore_save_model_weight(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 1
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding_parallel_degree"] = 2
@@ -337,7 +344,7 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
     def testDP8(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
+        train_args = add_ignore_save_model_weight(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 1
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding_parallel_degree"] = 1
