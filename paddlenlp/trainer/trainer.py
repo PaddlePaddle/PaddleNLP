@@ -1238,10 +1238,7 @@ class Trainer:
                 num_workers=self.args.dataloader_num_workers,
             )
 
-        if self.args.should_load_dataset:
-            train_sampler = self._get_train_sampler()
-        else:
-            train_sampler = None
+        train_sampler = self._get_train_sampler()
 
         if self.args.distributed_dataloader:
             logger.info("Training using DistDataLoader.")
@@ -1318,10 +1315,7 @@ class Trainer:
                 num_workers=self.args.dataloader_num_workers,
             )
 
-        if self.args.should_load_dataset:
-            eval_sampler = self._get_eval_sampler(eval_dataset)
-        else:
-            eval_sampler = None
+        eval_sampler = self._get_eval_sampler(eval_dataset)
 
         if self.args.distributed_dataloader:
             logger.info("Eval using DistDataLoader.")
@@ -1371,10 +1365,7 @@ class Trainer:
                 num_workers=self.args.dataloader_num_workers,
             )
 
-        if self.args.should_load_dataset:
-            test_sampler = self._get_eval_sampler(test_dataset)
-        else:
-            test_sampler = None
+        test_sampler = self._get_eval_sampler(test_dataset)
 
         if self.args.distributed_dataloader:
             logger.info("Test using DistDataLoader.")
