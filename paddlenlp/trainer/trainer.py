@@ -1518,17 +1518,9 @@ class Trainer:
                     core.default_custom_device_generator(i).manual_seed(checkpoint_rng_state["cuda"][i])
 
         if self.args.use_hybrid_parallel:
-            if self.args.unified_checkpoint and "checkpoint_compatible" in self.args.unified_checkpoint_config:
-                try:
-                    fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
-                        checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
-                    )
-                except:
-                    logger.info("hybrid_parallel_rng_state_tracker not in rng_state")
-            else:
-                fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
-                    checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
-                )
+            fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
+                checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
+            )
 
     @staticmethod
     def get_optimizer_cls_and_kwargs(args: TrainingArguments) -> Tuple[Any, Any]:

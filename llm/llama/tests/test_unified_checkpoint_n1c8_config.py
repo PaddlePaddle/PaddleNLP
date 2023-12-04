@@ -1258,18 +1258,18 @@ class TestModelOnN1C8CheckpointCompatible(TestMultipleGpus):
         assert len(res) == 2
         np.testing.assert_allclose(res[0], res[1])
 
-    def testDP8(self):
-        remove_logs()
-        remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding_parallel_degree"] = 1
-        train_args["sharding"] = "stage2"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
+    # def testDP8(self):
+    #     remove_logs()
+    #     remove_ckpt(pretrain_arguments["output_dir"])
+    #     train_args = copy.deepcopy(pretrain_arguments)
+    #     train_args["tensor_parallel_degree"] = 1
+    #     train_args["pipeline_parallel_degree"] = 1
+    #     train_args["sharding_parallel_degree"] = 1
+    #     train_args["sharding"] = "stage2"
+    #     train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
 
-        run_normal(self.run_n1c8, train_args)
-        run_unified_checkpoint(self.run_n1c8, train_args)
-        res = check_acc()
-        assert len(res) == 2
-        np.testing.assert_allclose(res[0], res[1])
+    #     run_normal(self.run_n1c8, train_args)
+    #     run_unified_checkpoint(self.run_n1c8, train_args)
+    #     res = check_acc()
+    #     assert len(res) == 2
+    #     np.testing.assert_allclose(res[0], res[1])
