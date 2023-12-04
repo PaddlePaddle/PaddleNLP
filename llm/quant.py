@@ -21,7 +21,6 @@ from paddle.distributed.fleet.meta_parallel import (
     RowParallelLinear,
 )
 from paddle.quantization import PTQ, QAT, QuantConfig
-from paddle.quantization.quanters.abs_max import FakeQuanterWithAbsMaxObserverLayer
 from paddleslim.quant.advanced import (
     GPTQ,
     EMASampler,
@@ -40,7 +39,6 @@ from paddleslim.quant.observers.abs_max_weight import (
     AbsMaxChannelWiseWeightObserverLayer,
 )
 from paddleslim.quant.observers.avg import AVGObserverLayer
-from paddleslim.quant.quanters import PACTQuanter
 
 from paddlenlp.peft import PrefixModelForCausalLM
 from paddlenlp.peft.lora import (
@@ -57,15 +55,18 @@ from paddlenlp.utils.log import logger
 
 
 def create_qat_model(quant_args, model, dtype):
-    # FakeQuanterChannelWiseAbsMaxObserver not yet merge in Paddle develop
-    from paddle.quantization.quanters import FakeQuanterChannelWiseAbsMaxObserver
+    from paddle.quantization.quanters import FakeQuanterWithAbsMaxObserver
+    from paddleslim.quant.quanters import (
+        FakeQuanterChannelWiseAbsMaxObserver,
+        PACTQuanter,
+    )
 
     q_config = QuantConfig(activation=None, weight=None)
     q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
     q_config.add_qat_layer_mapping(RowParallelLoRALinear, RowParallelQuantedLoRALinear)
     q_config.add_qat_layer_mapping(ColumnParallelLoRALinear, ColumnParallelQuantedLoRALinear)
     if quant_args.quant_type == "a8w8":
-        activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
+        activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserver(), init_value=20.0, dtype=dtype)
         weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype="float32")
     elif quant_args.quant_type == "weight_only_int4":
         activation = None

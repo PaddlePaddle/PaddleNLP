@@ -263,7 +263,7 @@ class DygraphPredictor(BasePredictor):
         return result
 
     def stream_predict(self, inputs: dict[str, paddle.Tensor]):
-        text_streamer = TextIteratorStreamer(self.tokenizer)
+        text_streamer = TextIteratorStreamer(self.tokenizer, skip_special_tokens=True)
         input_features = self._preprocess(inputs)
         generation_kwargs = dict(
             **input_features,
