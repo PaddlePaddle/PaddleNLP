@@ -69,11 +69,9 @@ def set_seed(seed: int = 1234, args=None):
         paddle.seed(seed)
 
     else:
-        hcg = fleet.get_hybrid_communicate_group()
-        if paddle.distributed.get_world_size() > 1:
+        hcg = fleet.get_hybrid_communicate_group() if hasattr(fleet.fleet, "_hcg") else None
+        if hcg is not None and paddle.distributed.get_world_size() > 1:
             # obtain rank message of hybrid parallel
-            if hcg is None:
-                assert False
 
             mp_rank = hcg.get_model_parallel_rank()
             mp_size = hcg.get_model_parallel_world_size()
