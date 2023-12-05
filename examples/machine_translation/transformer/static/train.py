@@ -320,8 +320,12 @@ def do_train(args):
                     max_mem_reserved_msg = ""
                     max_mem_allocated_msg = ""
                     if paddle.device.is_compiled_with_cuda():
-                        max_mem_reserved_msg = f"max_mem_reserved: {paddle.device.cuda.max_memory_reserved()} B,"
-                        max_mem_allocated_msg = f"max_mem_allocated: {paddle.device.cuda.max_memory_allocated()} B"
+                        max_mem_reserved_msg = (
+                            f"max_mem_reserved: {paddle.device.cuda.max_memory_reserved() // (1024 ** 2)} MB,"
+                        )
+                        max_mem_allocated_msg = (
+                            f"max_mem_allocated: {paddle.device.cuda.max_memory_allocated() // (1024 ** 2)} MB"
+                        )
                     logger.info(
                         "step_idx: %d, epoch: %d, batch: %d, avg loss: %f, "
                         "normalized loss: %f, ppl: %f, avg_speed: %.2f step/s, "
