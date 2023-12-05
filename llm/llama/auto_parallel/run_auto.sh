@@ -24,7 +24,7 @@ rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
 export SOT_LOG_LEVEL=4
-export PYTHONPATH=../../../:$PYTHONPATH  \
+export PYTHONPATH=../../../:$PYTHONPATH
 
 python -u -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \

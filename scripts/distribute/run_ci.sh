@@ -20,6 +20,17 @@ mkdir -p /workspace/case_logs
 export log_path=/workspace/case_logs
 export case_list=()
 
+target_lists_for_gpt=(
+    "model_zoo/gpt-3"
+)
+
+target_lists_for_llama=(
+    "llm/llama/auto_parallel"
+    "paddlenlp/transformers/llama/modeling_auto.py"
+)
+
+target_path_for_ci_scripts="scripts/distribute"
+
 ####################################
 install_paddle(){
     echo -e "\033[31m ---- Install paddlepaddle-gpu  \033"
@@ -42,6 +53,7 @@ install_paddlenlp(){
     cd -
     python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
 }
+
 ####################################
 get_diff_TO_case(){
 cd ${nlp_dir}
@@ -52,20 +64,25 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
     dir2=${arr_file_name[1]}
     dir3=${arr_file_name[2]}
     dir4=${arr_file_name[3]}
-    echo "file_name:"${file_name}, "dir1:"${dir1}, "dir2:"${dir2},"dir3:"${dir3},"dir4:"${dir4},".xx:" ${file_name##*.}
+    file_item=$dir1/$dir2/$dir3/$dir4
+    echo "file_name:"${file_name}, "path:"${file_item}
     if [ ! -f ${file_name} ];then # 针对pr删掉文件
         continue
     elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
         continue
-    elif [[ ${dir1} =~ "model_zoo" ]] && [[ ${dir2} =~ "gpt-3" ]];then
-        if [[ ${dir3} =~ "benchmarks" ]];then
-            continue
-        else
-            # model_zoo/gpt-3
-            case_list[${#case_list[*]}]=llama_auto
-            case_list[${#case_list[*]}]=gpt-3_auto
-            case_list[${#case_list[*]}]=gpt-3_dygraph
-        fi
+    elif [[ ${file_item} == *${target_path_for_ci_scripts}* ]];then
+        case_list[${#case_list[*]}]=llama_auto
+        case_list[${#case_list[*]}]=gpt-3_auto
+        case_list[${#case_list[*]}]=gpt-3_dygraph
+        continue
+    else
+        for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
+            if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
+                case_list[${#case_list[*]}]=gpt-3_auto
+                case_list[${#case_list[*]}]=gpt-3_dygraph
+        for ((i=0; i<${#target_lists_for_llama[@]}; i++)); do
+            if [[ ${file_item} == *${target_lists_for_llama[i]}* ]];then
+                case_list[${#case_list[*]}]=llama_auto
     elif [[ ${dir1} =~ "paddlenlp" ]];then
         export FLAGS_paddlenlp=1
     else
@@ -73,6 +90,7 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
     fi
 done
 }
+
 ####################################
 print_info(){
 if [ $1 -ne 0 ];then
@@ -89,6 +107,7 @@ else
     echo -e "\033[32m run $3 CI SUCCESS \033"
 fi
 }
+
 ####################################
 get_diff_TO_case # 获取待执行case列表
 case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${case_list[*]}))  # 去重并将结果存储回原列表

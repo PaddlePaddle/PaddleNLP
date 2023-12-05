@@ -1182,10 +1182,10 @@ function before_hook() {
     fi
 }
 
-echo -e "\033[31m ---- Start executing gpt-3 $1 \033[0m"
+echo -e "\033[31m ---- Start executing $1 \033[0m"
 if [[ $1 == "llama_case_list_auto" ]];then
     cd ${llama_case_path}
-else:
+else
     cd ${gpt_case_path}
 
 export FLAGS_before_hook=$2
