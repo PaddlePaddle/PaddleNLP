@@ -446,14 +446,14 @@ def main():
     print("Final pre-training config:", config)
 
     # Set the dtype for loading model
-    dtype = "float32"
-    if training_args.fp16_opt_level == "O2":
-        if training_args.fp16:
-            dtype = "float16"
-        if training_args.bf16:
-            dtype = "bfloat16"
+    # dtype = "float32"
+    # if training_args.fp16_opt_level == "O2":
+    #     if training_args.fp16:
+    #         dtype = "float16"
+    #     if training_args.bf16:
+    #         dtype = "bfloat16"
 
-    model = model_class._from_config(config, dtype=dtype)
+    model = model_class._from_config(config)
 
     if training_args.recompute:
 
@@ -500,9 +500,11 @@ def main():
     def loss_func(loss, outputs):
         return loss
 
-    total_train_batch_size = training_args.per_device_train_batch_size \
-                             * training_args.gradient_accumulation_steps \
-                             * training_args.data_parallel_degree
+    total_train_batch_size = (
+        training_args.per_device_train_batch_size
+        * training_args.gradient_accumulation_steps
+        * training_args.data_parallel_degree
+    )
     print_config(training_args)
 
     engine = auto.Engine(model, loss_func, optimizer, strategy=training_args.strategy)

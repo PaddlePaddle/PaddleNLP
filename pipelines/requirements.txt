@@ -15,11 +15,7 @@ pdfplumber
 faiss-cpu>=1.7.2
 opencv-python>=4.4
 opencv-contrib-python-headless
-python-multipart
 click==8.0
-fastapi
-uvicorn
-markdown
 numba
 pymilvus>=2.1
 wordcloud==1.8.2.2
@@ -29,3 +25,5 @@ sseclient-py==1.7.2
 spacy
 tritonclient[all]
 typing_extensions==4.5.0
+aistudio_sdk
+markdown

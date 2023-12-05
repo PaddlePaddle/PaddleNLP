@@ -18,14 +18,12 @@ from contextlib import closing
 import os
 import socket
 from dataclasses import dataclass, field
-from multiprocessing.shared_memory import SharedMemory
 from time import sleep
 from filelock import FileLock
-from regex import F
 
 import requests
 
-from predictor import BasePredictor, ModelArgument, PredictorArgument, create_predictor, predict
+from predictor import BasePredictor, ModelArgument, PredictorArgument, create_predictor
 
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.utils.log import logger
