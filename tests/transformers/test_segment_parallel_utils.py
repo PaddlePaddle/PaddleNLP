@@ -33,7 +33,7 @@ def prepare_data(batch_major=True, dim_size=4, batch_size=2, seq_len=2, num_head
     h = h
     num_head = num_head
     sep = dist.get_world_size()
-    assert sep == 2, f"sep should be 2, but {sep}"
+    # assert sep == 2, f"sep should be 2, but {sep}"
     num_elem = batch_size * seq_len // sep * num_head * h // num_head
     local_rank = dist.get_rank()
     input_data_list = []

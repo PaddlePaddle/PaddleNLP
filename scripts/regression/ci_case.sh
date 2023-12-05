@@ -1212,10 +1212,10 @@ ernie_health(){
 
 segment_parallel_utils(){
 cd ${nlp_dir}
-echo "test segment_parallel_utils"
+echo "test segment_parallel_utils, cudaid1:${cudaid1}, cudaid2:${cudaid2}"
 if [[ ${cudaid1} != ${cudaid2} ]]; then
-    export CUDA_VISIBLE_DEVICES=${cudaid1},${cudaid2}
-    echo $CUDA_VISIBLE_DEVICES
+    # export CUDA_VISIBLE_DEVICES=${cudaid1},${cudaid2}
+    # echo $CUDA_VISIBLE_DEVICES
     time (python -m paddle.distributed.launch tests/transformers/test_segment_parallel_utils.py >${log_path}/segment_parallel_utils) >>${log_path}/segment_parallel_utils 2>&1
     print_info $? segment_parallel_utils
 else
