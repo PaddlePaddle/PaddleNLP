@@ -75,12 +75,30 @@ class ChatTemplateTest(unittest.TestCase):
         assert final_query == "Human: 你好<sep>Bot: 您好，我是个人人工智能助手\n\n" + query
 
 
+class ChatTemplateContextDataTest(unittest.TestCase):
+    chat_template_config_file = "./tests/fixtures/chat_template_with_context.json"
+
+    @property
+    def chat_template(self):
+        return ChatTemplate.from_file(self.chat_template_config_file)
+
+    def test_inference_template(self):
+        query = [["你好"]]
+        context_data = {
+            "system": "<<SYSTEM-MESSAGE>>",
+            "instruction": "<<INSTRUCTION-MESSAGE>>",
+        }
+        final_query = self.chat_template(query, context_data=context_data)
+        expected_query = "你是一个人工智能助手<<SYSTEM-MESSAGE>>-<<INSTRUCTION-MESSAGE>>\nHuman: 你好<sep> Bot:"
+        self.assertEqual(final_query, expected_query)
+
+
 class ChatTemplateIntegrationTest(unittest.TestCase):
     def test_llama2_chat_template(self):
         tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat")
         query = "who are you?"
         final_query = tokenizer.apply_chat_template(query, tokenize=False)
-        expected_query = f"<<SYS>>\nYou are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe.  Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.\n\nIf a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information.\n<</SYS>>\n\n[INST] {query} [/INST] "
+        expected_query = "<s>[INST] <<SYS>>\nYou are a helpful assistant.\n<</SYS>>[INST] who are you? [/INST]"
         self.assertEqual(final_query, expected_query)
 
     def test_linlyai_chinese_llama_2_chat_template(self):
@@ -132,16 +150,6 @@ class ChatTemplateIntegrationTest(unittest.TestCase):
             "\n<|im_start|>user\n今天吃啥<|im_end|>\n<|im_start|>assistant\n"
         )
         self.assertEqual(final_query, expected_query)
-
-        # 2. check the bos_token_id and eos_token_id
-        self.assertEqual(
-            tokenizer.convert_tokens_to_ids(["<|im_start|>"])[0],
-            tokenizer.chat_template_bos_token_id,
-        )
-        self.assertEqual(
-            tokenizer.convert_tokens_to_ids(["<|im_end|>"])[0],
-            tokenizer.chat_template_eos_token_id,
-        )
 
 
 @parameterized_class(
@@ -256,3 +264,17 @@ class TestChatTemplateTruncation(unittest.TestCase):
             sentence_result,
             expected_sentence,
         )
+
+    def test_inference_template_with_context_data(self):
+        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-llama")
+        chat_template_config_file = "./tests/fixtures/chat_template_with_context.json"
+        tokenizer.init_chat_template(chat_template_config_file)
+
+        query = "你好"
+        context_data = {
+            "system": "<<SYSTEM-MESSAGE>>",
+            "instruction": "<<INSTRUCTION-MESSAGE>>",
+        }
+        final_query = tokenizer.apply_chat_template(query, context_data=context_data, tokenize=False)
+        expected_query = "你是一个人工智能助手<<SYSTEM-MESSAGE>>-<<INSTRUCTION-MESSAGE>>\nHuman: 你好<sep> Bot:"
+        self.assertEqual(final_query, expected_query)

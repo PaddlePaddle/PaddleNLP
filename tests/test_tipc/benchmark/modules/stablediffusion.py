@@ -54,6 +54,8 @@ class Lambda(BaseTransform):
 class StableDiffusion(nn.Layer):
     def __init__(self, args):
         super().__init__()
+        from ppdiffusers import AutoencoderKL, DDPMScheduler, UNet2DConditionModel
+
         self.args = args
         self.unet = UNet2DConditionModel.from_pretrained(url_or_path_join(args.model_name_or_path, "unet"))
         self.vae = AutoencoderKL.from_pretrained(url_or_path_join(args.model_name_or_path, "vae"))
@@ -205,6 +207,9 @@ class StableDiffusionBenchmark(BenchmarkBase):
             examples["input_ids"] = tokenize_captions(examples)
 
             return examples
+
+        from ppdiffusers.training_utils import main_process_first
+        from ppdiffusers.utils import PPDIFFUSERS_CACHE
 
         file_path = get_path_from_url_with_filelock(
             "https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/pokemon-blip-captions.tar.gz",
