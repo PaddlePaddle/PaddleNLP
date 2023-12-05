@@ -54,8 +54,6 @@ class Lambda(BaseTransform):
 class StableDiffusion(nn.Layer):
     def __init__(self, args):
         super().__init__()
-        from ppdiffusers import AutoencoderKL, DDPMScheduler, UNet2DConditionModel
-
         self.args = args
         self.unet = UNet2DConditionModel.from_pretrained(url_or_path_join(args.model_name_or_path, "unet"))
         self.vae = AutoencoderKL.from_pretrained(url_or_path_join(args.model_name_or_path, "vae"))
@@ -208,9 +206,6 @@ class StableDiffusionBenchmark(BenchmarkBase):
 
             return examples
 
-        from ppdiffusers.training_utils import main_process_first
-        from ppdiffusers.utils import PPDIFFUSERS_CACHE
-
         file_path = get_path_from_url_with_filelock(
             "https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/pokemon-blip-captions.tar.gz",
             PPDIFFUSERS_CACHE,
@@ -275,23 +270,7 @@ class StableDiffusionBenchmark(BenchmarkBase):
         ips=None,
         **kwargs
     ):
-        max_mem_reserved_msg = ""
-        max_mem_allocated_msg = ""
-        if paddle.device.is_compiled_with_cuda():
-            max_mem_reserved_msg = f"max_mem_reserved: {paddle.device.cuda.max_memory_reserved() // (1024 ** 2)} MB,"
-            max_mem_allocated_msg = f"max_mem_allocated: {paddle.device.cuda.max_memory_allocated() // (1024 ** 2)} MB"
         logger.info(
-            "global step %d / %d, loss: %f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, "
-            "avg_samples: %.5f, ips: %.5f sample/sec, %s %s"
-            % (
-                step_id,
-                args.epoch * self.num_batch,
-                loss,
-                reader_cost,
-                batch_cost,
-                num_samples,
-                ips,
-                max_mem_reserved_msg,
-                max_mem_allocated_msg,
-            )
+            "global step %d / %d, loss: %f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sample/sec"
+            % (step_id, args.epoch * self.num_batch, loss, reader_cost, batch_cost, num_samples, ips)
         )
