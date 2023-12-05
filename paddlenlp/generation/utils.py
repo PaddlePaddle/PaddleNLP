@@ -855,7 +855,6 @@ class GenerationMixin(object):
                 input_ids = self.prepare_decoder_input_ids_for_generation(
                     input_ids, decoder_start_token_id, bos_token_id
                 )
-
         # streamer
         if streamer is not None:
             # streamer couldn't support beam_search strategy
@@ -1064,7 +1063,7 @@ class GenerationMixin(object):
             probs = F.softmax(next_tokens_scores)
             probs = paddle.log(probs)
             next_tokens = paddle.argmax(probs, axis=-1).unsqueeze(-1)
-            next_scores = paddle.index_sample(probs.astype("float32"), next_tokens)
+            next_scores = paddle.index_sample(probs, next_tokens)
 
             if eos_token_id is not None:
                 next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
@@ -1163,12 +1162,8 @@ class GenerationMixin(object):
             if top_p is not None and top_p < 1.0:
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
 
-            # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
-            if probs.dtype == paddle.bfloat16 and top_k == 1:
-                probs = probs.astype("float32")
-                next_tokens = paddle.unsqueeze(paddle.argmax(probs, axis=-1), -1)
-            else:
-                next_tokens = paddle.multinomial(probs)
+            # multinomial already support fp16 and bf16 currently, fix issue: https://github.com/PaddlePaddle/Paddle/issues/51852
+            next_tokens = paddle.multinomial(probs)
 
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
