@@ -349,10 +349,9 @@ def main():
     if data_args.data_cache is not None:
         os.makedirs(data_args.data_cache, exist_ok=True)
 
-    set_seed(seed=training_args.seed, args=training_args)
     paddle.set_device(training_args.device)
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
+
+    set_seed(seed=training_args.seed)
 
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
