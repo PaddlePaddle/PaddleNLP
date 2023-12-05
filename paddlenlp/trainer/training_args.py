@@ -642,6 +642,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "开启moe训练"},
     )
+    ignore_load_lr_and_optim: Optional[bool] = field(
+        default=False,
+        metadata={"help": "热启时，不加载lr与optimizer"}
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
