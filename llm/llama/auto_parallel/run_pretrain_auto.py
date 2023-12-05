@@ -14,6 +14,7 @@
 """
 GPT/Llama auto parallel pretraining scripts.
 """
+import contextlib
 import os
 import random
 import sys
@@ -24,7 +25,12 @@ from typing import List, Optional
 
 import numpy as np
 import paddle
+import paddle.distributed as dist
 import paddle.distributed.auto_parallel as auto
+from paddle.distributed.fleet.base.topology import (
+    CommunicateTopology,
+    HybridCommunicateGroup,
+)
 
 from paddlenlp.trainer import (
     PdArgumentParser,
@@ -62,6 +68,18 @@ def add_start_docstrings(*docstr):
         return fn
 
     return docstring_decorator
+
+
+@contextlib.contextmanager
+def exec_mode_guard():
+    origin_mode = "dynamic" if paddle.in_dynamic_mode() else "static"
+    try:
+        yield
+    finally:
+        if origin_mode == "dynamic":
+            paddle.disable_static()
+        else:
+            paddle.enable_static()
 
 
 @dataclass
@@ -520,6 +538,18 @@ def main():
         mode="train",
     )
 
+    dp_degree = training_args.data_parallel_degree
+    mp_degree = training_args.tensor_parallel_degree
+    pp_degree = training_args.pipeline_parallel_degree
+    assert dp_degree * mp_degree * pp_degree == dist.get_world_size()
+
+    with exec_mode_guard():
+        paddle.disable_static()
+        topology = CommunicateTopology(
+            ["data", "pipe", "sharding", "sep", "model"], [dp_degree, pp_degree, 1, 1, mp_degree]
+        )
+        hcg = HybridCommunicateGroup(topology)
+
     train_dataloader = engine.dataloader(
         dataset=train_dataset,
         batch_size=total_train_batch_size,
@@ -561,7 +591,28 @@ def main():
             if (step + 1) % training_args.logging_steps == 0:
                 num_steps = global_step - global_step_last_logged
                 logs = {}
-                logs["loss"] = round(tr_loss / num_steps, 8)
+
+                # NOTE: temporary impls for printing loss and loss_cur_dp
+                with exec_mode_guard():
+                    paddle.disable_static()
+                    if dist.get_world_size() > 1:
+                        tr_loss_tensor = paddle.to_tensor([float(tr_loss)], dtype="float32")
+
+                        if training_args.pipeline_parallel_degree > 1:
+                            dist.broadcast(
+                                tr_loss_tensor,
+                                src=hcg.get_rank_from_stage(training_args.pipeline_parallel_degree - 1),
+                                sync_op=True,
+                                group=hcg.get_pipe_parallel_group(),
+                            )
+                            tr_loss = tr_loss_tensor.numpy()[0]
+
+                        dist.all_reduce(tr_loss_tensor, dist.ReduceOp.SUM)
+                        logs["loss"] = round(tr_loss_tensor.numpy()[0] / dist.get_world_size() / num_steps, 8)
+                    else:
+                        logs["loss"] = round(tr_loss / num_steps, 8)
+
+                logs["loss_cur_dp"] = round(tr_loss / num_steps, 8)
                 logs["learning_rate"] = float("{0:.3e}".format(engine.optimizer.get_lr()))
                 logs["global_step"] = int(global_step)
                 logs.update(
