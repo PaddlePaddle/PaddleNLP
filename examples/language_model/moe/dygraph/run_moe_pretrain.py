@@ -629,10 +629,15 @@ def do_train(args):
                     max_mem_reserved_msg = ""
                     max_mem_allocated_msg = ""
                     if paddle.device.is_compiled_with_cuda():
-                        max_mem_reserved_msg = f"max_mem_reserved: {paddle.device.cuda.max_memory_reserved()} B,"
-                        max_mem_allocated_msg = f"max_mem_allocated: {paddle.device.cuda.max_memory_allocated()} B"
+                        max_mem_reserved_msg = (
+                            f"max_mem_reserved: {paddle.device.cuda.max_memory_reserved() // (1024 ** 2)} MB,"
+                        )
+                        max_mem_allocated_msg = (
+                            f"max_mem_allocated: {paddle.device.cuda.max_memory_allocated() // (1024 ** 2)} MB"
+                        )
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, bal_loss: %.9f, speed: %.2f step/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e, %s %s"
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, bal_loss: %.9f, speed: %.2f step/s, "
+                        "ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e, %s, %s"
                         % (
                             global_step,
                             epoch,
