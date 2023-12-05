@@ -637,7 +637,7 @@ def do_train(args):
                         )
                     logger.info(
                         "global step %d, epoch: %d, batch: %d, loss: %.9f, bal_loss: %.9f, speed: %.2f step/s, "
-                        "ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e, %s, %s"
+                        "ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e, %s %s"
                         % (
                             global_step,
                             epoch,

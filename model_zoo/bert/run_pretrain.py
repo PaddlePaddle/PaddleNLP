@@ -445,7 +445,7 @@ def do_train(args):
                     logger.info(
                         "global step: %d, epoch: %d, batch: %d, loss: %f, "
                         "avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, "
-                        "avg_samples: %.5f, ips: %.5f sequences/sec, %s, %s"
+                        "avg_samples: %.5f, ips: %.5f sequences/sec, %s %s"
                         % (
                             global_step,
                             epoch,

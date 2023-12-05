@@ -1142,7 +1142,7 @@ class Trainer:
         if self.timers is not None and paddle.device.is_compiled_with_cuda():
             max_mem_reserved_msg = paddle.device.cuda.max_memory_reserved() // (1024 ** 2)
             max_mem_allocated_msg = paddle.device.cuda.max_memory_allocated() // (1024 ** 2)
-            mem_info = f"max_mem_reserved: {max_mem_reserved_msg} MB, max_mem_allocated: {max_mem_allocated_msg} MB"
+            mem_info = f"max_mem_reserved: {max_mem_reserved_msg} MB max_mem_allocated: {max_mem_allocated_msg} MB"
         else:
             mem_info = ""
 
