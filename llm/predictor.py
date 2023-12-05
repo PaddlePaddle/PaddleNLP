@@ -343,6 +343,17 @@ class InferencePredictorMixin:
                     dtype=self.dtype,
                 )
                 self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, self.num_layers, axis=0)]
+        base = 10000
+        head_size = self.model_config.hidden_size // self.model_config.num_attention_heads
+        inv_freq = 1.0 / (base ** (paddle.arange(0, head_size, 2) / head_size))
+        max_seq_len_cached = self.attention_mask.shape[2]
+        t = paddle.arange(max_seq_len_cached, dtype=inv_freq.dtype)
+        freqs = paddle.einsum("i,j->ij", t, inv_freq)
+        emb = paddle.concat([freqs, freqs], axis=-1).cast("float16")
+        cos_cached = emb.cos()[None, None, :, :]
+        sin_cached = emb.sin()[None, None, :, :]
+        self.cos_table = paddle.squeeze(cos_cached[:, :, :max_seq_len_cached, ...])
+        self.sin_table = paddle.squeeze(sin_cached[:, :, :max_seq_len_cached, ...])
 
     def _postprocess(self, predictions):
         if paddle.distributed.get_rank() == 0:
@@ -491,7 +502,8 @@ class InferencePredictorMixin:
             else:
                 for i in range(len(self.pre_caches)):
                     inputs["pre_caches_{}".format(i)] = self.pre_caches[i].numpy()
-
+        inputs["cos_table"] = self.cos_table
+        inputs["sin_table"] = self.sin_table
         return inputs
 
 

@@ -29,9 +29,12 @@ MAX_LEN=4096
 export FLAGS_use_stream_safe_cuda_allocator=0
 
 # 使能Lccl
-export LCCL_ENABLE_FALLBACK=1
-export HCCL_OP_BASE_FFTS_MODE_ENABLE=TRUE
+# export LCCL_ENABLE_FALLBACK=1
+# export HCCL_OP_BASE_FFTS_MODE_ENABLE=TRUE
 export HCCL_BUFFSIZE=120
+
+# 内存算法
+export ATB_WORKSPACE_MEM_ALLOC_GLOBAL=1
 
 # export ATB_PROFILING_ENABLE=1
 
@@ -41,7 +44,7 @@ then
     export FLAGS_eager_delete_tensor_gb=0.5
 fi
 # export FLAGS_new_executor_serial_run=1
-export FLAGS_allocator_strategy="auto_growth"
+# export FLAGS_allocator_strategy="auto_growth"
 
 # model_dir="/home/data/acltransformer_testdata/weights/inference-dy7b-mp8/"
 # model_dir="/home/data/dataset/llama-7b/topp/inference-mp8-topp"

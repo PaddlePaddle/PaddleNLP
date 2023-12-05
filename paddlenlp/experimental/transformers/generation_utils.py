@@ -92,6 +92,8 @@ class GenerationInferenceModel(GenerationMixin):
             paddle.static.InputSpec(shape=[None, 1], dtype="bool", name="stop_flags"),  # stop_flags
             paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="tgt_ids"),  # tgt_ids
             paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="tgt_pos"),  # tgt_pos
+            paddle.static.InputSpec(shape=[None, None], dtype="float16", name="cos_table"),  # tgt_pos
+            paddle.static.InputSpec(shape=[None, None], dtype="float16", name="sin_table"),  # tgt_pos
             paddle.static.InputSpec(
                 shape=[None, 1, 1, None], dtype=dtype, name="tgt_generation_mask"
             ),  # tgt_generation_mask
@@ -150,6 +152,8 @@ class GenerationInferenceModel(GenerationMixin):
         stop_flags=None,
         tgt_ids=None,
         tgt_pos=None,
+        cos_table=None,
+        sin_table=None,
         tgt_generation_mask=None,
         pre_ids=None,
         stop_nums=None,
@@ -179,6 +183,8 @@ class GenerationInferenceModel(GenerationMixin):
         model_kwargs["presence_score"] = presence_score
         model_kwargs["logits_processors"] = logits_processors or LogitsProcessorList()
         model_kwargs["pre_caches"] = pre_caches
+        model_kwargs["cos_table"] = cos_table
+        model_kwargs["sin_table"] = sin_table
 
         ret = self.sample(
             input_ids,
