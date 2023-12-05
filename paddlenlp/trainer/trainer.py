@@ -88,7 +88,7 @@ from ..utils.env import (
     PADDLE_WEIGHTS_NAME,
     PREFIX_WEIGHTS_NAME,
 )
-from ..utils.import_utils import is_datasets_available
+from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
@@ -1046,6 +1046,22 @@ class Trainer:
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
             self._globalstep_last_start_time = time.time()
+
+            # Add additional memory in log.
+            if not self.args.skip_memory_metrics: 
+                logs.update(
+                    {
+                    "cpu_mem_used" : self._memory_tracker.cpu_mem_used()>>20,
+                    "cpu_mem_used_peak": self._memory_tracker.cpu_mem_used_peak >> 20,
+                    }
+                )
+                if is_paddle_cuda_available():
+                    logs.update(
+                        {
+                        "gpu_max_memory_allocated": paddle.device.cuda.max_memory_allocated() >> 20,
+                        "gpu_max_memory_reserved": paddle.device.cuda.max_memory_reserved() >> 20,
+                        }
+                    )
 
             self.log(logs, **kwargs)
 
