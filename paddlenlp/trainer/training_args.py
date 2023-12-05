@@ -710,6 +710,16 @@ class TrainingArguments:
         metadata={"help": "Whether to unify hybrid parallel checkpoint."},
     )
 
+    load_optimizer_and_scheduler: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Whether to load optimizer and scheduler."},
+    )
+
+    force_reshard_pp: Optional[bool] = field(
+        default=False,
+        metadata={"help": "reshard pp even if pp degree in the model and pp degree in script match"},
+    )
+
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
         if env_local_rank != -1 and env_local_rank != self.local_rank and paddle.distributed.get_world_size() > 1:
@@ -1364,13 +1374,16 @@ class TrainingArguments:
         else:
             return None
 
-    def sharded_name_suffix(self, shard_id=None):
+    def sharded_name_suffix(self, shard_id=None, pp_id=None):
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
-                name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
+                if pp_id is None:
+                    pp_id = self.pipeline_parallel_rank
+                assert isinstance(pp_id, int)
+                name.append(f"pp{pp_id:0>2d}")
             if self.sharding_parallel_degree > 1:
                 if shard_id is None:
                     shard_id = self.sharding_parallel_rank

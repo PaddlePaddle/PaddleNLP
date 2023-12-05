@@ -525,6 +525,7 @@ class Trainer:
                 resume_from_checkpoint,
                 base_weight_name=weight_name,
             )
+            self.model.set_state_dict(state_dict)
         else:
             if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
 
@@ -2255,6 +2256,11 @@ class Trainer:
                     path = os.path.join(checkpoint, optimizer_name)
                     if os.path.isfile(path):
                         opt_state_dict = paddle.load(path)
+
+        if not self.args.load_optimizer_and_scheduler:
+            tmp = self.optimizer.state_dict()
+            tmp["master_weights"] = opt_state_dict["master_weights"]
+            opt_state_dict = tmp
 
         # broadcast optimizer state in dp group
         opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
