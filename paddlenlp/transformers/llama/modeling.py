@@ -796,6 +796,20 @@ class LlamaAttention(nn.Layer):
             key_states = self.k_proj(hidden_states)
             value_states = self.v_proj(hidden_states)
             if self.reshard_layer is not None:
+                if self.sequence_parallel:
+                    assert self.seq_length % self.config.sep_parallel_degree == 0
+                    query_states = paddle.reshape(
+                        query_states,
+                        [-1, self.seq_length // self.config.sep_parallel_degree, self.num_heads * self.head_dim],
+                    )
+                    key_states = paddle.reshape(
+                        key_states,
+                        [-1, self.seq_length // self.config.sep_parallel_degree, self.num_heads * self.head_dim],
+                    )
+                    value_states = paddle.reshape(
+                        value_states,
+                        [-1, self.seq_length // self.config.sep_parallel_degree, self.num_heads * self.head_dim],
+                    )
                 query_states = self.reshard_layer(
                     query_states,
                     split_axis=2,
@@ -811,11 +825,11 @@ class LlamaAttention(nn.Layer):
                     split_axis=2,
                     concat_axis=1,
                 )
-                query_states = paddle.reshape_(
+                query_states = paddle.reshape(
                     query_states, [0, self.seq_length, -1, self.head_dim]
                 )  # [bs, seq_len, num_head/k, head_dim], k is sep degree
-                key_states = paddle.reshape_(key_states, [0, self.seq_length, -1, self.head_dim])
-                value_states = paddle.reshape_(value_states, [0, self.seq_length, -1, self.head_dim])
+                key_states = paddle.reshape(key_states, [0, self.seq_length, -1, self.head_dim])
+                value_states = paddle.reshape(value_states, [0, self.seq_length, -1, self.head_dim])
             else:
                 if self.sequence_parallel:
                     target_query_shape = [-1, self.seq_length, self.num_heads, self.head_dim]
@@ -833,7 +847,6 @@ class LlamaAttention(nn.Layer):
             kv_seq_len += past_key_value[0].shape[-3]
 
         if self.config.rope:
-            # TODO(pangengzheng): deal with position_ids outside
             if self.reshard_layer is not None:
                 batch_size, seq_length, _, _ = query_states.shape
                 position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))

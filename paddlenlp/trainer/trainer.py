@@ -1636,7 +1636,12 @@ class Trainer:
         if (
             self.args.world_size > 1
             and not self.args.use_hybrid_parallel
-            or not (in_pipeline_parallel_mode or in_sharding_parallel_mode or in_tensor_parallel_mode)
+            or not (
+                in_pipeline_parallel_mode
+                or in_sharding_parallel_mode
+                or in_tensor_parallel_mode
+                or in_sep_parallel_mode
+            )
         ):
             model = paddle.DataParallel(model)
             # Distributed training (should be after fp16 initialization)
