@@ -20,7 +20,13 @@ Model:
   fuse_attn_qkv: True
   use_recompute: True
   recompute_granularity:
+  enable_refined_recompute: False
+  sr: 0
+  refined_ops_patterns:
+    - {main_ops: [matmul_v2, elementwise_add], num: 0, pre_ops: [], suf_ops: []}
+    - {main_ops: [flash_attn], num: 0, pre_ops: [], suf_ops: []}
   no_recompute_layers:
+  sequence_parallel: False
 
 
 Distributed:

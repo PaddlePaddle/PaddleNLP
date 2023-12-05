@@ -102,6 +102,7 @@ class MultiHeadAttention(nn.Layer):
         scale_qk_coeff=1.0,
         use_recompute=False,
         recompute_granularity="full",
+        enable_refined_recompute=False,
         use_flash_attn=False,
         ipp=None,
         sequence_parallel=False,
@@ -117,6 +118,7 @@ class MultiHeadAttention(nn.Layer):
         self.scale_qk_coeff = scale_qk_coeff
         self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
+        self.enable_refined_recompute = enable_refined_recompute
         self.ipp = ipp
         self.use_flash_attn = use_flash_attn if flash_attention else None
         self.sequence_parallel = sequence_parallel
@@ -292,9 +294,15 @@ class MultiHeadAttention(nn.Layer):
         value = query if value is None else value
         # compute q ,k ,v
         if self.fuse_attn_qkv:
-            q, k, v, cache = self._fuse_prepare_qkv(query, use_cache, cache)
+            if self.enable_refined_recompute:
+                q, k, v, cache = auto.exclude_ops_in_recompute(self._fuse_prepare_qkv)(query, use_cache, cache)
+            else:
+                q, k, v, cache = self._fuse_prepare_qkv(query, use_cache, cache)
         else:
-            q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
+            if self.enable_refined_recompute:
+                q, k, v, cache = auto.exclude_ops_in_recompute(self._prepare_qkv)(query, key, value, use_cache, cache)
+            else:
+                q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
 
         if self.use_flash_attn and attn_mask is None:
             attn_func = self._flash_attention
@@ -302,14 +310,23 @@ class MultiHeadAttention(nn.Layer):
             attn_func = self.core_attn
 
         if self.use_recompute and self.recompute_granularity == "core_attn":
-            out, weights = auto.recompute(attn_func)(q, k, v, attn_mask)
+            if self.enable_refined_recompute:
+                out, weights = auto.recompute(auto.exclude_ops_in_recompute(attn_func))(q, k, v, attn_mask)
+            else:
+                out, weights = auto.recompute(attn_func)(q, k, v, attn_mask)
         else:
-            out, weights = attn_func(q, k, v, attn_mask=attn_mask)
+            if self.enable_refined_recompute:
+                out, weights = auto.exclude_ops_in_recompute(attn_func)(q, k, v, attn_mask=attn_mask)
+            else:
+                out, weights = attn_func(q, k, v, attn_mask=attn_mask)
 
         auto.shard_tensor(self.out_proj.weight, auto_env.get_mesh()[self.ipp], [auto_env.get_mesh().mp_dim, None])
 
         # project to output
-        out = self.out_proj(out)
+        if self.enable_refined_recompute:
+            out = auto.exclude_ops_in_recompute(self.out_proj)(out)
+        else:
+            out = self.out_proj(out)
 
         if self.sequence_parallel:
             # FIXME Hack to shard op for module (linear)
@@ -430,6 +447,7 @@ class TransformerDecoderLayer(nn.Layer):
         scale_qk_coeff=1.0,
         use_recompute=False,
         recompute_granularity="full",
+        enable_refined_recompute=False,
         use_flash_attn=False,
         use_fused_dropout_add=True,
         ipp=None,
@@ -445,6 +463,7 @@ class TransformerDecoderLayer(nn.Layer):
         self.normalize_before = normalize_before
         self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
+        self.enable_refined_recompute = enable_refined_recompute
         self.ipp = ipp
         self.sequence_parallel = sequence_parallel
 
@@ -468,6 +487,7 @@ class TransformerDecoderLayer(nn.Layer):
             scale_qk_coeff=scale_qk_coeff,
             use_recompute=use_recompute,
             recompute_granularity=recompute_granularity,
+            enable_refined_recompute=enable_refined_recompute,
             use_flash_attn=use_flash_attn,
             ipp=ipp,
             sequence_parallel=sequence_parallel,
@@ -490,11 +510,17 @@ class TransformerDecoderLayer(nn.Layer):
         else:
             self.activation = getattr(F, activation)
 
+    def linear1_func(self, tag):
+        return self.linear1(tag)
+
+    def linear2_func(self, tag):
+        return self.linear2(tag)
+
     def forward(self, tgt, memory, tgt_mask=None, use_cache=False, cache=None):
 
         auto.shard_tensor(self.linear1.weight, auto_env.get_mesh()[self.ipp], [None, auto_env.get_mesh().mp_dim])
         auto.shard_tensor(self.linear2.weight, auto_env.get_mesh()[self.ipp], [auto_env.get_mesh().mp_dim, None])
-
+            
         residual = tgt
 
         if self.normalize_before:
@@ -530,7 +556,10 @@ class TransformerDecoderLayer(nn.Layer):
         if self.sequence_parallel:
             # Enter TP Region
             auto.shard_tensor(tgt, auto_env.get_mesh()[0], [None, None, None])
-            tgt = self.linear2(self.activation(self.linear1(tgt)))
+            if self.recompute_granularity == 'full' and self.enable_refined_recompute:
+                tgt = auto.exclude_ops_in_recompute(self.linear2_func)(self.activation(auto.exclude_ops_in_recompute(self.linear1_func)(tgt)))
+            else:
+                tgt = self.linear2(self.activation(self.linear1(tgt)))
             # NOTE shard_op to cut off the SP sharding propagation backward.
             shard_op_for_sequence_parallel_linear(tgt)
 
@@ -544,10 +573,16 @@ class TransformerDecoderLayer(nn.Layer):
         else:
             # Mixed SP and TP Region
             if not self.use_fused_dropout_add:
-                tgt = self.dropout2(self.linear2(self.activation(self.linear1(tgt))))
+                if self.recompute_granularity == 'full' and self.enable_refined_recompute:
+                    tgt = self.dropout2(auto.exclude_ops_in_recompute(self.linear2_func)(self.activation(auto.exclude_ops_in_recompute(self.linear1_func)(tgt))))
+                else:
+                    tgt = self.dropout2(self.linear2_func(self.activation(self.linear1_func(tgt))))
                 tgt = residual + tgt
             else:
-                tgt = self.fused_dropout_add2(self.linear2(self.activation(self.linear1(tgt))), residual)
+                if self.recompute_granularity == 'full' and self.enable_refined_recompute:
+                    tgt = self.fused_dropout_add2(auto.exclude_ops_in_recompute(self.linear2_func)(self.activation(auto.exclude_ops_in_recompute(self.linear1_func)(tgt))), residual)
+                else:
+                    tgt = self.fused_dropout_add2(self.linear2_func(self.activation(self.linear1_func(tgt))), residual)
 
         if not self.normalize_before:
             tgt = self.norm2(tgt)
@@ -589,9 +624,16 @@ class GPTEmbeddings(nn.Layer):
             weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=initializer_range)),
         )
 
+        # self.output_word_embeddings = nn.Embedding(
+        #     vocab_size,
+        #     hidden_size,
+        #     weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=initializer_range)),
+        # )
+
         if freeze_embedding:
             self.word_embeddings.weight.learning_rate = 0.0
             self.position_embeddings.weight.learning_rate = 0.0
+            # self.output_word_embeddings.weight.learning_rate = 0.0
 
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
@@ -602,6 +644,7 @@ class GPTEmbeddings(nn.Layer):
             position_ids = seq_length - ones
 
         auto.shard_tensor(self.word_embeddings.weight, auto_env.get_mesh()[0], [auto_env.get_mesh().mp_dim, None])
+        # auto.shard_tensor(self.output_word_embeddings.weight, auto_env.get_mesh()[0], [auto_env.get_mesh().mp_dim, None])
 
         input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
@@ -618,6 +661,35 @@ class GPTEmbeddings(nn.Layer):
         embeddings = self.dropout(embeddings)
         return embeddings
 
+
+class GPTOutputEmbeddings(nn.Layer):
+    """
+    Embedding to calculate logits when we don't share the weight with input embedding.
+    """
+
+    def __init__(
+        self,
+        vocab_size,
+        hidden_size=768,
+        initializer_range=0.02,
+        freeze_embedding=False,
+    ):
+        super(GPTOutputEmbeddings, self).__init__()
+
+        self.output_word_embeddings = nn.Embedding(
+            vocab_size,
+            hidden_size,
+            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=initializer_range)),
+        )
+
+        if freeze_embedding:
+            self.output_word_embeddings.weight.learning_rate = 0.0
+
+
+    def forward(self, encoder_outputs=None):
+        auto.shard_tensor(self.output_word_embeddings.weight, auto_env.get_mesh()[-1], [auto_env.get_mesh().mp_dim, None])
+        logits = paddle.matmul(encoder_outputs, get_attr(self.output_word_embeddings, "weight"), transpose_y=True)
+        return logits
 
 class GPTModelAuto(nn.Layer):
     def __init__(
@@ -637,13 +709,13 @@ class GPTModelAuto(nn.Layer):
         fuse_attn_qkv=False,
         scale_qk_by_layer_num=True,
         recompute_granularity="full",
+        enable_refined_recompute=False,
         freeze_embedding=False,
         use_flash_attn=False,
         fused_softmax_with_triangular=False,
         use_fused_dropout_add=True,
         sequence_parallel=False,
     ):
-
         super(GPTModelAuto, self).__init__()
 
         self.initializer_range = initializer_range
@@ -701,6 +773,7 @@ class GPTModelAuto(nn.Layer):
                     scale_qk_coeff=num_layers if scale_qk_by_layer_num else 1.0,
                     use_recompute=use_recompute,
                     recompute_granularity=recompute_granularity,
+                    enable_refined_recompute=enable_refined_recompute,
                     use_fused_dropout_add=use_fused_dropout_add,
                     use_flash_attn=use_flash_attn,
                     ipp=layer_to_pipe[i],
@@ -716,6 +789,13 @@ class GPTModelAuto(nn.Layer):
             use_recompute=use_recompute,
             recompute_granularity=recompute_granularity,
             sequence_parallel=sequence_parallel,
+        )
+
+        self.output_embeddings = GPTOutputEmbeddings(
+            vocab_size,
+            hidden_size,
+            self.initializer_range,
+            freeze_embedding,
         )
 
     def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None):
@@ -761,8 +841,10 @@ class GPTModelAuto(nn.Layer):
             use_cache=use_cache,
             cache=cache,
         )
-        
-        return encoder_outputs
+
+        logits = self.output_embeddings(encoder_outputs)
+
+        return encoder_outputs, logits
 
 
 class GPTForPretrainingAuto(nn.Layer):
@@ -784,22 +866,19 @@ class GPTForPretrainingAuto(nn.Layer):
         self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
     ):
 
-        outputs = self.gpt(
+        outputs, logits = self.gpt(
             input_ids, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
         )
         if use_cache:
-            encoder_outputs, cached_kvs = outputs[:2]
-        else:
-            encoder_outputs = outputs
+            _, cached_kvs = outputs[:2]
+        # else:
+        #     encoder_outputs = outputs
 
-        # FIXME should we force the encoder_outputs mesh is the last stage ? 
-        if self.sequence_parallel:
-            auto.shard_tensor(encoder_outputs, auto_env.get_mesh()[-1], [None, None, None])
-
-        x_dims_mapping = [auto_env.get_mesh().dp_dim] + [None] * (len(encoder_outputs.shape) - 1)
-        w_dims_mapping = [auto_env.get_mesh().mp_dim, None]
-        matmul = auto.shard_op(paddle.matmul, auto_env.get_mesh()[-1], [x_dims_mapping, w_dims_mapping, None])
-        logits = matmul(encoder_outputs, get_attr(self.gpt.embeddings.word_embeddings, "weight"), transpose_y=True)
+        # x_dims_mapping = [auto_env.get_mesh().dp_dim] + [None] * (len(encoder_outputs.shape) - 1)
+        # w_dims_mapping = [auto_env.get_mesh().mp_dim, None]
+        # matmul = auto.shard_op(paddle.matmul, auto_env.get_mesh()[-1], [x_dims_mapping, w_dims_mapping, None])
+        # logits = matmul(encoder_outputs, get_attr(self.gpt.embeddings.word_embeddings, "weight"), transpose_y=True)
+        # logits = paddle.matmul(encoder_outputs, get_attr(self.gpt.embeddings.output_word_embeddings, "weight"), transpose_y=True)
 
         if use_cache:
             return logits, cached_kvs
