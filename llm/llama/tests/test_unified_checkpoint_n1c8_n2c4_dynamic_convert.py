@@ -112,7 +112,7 @@ class TestModelOnN1C8ToN2C4(TestMultipleGpus):
     def setUp(self):
         os.environ.update(environment_variables)
         self.configs = get_pretrain_arguments(pretrain_arguments)
-        self.k = 2  # max: 16, min: 1
+        self.k = 16  # max: 16, min: 1
 
     def move_checkpoint(self):
         save_steps = pretrain_arguments["save_steps"]
