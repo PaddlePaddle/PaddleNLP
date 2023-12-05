@@ -62,6 +62,7 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
             continue
         else
             # model_zoo/gpt-3
+            case_list[${#case_list[*]}]=llama_auto
             case_list[${#case_list[*]}]=gpt-3_auto
             case_list[${#case_list[*]}]=gpt-3_dygraph
         fi
@@ -107,8 +108,13 @@ if [[ ${#case_list[*]} -ne 0 ]];then
     export FLAGS_before_hook=0
     for case in ${case_list[*]};do
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: ${case} \033"
-        if [[ ${case} == "gpt-3_auto" ]];then
-            bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh case_list_auto $FLAGS_before_hook
+        if [[ ${case} == "llama_auto" ]];then
+            bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh llama_case_list_auto $FLAGS_before_hook
+            print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` ${case}
+            export FLAGS_before_hook=1
+            let case_num++
+        elif [[ ${case} == "gpt-3_auto" ]];then
+            bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh gpt_case_list_auto $FLAGS_before_hook
             print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` ${case}
             export FLAGS_before_hook=1
             let case_num++
