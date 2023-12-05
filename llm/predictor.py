@@ -717,11 +717,7 @@ def create_predictor(
 ):
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
     # init chat_template for tokenizer
-    if predictor_args.chat_template is not None:
-        if predictor_args.chat_template == "None":
-            tokenizer.chat_template = None
-        else:
-            init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
+    init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
 
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer) and not tokenizer.pad_token:
