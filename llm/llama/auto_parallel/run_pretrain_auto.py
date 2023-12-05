@@ -607,9 +607,7 @@ def main():
             if (step + 1) % training_args.logging_steps == 0:
                 num_steps = global_step - global_step_last_logged
                 logs = {}
-
                 logs["loss"] = round(tr_loss / num_steps, 8)
-                logs["loss_cur_dp"] = round(tr_loss / num_steps, 8)
                 logs["learning_rate"] = float("{0:.3e}".format(engine.optimizer.get_lr()))
                 logs["global_step"] = int(global_step)
                 logs.update(
