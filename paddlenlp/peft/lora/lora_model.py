@@ -51,6 +51,7 @@ class LoRAModel(nn.Layer):
 
     def __init__(self, model, lora_config: LoRAConfig) -> None:
         super().__init__()
+        self.quantized = False
         self.lora_config = lora_config
         self.lora_split_mapping = {}
         if self.lora_config.dtype is None:
