@@ -88,7 +88,7 @@ from ..utils.env import (
     PADDLE_WEIGHTS_NAME,
     PREFIX_WEIGHTS_NAME,
 )
-from ..utils.import_utils import is_datasets_available
+from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
