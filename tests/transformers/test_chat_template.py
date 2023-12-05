@@ -14,7 +14,9 @@
 # limitations under the License.
 from __future__ import annotations
 
+import os
 import sys
+import tempfile
 import unittest
 from typing import Optional
 
@@ -113,6 +115,15 @@ class ChatTemplateIntegrationTest(unittest.TestCase):
         final_query = tokenizer.apply_chat_template(query, tokenize=False)
         expected_query = "<s>### Instruction: 你好  ### Response:您好，我是个人人工智能助手 </s>### Instruction:今天吃啥  ### Response:"
         self.assertEqual(final_query, expected_query)
+
+    def test_linlyai_chinese_llama_2_chat_template_with_none_saved(self):
+        tokenizer = AutoTokenizer.from_pretrained("linly-ai/chinese-llama-2-7b")
+        tokenizer.chat_template = None
+        with tempfile.TemporaryDirectory() as tempdir:
+            tokenizer.save_pretrained(tempdir)
+
+            chat_template_file = os.path.join(tempdir, "chat_template.json")
+            self.assertFalse(os.path.exists(chat_template_file))
 
     def test_chatglm_bellegroup(self):
         # refer to: https://huggingface.co/THUDM/chatglm-6b/blob/main/modeling_chatglm.py#L1267
