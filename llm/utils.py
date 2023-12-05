@@ -392,6 +392,7 @@ def dybatch_preprocess(
     architectures: str,
     top_p: float,
     temperature: float,
+    eos_token_id: int | list[list[int]],
     pre_caches_length: int = 0,
     benchmark: bool = False,
     chat_template: Optional[str] = None,
@@ -485,16 +486,12 @@ def dybatch_preprocess(
         0,
     ] * bs
     tgt_pos = np.array(tgt_pos).astype("int64")
-    inputs["eos_token_id"] = (
-        np.array(
-            [
-                tokenizer.eos_token_id,
-            ]
-            * bs
-        )
-        .reshape(-1, 1)
-        .astype("int64")
-    )
+
+    if isinstance(eos_token_id, int):
+        eos_token_id = [eos_token_id]
+
+    inputs["eos_token_id"] = np.array(eos_token_id * bs).reshape(-1, 1).astype("int64")
+
     inputs["top_p"] = (
         np.array(
             [

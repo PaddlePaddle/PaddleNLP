@@ -20,6 +20,7 @@ import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from threading import Thread
+from typing import List, Optional
 
 import numpy as np
 import paddle
@@ -34,7 +35,7 @@ from utils import (
     load_real_time_tokens,
 )
 
-from paddlenlp.generation import TextIteratorStreamer
+from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.trainer import PdArgumentParser
@@ -152,6 +153,20 @@ def init_dist_env():
     return tensor_parallel_rank, tensor_parallel_degree
 
 
+def get_eos_token_id(
+    tokenizer: PretrainedTokenizer, generation_config: Optional[GenerationConfig] = None
+) -> int | List[List[int]]:
+    """get eos_token_id from generation_config or tokenizer
+
+    Returns:
+        int | List[int]: eos_token_id to stop the generation
+    """
+    if generation_config is None or generation_config.eos_token_id is None:
+        return tokenizer.eos_token_id
+
+    return generation_config.eos_token_id
+
+
 class BasePredictor:
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
         self.model_config = AutoConfig.from_pretrained(config.model_name_or_path)
@@ -164,6 +179,14 @@ class BasePredictor:
         self.return_tensors = "pd"
         self.tensor_parallel_rank, self.tensor_parallel_degree = init_dist_env()
         self.model_config.tensor_parallel_rank, self.model_config.tensor_parallel_degree = init_dist_env()
+
+        try:
+            self.generation_config = GenerationConfig.from_pretrained(config.model_name_or_path)
+        except:
+            logger.warning(
+                "Can't find generation config, so it will not use generation_config field in the model config"
+            )
+            self.generation_config = None
 
     def _preprocess(self, source):
         if self.config.chat_template is not None:
@@ -251,7 +274,7 @@ class DygraphPredictor(BasePredictor):
             **inputs,
             max_new_tokens=self.config.max_length,
             bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=self.tokenizer.eos_token_id,
+            eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
             pad_token_id=self.tokenizer.pad_token_id,
             decode_strategy=self.config.decode_strategy,
             temperature=self.config.temperature,
@@ -270,7 +293,7 @@ class DygraphPredictor(BasePredictor):
             streamer=text_streamer,
             max_new_tokens=self.config.max_length,
             bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=self.tokenizer.eos_token_id,
+            eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
             pad_token_id=self.tokenizer.pad_token_id,
             decode_strategy="greedy_search"
             if self.config.top_k == 1 and self.config.top_p == 1.0
@@ -392,6 +415,14 @@ class InferencePredictorMixin:
                 )
                 self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, self.num_layers, axis=0)]
 
+        try:
+            self.generation_config = GenerationConfig.from_pretrained(config.model_name_or_path)
+        except:
+            logger.warning(
+                "Can't find generation config, so it will not use generation_config field in the model config"
+            )
+            self.generation_config = None
+
     def _postprocess(self, predictions):
         if paddle.distributed.get_rank() == 0:
             tokens: np.ndarray = load_real_time_tokens()
@@ -419,6 +450,7 @@ class InferencePredictorMixin:
             self.architectures,
             top_p=self.config.top_p,
             temperature=self.config.temperature,
+            eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
             benchmark=self.config.benchmark,
             pre_caches_length=pre_caches_length,
             chat_template=self.config.chat_template,
