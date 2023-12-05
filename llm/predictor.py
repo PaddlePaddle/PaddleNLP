@@ -95,7 +95,11 @@ class PredictorArgument:
     chat_template: str = field(
         default=None,
         metadata={
-            "help": "the path of `chat_template.json` file to handle multi-rounds conversation. If is None, it will not use `chat_template.json`; If is equal with `model_name_or_path`, it will use the default loading; If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
+            "help": "the path of `chat_template.json` file to handle multi-rounds conversation. "
+            "If is None(do not set --chat_template argument), it will use the default `chat_template.json`;"
+            "If is equal with `model_name_or_path`, it will use the default loading; "
+            "If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
+            "If is none string, it will not use chat_template.json."
         },
     )
     enable_memory_optim: bool = field(
@@ -189,16 +193,9 @@ class BasePredictor:
             self.generation_config = None
 
     def _preprocess(self, source):
-        if self.config.chat_template is not None:
-            if self.tokenizer.chat_template is None:
-                logger.warning(
-                    f"Tokenizer<{self.tokenizer}> doesn't have chat_template field, so it will not use chat_template."
-                    "Or you can customize your tokenizer, please refer to:"
-                    "https://paddlenlp.readthedocs.io/zh/latest/get_started/chat_template.html"
-                )
-            else:
-                source = [source] if isinstance(source, str) else source
-                source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
+        if self.tokenizer.chat_template is not None:
+            source = [source] if isinstance(source, str) else source
+            source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
         tokenized_source = self.tokenizer(
             source,
@@ -438,7 +435,7 @@ class InferencePredictorMixin:
         self.tgt_generation_mask[:] = 0
         pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
 
-        if self.config.chat_template is not None:
+        if self.tokenizer.chat_template is not None:
             source = [source] if isinstance(source, str) else source
             source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
@@ -453,7 +450,6 @@ class InferencePredictorMixin:
             eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
             benchmark=self.config.benchmark,
             pre_caches_length=pre_caches_length,
-            chat_template=self.config.chat_template,
         )
 
         if "chatglmforcausallm" == self.architectures.lower():
