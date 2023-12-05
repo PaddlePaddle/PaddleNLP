@@ -79,12 +79,6 @@ def get_unfinished_flag(
     """
     if isinstance(eos_token_id, int):
         unfinished_flag = paddle.logical_and(unfinished_flag, input_ids[:, -1:] != eos_token_id)
-    elif isinstance(eos_token_id[0], int):
-        eos_token_id_tensor = paddle.to_tensor([eos_token_id])
-        is_last_tokens_equal = paddle.all(
-            paddle.equal(input_ids[:, -len(eos_token_id) :], eos_token_id_tensor), axis=-1
-        ).unsqueeze(-1)
-        unfinished_flag = paddle.logical_and(unfinished_flag, ~is_last_tokens_equal)
     else:
         batch_unfinish_flag = None
         for batch_eos_token_id in eos_token_id:
@@ -860,6 +854,13 @@ class GenerationMixin(object):
             else:
                 input_ids = self.prepare_decoder_input_ids_for_generation(
                     input_ids, decoder_start_token_id, bos_token_id
+                )
+        # streamer
+        if streamer is not None:
+            # streamer couldn't support beam_search strategy
+            if generation_config.decode_strategy == "beam_search" or generation_config.num_beams > 1:
+                raise ValueError(
+                    "`streamer` cannot be used with beam search (yet!). Make sure that `num_beams` is set to 1."
                 )
 
         if pad_token_id is None and eos_token_id is not None:
