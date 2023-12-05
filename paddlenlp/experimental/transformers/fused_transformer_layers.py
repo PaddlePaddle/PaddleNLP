@@ -29,7 +29,7 @@ from paddle.nn.quant import weight_only_linear
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
-from paddle_custom_device.npu import qkv_transpose_split, encode_rotary_qk, write_cache_kv, transpose_remove_padding, rebuild_padding
+from paddle_custom_device.npu import qkv_transpose_split, encode_rotary_qk, write_cache_kv, transpose_remove_padding, rebuild_padding, masked_multihead_attention_npu
 
 if is_paddlenlp_ops_available():
     from paddlenlp_ops import (
@@ -485,7 +485,8 @@ class FusedMultiTransformer(Layer):
         caches=None,
         pre_caches=None,
         pre_caches_length=0,
-        rotary_embs=None,
+        cos_table=None,
+        sin_table=None,
         rotary_emb_dims=0,
         seq_lens=None,
         time_step=None,
@@ -564,7 +565,8 @@ class FusedMultiTransformer(Layer):
                 encode_rotary_qk(
                     q_out,
                     k_out,
-                    rotary_embs,
+                    cos_table,
+                    sin_table,
                     seq_lens,
                     rotary_emb_dims=rotary_emb_dims,
                     use_neox=self.use_neox_rotary_style,
@@ -591,15 +593,16 @@ class FusedMultiTransformer(Layer):
                 fmha_out = transpose_remove_padding(qktv_out, seq_lens, padding_offset)
 
             else:
-                fmha_out = masked_multihead_attention(
+                fmha_out = masked_multihead_attention_npu(
                     x=qkv_out,
                     cache_kv=caches[i],
                     src_mask=attn_mask,
                     sequence_lengths=seq_lens,
-                    rotary_tensor=rotary_embs,
+                    cos_table=cos_table,
+                    sin_table=sin_table,
                     rotary_emb_dims=rotary_emb_dims,
                     use_neox_rotary_style=self.use_neox_rotary_style,
-                )[0]
+                )
 
             # out_linear
             if self.use_weight_only:

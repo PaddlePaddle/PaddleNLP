@@ -18,7 +18,7 @@ import paddle
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
-from paddle_custom_device.npu import fused_get_rotary_embedding, get_padding_offset
+from paddle_custom_device.npu import fused_get_rotary_embedding, get_padding_offset, atb_gather
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformer,
@@ -88,6 +88,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             ), "Expected quant_algo equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
                 self.quant_algo
             )
+
         self.embed_tokens = nn.Embedding(
             self.vocab_size,
             self.hidden_size,
@@ -220,6 +221,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         past_key_values=None,
         output_attentions=False,
         output_hidden_states=None,
+        cos_table=None,
+        sin_table=None,
         return_dict=False,
         **kwargs,
     ):
@@ -274,9 +277,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         position_offset = 0
         if not is_decoder and pre_caches is not None:
             position_offset = 128
-        new_rope = fused_get_rotary_embedding(
-            ids_remove_padding, position_ids, self.head_dim_shape_tensor, position_offset, True
-        )
 
         with paddle.base.framework._stride_in_no_check_dy2st_diff():
             hidden_states, _ = self.transformer_block(
@@ -289,7 +289,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 pre_caches=pre_caches,
                 pre_caches_length=position_offset,
                 seq_lens=seq_lens,
-                rotary_embs=new_rope,
+                cos_table=atb_gather(position_ids, cos_table),
+                sin_table=atb_gather(position_ids, sin_table),
                 rotary_emb_dims=1,
                 time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
             )
@@ -467,6 +468,9 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         cache = kwargs.get("cache", None)
         pre_caches = kwargs.get("pre_caches", None)
         inputs_embeds = kwargs.get("inputs_embeds", None)
+        cos_table = kwargs.get("cos_table", None)
+        sin_table = kwargs.get("sin_table", None)
+
         if cache is not None:
             input_ids = tgt_ids
             position_ids = tgt_pos
@@ -486,6 +490,8 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
             "seq_len_decoder": seq_len_decoder,
             "cache": cache,
             "pre_caches": pre_caches,
+            "cos_table": cos_table,
+            "sin_table": sin_table,
         }
         return model_inputs
 
@@ -506,6 +512,8 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
+        cos_table=None,
+        sin_table=None,
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -528,6 +536,8 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            cos_table=cos_table,
+            sin_table=sin_table,
         )
 
         hidden_states = outputs[0]
