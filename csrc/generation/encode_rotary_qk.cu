@@ -105,6 +105,7 @@ void LaunchRotaryQK(const paddle::Tensor& q,
 
     const int32_t batch_size = q.shape()[0];
     const int32_t head_num = q.shape()[1];
+    const int32_t kv_head_num = kv.shape()[1];
     const int32_t seq_len = q.shape()[2];
     const int32_t dim_head = q.shape()[3];
 
@@ -147,7 +148,8 @@ void LaunchRotaryQK(const paddle::Tensor& q,
             head_num,
             seq_len * rotary_emb_dims,
             last_dim);
-        RotaryKernel<<<grid, BlockSize, 0, cu_stream>>>(
+        dim3 grid_k(batch_size, kv_head_num, seq_len * rotary_emb_dims);
+        RotaryKernel<<<grid_k, BlockSize, 0, cu_stream>>>(
             k_data,
             cos_emb,
             sin_emb,
@@ -155,7 +157,7 @@ void LaunchRotaryQK(const paddle::Tensor& q,
             k_out_data,
             rotary_emb_dims,
             batch_size,
-            head_num,
+            kv_head_num,
             seq_len * rotary_emb_dims,
             last_dim);
     } else {

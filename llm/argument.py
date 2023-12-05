@@ -44,6 +44,12 @@ class DataArgument:
             "help": "Weather to return `MapDataset` or an `IterDataset`.True for `IterDataset`. False for `MapDataset`."
         },
     )
+    chat_template: str = field(
+        default=None,
+        metadata={
+            "help": "the path of `chat_template.json` file to handle multi-rounds conversation. If is None, it will not use `chat_template.json`; If is equal with `model_name_or_path`, it will use the default loading; If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
+        },
+    )
 
 
 @dataclass
@@ -52,6 +58,25 @@ class ModelArgument:
         default=None, metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
+    weight_quantize_algo: str = field(
+        default=None,
+        metadata={
+            "help": "Model weight quantization algorithm including 'nf4', 'fp4','weight_only_int4', 'weight_only_int8'."
+        },
+    )
+    weight_blocksize: int = field(
+        default=64,
+        metadata={"help": "Block size for weight quantization(Only available for nf4 or fp4 quant_scale.)."},
+    )
+    weight_double_quant: bool = field(
+        default=False, metadata={"help": "Whether apply double quant(Only available for nf4 or fp4 quant_scale.)."}
+    )
+    weight_double_quant_block_size: int = field(
+        default=256,
+        metadata={
+            "help": "Block size for quant_scale of weight quant_scale(Only available for nf4 or fp4 quant_scale.)"
+        },
+    )
 
     # LoRA related parameters
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})

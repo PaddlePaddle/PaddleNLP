@@ -44,6 +44,7 @@ from . import (
     ops,
     peft,
     prompt,
+    quantization,
     seq2vec,
     trainer,
     transformers,

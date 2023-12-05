@@ -15,7 +15,6 @@
 
 from typing import Optional
 
-import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
@@ -80,9 +79,9 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         self.multi_query_group_num = config.multi_query_group_num
 
         self.use_weight_only = False
-        self.quant_bits = config.quant_bits
-        self.quant_algo = "weight_only_int" + str(self.quant_bits)
-        if self.quant_bits != -1:
+        self.weight_only_quant_bits = config.weight_only_quant_bits
+        self.quant_algo = "weight_only_int" + str(self.weight_only_quant_bits)
+        if self.weight_only_quant_bits != -1:
             self.use_weight_only = True
 
         if self.use_weight_only:
@@ -161,7 +160,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             config.num_attention_heads,
             config.ffn_hidden_size,
             dropout_rate=0.0,
-            quant_bits=self.quant_bits,
+            weight_only_quant_bits=self.weight_only_quant_bits,
             activation="swiglu",
             normalize_before=True,
             num_layers=config.num_hidden_layers,
@@ -180,6 +179,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
             epsilon=config.layernorm_epsilon,
             norm_type="rmsnorm",
+            kv_num_heads=config.multi_query_group_num,
         )
 
         if self.use_weight_only:
@@ -310,45 +310,20 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         for i in range(self.num_layers):
             ln_scale = state_dict.pop(key("encoder.layers.{}.input_layernorm.weight".format(i)))
 
-            q_weight = state_dict.pop(key("encoder.layers.{}.self_attention.query.weight".format(i)))
-            k_weight = state_dict.pop(key("encoder.layers.{}.self_attention.key.weight".format(i)))
-            v_weight = state_dict.pop(key("encoder.layers.{}.self_attention.value.weight".format(i)))
-            q_bias = state_dict.pop(key("encoder.layers.{}.self_attention.query.bias".format(i)))
-            k_bias = state_dict.pop(key("encoder.layers.{}.self_attention.key.bias".format(i)))
-            v_bias = state_dict.pop(key("encoder.layers.{}.self_attention.value.bias".format(i)))
-
-            k_weight = k_weight.reshape([self.hidden_size, self.multi_query_group_num, 1, self.head_size])
-            k_bias = k_bias.reshape([self.multi_query_group_num, 1, self.head_size])
-            v_weight = v_weight.reshape([self.hidden_size, self.multi_query_group_num, 1, self.head_size])
-            v_bias = v_bias.reshape([self.multi_query_group_num, 1, self.head_size])
-
-            k_weight = np.tile(k_weight, [1, 1, self.num_heads // self.multi_query_group_num, 1])
-            v_weight = np.tile(v_weight, [1, 1, self.num_heads // self.multi_query_group_num, 1])
-            k_bias = np.tile(k_bias, [1, self.num_heads // self.multi_query_group_num, 1])
-            v_bias = np.tile(v_bias, [1, self.num_heads // self.multi_query_group_num, 1])
-            k_weight = k_weight.reshape([self.hidden_size, self.hidden_size])
-            k_bias = k_bias.reshape([self.hidden_size])
-            v_weight = v_weight.reshape([self.hidden_size, self.hidden_size])
-            v_bias = v_bias.reshape([self.hidden_size])
-
-            concated_qkv_weight = np.concatenate([q_weight, k_weight, v_weight], axis=-1)
-            concated_qkv_weight = concated_qkv_weight.transpose(1, 0)
-            concated_qkv_weight = concated_qkv_weight.reshape([3 * self.hidden_size, self.hidden_size])
+            concated_qkv_weight = state_dict.pop(
+                key("encoder.layers.{}.self_attention.query_key_value.weight".format(i))
+            )
+            concated_qkv_weight = concated_qkv_weight.transpose([1, 0])
             concated_qkv_weight = paddle.to_tensor(concated_qkv_weight)
 
-            concated_qkv_bias = np.concatenate([q_bias, k_bias, v_bias], axis=-1)
-            concated_qkv_bias = concated_qkv_bias.reshape([3 * self.hidden_size])
+            concated_qkv_bias = state_dict.pop(key("encoder.layers.{}.self_attention.query_key_value.bias".format(i)))
             concated_qkv_bias = paddle.to_tensor(concated_qkv_bias)
 
             out_proj_weight = state_dict.pop(key("encoder.layers.{}.self_attention.dense.weight".format(i)))
 
             ffn_ln_scale = state_dict.pop(key("encoder.layers.{}.post_attention_layernorm.weight".format(i)))
 
-            # shuffle the column of ffn1's weight for fine grained FM
             ffn1_weight = state_dict.pop(key("encoder.layers.{}.mlp.dense_h_to_4h.weight".format(i)))
-            ffn1_weight_0 = ffn1_weight[..., 0::2]
-            ffn1_weight_1 = ffn1_weight[..., 1::2]
-            ffn1_weight = paddle.concat([ffn1_weight_0, ffn1_weight_1], axis=-1)
             ffn2_weight = state_dict.pop(key("encoder.layers.{}.mlp.dense_4h_to_h.weight".format(i)))
 
             self.transformer_block.ln_scales[i].set_value(ln_scale)
@@ -423,7 +398,7 @@ class ChatGLMv2ForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMv2Pret
                 [
                     2,
                     max_batch_size,
-                    config.num_attention_heads // max(config.tensor_parallel_degree, 1),
+                    config.multi_query_group_num,
                     max_length,
                     config.hidden_size // config.num_attention_heads,
                 ]

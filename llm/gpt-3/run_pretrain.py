@@ -37,6 +37,7 @@ from paddlenlp.transformers import (
     GPTForCausalLM,
     GPTForCausalLMPipe,
     LinearAnnealingWithWarmupDecay,
+    register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
@@ -133,12 +134,6 @@ class ModelArguments:
         default=1,
         metadata={"help": "virtual_pp_degree"},
     )
-    continue_training: bool = field(
-        default=False,
-        metadata={
-            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
-        },
-    )
     fused_linear: bool = field(
         default=False,
         metadata={"help": "gpt, whether to fuse linear projection"},
@@ -147,6 +142,14 @@ class ModelArguments:
         default=False,
         metadata={"help": "gpt, whether to fuse attention qkv"},
     )
+    fuse_attention_ffn: bool = field(
+        default=False,
+        metadata={"help": "whether to fuse first up and gate proj in mlp block"},
+    )
+    recompute_granularity: str = field(
+        default="full",
+        metadata={"help": "Choose among ['full', 'core_attn', 'full_attn']"},
+    )
     enable_fuse_transformer: bool = field(
         default=False,
         metadata={"help": "gpt, enable_fuse_transformer"},
@@ -154,10 +157,19 @@ class ModelArguments:
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
     continue_training: bool = field(
-        default=True,
+        default=False,
         metadata={
-            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
+            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. "
+            + "If set True, the model_name_or_path argument must exist in the paddlenlp models."
         },
+    )
+    sequence_parallel: bool = field(
+        default=False,
+        metadata={"help": "whether to use sequence parallel"},
+    )
+    fuse_sequence_parallel_allreduce: bool = field(
+        default=False,
+        metadata={"help": "whether to use fuse sequence parallel allreduce"},
     )
 
 
@@ -377,17 +389,21 @@ def main():
     if not model_args.continue_training:
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
         logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
-
-    config.output_attentions = model_args.output_attentions
+    config.seq_length = data_args.max_seq_length
+    config.use_flash_attention = model_args.use_flash_attention
+    config.fuse_attention_qkv = model_args.fuse_attention_qkv
+    config.fuse_attention_ffn = model_args.fuse_attention_ffn
     config.virtual_pp_degree = model_args.virtual_pp_degree
+    config.sequence_parallel = model_args.sequence_parallel
+    config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
+    config.output_attentions = model_args.output_attentions
     config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
     config.hidden_dropout_prob = model_args.hidden_dropout_prob
     config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
     config.enable_fuse_transformer = model_args.enable_fuse_transformer
-    config.fuse_attention_qkv = model_args.fuse_attention_qkv
-    config.use_recompute = training_args.recompute
-    config.use_flash_attention = model_args.use_flash_attention
 
+    config.recompute_granularity = model_args.recompute_granularity
+    config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
 
@@ -412,6 +428,14 @@ def main():
         )
     else:
         model = model_class.from_config(config, dtype=dtype)
+
+    if model_args.sequence_parallel:
+        register_sequence_parallel_allreduce_hooks(
+            model, training_args.gradient_accumulation_steps, model_args.fuse_sequence_parallel_allreduce
+        )
+
+    if training_args.recompute:
+        model.recompute_enable()
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:

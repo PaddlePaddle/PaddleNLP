@@ -54,6 +54,7 @@ from paddlenlp.utils.env import (
     LEGACY_CONFIG_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
+    PYTORCH_WEIGHTS_INDEX_NAME,
     PYTORCH_WEIGHTS_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
@@ -385,7 +386,7 @@ def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conver
         # for local file, we use support_conversion to select paddle or torch weight.
         file_name = PYTORCH_WEIGHTS_NAME if support_conversion else PADDLE_WEIGHTS_NAME
 
-    file_name_list = [SAFE_WEIGHTS_NAME] + [file_name]
+    file_name_list = [SAFE_WEIGHTS_NAME] + [file_name] + [PYTORCH_WEIGHTS_INDEX_NAME] + [SAFE_WEIGHTS_INDEX_NAME]
     resolved_file = None
     for fn in file_name_list:
         resolved_file = cached_file_for_hf_hub(
@@ -1717,7 +1718,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # Weight quantization if not yet quantized & update loaded_keys
         if config.quantization_config.is_weight_quantize():
             try:
-                from ..utils.quantization import (
+                from ..quantization.quantization_utils import (
                     convert_to_quantize_state_dict,
                     update_loaded_state_dict_keys,
                 )
@@ -1727,12 +1728,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 state_dict = convert_to_quantize_state_dict(
                     state_dict,
                     quantization_linear_list,
-                    config.quantization_config.weight_quantize_algo,
+                    config.quantization_config,
                     dtype,
                 )
                 loaded_keys = [k for k in state_dict.keys()]
             else:
-                loaded_keys = update_loaded_state_dict_keys(loaded_keys, quantization_linear_list)
+                loaded_keys = update_loaded_state_dict_keys(
+                    loaded_keys, quantization_linear_list, config.quantization_config
+                )
             if keep_in_fp32_modules is None:
                 keep_in_fp32_modules = ["quant_scale"]
             else:
@@ -1868,7 +1871,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     state_dict = convert_to_quantize_state_dict(
                         state_dict,
                         quantization_linear_list,
-                        config.quantization_config.weight_quantize_algo,
+                        config.quantization_config,
                         dtype,
                     )
 
@@ -2068,7 +2071,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         if config.quantization_config.is_weight_quantize():
             try:
-                from ..utils.quantization import replace_with_quantization_linear
+                from ..quantization.quantization_utils import (
+                    replace_with_quantization_linear,
+                )
             except ImportError:
                 raise ImportError("You need to install paddlepaddle >= 2.5.2")
 
@@ -2117,8 +2122,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if not is_sharded and state_dict is None:
             # Time to load the checkpoint
             if convert_from_torch:
-                if resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME) or resolved_archive_file.endswith(
-                    SAFE_WEIGHTS_NAME
+                if (
+                    resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME)
+                    or resolved_archive_file.endswith(PYTORCH_WEIGHTS_INDEX_NAME)
+                    or resolved_archive_file.endswith(SAFE_WEIGHTS_NAME)
+                    or resolved_archive_file.endswith(SAFE_WEIGHTS_INDEX_NAME)
                 ):
                     # try to get the name-mapping info
                     logger.info(
@@ -2159,7 +2167,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 if not isinstance(state_dict[k], paddle.Tensor):
                     with device_guard():
                         state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
-
         # 3. init the model
         init_args = config["init_args"] or ()
         with ContextManagers(init_contexts):
@@ -2176,7 +2183,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             with ContextManagers(quantization_init_contexts):
                 quantization_linear_list = replace_with_quantization_linear(
                     model=model,
-                    quant_algo=config.quantization_config.weight_quantize_algo,
+                    quantization_config=config.quantization_config,
                     llm_int8_threshold=config.quantization_config.llm_int8_threshold,
                 )
 

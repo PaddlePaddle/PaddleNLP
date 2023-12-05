@@ -20,7 +20,6 @@ from .batch_sampler import *
 from .env import CONFIG_NAME, GENERATION_CONFIG_NAME, LEGACY_CONFIG_NAME
 from .import_utils import install_package, uninstall_package
 from .initializer import to
-from .quantization_config import QuantizationConfig
 from .serialization import load_torch
 
 # hack impl for EagerParamBase to function
