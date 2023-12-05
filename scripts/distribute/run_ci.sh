@@ -53,7 +53,6 @@ install_paddlenlp(){
     cd -
     python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
 }
-
 ####################################
 get_diff_TO_case(){
 cd ${nlp_dir}
@@ -70,6 +69,8 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
         continue
     elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
         continue
+    elif [[ ${dir1} =~ "paddlenlp" ]];then
+	    export FLAGS_paddlenlp=1
     elif [[ ${file_item} == *${target_path_for_ci_scripts}* ]];then
         case_list[${#case_list[*]}]=llama_auto
         case_list[${#case_list[*]}]=gpt-3_auto
@@ -80,17 +81,16 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
             if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
                 case_list[${#case_list[*]}]=gpt-3_auto
                 case_list[${#case_list[*]}]=gpt-3_dygraph
+            fi
+        done
         for ((i=0; i<${#target_lists_for_llama[@]}; i++)); do
             if [[ ${file_item} == *${target_lists_for_llama[i]}* ]];then
                 case_list[${#case_list[*]}]=llama_auto
-    elif [[ ${dir1} =~ "paddlenlp" ]];then
-        export FLAGS_paddlenlp=1
-    else
-        continue
+            fi
+        done
     fi
 done
 }
-
 ####################################
 print_info(){
 if [ $1 -ne 0 ];then
@@ -107,7 +107,6 @@ else
     echo -e "\033[32m run $3 CI SUCCESS \033"
 fi
 }
-
 ####################################
 get_diff_TO_case # 获取待执行case列表
 case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${case_list[*]}))  # 去重并将结果存储回原列表
@@ -124,23 +123,26 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         install_paddlenlp
     fi
     case_num=1
-    export FLAGS_before_hook=0
+    export FLAGS_install_deps=0
+    export FLAGS_download_data=""
     for case in ${case_list[*]};do
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: ${case} \033"
         if [[ ${case} == "llama_auto" ]];then
-            bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh llama_case_list_auto $FLAGS_before_hook
-            print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` ${case}
-            export FLAGS_before_hook=1
+            bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh llama_case_list_auto $FLAGS_install_deps $FLAGS_download_data
+            print_info $? `ls -lt ${log_path} | grep llama | head -n 1 | awk '{print $9}'` ${case}
+            export FLAGS_download_data="llama ""$FLAGS_download_data"
             let case_num++
         elif [[ ${case} == "gpt-3_auto" ]];then
-            bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh gpt_case_list_auto $FLAGS_before_hook
+            bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh gpt_case_list_auto $FLAGS_install_deps $FLAGS_download_data
             print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` ${case}
-            export FLAGS_before_hook=1
+            export FLAGS_install_deps=1
+            export FLAGS_download_data="gpt ""$FLAGS_download_data"
             let case_num++
         elif [[ ${case} == "gpt-3_dygraph" ]];then
-            bash /workspace/PaddleNLP/scripts/distribute/ci_case_dy.sh case_list_dygraph $FLAGS_before_hook
+            bash /workspace/PaddleNLP/scripts/distribute/ci_case_dy.sh gpt_case_list_dygraph $FLAGS_install_deps $FLAGS_download_data
             print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` ${case}
-            export FLAGS_before_hook=1
+            export FLAGS_install_deps=1
+            export FLAGS_download_data="gpt ""$FLAGS_download_data"
             let case_num++
         else
             echo -e "\033[31m ---- no ${case} \033"

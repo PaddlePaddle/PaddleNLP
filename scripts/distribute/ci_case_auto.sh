@@ -1158,17 +1158,20 @@ function before_hook() {
     export FLAGS_cudnn_deterministic=1             # 1：关闭随机性
     unset CUDA_MODULE_LOADING
     env | grep FLAGS
-    if [[ $FLAGS_before_hook == 0 ]];then
+    export http_proxy=${proxy}
+    export https_proxy=${proxy}
+    if [[ $FLAGS_install_deps == 0 ]] && [[ -e "requirements.txt" ]];then
         echo -e "\033[31m ---- Install requirements  \033[0m"
-        export http_proxy=${proxy}
-        export https_proxy=${proxy}
         python -m pip install -r requirements.txt --force-reinstall
         python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
-
-        echo -e "\033[31m ---- download data  \033[0m"
+    else
+        echo -e "\033[31m ---- Skip install requirements \033[0m"
+    fi
+    if [[ $exec_case =~ "gpt" ]] && [[ ! $FLAGS_download_data =~ "gpt" ]];then
+        echo -e "\033[31m ---- download gpt data  \033[0m"
         rm -rf data
         if [[ -e ${data_path}/data ]]; then
-            echo "data downloaded"
+            echo "gpt data downloaded"
         else
             # download data for gpt
             mkdir ${data_path}/data;
@@ -1176,18 +1179,35 @@ function before_hook() {
             wget -O ${data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
         fi
         cp -r ${data_path}/data ${gpt_case_path}/
+    else
+        echo -e "\033[31m ---- Skip download gpt data \033[0m"
+    fi
+    if [[ $exec_case =~ "llama" ]] && [[ ! $FLAGS_download_data =~ "llama" ]];then
+        echo -e "\033[31m ---- download llama data  \033[0m"
+        rm -rf data
+        if [[ -e ${data_path}/data ]]; then
+            echo "llama data downloaded"
+        else
+            # download data for llama
+            mkdir ${data_path}/data;
+            wget -O ${data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
+            wget -O ${data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
+        fi
         cp -r ${data_path}/data ${llama_case_path}/
     else
-        echo -e "\033[31m ---- Skip install requirements and download data \033[0m"
+        echo -e "\033[31m ---- Skip download llama data \033[0m"
     fi
 }
 
 echo -e "\033[31m ---- Start executing $1 \033[0m"
-if [[ $1 == "llama_case_list_auto" ]];then
+if [[ $1 =~ "llama" ]];then
     cd ${llama_case_path}
 else
     cd ${gpt_case_path}
+fi
 
-export FLAGS_before_hook=$2
+export exec_case=$1
+export FLAGS_install_deps=$2
+export FLAGS_download_data=$3
 before_hook
 $1

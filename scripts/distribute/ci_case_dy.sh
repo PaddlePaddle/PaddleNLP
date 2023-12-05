@@ -22,7 +22,7 @@ export data_path=/fleetx_data
 
 unset CUDA_VISIBLE_DEVICES
 
-function case_list_dygraph(){
+function gpt_case_list_dygraph(){
     gpt_preprocess_data
     gpt_345M_single
     gpt_1.3B_dp
@@ -410,13 +410,16 @@ function check_result() {
 function before_hook() {
     echo -e "\033[31m ---- Set FLAGS  \033[0m"
     env | grep FLAGS
-    if [[ $FLAGS_before_hook == 0 ]];then
+    export http_proxy=${proxy}
+    export https_proxy=${proxy}
+    if [[ $FLAGS_install_deps == 0 ]] && [[ -e "requirements.txt" ]];then
         echo -e "\033[31m ---- Install requirements  \033[0m"
-        export http_proxy=${proxy}
-        export https_proxy=${proxy}
         python -m pip install -r requirements.txt --force-reinstall
         python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
-        
+    else
+        echo -e "\033[31m ---- Skip install requirements \033[0m"
+    fi
+    if [[ $FLAGS_download_data == 0 ]];then
         echo -e "\033[31m ---- download data  \033[0m"
         rm -rf data
         if [[ -e ${data_path}/data ]]; then
@@ -429,7 +432,7 @@ function before_hook() {
         fi
         cp -r ${data_path}/data ${case_path}/
     else
-        echo -e "\033[31m ---- Skip install requirements \033[0m"
+        echo -e "\033[31m ---- Skip download data \033[0m"
     fi
     echo -e "\033[31m ---- Install ppfleetx/ops  \033[0m"
     cd ppfleetx/ops && python setup_cuda.py install && cd ../..
@@ -504,6 +507,7 @@ function before_hook() {
 
 echo -e "\033[31m ---- Start executing gpt-3 $1 \033[0m"
 cd ${case_path}
-export FLAGS_before_hook=$2
+export FLAGS_install_deps=$2
+export FLAGS_download_data=$3
 before_hook
 $1
