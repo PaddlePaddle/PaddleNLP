@@ -930,6 +930,7 @@ class Trainer:
                     )
                     enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
+                    enable_release_grads = "enable_release_grads" in pipeline_parallel_config
 
                     # Pipeline parallel mode, overlap with dp
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
@@ -982,7 +983,14 @@ class Trainer:
                     if optimizer_was_run:
                         self.lr_scheduler.step()
 
-                    self.optimizer.clear_grad()
+                    if enable_release_grads and args.pipeline_parallel_degree > 1:
+                        self.optimizer.clear_grad(set_to_zero=False)
+                        for _, buffers in model._chunk_2_comm_buffers.items():
+                            for buffer in buffers:
+                                buffer._clear_grad_storage()
+                    else:
+                        self.optimizer.clear_grad()
+
                     self.callback_handler.on_optimizer_end(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
                     )

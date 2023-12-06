@@ -889,6 +889,7 @@ class TrainingArguments:
                                 "enable_dp_comm_overlap",
                                 "enable_sharding_comm_overlap",
                                 "enable_timer",
+                                "enable_release_grads",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -909,6 +910,7 @@ class TrainingArguments:
                         "sharding_comm_overlap": "enable_sharding_comm_overlap" in pipeline_parallel_config
                         and self.sharding_parallel_degree > 1,
                         "enable_timer": "enable_timer" in pipeline_parallel_config,
+                        "release_gradients": "enable_release_grads" in pipeline_parallel_config,
                     }
                     if dygraph_pp_configs["dp_comm_overlap"]:
                         raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
