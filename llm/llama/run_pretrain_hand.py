@@ -43,6 +43,7 @@ from paddlenlp.transformers import (
     LlamaForCausalLM,
 )
 from paddlenlp.utils.log import logger
+from paddlenlp.trainer.utils.reshard import NodeModelState, all_gather_state_dict
 
 MODEL_CLASSES = {
     "llama": (
@@ -565,7 +566,7 @@ def main():
 
             tr_loss += tr_loss_step
 
-            if global_step > 0 and global_step % training_args.gradient_accumulation_steps == 0:
+            if global_step % training_args.gradient_accumulation_steps == (training_args.gradient_accumulation_steps -1):
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
@@ -574,6 +575,7 @@ def main():
 
             global_step += 1
             if global_step // training_args.gradient_accumulation_steps >= 20:
+                save_model(model)
                 sys.exit(0)
 
     '''
@@ -621,6 +623,88 @@ def main():
                 break
     '''
 
+def save_model(model):
+    hcg = fleet.get_hybrid_communicate_group()
+    dp_degree = hcg.get_data_parallel_world_size()
+    dp_rank = hcg.get_data_parallel_rank()
+    mp_degree = hcg.get_model_parallel_world_size()
+    mp_rank = hcg.get_model_parallel_rank()
+    if dp_rank > 0:
+        return 
+    state_dict = model.state_dict()
+    for (k,v) in state_dict.items():
+        print(f"{k}=>{v.name} {v.shape}")
+    paddle.save(state_dict,f"hand/mp{mp_rank:02d}.pdparams")    
+    group = hcg.get_model_parallel_group()
+
+    # evenly ditribute param
+    node_model_state = NodeModelState()
+    node_model_state.add_weights(state_dict, mp_rank)
+    
+    def merge_func(k, v):
+        assert len(v) == mp_degree
+        tensor_list = [e[1] for e in v]
+        # merge by col
+        if "self_attn.qkv_proj.weight" in k:
+            return merge_tensor(tensor_list, 3, 1)
+        elif "self_attn.qkv_proj.bias" in k:
+            return merge_tensor(tensor_list, 3, 0)
+        elif "self_attn.q_proj.weight" in k:
+            return merge_tensor(tensor_list, 1, 0)
+        elif "self_attn.k_proj.weight" in k:
+            return merge_tensor(tensor_list, 1, 0)   
+        elif "self_attn.v_proj.weight" in k:
+            return merge_tensor(tensor_list, 1, 0)      
+        elif "mlp.up_gate_proj.weight" in k:
+            return merge_tensor(tensor_list, 2, 1)
+        elif "mlp.up_proj.weight" in k:
+            return merge_tensor(tensor_list, 1, 0)
+        elif "mlp.gate_proj.weight" in k:
+            return merge_tensor(tensor_list, 1, 0)
+        elif "lm_head.weight" in k:
+            return merge_tensor(tensor_list, 1, 0)
+        elif "embed_tokens.weight" in k:
+            return merge_tensor(tensor_list, 1, 0)
+        # merge by row
+        elif "mlp.up_gate_proj.bias" in k:
+            return merge_tensor(tensor_list, 2, 0)
+        elif "self_attn.o_proj.weight" in k:
+            return merge_tensor(tensor_list, 1, 0)
+        elif "mlp.down_proj.weight" in k:
+            return merge_tensor(v, 1, 0)
+        else:
+            assert "norm" in k, k
+            # duplicate
+            return v[0][1]
+
+    node_model_state = node_model_state.even_distribute(group)
+    node_model_state = node_model_state.collapse_key().merge_items(merge_func)
+
+    def filter_func(name):
+        return True
+
+    all_state_dict = all_gather_state_dict(node_model_state.model_weights, filter_func, group)
+    paddle.save(state_dict,f"hand/all.pdparams")
+
+def merge_tensor(tensor_list, fuse_num, axis):
+    if fuse_num > 1:
+        part_list = [
+            paddle.split(e, num_or_sections=fuse_num, axis=axis)
+            for e in tensor_list
+        ]
+        fuse_list = [paddle.concat(x=e, axis=axis) for e in zip(*part_list)]
+        return paddle.concat(x=fuse_list, axis=axis)
+    else:
+        return paddle.concat(x=tensor_list, axis=axis)
+
+def load_model(model):
+    hcg = fleet.get_hybrid_communicate_group()
+    mp_degree = hcg.get_model_parallel_world_size()
+    mp_rank = hcg.get_model_parallel_rank()
+    state_dict=paddle.load(f"hand/mp{mp_rank:02d}.pdparams")  
+    model.set_state_dict(state_dict)
+    
+    
 
 if __name__ == "__main__":
     main()
