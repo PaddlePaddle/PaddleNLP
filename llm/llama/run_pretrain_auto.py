@@ -467,10 +467,8 @@ def main():
             dtype = "bfloat16"
 
     model = model_class._from_config(config, dtype=dtype)
-
     # load model
     load_model(model)
-
     # add shard_layer here
     pp_stage = 0
     for name, layer in model.named_sublayers(include_self=False):
@@ -565,13 +563,39 @@ def main():
     start_time_last_logged = time.time()
     tr_loss = float(0)
 
+
+    #hack: create dp group for distributed input data to align dygraph parallel loss.
+    dp_group = None
+    dp0_mesh = fleet.auto.get_mesh().get_mesh_with_dim("dp").mesh 
+    for i in range(dp0_mesh.shape[-1]):
+        ranks = dp0_mesh[:, i]
+        group = dist.new_group(ranks)
+        if dist.get_rank() in ranks:
+            dp_group = group
+
+
     model.train()
     optimizer = dist.shard_optimizer(optimizer)
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
             input_ids, labels = inputs["input_ids"], inputs["labels"]
+
             input_id = input_ids[0][0].numpy()
             label = labels[0][0].numpy()
+
+            hack for align dygraph parallel.
+            if dp_group is not None:
+                cur_rank = dist.get_rank()
+                res = []
+                dist.all_gather(res, paddle.Tensor(input_ids, place=paddle.CUDAPlace(cur_rank)), group=dp_group)
+                input_ids = paddle.concat(res)
+                input_ids = dist.shard_tensor(input_ids, get_mesh(), [dist.Shard(0), dist.Replicate()])
+
+                res = []
+                dist.all_gather(res, paddle.Tensor(labels, place=paddle.CUDAPlace(cur_rank)), group=dp_group)
+                labels = paddle.concat(res)
+                labels = dist.shard_tensor(labels, get_mesh(), [dist.Shard(0), dist.Replicate()])
+
 
             res = model(input_ids, labels=labels)
 
@@ -655,6 +679,7 @@ def load_model(model):
     for (k,v) in state_dict.items():
         assert k in model_state_dict, f"{k} not in {model_state_dict.keys()}"
         #print(f"{k}=>{v.shape}")
+
 
 if __name__ == "__main__":
     main()
