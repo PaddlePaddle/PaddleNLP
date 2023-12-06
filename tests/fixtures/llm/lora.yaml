@@ -33,7 +33,7 @@ lora:
     chatglm:
       model_name_or_path: __internal_testing__/tiny-fused-chatglm
     chatglm2:
-      model_name_or_path: __internal_testing__/tiny-random-chatglm2
+      model_name_or_path: __internal_testing__/tiny-fused-chatglm2
     bloom:
       model_name_or_path: __internal_testing__/tiny-fused-bloom
     qwen:

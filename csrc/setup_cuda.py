@@ -41,7 +41,6 @@ setup(
             "./generation/transpose_removing_padding.cu",
             "./generation/write_cache_kv.cu",
             "./generation/encode_rotary_qk.cu",
-            "./generation/top_p_sampling.cu",
             "./generation/set_alibi_mask_value.cu",
             "./generation/get_padding_offset_v2.cu",
             "./generation/rebuild_padding_v2.cu",

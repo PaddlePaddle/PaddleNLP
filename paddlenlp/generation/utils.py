@@ -26,7 +26,6 @@ from paddle.utils import map_structure
 
 from paddlenlp.transformers.model_outputs import ModelOutput
 from paddlenlp.transformers.utils import get_scale_by_dtype
-from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
 from .configuration_utils import DEFAULT_MAX_NEW_TOKENS, GenerationConfig
@@ -48,9 +47,6 @@ from .stopping_criteria import (
     validate_stopping_criteria,
 )
 from .streamers import BaseStreamer
-
-if is_paddlenlp_ops_available():
-    import paddlenlp_ops
 
 __all__ = [
     "GenerationMixin",
@@ -83,12 +79,6 @@ def get_unfinished_flag(
     """
     if isinstance(eos_token_id, int):
         unfinished_flag = paddle.logical_and(unfinished_flag, input_ids[:, -1:] != eos_token_id)
-    elif isinstance(eos_token_id[0], int):
-        eos_token_id_tensor = paddle.to_tensor([eos_token_id])
-        is_last_tokens_equal = paddle.all(
-            paddle.equal(input_ids[:, -len(eos_token_id) :], eos_token_id_tensor), axis=-1
-        ).unsqueeze(-1)
-        unfinished_flag = paddle.logical_and(unfinished_flag, ~is_last_tokens_equal)
     else:
         batch_unfinish_flag = None
         for batch_eos_token_id in eos_token_id:
@@ -865,7 +855,6 @@ class GenerationMixin(object):
                 input_ids = self.prepare_decoder_input_ids_for_generation(
                     input_ids, decoder_start_token_id, bos_token_id
                 )
-
         # streamer
         if streamer is not None:
             # streamer couldn't support beam_search strategy
@@ -873,7 +862,6 @@ class GenerationMixin(object):
                 raise ValueError(
                     "`streamer` cannot be used with beam search (yet!). Make sure that `num_beams` is set to 1."
                 )
-            streamer.put(input_ids)
 
         if pad_token_id is None and eos_token_id is not None:
             print("Setting `pad_token_id` to `eos_token_id`:{} for " "open-end generation.".format(eos_token_id))
@@ -1075,7 +1063,7 @@ class GenerationMixin(object):
             probs = F.softmax(next_tokens_scores)
             probs = paddle.log(probs)
             next_tokens = paddle.argmax(probs, axis=-1).unsqueeze(-1)
-            next_scores = paddle.index_sample(probs.astype("float32"), next_tokens)
+            next_scores = paddle.index_sample(probs, next_tokens)
 
             if eos_token_id is not None:
                 next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
@@ -1085,7 +1073,8 @@ class GenerationMixin(object):
 
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
             if streamer is not None:
-                streamer.put(next_tokens.cpu())
+                if self.config.tensor_parallel_rank == 0:
+                    streamer.put(next_tokens.cpu())
 
             if stopping_criteria(input_ids, scores):
                 generate_end = True
@@ -1173,12 +1162,8 @@ class GenerationMixin(object):
             if top_p is not None and top_p < 1.0:
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
 
-            # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
-            if probs.dtype == paddle.bfloat16 and top_k == 1:
-                probs = probs.astype("float32")
-                next_tokens = paddle.unsqueeze(paddle.argmax(probs, axis=-1), -1)
-            else:
-                next_tokens = paddle.multinomial(probs)
+            # multinomial already support fp16 and bf16 currently, fix issue: https://github.com/PaddlePaddle/Paddle/issues/51852
+            next_tokens = paddle.multinomial(probs)
 
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
@@ -1193,7 +1178,8 @@ class GenerationMixin(object):
             cur_len += 1
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
             if streamer is not None:
-                streamer.put(next_tokens.cpu())
+                if self.config.tensor_parallel_rank == 0:
+                    streamer.put(next_tokens.cpu())
 
             if stopping_criteria(input_ids, scores):
                 generate_end = True
@@ -1340,12 +1326,8 @@ class GenerationMixin(object):
             # compute next_tokens
             if use_top_p:
                 logits = logits / temperature
-                if is_paddlenlp_ops_available():
-                    top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
-                    _, next_tokens = paddlenlp_ops.top_p_sampling(probs, top_ps_tensor, -1)
-                else:
-                    probs = TopPProcess(probs, top_p, min_tokens_to_keep)
-                    next_tokens = paddle.multinomial(probs)
+                top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
+                _, next_tokens = paddle.tensor.top_p_sampling(probs, top_ps_tensor)
             else:
                 probs = TopKProcess(probs, top_k, min_tokens_to_keep)
                 if top_k == 1:

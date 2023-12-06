@@ -24,7 +24,7 @@ from paddle.incubate.nn.functional import (
 )
 from paddle.nn import Layer
 from paddle.nn.initializer import Constant
-from paddle.nn.quant import weight_only_linear
+from paddle.nn.quant import weight_only_linear, weight_quantize
 
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
@@ -850,7 +850,11 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
 
         assert self.weight_only_quant_bits != -1
         self.weight_dtype = "int" + str(self.weight_only_quant_bits)
-
+        # test for weight only quant scale
+        _, quant_weight_dtype_test_scale_tensor = weight_quantize(
+            paddle.ones(shape=[64, 64], dtype="float16"), algo="weight_only_int" + str(self.weight_only_quant_bits)
+        )
+        self.weight_scale_dtype = quant_weight_dtype_test_scale_tensor.dtype
         self.qkv_weights_scale = []
         self.linear_weights_scale = []
         self.ffn1_weights_scale = []
@@ -866,28 +870,28 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             qkv_weight_scale = self.create_parameter(
                 shape=[(config.num_heads + 2 * config.kv_num_heads) * self.head_dim],
                 attr=qkv_weight_scale_attr,
-                dtype=self._dtype,
+                dtype=self.weight_scale_dtype,
                 is_bias=False,
             )
 
             linear_weight_scale = self.create_parameter(
                 shape=[config.embed_dim],
                 attr=linear_weight_scale_attr,
-                dtype=self._dtype,
+                dtype=self.weight_scale_dtype,
                 is_bias=False,
             )
 
             ffn1_weight_scale = self.create_parameter(
                 shape=[config.dim_feedforward * 2] if config.activation.endswith("glu") else [config.dim_feedforward],
                 attr=ffn1_weight_scale_attr,
-                dtype=self._dtype,
+                dtype=self.weight_scale_dtype,
                 is_bias=False,
             )
 
             ffn2_weight_scale = self.create_parameter(
                 shape=[config.embed_dim],
                 attr=ffn2_weight_scale_attr,
-                dtype=self._dtype,
+                dtype=self.weight_scale_dtype,
                 is_bias=False,
             )
 
