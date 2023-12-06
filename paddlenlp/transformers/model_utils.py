@@ -2436,12 +2436,12 @@ class PipelinePretrainedModel(PretrainedModel):
                                 f"Please check! we treat this key as last layer, get {k}, set origin name as {'.'.join(single_name)}"
                             )
                     elif name_splited[0] == "shared_layers":
-                        # TODO: it treat shared_layers as first layer
-                        single_name = [prefixs["0"]]
+                        first_shared_comm_key = list(self.shared_comm.keys())[0]
+                        shared_layer_idx_rank = self.shared_comm[first_shared_comm_key]["group"].rank
+                        shared_layer_idx = self.shared_comm[first_shared_comm_key]["layer_idx"][shared_layer_idx_rank]
+
+                        single_name = [prefixs[str(shared_layer_idx)]]
                         single_name.extend(name_splited[2:])
-                        logger.warning(
-                            f"Please check! we treat shared_layers as first layer, get {k}, set origin name as {'.'.join(single_name)}"
-                        )
                     else:
                         raise ValueError(f"Unexpected key: {k} for pp layer.")
                 else:
@@ -2451,12 +2451,12 @@ class PipelinePretrainedModel(PretrainedModel):
                         single_name = [prefixs[idx]]
                         single_name.extend(name_splited[1:])
                     elif idx == "shared_layers":
-                        # TODO: it treat shared_layers as first layer
-                        single_name = [prefixs["0"]]
+                        first_shared_comm_key = list(self.shared_comm.keys())[0]
+                        shared_layer_idx_rank = self.shared_comm[first_shared_comm_key]["group"].rank
+                        shared_layer_idx = self.shared_comm[first_shared_comm_key]["layer_idx"][shared_layer_idx_rank]
+
+                        single_name = [prefixs[str(shared_layer_idx)]]
                         single_name.extend(name_splited[2:])
-                        logger.warning(
-                            f"Please check! we treat shared_layers as first layer, get {k}, set origin name as {'.'.join(single_name)}"
-                        )
                     else:
                         raise ValueError(f"Unexpected key: {k} for pp layer.")
 

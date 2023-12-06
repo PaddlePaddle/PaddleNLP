@@ -1358,7 +1358,10 @@ class GPTLMHead(nn.Layer):
             hidden_states = paddle.reshape_(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
 
         if tensor_parallel_output is None:
-            tensor_parallel_output = self.config.tensor_parallel_output
+            if self.config.sequence_parallel:
+                tensor_parallel_output = False
+            else:
+                tensor_parallel_output = self.config.tensor_parallel_output
 
         logits = parallel_matmul(
             hidden_states, self.weight, transpose_y=self.transpose_y, tensor_parallel_output=tensor_parallel_output
