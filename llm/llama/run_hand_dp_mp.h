@@ -27,11 +27,12 @@ export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../:$PYTHONPATH
 #ulimit -c unlimited
 #export GLOG_v=10
+export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
 
 python -u  -m paddle.distributed.launch \
-    --gpus "0,1,2,3,4,5,6,7" \
-    --log_dir "output/$task_name""_log" \
-    run_pretrain_auto.py \
+    --gpus "0, 1,2,3,4,5,6,7" \
+    --log_dir "hand" \
+    run_pretrain_hand.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
     --tokenizer_name_or_path "facebook/llama-7b" \
@@ -70,4 +71,3 @@ python -u  -m paddle.distributed.launch \
     --do_eval \
     --device "gpu" \
     --data_impl "mmap" \
-    --parallel_mode "auto"

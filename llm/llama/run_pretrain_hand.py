@@ -40,14 +40,14 @@ from paddlenlp.transformers import (
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
     LlamaConfig,
-    LlamaForCausalLMAuto,
+    LlamaForCausalLM,
 )
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
     "llama": (
         LlamaConfig,
-        LlamaForCausalLMAuto,
+        LlamaForCausalLM,
     ),
 }
 
@@ -380,9 +380,6 @@ def get_mesh(pp_idx=0):
         mesh = mesh.get_mesh_with_dim("pp")[pp_idx]
     return mesh
 
-def shard_fn(layer, mesh_idx, placements):
-    layer.weight = dist.shard_tensor(layer.weight, get_mesh(mesh_idx), placements)
-
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
@@ -405,6 +402,15 @@ def main():
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
+        strategy = fleet.DistributedStrategy()
+        strategy.hybrid_configs = {
+            "dp_degree": training_args.data_parallel_degree,
+            "mp_degree": training_args.tensor_parallel_degree,
+            "pp_degree": 1,
+            "sharding_degree": 1,
+        }
+        fleet.init(is_collective=True, strategy=strategy)
+
 
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
@@ -465,29 +471,6 @@ def main():
             dtype = "bfloat16"
 
     model = model_class._from_config(config, dtype=dtype)
-
-    # add shard_layer here
-    pp_stage = 0
-    for name, layer in model.named_sublayers(include_self=False):
-        print(name, "==>", type(layer))
-
-        if hasattr(layer, "ipp"):
-            pp_stage = layer.ipp
-        if "embed_tokens" in name:
-            # embedding only support column split now. it will update in the future
-            shard_fn(layer, 0, [dist.Replicate(), dist.Shard(1)])
-        for n in ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.qkv_proj", "gate_proj", "up_proj", "gate_up_fused_proj"]:
-            if n in name:
-                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(1)])
-                break
-        for n in ["self_attn.o_proj", "down_proj"]:
-            if n in name:
-                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(0)])
-                break
-
-        if "lm_head" in name:
-            shard_fn(layer, -1, [dist.Replicate(), dist.Shard(1)])
-
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
@@ -521,6 +504,10 @@ def main():
     )
 
     optimizer = create_optimizer(model, lr_scheduler, training_args)
+    
+    model = fleet.distributed_model(model)
+    optimizer = fleet.distributed_optimizer(optimizer)
+
 
     def loss_func(loss, outputs):
         return loss
@@ -561,7 +548,6 @@ def main():
     tr_loss = float(0)
 
     model.train()
-    optimizer = dist.shard_optimizer(optimizer)
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
             print(inputs.keys())
@@ -587,7 +573,7 @@ def main():
                 tr_loss = 0
 
             global_step += 1
-            if global_step // training_args.gradient_accumulation_steps >= 10:
+            if global_step // training_args.gradient_accumulation_steps >= 20:
                 sys.exit(0)
 
     '''
