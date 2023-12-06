@@ -1334,6 +1334,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 k_dequant_scales[i] if k_dequant_scales is not None else None,
                 v_dequant_scales[i] if v_dequant_scales is not None else None,
                 None, # qkv_out_scales
+                None, # qkv_bias
                 None, # out_shifts
                 None, # out_smooths
                 rotary_embs,
