@@ -21,6 +21,7 @@ import time
 import types
 from dataclasses import dataclass, field
 from typing import List, Optional
+from paddle.autograd import PyLayer
 
 import numpy as np
 import paddle
@@ -510,8 +511,11 @@ def main():
     optimizer = fleet.distributed_optimizer(optimizer)
     load_model(model)
 
-    def loss_func(loss, outputs):
-        return loss
+    def loss_func(loss):
+        hcg = fleet.get_hybrid_communicate_group()
+        group = hcg.get_data_parallel_group()
+        return LossMean.apply(loss, group)
+        
 
     total_train_batch_size = training_args.per_device_train_batch_size \
                              * training_args.gradient_accumulation_steps \
@@ -561,6 +565,7 @@ def main():
                 tr_loss_step /= training_args.gradient_accumulation_steps
 
             # do backward every micro step.
+            tr_loss_step = loss_func(tr_loss_step)
             tr_loss_step.backward()
 
             tr_loss += tr_loss_step
@@ -702,6 +707,19 @@ def load_model(model):
     mp_rank = hcg.get_model_parallel_rank()
     state_dict=paddle.load(f"hand/mp{mp_rank:02d}.pdparams")  
     model.set_state_dict(state_dict)
+
+
+class LossMean(PyLayer):
+    @staticmethod
+    def forward(ctx, inp, group):
+        with paddle.no_grad():
+            inps = []
+            paddle.distributed.all_gather(inps, inp, group=group)
+            return (inps[0] + inps[1]) / 2.0
+
+    @staticmethod
+    def backward(ctx, grad):
+        return grad
     
     
 
