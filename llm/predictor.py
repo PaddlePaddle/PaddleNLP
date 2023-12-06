@@ -859,6 +859,17 @@ def create_predictor(
                     dtype=predictor_args.dtype,
                 )
                 model.eval()
+            elif "qwen" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    QwenForCausalLMInferenceModel,
+                )
+
+                model = QwenForCausalLMInferenceModel.from_pretrained(
+                    predictor_args.model_name_or_path,
+                    config=config,
+                    dtype=predictor_args.dtype,
+                )
+                model.eval()
             else:
                 raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt]")
             predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
