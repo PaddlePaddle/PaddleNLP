@@ -58,6 +58,8 @@ from paddlenlp.data.causal_dataset import (
     print_rank_0,
 )
 
+from collections import OrderedDict
+
 
 def add_start_docstrings(*docstr):
     def docstring_decorator(fn):
@@ -466,6 +468,9 @@ def main():
 
     model = model_class._from_config(config, dtype=dtype)
 
+    # load model
+    load_model(model)
+
     # add shard_layer here
     pp_stage = 0
     for name, layer in model.named_sublayers(include_self=False):
@@ -564,8 +569,10 @@ def main():
     optimizer = dist.shard_optimizer(optimizer)
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
-            print(inputs.keys())
             input_ids, labels = inputs["input_ids"], inputs["labels"]
+            input_id = input_ids[0][0].numpy()
+            label = labels[0][0].numpy()
+
             res = model(input_ids, labels=labels)
 
             # add criterion in the future.
@@ -579,11 +586,11 @@ def main():
 
             tr_loss += tr_loss_step
 
-            if global_step > 0 and global_step % training_args.gradient_accumulation_steps == 0:
+            if global_step % training_args.gradient_accumulation_steps == (training_args.gradient_accumulation_steps -1):
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
-                print(f"global_step {global_step} loss {tr_loss}")
+                print(f"global_step {global_step};input id {input_id}; label {label}; loss {tr_loss.numpy()}")
                 tr_loss = 0
 
             global_step += 1
@@ -635,6 +642,19 @@ def main():
                 break
     '''
 
+def load_model(model):
+    model_state_dict = model.state_dict()
+    state_dict=paddle.load(f"hand/all.pdparams") 
+    tmp = OrderedDict()
+    (tmp, state_dict) = (state_dict, tmp)
+    for (k, v) in tmp.items():
+        assert "_layers." in k
+        k = k[len("_layers."):]
+        state_dict[k] = v
+    model.set_state_dict(state_dict)
+    for (k,v) in state_dict.items():
+        assert k in model_state_dict, f"{k} not in {model_state_dict.keys()}"
+        #print(f"{k}=>{v.shape}")
 
 if __name__ == "__main__":
     main()

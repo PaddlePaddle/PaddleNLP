@@ -31,7 +31,7 @@ export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
 
 python -u  -m paddle.distributed.launch \
     --gpus "0, 1,2,3,4,5,6,7" \
-    --log_dir "hand" \
+    --log_dir "hand_load" \
     run_pretrain_hand.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \

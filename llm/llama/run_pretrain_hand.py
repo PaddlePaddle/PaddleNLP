@@ -508,7 +508,7 @@ def main():
     
     model = fleet.distributed_model(model)
     optimizer = fleet.distributed_optimizer(optimizer)
-
+    load_model(model)
 
     def loss_func(loss, outputs):
         return loss
@@ -551,7 +551,6 @@ def main():
     model.train()
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
-            print(inputs.keys())
             input_ids, labels = inputs["input_ids"], inputs["labels"]
             res = model(input_ids, labels=labels)
 
@@ -570,12 +569,12 @@ def main():
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
-                print(f"global_step {global_step} loss {tr_loss}")
+                print(f"global_step {global_step};input id {input_ids[0][0].numpy()}; label {labels[0][0].numpy()}; loss {tr_loss.numpy()}")
                 tr_loss = 0
 
             global_step += 1
-            if global_step // training_args.gradient_accumulation_steps >= 20:
-                save_model(model)
+            if global_step // training_args.gradient_accumulation_steps >= 100:
+                #save_model(model)
                 sys.exit(0)
 
     '''
@@ -634,7 +633,7 @@ def save_model(model):
     state_dict = model.state_dict()
     for (k,v) in state_dict.items():
         print(f"{k}=>{v.name} {v.shape}")
-    paddle.save(state_dict,f"hand/mp{mp_rank:02d}.pdparams")    
+    paddle.save(state_dict, f"hand/mp{mp_rank:02d}.pdparams")    
     group = hcg.get_model_parallel_group()
 
     # evenly ditribute param
@@ -650,28 +649,28 @@ def save_model(model):
         elif "self_attn.qkv_proj.bias" in k:
             return merge_tensor(tensor_list, 3, 0)
         elif "self_attn.q_proj.weight" in k:
-            return merge_tensor(tensor_list, 1, 0)
+            return merge_tensor(tensor_list, 1, 1)
         elif "self_attn.k_proj.weight" in k:
-            return merge_tensor(tensor_list, 1, 0)   
+            return merge_tensor(tensor_list, 1, 1)   
         elif "self_attn.v_proj.weight" in k:
-            return merge_tensor(tensor_list, 1, 0)      
+            return merge_tensor(tensor_list, 1, 1)      
         elif "mlp.up_gate_proj.weight" in k:
             return merge_tensor(tensor_list, 2, 1)
         elif "mlp.up_proj.weight" in k:
-            return merge_tensor(tensor_list, 1, 0)
+            return merge_tensor(tensor_list, 1, 1)
         elif "mlp.gate_proj.weight" in k:
-            return merge_tensor(tensor_list, 1, 0)
+            return merge_tensor(tensor_list, 1, 1)
         elif "lm_head.weight" in k:
-            return merge_tensor(tensor_list, 1, 0)
-        elif "embed_tokens.weight" in k:
-            return merge_tensor(tensor_list, 1, 0)
-        # merge by row
+            return merge_tensor(tensor_list, 1, 1)
         elif "mlp.up_gate_proj.bias" in k:
             return merge_tensor(tensor_list, 2, 0)
+        # merge by row
         elif "self_attn.o_proj.weight" in k:
             return merge_tensor(tensor_list, 1, 0)
         elif "mlp.down_proj.weight" in k:
-            return merge_tensor(v, 1, 0)
+            return merge_tensor(tensor_list, 1, 0)
+        elif "embed_tokens.weight" in k:
+            return merge_tensor(tensor_list, 1, 0)    
         else:
             assert "norm" in k, k
             # duplicate
@@ -684,7 +683,7 @@ def save_model(model):
         return True
 
     all_state_dict = all_gather_state_dict(node_model_state.model_weights, filter_func, group)
-    paddle.save(state_dict,f"hand/all.pdparams")
+    paddle.save(all_state_dict, f"hand/all.pdparams")
 
 def merge_tensor(tensor_list, fuse_num, axis):
     if fuse_num > 1:
