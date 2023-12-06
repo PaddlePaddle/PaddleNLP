@@ -1192,7 +1192,6 @@ class TrainingArguments:
                         recompute.refined_ops_patterns.append(eval(pattern))
 
             self.strategy = strategy
-            logger.info(self.strategy)
             order = ["dp", "pp", "mp"]
             degree = [self.data_parallel_degree, pipeline_parallel_degree, tensor_parallel_degree]
             mesh_dims = list(filter(lambda x: x[1] > 1, list(zip(order, degree))))

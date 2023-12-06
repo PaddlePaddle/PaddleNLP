@@ -17,9 +17,13 @@
 set -e
 
 export log_path=/workspace/case_logs
-export gpt_case_path=/workspace/PaddleNLP/model_zoo/gpt-3
-export llama_case_path=/workspace/PaddleNLP/llm/llama/auto_parallel
-export data_path=/fleetx_data
+export root_path=/workspace/PaddleNLP
+
+export gpt_case_path=$root_path/model_zoo/gpt-3
+export gpt_data_path=/fleetx_data
+
+export llama_case_path=$root_path/llm/llama/auto_parallel
+export llama_data_path=/llama_data
 
 unset CUDA_VISIBLE_DEVICES
 
@@ -749,7 +753,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3_pir() {
 
 function gpt_auto_sp_acc_check() {
     echo "=========== $FUNCNAME run begin ==========="
-    export PYTHONPATH=/workspace/PaddleNLP/:$PYTHONPATH
+    export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_infer_spmd_enable=true
     export FLAGS_call_stack_level=2
     mp_degree=2
@@ -831,10 +835,9 @@ function gpt_auto_sp_acc_check() {
 
 function llama_auto_recompute_bs1_fp32_DP1-MP1-PP1() {
     echo "=========== $FUNCNAME run begin ==========="
-    export PYTHONPATH=/workspace/PaddleNLP/:$PYTHONPATH
+    export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=2
     export SOT_LOG_LEVEL=4
-    export FLAGS_program_topo_reorder=True
 
     task_name="llama_auto_bs1_dp1mp1pp1"
     case_out_dir="output/$task_name"
@@ -891,7 +894,7 @@ function llama_auto_recompute_bs1_fp32_DP1-MP1-PP1() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.70990562
+    loss_base=9.71193314
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -900,10 +903,9 @@ function llama_auto_recompute_bs1_fp32_DP1-MP1-PP1() {
 
 function llama_auto_recompute_bs2_fp32_DP2-MP1-PP1() {
     echo "=========== $FUNCNAME run begin ==========="
-    export PYTHONPATH=/workspace/PaddleNLP/:$PYTHONPATH
+    export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=2
     export SOT_LOG_LEVEL=4
-    export FLAGS_program_topo_reorder=True
 
     task_name="llama_auto_bs2_dp2mp1pp1"
     case_out_dir="output/$task_name"
@@ -960,7 +962,7 @@ function llama_auto_recompute_bs2_fp32_DP2-MP1-PP1() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.60178852
+    loss_base=9.57837963
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -969,10 +971,9 @@ function llama_auto_recompute_bs2_fp32_DP2-MP1-PP1() {
 
 function llama_auto_recompute_bs2_fp32_DP2-MP2-PP1() {
     echo "=========== $FUNCNAME run begin ==========="
-    export PYTHONPATH=/workspace/PaddleNLP/:$PYTHONPATH
+    export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=2
     export SOT_LOG_LEVEL=4
-    export FLAGS_program_topo_reorder=True
 
     task_name="llama_auto_bs2_dp2mp2pp1"
     case_out_dir="output/$task_name"
@@ -1029,7 +1030,7 @@ function llama_auto_recompute_bs2_fp32_DP2-MP2-PP1() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.65739155
+    loss_base=9.6846962
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -1038,10 +1039,9 @@ function llama_auto_recompute_bs2_fp32_DP2-MP2-PP1() {
 
 function llama_auto_recompute_bs8_fp32_DP2-MP2-PP2() {
     echo "=========== $FUNCNAME run begin ==========="
-    export PYTHONPATH=/workspace/PaddleNLP/:$PYTHONPATH
+    export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=2
     export SOT_LOG_LEVEL=4
-    export FLAGS_program_topo_reorder=True
 
     task_name="llama_auto_bs2_dp2mp2pp1"
     case_out_dir="output/$task_name"
@@ -1098,7 +1098,7 @@ function llama_auto_recompute_bs8_fp32_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.57578373
+    loss_base=9.59060478
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -1151,8 +1151,8 @@ function check_result() {
     fi
 }
 
-function before_hook() {
-    echo -e "\033[31m ---- Set FLAGS  \033[0m"
+function before_hook_for_gpt() {
+    echo -e "\033[31m ---- Set FLAGS for GPT auto cases  \033[0m"
     export FLAGS_new_executor_micro_batching=True  # True：打开新执行器
     export FLAGS_embedding_deterministic=1         # 1：关闭随机性
     export FLAGS_cudnn_deterministic=1             # 1：关闭随机性
@@ -1160,54 +1160,70 @@ function before_hook() {
     env | grep FLAGS
     export http_proxy=${proxy}
     export https_proxy=${proxy}
-    if [[ $FLAGS_install_deps == 0 ]] && [[ -e "requirements.txt" ]];then
-        echo -e "\033[31m ---- Install requirements  \033[0m"
+    if [[ $FLAGS_install_deps == 0 ]];then
+        echo -e "\033[31m ---- Install requirements for GPT auto cases  \033[0m"
         python -m pip install -r requirements.txt --force-reinstall
         python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
     else
-        echo -e "\033[31m ---- Skip install requirements \033[0m"
+        echo -e "\033[31m ---- Skip install requirements for GPT auto cases  \033[0m"
     fi
-    if [[ $exec_case =~ "gpt" ]] && [[ ! $FLAGS_download_data =~ "gpt" ]];then
-        echo -e "\033[31m ---- download gpt data  \033[0m"
+    if [[ ! $FLAGS_download_data =~ "gpt" ]];then
+        echo -e "\033[31m ---- Download GPT data  \033[0m"
         rm -rf data
-        if [[ -e ${data_path}/data ]]; then
-            echo "gpt data downloaded"
+        if [[ -e ${gpt_data_path}/data ]]; then
+            echo "GPT data downloaded"
         else
             # download data for gpt
-            mkdir ${data_path}/data;
-            wget -O ${data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
-            wget -O ${data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
+            mkdir ${gpt_data_path}/data;
+            wget -O ${gpt_data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
+            wget -O ${gpt_data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
         fi
-        cp -r ${data_path}/data ${gpt_case_path}/
+        cp -r ${gpt_data_path}/data ${gpt_case_path}/
     else
         echo -e "\033[31m ---- Skip download gpt data \033[0m"
     fi
-    if [[ $exec_case =~ "llama" ]] && [[ ! $FLAGS_download_data =~ "llama" ]];then
-        echo -e "\033[31m ---- download llama data  \033[0m"
+}
+
+function before_hook_for_llama() {
+    echo -e "\033[31m ---- Set FLAGS for LLaMA auto cases  \033[0m"
+    export FLAGS_new_executor_micro_batching=True  # True：打开新执行器
+    export FLAGS_embedding_deterministic=1         # 1：关闭随机性
+    export FLAGS_cudnn_deterministic=1             # 1：关闭随机性
+    export FLAGS_program_topo_reorder=1            # 1: 反向对齐动手拓扑排序
+    unset CUDA_MODULE_LOADING
+    env | grep FLAGS
+    export http_proxy=${proxy}
+    export https_proxy=${proxy}
+    if [[ ! $FLAGS_download_data =~ "llama" ]];then
+        echo -e "\033[31m ---- Download LLaMA data  \033[0m"
         rm -rf data
-        if [[ -e ${data_path}/data ]]; then
-            echo "llama data downloaded"
+        if [[ -e ${llama_data_path}/data ]]; then
+            echo "LLaMA data downloaded"
         else
             # download data for llama
-            mkdir ${data_path}/data;
-            wget -O ${data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
-            wget -O ${data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
+            mkdir ${llama_data_path}/data;
+            wget -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
+            wget -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
         fi
-        cp -r ${data_path}/data ${llama_case_path}/
+        cp -r ${llama_data_path}/data ${llama_case_path}/
     else
-        echo -e "\033[31m ---- Skip download llama data \033[0m"
+        echo -e "\033[31m ---- Skip download LLaMA data \033[0m"
     fi
 }
 
 echo -e "\033[31m ---- Start executing $1 \033[0m"
-if [[ $1 =~ "llama" ]];then
-    cd ${llama_case_path}
-else
-    cd ${gpt_case_path}
-fi
-
 export exec_case=$1
 export FLAGS_install_deps=$2
 export FLAGS_download_data=$3
-before_hook
+
+if [[ $exec_case =~ "gpt" ]];then
+    cd ${gpt_case_path}
+    before_hook_for_gpt
+elif [[ $exec_case =~ "llama" ]];then
+    cd ${llama_case_path}
+    before_hook_for_llama
+else
+    echo -e "\033[31m ---- Invalid exec_case $exec_case \033[0m"
+fi
+
 $1

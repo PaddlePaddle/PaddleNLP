@@ -91,13 +91,22 @@ class PreTrainingArguments(TrainingArguments):
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
         },
     )
-    enable_linear_fused_grad_add: bool = field(
+    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
+    fused_linear_param_grad_add: bool = field(
         default=False,
         metadata={
-            "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
+            "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
         },
     )
-    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
+
+    def __post_init__(self):
+        super().__post_init__()
+        assert self.use_auto_parallel
+        if self.fused_linear_param_grad_add:
+            fused_passes = self.strategy.fused_passes
+            fused_passes.enable = True
+            fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
+        logger.info(self.strategy)
 
 
 @dataclass
@@ -401,17 +410,29 @@ def init_seed(seed: int = 1234, args=None):
             paddle.seed(args.seed)
 
 
+def validate_batch(batch, args):
+    batches = []
+    if args.pipeline_parallel_degree > 1 or args.gradient_accumulation_steps == 1:
+        batches = batch
+    else:
+        feed_names = []
+        split_batches = []
+        for n, b in batch[0].items():
+            feed_names.append(n)
+            split_batches.append(np.split(np.array(b), args.gradient_accumulation_steps, 0))
+        for i in range(len(split_batches[0])):
+            micro_batch = [split_batch[i] for split_batch in split_batches]
+            batches.append(dict(zip(feed_names, micro_batch)))
+
+    return batches
+
+
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
-    if training_args.enable_linear_fused_grad_add:
-        from fused_layers import mock_layers
-
-        mock_layers()
 
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
@@ -588,17 +609,20 @@ def main():
     tr_loss = float(0)
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
-            outs = engine.run(inputs, mode="train")
+            batches = validate_batch(inputs, training_args)
 
-            if "loss" in outs:
-                tr_loss_step = np.sum(outs["loss"])
-            else:
-                tr_loss_step = float(0)
+            for micro_batch in batches:
+                outs = engine.run(micro_batch, mode="train")
 
-            if training_args.gradient_accumulation_steps > 1:
-                tr_loss_step /= training_args.gradient_accumulation_steps
+                if "loss" in outs:
+                    tr_loss_step = np.sum(outs["loss"])
+                else:
+                    tr_loss_step = float(0)
 
-            tr_loss += tr_loss_step
+                if training_args.gradient_accumulation_steps > 1:
+                    tr_loss_step /= training_args.gradient_accumulation_steps
+
+                tr_loss += tr_loss_step
 
             if lr_scheduler is not None:
                 engine.optimizer._learning_rate.step()

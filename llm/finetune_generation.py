@@ -81,10 +81,6 @@ def main():
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
 
-    # if using chat_template, data_args.eval_with_do_generation must be false
-    if data_args.chat_template is not None:
-        data_args.eval_with_do_generation = False
-
     # Detecting last checkpoint.
     last_checkpoint = None
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
@@ -170,6 +166,10 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
     # init chat_template for tokenizer
     init_chat_template(tokenizer, model_args.model_name_or_path, data_args.chat_template)
+
+    # if using chat_template, data_args.eval_with_do_generation must be false
+    if tokenizer.chat_template is not None:
+        data_args.eval_with_do_generation = False
 
     if isinstance(tokenizer, LlamaTokenizer):
         tokenizer.pad_token_id = tokenizer.eos_token_id
