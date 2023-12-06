@@ -351,7 +351,7 @@ def main():
 
     paddle.set_device(training_args.device)
 
-    set_seed(seed=training_args.seed)
+    set_seed(seed=training_args.seed, args=training_args)
 
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
