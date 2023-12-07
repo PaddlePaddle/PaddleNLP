@@ -426,6 +426,8 @@ def main():
             config=config,
             dtype=dtype,
         )
+        print(f"hot start -----------------------")
+        # print(f"model = {model}")
     else:
         model = model_class.from_config(config, dtype=dtype)
 
