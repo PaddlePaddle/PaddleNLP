@@ -2421,17 +2421,17 @@ class PipelinePretrainedModel(PretrainedModel):
             # else it will be like 0.xxx
             use_virtual_pp_degree = first_key[0].isdigit() and first_key[1].isdigit()
 
-            prefixs = self.get_sequential_name_prefixs()
+            prefixes = self.get_sequential_name_prefixs()
             for k in state_dict_keys:
                 name_splited = k.split(".")
                 if use_virtual_pp_degree:
                     if name_splited[0].isdigit():
                         if name_splited[1].isdigit():
                             idx = str(int(name_splited[0]) + int(name_splited[1]))
-                            single_name = [prefixs[idx]]
+                            single_name = [prefixes[idx]]
                             single_name.extend(name_splited[2:])
                         else:
-                            single_name = [prefixs[str(len(prefixs) - 1)]]
+                            single_name = [prefixes[str(len(prefixes) - 1)]]
                             single_name.extend(name_splited[2:])
                             logger.warning(
                                 f"Please check! we treat this key as last layer, get {k}, set origin name as {'.'.join(single_name)}"
@@ -2445,7 +2445,7 @@ class PipelinePretrainedModel(PretrainedModel):
                     idx = name_splited[0]
                     # for normal pp layer
                     if idx.isdigit():
-                        single_name = [prefixs[idx]]
+                        single_name = [prefixes[idx]]
                         single_name.extend(name_splited[1:])
                     elif idx == "shared_layers":
                         single_name = [self.get_shardlayer_prefix(name_splited)]
@@ -2463,7 +2463,7 @@ class PipelinePretrainedModel(PretrainedModel):
 
     def get_shardlayer_prefix(self, name_splited):
         shared_layer_names = {s.layer_name for s in self._layers_desc if isinstance(s, SharedLayerDesc)}
-        assert name_splited[1] in shared_layer_names, f"The shared layer name {name_splited[1]} must be in prefixs!"
+        assert name_splited[1] in shared_layer_names, f"The shared layer name {name_splited[1]} must be in prefixes!"
         shared_layer_key = name_splited[1]
         for idx, layer in enumerate(self._layers_desc):
             if isinstance(layer, SharedLayerDesc) and layer.layer_name == shared_layer_key:
