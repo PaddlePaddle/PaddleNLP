@@ -1095,7 +1095,7 @@ class TrainingArguments:
                 pipeline.enable_send_recv_overlap = "enable_send_recv_overlap" in pipeline_parallel_config
                 pipeline.accumulate_steps = self.gradient_accumulation_steps
                 pipeline.micro_batch_size = self.per_device_train_batch_size
-                pipeline.schedule_mode = "1F1B"
+                pipeline.schedule_mode = self.pipeline_schedule_mode
 
                 if self.amp_master_grad:
                     warnings.warn("`amp_master_grad` is not supported NOW in AutoParallel!")
@@ -1110,6 +1110,11 @@ class TrainingArguments:
                         "In pipeline model, the evaluation also shares same setting with training. "
                         "Please set per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
                     )
+            elif self.gradient_accumulation_steps > 1:
+                gradient_merge = strategy.gradient_merge
+                gradient_merge.enable = True
+                gradient_merge.k_steps = self.gradient_accumulation_steps
+                gradient_merge.avg = True
 
             if tensor_parallel_degree > 1:
                 mp_optimization = strategy.mp_optimization
