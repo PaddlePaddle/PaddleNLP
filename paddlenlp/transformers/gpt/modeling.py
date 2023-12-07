@@ -1381,7 +1381,7 @@ class GPTForCausalLM(GPTPretrainedModel):
         self.gpt = GPTModel(config)
         self.lm_head = GPTLMHead(config, embedding_weights=self.gpt.embeddings.word_embeddings.weight)
 
-        self.tie_weights()
+        # self.tie_weights()
         self.criterion = GPTPretrainingCriterion(config)
 
     def get_output_embeddings(self):
