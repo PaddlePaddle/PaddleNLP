@@ -19,9 +19,10 @@ import unittest
 import paddle
 from parameterized import parameterized_class
 
-from paddlenlp.transformers import (  # ChatGLMForCausalLM,
+from paddlenlp.transformers import (
     AutoTokenizer,
     BloomForCausalLM,
+    ChatGLMForCausalLM,
     LlamaForCausalLM,
 )
 from paddlenlp.utils.downloader import (
@@ -38,7 +39,7 @@ from .testing_utils import LLMTest
     [
         ["__internal_testing__/tiny-random-llama", LlamaForCausalLM],
         ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
-        # ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
+        ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
         # TODO(wj-Mcat): disable chatglm2 test temporarily
         # ["__internal_testing__/tiny-fused-chatglm2", ChatGLMv2ForCausalLM],
     ],

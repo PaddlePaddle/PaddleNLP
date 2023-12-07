@@ -452,7 +452,7 @@ class InferencePredictorMixin:
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = 1
                 self.attention_mask[i, 0, : length - 1, length - 1] = 0
-                self.tgt_pos[i, 0, 0] = paddle.to_tensor([length], dtype="int64")
+                self.tgt_pos[i, 0, 0] = paddle.to_tensor([length - 2], dtype="int64")
 
                 if pre_caches_length > 0:
                     prefix_attention_mask = paddle.ones(
