@@ -42,6 +42,7 @@ from huggingface_hub import (
 )
 from huggingface_hub.utils import EntryNotFoundError
 from paddle import Tensor
+from paddle.distributed.fleet.meta_parallel.parallel_layers import SharedLayerDesc
 from paddle.nn import Embedding, Layer
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
@@ -2436,11 +2437,7 @@ class PipelinePretrainedModel(PretrainedModel):
                                 f"Please check! we treat this key as last layer, get {k}, set origin name as {'.'.join(single_name)}"
                             )
                     elif name_splited[0] == "shared_layers":
-                        first_shared_comm_key = list(self.shared_comm.keys())[0]
-                        shared_layer_idx_rank = self.shared_comm[first_shared_comm_key]["group"].rank
-                        shared_layer_idx = self.shared_comm[first_shared_comm_key]["layer_idx"][shared_layer_idx_rank]
-
-                        single_name = [prefixs[str(shared_layer_idx)]]
+                        single_name = [self.get_shardlayer_prefix(name_splited)]
                         single_name.extend(name_splited[2:])
                     else:
                         raise ValueError(f"Unexpected key: {k} for pp layer.")
@@ -2451,11 +2448,7 @@ class PipelinePretrainedModel(PretrainedModel):
                         single_name = [prefixs[idx]]
                         single_name.extend(name_splited[1:])
                     elif idx == "shared_layers":
-                        first_shared_comm_key = list(self.shared_comm.keys())[0]
-                        shared_layer_idx_rank = self.shared_comm[first_shared_comm_key]["group"].rank
-                        shared_layer_idx = self.shared_comm[first_shared_comm_key]["layer_idx"][shared_layer_idx_rank]
-
-                        single_name = [prefixs[str(shared_layer_idx)]]
+                        single_name = [self.get_shardlayer_prefix(name_splited)]
                         single_name.extend(name_splited[2:])
                     else:
                         raise ValueError(f"Unexpected key: {k} for pp layer.")
@@ -2467,6 +2460,21 @@ class PipelinePretrainedModel(PretrainedModel):
             self._pp_to_single_mapping = pp_to_single_mapping
 
         return self._single_to_pp_mapping
+
+    def get_shardlayer_prefix(self, name_splited):
+        shared_layer_names = {s.layer_name for s in self._layers_desc if isinstance(s, SharedLayerDesc)}
+        assert name_splited[1] in shared_layer_names, f"The shared layer name {name_splited[1]} must be in prefixs!"
+        shared_layer_key = name_splited[1]
+        for idx, layer in enumerate(self._layers_desc):
+            if isinstance(layer, SharedLayerDesc) and layer.layer_name == shared_layer_key:
+                if self.get_stage_from_index(idx) == self._stage_id:
+                    return self.get_sequential_name_prefixs()[str(idx)]
+
+        default_prefix = self.get_sequential_name_prefixs()["0"]
+        logger.warning(
+            f"Please check! we treat this key as last layer, get {'.'.join(name_splited)}, set prefix name as {default_prefix}"
+        )
+        return default_prefix
 
     def state_dict(self, *args, **kwargs):
         state_dict = super().state_dict(*args, **kwargs)
