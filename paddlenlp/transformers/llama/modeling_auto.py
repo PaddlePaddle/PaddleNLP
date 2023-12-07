@@ -54,7 +54,6 @@ from .modeling import (
     apply_rotary_pos_emb,
     build_alibi_tensor,
     get_triangle_upper_mask,
-    is_casual_mask,
     repeat_kv,
     rms_norm_fused,
 )
@@ -685,39 +684,6 @@ class LlamaPretrainedModelAuto(PretrainedModel):
 
         return mappings
 
-    def _init_weights(self, layer):
-        """Initialization hook"""
-        if isinstance(
-            layer,
-            (
-                nn.Linear,
-                nn.Embedding,
-                LlamaLMHeadAuto,
-            ),
-        ):
-            # In the dygraph mode, use the `set_value` to reset the parameter directly,
-            # and reset the `state_dict` to update parameter in static mode.
-            if isinstance(layer.weight, paddle.Tensor):
-                layer.weight.set_value(
-                    paddle.tensor.normal(
-                        mean=0.0,
-                        std=self.config.initializer_range
-                        if hasattr(self.config, "initializer_range")
-                        else self.llama.config.initializer_range,
-                        shape=layer.weight.shape,
-                    )
-                )
-        # Layer.apply is DFS https://github.com/PaddlePaddle/Paddle/blob/a6f5021fcc58b21f4414bae6bf4731ef6971582c/python/paddle/nn/layer/layers.py#L527-L530
-        # sublayer is init first
-        # scale RowParallelLinear weight
-        with paddle.no_grad():
-            if isinstance(layer, LlamaMLPAuto):
-                factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
-                layer.down_proj.weight.scale_(factor)
-            if isinstance(layer, LlamaAttentionAuto):
-                factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
-                layer.o_proj.weight.scale_(factor)
-
 
 @register_base_model
 class LlamaModelAuto(LlamaPretrainedModelAuto):
@@ -856,9 +822,8 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
         if self.config.use_flash_attention:
-            is_casual = is_casual_mask(attention_mask)
-            if is_casual and alibi is None:
-                attention_mask = None
+            # attention_mask in flash_attn is always None for pretrain
+            attention_mask = None
         hidden_states = inputs_embeds
 
         # decoder layers

@@ -514,10 +514,6 @@ class ChatTemplate:
     system: str | None = None
     query: str = None
 
-    sep_token_id: int | None = None
-    eos_token_id: int | None = None
-    bos_token_id: int | None = None
-
     @staticmethod
     @lru_cache()
     def _compile_jinja_template(chat_template):
@@ -617,25 +613,6 @@ class ChatTemplate:
 
 class ChatTemplateMixin:
     chat_template: Optional[ChatTemplate] = None
-
-    @property
-    def chat_template_eos_token_id(self):
-        if self.chat_template.eos_token_id:
-            return self.chat_template.eos_token_id
-        return self.eos_token_id
-
-    @property
-    def chat_template_bos_token_id(self):
-        if self.chat_template.bos_token_id:
-            return self.chat_template.bos_token_id
-        return self.bos_token_id
-
-    @property
-    def chat_template_sep_token_id(self):
-        if self.chat_template.sep_token_id:
-            return self.chat_template.sep_token_id
-
-        return self.sep_token_id
 
     def apply_chat_template(
         self,

@@ -424,13 +424,5 @@ elif [ ${MODE} = "benchmark_train" ];then
     python -m pip install -e ../
     # python -m pip install paddlenlp    # PDC 镜像中安装失败
     python -m pip list
-    export http_proxy=${HTTP_PRO}
-    export https_proxy=${HTTPS_PRO}
-    # install develop paddlemix/ppdiffusers
-    git clone https://github.com/PaddlePaddle/PaddleMIX.git
-    unset http_proxy
-    unset https_proxy
-    cd PaddleMIX
-    python -m pip install -e ./ppdiffusers
     cd -
 fi

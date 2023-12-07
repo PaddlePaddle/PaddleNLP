@@ -92,9 +92,10 @@ function _train(){
         use_fp16_cmd="--use_amp true"
     fi
 
-    if [ "${tensor_parallel_degree}" != "1" ]; then
-        export CUDA_DEVICE_MAX_CONNECTIONS=1
-    fi
+    # Disable for hanging bug
+    # if [ "${tensor_parallel_degree}" != "1" ]; then
+    #     export CUDA_DEVICE_MAX_CONNECTIONS=1
+    # fi
 
     if [ "${pipeline_parallel_config}" != "" ]; then
         pipeline_parallel_config_args="--pipeline_parallel_config ${pipeline_parallel_config}"
