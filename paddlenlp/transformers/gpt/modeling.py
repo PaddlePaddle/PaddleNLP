@@ -718,7 +718,6 @@ class GPTEmbeddings(nn.Layer):
             position_ids = seq_length - ones
 
         position_embeddings = self.position_embeddings(position_ids)
-
         embeddings = inputs_embeddings + position_embeddings
 
         if self.config.sequence_parallel:
