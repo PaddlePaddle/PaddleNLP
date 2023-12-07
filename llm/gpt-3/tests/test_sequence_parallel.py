@@ -61,7 +61,7 @@ class TestGPT(unittest.TestCase):
 
         config.tensor_parallel_degree = tp_degree
         config.tensor_parallel_rank = tensor_parallel_rank
-        config.tensor_parallel_output = True
+        config.tensor_parallel_output = False
         # when tp_degree > 1, sequence_parallel can be set to True
         config.sequence_parallel = True
         config.fuse_sequence_parallel_allreduce = False
