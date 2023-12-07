@@ -4,7 +4,7 @@ task_name2="single_card"
 
 export PYTHONPATH="../../../PaddleNLP_PP_recompute/"
 
-max_steps=50000
+max_steps=100000
 log_dir1='p2-pp2-sp1-dp2'
 log_dir2='single_card'
 
@@ -14,7 +14,7 @@ rm -rf $log_dir1
 rm -rf $log_dir2
 
 export FLAGS_cudnn_deterministic=1
-export FLAGS_embedding_deterministic=1
+export FLAGS_embedding_deterministic=2
 
 command1="python3.7 -u -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
@@ -31,7 +31,7 @@ command1="python3.7 -u -m paddle.distributed.launch \
     --sequence_parallel true \
     --split 949,50,1 \
     --max_seq_length 1024 \
-    --per_device_train_batch_size 8 \
+    --per_device_train_batch_size 2 \
     --seed 1234 \
     --fuse_attention_qkv 1 \
     --use_flash_attention 0 \
@@ -61,7 +61,7 @@ command1="python3.7 -u -m paddle.distributed.launch \
 $command1
 
 export FLAGS_cudnn_deterministic=1
-export FLAGS_embedding_deterministic=1
+export FLAGS_embedding_deterministic=2
 
 command2="python3.7 -u -m paddle.distributed.launch \
     --gpus "0" \
@@ -74,7 +74,7 @@ command2="python3.7 -u -m paddle.distributed.launch \
     --output_dir "output/$task_name2" \
     --split 949,50,1 \
     --max_seq_length 1024 \
-    --per_device_train_batch_size 16 \
+    --per_device_train_batch_size 4 \
     --seed 1234 \
     --fuse_attention_qkv 1 \
     --use_flash_attention 0 \
@@ -102,3 +102,6 @@ command2="python3.7 -u -m paddle.distributed.launch \
     --device "gpu"
 "
 $command2
+
+# grep loss single_card/workerlog.0
+# grep loss p2-pp2-sp1-dp2/workerlog.0
