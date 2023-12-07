@@ -156,6 +156,7 @@ std::vector<paddle::Tensor> TokenPenaltyMultiScores(const paddle::Tensor& pre_id
                                                     const paddle::Tensor& eos_token_id) {
 
     switch (logits.type()) {
+#if CUDA_VERSION >= 11000
         case paddle::DataType::BFLOAT16: {
             return token_penalty_multi_scores_kernel<paddle::DataType::BFLOAT16>(
                 pre_ids,
@@ -168,6 +169,7 @@ std::vector<paddle::Tensor> TokenPenaltyMultiScores(const paddle::Tensor& pre_id
                 eos_token_id
             );
         }
+#endif 
         case paddle::DataType::FLOAT16: {
             return token_penalty_multi_scores_kernel<paddle::DataType::FLOAT16>(
                 pre_ids,

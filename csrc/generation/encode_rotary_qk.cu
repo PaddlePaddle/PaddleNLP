@@ -193,11 +193,13 @@ void RotaryQK(const paddle::Tensor& q,
               const int32_t rotary_emb_dims, 
               bool use_neox) {
     switch (q.type()) {
+#if CUDA_VERSION >= 11000
         case paddle::DataType::BFLOAT16: {
             return LaunchRotaryQK<paddle::DataType::BFLOAT16>(
                 q, kv, rotary_emb, seq_lens, rotary_emb_dims, use_neox
             );
         }
+#endif 
         case paddle::DataType::FLOAT16: {
             return LaunchRotaryQK<paddle::DataType::FLOAT16>(
                 q, kv, rotary_emb, seq_lens, rotary_emb_dims, use_neox

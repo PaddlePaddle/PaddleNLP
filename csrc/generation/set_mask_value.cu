@@ -14,6 +14,7 @@
 
 #include "paddle/extension.h"
 
+
 template <paddle::DataType D>
 class PDTraits;
 
@@ -31,12 +32,14 @@ public:
   typedef paddle::float16 data_t;
 };
 
+#if CUDA_VERSION >= 11000
 template <>
 class PDTraits<paddle::DataType::BFLOAT16> {
 public:
   typedef __nv_bfloat16 DataType;
   typedef paddle::bfloat16 data_t;
 };
+#endif
 
 template <typename T>
 __global__ void set_value_by_id(const int *seq_lens, const bool *stop_flags, T *output_data, int *sequence_lengths, int bs, int length) {
@@ -77,6 +80,7 @@ std::vector<paddle::Tensor> set_mask_value(const paddle::Tensor& input_data, con
 
 std::vector<paddle::Tensor> SetMaskValue(const paddle::Tensor& input_data, const paddle::Tensor& stop_flags, const paddle::Tensor& seq_lens) {
     switch (input_data.type()) {
+#if CUDA_VERSION >= 11000       
         case paddle::DataType::BFLOAT16: {
             return set_mask_value<paddle::DataType::BFLOAT16>(
                 input_data,
@@ -84,6 +88,7 @@ std::vector<paddle::Tensor> SetMaskValue(const paddle::Tensor& input_data, const
                 seq_lens
             );
         }
+#endif 
         case paddle::DataType::FLOAT16: {
             return set_mask_value<paddle::DataType::FLOAT16>(
                 input_data,
