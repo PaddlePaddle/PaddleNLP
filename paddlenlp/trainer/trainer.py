@@ -673,12 +673,8 @@ class Trainer:
         self.state = TrainerState()
 
         if self.args.should_load_sharding_stage1_model:
-            print('x'*100)
-            print(f"self.args.should_load_sharding_stage1_model = {self.args.should_load_sharding_stage1_model}")
             model = self._wrap_model_and_load_sharded_checkpoint(resume_from_checkpoint)
         elif self.args.should_save_sharding_stage1_model:
-            print('y' * 100)
-            print(f"self.args.should_save_sharding_stage1_model = {self.args.should_save_sharding_stage1_model}")
             # In the non-sharded mode, should invoke _load_from_checkpoint before _wrap_model.
             # In this mode, the rank0 load all params and the _wrap_model implicitly broadcast params from rank0 to the other ranks.
             model = self._wrap_model(self.model_wrapped)
@@ -693,9 +689,6 @@ class Trainer:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
             self._load_optimizer_and_scheduler(resume_from_checkpoint)
         else:
-            # print('z'*100)
-            # print(f"self._wrap_model(self.model_wrapped)")
-            # print(f"self.model_wrapped = {self.model_wrapped}")
             model = self._wrap_model(self.model_wrapped)
             # for the rest of this function `model` is the outside model, whether it was wrapped or not
             if model is not self.model:
@@ -704,7 +697,6 @@ class Trainer:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
             self._load_optimizer_and_scheduler(resume_from_checkpoint)
 
-        # print(f"model: {self.model}")
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples:,}")
         logger.info(f"  Num Epochs = {num_train_epochs}")
@@ -717,20 +709,6 @@ class Trainer:
         # TODO: Temporary fix since Tensor.numel() not supported in distributed mode
         per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
 
-
-        # 计算tensor的md5sum。
-        import hashlib
-        def calculate_md5_of_tensor(tensor) :
-            numpy_array = tensor.numpy()
-            array_bytes = numpy_array.tobytes()
-            return hashlib.md5(array_bytes).hexdigest()
-        
-        # print('*'*100)
-        # for p in model.parameters():
-        #     # if not p.stop_gradient:
-        #         print(f"p.name = {p.name}")
-        #         print(f"calculate_md5_of_tensor(p): {calculate_md5_of_tensor(p)}")
-        # print('*'*100)
 
         logger.info(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
         if self.args.use_hybrid_parallel:
@@ -1001,19 +979,6 @@ class Trainer:
                     else:
                         self.optimizer.step()
 
-                    # print('*'*100)
-                    # for p in parameters_list:
-                    #     print("p.name", p.name)
-                    #     if hasattr(p, "main_grad") and p.main_grad is not None:
-                    #         print("p.main_grad", calculate_md5_of_tensor(p.main_grad))
-                    #     elif hasattr(p, "grad") and p.grad is not None:
-                    #             print("p.grad", calculate_md5_of_tensor(p.grad))
-                    #     else:
-                    #         print("p is not trainable")
-
-                    # print('*'*100)
-
-                    # print(f"self.optimizer: {self.optimizer}")
                     self.timers and self.timers("optimizer-step").stop()
 
                     if optimizer_was_run:
@@ -1491,8 +1456,6 @@ class Trainer:
                     else None,
                     **optimizer_kwargs,
                 )
-                # print(f"create_optimizer -------------- ")
-                # print(f"self.optimizer = {self.optimizer }")
 
         return self.optimizer
 
@@ -1724,7 +1687,6 @@ class Trainer:
             assert self.optimizer is not None, "Pipeline mode need decorate optimizer, pelease init optimizer."
             if self.args.amp_master_grad:
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
-            print(f"self.optimizer : {self.optimizer}")
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
 
         # No pipeline mode, sharding only
