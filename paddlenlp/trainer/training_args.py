@@ -609,6 +609,10 @@ class TrainingArguments:
             "Only support for networks with transformer blocks."
         },
     )
+    sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
+    refined_ops_patterns: Optional[List[str]] = field(
+        default=None, metadata={"help": "The pattern of refined recompute."}
+    )
 
     scale_loss: float = field(default=2**15, metadata={"help": "The value of initial scale_loss for fp16."})
 
@@ -812,10 +816,42 @@ class TrainingArguments:
         except:
             pass
 
-        if paddle.distributed.get_world_size() > 1 and (
-            len(self.sharding) > 0 or self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1
-        ):
-            self.use_hybrid_parallel = not self.use_auto_parallel
+        if paddle.distributed.get_world_size() > 1:
+            world_size = paddle.distributed.get_world_size()
+            tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
+            pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
+
+            assert (
+                world_size % (self.tensor_parallel_degree * self.pipeline_parallel_degree) == 0
+            ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
+
+            if self.sharding_parallel_degree == -1:
+                if len(self.sharding) > 0:
+                    self.sharding_parallel_degree = world_size // (tensor_parallel_degree * pipeline_parallel_degree)
+
+            sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
+            if sharding_parallel_degree == 1 and len(self.sharding) > 0:
+                logger.warning("sharding_parallel_degree=1 means no sharding, please set sharding to empty!")
+                self.sharding = []
+
+            self.data_parallel_degree = world_size // (
+                sharding_parallel_degree * tensor_parallel_degree * pipeline_parallel_degree
+            )
+
+            if sharding_parallel_degree > 1 or tensor_parallel_degree > 1 or pipeline_parallel_degree > 1:
+                self.use_hybrid_parallel = True
+                self.sharding_parallel_degree = sharding_parallel_degree
+                self.tensor_parallel_degree = tensor_parallel_degree
+                self.pipeline_parallel_degree = pipeline_parallel_degree
+
+            if not self.use_hybrid_parallel:
+                self.sharding = []
+                self.sharding_parallel_degree = -1
+                self.tensor_parallel_degree = -1
+                self.pipeline_parallel_degree = -1
+
+        if self.use_hybrid_parallel and self.use_auto_parallel:
+            self.use_hybrid_parallel = False
 
         if self.distributed_dataloader and not (self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1):
             warnings.warn("We set `distributed_dataloader` to False if tp_degree <= 1 and pp_degree <= 1")
@@ -829,36 +865,11 @@ class TrainingArguments:
         # use_hybrid_parallel
         if self.use_hybrid_parallel:
             world_size = paddle.distributed.get_world_size()
-            tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
-            pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
-
-            assert (
-                world_size % (tensor_parallel_degree * pipeline_parallel_degree) == 0
-            ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
-
-            if self.sharding_parallel_degree == -1:
-                if len(self.sharding) > 0:
-                    self.sharding_parallel_degree = world_size // (tensor_parallel_degree * pipeline_parallel_degree)
-
-            sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
-            if sharding_parallel_degree == 1 and len(self.sharding) > 0:
-                logger.warning("sharding_parallel_degree=1 means no sharding, please set sharding to empty!")
-                self.sharding = []
-
-            assert world_size % (sharding_parallel_degree * tensor_parallel_degree * pipeline_parallel_degree) == 0, (
-                "The world size for workers should be divided by sharding_parallel_degree, tensor_parallel_degree, and pipeline_parallel_degree, "
-                "sharding_parallel_degree:{sharding_parallel_degree}, tensor_parallel_degree:{tensor_parallel_degree}, "
-                "pipeline_parallel_degree:{pipeline_parallel_degree}, "
-                " world_size:{world_size}"
-            )
-            self.data_parallel_degree = world_size // (
-                sharding_parallel_degree * tensor_parallel_degree * pipeline_parallel_degree
-            )
 
             if ShardingOption.OFFLOAD in self.sharding:
                 warnings.warn("`offload` is not supported NOW!")
 
-            if pipeline_parallel_degree > 1:
+            if self.pipeline_parallel_degree > 1:
                 if ShardingOption.FULL_SHARD in self.sharding or ShardingOption.SHARD_GRAD_OP in self.sharding:
                     raise ValueError(
                         "pipeline parallel is not compatible for sharding stage2 or stage3, please using sharding stage1"
@@ -867,7 +878,7 @@ class TrainingArguments:
             # TODO use paddle.distributed.is_initialized() after paddle 2.4rc
             if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized():
                 strategy = fleet.DistributedStrategy()
-                if pipeline_parallel_degree > 1:
+                if self.pipeline_parallel_degree > 1:
                     pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
                     for x in pipeline_parallel_config:
                         if len(x) > 0:
@@ -911,7 +922,7 @@ class TrainingArguments:
                             "Please set per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
                         )
 
-                if tensor_parallel_degree > 1:
+                if self.tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
 
                     if " " in self.tensor_parallel_config:
@@ -975,20 +986,20 @@ class TrainingArguments:
 
                 hybrid_configs = {
                     "dp_degree": self.data_parallel_degree,
-                    "mp_degree": tensor_parallel_degree,
-                    "pp_degree": pipeline_parallel_degree,
-                    "sharding_degree": sharding_parallel_degree,
+                    "mp_degree": self.tensor_parallel_degree,
+                    "pp_degree": self.pipeline_parallel_degree,
+                    "sharding_degree": self.sharding_parallel_degree,
                     "order": order,
                 }
 
-                if pipeline_parallel_degree > 1:
+                if self.pipeline_parallel_degree > 1:
                     hybrid_configs["pp_configs"] = dygraph_pp_configs
                     logger.info(f"using pipeline configs:{dygraph_pp_configs}")
 
                 # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
                 strategy.hybrid_configs = hybrid_configs
 
-                if sharding_parallel_degree > 1:
+                if self.sharding_parallel_degree > 1:
                     sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
                     for x in sharding_parallel_config:
                         if len(x) > 0:
@@ -1006,7 +1017,7 @@ class TrainingArguments:
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
 
-                        if pipeline_parallel_degree == 1:
+                        if self.pipeline_parallel_degree == 1:
                             strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
                                 True if "enable_stage1_tensor_fusion" in sharding_parallel_config else False
                             )
@@ -1169,9 +1180,13 @@ class TrainingArguments:
             if self.recompute:
                 recompute = strategy.recompute
                 recompute.enable = True
+                recompute.sr = self.sr if self.sr is not None else 0
+                recompute.refined_ops_patterns = []
+                if self.refined_ops_patterns is not None:
+                    for pattern in self.refined_ops_patterns:
+                        recompute.refined_ops_patterns.append(eval(pattern))
 
             self.strategy = strategy
-            logger.info(self.strategy)
             order = ["dp", "pp", "mp"]
             degree = [self.data_parallel_degree, pipeline_parallel_degree, tensor_parallel_degree]
             mesh_dims = list(filter(lambda x: x[1] > 1, list(zip(order, degree))))
@@ -1182,13 +1197,18 @@ class TrainingArguments:
             world_size = paddle.distributed.get_world_size()
             if world_size > 1:
                 if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized():
-                    paddle.distributed.init_parallel_env()
+                    if self.unified_checkpoint:
+                        self.use_hybrid_parallel = True
+                        strategy = fleet.DistributedStrategy()
+                        fleet.init(is_collective=True, strategy=strategy)
+                    else:
+                        paddle.distributed.init_parallel_env()
 
-        if self.unified_checkpoint and not self.use_hybrid_parallel:
-            logger.warning(
-                "The unified_checkpoint only avaliable for hybrid_parallel. Set unified_checkpoint to False for not using hybrid_parallel."
-            )
-            self.unified_checkpoint = False
+        # if self.unified_checkpoint and not self.use_hybrid_parallel:
+        #     logger.warning(
+        #         "The unified_checkpoint only avaliable for hybrid_parallel. Set unified_checkpoint to False for not using hybrid_parallel."
+        #     )
+        #     self.unified_checkpoint = False
 
         if self.report_to is None:
             logger.info(

@@ -44,8 +44,6 @@ from paddlenlp.utils.env import (
 from paddlenlp.utils.log import logger
 
 if is_safetensors_available():
-
-    # from safetensors.numpy import load_file as safe_load_file
     from safetensors.numpy import save_file as safe_save_file
 
 
@@ -267,7 +265,7 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
     results = unified_optimizer_into_shards(args, model, optimizer, safe_serialization=safe_serialization)
     master_weight_state_dict = None
     if len(results) == 1:
-        optim_state_dict, shard_optim_file, sharded_optim_index = results
+        optim_state_dict, shard_optim_file, sharded_optim_index = results[0]
     else:
         optim_state_dict, shard_optim_file, sharded_optim_index = results[0]
         master_weight_state_dict, shard_master_weight_file, sharded_master_weight_index = results[1]
@@ -310,8 +308,111 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
                 json.dump(sharded_master_weight_index, f, indent=4)
 
 
-def load_unified_optimizer():
-    pass
+def load_unified_optimizer(model, optimizer, resume_from_checkpoint, safe_serialization=False):
+    """Load potential model checkpoint
+
+    Args:
+        model (PretrainedModel): Your model to load
+        resume_from_checkpoint (str): path of the checkpoint to load
+
+    Returns:
+        None
+    """
+    # init and get optimizer LR_Scheduler
+    returned_optim_state_dict = nested_copy(optimizer.state_dict())
+
+    if not safe_serialization:
+        index_filename, index_filename_master_weights = PADDLE_OPTIMIZER_INDEX_NAME, PADDLE_MASTER_WEIGHTS_INDEX_NAME
+    else:
+        index_filename, index_filename_master_weights = SAFE_OPTIMIZER_INDEX_NAME, SAFE_MASTER_WEIGHTS_INDEX_NAME
+
+    resolved_archive_file, sharded_metadata = get_optimizer_shard_files(
+        optimizer_path=resume_from_checkpoint,
+        index_filename=os.path.join(resume_from_checkpoint, index_filename),
+    )
+    has_master_weights = True if sharded_metadata["master_weights"] else False
+
+    model_state_dict = model.state_dict()
+    model_keys = list(model_state_dict.keys())
+    struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}  # get optimizer param mappings
+
+    expected_keys = get_expected_keys(sharded_metadata, model, optimizer)
+
+    # This should always be a list but, just to be sure.
+    if not isinstance(resolved_archive_file, list):
+        resolved_archive_file = [resolved_archive_file]
+    if len(resolved_archive_file) > 1:
+        resolved_archive_file = tqdm(resolved_archive_file, desc="Loading optimizer shards")
+
+    if has_master_weights:
+        returned_optim_state_dict["master_weights"] = {}
+
+        resolved_archive_file_mw, sharded_metadata_mw = get_optimizer_shard_files(
+            optimizer_path=resume_from_checkpoint,
+            index_filename=os.path.join(resume_from_checkpoint, index_filename_master_weights),
+        )
+
+        expected_keys_mw = get_expected_keys(sharded_metadata_mw, model, optimizer)
+        if not isinstance(resolved_archive_file_mw, list):
+            resolved_archive_file_mw = [resolved_archive_file_mw]
+        if len(resolved_archive_file_mw) > 1:
+            resolved_archive_file_mw = tqdm(resolved_archive_file_mw, desc="Loading master weights shards")
+
+    def load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys, is_master_weight=False):
+        returned_state_dict = {}
+        # load optimizer
+        for shard_file in resolved_archive_file:
+            # TODO: check if no expected_keys in shard_file, then don't load it
+            if expected_keys.isdisjoint(sharded_metadata["file_map"][os.path.split(shard_file)[-1]]):
+                continue
+
+            if shard_file.endswith(".safetensors"):
+                # assert model_keys is not None, "model_keys is None." TODO: correct the assert
+                if model.config.tensor_parallel_degree > 1:
+                    tp_actions = model.get_tensor_parallel_convert_actions(model.config, model_keys, ignore_error=True)
+                    if not is_master_weight:
+                        tp_actions = mapping_optimizer_tp_actions(tp_actions, expected_keys)
+
+                    # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
+                    state_dict = load_state_dict(shard_file, tp_actions, expected_keys)
+                else:
+                    # for pipeline model, we don't need to use tp_actions
+                    state_dict = load_state_dict(shard_file, None, expected_keys)
+
+            returned_state_dict.update(state_dict)
+            # force memory release
+            del state_dict
+            gc.collect()
+        return returned_state_dict
+
+    state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys)
+    if has_master_weights:
+        state_dict_master_weight = load_resolved_archive_file(
+            resolved_archive_file_mw, sharded_metadata_mw, expected_keys_mw, is_master_weight=True
+        )
+
+    # rename optimizer param
+    for key in list(state_dict_optim.keys()):
+        key_name = key.split("/")
+        static_name = struct2static_name_mappings[key_name[0]]
+        if has_master_weights:
+            key_name = "_".join([static_name, "fp32_master_0", key_name[1]])
+        else:
+            key_name = "_".join([static_name, key_name[1]])
+        returned_optim_state_dict[key_name] = state_dict_optim[key]
+        returned_optim_state_dict[key_name].name = key_name
+
+    if has_master_weights:
+        for key in list(state_dict_master_weight.keys()):
+            static_name = struct2static_name_mappings[key]
+            returned_optim_state_dict["master_weights"][static_name] = state_dict_master_weight[key]
+            returned_optim_state_dict["master_weights"][static_name].name = "_".join([static_name, "fp32_master_0"])
+
+    returned_optim_state_dict = nested_copy_place(
+        returned_optim_state_dict, place=paddle.framework._current_expected_place()
+    )
+
+    return returned_optim_state_dict
 
 
 def unified_optimizer_into_shards(
@@ -395,11 +496,13 @@ def unified_optimizer_into_shards(
             index_master_weight_file[key] = shard_master_weight_file
             total_master_weight_size += weight.numel().item() * dtype_byte_size(weight.dtype)
 
-    index_optimizer_filelist, total_optim_size_list = gather_sharded_object(index_optimizer_file, total_optim_size)
+    index_optimizer_filelist, total_optim_size_list = gather_sharded_object(
+        index_optimizer_file, total_optim_size, is_optimizer=True
+    )
     sharded_optim_index = get_sharded_index(index_optimizer_filelist, total_optim_size_list)
     if master_weights is not None:
         index_master_weight_filelist, total_master_weight_size_list = gather_sharded_object(
-            index_master_weight_file, total_master_weight_size
+            index_master_weight_file, total_master_weight_size, is_optimizer=True
         )
         sharded_master_weight_index = get_sharded_index(index_master_weight_filelist, total_master_weight_size_list)
 
@@ -407,13 +510,12 @@ def unified_optimizer_into_shards(
         sharded_optim_index["master_weights"] = True
 
     if master_weights is None:
-        return (optim_state_dict, shard_optimizer_file, sharded_optim_index)
+        return [(optim_state_dict, shard_optimizer_file, sharded_optim_index)]
     else:
-        return (optim_state_dict, shard_optimizer_file, sharded_optim_index), (
-            master_weights,
-            shard_master_weight_file,
-            sharded_master_weight_index,
-        )
+        return [
+            (optim_state_dict, shard_optimizer_file, sharded_optim_index),
+            (master_weights, shard_master_weight_file, sharded_master_weight_index),
+        ]
 
 
 def get_sharded_file_name(args, file_name, is_optimizer=False):
@@ -463,7 +565,7 @@ def get_sharded_index(
     return None
 
 
-def gather_sharded_object(index_file, total_size):
+def gather_sharded_object(index_file, total_size, is_optimizer=False):
 
     index_file_list, total_size_list = [], []
 
@@ -485,17 +587,25 @@ def gather_sharded_object(index_file, total_size):
         dist.all_gather_object(
             pp_total_size_list, total_size_list if len(total_size_list) > 0 else total_size, pp_group
         )
-        if isinstance(pp_total_size_list[0], list):
-            total_size_list = [y for x in pp_total_size_list for y in x]
-            index_file_list = [y for x in pp_index_file_list for y in x]
-        else:
-            index_file_list = pp_index_file_list
-            total_size_list = pp_total_size_list
+        index_file_list = pp_index_file_list
+        total_size_list = pp_total_size_list
+
+    index_file_list = flatten_list(index_file_list)
+    total_size_list = flatten_list(total_size_list)
 
     # for pure sharding
     if len(index_file_list) == 0 and len(total_size_list) == 0:
         index_file_list = [index_file]
         total_size_list = [total_size]
+    if is_optimizer:
+        sharding_group = hcg.get_sharding_parallel_group()
+        if sharding_group.nranks > 1:
+            sharding_index_file_list = []
+            sharding_total_size_list = []
+            dist.all_gather_object(sharding_index_file_list, index_file_list, sharding_group)
+            dist.all_gather_object(sharding_total_size_list, total_size_list, sharding_group)
+            index_file_list = flatten_list(sharding_index_file_list)
+            total_size_list = flatten_list(sharding_total_size_list)
 
     return index_file_list, total_size_list
 
@@ -646,12 +756,112 @@ def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys)
     return state_dict_to_save
 
 
+def get_optimizer_shard_files(optimizer_path, index_filename):
+    """
+    For a given model:
+    - download and cache all the shards of a sharded checkpoint if `pretrained_model_name_or_path` is a model ID on the
+      Hub
+    - returns the list of paths to all the shards, as well as some metadata.
+    For the description of each arg, see [`PretrainedModel.from_pretrained`]. `index_filename` is the full path to the
+    index (downloaded and cached if `pretrained_model_name_or_path` is a model ID on the Hub).
+    """
+
+    import json
+
+    if not os.path.isfile(index_filename):
+        raise ValueError(f"Can't find a optimizer index ({index_filename}) in {optimizer_path}.")
+
+    with open(index_filename, "r") as f:
+        index = json.loads(f.read())
+
+    shard_filenames = sorted(set(index["weight_map"].values()))
+    sharded_metadata = index["metadata"]
+    sharded_metadata["all_optimizer_keys"] = list(index["weight_map"].keys())
+    sharded_metadata["weight_map"] = index["weight_map"].copy()
+    sharded_metadata["master_weights"] = index.get("master_weights", False)
+
+    file_map = {file: set() for file in shard_filenames}
+    for weight, file in index["weight_map"].items():
+        file_map[file].add(weight)
+
+    sharded_metadata["file_map"] = file_map
+
+    # First, let's deal with local folder.
+    # TODO: if optimizer_path is a folder, we should check if the optimizer is already cached or not.
+    if os.path.isdir(optimizer_path):
+        shard_filenames = [os.path.join(optimizer_path, f) for f in shard_filenames]
+        return shard_filenames, sharded_metadata
+
+
+def get_expected_keys(sharded_metadata, model, optimizer):
+    hcg = fleet.get_hybrid_communicate_group()
+    sharding_group = hcg.get_sharding_parallel_group()
+    sharding_rank = sharding_group.rank
+    in_sharding_parallel_model = sharding_group.nranks > 1
+    if in_sharding_parallel_model:
+        params2rank = optimizer._param2rank
+
+    struct2static_name_mappings = {k: v.name for k, v in model.state_dict().items()}
+
+    expected_keys = []
+    for key in list(sharded_metadata["all_optimizer_keys"]):
+        key_name = key.split("/")[0]
+        static_name = struct2static_name_mappings.get(key_name, None)
+
+        if in_sharding_parallel_model:
+            params_rank = params2rank.get(static_name, None)
+            if params_rank == sharding_rank:
+                expected_keys.append(key)
+        else:
+            if static_name is not None:
+                expected_keys.append(key)
+    expected_keys = set(expected_keys)
+
+    loaded_keys = sharded_metadata["all_optimizer_keys"]
+    missing_keys = expected_keys - set(loaded_keys)
+    if len(missing_keys) > 0:
+        raise ValueError(f"optimizer missing weights keys: {missing_keys}")
+
+    return expected_keys
+
+
+def mapping_optimizer_tp_actions(tp_actions, optimizer_loaded_keys):
+    """# conert param.name to
+    param.key/moment1_0
+    or param.key/beta1_XXX
+    or param.key/beta2_XXX
+    Args:
+        tp_actions (dict): dictionay of tensor parallel actions {key: action}
+        optimizer_loaded_keys (list or set): [param.key1/moment1_0, param.key2/beta1_XXX, param.key3/beta2_XXX]
+    Returns:
+        dict: new dictionay of tensor parallel actions {key: action}
+    """
+    new_actions = {}
+    for key in optimizer_loaded_keys:
+        key_base = key.split("/")[0]
+        if ("moment" in key.split("/")[1] or "velocity" in key.split("/")[1]) and key_base in tp_actions:
+            new_actions[key] = tp_actions[key_base]
+    return new_actions
+
+
 def nested_copy(inputs):
     if isinstance(inputs, dict):
         outputs = {}
         for key in list(inputs.keys()):
             outputs[key] = nested_copy(inputs[key])
         return outputs
+    return inputs
+
+
+def nested_copy_place(inputs, place=None):
+    if isinstance(inputs, dict):
+        outputs = {}
+        for key in list(inputs.keys()):
+            outputs[key] = nested_copy_place(inputs[key], place)
+        return outputs
+    if isinstance(inputs, paddle.Tensor):
+        inputs = inputs._copy_to(place, False)
+
     return inputs
 
 
