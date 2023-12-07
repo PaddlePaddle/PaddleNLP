@@ -723,7 +723,8 @@ class GPTEmbeddings(nn.Layer):
         if input_ids is not None:
             input_shape = paddle.shape(input_ids)
             inputs_embeddings = self.word_embeddings(input_ids)
-            inputs_embeddings.register_hook(lambda grad: print(f"inputs_embeddings: {calculate_md5_of_tensor(grad)}"))
+            # self.word_embeddings.register_hook(lambda grad: print("word_embeddings grad:", calculate_md5_of_tensor(grad)))
+            # inputs_embeddings.register_hook(lambda grad: print("inputs_embeddings grad:", calculate_md5_of_tensor(grad)))
         else:
             input_shape = paddle.shape(inputs_embeddings)[:-1]
 
@@ -733,10 +734,8 @@ class GPTEmbeddings(nn.Layer):
             position_ids = seq_length - ones
 
         position_embeddings = self.position_embeddings(position_ids)
-        position_embeddings.register_hook(lambda grad: print(f"position_embeddings :{calculate_md5_of_tensor(grad)}"))
-
         embeddings = inputs_embeddings + position_embeddings
-        embeddings.register_hook(lambda grad: print(f"embeddings + : {calculate_md5_of_tensor(grad)}"))
+        # embeddings.register_hook(lambda grad: print("inputs_embeddings + position_embeddings embeddings grad:", calculate_md5_of_tensor(grad)))
 
         if self.config.sequence_parallel:
             bs, seq_len, hidden_size = embeddings.shape
@@ -745,7 +744,8 @@ class GPTEmbeddings(nn.Layer):
             # [bs * seq_len / n, dim] (n is mp parallelism)
             embeddings = ScatterOp.apply(embeddings)
         embeddings = self.dropout(embeddings)
-        embeddings.register_hook(lambda grad: print(f"embeddings dropout: {calculate_md5_of_tensor(grad)}"))
+        # embeddings.register_hook(lambda grad: print("embeddings grad:", calculate_md5_of_tensor(grad)))
+        # embeddings.register_hook(lambda grad: print("hidden_states:", md5sum(grad))
         # print("GPTEmbeddings embeddings: ", calculate_md5_of_tensor(embeddings))
 
         return embeddings
@@ -1240,8 +1240,6 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
 
         """
         # print("loss func:", self.loss_func)
-        # print("loss func input prediction_scores", calculate_md5_of_tensor(prediction_scores))
-        
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
             # skip ignore_index which loss == 0
@@ -1250,6 +1248,7 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
                 loss_mask = loss_mask.reshape([-1])
             masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
             loss = masked_lm_loss / loss_mask.sum()
+        # print("loss", calculate_md5_of_tensor(loss))
         return loss
 
 
@@ -1388,7 +1387,7 @@ class GPTLMHead(nn.Layer):
         logits = parallel_matmul(
             hidden_states, self.weight, transpose_y=self.transpose_y, tensor_parallel_output=tensor_parallel_output
         )
-        # print("GPTLMHead  hiddens end: ", calculate_md5_of_tensor(logits))
+        # print("logits: ", calculate_md5_of_tensor(logits))
         return logits
 
 
@@ -1408,7 +1407,7 @@ class GPTForCausalLM(GPTPretrainedModel):
         # self.lm_head = GPTLMHead(config, embedding_weights=self.gpt.embeddings.word_embeddings.weight)
         self.lm_head = GPTLMHead(config, embedding_weights=None)
 
-        self.tie_weights()
+        # self.tie_weights()
         self.criterion = GPTPretrainingCriterion(config)
 
     def get_output_embeddings(self):
