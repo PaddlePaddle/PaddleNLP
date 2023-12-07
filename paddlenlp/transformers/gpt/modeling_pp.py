@@ -139,9 +139,7 @@ class LayerNormPipe(nn.LayerNorm):
 
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
-        # print("LayerNormPipe input", calculate_md5_of_tensor(hidden_states))
         hidden_states = super().forward(hidden_states)
-        # print("LayerNormPipe output", calculate_md5_of_tensor(hidden_states))
         return hidden_states
 
 import hashlib
@@ -159,24 +157,18 @@ class GPTLMHeadPipe(GPTEmbeddings):
         return get_attr(self.word_embeddings, "weight")
 
     def forward(self, output):
-        # print("GPTLMHeadPipe output begin", calculate_md5_of_tensor(output))
-        # print("self.config.sequence_parallel", self.config.sequence_parallel)
         if self.config.sequence_parallel:
             output = GatherOp.apply(output)
             output = paddle.reshape_(output, [-1, self.config.seq_length, self.config.hidden_size])
 
         tensor_parallel_output = True if self.config.tensor_parallel_degree > 1 else False
 
-        # print("GPTLMHeadPipe self.embedding_weight : ", calculate_md5_of_tensor(self.embedding_weight))
-        # print("GPTLMHeadPipe self.transpose_y : ", self.transpose_y)
-        # print("GPTLMHeadPipe tensor_parallel_output : ", tensor_parallel_output)
         output = parallel_matmul(
             output,
             self.embedding_weight,
             transpose_y=True,
             tensor_parallel_output=tensor_parallel_output,
         )
-        # print("GPTLMHeadPipe output end", calculate_md5_of_tensor(output))
         return output
 
 

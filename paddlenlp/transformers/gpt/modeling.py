@@ -105,10 +105,8 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, transpose_y=True, tensor
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
         input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
         logits = paddle.matmul(input_parallel, y, transpose_y=transpose_y)
-        # mp
         if tensor_parallel_output:
             return logits
-        # pp 
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
 
     else:
@@ -516,9 +514,7 @@ class TransformerDecoder(nn.Layer):
             next_decoder_cache = next_decoder_cache + (outputs[-1],) if use_cache else None
 
         if self.norm is not None:
-            # print("transformer layer norm begin", calculate_md5_of_tensor(output))
             output = self.norm(output)
-            # print("transformer layer norm end", calculate_md5_of_tensor(output))
 
         next_cache = next_decoder_cache if use_cache else None
         if not return_dict:
@@ -612,7 +608,6 @@ class GPTDecoderLayer(nn.Layer):
     def forward(
         self, hidden_states, attention_mask=None, use_cache=False, past_key_value=None, output_attentions=False
     ):
-        # print("GPTDecoderLayer: hidden_states start", calculate_md5_of_tensor(hidden_states))
         # when sequence_parallel=True:
         # hidden_states => [bs * seq_len / n, embed_dim]
         residual = hidden_states
@@ -674,7 +669,6 @@ class GPTDecoderLayer(nn.Layer):
         if not self.config.normalize_before:
             hidden_states = self.norm2(hidden_states)
 
-        # print("GPTDecoderLayer: hidden_states end", calculate_md5_of_tensor(hidden_states))
         if not (output_attentions or use_cache):
             return hidden_states
 
@@ -715,15 +709,12 @@ class GPTEmbeddings(nn.Layer):
             config.max_position_embeddings,
             config.hidden_size,
         )
-        # print("config.hidden_dropout_prob", config.hidden_dropout_prob)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, input_ids, position_ids=None, inputs_embeddings=None):
-        # print("GPTEmbeddings input_ids: ", calculate_md5_of_tensor(input_ids))
         if input_ids is not None:
             input_shape = paddle.shape(input_ids)
             inputs_embeddings = self.word_embeddings(input_ids)
-            # inputs_embeddings.register_hook(lambda grad: print(f"inputs_embeddings: {calculate_md5_of_tensor(grad)}"))
         else:
             input_shape = paddle.shape(inputs_embeddings)[:-1]
 
@@ -733,10 +724,8 @@ class GPTEmbeddings(nn.Layer):
             position_ids = seq_length - ones
 
         position_embeddings = self.position_embeddings(position_ids)
-        # position_embeddings.register_hook(lambda grad: print(f"position_embeddings :{calculate_md5_of_tensor(grad)}"))
 
         embeddings = inputs_embeddings + position_embeddings
-        # embeddings.register_hook(lambda grad: print(f"embeddings + : {calculate_md5_of_tensor(grad)}"))
 
         if self.config.sequence_parallel:
             bs, seq_len, hidden_size = embeddings.shape
@@ -745,8 +734,6 @@ class GPTEmbeddings(nn.Layer):
             # [bs * seq_len / n, dim] (n is mp parallelism)
             embeddings = ScatterOp.apply(embeddings)
         embeddings = self.dropout(embeddings)
-        # embeddings.register_hook(lambda grad: print(f"embeddings dropout: {calculate_md5_of_tensor(grad)}"))
-        # print("GPTEmbeddings embeddings: ", calculate_md5_of_tensor(embeddings))
 
         return embeddings
 
@@ -1239,8 +1226,6 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
             Tensor: The pretraining loss. Its data type should be float32 and its shape is [1].
 
         """
-        # print("loss func:", self.loss_func)
-        # print("loss func input prediction_scores", calculate_md5_of_tensor(prediction_scores))
         
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
@@ -1373,8 +1358,6 @@ class GPTLMHead(nn.Layer):
                 self.weight.split_axis = 0
 
     def forward(self, hidden_states, tensor_parallel_output=None):
-        # print("GPTLMHead hiddens begin: ", calculate_md5_of_tensor(hidden_states))
-        # print("GPTLMHead self.config.sequence_parallel", self.config.sequence_parallel)
         if self.config.sequence_parallel:
             hidden_states = GatherOp.apply(hidden_states)
             hidden_states = paddle.reshape_(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
@@ -1382,13 +1365,9 @@ class GPTLMHead(nn.Layer):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
-        # print("GPTLMHeadPipe self.embedding_weight : ", calculate_md5_of_tensor(self.weight))
-        # print("GPTLMHeadPipe self.transpose_y : ", self.transpose_y)
-        # print("GPTLMHeadPipe tensor_parallel_output : ", tensor_parallel_output)
         logits = parallel_matmul(
             hidden_states, self.weight, transpose_y=self.transpose_y, tensor_parallel_output=tensor_parallel_output
         )
-        # print("GPTLMHead  hiddens end: ", calculate_md5_of_tensor(logits))
         return logits
 
 
@@ -1481,9 +1460,7 @@ class GPTForCausalLM(GPTPretrainedModel):
         else:
             hidden_states = outputs[0]
 
-        # print("GPTForCausalLM lm_head(hidden_states)", calculate_md5_of_tensor(hidden_states))
         logits = self.lm_head(hidden_states)
-        # print("GPTForCausalLM logits", calculate_md5_of_tensor(logits))
 
         loss = None
         if labels is not None:
