@@ -723,7 +723,7 @@ class GPTEmbeddings(nn.Layer):
         if input_ids is not None:
             input_shape = paddle.shape(input_ids)
             inputs_embeddings = self.word_embeddings(input_ids)
-            inputs_embeddings.register_hook(lambda grad: print(f"inputs_embeddings: {calculate_md5_of_tensor(grad)}"))
+            # inputs_embeddings.register_hook(lambda grad: print(f"inputs_embeddings: {calculate_md5_of_tensor(grad)}"))
         else:
             input_shape = paddle.shape(inputs_embeddings)[:-1]
 
@@ -733,10 +733,10 @@ class GPTEmbeddings(nn.Layer):
             position_ids = seq_length - ones
 
         position_embeddings = self.position_embeddings(position_ids)
-        position_embeddings.register_hook(lambda grad: print(f"position_embeddings :{calculate_md5_of_tensor(grad)}"))
+        # position_embeddings.register_hook(lambda grad: print(f"position_embeddings :{calculate_md5_of_tensor(grad)}"))
 
         embeddings = inputs_embeddings + position_embeddings
-        embeddings.register_hook(lambda grad: print(f"embeddings + : {calculate_md5_of_tensor(grad)}"))
+        # embeddings.register_hook(lambda grad: print(f"embeddings + : {calculate_md5_of_tensor(grad)}"))
 
         if self.config.sequence_parallel:
             bs, seq_len, hidden_size = embeddings.shape
@@ -745,7 +745,7 @@ class GPTEmbeddings(nn.Layer):
             # [bs * seq_len / n, dim] (n is mp parallelism)
             embeddings = ScatterOp.apply(embeddings)
         embeddings = self.dropout(embeddings)
-        embeddings.register_hook(lambda grad: print(f"embeddings dropout: {calculate_md5_of_tensor(grad)}"))
+        # embeddings.register_hook(lambda grad: print(f"embeddings dropout: {calculate_md5_of_tensor(grad)}"))
         # print("GPTEmbeddings embeddings: ", calculate_md5_of_tensor(embeddings))
 
         return embeddings
@@ -1405,8 +1405,7 @@ class GPTForCausalLM(GPTPretrainedModel):
     def __init__(self, config: GPTConfig):
         super(GPTForCausalLM, self).__init__(config)
         self.gpt = GPTModel(config)
-        # self.lm_head = GPTLMHead(config, embedding_weights=self.gpt.embeddings.word_embeddings.weight)
-        self.lm_head = GPTLMHead(config, embedding_weights=None)
+        self.lm_head = GPTLMHead(config, embedding_weights=self.gpt.embeddings.word_embeddings.weight)
 
         self.tie_weights()
         self.criterion = GPTPretrainingCriterion(config)

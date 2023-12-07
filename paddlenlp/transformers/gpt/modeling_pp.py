@@ -130,6 +130,13 @@ class LayerNormPipe(nn.LayerNorm):
         super(LayerNormPipe, self).__init__(config.hidden_size, epsilon=1e-05)
         self.weight.name = self.weight.name + ".norm"
 
+        from ..sequence_parallel_utils import (
+            mark_as_sequence_parallel_parameter,
+        )
+        if config.sequence_parallel:
+            mark_as_sequence_parallel_parameter(self.weight)
+            mark_as_sequence_parallel_parameter(self.bias)
+
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
         # print("LayerNormPipe input", calculate_md5_of_tensor(hidden_states))

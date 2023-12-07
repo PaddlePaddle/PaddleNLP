@@ -1,13 +1,12 @@
 #!/bin/sh
-task_name1="mp2-pp2"
-task_name2="mp2"
+task_name1="mp2-pp2-sp1-dp2"
+task_name2="single_card"
 
 export PYTHONPATH="../../../PaddleNLP_PP_recompute/"
-export FLAGS_cudnn_deterministic=True
 
-max_steps=3
-log_dir1='mp2-pp2'
-log_dir2='mp2'
+max_steps=10
+log_dir1='p2-pp2-sp1-dp2'
+log_dir2='single_card'
 
 
 rm -rf output/$task_name1 output/$task_name1
@@ -17,17 +16,8 @@ rm -rf $log_dir2
 export FLAGS_cudnn_deterministic=1
 export FLAGS_embedding_deterministic=2
 
-# export NVIDIA_TF32_OVERRIDE=0
-# export FLAGS_embedding_deterministic=1
-# export FLAGS_cudnn_deterministic=1
-# export Flags_mp_aysnc_allreduce=1
-# export Flags_skip_mp_c_identity=1
-# export FLAGS_shard_norm_align_dp=0
-# export FLAGS_shard_use_reduce=1
-
-
 command1="python3.7 -u -m paddle.distributed.launch \
-    --gpus "0,1,3,4" \
+    --gpus "0,1,2,3,4,5,6,7" \
     --log_dir ${log_dir1} \
     run_pretrain.py \
     --model_type "gpt" \
@@ -38,10 +28,10 @@ command1="python3.7 -u -m paddle.distributed.launch \
     --tensor_parallel_degree 2 \
     --pipeline_parallel_degree 2 \
     --pipeline_parallel_config "disable_partial_send_recv" \
-    --sequence_parallel false \
+    --sequence_parallel true \
     --split 949,50,1 \
     --max_seq_length 1024 \
-    --per_device_train_batch_size 1 \
+    --per_device_train_batch_size 8 \
     --seed 1234 \
     --fuse_attention_qkv 1 \
     --use_flash_attention 0 \
@@ -61,7 +51,7 @@ command1="python3.7 -u -m paddle.distributed.launch \
     --report_to "visualdl" \
     --disable_tqdm true \
     --recompute 0 \
-    --gradient_accumulation_steps 1 \
+    --gradient_accumulation_steps 2 \
     --do_train \
     --attention_probs_dropout_prob 0 \
     --hidden_dropout_prob 0 \
@@ -72,9 +62,10 @@ $command1
 
 export FLAGS_cudnn_deterministic=1
 export FLAGS_embedding_deterministic=2
+export FLAGS_embedding_deterministic=1
 
 command2="python3.7 -u -m paddle.distributed.launch \
-    --gpus "0,1" \
+    --gpus "0" \
     --log_dir ${log_dir2} \
     run_pretrain.py \
     --model_type "gpt" \
@@ -82,11 +73,9 @@ command2="python3.7 -u -m paddle.distributed.launch \
     --tokenizer_name_or_path gpt2-medium-en \
     --input_dir "./data" \
     --output_dir "output/$task_name2" \
-    --tensor_parallel_degree 2 \
-    --sequence_parallel false \
     --split 949,50,1 \
     --max_seq_length 1024 \
-    --per_device_train_batch_size 1 \
+    --per_device_train_batch_size 16 \
     --seed 1234 \
     --fuse_attention_qkv 1 \
     --use_flash_attention 0 \
@@ -106,7 +95,7 @@ command2="python3.7 -u -m paddle.distributed.launch \
     --report_to "visualdl" \
     --disable_tqdm true \
     --recompute 0 \
-    --gradient_accumulation_steps 1 \
+    --gradient_accumulation_steps 2 \
     --do_train \
     --attention_probs_dropout_prob 0 \
     --hidden_dropout_prob 0 \
