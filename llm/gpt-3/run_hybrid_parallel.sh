@@ -5,11 +5,7 @@ task_name2="mp2"
 export PYTHONPATH="../../../PaddleNLP_PP_recompute/"
 export FLAGS_cudnn_deterministic=True
 
-max_steps=10
-gradient_accumulation_steps=2
-amp_master_grad=1
-per_device_train_batch_size=2
-
+max_steps=3
 log_dir1='mp2-pp2'
 log_dir2='mp2'
 
@@ -31,7 +27,7 @@ export FLAGS_embedding_deterministic=2
 
 
 command1="python3.7 -u -m paddle.distributed.launch \
-    --gpus "0,1,2,3,4,5,6,7" \
+    --gpus "0,1,3,4" \
     --log_dir ${log_dir1} \
     run_pretrain.py \
     --model_type "gpt" \
@@ -42,16 +38,16 @@ command1="python3.7 -u -m paddle.distributed.launch \
     --tensor_parallel_degree 2 \
     --pipeline_parallel_degree 2 \
     --pipeline_parallel_config "disable_partial_send_recv" \
-    --sequence_parallel true \
+    --sequence_parallel false \
     --split 949,50,1 \
     --max_seq_length 1024 \
-    --per_device_train_batch_size $per_device_train_batch_size \
+    --per_device_train_batch_size 1 \
     --seed 1234 \
     --fuse_attention_qkv 1 \
     --use_flash_attention 0 \
     --bf16  \
     --fp16_opt_level "O2"  \
-    --amp_master_grad $amp_master_grad \
+    --amp_master_grad 1 \
     --learning_rate 0.00001 \
     --min_learning_rate 0.000005 \
     --max_steps $max_steps \
@@ -65,7 +61,7 @@ command1="python3.7 -u -m paddle.distributed.launch \
     --report_to "visualdl" \
     --disable_tqdm true \
     --recompute 0 \
-    --gradient_accumulation_steps $gradient_accumulation_steps \
+    --gradient_accumulation_steps 1 \
     --do_train \
     --attention_probs_dropout_prob 0 \
     --hidden_dropout_prob 0 \
@@ -78,7 +74,7 @@ export FLAGS_cudnn_deterministic=1
 export FLAGS_embedding_deterministic=2
 
 command2="python3.7 -u -m paddle.distributed.launch \
-    --gpus "0,1,2,3" \
+    --gpus "0,1" \
     --log_dir ${log_dir2} \
     run_pretrain.py \
     --model_type "gpt" \
@@ -87,16 +83,16 @@ command2="python3.7 -u -m paddle.distributed.launch \
     --input_dir "./data" \
     --output_dir "output/$task_name2" \
     --tensor_parallel_degree 2 \
-    --sequence_parallel true \
+    --sequence_parallel false \
     --split 949,50,1 \
     --max_seq_length 1024 \
-    --per_device_train_batch_size $per_device_train_batch_size \
+    --per_device_train_batch_size 1 \
     --seed 1234 \
     --fuse_attention_qkv 1 \
     --use_flash_attention 0 \
     --bf16  \
     --fp16_opt_level "O2"  \
-    --amp_master_grad $amp_master_grad \
+    --amp_master_grad 1 \
     --learning_rate 0.00001 \
     --min_learning_rate 0.000005 \
     --max_steps $max_steps \
@@ -110,7 +106,7 @@ command2="python3.7 -u -m paddle.distributed.launch \
     --report_to "visualdl" \
     --disable_tqdm true \
     --recompute 0 \
-    --gradient_accumulation_steps $gradient_accumulation_steps \
+    --gradient_accumulation_steps 1 \
     --do_train \
     --attention_probs_dropout_prob 0 \
     --hidden_dropout_prob 0 \
@@ -119,10 +115,8 @@ command2="python3.7 -u -m paddle.distributed.launch \
 "
 $command2
 
-# grep sequence_parallel mp2/workerlog.0
-# grep sequence_parallel mp2-pp2/workerlog.0
-grep loss mp2/workerlog.0
-grep loss mp2-pp2/workerlog.0
+# grep loss mp2/workerlog.0
+# grep loss mp2-pp2/workerlog.0
 
 # log_dir0='hot_launch_ckpt-hack'
 # task_name0="hot_launch_ckpt-hack"

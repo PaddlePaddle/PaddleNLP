@@ -1001,17 +1001,17 @@ class Trainer:
                     else:
                         self.optimizer.step()
 
-                    # print('*'*100)
-                    # for p in parameters_list:
-                    #     print("p.name", p.name)
-                    #     if hasattr(p, "main_grad") and p.main_grad is not None:
-                    #         print("p.main_grad", calculate_md5_of_tensor(p.main_grad))
-                    #     elif hasattr(p, "grad") and p.grad is not None:
-                    #             print("p.grad", calculate_md5_of_tensor(p.grad))
-                    #     else:
-                    #         print("p is not trainable")
+                    print('*'*100)
+                    for p in parameters_list:
+                        print("p.name", p.name)
+                        if hasattr(p, "main_grad") and p.main_grad is not None:
+                            print("p.main_grad", calculate_md5_of_tensor(p.main_grad))
+                        elif hasattr(p, "grad") and p.grad is not None:
+                                print("p.grad", calculate_md5_of_tensor(p.grad))
+                        else:
+                            print("p is not trainable")
 
-                    # print('*'*100)
+                    print('*'*100)
 
                     # print(f"self.optimizer: {self.optimizer}")
                     self.timers and self.timers("optimizer-step").stop()
