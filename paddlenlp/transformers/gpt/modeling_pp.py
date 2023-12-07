@@ -138,16 +138,6 @@ class GPTLMHeadPipe(GPTLMHead):
     def __init__(self, config):
         super(GPTLMHeadPipe, self).__init__(config)
 
-        class _word_embeddings:
-            def __init__(self, lmhead) -> None:
-                self.weight = lmhead.weight
-
-            @property
-            def embedding_weight(self):
-                return self.weight
-
-        self.word_embeddings = _word_embeddings(self)
-
     @property
     def embedding_weight(self):
         return get_attr(self, "weight")

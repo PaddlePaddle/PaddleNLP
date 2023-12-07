@@ -1198,7 +1198,7 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
     def __init__(self, config):
         super(GPTPretrainingCriterion, self).__init__()
         self.config = config
-        if config.tensor_parallel_degree > 1 and config.tensor_parallel_output:
+        if config.tensor_parallel_degree > 1 and config.tensor_parallel_output and not config.sequence_parallel:
             self.loss_func = fleet.meta_parallel.ParallelCrossEntropy(ignore_index=config.ignore_index)
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=config.ignore_index)
