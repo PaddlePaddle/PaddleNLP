@@ -142,12 +142,6 @@ class LayerNormPipe(nn.LayerNorm):
         hidden_states = super().forward(hidden_states)
         return hidden_states
 
-import hashlib
-def calculate_md5_of_tensor(tensor) :
-    numpy_array = tensor.numpy()
-    array_bytes = numpy_array.tobytes()
-    return hashlib.md5(array_bytes).hexdigest()
-
 class GPTLMHeadPipe(GPTEmbeddings):
     def __init__(self, config):
         super(GPTLMHeadPipe, self).__init__(config)
