@@ -344,8 +344,8 @@ def create_input_specs():
     token_type_ids = None
     position_ids = None
     attention_mask = None
-    raw_input_ids = paddle.static.InputSpec(name="raw_input_ids", shape=[-1, -1], dtype="float32")
-    generator_labels = paddle.static.InputSpec(name="generator_labels", shape=[-1, -1], dtype="float32")
+    raw_input_ids = paddle.static.InputSpec(name="raw_input_ids", shape=[-1, -1], dtype="int64")
+    generator_labels = paddle.static.InputSpec(name="generator_labels", shape=[-1, -1], dtype="int64")
     return [input_ids, token_type_ids, position_ids, attention_mask, raw_input_ids, generator_labels]
 
 
