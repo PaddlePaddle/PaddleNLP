@@ -525,6 +525,17 @@ def main():
     total_train_batch_size = (training_args.per_device_train_batch_size *
                               training_args.gradient_accumulation_steps *
                               training_args.data_parallel_degree)
+
+    # amp = training_args.strategy.amp
+    # amp.enable = True
+    # amp.dtype = "float16"
+    # amp.level = "o2"
+    # amp.custom_white_list = ['softmax', 'layer_norm', 'gelu']
+    # amp.custom_black_list = [
+    #     'c_softmax_with_cross_entropy',
+    #     'elementwise_div',
+    #     'reduce_sum',
+    # ]
     print_config(training_args)
 
     engine = auto.Engine(
