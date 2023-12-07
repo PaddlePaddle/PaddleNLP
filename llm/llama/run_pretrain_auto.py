@@ -334,9 +334,9 @@ def create_optimizer(model, lr_scheduler, training_args):
         apply_decay_param_fun=apply_decay_param_fun,
         parameters=model.parameters(),
         weight_decay=training_args.weight_decay,
-        # grad_clip=paddle.nn.ClipGradByGlobalNorm(training_args.max_grad_norm)
-        # if training_args.max_grad_norm > 0
-        # else None,
+        grad_clip=paddle.nn.ClipGradByGlobalNorm(training_args.max_grad_norm)
+        if training_args.max_grad_norm > 0
+        else None,
         **optimizer_kwargs,
     )
 
