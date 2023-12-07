@@ -533,12 +533,6 @@ class TransformerDecoder(nn.Layer):
             cross_attentions=None,
         )
 
-import hashlib
-def calculate_md5_of_tensor(tensor) :
-    numpy_array = tensor.numpy()
-    array_bytes = numpy_array.tobytes()
-    return hashlib.md5(array_bytes).hexdigest()
-
 class GPTDecoderLayer(nn.Layer):
     """
     The transformer decoder layer.
@@ -772,7 +766,7 @@ class GPTPretrainedModel(PretrainedModel):
                 # Column Linear
                 "layers.0.linear1.weight": partial(fn, is_column=True),
                 "layers.0.linear1.bias": partial(fn, is_column=True),
-				# Row Linear
+                # Row Linear
                 "word_embeddings.weight": partial(fn, is_column=False),
                 "lm_head.weight": partial(fn, is_column=False),
 				"layers.0.self_attn.out_proj.weight": partial(fn, is_column=False),
