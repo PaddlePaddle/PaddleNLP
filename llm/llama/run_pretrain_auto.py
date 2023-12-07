@@ -85,6 +85,14 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
         },
     )
+    nvprof_start: int = field(
+        default=-1,
+        metadata={"help": "The step to start nv_profiler."},
+    )
+    nvprof_end: int = field(
+        default=-1,
+        metadata={"help": "The step to end nv_profiler."},
+    )
 
     def __post_init__(self):
         super().__post_init__()
@@ -457,6 +465,8 @@ def main():
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
 
+    # config.num_hidden_layers = 4
+
     print("Final pre-training config:", config)
 
     # Set the dtype for loading model
@@ -554,9 +564,18 @@ def main():
     global_step_last_logged = 0
     start_time_last_logged = time.time()
     tr_loss = float(0)
+
+    nvprof_start = training_args.nvprof_start
+    nvprof_end = training_args.nvprof_end
+
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
-            outs = engine.run(inputs, mode="train")
+            with paddle.profiler.utils._nvprof_range(
+                iter_id=step,
+                start=nvprof_start,
+                end=nvprof_end,
+            ):
+                outs = engine.run(inputs, mode="train")
 
             if "loss" in outs:
                 tr_loss_step = np.sum(outs["loss"])

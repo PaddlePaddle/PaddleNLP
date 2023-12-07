@@ -709,6 +709,14 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Whether to unify hybrid parallel checkpoint."},
     )
+    nvprof_start: int = field(
+        default=-1,
+        metadata={"help": "The step to start nv_profiler."},
+    )
+    nvprof_end: int = field(
+        default=-1,
+        metadata={"help": "The step to end nv_profiler."},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
