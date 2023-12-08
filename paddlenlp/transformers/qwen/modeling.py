@@ -982,7 +982,8 @@ class RotaryEmbedding(nn.Layer):
             self._seq_len_cached = max(2 * seqlen, 16)
             self._ntk_alpha_cached = ntk_alpha
             seq = paddle.arange(self._seq_len_cached)
-            freqs = paddle.outer(seq.astype(self.inv_freq.dtype), self.inv_freq)
+            with paddle.amp.auto_cast(enable=False):
+                freqs = paddle.outer(seq.astype(self.inv_freq.dtype), self.inv_freq)
             emb = paddle.concat([freqs, freqs], axis=-1)
             self.cos_cached = emb.cos()[None, :, None, :]
             self.sin_cached = emb.sin()[None, :, None, :]
