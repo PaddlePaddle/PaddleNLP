@@ -24,10 +24,7 @@ from paddle.distributed.fleet.utils import recompute
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
 from paddlenlp.transformers.sequence_parallel_utils import GatherOp
 
-from ..sequence_parallel_utils import (
-    mark_as_sequence_parallel_parameter,
-)
-
+from ..sequence_parallel_utils import mark_as_sequence_parallel_parameter
 from .modeling import (
     GPTConfig,
     GPTDecoderLayer,
@@ -147,12 +144,17 @@ class LayerNormPipe(nn.LayerNorm):
 
 
 import hashlib
-def calculate_md5_of_tensor(tensor) :
+
+
+def calculate_md5_of_tensor(tensor):
     numpy_array = tensor.numpy()
     array_bytes = numpy_array.tobytes()
     return hashlib.md5(array_bytes).hexdigest()
 
+
 from paddlenlp.transformers.gpt.modeling import GPTLMHead
+
+
 class GPTLMHeadPipe(GPTLMHead):
     def __init__(self, config, embedding_weights=None):
         super(GPTLMHeadPipe, self).__init__(config, embedding_weights)
