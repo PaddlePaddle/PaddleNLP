@@ -36,7 +36,6 @@ from .modeling import (
     parallel_matmul,
 )
 
-
 __all__ = [
     "GPTForCausalLMPipe",
 ]
