@@ -169,10 +169,6 @@ except:
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
 
 
-def is_dp_group_support_in_group_sharded_parallel():
-    return "dp_group" in set(inspect.signature(paddle.distributed.sharding.group_sharded_parallel).parameters.keys())
-
-
 __all__ = ["Trainer"]
 
 
@@ -897,30 +893,19 @@ class Trainer:
                     and (step + 1) == steps_in_epoch
                 ):
                     self.timers and self.timers("forward-backward").stop()
-                    # Maunally collect gradients when group_sharded_parallel can't accept dp_group
-                    # Case 1: Use sharding stage 2/3 with dp
-                    # Case 2: Use recompute and dp
+                    # Maunally collect gradients
+                    # Case 1: Use recompute and dp
+                    # Case 2: Hack dp with master_grad
+                    # Case 3: Pipeline or sharding overlap
                     # local_rank != -1 don't means dp in networks.
                     self.timers and self.timers("all-reduce").start()
 
-                    if self.sharding and ShardingOption.SHARD_OP not in self.args.sharding:
-                        if self.args.data_parallel_degree > 1 and not is_dp_group_support_in_group_sharded_parallel():
-                            fused_allreduce_gradients(model.parameters(), fleet.get_hybrid_communicate_group())
-                            if ShardingOption.FULL_SHARD in self.args.sharding:
-                                # Why need sync on parm again ?
-                                # TODO: fix this.
-                                for p in model.parameters():
-                                    if hasattr(p, "bw_storage"):
-                                        assert p.grad is None, "This case shouldn't happen."
-                                        p.bw_storage.scale_(1.0 / self.dp_group.nranks)
-                                        paddle.distributed.all_reduce(p.bw_storage, group=self.dp_group)
-
-                    # Case 2: Use recompute and dp / sharding stage1,
+                    # Case 1: Use recompute and dp / sharding stage1,
                     # manualy collect gradient for dp.
-                    elif args.recompute and availiable_no_sync:
+                    if args.recompute and availiable_no_sync:
                         fused_allreduce_gradients(list(model.parameters()), None)
 
-                    # Case 3: hack dp with master_grad
+                    # Case 2: hack dp with master_grad
                     if dp_master_grad and not (args.recompute and availiable_no_sync):
                         fused_allreduce_gradients(list(model.parameters()), None)
 
@@ -931,7 +916,7 @@ class Trainer:
                     enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
 
-                    # Pipeline parallel mode, overlap with dp
+                    # Case 3: Pipeline parallel mode, overlap with dp
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
                         parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
 
@@ -1238,10 +1223,7 @@ class Trainer:
                 num_workers=self.args.dataloader_num_workers,
             )
 
-        if self.args.should_load_dataset:
-            train_sampler = self._get_train_sampler()
-        else:
-            train_sampler = None
+        train_sampler = self._get_train_sampler()
 
         if self.args.distributed_dataloader:
             logger.info("Training using DistDataLoader.")
@@ -1318,10 +1300,7 @@ class Trainer:
                 num_workers=self.args.dataloader_num_workers,
             )
 
-        if self.args.should_load_dataset:
-            eval_sampler = self._get_eval_sampler(eval_dataset)
-        else:
-            eval_sampler = None
+        eval_sampler = self._get_eval_sampler(eval_dataset)
 
         if self.args.distributed_dataloader:
             logger.info("Eval using DistDataLoader.")
@@ -1371,10 +1350,7 @@ class Trainer:
                 num_workers=self.args.dataloader_num_workers,
             )
 
-        if self.args.should_load_dataset:
-            test_sampler = self._get_eval_sampler(test_dataset)
-        else:
-            test_sampler = None
+        test_sampler = self._get_eval_sampler(test_dataset)
 
         if self.args.distributed_dataloader:
             logger.info("Test using DistDataLoader.")
@@ -1705,14 +1681,6 @@ class Trainer:
                     self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
                 self.optimizer = fleet.distributed_optimizer(self.optimizer)
             else:
-                # sync params (broadcast) buffers in dp group
-                if not is_dp_group_support_in_group_sharded_parallel() and self.args.data_parallel_degree > 1:
-                    from paddle.distributed.parallel import sync_params_buffers
-
-                    hcg = fleet.get_hybrid_communicate_group()
-                    dp_group = hcg.get_data_parallel_group()
-                    sync_params_buffers(model, comm_group=dp_group, src_rank=dp_group.ranks[0])
-
                 cpu_offload = ShardingOption.OFFLOAD in self.args.sharding
                 assert self.optimizer is not None, "optimizer is empty!"
                 level = None
@@ -1726,9 +1694,8 @@ class Trainer:
                 # add dp_group and exclude_layer params
                 # https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/distributed/sharding/group_sharded_parallel_cn.html#group-sharded-parallel
                 extra_kwargs = {}
-                if is_dp_group_support_in_group_sharded_parallel():
-                    extra_kwargs["dp_group"] = self.dp_group
-                    extra_kwargs["exclude_layer"] = ["GroupNorm"]
+                extra_kwargs["dp_group"] = self.dp_group
+                extra_kwargs["exclude_layer"] = ["GroupNorm"]
 
                 if self.args.amp_master_grad:
                     assert (

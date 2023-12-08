@@ -77,13 +77,22 @@ class PreTrainingArguments(TrainingArguments):
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
         },
     )
-    enable_linear_fused_grad_add: bool = field(
+    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
+    fused_linear_param_grad_add: bool = field(
         default=False,
         metadata={
-            "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
+            "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
         },
     )
-    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
+
+    def __post_init__(self):
+        super().__post_init__()
+        assert self.use_auto_parallel
+        if self.fused_linear_param_grad_add:
+            fused_passes = self.strategy.fused_passes
+            fused_passes.enable = True
+            fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
+        logger.info(self.strategy)
 
 
 @dataclass
@@ -379,11 +388,6 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    if training_args.enable_linear_fused_grad_add:
-        from fused_layers import mock_layers
-
-        mock_layers()
-
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
 
@@ -446,14 +450,14 @@ def main():
     print("Final pre-training config:", config)
 
     # Set the dtype for loading model
-    dtype = "float32"
-    if training_args.fp16_opt_level == "O2":
-        if training_args.fp16:
-            dtype = "float16"
-        if training_args.bf16:
-            dtype = "bfloat16"
+    # dtype = "float32"
+    # if training_args.fp16_opt_level == "O2":
+    #     if training_args.fp16:
+    #         dtype = "float16"
+    #     if training_args.bf16:
+    #         dtype = "bfloat16"
 
-    model = model_class._from_config(config, dtype=dtype)
+    model = model_class._from_config(config)
 
     if training_args.recompute:
 
@@ -500,9 +504,11 @@ def main():
     def loss_func(loss, outputs):
         return loss
 
-    total_train_batch_size = training_args.per_device_train_batch_size \
-                             * training_args.gradient_accumulation_steps \
-                             * training_args.data_parallel_degree
+    total_train_batch_size = (
+        training_args.per_device_train_batch_size
+        * training_args.gradient_accumulation_steps
+        * training_args.data_parallel_degree
+    )
     print_config(training_args)
 
     engine = auto.Engine(model, loss_func, optimizer, strategy=training_args.strategy)
