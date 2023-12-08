@@ -27,6 +27,7 @@ from paddlenlp.transformers.sequence_parallel_utils import (
     mark_as_sequence_parallel_parameter,
 )
 
+
 from .modeling import (
     GPTConfig,
     GPTDecoderLayer,
