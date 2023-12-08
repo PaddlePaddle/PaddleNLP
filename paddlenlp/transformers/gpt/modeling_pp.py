@@ -22,7 +22,10 @@ from paddle.distributed.fleet.meta_parallel import (
 from paddle.distributed.fleet.utils import recompute
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
-from paddlenlp.transformers.sequence_parallel_utils import GatherOp
+from paddlenlp.transformers.sequence_parallel_utils import (
+    GatherOp,
+    mark_as_sequence_parallel_parameter,
+)
 
 from .modeling import (
     GPTConfig,
@@ -32,6 +35,7 @@ from .modeling import (
     GPTPretrainingCriterion,
     parallel_matmul,
 )
+
 
 __all__ = [
     "GPTForCausalLMPipe",
@@ -128,7 +132,10 @@ class GPTDecoderLayerPipe(GPTDecoderLayer):
 class LayerNormPipe(nn.LayerNorm):
     def __init__(self, config):
         super(LayerNormPipe, self).__init__(config.hidden_size, epsilon=1e-05)
-
+        
+        if config.sequence_parallel:
+            mark_as_sequence_parallel_parameter(self.weight)
+            mark_as_sequence_parallel_parameter(self.bias)
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
         hidden_states = super().forward(hidden_states)
