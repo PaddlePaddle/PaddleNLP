@@ -1125,15 +1125,8 @@ class Trainer:
         else:
             timer_info = ""
 
-        if self.timers is not None and paddle.device.is_compiled_with_cuda():
-            max_mem_reserved_msg = paddle.device.cuda.max_memory_reserved() // (1024 ** 2)
-            max_mem_allocated_msg = paddle.device.cuda.max_memory_allocated() // (1024 ** 2)
-            mem_info = f"max_mem_reserved: {max_mem_reserved_msg} MB max_mem_allocated: {max_mem_allocated_msg} MB"
-        else:
-            mem_info = ""
-
         if timer_info or paddle_timer_info:
-            logger.info(f"[Profile global_step: {self.state.global_step}] {timer_info} {paddle_timer_info} {mem_info}")
+            logger.info(f"[Profile global_step: {self.state.global_step}] {timer_info} {paddle_timer_info}")
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
