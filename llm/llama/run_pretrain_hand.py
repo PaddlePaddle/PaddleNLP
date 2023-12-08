@@ -512,9 +512,10 @@ def main():
     load_model(model)
 
     def loss_func(loss):
-        hcg = fleet.get_hybrid_communicate_group()
-        group = hcg.get_data_parallel_group()
-        return LossMean.apply(loss, group)
+        return loss
+        #hcg = fleet.get_hybrid_communicate_group()
+        #group = hcg.get_data_parallel_group()
+        #return LossMean.apply(loss, group)
         
 
     total_train_batch_size = training_args.per_device_train_batch_size \
@@ -567,6 +568,7 @@ def main():
             # do backward every micro step.
             tr_loss_step = loss_func(tr_loss_step)
             tr_loss_step.backward()
+            print_grad(model)
 
             tr_loss += tr_loss_step
 
@@ -648,38 +650,8 @@ def save_model(model):
     def merge_func(k, v):
         assert len(v) == mp_degree
         tensor_list = [e[1] for e in v]
-        # merge by col
-        if "self_attn.qkv_proj.weight" in k:
-            return merge_tensor(tensor_list, 3, 1)
-        elif "self_attn.qkv_proj.bias" in k:
-            return merge_tensor(tensor_list, 3, 0)
-        elif "self_attn.q_proj.weight" in k:
-            return merge_tensor(tensor_list, 1, 1)
-        elif "self_attn.k_proj.weight" in k:
-            return merge_tensor(tensor_list, 1, 1)   
-        elif "self_attn.v_proj.weight" in k:
-            return merge_tensor(tensor_list, 1, 1)      
-        elif "mlp.up_gate_proj.weight" in k:
-            return merge_tensor(tensor_list, 2, 1)
-        elif "mlp.up_proj.weight" in k:
-            return merge_tensor(tensor_list, 1, 1)
-        elif "mlp.gate_proj.weight" in k:
-            return merge_tensor(tensor_list, 1, 1)
-        elif "lm_head.weight" in k:
-            return merge_tensor(tensor_list, 1, 1)
-        elif "mlp.up_gate_proj.bias" in k:
-            return merge_tensor(tensor_list, 2, 0)
-        # merge by row
-        elif "self_attn.o_proj.weight" in k:
-            return merge_tensor(tensor_list, 1, 0)
-        elif "mlp.down_proj.weight" in k:
-            return merge_tensor(tensor_list, 1, 0)
-        elif "embed_tokens.weight" in k:
-            return merge_tensor(tensor_list, 1, 0)    
-        else:
-            assert "norm" in k, k
-            # duplicate
-            return v[0][1]
+        return merge_mp_tensor_list(k, tensor_list)
+        
 
     node_model_state = node_model_state.even_distribute(group)
     node_model_state = node_model_state.collapse_key().merge_items(merge_func)
@@ -722,6 +694,76 @@ class LossMean(PyLayer):
         return grad
 
 
+def print_grad(model):
+    model_state_dict = model.state_dict()
+    name_mapping = {v.name: k for (k, v) in model_state_dict.items()}
+    for p in model.parameters():
+        assert p.name in name_mapping
+        grad = p.grad
+        reduce_dp(grad)
+        grad = merge_mp(name_mapping[p.name], grad)
+        print(f"{p.name}_grad shape: {grad.shape} md5sum: {grad._md5sum()}")            
+
+
+def merge_mp(k, input):
+    hcg = fleet.get_hybrid_communicate_group()
+    mp_degree = hcg.get_model_parallel_world_size()
+    if mp_degree <=1:
+        return input
+    else:
+        group = hcg.get_model_parallel_group()
+        with paddle.no_grad():
+            inps = []
+            paddle.distributed.all_gather(inps, input, group=group)
+            return merge_mp_tensor_list(k, inps)
+
+def reduce_dp(input):
+    hcg = fleet.get_hybrid_communicate_group()
+    dp_degree = hcg.get_data_parallel_world_size()
+    if dp_degree <=1:
+        return input
+    else:
+        group = hcg.get_data_parallel_group()
+        with paddle.no_grad():
+            paddle.distributed.all_reduce(input, group=group)
+            return input
+
+
+
+
+def merge_mp_tensor_list(k, tensor_list):
+    # merge by col
+    if "self_attn.qkv_proj.weight" in k:
+        return merge_tensor(tensor_list, 3, 1)
+    elif "self_attn.qkv_proj.bias" in k:
+        return merge_tensor(tensor_list, 3, 0)
+    elif "self_attn.q_proj.weight" in k:
+        return merge_tensor(tensor_list, 1, 1)
+    elif "self_attn.k_proj.weight" in k:
+        return merge_tensor(tensor_list, 1, 1)   
+    elif "self_attn.v_proj.weight" in k:
+        return merge_tensor(tensor_list, 1, 1)      
+    elif "mlp.up_gate_proj.weight" in k:
+        return merge_tensor(tensor_list, 2, 1)
+    elif "mlp.up_proj.weight" in k:
+        return merge_tensor(tensor_list, 1, 1)
+    elif "mlp.gate_proj.weight" in k:
+        return merge_tensor(tensor_list, 1, 1)
+    elif "lm_head.weight" in k:
+        return merge_tensor(tensor_list, 1, 1)
+    elif "mlp.up_gate_proj.bias" in k:
+        return merge_tensor(tensor_list, 2, 0)
+    # merge by row
+    elif "self_attn.o_proj.weight" in k:
+        return merge_tensor(tensor_list, 1, 0)
+    elif "mlp.down_proj.weight" in k:
+        return merge_tensor(tensor_list, 1, 0)
+    elif "embed_tokens.weight" in k:
+        return merge_tensor(tensor_list, 1, 0)    
+    else:
+        assert "norm" in k, k
+        # duplicate
+        return tensor_list[0]    
     
 
 if __name__ == "__main__":

@@ -383,7 +383,9 @@ def get_mesh(pp_idx=0):
     return mesh
 
 def shard_fn(layer, mesh_idx, placements):
+    paran_name = layer.weight.name
     layer.weight = dist.shard_tensor(layer.weight, get_mesh(mesh_idx), placements)
+    layer.weight.name = paran_name
 
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
@@ -607,7 +609,7 @@ def main():
 
             # do backward every micro step.
             tr_loss_step.backward()
-
+            print_grad(model)
             tr_loss += tr_loss_step
 
             if global_step % training_args.gradient_accumulation_steps == (training_args.gradient_accumulation_steps -1):
@@ -679,6 +681,19 @@ def load_model(model):
     for (k,v) in state_dict.items():
         assert k in model_state_dict, f"{k} not in {model_state_dict.keys()}"
         #print(f"{k}=>{v.shape}")
+
+def print_grad(model):
+    model_state_dict = model.state_dict()
+    name_mapping = {v.name: k for (k, v) in model_state_dict.items()}
+    for p in model.parameters():
+        assert p.name in name_mapping
+        print(f"{p.name}_grad shape: {p.grad.shape} md5sum: {p.grad._md5sum()}")    
+
+        
+
+
+                
+
 
 
 if __name__ == "__main__":
