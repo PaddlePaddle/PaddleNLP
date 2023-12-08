@@ -25,7 +25,6 @@ from typing import List, Optional
 import numpy as np
 import paddle
 import paddle.distributed.auto_parallel as auto
-from paddle.distributed import fleet
 
 from paddlenlp.trainer import (
     PdArgumentParser,
@@ -88,20 +87,11 @@ class PreTrainingArguments(TrainingArguments):
 
     def __post_init__(self):
         super().__post_init__()
-
         assert self.use_auto_parallel
-        strategy = fleet.auto.Strategy(self.strategy._config_dict)
-
-        fused_passes = strategy.fused_passes
-        fused_passes_list = fused_passes.fused_passes_list
-
         if self.fused_linear_param_grad_add:
-            fused_passes_list.append("fused_linear_param_grad_add_pass")
-
-        fused_passes.enable = len(fused_passes_list) > 0
-        fused_passes.fused_passes_list = fused_passes_list
-
-        self.strategy = strategy
+            fused_passes = self.strategy.fused_passes
+            fused_passes.enable = True
+            fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
         logger.info(self.strategy)
 
 

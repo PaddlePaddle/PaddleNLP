@@ -91,7 +91,7 @@ from ..utils.env import (
     PADDLE_WEIGHTS_NAME,
     PREFIX_WEIGHTS_NAME,
 )
-from ..utils.import_utils import is_datasets_available
+from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
@@ -167,10 +167,6 @@ try:
     from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
 except:
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
-
-
-def is_dp_group_support_in_group_sharded_parallel():
-    return "dp_group" in set(inspect.signature(paddle.distributed.sharding.group_sharded_parallel).parameters.keys())
 
 
 __all__ = ["Trainer"]
@@ -897,30 +893,19 @@ class Trainer:
                     and (step + 1) == steps_in_epoch
                 ):
                     self.timers and self.timers("forward-backward").stop()
-                    # Maunally collect gradients when group_sharded_parallel can't accept dp_group
-                    # Case 1: Use sharding stage 2/3 with dp
-                    # Case 2: Use recompute and dp
+                    # Maunally collect gradients
+                    # Case 1: Use recompute and dp
+                    # Case 2: Hack dp with master_grad
+                    # Case 3: Pipeline or sharding overlap
                     # local_rank != -1 don't means dp in networks.
                     self.timers and self.timers("all-reduce").start()
 
-                    if self.sharding and ShardingOption.SHARD_OP not in self.args.sharding:
-                        if self.args.data_parallel_degree > 1 and not is_dp_group_support_in_group_sharded_parallel():
-                            fused_allreduce_gradients(model.parameters(), fleet.get_hybrid_communicate_group())
-                            if ShardingOption.FULL_SHARD in self.args.sharding:
-                                # Why need sync on parm again ?
-                                # TODO: fix this.
-                                for p in model.parameters():
-                                    if hasattr(p, "bw_storage"):
-                                        assert p.grad is None, "This case shouldn't happen."
-                                        p.bw_storage.scale_(1.0 / self.dp_group.nranks)
-                                        paddle.distributed.all_reduce(p.bw_storage, group=self.dp_group)
-
-                    # Case 2: Use recompute and dp / sharding stage1,
+                    # Case 1: Use recompute and dp / sharding stage1,
                     # manualy collect gradient for dp.
-                    elif args.recompute and availiable_no_sync:
+                    if args.recompute and availiable_no_sync:
                         fused_allreduce_gradients(list(model.parameters()), None)
 
-                    # Case 3: hack dp with master_grad
+                    # Case 2: hack dp with master_grad
                     if dp_master_grad and not (args.recompute and availiable_no_sync):
                         fused_allreduce_gradients(list(model.parameters()), None)
 
@@ -931,7 +916,7 @@ class Trainer:
                     enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
 
-                    # Pipeline parallel mode, overlap with dp
+                    # Case 3: Pipeline parallel mode, overlap with dp
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
                         parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
 
@@ -1181,6 +1166,22 @@ class Trainer:
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
             self._globalstep_last_start_time = time.time()
+
+            # Add additional memory in log.
+            if not self.args.skip_memory_metrics:
+                logs.update(
+                    {
+                        "cpu_mem_used": self._memory_tracker.cpu_mem_used() >> 20,
+                        "cpu_mem_used_peak": self._memory_tracker.cpu_mem_used_peak >> 20,
+                    }
+                )
+                if is_paddle_cuda_available():
+                    logs.update(
+                        {
+                            "gpu_max_memory_allocated": paddle.device.cuda.max_memory_allocated() >> 20,
+                            "gpu_max_memory_reserved": paddle.device.cuda.max_memory_reserved() >> 20,
+                        }
+                    )
 
             self.log(logs, **kwargs)
 
@@ -1703,14 +1704,6 @@ class Trainer:
                     self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
                 self.optimizer = fleet.distributed_optimizer(self.optimizer)
             else:
-                # sync params (broadcast) buffers in dp group
-                if not is_dp_group_support_in_group_sharded_parallel() and self.args.data_parallel_degree > 1:
-                    from paddle.distributed.parallel import sync_params_buffers
-
-                    hcg = fleet.get_hybrid_communicate_group()
-                    dp_group = hcg.get_data_parallel_group()
-                    sync_params_buffers(model, comm_group=dp_group, src_rank=dp_group.ranks[0])
-
                 cpu_offload = ShardingOption.OFFLOAD in self.args.sharding
                 assert self.optimizer is not None, "optimizer is empty!"
                 level = None
@@ -1724,9 +1717,8 @@ class Trainer:
                 # add dp_group and exclude_layer params
                 # https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/distributed/sharding/group_sharded_parallel_cn.html#group-sharded-parallel
                 extra_kwargs = {}
-                if is_dp_group_support_in_group_sharded_parallel():
-                    extra_kwargs["dp_group"] = self.dp_group
-                    extra_kwargs["exclude_layer"] = ["GroupNorm"]
+                extra_kwargs["dp_group"] = self.dp_group
+                extra_kwargs["exclude_layer"] = ["GroupNorm"]
 
                 if self.args.amp_master_grad:
                     assert (
