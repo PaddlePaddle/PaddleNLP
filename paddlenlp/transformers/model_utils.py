@@ -2400,7 +2400,7 @@ class PipelinePretrainedModel(PretrainedModel):
     def get_sequential_layers(self):
         return [x["layer"] for x in self._sequential_layers]
 
-    def get_sequential_name_prefixs(self):
+    def get_sequential_name_prefixes(self):
         return {str(index): x["name_prefix"] for index, x in enumerate(self._sequential_layers)}
 
     def _set_pipeline_name_mapping(self, mappings=None):
@@ -2421,7 +2421,7 @@ class PipelinePretrainedModel(PretrainedModel):
             # else it will be like 0.xxx
             use_virtual_pp_degree = first_key[0].isdigit() and first_key[1].isdigit()
 
-            prefixes = self.get_sequential_name_prefixs()
+            prefixes = self.get_sequential_name_prefixes()
             for k in state_dict_keys:
                 name_splited = k.split(".")
                 if use_virtual_pp_degree:
@@ -2468,9 +2468,9 @@ class PipelinePretrainedModel(PretrainedModel):
         for idx, layer in enumerate(self._layers_desc):
             if isinstance(layer, SharedLayerDesc) and layer.layer_name == shared_layer_key:
                 if self.get_stage_from_index(idx) == self._stage_id:
-                    return self.get_sequential_name_prefixs()[str(idx)]
+                    return self.get_sequential_name_prefixes()[str(idx)]
 
-        default_prefix = self.get_sequential_name_prefixs()["0"]
+        default_prefix = self.get_sequential_name_prefixes()["0"]
         logger.warning(
             f"Please check! we treat this key as last layer, get {'.'.join(name_splited)}, set prefix name as {default_prefix}"
         )
