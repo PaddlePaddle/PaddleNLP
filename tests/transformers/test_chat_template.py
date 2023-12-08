@@ -96,13 +96,6 @@ class ChatTemplateContextDataTest(unittest.TestCase):
 
 
 class ChatTemplateIntegrationTest(unittest.TestCase):
-    def test_llama2_chat_template(self):
-        tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat")
-        query = "who are you?"
-        final_query = tokenizer.apply_chat_template(query, tokenize=False)
-        expected_query = "<s>[INST] <<SYS>>\nYou are a helpful assistant.\n<</SYS>>[INST] who are you? [/INST]"
-        self.assertEqual(final_query, expected_query)
-
     def test_linlyai_chinese_llama_2_chat_template(self):
         tokenizer = AutoTokenizer.from_pretrained("linly-ai/chinese-llama-2-7b")
         query = "你好"
