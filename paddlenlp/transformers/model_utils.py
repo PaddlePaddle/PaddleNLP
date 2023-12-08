@@ -1410,7 +1410,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         from_hf_hub: bool = False,
         from_aistudio: bool = False,
         cache_dir: str | None = None,
-        subfolder: Optional[str] = None,
+        subfolder: Optional[str] = "",
         config: PretrainedConfig = None,
         convert_from_torch: bool = False,
         use_safetensors: bool | None = None,
@@ -2024,9 +2024,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         force_download = kwargs.get("force_download", False)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", False)
         dtype = kwargs.pop("dtype", None)
-        from_hf_hub = kwargs.get("from_hf_hub", False)
-        from_aistudio = kwargs.get("from_aistudio", False)
-        subfolder = kwargs.get("subfolder", None)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        from_aistudio = kwargs.pop("from_aistudio", False)
+        subfolder = kwargs.pop("subfolder", None)
+        if subfolder is None:
+            subfolder = ""
         variant = kwargs.pop("variant", None)
         use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
 
@@ -2049,20 +2051,25 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if convert_from_torch is None:
             convert_from_torch = False
 
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
         # 1. get the PretrainedConfig to init model
         if not isinstance(config, PretrainedConfig):
             config_path = config if config is not None else pretrained_model_name_or_path
             config, model_kwargs = cls.config_class.from_pretrained(
                 config_path,
                 cache_dir=cache_dir,
+                from_hf_hub=from_hf_hub,
+                from_aistudio=from_aistudio,
+                subfolder=subfolder,
                 return_unused_kwargs=True,
                 **kwargs,
             )
         if "from_aistudio" in model_kwargs:
             model_kwargs.pop("from_aistudio")
-        if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
-            config.save_pretrained(cache_dir)
+
+        if not from_hf_hub and not from_aistudio:
+            if not os.path.exists(os.path.join(cache_dir, pretrained_model_name_or_path, subfolder, CONFIG_NAME)):
+                config.save_pretrained(os.path.join(cache_dir, pretrained_model_name_or_path, subfolder))
 
         # refine options for config
         convert_from_torch = cls.support_conversion(config) and convert_from_torch
@@ -2208,6 +2215,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     pretrained_model_name_or_path,
                     cache_dir=cache_dir,
                     force_download=force_download,
+                    from_hf_hub=from_hf_hub,
+                    from_aistudio=from_aistudio,
                     subfolder=subfolder,
                     **kwargs,
                 )

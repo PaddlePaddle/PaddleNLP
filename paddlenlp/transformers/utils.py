@@ -287,31 +287,20 @@ def param_in_func(func, param_field: str) -> bool:
     return param_field in result[0]
 
 
-def resolve_cache_dir(pretrained_model_name_or_path: str, from_hf_hub: bool, cache_dir: Optional[str] = None) -> str:
+def resolve_cache_dir(from_hf_hub: bool, from_aistudio: bool, cache_dir: Optional[str] = None) -> str:
     """resolve cache dir for PretrainedModel and PretrainedConfig
 
     Args:
-        pretrained_model_name_or_path (str): the name or path of pretrained model
         from_hf_hub (bool): if load from huggingface hub
         cache_dir (str): cache_dir for models
     """
-    if os.path.isdir(pretrained_model_name_or_path):
-        return pretrained_model_name_or_path
-
-    # hf hub library takes care of appending the model name so we don't append the model name
+    if cache_dir is not None:
+        return cache_dir
+    if from_aistudio:
+        return None
     if from_hf_hub:
-        if cache_dir is not None:
-            return cache_dir
-        else:
-            return HF_CACHE_HOME
-    else:
-        if cache_dir is not None:
-            # since model_clas.from_pretrained calls config_clas.from_pretrained, the model_name may get appended twice
-            if cache_dir.endswith(pretrained_model_name_or_path):
-                return cache_dir
-            else:
-                return os.path.join(cache_dir, pretrained_model_name_or_path)
-        return os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        return HF_CACHE_HOME
+    return MODEL_HOME
 
 
 def find_transformer_model_type(model_class: Type) -> str:
@@ -411,9 +400,10 @@ def paddlenlp_hub_download(
     cache_dir: Union[str, Path, None] = None,
     local_dir: Union[str, Path, None] = None,
 ) -> str:
-
+    if subfolder is None:
+        subfolder = ""
     # check in cache_dir
-    weight_file_path = os.path.join(cache_dir, filename)
+    weight_file_path = os.path.join(cache_dir, repo_id, subfolder, filename)
 
     if os.path.exists(weight_file_path):
         logger.info(f"Already cached {weight_file_path}")
@@ -448,13 +438,18 @@ def paddlenlp_hub_download(
         return None
 
     # find in community repo
-    community_model_file_path = "/".join([COMMUNITY_MODEL_PREFIX, repo_id, filename])
+    url_list = [COMMUNITY_MODEL_PREFIX, repo_id, filename]
+    if subfolder != "":
+        url_list.insert(2, subfolder)
+    community_model_file_path = "/".join(url_list)
     assert is_url(community_model_file_path)
 
     # check wether the target file exist in the comunity bos server
     if url_file_exists(community_model_file_path):
         logger.info(f"Downloading {community_model_file_path}")
-        weight_file_path = get_path_from_url_with_filelock(community_model_file_path, cache_dir)
+        weight_file_path = get_path_from_url_with_filelock(
+            community_model_file_path, os.path.join(cache_dir, repo_id, subfolder)
+        )
         # # check the downloaded weight file and registered weight file name
         download_check(community_model_file_path, "paddlenlp_hub_download")
         return weight_file_path
@@ -517,17 +512,17 @@ def cached_file(
                 return None
         return resolved_file
 
-    if cache_dir is None:
-        cache_dir = os.path.join(MODEL_HOME, ".cache")
-    if isinstance(cache_dir, Path):
+    if cache_dir is not None and isinstance(cache_dir, Path):
         cache_dir = str(cache_dir)
 
     if from_aistudio:
         try:
-            resolved_file = aistudio_download(repo_id=path_or_repo_id, filename=filename)
+            resolved_file = aistudio_download(repo_id=path_or_repo_id, filename=filename, cache_dir=cache_dir)
         except:
             resolved_file = None
     else:
+        if cache_dir is None:
+            cache_dir = os.path.join(MODEL_HOME, ".cache")
         try:
             # Load from URL or cache if already cached
             resolved_file = paddlenlp_hub_download(

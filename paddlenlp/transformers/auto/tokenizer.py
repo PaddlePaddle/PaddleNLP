@@ -265,9 +265,11 @@ class AutoTokenizer:
         use_fast = kwargs.pop("use_fast", False)
         cache_dir = kwargs.get("cache_dir", None)
         subfolder = kwargs.get("subfolder", "")
+        if subfolder is None:
+            subfolder = ""
         from_aistudio = kwargs.get("from_aistudio", False)
         from_hf_hub = kwargs.get("from_hf_hub", False)
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
 
         if "use_faster" in kwargs:
             use_fast = kwargs.pop("use_faster", False)
@@ -281,7 +283,10 @@ class AutoTokenizer:
         if from_aistudio or from_hf_hub:
             if from_aistudio:
                 config_file = aistudio_download(
-                    repo_id=pretrained_model_name_or_path, filename=cls.tokenizer_config_file
+                    repo_id=pretrained_model_name_or_path,
+                    filename=cls.tokenizer_config_file,
+                    cache_dir=cache_dir,
+                    subfolder=subfolder,
                 )
             else:
                 config_file = hf_hub_download(
@@ -347,9 +352,11 @@ class AutoTokenizer:
                 raise FileNotFoundError(f"{config_file} is not found under '{pretrained_model_name_or_path}'")
         # Assuming from community-contributed pretrained models
         else:
-            community_config_path = "/".join(
-                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
-            )
+            url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
+            cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
+            if subfolder != "":
+                url_list.insert(2, subfolder)
+            community_config_path = "/".join(url_list)
             try:
                 resolved_vocab_file = get_path_from_url_with_filelock(community_config_path, cache_dir)
             except RuntimeError as err:
