@@ -28,7 +28,9 @@ export PYTHONPATH=../../:$PYTHONPATH
 #ulimit -c unlimited
 #export GLOG_v=10
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
-
+export FLAGS_embedding_deterministic=1        
+export FLAGS_cudnn_deterministic=1
+export NVIDIA_TF32_OVERRIDE=0
 python -u  -m paddle.distributed.launch \
     --gpus "0, 1,2,3,4,5,6,7" \
     --log_dir "hand_load" \

@@ -25,7 +25,9 @@ import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
+import paddle.distributed as dist
 from paddle.distributed.fleet.utils import recompute
+import numpy as np
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -53,6 +55,7 @@ from ..sequence_parallel_utils import (
     ScatterOp,
     mark_as_sequence_parallel_parameter,
 )
+from paddle.autograd import PyLayer
 from .configuration import (
     LLAMA_PRETRAINED_INIT_CONFIGURATION,
     LLAMA_PRETRAINED_RESOURCE_FILES_MAP,
@@ -172,7 +175,7 @@ def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
         logits = paddle.matmul(x, y, transpose_y=False)
         return logits
 
-
+attention_cnt = 0
 def scaled_dot_product_attention(
     query_states,
     config,
@@ -220,16 +223,29 @@ def scaled_dot_product_attention(
             attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
         return (attn_output, attn_weights) if output_attentions else attn_output
     else:
+        global attention_cnt
         #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
         query_states = paddle.transpose(query_states, [0, 2, 1, 3])
         # merge with the next tranpose
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
+        
+        if attention_cnt == 0:
+            q_tmp = concat_dp(query_states)
+            q_tmp = concat_mp(q_tmp, 1)
+            print(f"q_{attention_cnt} shape: {q_tmp.shape} md5: {q_tmp._md5sum()}")
+
 
         # matmul and devide by sqrt(head_dim)
         attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
+        if attention_cnt == 0:
+            attn_weights_tmp = concat_dp(attn_weights)
+            attn_weights_tmp = concat_mp(attn_weights_tmp, 1)
+            print(f"attn_weights_{attention_cnt} shape: {attn_weights_tmp.shape} local_shape: {attn_weights.shape} md5sum: {attn_weights_tmp._md5sum()}")
+
         # then add alibi bias
         if alibi is not None:
+            print("with alibi")
             alibi = alibi.reshape([bsz, num_heads, 1, -1])
             attn_weights = attn_weights + alibi
 
@@ -252,11 +268,21 @@ def scaled_dot_product_attention(
             )
 
         attn_weights = attn_weights + attention_mask
+        if attention_cnt == 0:
+            attn_weights_tmp = concat_dp(attn_weights)
+            attn_weights_tmp = concat_mp(attn_weights_tmp, 1)
+            print(f"attn_weights_after_add_{attention_cnt} shape: {attn_weights_tmp.shape} local_shape: {attn_weights.shape} md5: {attn_weights_tmp._md5sum()}")
+
         if not paddle.in_dynamic_mode():
-            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32")#.astype(query_states.dtype)
         else:
-            with paddle.amp.auto_cast(False):
-                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+            #with paddle.amp.auto_cast(False):
+            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32")#.astype(query_states.dtype)
+        
+        if attention_cnt == 0:
+            attn_weights_tmp = concat_dp(attn_weights)
+            attn_weights_tmp = concat_mp(attn_weights_tmp, 1)
+            print(f"attn_weights_after_soft_{attention_cnt} shape: {attn_weights_tmp.shape} local_shape: {attn_weights.shape} md5sum: {attn_weights_tmp._md5sum()}")
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
@@ -264,6 +290,11 @@ def scaled_dot_product_attention(
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
             attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+
+        attn_output_tmp = concat_dp(attn_output)
+        attn_output_tmp = concat_mp(attn_output_tmp)
+        print(f"attn_output_{attention_cnt} shape: {attn_output_tmp.shape} md5sum: {attn_output_tmp._md5sum()}")
+        attention_cnt = attention_cnt+1
         return (attn_output, attn_weights) if output_attentions else attn_output
 
 
@@ -354,7 +385,7 @@ def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
     batch, slen, num_key_value_heads, head_dim = hidden_states.shape
     if n_rep == 1:
         return hidden_states
-
+    print("repeat kv")
     hidden_states = hidden_states.unsqueeze(-2).tile([1, 1, 1, n_rep, 1])
     return hidden_states.reshape([batch, slen, num_key_value_heads * n_rep, head_dim])
 
@@ -756,7 +787,7 @@ class LlamaAttention(nn.Layer):
         if past_key_value is not None:
             kv_seq_len += past_key_value[0].shape[-3]
 
-        if self.config.rope:
+        if self.config.rope and False: 
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
@@ -789,7 +820,6 @@ class LlamaAttention(nn.Layer):
         # repeat k/v heads if n_kv_heads < n_heads
         key_states = repeat_kv(key_states, self.num_key_value_groups)
         value_states = repeat_kv(value_states, self.num_key_value_groups)
-
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (
             self.enable_recompute
@@ -847,7 +877,7 @@ class LlamaAttention(nn.Layer):
 
 
 class LlamaDecoderLayer(nn.Layer):
-    def __init__(self, config, layerwise_recompute: bool = False):
+    def __init__(self, config, layerwise_recompute: bool = False, index=None):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size
@@ -861,6 +891,7 @@ class LlamaDecoderLayer(nn.Layer):
         self.enable_recompute = False
         self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
+        self.idx = index
 
     def forward(
         self,
@@ -889,6 +920,9 @@ class LlamaDecoderLayer(nn.Layer):
         # [bs * seq_len, embed_dim] -> [seq_len * bs / n, embed_dim] (sequence_parallel)
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
+        if self.idx == 0:
+            hidden_states_tmp = concat_dp(hidden_states)
+            print(f"input_layernorm_{self.idx} shape: {hidden_states_tmp.shape} md5sum: {hidden_states_tmp._md5sum()}")
 
         # Self Attention
         has_gradient = not hidden_states.stop_gradient
@@ -931,13 +965,29 @@ class LlamaDecoderLayer(nn.Layer):
         if use_cache:
             present_key_value = outputs[2 if output_attentions else 1]
 
+        
         hidden_states = residual + hidden_states
+
+        if self.idx == 0:
+            hidden_states_tmp = concat_dp(hidden_states)
+            print(f"att_{self.idx} shape: {hidden_states_tmp.shape} md5sum: {hidden_states_tmp._md5sum()}")
+
 
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
+
+        if self.idx == 0:
+            hidden_states_tmp = concat_dp(hidden_states)
+            print(f"post_attention_layernorm_{self.idx} shape: {hidden_states_tmp.shape} md5sum: {hidden_states_tmp._md5sum()}")
+
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
+
+        if self.idx == 0:
+            hidden_states_tmp = concat_dp(hidden_states)
+            print(f"mlp_{self.idx} shape: {hidden_states_tmp.shape} md5sum: {hidden_states_tmp._md5sum()}")
+
 
         outputs = (hidden_states,)
 
@@ -1117,7 +1167,7 @@ class LlamaModel(LlamaPretrainedModel):
             )
 
         self.layers = nn.LayerList(
-            [LlamaDecoderLayer(config, i not in self.no_recompute_layers) for i in range(config.num_hidden_layers)]
+            [LlamaDecoderLayer(config, i not in self.no_recompute_layers, i) for i in range(config.num_hidden_layers)]
         )
         self.norm = LlamaRMSNorm(config)
 
@@ -1198,6 +1248,8 @@ class LlamaModel(LlamaPretrainedModel):
         return_dict=False,
         **kwargs,
     ):
+        input_ids_tmp = concat_dp(input_ids)
+        print(f"inputs_ids shape: {input_ids_tmp.shape} sum: {input_ids_tmp.sum().numpy()}")
         if self.sequence_parallel and use_cache:
             raise ValueError("We currently only support sequence parallel without cache.")
 
@@ -1269,7 +1321,8 @@ class LlamaModel(LlamaPretrainedModel):
             if is_casual and alibi is None:
                 attention_mask = None
         hidden_states = inputs_embeds
-
+        hidden_states_tmp = concat_dp(hidden_states)
+        print(f"inputs_embeds shape: {hidden_states_tmp.shape} md5sum: {hidden_states_tmp._md5sum()}")
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
@@ -1318,6 +1371,8 @@ class LlamaModel(LlamaPretrainedModel):
 
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
+            hidden_states_tmp = concat_dp(hidden_states)
+            print(f"hidden_states {idx}. shape: {hidden_states_tmp.shape} md5sum : {hidden_states_tmp._md5sum()}")    
 
         hidden_states = self.norm(hidden_states)
 
@@ -1337,7 +1392,7 @@ class LlamaModel(LlamaPretrainedModel):
             cross_attentions=None,
         )
 
-
+loss_cnt = 0
 class LlamaPretrainingCriterion(paddle.nn.Layer):
     """
     Criterion for Llama.
@@ -1363,13 +1418,17 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
                     f"enable_parallel_cross_entropy, the vocab_size should be splited: {prediction_scores.shape[-1]}, {self.config.vocab_size}"
                 )
                 self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
-
+        global loss_cnt
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
+            masked_lm_loss = concat_dp_with_grad(masked_lm_loss)
+            print(f"masked_lm_loss_{loss_cnt} shape: {masked_lm_loss.shape} md5sum: {masked_lm_loss._md5sum()}")
             # skip ignore_index which loss == 0
             masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
             loss = paddle.mean(masked_lm_loss)
-
+        if loss_cnt ==0:
+            print(f"loss_{loss_cnt} shape: {loss.shape} md5sum: {loss._md5sum()}")
+        loss_cnt = loss_cnt + 1    
         return loss
 
 
@@ -1524,9 +1583,13 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         tensor_parallel_output = (
             self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         )
-
+        hidden_states_tmp = concat_dp(hidden_states)
+        print(f"llamaout shape: {hidden_states_tmp.shape} md5sum: {hidden_states_tmp._md5sum()}")
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
-
+        logits_tmp = concat_dp(logits)
+        logits_tmp = concat_mp(logits_tmp)
+        print(f"logits shape: {logits_tmp.shape} md5sum: {logits_tmp._md5sum()}")
+        logits = concat_mp_with_grad(logits)
         loss = None
         if labels is not None:
             loss = self.criterion(logits, labels)
@@ -1542,3 +1605,73 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+def concat_dp(input):
+    hcg = fleet.get_hybrid_communicate_group()
+    dp_degree = hcg.get_data_parallel_world_size()
+    if dp_degree <=1:
+        return input
+    else:
+        group = hcg.get_data_parallel_group()
+        return concat(input, 0, group)
+   
+    
+
+def concat_mp(input, axis=-1):
+    hcg = fleet.get_hybrid_communicate_group()
+    mp_degree = hcg.get_model_parallel_world_size()
+    if mp_degree <=1:
+        return input
+    else:
+        group = hcg.get_model_parallel_group()
+        return concat(input, axis, group)
+
+def concat(input, axis, group):
+    with paddle.no_grad():
+        inps = []
+        paddle.distributed.all_gather(inps, input, group=group)
+        return paddle.concat(x=inps, axis=axis)
+
+def concat_dp_with_grad(input):
+    hcg = fleet.get_hybrid_communicate_group()
+    dp_degree = hcg.get_data_parallel_world_size()
+    if dp_degree <=1:
+        return input
+    else:
+        group = hcg.get_data_parallel_group()
+        return Concat.apply(input, 0, group)
+
+
+def concat_mp_with_grad(input):
+    hcg = fleet.get_hybrid_communicate_group()
+    mp_degree = hcg.get_model_parallel_world_size()
+    if mp_degree <=1:
+        return input
+    else:
+        group = hcg.get_model_parallel_group()
+        return Concat.apply(input, -1, group)
+
+
+
+
+
+class Concat(PyLayer):
+    @staticmethod
+    def forward(ctx, inp, axis, group):
+        inputs = []
+        paddle.distributed.all_gather(inputs, inp, group=group)
+        with paddle.no_grad():
+            cat = paddle.concat(inputs, axis=axis)
+        ctx.args_axis = axis
+        ctx.args_group = group
+        return cat
+
+    @staticmethod
+    def backward(ctx, grad):
+        axis = ctx.args_axis
+        group = ctx.args_group
+        with paddle.no_grad():
+            grads = paddle.split(
+                grad, paddle.distributed.get_world_size(group), axis=axis
+            )
+        grad = grads[paddle.distributed.get_rank(group)]
+        return grad        

@@ -573,7 +573,7 @@ def main():
         if dist.get_rank() in ranks:
             dp_group = group
 
-
+    assert dp_group is not None
     model.train()
     optimizer = dist.shard_optimizer(optimizer)
     for epoch_idx in range(num_train_epochs):
@@ -583,7 +583,7 @@ def main():
             input_id = input_ids[0][0].numpy()
             label = labels[0][0].numpy()
 
-            hack for align dygraph parallel.
+            #hack for align dygraph parallel.
             if dp_group is not None:
                 cur_rank = dist.get_rank()
                 res = []
@@ -618,7 +618,7 @@ def main():
                 tr_loss = 0
 
             global_step += 1
-            if global_step // training_args.gradient_accumulation_steps >= 10:
+            if global_step // training_args.gradient_accumulation_steps >= 0:
                 sys.exit(0)
 
     '''

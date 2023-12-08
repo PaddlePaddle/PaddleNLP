@@ -578,7 +578,7 @@ def main():
                 tr_loss = 0
 
             global_step += 1
-            if global_step // training_args.gradient_accumulation_steps >= 100:
+            if global_step // training_args.gradient_accumulation_steps >= 0:
                 #save_model(model)
                 sys.exit(0)
 
@@ -720,7 +720,8 @@ class LossMean(PyLayer):
     @staticmethod
     def backward(ctx, grad):
         return grad
-    
+
+
     
 
 if __name__ == "__main__":
