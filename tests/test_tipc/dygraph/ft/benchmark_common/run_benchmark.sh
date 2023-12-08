@@ -141,7 +141,7 @@ function _train(){
         case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/tests/mylog
         cp -r ${case_path}/mylog/workerlog.* ./mylog/
         rm ${log_file}
-        cp ${case_path}/mylog/workerlog.${workerlog_id} ${log_file}
+        cp ${case_path}/mylog/workerlog.0 ${log_file}
     fi
 }
 
