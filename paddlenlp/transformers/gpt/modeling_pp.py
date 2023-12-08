@@ -24,9 +24,8 @@ from paddle.distributed.fleet.utils import recompute
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
 from paddlenlp.transformers.sequence_parallel_utils import (
     GatherOp,
-    mark_as_sequence_parallel_parameter
+    mark_as_sequence_parallel_parameter,
 )
-
 
 from .modeling import (
     GPTConfig,
@@ -135,7 +134,7 @@ class LayerNormPipe(nn.LayerNorm):
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.weight)
             mark_as_sequence_parallel_parameter(self.bias)
-        
+
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
         hidden_states = super().forward(hidden_states)
