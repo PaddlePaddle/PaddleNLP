@@ -702,7 +702,7 @@ def print_grad(model):
         grad = p.grad
         reduce_dp(grad)
         grad = merge_mp(name_mapping[p.name], grad)
-        print(f"{p.name}_grad shape: {grad.shape} md5sum: {grad._md5sum()}")            
+        print(f"{name_mapping[p.name]} {p.name}_grad shape: {grad.shape} md5sum: {grad._md5sum()}")            
 
 
 def merge_mp(k, input):

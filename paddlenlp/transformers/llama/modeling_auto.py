@@ -215,7 +215,7 @@ def scaled_dot_product_attention(
         attention_cnt = attention_cnt+1
         return (attn_output, attn_weights) if output_attentions else attn_output
 
-
+norm_cnt = 0
 class LlamaRMSNormAuto(nn.Layer):
     def __init__(self, config):
         super().__init__()
@@ -245,7 +245,12 @@ class LlamaRMSNormAuto(nn.Layer):
         if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
             hidden_states = paddle.cast(hidden_states, self.weight.dtype)
 
-        return hidden_states * self.weight
+        global norm_cnt
+        print(f"layernorm_before_scale_{norm_cnt} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()}")    
+        hidden_states = hidden_states * self.weight
+        print(f"layernorm_after_scale_{norm_cnt} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()}")    
+        norm_cnt = norm_cnt + 1    
+        return hidden_states 
 
 
 class LlamaMLPAuto(nn.Layer):

@@ -687,7 +687,7 @@ def print_grad(model):
     name_mapping = {v.name: k for (k, v) in model_state_dict.items()}
     for p in model.parameters():
         assert p.name in name_mapping
-        print(f"{p.name}_grad shape: {p.grad.shape} md5sum: {p.grad._md5sum()}")    
+        print(f"{name_mapping[p.name]} {p.name}_grad shape: {p.grad.shape} md5sum: {p.grad._md5sum()}")    
 
         
 

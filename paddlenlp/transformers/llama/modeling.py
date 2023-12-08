@@ -344,7 +344,7 @@ def rms_norm_fused(x_in, w, eps):
     fused_ln = try_import("fused_ln")
     return fused_ln.fused_rms_norm(x_in, w, eps)[0]
 
-
+norm_cnt = 0
 class LlamaRMSNorm(nn.Layer):
     def __init__(self, config):
         super().__init__()
@@ -374,7 +374,14 @@ class LlamaRMSNorm(nn.Layer):
 
         if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
             hidden_states = paddle.cast(hidden_states, self.weight.dtype)
-        return hidden_states * self.weight
+        global norm_cnt
+        hidden_states_tmp = concat_dp(hidden_states)
+        print(f"layernorm_before_scale_{norm_cnt} shape: {hidden_states_tmp.shape} md5sum: {hidden_states_tmp._md5sum()}")    
+        hidden_states = hidden_states * self.weight
+        hidden_states_tmp = concat_dp(hidden_states)
+        print(f"layernorm_after_scale_{norm_cnt} shape: {hidden_states_tmp.shape} md5sum: {hidden_states_tmp._md5sum()}")    
+        norm_cnt = norm_cnt + 1
+        return hidden_states
 
 
 def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
@@ -1424,7 +1431,8 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
             masked_lm_loss = concat_dp_with_grad(masked_lm_loss)
             print(f"masked_lm_loss_{loss_cnt} shape: {masked_lm_loss.shape} md5sum: {masked_lm_loss._md5sum()}")
             # skip ignore_index which loss == 0
-            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
+            masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
+            # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
             loss = paddle.mean(masked_lm_loss)
         if loss_cnt ==0:
             print(f"loss_{loss_cnt} shape: {loss.shape} md5sum: {loss._md5sum()}")
