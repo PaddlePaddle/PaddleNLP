@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+GPT/Llama pretraining scripts.
+"""
 import math
 import os
 import random
@@ -22,29 +25,40 @@ from typing import List, Optional
 import numpy as np
 import paddle
 
+from paddlenlp.trainer import (
+    PdArgumentParser,
+    Trainer,
+    TrainingArguments,
+    Mutil_dataset_PretrainingTrainer,
+    get_last_checkpoint,
+    speed_metrics,
+)
+from paddlenlp.data import Stack
+from paddlenlp.transformers import (
+    AutoTokenizer,
+    CosineAnnealingWithWarmupDecay,
+    LinearAnnealingWithWarmupDecay,
+    LlamaConfig,
+    LlamaForCausalLM,
+    LlamaForCausalLMPipe,
+    register_sequence_parallel_allreduce_hooks,
+)
+from paddlenlp.utils.batch_sampler import DistributedBatchSampler
+from paddlenlp.utils.log import logger
+
+MODEL_CLASSES = {
+    "llama": (
+        LlamaConfig,
+        LlamaForCausalLM,
+    ),
+}
+
+
 from paddlenlp.data.causal_dataset import (
     build_train_valid_test_datasets,
     check_data_split,
     print_rank_0,
 )
-from paddlenlp.trainer import (
-    PdArgumentParser,
-    Trainer,
-    TrainingArguments,
-    get_last_checkpoint,
-    speed_metrics,
-)
-from paddlenlp.transformers import (
-    AutoConfig,
-    AutoModelForCausalLM,
-    AutoModelForCausalLMPipe,
-    AutoTokenizer,
-    CosineAnnealingWithWarmupDecay,
-    LinearAnnealingWithWarmupDecay,
-    register_sequence_parallel_allreduce_hooks,
-)
-from paddlenlp.utils.batch_sampler import DistributedBatchSampler
-from paddlenlp.utils.log import logger
 
 
 def add_start_docstrings(*docstr):
@@ -107,6 +121,7 @@ class DataArguments:
         metadata={"help": "Whether to skip the warmup process of mmap files."},
     )
     data_cache: str = field(default=None, metadata={"help": "The path of the cached dataset."})
+    mutil_dataset: bool = field(default=False, metadata={"help": "Whether or not to split the dataset when there are multiple datasets"})
 
 
 @dataclass
@@ -115,6 +130,9 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to pre-train from.
     """
 
+    model_type: Optional[str] = field(
+        default="llama", metadata={"help": "Only support for llama pre-training for now."}
+    )
     model_name_or_path: str = field(
         default="__internal_testing__/tiny-random-llama",
         metadata={
@@ -134,7 +152,7 @@ class ModelArguments:
     )
     use_fused_rms_norm: bool = field(
         default=False,
-        metadata={"help": "llama or other model, use_fused_rms_norm"},
+        metadata={"help": "llama, use_fused_rms_norm"},
     )
     fuse_attention_qkv: bool = field(
         default=False,
@@ -186,28 +204,25 @@ class ModelArguments:
     )
 
 
+def _collate_data(data, stack_fn=Stack()):
+    tokens_ = stack_fn([x["text"] for x in data])
+
+    labels = tokens_[:, 1:]
+    tokens = tokens_[:, :-1]
+
+    return {
+        "input_ids": tokens,
+        "labels": labels,
+    }
+    
 def create_pretrained_dataset(
     data_args,
     training_args,
+    train_val_test_num_samples,
     data_file,
     tokenizer,
     need_data=True,
 ):
-
-    check_data_split(data_args.split, training_args.do_train, training_args.do_eval, training_args.do_predict)
-
-    train_val_test_num_samples = [
-        training_args.per_device_train_batch_size
-        * training_args.dataset_world_size
-        * training_args.max_steps
-        * training_args.gradient_accumulation_steps,
-        training_args.per_device_eval_batch_size
-        * training_args.dataset_world_size
-        * training_args.eval_iters
-        * (training_args.max_steps // training_args.eval_steps + 1),
-        training_args.per_device_eval_batch_size * training_args.dataset_world_size * training_args.test_iters,
-    ]
-
     print_rank_0(" > datasets target sizes (minimum size):")
     if training_args.do_train:
         print_rank_0("    train:      {}".format(train_val_test_num_samples[0]))
@@ -234,20 +249,8 @@ def create_pretrained_dataset(
         logger.info(f"Sample data for {mode} mode.")
         # input_ids, loss_mask, attention_mask, position_ids, labels = data
         input_ids = data["text"]
-        logger.info(tokenizer._decode(list(input_ids)))
 
-    from paddlenlp.data import Stack
-
-    def _collate_data(data, stack_fn=Stack()):
-        tokens_ = stack_fn([x["text"] for x in data])
-
-        labels = tokens_[:, 1:]
-        tokens = tokens_[:, :-1]
-
-        return {
-            "input_ids": tokens,
-            "labels": labels,
-        }
+        logger.info(tokenizer._decode(input_ids))
 
     if need_data:
         if training_args.do_train:
@@ -257,7 +260,7 @@ def create_pretrained_dataset(
         if training_args.do_predict:
             print_dataset(test_dataset[0], "test")
 
-    return train_dataset, valid_dataset, test_dataset, _collate_data
+    return train_dataset, valid_dataset, test_dataset
 
 
 def get_train_data_file(args):
@@ -411,8 +414,11 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
+    config_class, model_class = MODEL_CLASSES[model_args.model_type]
+
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
-    config = AutoConfig.from_pretrained(model_args.model_name_or_path)
+
+    config = config_class.from_pretrained(model_args.model_name_or_path)
 
     config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
@@ -453,9 +459,8 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
-    model_class = AutoModelForCausalLM
-    if training_args.pipeline_parallel_degree > 1:
-        model_class = AutoModelForCausalLMPipe
+    if training_args.pipeline_parallel_degree > 1 and model_args.model_type == "llama":
+        model_class = LlamaForCausalLMPipe
 
     if model_args.continue_training:
         model = model_class.from_pretrained(
@@ -464,7 +469,7 @@ def main():
             dtype=dtype,
         )
     else:
-        model = model_class.from_config(config, dtype=dtype)
+        model = model_class._from_config(config, dtype=dtype)
 
     if model_args.sequence_parallel:
         register_sequence_parallel_allreduce_hooks(
@@ -477,11 +482,7 @@ def main():
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
-
-    if training_args.warmup_steps > 0:
-        warmup_steps = training_args.warmup_steps
-    else:
-        warmup_steps = training_args.warmup_ratio * training_args.max_steps
+    warmup_steps = training_args.warmup_ratio * training_args.max_steps
 
     lr_scheduler = None
     if training_args.lr_scheduler_type.value == "cosine":
@@ -502,14 +503,18 @@ def main():
         )
 
     data_file = get_train_data_file(data_args)
-    train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(
-        data_args,
-        training_args,
-        data_file,
-        tokenizer,
-        need_data=training_args.should_load_dataset,
-    )
-
+    check_data_split(data_args.split, training_args.do_train, training_args.do_eval, training_args.do_predict)
+    train_val_test_num_samples = [
+        training_args.per_device_train_batch_size
+        * training_args.dataset_world_size
+        * training_args.max_steps
+        * training_args.gradient_accumulation_steps,
+        training_args.per_device_eval_batch_size
+        * training_args.dataset_world_size
+        * training_args.eval_iters
+        * (training_args.max_steps // training_args.eval_steps + 1),
+        training_args.per_device_eval_batch_size * training_args.dataset_world_size * training_args.test_iters,
+    ]
     total_effective_tokens = (
         training_args.per_device_train_batch_size
         * training_args.dataset_world_size
@@ -517,16 +522,39 @@ def main():
         * training_args.gradient_accumulation_steps
         * data_args.max_seq_length
     )
-
-    trainer = PretrainingTrainer(
-        model=model,
-        args=training_args,
-        data_collator=data_collator,
-        train_dataset=train_dataset if training_args.do_train else None,
-        eval_dataset=eval_dataset if training_args.do_eval else None,
-        optimizers=(None, lr_scheduler),
-        tokenizer=tokenizer,
-    )
+    start_time = time.time()
+    data_collator = _collate_data
+    if data_args.mutil_dataset is False or len(data_file) == 1:
+        train_dataset, eval_dataset, test_dataset = create_pretrained_dataset(
+            data_args,
+            training_args,
+            train_val_test_num_samples,
+            data_file,
+            tokenizer,
+            need_data=training_args.should_load_dataset,
+        )
+        print(time.time()-start_time)
+        
+        trainer = PretrainingTrainer(
+            model=model,
+            args=training_args,
+            data_collator=data_collator,
+            train_dataset=train_dataset if training_args.do_train else None,
+            eval_dataset=eval_dataset if training_args.do_eval else None,
+            optimizers=(None, lr_scheduler),
+            tokenizer=tokenizer,
+        )
+    else:
+        trainer = Mutil_dataset_PretrainingTrainer(
+            model=model,
+            args=training_args,
+            data=data_file,
+            data_collator=data_collator,
+            train_val_test_num_samples=train_val_test_num_samples,
+            optimizers=(None, lr_scheduler),
+            tokenizer=tokenizer,
+            data_args=data_args
+        )
 
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:

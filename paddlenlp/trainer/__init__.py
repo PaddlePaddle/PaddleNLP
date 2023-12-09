@@ -21,3 +21,4 @@ from .trainer_utils import *
 from .trainer_compress import *
 from .training_args_seq2seq import *
 from .trainer_seq2seq import *
+from .mutil_dataset_with_resume import *
