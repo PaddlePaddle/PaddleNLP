@@ -119,7 +119,7 @@ class QWenInferenceModel(QWenPretrainedModel):
         transformer_config = FusedMultiTransformerConfig(
             self.hidden_size,
             self.num_attention_heads,
-            self.intermediate_size,
+            self.intermediate_size // 2,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
             nranks=1,
