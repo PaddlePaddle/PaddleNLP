@@ -39,7 +39,7 @@ from paddlenlp.transformers.model_utils import (
 from paddlenlp.transformers.qwen.configuration import QWenConfig
 from paddlenlp.transformers.qwen.modeling import QWenLMHead, QWenPretrainingCriterion
 
-__all__ = ["QwenForCausalLMInferenceModel"]
+__all__ = ["QWenForCausalLMInferenceModel"]
 
 class FusedQWenRMSNorm(nn.Layer):
     def __init__(self, config):

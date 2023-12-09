@@ -861,10 +861,10 @@ def create_predictor(
                 model.eval()
             elif "qwen" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
-                    QwenForCausalLMInferenceModel,
+                    QWenForCausalLMInferenceModel,
                 )
 
-                model = QwenForCausalLMInferenceModel.from_pretrained(
+                model = QWenForCausalLMInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path,
                     config=config,
                     dtype=predictor_args.dtype,
