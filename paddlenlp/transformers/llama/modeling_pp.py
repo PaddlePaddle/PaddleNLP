@@ -29,6 +29,8 @@ from .modeling import (
     LlamaPretrainingCriterion,
     LlamaRMSNorm,
     build_alibi_tensor,
+    concat_dp,
+    concat_mp
 )
 
 
@@ -114,7 +116,11 @@ class LlamaEmbeddingPipe(nn.Layer):
             _type_: _description_
         """
         input_ids, attention_mask, position_ids, alibi = parse_args(args)
+        #input_ids_tmp = concat_dp(input_ids)
+        #print(f"inputs_ids shape: {input_ids_tmp.shape} md5sum: {input_ids_tmp._md5sum()}")
         input_embeds = self.embed_tokens(input_ids)
+        input_embeds_tmp = concat_dp(input_embeds)
+        print(f"inputs_embeds shape: {input_embeds_tmp.shape} md5sum: {input_embeds_tmp._md5sum()}")
         if self.sequence_parallel:
             from paddlenlp.transformers import ScatterOp
 
@@ -237,7 +243,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self.add_sequential_layer(LayerDesc(LlamaEmbeddingPipe, config=config), "llama")
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
-                LayerDesc(LlamaDecoderLayerPipe, config=config, layerwise_recompute=i not in self.no_recompute_layers),
+                LayerDesc(LlamaDecoderLayerPipe, config=config, layerwise_recompute=i not in self.no_recompute_layers, index=i),
                 f"llama.layers.{i}",
             )
         self.add_sequential_layer(LayerDesc(LlamaRMSNormPipe, config=config), "llama.norm")
@@ -267,3 +273,4 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self.apply(self._init_weights)
         # DON'T init PipelinePretrainedModel
         # PipelinePretrainedModel.__init__(self.super(), config=config)
+
