@@ -293,7 +293,7 @@ class QWenInferenceModel(QWenPretrainedModel):
         
         if past_key_values is None:
             past_length = 0
-            past_key_values = tuple([None] * len(self.config.num_hidden_layers))
+            past_key_values = tuple([None] * self.config.num_hidden_layers)
         else:
             past_length = past_key_values[0][0].shape[1]
         
