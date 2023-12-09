@@ -121,7 +121,7 @@ class InferenceTest(unittest.TestCase):
         # 3. run sample decoding & benchmark on fused-mt model
         subprocess.run(
             command_prefix
-            + " top_p=0.7 decode_strategy=sampling benchmark=1 inference_model=true bash "
+            + " top_p=0.99 max_length=1024 decode_strategy=sampling benchmark=1 inference_model=true bash "
             + self.run_predictor_shell_path,
             stdout=self.log_file,
             stderr=self.log_file,
@@ -224,7 +224,7 @@ class PTuningInfereneTest(InferenceTest):
         # 3. run sample decoding & benchmark on fused-mt model
         subprocess.run(
             command_prefix
-            + " top_p=0.7 decode_strategy=sampling benchmark=1 inference_model=true bash "
+            + " top_p=0.99999 max_length=1024 decode_strategy=sampling benchmark=1 inference_model=true bash "
             + self.run_predictor_shell_path,
             stdout=self.log_file,
             stderr=self.log_file,
