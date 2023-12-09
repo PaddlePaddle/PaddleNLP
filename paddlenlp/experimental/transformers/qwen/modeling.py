@@ -156,28 +156,52 @@ class QWenInferenceModel(QWenPretrainedModel):
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         head_size = self.hidden_size // self.num_attention_heads
-
-        self.wte.weight.set_value(paddle.to_tensor(state_dict["qwen.wte.weight"]))
-        self.ln_f.weight.set_value(paddle.to_tensor(state_dict["qwen.ln_f.weight"]), dtype=self.ln_f.weight.dtype)
+        wte_weight = paddle.to_tensor(
+            state_dict["qwen.wte.weight"],
+            dtype=self.wte.weight.dtype
+        )
+        ln_f_weight = paddle.to_tensor(
+            state_dict["qwen.ln_f.weight"], 
+            dtype=self.ln_f.weight.dtype
+        )
+        self.wte.weight.set_value(wte_weight)
+        self.ln_f.weight.set_value(ln_f_weight)
 
         for idx in range(self.num_layers):
             ln_scale = paddle.to_tensor(
-                state_dict["qwen.h.{}.ln_1.weight".format(idx)], dtype=self.transformer_block.ln_scales[idx].dtype
+                state_dict["qwen.h.{}.ln_1.weight".format(idx)], 
+                dtype=self.transformer_block.ln_scales[idx].dtype
             )
-            qkv_weight = paddle.to_tensor(state_dict["qwen.h.{}.attn.c_attn.weight".format(idx)])
-            qkv_bias = paddle.to_tensor(state_dict["qwen.h.{}.attn.c_attn.bias".format(idx)])
+            qkv_weight = paddle.to_tensor(
+                state_dict["qwen.h.{}.attn.c_attn.weight".format(idx)].transpose([1, 0]),
+                dtype=self.transformer_block.qkv_weights[idx].dtype
+            )
+            qkv_bias = paddle.to_tensor(
+                state_dict["qwen.h.{}.attn.c_attn.bias".format(idx)],
+                dtype=self.transformer_block.qkv_biases[idx].dtype
+            )
 
-            linear_weight = paddle.to_tensor(state_dict["qwen.h.{}.attn.c_proj.weight".format(idx)])
+            linear_weight = paddle.to_tensor(
+                state_dict["qwen.h.{}.attn.c_proj.weight".format(idx)],
+                dtype=self.transformer_block.linear_weights[idx].dtype
+            )
 
             ffn_ln_scale = paddle.to_tensor(
-                state_dict["qwen.h.{}.ln_2.weight".format(idx)], dtype=self.transformer_block.ffn_ln_scales[idx].dtype
+                state_dict["qwen.h.{}.ln_2.weight".format(idx)], 
+                dtype=self.transformer_block.ffn_ln_scales[idx].dtype
             )
 
             up_weight = state_dict["qwen.h.{}.mlp.w1.weight".format(idx)]
             gate_weight = state_dict["qwen.h.{}.mlp.w2.weight".format(idx)]
             concated_ffn1_weight = np.concatenate([up_weight, gate_weight], axis=-1)
-            ffn1_weight = paddle.to_tensor(concated_ffn1_weight)
-            ffn2_weight = paddle.to_tensor(state_dict["qwen.h.{}.mlp.c_proj.weight".format(idx)])
+            ffn1_weight = paddle.to_tensor(
+                concated_ffn1_weight,
+                dtype=self.transformer_block.ffn1_weights[idx].dtype
+            )
+            ffn2_weight = paddle.to_tensor(
+                state_dict["qwen.h.{}.mlp.c_proj.weight".format(idx)],
+                dtype=self.transformer_block.ffn2_weights[idx].dtype
+            )
 
             self.transformer_block.ln_scales[idx].set_value(ln_scale)
             
@@ -497,6 +521,10 @@ class QWenForCausalLMInferenceModel(GenerationInferenceModel, QWenPretrainedMode
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         if "lm_head.weight" in state_dict:
-            self.lm_head.weight.set_value(state_dict["lm_head.weight"])
+            lm_head_weight = paddle.to_tensor(
+                state_dict["lm_head.weight"], 
+                dtype=self.lm_head.weight.dtype
+            )
+            self.lm_head.weight.set_value(lm_head_weight)
         self.qwen.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
         
