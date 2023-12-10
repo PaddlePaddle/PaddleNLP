@@ -30,7 +30,27 @@ def get_md5sum(file_path):
     return md5sum
 
 
-def main(args):
+def parse_args():
+    parser = argparse.ArgumentParser()
+
+    # Required parameters
+    parser.add_argument(
+        "--model_dir", required=True, default=None, help="Directory of storing ElectraForTotalPreTraining model"
+    )
+    parser.add_argument(
+        "--generator_output_file", default="generator_for_ft.pdparams", help="Electra generator model for fine-tuning"
+    )
+    parser.add_argument(
+        "--discriminator_output_file",
+        default="discriminator_for_ft.pdparams",
+        help="Electra discriminator model for fine-tuning",
+    )
+    args = parser.parse_args()
+    return args
+
+
+def main():
+    args = parse_args()
     pretraining_model = os.path.join(args.model_dir, "model_state.pdparams")
     if os.path.islink(pretraining_model):
         print("%s already contain fine-tuning model, pleace check" % args.model_dir)
@@ -66,17 +86,4 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--model_dir", required=True, default=None, help="Directory of storing ElectraForTotalPreTraining model"
-    )
-    parser.add_argument(
-        "--generator_output_file", default="generator_for_ft.pdparams", help="Electra generator model for fine-tuning"
-    )
-    parser.add_argument(
-        "--discriminator_output_file",
-        default="discriminator_for_ft.pdparams",
-        help="Electra discriminator model for fine-tuning",
-    )
-    args, unparsed = parser.parse_known_args()
-    main(args)
+    main()

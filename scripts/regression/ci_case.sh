@@ -214,25 +214,49 @@ time (python -m paddle.distributed.launch  --log_dir log  run_pretrain.py --mode
 electra(){
 cd ${nlp_dir}/model_zoo/electra/
 export CUDA_VISIBLE_DEVICES=${cudaid2}
-export DATA_DIR=./BookCorpus/
 wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/BookCorpus.tar.gz && tar -xzvf BookCorpus.tar.gz
-time (python -u ./run_pretrain.py \
+time (python -m paddle.distributed.launch run_pretrain.py \
     --model_type electra \
-    --model_name_or_path electra-small \
+    --model_name_or_path chinese-electra-small \
     --input_dir ./BookCorpus/ \
     --output_dir ./pretrain_model/ \
-    --train_batch_size 64 \
-    --learning_rate 5e-4 \
-    --max_seq_length 128 \
+    --max_predictions_per_seq 20 \
+    --per_device_train_batch_size 2 \
+    --per_device_train_batch_size 2 \
     --weight_decay 1e-2 \
     --adam_epsilon 1e-6 \
     --warmup_steps 10000 \
-    --num_train_epochs 4 \
+    --save_steps 1 \
+    --max_steps 1 \
+    --do_train true \
+    --device gpu >${log_path}/electra_pretrain) >>${log_path}/electra_pretrain 2>&1
+print_info $? electra_pretrain
+time (python -u get_ft_model.py \
+    --model_dir ./pretrain_model >${log_path}/electra_get_ft_model) >>${log_path}/electra_get_ft_model 2>&1
+print_info $? electra_get_ft_model
+time (python -m paddle.distributed.launch run_glue.py \
+    --model_type electra \
+    --model_name_or_path  ./pretrain_model/ \
+    --task_name SST-2 \
+    --max_seq_length 128 \
+    --per_device_train_batch_size 32   \
+    --per_device_eval_batch_size 32   \
+    --learning_rate 1e-4 \
+    --num_train_epochs 3 \
     --logging_steps 1 \
     --save_steps 1 \
     --max_steps 1 \
-    --device gpu >${log_path}/electra_pretrain) >>${log_path}/electra_pretrain 2>&1
-print_info $? electra_pretrain
+    --output_dir ./tmp/ \
+    --device gpu \
+    --fp16 False\
+    --do_train \
+    --do_eval >${log_path}/electra_fintune) >>${log_path}/electra_fintune 2>&1
+print_info $? electra_fintune
+time (python -u ./export_model.py \
+    --model_name chinese-electra-small \
+    --input_model_dir ./tmp/  \
+    --output_model_dir ./infer_model/model >${log_path}/electra_export) >>${log_path}/electra_export 2>&1
+print_info $? electra_export
 }
 fast_gpt(){
 # FT

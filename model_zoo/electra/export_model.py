@@ -16,6 +16,7 @@ from __future__ import absolute_import, division, print_function
 
 import argparse
 import hashlib
+import json
 import os
 
 import paddle
@@ -35,12 +36,49 @@ def get_md5sum(file_path):
     return md5sum
 
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+
+    # Required parameters
+    parser.add_argument(
+        "--input_model_dir",
+        required=True,
+        type=str,
+        default=None,
+        help="Directory for storing Electra pretraining model",
+    )
+    parser.add_argument(
+        "--output_model_dir",
+        required=True,
+        default=None,
+        type=str,
+        help="Directory for output Electra inference model",
+    )
+    parser.add_argument(
+        "--model_name",
+        default="electra-deploy",
+        required=True,
+        type=str,
+        help="prefix name of output model and parameters",
+    )
+    args = parser.parse_args()
+    return args
+
+
 def main():
+    args = parse_args()
+    # check and load config
+    with open(os.path.join(args.input_model_dir, "config.json"), "r") as f:
+        config_dict = json.load(f)
+        num_choices = config_dict["num_choices"]
+    if num_choices is None or num_choices <= 0:
+        print("%s/model_config.json may not be right, please check" % args.input_model_dir)
+        exit(1)
+
     # check and load model
     input_model_file = os.path.join(args.input_model_dir, "model_state.pdparams")
     print("load model to get static model : %s \nmodel md5sum : %s" % (input_model_file, get_md5sum(input_model_file)))
     model_state_dict = paddle.load(input_model_file)
-
     if all((s.startswith("generator") or s.startswith("discriminator")) for s in model_state_dict.keys()):
         print("the model : %s is electra pretrain model, we need fine-tuning model to deploy" % input_model_file)
         exit(1)
@@ -49,7 +87,7 @@ def main():
         exit(1)
     elif "classifier.dense.weight" in model_state_dict:
         print("we are load glue fine-tuning model")
-        model = ElectraForSequenceClassification.from_pretrained(args.input_model_dir)
+        model = ElectraForSequenceClassification.from_pretrained(args.input_model_dir, num_classes=num_choices)
         print("total model layers : ", len(model_state_dict))
     else:
         print("the model file : %s may not be fine-tuning model, please check" % input_model_file)
@@ -65,15 +103,4 @@ def main():
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--input_model_dir", required=True, default=None, help="Directory for storing Electra pretraining model"
-    )
-    parser.add_argument(
-        "--output_model_dir", required=True, default=None, help="Directory for output Electra inference model"
-    )
-    parser.add_argument(
-        "--model_name", default="electra-deploy", type=str, help="prefix name of output model and parameters"
-    )
-    args, unparsed = parser.parse_known_args()
     main()

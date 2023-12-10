@@ -12,18 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import copy
 import io
-import json
 import logging
 import os
 import random
 import time
+from dataclasses import dataclass, field
 
 import numpy as np
 import paddle
 
+from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
 from paddlenlp.transformers import (
     ElectraForTotalPretraining,
     ElectraPretrainingCriterion,
@@ -40,99 +39,57 @@ MODEL_CLASSES = {
 }
 
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--model_type",
-        default="electra",
-        type=str,
-        help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
+@dataclass
+class TrainingArguments(TrainingArguments):
+
+    # per_device_train_batch_size
+    @property
+    def micro_batch_size(self):
+        return self.per_device_train_batch_size
+
+    @property
+    def eval_freq(self):
+        return self.eval_steps
+
+
+@dataclass
+class ModelArguments:
+    model_type: str = field(
+        default="electra", metadata={"help": "Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys())}
     )
-    parser.add_argument(
-        "--model_name_or_path",
+    model_name_or_path: str = field(
         default="electra-small",
-        type=str,
-        help="Path to pre-trained model or shortcut name selected in the list: "
-        + ", ".join(
-            sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])
-        ),
+        metadata={
+            "help": "Path to pre-trained model or shortcut name selected in the list: "
+            + ", ".join(
+                sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])
+            )
+        },
     )
-    parser.add_argument(
-        "--input_dir",
-        default=None,
-        type=str,
-        required=True,
-        help="The input directory where the data will be read from.",
+    max_seq_length: int = field(default=128, metadata={"help": "max length of each sequence"})
+    mask_prob: float = field(default=0.15, metadata={"help": "the probability of one word to be mask"})
+    eager_run: bool = field(default=True, metadata={"help": "Use dygraph mode."})
+    init_from_ckpt: bool = field(
+        default=True,
+        metadata={
+            "help": "Whether to load model checkpoint. if True, args.model_name_or_path must be dir store ckpt or will train from fresh start"
+        },
     )
-    parser.add_argument(
-        "--output_dir",
-        default=None,
-        type=str,
-        required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
+    max_predictions_per_seq: int = field(
+        default=20, metadata={"help": "The maximum total input sequence length after tokenization"}
     )
-    parser.add_argument("--max_seq_length", default=128, type=int, help="max length of each sequence")
-    parser.add_argument("--mask_prob", default=0.15, type=float, help="the probability of one word to be mask")
-    parser.add_argument(
-        "--train_batch_size",
-        default=96,
-        type=int,
-        help="Batch size per GPU/CPU for training.",
-    )
-    parser.add_argument(
-        "--eval_batch_size",
-        default=96,
-        type=int,
-        help="Batch size per GPU/CPU for training.",
-    )
-    parser.add_argument("--learning_rate", default=5e-4, type=float, help="The initial learning rate for Adam.")
-    parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
-    parser.add_argument("--adam_epsilon", default=1e-6, type=float, help="Epsilon for Adam optimizer.")
-    parser.add_argument(
-        "--num_train_epochs",
-        default=4,
-        type=int,
-        help="Total number of training epochs to perform.",
-    )
-    parser.add_argument(
-        "--max_steps",
-        default=-1,
-        type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
-    )
-    parser.add_argument("--warmup_steps", default=10000, type=int, help="Linear warmup over warmup_steps.")
-
-    parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
-    parser.add_argument("--save_steps", type=int, default=1000, help="Save checkpoint every X updates steps.")
-    parser.add_argument(
-        "--init_from_ckpt",
-        action="store_true",
-        help="Whether to load model checkpoint. if True, args.model_name_or_path must be dir store ckpt or will train from fresh start",
-    )
-    parser.add_argument(
-        "--use_amp", action="store_true", help="Whether to use float16(Automatic Mixed Precision) to train."
-    )
-    parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
-    parser.add_argument("--eager_run", type=bool, default=True, help="Use dygraph mode.")
-    parser.add_argument(
-        "--device",
-        default="gpu",
-        type=str,
-        choices=["cpu", "gpu"],
-        help="The device to select to train the model, is must be cpu/gpu.",
-    )
-    args = parser.parse_args()
-    return args
 
 
-def set_seed(args):
-    # Use the same data seed(for data shuffle) for all procs to guarantee data
-    # consistency after sharding.
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    # Maybe different op seeds(for dropout) for different procs is better. By:
-    # `paddle.seed(args.seed + paddle.distributed.get_rank())`
-    paddle.seed(args.seed)
+@dataclass
+class DataArguments:
+    """
+    Arguments pertaining to what data we are going to input our model for training and eval.
+    Using `PdArgumentParser` we can turn this class into argparse arguments to be able to
+    specify them on the command line.
+    """
+
+    input_dir: str = field(default=None, metadata={"help": "The input directory where the data will be read from."})
+    split: str = field(default="949,50,1", metadata={"help": "Train/valid/test data split."})
 
 
 class WorkerInitObj(object):
@@ -227,7 +184,11 @@ class DataCollatorForElectra(object):
     def __call__(self, examples):
         if self.mlm:
             inputs, raw_inputs, labels = self.mask_tokens(examples)
-            return inputs, raw_inputs, labels
+            return {
+                "input_ids": inputs,
+                "raw_input_ids": raw_inputs,
+                "generator_labels": labels,
+            }
         else:
             raw_inputs, _ = self.add_special_tokens_and_set_maskprob(examples, True, self.max_seq_length)
             raw_inputs = self.tensorize_batch(raw_inputs, "int64")
@@ -236,7 +197,11 @@ class DataCollatorForElectra(object):
             if self.tokenizer.pad_token is not None:
                 pad_token_id = self.tokenizer.convert_tokens_to_ids(self.tokenizer.pad_token)
                 labels[labels == pad_token_id] = -100
-            return batch, raw_inputs, labels  # noqa:821
+            return {
+                "raw_input_ids": raw_inputs,
+                "generator_labels": labels,
+            }
+            # return batch, raw_inputs, labels  # noqa:821
 
     def tensorize_batch(self, examples, dtype):
         if isinstance(examples[0], (list, tuple)):
@@ -303,6 +268,43 @@ class DataCollatorForElectra(object):
         return inputs, raw_inputs, labels
 
 
+class new_Trainer(Trainer):
+    def __init__(
+        self,
+        model=None,
+        criterion=None,
+        args=None,
+        data_collator=None,
+        train_dataset=None,
+        eval_dataset=None,
+        tokenizer=None,
+        compute_metrics=None,
+        callbacks=None,
+        optimizers=(None, None),
+        preprocess_logits_for_metrics=None,
+    ):
+        super(new_Trainer, self).__init__(
+            model,
+            criterion,
+            args,
+            data_collator,
+            train_dataset,
+            eval_dataset,
+            tokenizer,
+            compute_metrics,
+            callbacks,
+            optimizers,
+            preprocess_logits_for_metrics,
+        )
+
+    def compute_loss(self, model, inputs, return_outputs=False):
+
+        gen_logits, disc_logits, disc_labels, attention_mask = model(**inputs)
+        gen_labels = inputs["generator_labels"]
+        loss = self.criterion(gen_logits, disc_logits, gen_labels, disc_labels, attention_mask)
+        return loss
+
+
 def create_dataloader(dataset, mode="train", batch_size=1, use_gpu=True, data_collator=None):
     """
     Creats dataloader.
@@ -336,51 +338,27 @@ def create_dataloader(dataset, mode="train", batch_size=1, use_gpu=True, data_co
     return dataloader
 
 
-def do_train(args):
-    paddle.enable_static() if not args.eager_run else None
-    paddle.set_device(args.device)
+def do_train():
+    data_args, training_args, model_args = PdArgumentParser(
+        [DataArguments, TrainingArguments, ModelArguments]
+    ).parse_args_into_dataclasses()
+    training_args: TrainingArguments = training_args
+    model_args: ModelArguments = model_args
+    data_args: DataArguments = data_args
+
+    paddle.enable_static() if not model_args.eager_run else None
+    paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    set_seed(args)
-    # worker_init = WorkerInitObj(args.seed + paddle.distributed.get_rank())
+    model_args.model_type = model_args.model_type.lower()
+    model_class, tokenizer_class = MODEL_CLASSES[model_args.model_type]
 
-    args.model_type = args.model_type.lower()
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+    config = model_class.config_class.from_pretrained(model_args.model_name_or_path)
 
-    # Loads or initializes a model.
-    pretrained_models = list(tokenizer_class.pretrained_init_configuration.keys())
-    config = model_class.config_class.from_pretrained(args.model_name_or_path)
+    tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
 
-    if args.model_name_or_path in pretrained_models:
-        tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-        model = model_class(config)
-        args.init_from_ckpt = False
-    else:
-        if os.path.isdir(args.model_name_or_path) and args.init_from_ckpt:
-            # Load checkpoint
-            tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-            with open(os.path.join(args.model_name_or_path, "run_states.json"), "r") as f:
-                config_dict = json.load(f)
-                model_name = config_dict["model_name"]
-            if model_name in pretrained_models:
-                model = model_class.from_pretrained(args.model_name_or_path)
-                model.set_state_dict(paddle.load(os.path.join(args.model_name_or_path, "model_state.pdparams")))
-            else:
-                raise ValueError(
-                    "initialize a model from ckpt need model_name "
-                    "in model_config_file. The supported model_name "
-                    "are as follows: {}".format(tokenizer_class.pretrained_init_configuration.keys())
-                )
-        else:
-            raise ValueError(
-                "initialize a model need identifier or the "
-                "directory of storing model. if use identifier, the supported model "
-                "identifiers are as follows: {}, if use directory, "
-                "make sure set init_from_ckpt as True".format(model_class.pretrained_init_configuration.keys())
-            )
-
-    criterion = ElectraPretrainingCriterion(config)
+    model = model_class(config)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
@@ -388,169 +366,40 @@ def do_train(args):
     tic_load_data = time.time()
     print("start load data : %s" % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
     train_dataset = BookCorpus(
-        data_path=args.input_dir, tokenizer=tokenizer, max_seq_length=args.max_seq_length, mode="train"
+        data_path=data_args.input_dir, tokenizer=tokenizer, max_seq_length=model_args.max_seq_length, mode="train"
     )
     print("load data done, total : %s s" % (time.time() - tic_load_data))
 
     # Reads data and generates mini-batches.
     data_collator = DataCollatorForElectra(
-        tokenizer=tokenizer, max_seq_length=args.max_seq_length, mlm=True, mlm_probability=args.mask_prob
+        tokenizer=tokenizer, max_seq_length=model_args.max_seq_length, mlm=True, mlm_probability=model_args.mask_prob
+    )
+    criterion = ElectraPretrainingCriterion(config)
+
+    lr_scheduler = LinearDecayWithWarmup(
+        training_args.learning_rate, training_args.max_steps, training_args.warmup_steps
     )
 
-    train_data_loader = create_dataloader(
-        train_dataset,
-        batch_size=args.train_batch_size,
-        mode="train",
-        use_gpu=True if args.device in "gpu" else False,
+    trainer = new_Trainer(
+        model=model,
+        args=training_args,
         data_collator=data_collator,
+        train_dataset=train_dataset if training_args.do_train else None,
+        eval_dataset=None,
+        tokenizer=tokenizer,
+        criterion=criterion,
+        optimizers=(None, lr_scheduler),
     )
 
-    num_training_steps = args.max_steps if args.max_steps > 0 else (len(train_data_loader) * args.num_train_epochs)
-
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_steps)
-
-    clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=1.0)
-    # Generate parameter names needed to perform weight decay.
-    # All bias and LayerNorm parameters are excluded.
-    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler,
-        epsilon=args.adam_epsilon,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        grad_clip=clip,
-        apply_decay_param_fun=lambda x: x in decay_params,
-    )
-    if args.use_amp:
-        scaler = paddle.amp.GradScaler(init_loss_scaling=1024)
-
-    print("start train : %s" % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-    trained_global_step = global_step = 0
-    t_loss = paddle.to_tensor([0.0])
-    log_loss = paddle.to_tensor([0.0])
-    loss_list = []
-    log_list = []
-    tic_train = time.time()
-    if os.path.isdir(args.model_name_or_path) and args.init_from_ckpt:
-        optimizer.set_state_dict(paddle.load(os.path.join(args.model_name_or_path, "model_state.pdopt")))
-        trained_global_step = global_step = config_dict["global_step"]
-        if trained_global_step < num_training_steps:
-            print(
-                "[ start train from checkpoint ] we have already trained %s steps, seeking next step : %s"
-                % (trained_global_step, trained_global_step + 1)
-            )
-        else:
-            print(
-                "[ start train from checkpoint ] we have already trained %s steps, but total training steps is %s, please check configuration !"
-                % (trained_global_step, num_training_steps)
-            )
-            exit(0)
-
-    for epoch in range(args.num_train_epochs):
-        for step, batch in enumerate(train_data_loader):
-            if trained_global_step > 0:
-                trained_global_step -= 1
-                continue
-            global_step += 1
-            input_ids, raw_input_ids, gen_labels = batch
-            if args.use_amp:
-                with paddle.amp.auto_cast():
-                    gen_logits, disc_logits, disc_labels, attention_mask = model(
-                        input_ids=input_ids, raw_input_ids=raw_input_ids, generator_labels=gen_labels
-                    )
-                    loss = criterion(gen_logits, disc_logits, gen_labels, disc_labels, attention_mask)
-                scaled = scaler.scale(loss)
-                scaled.backward()
-                t_loss += loss.detach()
-                scaler.minimize(optimizer, scaled)
-            else:
-                gen_logits, disc_logits, disc_labels, attention_mask = model(
-                    input_ids=input_ids, raw_input_ids=raw_input_ids, generator_labels=gen_labels
-                )
-                loss = criterion(gen_logits, disc_logits, gen_labels, disc_labels, attention_mask)
-                loss.backward()
-                t_loss += loss.detach()
-                optimizer.step()
-            lr_scheduler.step()
-            optimizer.clear_grad()
-            if global_step % args.logging_steps == 0:
-                local_loss = (t_loss - log_loss) / args.logging_steps
-                if paddle.distributed.get_world_size() > 1:
-                    paddle.distributed.all_gather(loss_list, local_loss)
-                    if paddle.distributed.get_rank() == 0:
-                        log_str = (
-                            "global step {0:d}/{1:d}, epoch: {2:d}, batch: {3:d}, "
-                            "avg_loss: {4:.15f}, lr: {5:.10f}, speed: {6:.2f} s/it"
-                        ).format(
-                            global_step,
-                            num_training_steps,
-                            epoch,
-                            step,
-                            float((paddle.stack(loss_list).sum() / len(loss_list)).numpy()),
-                            optimizer.get_lr(),
-                            (time.time() - tic_train) / args.logging_steps,
-                        )
-                        print(log_str)
-                        log_list.append(log_str)
-                    loss_list = []
-                else:
-                    log_str = (
-                        "global step {0:d}/{1:d}, epoch: {2:d}, batch: {3:d}, "
-                        "loss: {4:.15f}, lr: {5:.10f}, speed: {6:.2f} s/it"
-                    ).format(
-                        global_step,
-                        num_training_steps,
-                        epoch,
-                        step,
-                        float(local_loss.numpy()),
-                        optimizer.get_lr(),
-                        (time.time() - tic_train) / args.logging_steps,
-                    )
-                    print(log_str)
-                    log_list.append(log_str)
-                log_loss = t_loss
-                tic_train = time.time()
-            if global_step % args.save_steps == 0:
-                if paddle.distributed.get_rank() == 0:
-                    output_dir = os.path.join(args.output_dir, "model_%d.pdparams" % global_step)
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
-                    model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
-                    config_to_save = copy.deepcopy(model_to_save.discriminator.electra.config)
-                    config_to_save.to_json_file(os.path.join(output_dir, "model_config.json"))
-                    run_states = {
-                        "model_name": model_name if args.init_from_ckpt else args.model_name_or_path,
-                        "global_step": global_step,
-                        "epoch": epoch,
-                        "step": step,
-                    }
-                    with open(os.path.join(output_dir, "run_states.json"), "w") as f:
-                        json.dump(run_states, f)
-                    paddle.save(model.state_dict(), os.path.join(output_dir, "model_state.pdparams"))
-                    tokenizer.save_pretrained(output_dir)
-                    paddle.save(optimizer.state_dict(), os.path.join(output_dir, "model_state.pdopt"))
-                    if len(log_list) > 0:
-                        with open(os.path.join(output_dir, "train.log"), "w") as f:
-                            for log in log_list:
-                                if len(log.strip()) > 0:
-                                    f.write(log.strip() + "\n")
-            if global_step >= num_training_steps:
-                return
-
-
-def print_arguments(args):
-    """print arguments"""
-    print("-----------  Configuration Arguments -----------")
-    for arg, value in sorted(vars(args).items()):
-        print("%s: %s" % (arg, value))
-    print("------------------------------------------------")
+    # training
+    if training_args.do_train:
+        train_result = trainer.train()
+        metrics = train_result.metrics
+        trainer.save_model()
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    print_arguments(args)
-    n_gpu = len(os.getenv("CUDA_VISIBLE_DEVICES", "").split(","))
-    if args.device in "gpu" and n_gpu > 1:
-        paddle.distributed.spawn(do_train, args=(args,), nprocs=n_gpu)
-    else:
-        do_train(args)
+    do_train()

@@ -113,7 +113,7 @@ def get_predicted_input(predicted_data, tokenizer, max_seq_length, batch_size):
     return sen_ids_batch, sen_words_batch
 
 
-def predict(args, sentences=[], paths=[]):
+def predict():
     """
     Args:
         sentences (list[str]): each string is a sentence. If sentences not paths
@@ -121,7 +121,9 @@ def predict(args, sentences=[], paths=[]):
     Returns:
         res (list(numpy.ndarray)): The result of sentence, indicate whether each word is replaced, same shape with sentences.
     """
-
+    args = parse_args()
+    sentences = args.predict_sentences
+    paths = args.predict_file
     # initialize data
     if sentences != [] and isinstance(sentences, list) and (paths == [] or paths is None):
         predicted_data = sentences
@@ -186,9 +188,7 @@ def predict(args, sentences=[], paths=[]):
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    sentences = args.predict_sentences
-    paths = args.predict_file
+
     # sentences = ["The quick brown fox see over the lazy dog.", "The quick brown fox jump over tree lazy dog."]
     # paths = ["../../debug/test.txt", "../../debug/test.txt.1"]
-    predict(args, sentences, paths)
+    predict()
