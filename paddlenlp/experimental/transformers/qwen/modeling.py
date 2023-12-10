@@ -223,34 +223,6 @@ class QWenInferenceModel(QWenPretrainedModel):
         )
         return ids_remove_padding, padding_offset, cum_offsets
     
-    def get_masks(self, batch_size, seq_length, past_length, padding_mask=None):
-        # casual mask
-        casual_mask = paddle.tril(paddle.ones([batch_size, 1, seq_length, seq_length], dtype="bool"))
-        if past_length > 0:
-            casual_mask = paddle.concat(
-                [paddle.ones([batch_size, 1, seq_length, past_length], dtype="bool"), casual_mask], axis=-1
-            )
-
-        # seq_mask
-        if padding_mask is None:
-            padding_mask = paddle.ones((batch_size, 1, seq_length, seq_length + past_length), dtype="bool")
-        if len(padding_mask.shape) == 2:
-            # from Tokenizer
-            padding_mask = (
-                padding_mask.unsqueeze(axis=[1, 2])
-                .expand([batch_size, 1, seq_length, seq_length + past_length])
-                .astype("bool")
-            )
-        elif len(padding_mask.shape) == 3:
-            # [batch_size,tgt_length, src_length] -> [batch_size, 1, tgt_length, src_length]
-            padding_mask = padding_mask.unsqueeze(1).astype("bool")
-        elif len(padding_mask.shape) == 4:
-            padding_mask = padding_mask.astype("bool")
-
-        casual_mask = casual_mask & padding_mask
-
-        return casual_mask
-    
     def forward(
         self,
         input_ids=None,
@@ -292,10 +264,7 @@ class QWenInferenceModel(QWenPretrainedModel):
             inputs_embeds = inputs_embeds.reshape([batch * seq_len, hidden_dim])
         
         if past_key_values is None:
-            past_length = 0
             past_key_values = tuple([None] * self.config.num_hidden_layers)
-        else:
-            past_length = past_key_values[0][0].shape[1]
         
         if not is_decoder:
             ids_remove_padding, padding_offset, cum_offsets = self.remove_padding(input_ids, seq_len_encoder)
@@ -307,15 +276,6 @@ class QWenInferenceModel(QWenPretrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.wte(ids_remove_padding)
         hidden_states = inputs_embeds
-
-        # bool 4D mask
-        attention_mask = self.get_masks(input_shape[0], input_shape[1], past_length, padding_mask=attention_mask)
-        zero = paddle.zeros(attention_mask.shape, dtype=hidden_states.dtype)
-        neg_inf = paddle.full_like(attention_mask, paddle.finfo(hidden_states.dtype).min, dtype=hidden_states.dtype)
-        # dtype 4D mask
-        attention_mask = paddle.where(attention_mask, zero, neg_inf)
-
-        output_shape = input_shape + [hidden_states.shape[-1]]
 
         # decoder layers
         presents = () if use_cache else None
@@ -349,7 +309,6 @@ class QWenInferenceModel(QWenPretrainedModel):
             )
         
         hidden_states = self.ln_f(hidden_states)
-        hidden_states = hidden_states.reshape(output_shape)
 
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
