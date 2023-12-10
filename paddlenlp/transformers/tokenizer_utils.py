@@ -58,7 +58,7 @@ from .tokenizer_utils_base import (
     TextInputPair,
     TruncationStrategy,
 )
-from .utils import InitTrackerMeta, fn_args_to_dict, resolve_cache_dir
+from .utils import InitTrackerMeta, fn_args_to_dict
 
 __all__ = [
     "PretrainedTokenizer",
@@ -613,6 +613,7 @@ class ChatTemplate:
 
 class ChatTemplateMixin:
     chat_template: Optional[ChatTemplate] = None
+    chat_template_path = None
 
     def apply_chat_template(
         self,
@@ -676,20 +677,12 @@ class ChatTemplateMixin:
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
-        cache_dir = kwargs.get("cache_dir", None)
-        from_hf_hub = kwargs.get("from_hf_hub", None)
-
         tokenizer = super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
 
-        # load chat-template
-        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
-
-        chat_template_file = os.path.join(cache_dir, CHAT_TEMPLATE_CONFIG_NAME)
-        if not os.path.exists(chat_template_file):
+        if tokenizer.chat_template_path is None or not os.path.exists(tokenizer.chat_template_path):
             return tokenizer
 
-        tokenizer.init_chat_template(chat_template_file)
+        tokenizer.init_chat_template(tokenizer.chat_template_path)
         return tokenizer
 
     def init_chat_template(self, chat_template: str | dict):

@@ -103,6 +103,13 @@ class ChatTemplateIntegrationTest(unittest.TestCase):
         expected_query = "<s>[INST] <<SYS>>\nYou are a helpful assistant.\n<</SYS>>[INST] who are you? [/INST]"
         self.assertEqual(final_query, expected_query)
 
+    def test_linlyai_chinese_llama_2_chat_template_aistudio(self):
+        tokenizer = AutoTokenizer.from_pretrained("aistudio/Linly-AI_Chinese-LLaMA-2-7B-hf", from_aistudio=True)
+        query = "你好"
+        final_query = tokenizer.apply_chat_template(query, tokenize=False)
+        expected_query = f"### Instruction:{query}  ### Response:"
+        self.assertEqual(final_query, expected_query)
+
     def test_linlyai_chinese_llama_2_chat_template(self):
         tokenizer = AutoTokenizer.from_pretrained("linly-ai/chinese-llama-2-7b")
         query = "你好"
