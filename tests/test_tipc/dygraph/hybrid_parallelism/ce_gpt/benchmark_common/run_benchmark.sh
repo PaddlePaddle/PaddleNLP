@@ -119,6 +119,7 @@ function _train(){
                 --max_steps ${max_iter}\
                 --save_steps 5000\
                 --device gpu\
+                --skip_memory_metrics 0 \
                 --warmup_ratio 0.01\
                 --scale_loss 32768\
                 --per_device_train_batch_size ${micro_batch_size}\
@@ -160,8 +161,10 @@ function _train(){
     fi
     #kill -9 `ps -ef|grep 'python'|awk '{print $2}'`
     if [ ${device_num} != "N1C1" -a -d mylog ]; then
+        case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/tests/mylog
+        cp -r ${case_path}/mylog/workerlog.* ./mylog/
         rm ${log_file}
-        cp mylog/workerlog.${workerlog_id} ${log_file}
+        cp ${case_path}/mylog/workerlog.${workerlog_id} ${log_file}
     fi
 }
 
