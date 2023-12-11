@@ -1486,7 +1486,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         elif os.path.isdir(pretrained_model_name_or_path):
             vocab_files_target["tokenizer_config_file"] = cls.tokenizer_config_file
             for file_id, file_name in vocab_files_target.items():
-                full_file_name = os.path.join(pretrained_model_name_or_path, file_name)
+                full_file_name = os.path.join(pretrained_model_name_or_path, subfolder, file_name)
                 if os.path.isfile(full_file_name):
                     vocab_files[file_id] = full_file_name
         else:
