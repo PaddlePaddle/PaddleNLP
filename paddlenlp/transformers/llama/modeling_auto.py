@@ -630,7 +630,7 @@ class LlamaDecoderLayerAuto(nn.Layer):
 
         if self.idx == 0:
             print(f"mlp_{self.idx} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()} dist_attr: {hidden_states.dist_attr}")
-
+        
         outputs = (hidden_states,)
 
         if output_attentions:

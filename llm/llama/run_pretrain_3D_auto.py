@@ -567,8 +567,6 @@ def main():
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
             input_ids, labels = inputs["input_ids"], inputs["labels"]
-            print(f"===> input_ids:  {input_ids.sum().item()}  {input_ids.mean().item()}")
-            print(f"===> labels:  {labels.sum().item()}  {labels.mean().item()}")
 
             input_id = input_ids[0][0].numpy()
             label = labels[0][0].numpy()
@@ -586,7 +584,7 @@ def main():
                 labels = paddle.concat(res)
                 labels = dist.shard_tensor(labels, get_mesh(-1), [dist.Shard(0), dist.Replicate()])
 
-
+            
             res = model(input_ids, labels=labels)
 
             # add criterion in the future.

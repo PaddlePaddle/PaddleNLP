@@ -520,7 +520,7 @@ class LlamaAttentionAuto(nn.Layer):
 
 
 class LlamaDecoderLayerAuto(nn.Layer):
-    def __init__(self, config, layerwise_recompute: bool = False, ipp: Optional[int] = None):
+    def __init__(self, config, layerwise_recompute: bool = False, ipp: Optional[int] = None, idx=None):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size
@@ -534,6 +534,7 @@ class LlamaDecoderLayerAuto(nn.Layer):
         self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
         self.ipp = ipp
+        self.idx = idx
 
     def forward(
         self,
@@ -611,7 +612,8 @@ class LlamaDecoderLayerAuto(nn.Layer):
         hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
-
+        md5 = hidden_states._md5sum()
+        print(f"decoder_{self.idx} shape: {hidden_states.shape} md5sum: {md5}")
         outputs = (hidden_states,)
 
         if output_attentions:
@@ -796,7 +798,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
         self.layers = nn.LayerList(
             [
-                LlamaDecoderLayerAuto(config, i not in self.no_recompute_layers, get_layer_ipp(i))
+                LlamaDecoderLayerAuto(config, i not in self.no_recompute_layers, get_layer_ipp(i), i)
                 for i in range(config.num_hidden_layers)
             ]
         )
@@ -880,6 +882,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
+        print(f"inputs_embeds: {inputs_embeds.shape} md5sum: {inputs_embeds._md5sum()}")    
 
         # embed positions
         if attention_mask is None:
@@ -1020,6 +1023,7 @@ class LlamaPretrainingCriterionAuto(paddle.nn.Layer):
                 self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
         masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
+        print(f"masked_lm_loss: {masked_lm_loss.shape} md5sum: {masked_lm_loss._md5sum()}")
         # skip ignore_index which loss == 0
         # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
         # TODO: solve the issue of conditional block

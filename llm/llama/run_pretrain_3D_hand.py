@@ -597,6 +597,8 @@ def main():
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
             input_ids, labels = inputs["input_ids"], inputs["labels"]
+            print(f"===> input_ids:  {input_ids._md5sum()}")
+            print(f"===> labels:  {labels._md5sum()}")
             pp_data_buffer.append(inputs)
             if len(pp_data_buffer) < training_args.gradient_accumulation_steps:
                 continue
