@@ -14,6 +14,7 @@
 """
 GPT/Llama auto parallel pretraining scripts.
 """
+import contextlib
 import os
 import random
 import sys
@@ -24,8 +25,8 @@ from typing import List, Optional
 
 import numpy as np
 import paddle
+import paddle.distributed as dist
 import paddle.distributed.auto_parallel as auto
-from paddle.distributed import fleet
 
 from paddlenlp.trainer import (
     PdArgumentParser,
@@ -65,6 +66,18 @@ def add_start_docstrings(*docstr):
     return docstring_decorator
 
 
+@contextlib.contextmanager
+def exec_mode_guard():
+    origin_mode = "dynamic" if paddle.in_dynamic_mode() else "static"
+    try:
+        yield
+    finally:
+        if origin_mode == "dynamic":
+            paddle.disable_static()
+        else:
+            paddle.enable_static()
+
+
 @dataclass
 @add_start_docstrings(TrainingArguments.__doc__)
 class PreTrainingArguments(TrainingArguments):
@@ -96,20 +109,11 @@ class PreTrainingArguments(TrainingArguments):
 
     def __post_init__(self):
         super().__post_init__()
-
         assert self.use_auto_parallel
-        strategy = fleet.auto.Strategy(self.strategy._config_dict)
-
-        fused_passes = strategy.fused_passes
-        fused_passes_list = fused_passes.fused_passes_list
-
         if self.fused_linear_param_grad_add:
-            fused_passes_list.append("fused_linear_param_grad_add_pass")
-
-        fused_passes.enable = len(fused_passes_list) > 0
-        fused_passes.fused_passes_list = fused_passes_list
-
-        self.strategy = strategy
+            fused_passes = self.strategy.fused_passes
+            fused_passes.enable = True
+            fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
         logger.info(self.strategy)
 
 
@@ -167,6 +171,21 @@ class ModelArguments:
 
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
+    )
+    vocab_size: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": ".Vocabulary size of the Llama model. Defines the number of different tokens that can be represented by the `inputs_ids`"
+        },
+    )
+    hidden_size: Optional[int] = field(default=None, metadata={"help": "Dimension of the hidden representations."})
+    intermediate_size: Optional[int] = field(default=None, metadata={"help": "Dimension of the MLP representations."})
+    num_hidden_layers: Optional[int] = field(
+        default=None, metadata={"help": "Number of hidden layers in the Transformer encoder."}
+    )
+    num_attention_heads: Optional[int] = field(
+        default=None,
+        metadata={"help": "Number of attention heads for each attention layer in the Transformer encoder."},
     )
     use_flash_attention: bool = field(
         default=False,
@@ -399,6 +418,23 @@ def init_seed(seed: int = 1234, args=None):
             paddle.seed(args.seed)
 
 
+def validate_batch(batch, args):
+    batches = []
+    if args.pipeline_parallel_degree > 1 or args.gradient_accumulation_steps == 1:
+        batches = batch
+    else:
+        feed_names = []
+        split_batches = []
+        for n, b in batch[0].items():
+            feed_names.append(n)
+            split_batches.append(np.split(np.array(b), args.gradient_accumulation_steps, 0))
+        for i in range(len(split_batches[0])):
+            micro_batch = [split_batch[i] for split_batch in split_batches]
+            batches.append(dict(zip(feed_names, micro_batch)))
+
+    return batches
+
+
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
@@ -447,6 +483,18 @@ def main():
 
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
+
+    config.vocab_size = model_args.vocab_size if model_args.vocab_size is not None else config.vocab_size
+    config.hidden_size = model_args.hidden_size if model_args.hidden_size is not None else config.hidden_size
+    config.intermediate_size = (
+        model_args.intermediate_size if model_args.intermediate_size is not None else config.intermediate_size
+    )
+    config.num_hidden_layers = (
+        model_args.num_hidden_layers if model_args.num_hidden_layers is not None else config.num_hidden_layers
+    )
+    config.num_attention_heads = (
+        model_args.num_attention_heads if model_args.num_attention_heads is not None else config.num_attention_heads
+    )
 
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
@@ -544,6 +592,11 @@ def main():
         mode="train",
     )
 
+    dp_degree = training_args.data_parallel_degree
+    mp_degree = training_args.tensor_parallel_degree
+    pp_degree = training_args.pipeline_parallel_degree
+    assert dp_degree * mp_degree * pp_degree == dist.get_world_size()
+
     train_dataloader = engine.dataloader(
         dataset=train_dataset,
         batch_size=total_train_batch_size,
@@ -570,22 +623,24 @@ def main():
 
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
+            batches = validate_batch(inputs, training_args)
             with paddle.profiler.utils._nvprof_range(
                 iter_id=step,
                 start=nvprof_start,
                 end=nvprof_end,
             ):
-                outs = engine.run(inputs, mode="train")
+                for micro_batch in batches:
+                    outs = engine.run(micro_batch, mode="train")
 
-            if "loss" in outs:
-                tr_loss_step = np.sum(outs["loss"])
-            else:
-                tr_loss_step = float(0)
+                    if "loss" in outs:
+                        tr_loss_step = np.sum(outs["loss"])
+                    else:
+                        tr_loss_step = float(0)
 
-            if training_args.gradient_accumulation_steps > 1:
-                tr_loss_step /= training_args.gradient_accumulation_steps
+                    if training_args.gradient_accumulation_steps > 1:
+                        tr_loss_step /= training_args.gradient_accumulation_steps
 
-            tr_loss += tr_loss_step
+                    tr_loss += tr_loss_step
 
             if lr_scheduler is not None:
                 engine.optimizer._learning_rate.step()
