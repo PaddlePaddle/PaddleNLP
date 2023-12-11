@@ -231,19 +231,17 @@ def scaled_dot_product_attention(
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
         
         if attention_cnt == 0:
-            pass
-            #q_tmp = concat_dp(query_states)
-            #q_tmp = concat_mp(q_tmp, 1)
-            #print(f"q_{attention_cnt} shape: {q_tmp.shape} md5: {q_tmp._md5sum()}")
+            q_tmp = concat_dp(query_states)
+            q_tmp = concat_mp(q_tmp, 1)
+            print(f"q_{attention_cnt} shape: {q_tmp.shape} md5: {q_tmp._md5sum()}")
 
 
         # matmul and devide by sqrt(head_dim)
         attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
         if attention_cnt == 0:
-            pass
-            #attn_weights_tmp = concat_dp(attn_weights)
-            #attn_weights_tmp = concat_mp(attn_weights_tmp, 1)
-            #print(f"attn_weights_{attention_cnt} shape: {attn_weights_tmp.shape} local_shape: {attn_weights.shape} md5sum: {attn_weights_tmp._md5sum()}")
+            attn_weights_tmp = concat_dp(attn_weights)
+            attn_weights_tmp = concat_mp(attn_weights_tmp, 1)
+            print(f"attn_weights_{attention_cnt} shape: {attn_weights_tmp.shape} local_shape: {attn_weights.shape} md5sum: {attn_weights_tmp._md5sum()}")
 
         # then add alibi bias
         if alibi is not None:
@@ -271,10 +269,9 @@ def scaled_dot_product_attention(
 
         attn_weights = attn_weights + attention_mask
         if attention_cnt == 0:
-            pass
-            #attn_weights_tmp = concat_dp(attn_weights)
-            #attn_weights_tmp = concat_mp(attn_weights_tmp, 1)
-            #print(f"attn_weights_after_add_{attention_cnt} shape: {attn_weights_tmp.shape} local_shape: {attn_weights.shape} md5: {attn_weights_tmp._md5sum()}")
+            attn_weights_tmp = concat_dp(attn_weights)
+            attn_weights_tmp = concat_mp(attn_weights_tmp, 1)
+            print(f"attn_weights_after_add_{attention_cnt} shape: {attn_weights_tmp.shape} local_shape: {attn_weights.shape} md5: {attn_weights_tmp._md5sum()}")
 
         if not paddle.in_dynamic_mode():
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32")#.astype(query_states.dtype)
@@ -283,10 +280,9 @@ def scaled_dot_product_attention(
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32")#.astype(query_states.dtype)
         
         if attention_cnt == 0:
-            pass
-            #attn_weights_tmp = concat_dp(attn_weights)
-            #attn_weights_tmp = concat_mp(attn_weights_tmp, 1)
-            #print(f"attn_weights_after_soft_{attention_cnt} shape: {attn_weights_tmp.shape} local_shape: {attn_weights.shape} md5sum: {attn_weights_tmp._md5sum()}")
+            attn_weights_tmp = concat_dp(attn_weights)
+            attn_weights_tmp = concat_mp(attn_weights_tmp, 1)
+            print(f"attn_weights_after_soft_{attention_cnt} shape: {attn_weights_tmp.shape} local_shape: {attn_weights.shape} md5sum: {attn_weights_tmp._md5sum()}")
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
@@ -771,7 +767,8 @@ class LlamaAttention(nn.Layer):
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
-
+        hidden_states_tmp = concat_dp(hidden_states)
+        print(f"attention input md5sum {hidden_states_tmp._md5sum()}")
         if self.fuse_attention_qkv:
             if self.sequence_parallel:
                 target_shape = [-1, self.seq_length, self.num_heads, 3 * self.head_dim]
@@ -798,7 +795,8 @@ class LlamaAttention(nn.Layer):
         if past_key_value is not None:
             kv_seq_len += past_key_value[0].shape[-3]
 
-        if self.config.rope and False: 
+        if self.config.rope: 
+            print("rope")
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)

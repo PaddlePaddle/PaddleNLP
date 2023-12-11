@@ -55,7 +55,7 @@ python -u  -m paddle.distributed.launch \
     --sharding_parallel_degree 1 \
     --learning_rate 0.0001 \
     --min_learning_rate 0.00001 \
-    --max_steps 30000 \
+    --max_steps 20000 \
     --save_steps 5000000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \

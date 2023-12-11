@@ -595,10 +595,10 @@ def main():
 
             # do backward every micro step.
             tr_loss_step.backward()
-            #print_grad(model)
             tr_loss += tr_loss_step
 
             if global_step % training_args.gradient_accumulation_steps == 0:
+                print_grad(model)
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
@@ -700,7 +700,8 @@ def print_grad(model):
     name_mapping = {v.name: k for (k, v) in model_state_dict.items()}
     for p in model.parameters():
         assert p.name in name_mapping
-        print(f"{p.name}_grad shape: {p.grad.shape} md5sum: {p.grad._md5sum()}")    
+        if p.grad is not None:
+            print(f"{p.name}_grad shape: {p.grad.shape} md5sum: {p.grad._md5sum()}")    
 
 def map_structure_name(k):
     fs = k.split(".")

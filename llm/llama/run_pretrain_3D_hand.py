@@ -612,6 +612,7 @@ def main():
             )
             
             loss = model.forward_backward_pipeline(pp_inputs)
+            print_grad(model)
 
             optimizer.step()
             lr_scheduler.step()

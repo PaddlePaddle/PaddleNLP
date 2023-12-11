@@ -92,7 +92,7 @@ def _make_causal_mask(input_ids_shape, past_key_values_length):
     # [bs, 1, tgt_len, tgt_len + past_len]
     return mask[None, None, :, :].expand([batch_size, 1, target_length, target_length + past_key_values_length])
 
-
+attention_cnt = 0
 def scaled_dot_product_attention(
     query_states,
     config,
@@ -139,9 +139,13 @@ def scaled_dot_product_attention(
         # merge with the next tranpose
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
-
+        global attention_cnt
+        if attention_cnt == 0:
+            print(f"q_{attention_cnt} shape: {query_states.shape} md5: {query_states._md5sum()}")
         # matmul and devide by sqrt(head_dim)
         attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
+        if attention_cnt == 0:
+            print(f"attn_weights_{attention_cnt} shape: {attn_weights.shape} local_shape: {attn_weights._local_shape} md5sum: {attn_weights._md5sum()}")
         # then add alibi bias
         if alibi is not None:
             alibi = alibi.reshape([bsz, num_heads, 1, -1])
@@ -164,16 +168,20 @@ def scaled_dot_product_attention(
             raise ValueError(
                 f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
             )
-
         attn_weights = attn_weights + attention_mask
+        if attention_cnt == 0:
+            print(f"attn_weights_after_add_{attention_cnt} shape: {attn_weights.shape} local_shape: {attn_weights._local_shape} md5: {attn_weights._md5sum()}")
+
         if not paddle.in_dynamic_mode():
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
         else:
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
-
+        if attention_cnt == 0:
+            print(f"attn_weights_after_soft_{attention_cnt} shape: {attn_weights.shape} local_shape: {attn_weights._local_shape} md5: {attn_weights._md5sum()}")
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
         attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+        attention_cnt = attention_cnt + 1
         return (attn_output, attn_weights) if output_attentions else attn_output
 
 
@@ -412,7 +420,7 @@ class LlamaAttentionAuto(nn.Layer):
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
-
+        print(f"attention input md5sum {hidden_states._md5sum()}")
         if self.fuse_attention_qkv:
             target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
             mix_layer = self.qkv_proj(hidden_states)
@@ -432,6 +440,7 @@ class LlamaAttentionAuto(nn.Layer):
             kv_seq_len += past_key_value[0].shape[-3]
 
         if self.config.rope:
+            print("rope")
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
@@ -564,6 +573,8 @@ class LlamaDecoderLayerAuto(nn.Layer):
         residual = hidden_states
 
         hidden_states = self.input_layernorm(hidden_states)
+        if self.idx == 0:
+            print(f"input_layernorm_{self.idx} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()}")
 
         # Self Attention
         has_gradient = not hidden_states.stop_gradient
@@ -606,10 +617,15 @@ class LlamaDecoderLayerAuto(nn.Layer):
             present_key_value = outputs[2 if output_attentions else 1]
 
         hidden_states = residual + hidden_states
+        if self.idx == 0:
+            print(f"att_{self.idx} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()}")
 
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
+        if self.idx == 0:
+            print(f"post_attention_layernorm_{self.idx} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()}")
+
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
         md5 = hidden_states._md5sum()
