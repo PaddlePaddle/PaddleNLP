@@ -435,7 +435,7 @@ def main():
         strategy.hybrid_configs = {
             "dp_degree": training_args.data_parallel_degree,
             "mp_degree": training_args.tensor_parallel_degree,
-            "pp_degree": 1,
+            "pp_degree": training_args.pipeline_parallel_degree,
             "sharding_degree": 1,
         }
         fleet.init(is_collective=True, strategy=strategy)
