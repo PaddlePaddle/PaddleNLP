@@ -51,7 +51,7 @@ function llama_case_list_auto() {
     llama_auto_recompute_bs8_fp32_DP2-MP2-PP2
 }
 
-function case_list_auto_pir() {
+function gpt_case_list_auto_pir() {
     gpt_auto_recompute_bs16_fp16_o2_DP1-MP1-PP8_pir
     gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_pir
     gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage1_pir
