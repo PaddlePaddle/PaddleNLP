@@ -56,13 +56,13 @@ python -u -m paddle.distributed.launch \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
     --max_grad_norm 1.0 \
-    --logging_steps 1\
+    --logging_steps 1 \
     --dataloader_num_workers 1 \
     --sharding "" \
     --eval_steps 1000 \
     --report_to "visualdl" \
     --disable_tqdm true \
-    --continue_training 0\
+    --continue_training 0 \
     --recompute 1 \
     --do_train \
     --do_eval \
