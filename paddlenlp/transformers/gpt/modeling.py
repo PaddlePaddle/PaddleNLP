@@ -306,15 +306,17 @@ class MultiHeadAttention(nn.Layer):
         return query_states, key_states, value_states, past_key_value
 
     def _flash_attention(self, q, k, v, attention_mask=None, output_attentions=False):
-        out, weights = flash_attention(
-            query=q,
-            key=k,
-            value=v,
-            dropout=self.config.attention_probs_dropout_prob,
-            causal=q.shape[1] != 1,
-            return_softmax=output_attentions,
-            training=self.training,
-        )
+        if self.config.attention_probs_dropout_prob:
+            with seed_guard_context("local_seed"):
+                out, weights = flash_attention(
+                    query=q,
+                    key=k,
+                    value=v,
+                    dropout=self.config.attention_probs_dropout_prob,
+                    causal=q.shape[1] != 1,
+                    return_softmax=output_attentions,
+                    training=self.training,
+                )
         # [bs, seq_len, num_head, head_dim] -> [bs, seq_len, num_head * head_dim]
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
         return (out, weights) if output_attentions else out
@@ -730,7 +732,9 @@ class GPTEmbeddings(nn.Layer):
             embeddings = paddle.reshape_(embeddings, [bs * seq_len, hidden_size])
             # [bs * seq_len / n, dim] (n is mp parallelism)
             embeddings = ScatterOp.apply(embeddings)
-        embeddings = self.dropout(embeddings)
+
+        with seed_guard_context("global_seed"):
+            embeddings = self.dropout(embeddings)
 
         return embeddings
 
