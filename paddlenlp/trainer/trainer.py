@@ -260,7 +260,7 @@ class Trainer:
         self._memory_tracker.start()
 
         # Seed must be set before instantiating the model when using model
-        set_seed(seed=self.args.seed, args=self.args)
+        set_seed(seed=self.args.seed)
 
         if model is None:
             raise RuntimeError("`Trainer` requires either a `model` or `model_init` argument")
