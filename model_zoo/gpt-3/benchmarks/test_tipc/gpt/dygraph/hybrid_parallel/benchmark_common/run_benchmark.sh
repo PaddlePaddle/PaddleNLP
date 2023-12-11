@@ -99,6 +99,7 @@ function _train(){
                -o Distributed.sharding.sharding_degree=${sharding_degree} \
                -o Distributed.sharding.sharding_stage=${sharding_stage} \
                -o Distributed.sharding.sharding_offload=${sharding_offload} \
+               -o Profiler_pretrain.memory_stats=True \
                -o Optimizer.lr.max_lr=1e-4 \
                -o Optimizer.lr.min_lr=1e-5 "
 
@@ -145,8 +146,10 @@ function _train(){
     fi
     #kill -9 `ps -ef|grep 'python'|awk '{print $2}'`
     if [ ${device_num} != "N1C1" -a -d mylog ]; then
+        case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/model_zoo/gpt-3/benchmarks
+        cp -r ${case_path}/mylog/workerlog.* ./mylog/
         rm ${log_file}
-        cp mylog/workerlog.${workerlog_id} ${log_file}
+        cp ${case_path}/mylog/workerlog.${workerlog_id} ${log_file}
     fi
 }
 
