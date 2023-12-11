@@ -24,6 +24,7 @@ from paddle.distributed.fleet.utils import recompute
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
 from paddlenlp.transformers.sequence_parallel_utils import GatherOp
 
+from ..sequence_parallel_utils import mark_as_sequence_parallel_parameter
 from .modeling import (
     GPTConfig,
     GPTDecoderLayer,
@@ -128,33 +129,60 @@ class GPTDecoderLayerPipe(GPTDecoderLayer):
 class LayerNormPipe(nn.LayerNorm):
     def __init__(self, config):
         super(LayerNormPipe, self).__init__(config.hidden_size, epsilon=1e-05)
+        self.weight.name = self.weight.name + ".norm"
+
+        if config.sequence_parallel:
+            mark_as_sequence_parallel_parameter(self.weight)
+            mark_as_sequence_parallel_parameter(self.bias)
 
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
+        # print("LayerNormPipe input", calculate_md5_of_tensor(hidden_states))
         hidden_states = super().forward(hidden_states)
+        # print("LayerNormPipe output", calculate_md5_of_tensor(hidden_states))
         return hidden_states
 
 
-class GPTLMHeadPipe(GPTEmbeddings):
-    def __init__(self, config):
-        super(GPTLMHeadPipe, self).__init__(config)
+import hashlib
 
-    @property
-    def embedding_weight(self):
-        return get_attr(self.word_embeddings, "weight")
+
+def calculate_md5_of_tensor(tensor):
+    numpy_array = tensor.numpy()
+    array_bytes = numpy_array.tobytes()
+    return hashlib.md5(array_bytes).hexdigest()
+
+
+from paddlenlp.transformers.gpt.modeling import GPTLMHead
+
+
+class GPTLMHeadPipe(GPTLMHead):
+    def __init__(self, config, embedding_weights=None):
+        super(GPTLMHeadPipe, self).__init__(config, embedding_weights)
+
+    # @property
+    # def embedding_weight(self):
+    #     return get_attr(self.word_embeddings, "weight")
 
     def forward(self, output):
-        if self.config.sequence_parallel:
-            output = GatherOp.apply(output)
-            output = paddle.reshape_(output, [-1, self.config.seq_length, self.config.hidden_size])
+        return super().forward(output)
+        # print("GPTLMHeadPipe output begin", calculate_md5_of_tensor(output))
+        # print("self.config.sequence_parallel", self.config.sequence_parallel)
+        # if self.config.sequence_parallel:
+        #     output = GatherOp.apply(output)
+        #     output = paddle.reshape_(output, [-1, self.config.seq_length, self.config.hidden_size])
 
-        tensor_parallel_output = False if self.config.tensor_parallel_degree > 1 else True
+        tensor_parallel_output = True if self.config.tensor_parallel_degree > 1 else False
+
+        # print("GPTLMHeadPipe self.embedding_weight : ", calculate_md5_of_tensor(self.embedding_weight))
+        # print("GPTLMHeadPipe self.transpose_y : ", self.transpose_y)
+        # print("GPTLMHeadPipe tensor_parallel_output : ", tensor_parallel_output)
         output = parallel_matmul(
             output,
             self.embedding_weight,
             transpose_y=True,
             tensor_parallel_output=tensor_parallel_output,
         )
+        # print("GPTLMHeadPipe output end", calculate_md5_of_tensor(output))
         return output
 
 
@@ -191,8 +219,12 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         config.tensor_parallel_degree = tensor_parallel_degree
         config.tensor_parallel_rank = tensor_parallel_rank
 
+        # self.add_sequential_layer(
+        #     SharedLayerDesc("gpt", GPTEmbeddingPipe, shared_weight_attr="embedding_weight", config=config),
+        #     "gpt.embeddings",
+        # )
         self.add_sequential_layer(
-            SharedLayerDesc("gpt", GPTEmbeddingPipe, shared_weight_attr="embedding_weight", config=config),
+            LayerDesc(GPTEmbeddingPipe, config=config),
             "gpt.embeddings",
         )
         for i in range(config.num_hidden_layers):
@@ -202,10 +234,12 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             )
 
         self.add_sequential_layer(LayerDesc(LayerNormPipe, config=config), "gpt.decoder.norm")
-        self.add_sequential_layer(
-            SharedLayerDesc("gpt", GPTLMHeadPipe, shared_weight_attr="embedding_weight", config=config),
-            "gpt.embeddings",
-        )
+        # self.add_sequential_layer(
+        #     SharedLayerDesc("gpt", GPTLMHeadPipe, shared_weight_attr="embedding_weight", config=config),
+        #     "gpt.embeddings",
+        # )
+        # self.add_sequential_layer(LayerDesc(GPTLMHeadPipe, config=config),"gpt.embeddings")
+        self.add_sequential_layer(LayerDesc(GPTLMHead, config=config), "lm_head")
 
         recompute_interval = 0
         # if use_recompute and recompute_granularity == "full":
