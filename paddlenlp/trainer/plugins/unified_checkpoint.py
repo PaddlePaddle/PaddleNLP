@@ -605,11 +605,11 @@ def check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serializa
         tp_group = hcg.get_model_parallel_group()
         pp_group = hcg.get_pipe_parallel_group()
 
-        need_filelist = set()
+        need_files = set()
         for key in model.state_dict().keys():
             filename = index["weight_map"][key]
-            need_filelist.add(filename)
-        diff_filelist = list(need_filelist.difference(set(existed_files)))
+            need_files.add(filename)
+        diff_filelist = list(need_files.difference(set(existed_files)))
         num_diff = paddle.to_tensor([len(diff_filelist)])
         if tp_group.nranks > 1:
             dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=tp_group)
@@ -683,11 +683,11 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
             )
         return existed_files
 
-    def check_dynamic_load(args, weight_map, existed_files, is_master_weights=False, typename_list=None):
+    def check_dynamic_load(args, weight_map, existed_files, is_master_weights=False, typename_set=None):
         # To decide whether to load the checkpoint locally, or need to dynamically distribute the checkpoint.
         local_resume = True
         if args.data_parallel_rank == 0:
-            need_filelist = set()
+            need_files = set()
             for key in model.state_dict().keys():
                 if sharding_group.nranks > 1:
                     static_name = struct2static_name_mappings.get(key, None)
@@ -696,15 +696,15 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
                         continue
 
                 if not is_master_weights:
-                    for type_name in typename_list:
+                    for type_name in typename_set:
                         type_key = key + "/" + type_name
                         filename = weight_map[type_key]
-                        need_filelist.add(filename)
+                        need_files.add(filename)
                 else:
                     filename = weight_map[key]
-                    need_filelist.add(filename)
+                    need_files.add(filename)
 
-            diff_filelist = list(need_filelist.difference(set(existed_files)))
+            diff_filelist = list(need_files.difference(set(existed_files)))
             num_diff = paddle.to_tensor([len(diff_filelist)])
             if tp_group.nranks > 1:
                 dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=tp_group)
@@ -726,12 +726,12 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
     if has_master_weights:
         existed_files_mw = check_complete(all_mw_filenames)
     # get optimizer's param type name, like moment1_0.
-    typename_list = set()
+    typename_set = set()
     for key in index["weight_map"].keys():
         _, typename = key.split("/")
-        typename_list.add(typename)
+        typename_set.add(typename)
     local_resume = check_dynamic_load(
-        args, index["weight_map"], existed_files, is_master_weights=False, typename_list=typename_list
+        args, index["weight_map"], existed_files, is_master_weights=False, typename_set=typename_set
     )
     local_resume_rw = True
     if has_master_weights:
@@ -785,7 +785,7 @@ def create_optimizer_dispatch_table(
     resume_from_checkpoint,
     struct2static_name_mappings,
     is_master_weights=False,
-    typename_list=None,
+    typename_set=None,
 ):
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
@@ -811,7 +811,7 @@ def create_optimizer_dispatch_table(
                 else:
                     recv_table[k] = [(dist.get_rank(), -1)]
             else:
-                for typename in typename_list:
+                for typename in typename_set:
                     type_key = k + "/" + typename
                     if typename in optimizer_non_scaler_name:
                         if hasattr(v, "is_distributed") and v.is_distributed:
@@ -908,11 +908,12 @@ def load_unified_optimizer_dynamically(args, model, optimizer, resume_from_check
         file_keyname_mappings_mw, file_machine_mappings_mw = get_file_mappings(index_mw, resume_from_checkpoint)
 
     # Get optimizer param type name, like moment1_0, moment2_0, beta1_pow_acc_0.
-    typename_list = set()
+    typename_set = set()
     for key in index["weight_map"].keys():
         _, typename = key.split("/")
-        typename_list.add(typename)
+        typename_set.add(typename)
     struct2static_name_mappings = {k: v.name for k, v in model.state_dict().items()}
+    static2struct_name_mappings = {v.name: k for k, v in model.state_dict().items()}
     # Get send_table and recv_table. The send table indicates which workers are responsible for sending tensors, and the recv table indicates which workers should receive the tensors.
     send_table, recv_table = create_optimizer_dispatch_table(
         args,
@@ -923,7 +924,7 @@ def load_unified_optimizer_dynamically(args, model, optimizer, resume_from_check
         resume_from_checkpoint,
         struct2static_name_mappings,
         is_master_weights=False,
-        typename_list=typename_list,
+        typename_set=typename_set,
     )
     if has_master_weights:
         send_table_mw, recv_table_mw = create_optimizer_dispatch_table(
@@ -943,22 +944,39 @@ def load_unified_optimizer_dynamically(args, model, optimizer, resume_from_check
     if sharding_group.nranks > 1:
         param2rank = optimizer._param2rank
     optim_state_dict_mw = {}
-    for k, v in model.state_dict().items():
+
+    def check_optimizer_param(parameter):
         if sharding_group.nranks > 1:
-            static_name = struct2static_name_mappings[k]
-            param_rank = param2rank.get(static_name, None)
+            param_rank = param2rank.get(parameter.name, None)
             if param_rank != sharding_group.rank:
-                continue
-        if v.stop_gradient:
-            continue
-        for typename in typename_list:
+                return False
+        if parameter.stop_gradient:
+            return False
+        return True
+
+    optimizer_keys_with_shape = []
+    if isinstance(optimizer._parameter_list[0], dict):
+        for param_group in optimizer._parameter_list:
+            # If parameter groups are set, there must be `params` key. This is guaranteed by the optimizer's initialization code.
+            for parameter in param_group["params"]:
+                if check_optimizer_param(parameter):
+                    optimizer_keys_with_shape.append((parameter.name, parameter.shape))
+    else:
+        for parameter in optimizer._parameter_list:
+            if check_optimizer_param(parameter):
+                optimizer_keys_with_shape.append((parameter.name, parameter.shape))
+
+    # see how to change
+    for static_name, shape in optimizer_keys_with_shape:
+        k = static2struct_name_mappings[static_name]
+        for typename in typename_set:
             new_k = k + "/" + typename
             if typename in optimizer_scalar_name:
                 optim_state_dict[new_k] = paddle.empty([1], dtype="float32")
             else:
-                optim_state_dict[new_k] = paddle.empty_like(v, dtype="float32")
+                optim_state_dict[new_k] = paddle.empty(shape, dtype="float32")
         if has_master_weights:
-            optim_state_dict_mw[k] = paddle.empty_like(v, dtype="float32")
+            optim_state_dict_mw[k] = paddle.empty(shape, dtype="float32")
 
     # Get all the keys that are splited by tensor parallelism.
     all_tp_keys = set()
