@@ -36,7 +36,7 @@ export NVIDIA_TF32_OVERRIDE=0
 
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
-    --log_dir "log_auto" \
+    --log_dir "auto_3d" \
     run_pretrain_3D_auto.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \

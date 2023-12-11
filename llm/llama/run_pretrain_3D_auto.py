@@ -472,8 +472,8 @@ def main():
     print("======M M M M======", model_class)
     model = model_class._from_config(config, dtype=dtype)
     # load model
-    #load_model(model)
-
+    load_model(model)
+    shard_model(model)
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
@@ -607,7 +607,7 @@ def main():
                 print(f"global_step {global_step // training_args.gradient_accumulation_steps};input id {input_id}; label {label}; loss {tr_loss.numpy()}  lr: {optimizer.get_lr()}")
                 tr_loss = 0
 
-            if global_step // training_args.gradient_accumulation_steps >= 20000:
+            if global_step // training_args.gradient_accumulation_steps >= 1:
                 sys.exit(0)
 
             global_step += 1
@@ -656,6 +656,26 @@ def main():
             if step >= training_args.max_steps:
                 break
     '''
+def shard_model(model):
+    pp_stage = 0
+    for name, layer in model.named_sublayers(include_self=False):
+        if hasattr(layer, "ipp"):
+            pp_stage = layer.ipp
+       #print(f"name {name},pp_stage {pp_stage}==>", type(layer))    
+        if "embed_tokens" in name:
+            # embedding only support column split now. it will update in the future
+            shard_fn(layer, 0, [dist.Replicate(), dist.Shard(1)])    
+        for n in ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.qkv_proj", "gate_proj", "up_proj", "gate_up_fused_proj"]:
+            if n in name:
+                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(1)])
+                break
+        for n in ["self_attn.o_proj", "down_proj"]:
+            if n in name:
+                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(0)])
+                break
+        if "lm_head" in name:
+            shard_fn(layer, -1, [dist.Replicate(), dist.Shard(1)])
+
 
 def load_model(model):
     model_state_dict = model.state_dict()
@@ -663,13 +683,19 @@ def load_model(model):
     tmp = OrderedDict()
     (tmp, state_dict) = (state_dict, tmp)
     for (k, v) in tmp.items():
-        assert "_layers." in k
-        k = k[len("_layers."):]
+        k = map_structure_name(k)
         state_dict[k] = v
     model.set_state_dict(state_dict)
+    assert len(model_state_dict) == len(state_dict), f"{len(model_state_dict)} vs {len(state_dict)}"
+    """
+    print("=======model_state_dict=======")
+    for (k,v) in model_state_dict.items():
+        print(f"{k}=>{v.shape}")
+    """    
+    print("=======state_dict=======")
     for (k,v) in state_dict.items():
-        assert k in model_state_dict, f"{k} not in {model_state_dict.keys()}"
-        #print(f"{k}=>{v.shape}")
+        assert k in model_state_dict
+        print(f"{k}=>{v.shape}")    
 
 def print_grad(model):
     model_state_dict = model.state_dict()
@@ -677,6 +703,18 @@ def print_grad(model):
     for p in model.parameters():
         assert p.name in name_mapping
         print(f"{p.name}_grad shape: {p.grad.shape} md5sum: {p.grad._md5sum()}")    
+
+def map_structure_name(k):
+    fs = k.split(".")
+    idx = int(fs[1])
+    if idx ==0:
+        return "llama.embed_tokens.weight"
+    if idx == 33:
+        return "llama.norm.weight"
+    if idx == 34:
+        return "lm_head.weight"
+    else: 
+        return f"llama.layers.{idx-1}." +".".join(fs[2:])         
 
 if __name__ == "__main__":
     main()

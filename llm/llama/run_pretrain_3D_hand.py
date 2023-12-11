@@ -662,7 +662,7 @@ def save_model(model):
         return 
     paddle.save(all_state_dict, f"hand/pp{pp_rank:02d}.pdparams")
     group = hcg.get_pipe_parallel_group()    
-    all_state_dict = all_gather_state_dict(node_model_state.model_weights, filter_func, group)
+    all_state_dict = all_gather_state_dict(all_state_dict, filter_func, group)
     if pp_rank > 0:
         return 
     paddle.save(all_state_dict, f"hand/all.pdparams")

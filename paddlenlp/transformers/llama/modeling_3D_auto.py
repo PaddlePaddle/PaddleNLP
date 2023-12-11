@@ -217,31 +217,39 @@ class LlamaMLPAuto(nn.Layer):
 
         if config.fuse_attention_ffn:
             self.gate_up_fused_proj = nn.Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
+            """
             self.gate_up_fused_proj.weight = dist.shard_tensor(
                 self.gate_up_fused_proj.weight,
                 get_mesh(self.ipp),
                 [dist.Replicate(), dist.Shard(1)],
             )
+            """
         else:
             self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+            """
             self.gate_proj.weight = dist.shard_tensor(
                 self.gate_proj.weight,
                 get_mesh(self.ipp),
                 [dist.Replicate(), dist.Shard(1)],
             )
+            """
             self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+            """
             self.up_proj.weight = dist.shard_tensor(
                 self.up_proj.weight,
                 get_mesh(self.ipp),
                 [dist.Replicate(), dist.Shard(1)],
             )
+            """
 
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
+        """
         self.down_proj.weight = dist.shard_tensor(
             self.down_proj.weight,
             get_mesh(self.ipp),
             [dist.Replicate(), dist.Shard(0)],
         )
+        """
 
 
     def forward(self, x):
@@ -300,55 +308,65 @@ class LlamaAttentionAuto(nn.Layer):
                 3 * self.hidden_size,
                 bias_attr=False,
             )
+            """
             self.qkv_proj.weight = dist.shard_tensor(
                 self.qkv_proj.weight,
                 get_mesh(self.ipp),
                 [dist.Replicate(), dist.Shard(1)],
             )
+            """
         else:
             self.q_proj = nn.Linear(
                 self.hidden_size,
                 self.hidden_size,
                 bias_attr=False,
             )
+            """
             self.q_proj.weight = dist.shard_tensor(
                 self.q_proj.weight,
                 get_mesh(self.ipp),
                 [dist.Replicate(), dist.Shard(1)],
             )
+            """
 
             self.k_proj = nn.Linear(
                 self.hidden_size,
                 self.config.num_key_value_heads * self.head_dim,
                 bias_attr=False,
             )
+            """
             self.k_proj.weight = dist.shard_tensor(
                 self.k_proj.weight,
                 get_mesh(self.ipp),
                 [dist.Replicate(), dist.Shard(1)],
             )
+            """
 
             self.v_proj = nn.Linear(
                 self.hidden_size,
                 self.config.num_key_value_heads * self.head_dim,
                 bias_attr=False,
             )
+            """
             self.v_proj.weight = dist.shard_tensor(
                 self.v_proj.weight,
                 get_mesh(self.ipp),
                 [dist.Replicate(), dist.Shard(1)],
             )
+            """
 
         self.o_proj = nn.Linear(
             self.hidden_size,
             self.hidden_size,
             bias_attr=False,
         )
+        """
         self.o_proj.weight = dist.shard_tensor(
             self.o_proj.weight,
             get_mesh(self.ipp),
             [dist.Replicate(), dist.Shard(0)],
         )
+        """
 
         if config.rope:
             self._init_rope()
@@ -759,11 +777,13 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             self.vocab_size,
             self.hidden_size,
         )
+        """
         self.embed_tokens.weight = dist.shard_tensor(
             self.embed_tokens.weight,
             get_mesh(),
             [dist.Replicate(), dist.Shard(1)],
         )
+        """
 
         def get_layer_ipp(layer_index):
             mesh = fleet.auto.get_mesh()
@@ -1015,7 +1035,11 @@ class LlamaLMHeadAuto(nn.Layer):
         super(LlamaLMHeadAuto, self).__init__()
         self.config = config
         vocab_size = config.vocab_size
-
+        self.weight = self.create_parameter(
+                shape=[config.hidden_size, vocab_size],
+                dtype=paddle.get_default_dtype(),
+            )
+        """
         self.weight = dist.shard_tensor(
             self.create_parameter(
                 shape=[config.hidden_size, vocab_size],
@@ -1024,7 +1048,7 @@ class LlamaLMHeadAuto(nn.Layer):
             get_mesh(-1),
             [dist.Replicate(), dist.Shard(1)],
         )
-
+        """
     def forward(self, hidden_states, tensor_parallel_output=None):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output

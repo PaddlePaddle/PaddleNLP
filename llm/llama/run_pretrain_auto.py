@@ -472,26 +472,7 @@ def main():
     # load model
     load_model(model)
     # add shard_layer here
-    pp_stage = 0
-    for name, layer in model.named_sublayers(include_self=False):
-        print(name, "==>", type(layer))
-
-        if hasattr(layer, "ipp"):
-            pp_stage = layer.ipp
-        if "embed_tokens" in name:
-            # embedding only support column split now. it will update in the future
-            shard_fn(layer, 0, [dist.Replicate(), dist.Shard(1)])
-        for n in ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.qkv_proj", "gate_proj", "up_proj", "gate_up_fused_proj"]:
-            if n in name:
-                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(1)])
-                break
-        for n in ["self_attn.o_proj", "down_proj"]:
-            if n in name:
-                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(0)])
-                break
-
-        if "lm_head" in name:
-            shard_fn(layer, -1, [dist.Replicate(), dist.Shard(1)])
+    shard_model(model)
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
@@ -667,6 +648,29 @@ def main():
             if step >= training_args.max_steps:
                 break
     '''
+
+def shard_model(model):
+    pp_stage = 0
+    for name, layer in model.named_sublayers(include_self=False):
+        print(name, "==>", type(layer))
+
+        if hasattr(layer, "ipp"):
+            pp_stage = layer.ipp
+        if "embed_tokens" in name:
+            # embedding only support column split now. it will update in the future
+            shard_fn(layer, 0, [dist.Replicate(), dist.Shard(1)])
+        for n in ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.qkv_proj", "gate_proj", "up_proj", "gate_up_fused_proj"]:
+            if n in name:
+                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(1)])
+                break
+        for n in ["self_attn.o_proj", "down_proj"]:
+            if n in name:
+                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(0)])
+                break
+
+        if "lm_head" in name:
+            shard_fn(layer, -1, [dist.Replicate(), dist.Shard(1)])
+
 
 def load_model(model):
     model_state_dict = model.state_dict()
