@@ -89,12 +89,6 @@ def set_seed(seed: int = 1234):
     random.seed(seed + 100 * pp_rank)
     np.random.seed(seed + 100 * pp_rank)
 
-    # seed = mp_rank +
-    #        pp_rank * (mp_size) +
-    #        dp_rank * (mp_size * pp_size) +
-    #        sharding_rank * (mp_size * pp_size * dp_size)
-    # seed offset is order to avoid conflicts with the parameter initialization seed
-
     seed_offset = seed + 1024 + paddle.distributed.get_world_size()
     global_seed = (
         seed_offset
