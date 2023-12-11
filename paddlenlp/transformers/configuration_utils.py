@@ -767,7 +767,12 @@ class PretrainedConfig:
                     )  # 4. load it as the community resource file
         # 3. get the configuration file from aistudio
         elif from_aistudio:
-            resolved_config_file = aistudio_download(repo_id=pretrained_model_name_or_path, filename=CONFIG_NAME)
+            resolved_config_file = aistudio_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=CONFIG_NAME,
+                subfolder=subfolder,
+                cache_dir=cache_dir,
+            )
         # 4. get the configuration file from HF HUB
         elif from_hf_hub:
             resolved_config_file = resolve_hf_config_path(

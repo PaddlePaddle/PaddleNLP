@@ -517,7 +517,9 @@ def cached_file(
 
     if from_aistudio:
         try:
-            resolved_file = aistudio_download(repo_id=path_or_repo_id, filename=filename, cache_dir=cache_dir)
+            resolved_file = aistudio_download(
+                repo_id=path_or_repo_id, filename=filename, subfolder=subfolder, cache_dir=cache_dir
+            )
         except:
             resolved_file = None
     else:
@@ -658,7 +660,12 @@ def get_checkpoint_shard_files(
     for shard_filename in tqdm.tqdm(shard_filenames, desc="Downloading shards", disable=not show_progress_bar):
         try:
             if from_aistudio:
-                cached_filename = aistudio_download(repo_id=pretrained_model_name_or_path, filename=shard_filename)
+                cached_filename = aistudio_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=shard_filename,
+                    subfolder=subfolder,
+                    cache_dir=cache_dir,
+                )
             else:
                 cached_filename = paddlenlp_hub_download(
                     pretrained_model_name_or_path,
