@@ -58,7 +58,7 @@ __all__ = [
 
 
 def set_seed(seed: int = 1234):
-    # NOTE(shenliang03): For parameter init seed:
+    # NOTE: For parameter init seed:
     # seed: dp/mp_undistributed_paramter/sharding is same; others is different
     # For compute seed(dropout):
     # global seed: only mp group is same.
