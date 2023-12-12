@@ -710,9 +710,9 @@ class TrainingArguments:
         metadata={"help": "Whether to unify hybrid parallel checkpoint."},
     )
 
-    load_optimizer_and_scheduler: Optional[bool] = field(
+    ignore_load_lr_and_optim: Optional[bool] = field(
         default=True,
-        metadata={"help": "Whether to load optimizer and scheduler."},
+        metadata={"help": "whether to ignore load optimizer and scheduler."},
     )
 
     force_reshard_pp: Optional[bool] = field(

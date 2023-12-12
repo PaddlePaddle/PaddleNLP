@@ -731,8 +731,10 @@ class Trainer:
         steps_trained_progress_bar = None
 
         # Check if continuing training from a checkpoint
-        if resume_from_checkpoint is not None and distributed_isfile(
-            os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
+        if (
+            resume_from_checkpoint is not None
+            and distributed_isfile(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
+            and not self.args.ignore_load_lr_and_optim
         ):
             self.state = TrainerState.load_from_json(
                 distributed_file(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
@@ -2231,6 +2233,9 @@ class Trainer:
         if checkpoint is None:
             return
 
+        if (not self.args.should_load_sharding_stage1_model) and self.args.ignore_load_lr_and_optim:
+            return
+
         opt_state_dict = None
         if self.args.should_load_sharding_stage1_model:
             opt_state_dict = self.sharding_io.load_optimizer_state_with_reshard(
@@ -2254,7 +2259,7 @@ class Trainer:
                     safe_serialization=True,
                 )
 
-        if not self.args.load_optimizer_and_scheduler:
+        if self.args.ignore_load_lr_and_optim and opt_state_dict:
             tmp = self.optimizer.state_dict()
             tmp["master_weights"] = opt_state_dict["master_weights"]
             opt_state_dict = tmp
@@ -2268,15 +2273,18 @@ class Trainer:
         else:
             raise ValueError(f"optimizer-state-dict not found, opt: {os.path.join(checkpoint, optimizer_name)}.")
 
-        if distributed_isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
-            self.lr_scheduler.set_state_dict(paddle.load(distributed_file(os.path.join(checkpoint, SCHEDULER_NAME))))
-        else:
-            raise ValueError(f"scheduler-file not found, scheduler:{os.path.join(checkpoint, SCHEDULER_NAME)}")
+        if not self.args.ignore_load_lr_and_optim:
+            if distributed_isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
+                self.lr_scheduler.set_state_dict(
+                    paddle.load(distributed_file(os.path.join(checkpoint, SCHEDULER_NAME)))
+                )
+            else:
+                raise ValueError(f"scheduler-file not found, scheduler:{os.path.join(checkpoint, SCHEDULER_NAME)}")
 
-        if self.do_grad_scaling and distributed_isfile(os.path.join(checkpoint, SCALER_NAME)):
-            self.scaler.load_state_dict(
-                paddle.load(distributed_file(os.path.join(checkpoint, SCALER_NAME)), return_numpy=True)
-            )
+            if self.do_grad_scaling and distributed_isfile(os.path.join(checkpoint, SCALER_NAME)):
+                self.scaler.load_state_dict(
+                    paddle.load(distributed_file(os.path.join(checkpoint, SCALER_NAME)), return_numpy=True)
+                )
 
     def log(self, logs: Dict[str, float], **kwargs) -> None:
         """
