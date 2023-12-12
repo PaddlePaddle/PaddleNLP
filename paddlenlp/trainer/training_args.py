@@ -1127,6 +1127,11 @@ class TrainingArguments:
                         "In pipeline model, the evaluation also shares same setting with training. "
                         "Please set per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
                     )
+            elif self.gradient_accumulation_steps > 1:
+                gradient_merge = strategy.gradient_merge
+                gradient_merge.enable = True
+                gradient_merge.k_steps = self.gradient_accumulation_steps
+                gradient_merge.avg = True
 
             if tensor_parallel_degree > 1:
                 mp_optimization = strategy.mp_optimization
@@ -1204,7 +1209,6 @@ class TrainingArguments:
                         recompute.refined_ops_patterns.append(eval(pattern))
 
             self.strategy = strategy
-            logger.info(self.strategy)
             order = ["dp", "pp", "mp"]
             degree = [self.data_parallel_degree, pipeline_parallel_degree, tensor_parallel_degree]
             mesh_dims = list(filter(lambda x: x[1] > 1, list(zip(order, degree))))
@@ -1329,6 +1333,8 @@ class TrainingArguments:
     def dataset_rank(self):
         if self.use_hybrid_parallel:
             return max(self.sharding_parallel_degree, 1) * self.data_parallel_rank + self.sharding_parallel_rank
+        elif self.use_auto_parallel:
+            return self.data_parallel_rank
         else:
             return paddle.distributed.get_rank()
 
@@ -1336,6 +1342,8 @@ class TrainingArguments:
     def dataset_world_size(self):
         if self.use_hybrid_parallel:
             return max(self.sharding_parallel_degree, 1) * max(self.data_parallel_degree, 1)
+        elif self.use_auto_parallel:
+            return max(self.data_parallel_degree, 1)
         else:
             return paddle.distributed.get_world_size()
 

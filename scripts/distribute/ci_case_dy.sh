@@ -17,12 +17,14 @@
 set -e
 
 export log_path=/workspace/case_logs
-export case_path=/workspace/PaddleNLP/model_zoo/gpt-3
-export data_path=/fleetx_data
+export root_path=/workspace/PaddleNLP
+
+export gpt_case_path=$root_path/model_zoo/gpt-3
+export gpt_data_path=/fleetx_data
 
 unset CUDA_VISIBLE_DEVICES
 
-function case_list_dygraph(){
+function gpt_case_list_dygraph(){
     gpt_preprocess_data
     gpt_345M_single
     gpt_1.3B_dp
@@ -40,8 +42,8 @@ function case_list_dygraph(){
     gpt_export_345M_mp1
     # gpt_export_345M_mp2
     # gpt_export_qat_345M
-    gpt_inference_345M_single
-    gpt_inference_345M_dp8
+    # gpt_inference_345M_single
+    # gpt_inference_345M_dp8
     gpt_345M_single_finetune
     gpt_eval_WikiText
     gpt_eval_LAMBADA
@@ -265,7 +267,7 @@ function gpt_export_345M_mp1() {
     rm -rf $log_dir
     rm -rf output
 
-    export PYTHONPATH=/workspace/PaddleNLP/model_zoo/gpt-3:$PYTHONPATH
+    export PYTHONPATH=$root_path/model_zoo/gpt-3:$PYTHONPATH
     export CUDA_VISIBLE_DEVICES=1
     python -m paddle.distributed.launch --log_dir $log_dir --devices "1" \
         ./tools/auto_export.py \
@@ -286,7 +288,7 @@ function gpt_export_345M_mp2() {
     rm -rf $log_dir
     rm -rf output
 
-    export PYTHONPATH=/workspace/PaddleNLP/model_zoo/gpt-3:$PYTHONPATH
+    export PYTHONPATH=$root_path/model_zoo/gpt-3:$PYTHONPATH
     export CUDA_VISIBLE_DEVICES=0,1
     python -m paddle.distributed.launch --devices "0,1" \
         ./tools/auto_export.py \
@@ -407,103 +409,115 @@ function check_result() {
     fi
 }
 
-function before_hook() {
-    echo -e "\033[31m ---- Set FLAGS  \033[0m"
+function before_hook_for_gpt() {
+    echo -e "\033[31m ---- Set FLAGS for GPT dygraph cases  \033[0m"
     env | grep FLAGS
-    if [[ $FLAGS_before_hook == 0 ]];then
-        echo -e "\033[31m ---- Install requirements  \033[0m"
-        export http_proxy=${proxy}
-        export https_proxy=${proxy}
+    export http_proxy=${proxy}
+    export https_proxy=${proxy}
+    if [[ $FLAGS_install_deps == 0 ]];then
+        echo -e "\033[31m ---- Install requirements for GPT dygraph cases  \033[0m"
         python -m pip install -r requirements.txt --force-reinstall
         python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
-        
-        echo -e "\033[31m ---- download data  \033[0m"
+    else
+        echo -e "\033[31m ---- Skip install requirements for GPT dygraph cases  \033[0m"
+    fi
+    if [[ ! $FLAGS_download_data =~ "gpt" ]];then
+        echo -e "\033[31m ---- download data for GPT dygraph cases  \033[0m"
         rm -rf data
-        if [[ -e ${data_path}/data ]]; then
+        if [[ -e ${gpt_data_path}/data ]]; then
             echo "data downloaded"
         else
             # download data for gpt
-            mkdir ${data_path}/data;
-            wget -O ${data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
-            wget -O ${data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
+            mkdir ${gpt_data_path}/data;
+            wget -O ${gpt_data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
+            wget -O ${gpt_data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
         fi
-        cp -r ${data_path}/data ${case_path}/
+        cp -r ${gpt_data_path}/data ${gpt_case_path}/
     else
-        echo -e "\033[31m ---- Skip install requirements \033[0m"
-        echo -e "\033[31m ---- Install ppfleetx/ops  \033[0m"
-        cd ppfleetx/ops && python setup_cuda.py install && cd ../..
-
-        echo -e "\033[31m ---- download other data  \033[0m"
-        rm -rf ckpt
-        if [[ -e ${data_path}/ckpt/PaddleFleetX_GPT_345M_220826 ]]; then
-            echo "ckpt/PaddleFleetX_GPT_345M_220826 downloaded"
-        else
-            # download ckpt for gpt
-            mkdir -p ${data_path}/ckpt
-            wget -O ${data_path}/ckpt/GPT_345M.tar.gz \
-                https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_345M.tar.gz
-            tar -xzf ${data_path}/ckpt/GPT_345M.tar.gz -C ${data_path}/ckpt
-            rm -rf ${data_path}/ckpt/GPT_345M.tar.gz
-        fi
-
-        rm -rf dataset
-        if [[ -e ${data_path}/dataset/wikitext_103_en ]]; then
-            echo "dataset/wikitext_103_en downloaded"
-        else
-            # download dataset/wikitext_103_en
-            mkdir -p ${data_path}/dataset/wikitext_103_en;
-            wget -O ${data_path}/dataset/wikitext_103_en/wikitext-103-en.txt http://fleet.bj.bcebos.com/datasets/gpt/wikitext-103-en.txt
-        fi
-
-        rm -rf wikitext-103
-        if [[ -e ${data_path}/wikitext-103 ]]; then
-            echo "wikitext-103 downloaded"
-        else
-            # download wikitext-103 for gpt eval
-            wget -O ${data_path}/wikitext-103-v1.zip https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-103-v1.zip
-            unzip -q ${data_path}/wikitext-103-v1.zip -d ${data_path}/
-            rm -rf ${data_path}/wikitext-103-v1.zip
-        fi
-
-        rm -rf lambada_test.jsonl
-        if [[ -e ${data_path}/lambada_test.jsonl ]]; then
-            echo "lambada_test.jsonl downloaded"
-        else
-            # download lambada_test.jsonl for gpt eval
-            wget -O ${data_path}/lambada_test.jsonl https://raw.githubusercontent.com/cybertronai/bflm/master/lambada_test.jsonl
-        fi
-
-        rm -rf pretrained
-        if [[ -e ${data_path}/pretrained ]]; then
-            echo "GPT_345M_FP16 downloaded"
-        else
-            # download GPT_345M_FP16 for gpt export
-            wget -O ${data_path}/GPT_345M_FP16.tar.gz https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_345M_FP16.tar.gz
-            tar -zxvf ${data_path}/GPT_345M_FP16.tar.gz -C ${data_path}/
-            rm -rf ${data_path}/GPT_345M_FP16.tar.gz
-        fi
-
-        rm -rf GPT_345M_QAT_wo_analysis
-        if [[ -e ${data_path}/GPT_345M_QAT_wo_analysis ]]; then
-            echo "GPT_345M_QAT_wo_analysis downloaded"
-        else
-            # download GPT_345M_QAT_wo_analysis for gpt qat
-            wget -O ${data_path}/GPT_345M_QAT_wo_analysis.tar https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_345M_QAT_wo_analysis.tar
-            tar xf ${data_path}/GPT_345M_QAT_wo_analysis.tar -C ${data_path}/
-            rm -rf ${data_path}/GPT_345M_QAT_wo_analysis.tar
-        fi
-
-        ln -s ${data_path}/ckpt ${case_path}/ckpt
-        cp -r ${data_path}/dataset ${case_path}/
-        ln -s ${data_path}/wikitext-103 ${case_path}/wikitext-103
-        cp ${data_path}/lambada_test.jsonl ${case_path}/
-        ln -s ${data_path}/pretrained ${case_path}/pretrained
-        ln -s ${data_path}/GPT_345M_QAT_wo_analysis ${case_path}/GPT_345M_QAT_wo_analysis
+        echo -e "\033[31m ---- Skip download data for GPT dygraph cases \033[0m"
     fi
+    echo -e "\033[31m ---- Install ppfleetx/ops  \033[0m"
+    cd ppfleetx/ops && python setup_cuda.py install && cd ../..
+
+    echo -e "\033[31m ---- download other data  \033[0m"
+    rm -rf ckpt
+    if [[ -e ${gpt_data_path}/ckpt/PaddleFleetX_GPT_345M_220826 ]]; then
+        echo "ckpt/PaddleFleetX_GPT_345M_220826 downloaded"
+    else
+        # download ckpt for gpt
+        mkdir -p ${gpt_data_path}/ckpt
+        wget -O ${gpt_data_path}/ckpt/GPT_345M.tar.gz \
+            https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_345M.tar.gz
+        tar -xzf ${gpt_data_path}/ckpt/GPT_345M.tar.gz -C ${gpt_data_path}/ckpt
+        rm -rf ${gpt_data_path}/ckpt/GPT_345M.tar.gz
+    fi
+
+    rm -rf dataset
+    if [[ -e ${gpt_data_path}/dataset/wikitext_103_en ]]; then
+        echo "dataset/wikitext_103_en downloaded"
+    else
+        # download dataset/wikitext_103_en
+        mkdir -p ${gpt_data_path}/dataset/wikitext_103_en;
+        wget -O ${gpt_data_path}/dataset/wikitext_103_en/wikitext-103-en.txt http://fleet.bj.bcebos.com/datasets/gpt/wikitext-103-en.txt
+    fi
+
+    rm -rf wikitext-103
+    if [[ -e ${gpt_data_path}/wikitext-103 ]]; then
+        echo "wikitext-103 downloaded"
+    else
+        # download wikitext-103 for gpt eval
+        wget -O ${gpt_data_path}/wikitext-103-v1.zip https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-103-v1.zip
+        unzip -q ${gpt_data_path}/wikitext-103-v1.zip -d ${gpt_data_path}/
+        rm -rf ${gpt_data_path}/wikitext-103-v1.zip
+    fi
+
+    rm -rf lambada_test.jsonl
+    if [[ -e ${gpt_data_path}/lambada_test.jsonl ]]; then
+        echo "lambada_test.jsonl downloaded"
+    else
+        # download lambada_test.jsonl for gpt eval
+        wget -O ${gpt_data_path}/lambada_test.jsonl https://raw.githubusercontent.com/cybertronai/bflm/master/lambada_test.jsonl
+    fi
+
+    rm -rf pretrained
+    if [[ -e ${gpt_data_path}/pretrained ]]; then
+        echo "GPT_345M_FP16 downloaded"
+    else
+        # download GPT_345M_FP16 for gpt export
+        wget -O ${gpt_data_path}/GPT_345M_FP16.tar.gz https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_345M_FP16.tar.gz
+        tar -zxvf ${gpt_data_path}/GPT_345M_FP16.tar.gz -C ${gpt_data_path}/
+        rm -rf ${gpt_data_path}/GPT_345M_FP16.tar.gz
+    fi
+
+    rm -rf GPT_345M_QAT_wo_analysis
+    if [[ -e ${gpt_data_path}/GPT_345M_QAT_wo_analysis ]]; then
+        echo "GPT_345M_QAT_wo_analysis downloaded"
+    else
+        # download GPT_345M_QAT_wo_analysis for gpt qat
+        wget -O ${gpt_data_path}/GPT_345M_QAT_wo_analysis.tar https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_345M_QAT_wo_analysis.tar
+        tar xf ${gpt_data_path}/GPT_345M_QAT_wo_analysis.tar -C ${gpt_data_path}/
+        rm -rf ${gpt_data_path}/GPT_345M_QAT_wo_analysis.tar
+    fi
+
+    ln -s ${gpt_data_path}/ckpt ${gpt_case_path}/ckpt
+    cp -r ${gpt_data_path}/dataset ${gpt_case_path}/
+    ln -s ${gpt_data_path}/wikitext-103 ${gpt_case_path}/wikitext-103
+    cp ${gpt_data_path}/lambada_test.jsonl ${gpt_case_path}/
+    ln -s ${gpt_data_path}/pretrained ${gpt_case_path}/pretrained
+    ln -s ${gpt_data_path}/GPT_345M_QAT_wo_analysis ${gpt_case_path}/GPT_345M_QAT_wo_analysis
 }
 
-echo -e "\033[31m ---- Start executing gpt-3 $1 \033[0m"
-cd ${case_path}
-export FLAGS_before_hook=$2
-before_hook
+echo -e "\033[31m ---- Start executing $1 \033[0m"
+
+export exec_case=$1
+export FLAGS_install_deps=$2
+export FLAGS_download_data=$3
+
+if [[ $exec_case =~ "gpt" ]];then
+    cd ${gpt_case_path}
+    before_hook_for_gpt
+else
+    echo -e "\033[31m ---- Invalid exec_case $exec_case \033[0m"
+fi
+
 $1

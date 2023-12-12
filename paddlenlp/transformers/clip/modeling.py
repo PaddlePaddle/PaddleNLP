@@ -827,7 +827,10 @@ class CLIPTextTransformer(nn.Layer):
                 paddle.stack(
                     [
                         paddle.arange(last_hidden_state.shape[0], dtype="int32"),
-                        (input_ids == self.eos_token_id).cast("int32").argmax(axis=-1, dtype="int32"),
+                        # make sure we have 1D tensor, not 0D tensor
+                        (input_ids == paddle.to_tensor([self.eos_token_id], dtype=input_ids.dtype))
+                        .cast("int32")
+                        .argmax(axis=-1, dtype="int32"),
                     ],
                     axis=-1,
                 )
