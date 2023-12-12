@@ -22,6 +22,9 @@ export root_path=/workspace/PaddleNLP
 export gpt_case_path=$root_path/model_zoo/gpt-3
 export gpt_data_path=/fleetx_data
 
+export llm_gpt_case_path=$root_path/llm/gpt-3
+export llm_gpt_data_path=/llm_gpt_data
+
 unset CUDA_VISIBLE_DEVICES
 
 function gpt_case_list_dygraph(){
@@ -49,6 +52,9 @@ function gpt_case_list_dygraph(){
     gpt_eval_LAMBADA
 }
 
+function llm_gpt_case_list_dygraph() {
+    llm_gpt_recompute_bs32_bf16_SD8
+}
 
 ############ case start ############
 function gpt_preprocess_data() {
@@ -400,12 +406,101 @@ function gpt_eval_LAMBADA() {
     check_result $FUNCNAME
     echo "=========== $FUNCNAME run  end ==========="
 }
+
+function llm_gpt_recompute_bs32_bf16_SD8() {
+    echo "=========== $FUNCNAME run begin ==========="
+    log_dir=mylog
+    rm -rf $log_dir
+    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 run_pretrain.py \
+        --model_type gpt \
+        --model_name_or_path gpt2-medium-en \
+        --tokenizer_name_or_path gpt2-medium-en \
+        --input_dir ./data \
+        --output_dir output \
+        --sharding stage1 \
+        --sharding_parallel_degree 8 \
+        --split 949,50,1 \
+        --max_seq_length 1024 \
+        --seed 1234 \
+        --fuse_attention_qkv True \
+        --use_flash_attention True \
+        --bf16 True \
+        --fp16_opt_level O2 \
+        --amp_master_grad True \
+        --learning_rate 0.00001 \
+        --min_learning_rate 0.000005 \
+        --max_grad_norm 1.0 \
+        --logging_steps 1 \
+        --continue_training 0 \
+        --dataloader_num_workers 1 \
+        --eval_steps 1000 \
+        --disable_tqdm True \
+        --gradient_accumulation_steps 2 \
+        --weight_decay 0.01 \
+        --max_steps 30 \
+        --save_steps 5000 \
+        --device gpu \
+        --warmup_ratio 0.01 \
+        --scale_loss 32768 \
+        --per_device_train_batch_size 2 \
+        --do_train \
+        --recompute True \
+        >>${log_path}/$FUNCNAME 2>&1
+    loss=`cat $log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    ips=`cat $log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
+    mem=`cat $log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'gpu_max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
+    echo "result: loss=$loss ips=$ips mem=$mem"
+    loss_base=8.88019562
+    ips_base=166
+    mem_base=1280.5
+    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    echo "=========== $FUNCNAME run  end ==========="
+}
 ############ case end ############
 
 function check_result() {
+    echo -e "$1" >> ${log_path}/result.log
     if [ $? -ne 0 ];then
         echo -e "\033[31m $1 run failed! \033[0m" | tee -a ${log_path}/result.log
         exit -1
+    fi
+
+    if [ ! $1 =~ "llm" ]; then
+        pass
+    elif [ $# -ne 7 ]; then
+        echo -e "\033[31m $1 parameter transfer failed: $@ \033[0m" | tee -a ${log_path}/result.log
+        exit -1
+    else
+        diff_loss=$(echo $2 $3|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
+        echo -e "loss_base: $2 loss_test: $3 loss_diff: $diff_loss%" | tee -a ${log_path}/result.log
+        if [ $2 != $3 ];then
+            echo -e "\033[31m $1 loss diff check failed! \033[0m" | tee -a ${log_path}/result.log
+            exit -1
+        fi
+        
+        diff_ips=$(echo $4 $5|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
+        echo -e "ips_base: $4 ips_test: $5 ips_diff: $diff_ips% " | tee -a $log_path/result.log
+        v1=$(echo $diff_ips 5.0|awk '{print($1>=$2)?"0":"1"}')
+        v2=$(echo $diff_ips -5.0|awk '{print($1<=$2)?"0":"1"}')
+        if [[ $v1 == 0 ]];then
+            echo -e "$1 IPS increase greater than 5%, not exit " | tee -a $log_path/result.log
+        fi
+        if [[ $v2 == 0 ]];then
+            echo -e "\033[31m $1 IPS diff check failed! \033[0m" | tee -a $log_path/result.log
+            exit -1
+        fi
+
+        diff_mem=$(echo $6 $7|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
+        echo -e "mem_base: $6 mem_test: $7 mem_diff: $diff_mem% " | tee -a $log_path/result.log
+        w1=$(echo $diff_mem 5.0|awk '{print($1>=$2)?"0":"1"}')
+        w2=$(echo $diff_mem -5.0|awk '{print($1<=$2)?"0":"1"}')
+        if [[ $w1 == 0 ]];then
+            echo -e "\033[31m $1 MEM diff check failed! \033[0m" | tee -a $log_path/result.log
+            exit -1
+        fi
+        if [[ $w2 == 0 ]];then
+            echo -e "$1 MEM decreases greater than 5%, not exit " | tee -a $log_path/result.log
+        fi
     fi
 }
 
@@ -507,13 +602,40 @@ function before_hook_for_gpt() {
     ln -s ${gpt_data_path}/GPT_345M_QAT_wo_analysis ${gpt_case_path}/GPT_345M_QAT_wo_analysis
 }
 
+function before_hook_for_llm_gpt() {
+    echo -e "\033[31m ---- Set FLAGS for llm GPT cases  \033[0m"
+    env | grep FLAGS
+    export http_proxy=${proxy}
+    export https_proxy=${proxy}
+    python -m pip install -r $root_path/requirements.txt
+    python -m pip install regex
+    if [[ ! $FLAGS_download_data =~ "llm_gpt" ]];then
+        echo -e "\033[31m ---- Download llm GPT data  \033[0m"
+        rm -rf data
+        if [[ -e ${llm_gpt_data_path}/data ]]; then
+            echo "llm GPT data downloaded"
+        else
+            # download data for llm GPT
+            mkdir ${llm_gpt_data_path}/data;
+            wget -O ${llm_gpt_data_path}/data/gpt2-en-mmap.bin https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/openwebtext2/gpt/mmap/gpt2-en-mmap.bin
+            wget -O ${llm_gpt_data_path}/data/gpt2-en-mmap.idx https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/openwebtext2/gpt/mmap/gpt2-en-mmap.idx
+        fi
+        cp -r ${llm_gpt_data_path}/data ${llm_gpt_case_path}/
+    else
+        echo -e "\033[31m ---- Skip download llm GPT data \033[0m"
+    fi
+}
+
 echo -e "\033[31m ---- Start executing $1 \033[0m"
 
 export exec_case=$1
 export FLAGS_install_deps=$2
 export FLAGS_download_data=$3
 
-if [[ $exec_case =~ "gpt" ]];then
+if [[ $exec_case =~ "llm_gpt" ]];then
+    cd ${llm_gpt_case_path}
+    before_hook_for_llm_gpt
+elif [[ $exec_case =~ "gpt" ]];then
     cd ${gpt_case_path}
     before_hook_for_gpt
 else
