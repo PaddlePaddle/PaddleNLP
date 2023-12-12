@@ -12,20 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# just for debug
+# just for debug auto_parallel
 
 set -x
 unset CUDA_VISIBLE_DEVICES
 
+export PARALLEL_CROSS_ENTROPY=true
+export FLAGS_embedding_deterministic=1
+export FLAGS_cudnn_deterministic=1
 export FLAGS_call_stack_level=2
 
-task_name="llama_auto_dp2mp2pp2"
-rm -rf output/$task_name/
+task_name="llama_auto_dp2sharding2mp2pp2_vpp2"
+# rm -rf output/$task_name/  # ckpt is saved in 'output/''
 rm -rf "output/$task_name""_log"
 
-export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../../:$PYTHONPATH
-
 python -u -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "output/$task_name""_log" \
@@ -38,17 +39,19 @@ python -u -m paddle.distributed.launch \
     --split 949,50,1 \
     --max_seq_length 2048 \
     --per_device_train_batch_size 1 \
-    --per_device_eval_batch_size 4 \
-    --gradient_accumulation_steps 4 \
+    --per_device_eval_batch_size 8 \
+    --gradient_accumulation_steps 8 \
     --use_flash_attention 0 \
     --use_fused_rms_norm 0 \
     --fp16 0 \
     --fp16_opt_level "O2"  \
     --scale_loss 1024 \
-    --pipeline_parallel_degree 2 \
     --tensor_parallel_degree 2 \
-    --sharding_parallel_degree 1 \
-    --sharding "stage1" \
+    --pipeline_parallel_degree 2 \
+    --virtual_pp_degree 2 \
+    --pipeline_schedule_mode "VPP" \
+    --sharding_parallel_degree 2 \
+    --sharding "stage2" \
     --learning_rate 0.0001 \
     --min_learning_rate 0.00001 \
     --max_steps 10 \
@@ -58,14 +61,16 @@ python -u -m paddle.distributed.launch \
     --max_grad_norm 1.0 \
     --logging_steps 1 \
     --dataloader_num_workers 1 \
-    --sharding "" \
     --eval_steps 1000 \
     --report_to "visualdl" \
     --disable_tqdm true \
     --continue_training 0 \
     --recompute 1 \
+    --recompute_granularity full \
     --do_train \
     --do_eval \
     --device "gpu" \
     --data_impl "mmap" \
     --parallel_mode "auto"
+
+    # --resume_from_checkpoint "output/llama_auto_serial/checkpoint-2" \

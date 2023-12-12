@@ -51,6 +51,7 @@ from .modeling import (
     LlamaNTKScalingRotaryEmbedding,
     LlamaRotaryEmbedding,
     _expand_2d_mask,
+    _make_causal_mask,
     apply_rotary_pos_emb,
     build_alibi_tensor,
     get_triangle_upper_mask,
@@ -94,22 +95,6 @@ def get_dist_attr(shard_specs, pp_idx=None):
                 new_spec.append(None)
 
     return mesh, new_spec
-
-
-def _make_causal_mask(input_ids_shape, past_key_values_length):
-    """
-    Make causal mask used for self-attention
-    """
-    batch_size, target_length = input_ids_shape  # target_length: seq_len
-
-    mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
-
-    if past_key_values_length > 0:
-        # [tgt_len, tgt_len + past_len]
-        mask = paddle.concat([paddle.ones([target_length, past_key_values_length], dtype="bool"), mask], axis=-1)
-
-    # [bs, 1, tgt_len, tgt_len + past_len]
-    return mask[None, None, :, :].expand([batch_size, 1, target_length, target_length + past_key_values_length])
 
 
 def scaled_dot_product_attention(
