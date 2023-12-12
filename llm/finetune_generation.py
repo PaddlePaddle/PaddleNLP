@@ -310,7 +310,7 @@ def main():
             and training_args.pipeline_parallel_degree < 1
         ):
             raise NotImplementedError(
-                "InTokens data stream is only implemented for LLaMA, Bloom, ChatGLM and QWen so far."
+                "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM and QWen so far."
             )
     train_ds = (
         train_ds.map(partial(trans_func, is_test=False, intokens=data_args.zero_padding))
@@ -323,7 +323,7 @@ def main():
     eval_intokens = data_args.zero_padding
     if data_args.zero_padding and data_args.eval_with_do_generation:
         logger.warning(
-            "`intokens` conflicts with `eval_with_do_generation`. Setting intokens to False for the eval_dataset."
+            "`zero_padding` conflicts with `eval_with_do_generation`. Setting zero_padding to False for the eval_dataset."
         )
         eval_intokens = False
     dev_ds = (
@@ -336,7 +336,7 @@ def main():
             intoken_dataset = InTokensIterableDataset
         else:
             intoken_dataset = InTokensMapDataset
-        logger.info("Creating InTokens Data Stream. This may take a few minutes.")
+        logger.info("Creating Zero Padding Data Stream. This may take a few minutes.")
         train_ds = (
             intoken_dataset(
                 train_ds,
