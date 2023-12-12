@@ -5,19 +5,19 @@ codecov:
 coverage:
   status:
     project:
-      default:
-        tartget: auto
-        informational: true
+      default: 
+      target: 75% # overall project Coverage < 75%  CI will fail
+      informational: true
     patch:
       default: false
       transformers:
-        target: 75% #  Coverage < 75%  CI will fail
+        target: 90% # lines adjusted  Coverage < 90%  CI will fail
         paths: "paddlenlp/transformers/"
       trainer:
-        target: 75% 
+        target: 90%
         paths: "paddlenlp/trainer/"
       peft:
-       target: 75%
+       target: 90%
        paths: "paddlenlp/peft/"
       prompt:
        traget: 90%
