@@ -10,15 +10,6 @@ coverage:
       informational: true
     patch:
       default: false
-      transformers:
+      paddlenlp:
         target: 90% # lines adjusted  Coverage < 90%  CI will fail
-        paths: "paddlenlp/transformers/"
-      trainer:
-        target: 90%
-        paths: "paddlenlp/trainer/"
-      peft:
-       target: 90%
-       paths: "paddlenlp/peft/"
-      prompt:
-       traget: 90%
-       paths: "paddlenlp/prompt/"
+        paths: "paddlenlp/"
