@@ -21,6 +21,7 @@ import paddle.base.core as core
 import paddle.nn as nn
 from paddle.distributed.fleet import auto
 from paddle.profiler import SummaryView
+from paddle.utils.profiler import job_schedule_profiler_range
 
 try:
     from ppfleetx.optims import build_lr_scheduler, build_optimizer
@@ -181,12 +182,8 @@ class AutoEngine(BasicEngine):
         self._auto_engine.prepare(mode="train")
 
         for step, batch in enumerate(train_data_loader):
-            if (step == self._job_schedule_profiler_start) and use_new_executor():
-                self._auto_engine.enable_job_schedule_profiler = True
-
-            if (step == self._job_schedule_profiler_end - 1) and use_new_executor():
-                self._auto_engine.enable_job_schedule_profiler = False
-                sys.exit()
+            with job_schedule_profiler_range(step, self._job_schedule_profiler_start, self._auto_engine.enable_job_schedule_profiler) as status:
+                self._auto_engine.enable_job_schedule_profiler = status
 
             if epoch_index == self._load_recovery["epoch"]:
                 if step < self._load_recovery["step"]:

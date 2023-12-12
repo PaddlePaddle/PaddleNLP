@@ -27,7 +27,7 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 import paddle.distributed.auto_parallel as auto
-from paddle.utils.profiler import profiler_range
+from paddle.utils.profiler import job_schedule_profiler_range
 
 from paddlenlp.trainer import (
     PdArgumentParser,
@@ -613,8 +613,8 @@ def main():
             elif pp_degree > 1:
                 local_batches = inputs
 
-            with profiler_range(step, job_schedule_profiler_start, job_schedule_profiler_end) as enable_profiler:
-                engine.enable_job_schedule_profiler = enable_profiler
+            with job_schedule_profiler_range(step, job_schedule_profiler_start, job_schedule_profiler_end) as status:
+                engine.enable_job_schedule_profiler = status
 
             for micro_batch in local_batches:
                 outs = engine.run(micro_batch, mode="train")
