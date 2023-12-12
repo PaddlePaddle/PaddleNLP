@@ -500,8 +500,9 @@ class Trainer:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
         if self.args.unified_checkpoint:
-            if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
+            if resume_from_checkpoint is not None:
                 load_unified_checkpoint(
+                    self.args,
                     self.model,
                     resume_from_checkpoint,
                     safe_serialization=True,
@@ -2009,7 +2010,7 @@ class Trainer:
                 logger.info("Saving optimizer files.")
                 paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
-            # FIXME: manybe only save one copy
+            # FIXME: maybe only save one copy
             paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
 
             if self.do_grad_scaling:
@@ -2236,19 +2237,22 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
-            if self.args.data_parallel_rank == 0:
-                if self.args.unified_checkpoint:
-                    opt_state_dict = load_unified_optimizer(
-                        model=self.model,
-                        optimizer=self.optimizer,
-                        resume_from_checkpoint=checkpoint,
-                        safe_serialization=True,
-                    )
-                else:
+            if not self.args.unified_checkpoint:
+                if self.args.data_parallel_rank == 0:
                     optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
                     path = os.path.join(checkpoint, optimizer_name)
                     if os.path.isfile(path):
                         opt_state_dict = paddle.load(path)
+                else:
+                    opt_state_dict = None
+            else:
+                opt_state_dict = load_unified_optimizer(
+                    args=self.args,
+                    model=self.model,
+                    optimizer=self.optimizer,
+                    resume_from_checkpoint=checkpoint,
+                    safe_serialization=True,
+                )
 
         if not self.args.load_optimizer_and_scheduler:
             tmp = self.optimizer.state_dict()
