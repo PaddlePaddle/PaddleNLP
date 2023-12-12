@@ -45,10 +45,10 @@ function gpt_case_list_auto() {
 }
 
 function llama_case_list_auto() {
-    llama_auto_recompute_bs1_fp32_DP1-MP1-PP1
-    llama_auto_recompute_bs2_fp32_DP2-MP1-PP1
-    llama_auto_recompute_bs2_fp32_DP2-MP2-PP1
-    llama_auto_recompute_bs8_fp32_DP2-MP2-PP2
+    llama_auto_recompute_bs8_fp32_DP1-MP1-PP1
+    llama_auto_recompute_bs16_fp32_DP2-MP1-PP1
+    llama_auto_recompute_bs16_fp32_DP2-MP2-PP1
+    llama_auto_recompute_bs16_fp32_DP2-MP2-PP2
 }
 
 function case_list_auto_pir() {
@@ -833,13 +833,13 @@ function gpt_auto_sp_acc_check() {
     echo "=========== $FUNCNAME run  end ==========="
 }
 
-function llama_auto_recompute_bs1_fp32_DP1-MP1-PP1() {
+function llama_auto_recompute_bs8_fp32_DP1-MP1-PP1() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=2
     export SOT_LOG_LEVEL=4
 
-    task_name="llama_auto_bs1_dp1mp1pp1"
+    task_name="llama_auto_bs8_dp1mp1pp1"
     case_out_dir="output/$task_name"
     case_log_dir="output/$task_name""_log"
     rm -rf $case_out_dir
@@ -859,7 +859,7 @@ function llama_auto_recompute_bs1_fp32_DP1-MP1-PP1() {
         --max_seq_length 2048 \
         --per_device_train_batch_size 1 \
         --per_device_eval_batch_size 1 \
-        --gradient_accumulation_steps 1 \
+        --gradient_accumulation_steps 8 \
         --use_flash_attention 0 \
         --use_fused_rms_norm 0 \
         --fp16 0 \
@@ -876,13 +876,13 @@ function llama_auto_recompute_bs1_fp32_DP1-MP1-PP1() {
         --weight_decay 0.01 \
         --warmup_ratio 0.01 \
         --max_grad_norm 1.0 \
-        --logging_steps 1\
+        --logging_steps 1 \
         --dataloader_num_workers 1 \
         --sharding "" \
         --eval_steps 1000 \
         --report_to "visualdl" \
         --disable_tqdm true \
-        --continue_training 0\
+        --continue_training 0 \
         --recompute 1 \
         --do_train \
         --do_eval \
@@ -894,20 +894,20 @@ function llama_auto_recompute_bs1_fp32_DP1-MP1-PP1() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.71193314
+    loss_base=9.52110565
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
-function llama_auto_recompute_bs2_fp32_DP2-MP1-PP1() {
+function llama_auto_recompute_bs16_fp32_DP2-MP1-PP1() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=2
     export SOT_LOG_LEVEL=4
 
-    task_name="llama_auto_bs2_dp2mp1pp1"
+    task_name="llama_auto_bs16_dp2mp1pp1"
     case_out_dir="output/$task_name"
     case_log_dir="output/$task_name""_log"
     rm -rf $case_out_dir
@@ -927,7 +927,7 @@ function llama_auto_recompute_bs2_fp32_DP2-MP1-PP1() {
         --max_seq_length 2048 \
         --per_device_train_batch_size 1 \
         --per_device_eval_batch_size 1 \
-        --gradient_accumulation_steps 1 \
+        --gradient_accumulation_steps 8 \
         --use_flash_attention 0 \
         --use_fused_rms_norm 0 \
         --fp16 0 \
@@ -944,13 +944,13 @@ function llama_auto_recompute_bs2_fp32_DP2-MP1-PP1() {
         --weight_decay 0.01 \
         --warmup_ratio 0.01 \
         --max_grad_norm 1.0 \
-        --logging_steps 1\
+        --logging_steps 1 \
         --dataloader_num_workers 1 \
         --sharding "" \
         --eval_steps 1000 \
         --report_to "visualdl" \
         --disable_tqdm true \
-        --continue_training 0\
+        --continue_training 0 \
         --recompute 1 \
         --do_train \
         --do_eval \
@@ -962,20 +962,20 @@ function llama_auto_recompute_bs2_fp32_DP2-MP1-PP1() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.57837963
+    loss_base=9.41858447
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
-function llama_auto_recompute_bs2_fp32_DP2-MP2-PP1() {
+function llama_auto_recompute_bs16_fp32_DP2-MP2-PP1() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=2
     export SOT_LOG_LEVEL=4
 
-    task_name="llama_auto_bs2_dp2mp2pp1"
+    task_name="llama_auto_bs16_dp2mp2pp1"
     case_out_dir="output/$task_name"
     case_log_dir="output/$task_name""_log"
     rm -rf $case_out_dir
@@ -995,7 +995,7 @@ function llama_auto_recompute_bs2_fp32_DP2-MP2-PP1() {
         --max_seq_length 2048 \
         --per_device_train_batch_size 1 \
         --per_device_eval_batch_size 1 \
-        --gradient_accumulation_steps 1 \
+        --gradient_accumulation_steps 8 \
         --use_flash_attention 0 \
         --use_fused_rms_norm 0 \
         --fp16 0 \
@@ -1012,13 +1012,13 @@ function llama_auto_recompute_bs2_fp32_DP2-MP2-PP1() {
         --weight_decay 0.01 \
         --warmup_ratio 0.01 \
         --max_grad_norm 1.0 \
-        --logging_steps 1\
+        --logging_steps 1 \
         --dataloader_num_workers 1 \
         --sharding "" \
         --eval_steps 1000 \
         --report_to "visualdl" \
         --disable_tqdm true \
-        --continue_training 0\
+        --continue_training 0 \
         --recompute 1 \
         --do_train \
         --do_eval \
@@ -1030,20 +1030,20 @@ function llama_auto_recompute_bs2_fp32_DP2-MP2-PP1() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.6846962
+    loss_base=9.53447247
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
-function llama_auto_recompute_bs8_fp32_DP2-MP2-PP2() {
+function llama_auto_recompute_bs16_fp32_DP2-MP2-PP2() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=2
     export SOT_LOG_LEVEL=4
 
-    task_name="llama_auto_bs2_dp2mp2pp1"
+    task_name="llama_auto_bs16_dp2mp2pp1"
     case_out_dir="output/$task_name"
     case_log_dir="output/$task_name""_log"
     rm -rf $case_out_dir
@@ -1062,8 +1062,8 @@ function llama_auto_recompute_bs8_fp32_DP2-MP2-PP2() {
         --split 949,50,1 \
         --max_seq_length 2048 \
         --per_device_train_batch_size 1 \
-        --per_device_eval_batch_size 4 \
-        --gradient_accumulation_steps 4 \
+        --per_device_eval_batch_size 8 \
+        --gradient_accumulation_steps 8 \
         --use_flash_attention 0 \
         --use_fused_rms_norm 0 \
         --fp16 0 \
@@ -1080,13 +1080,13 @@ function llama_auto_recompute_bs8_fp32_DP2-MP2-PP2() {
         --weight_decay 0.01 \
         --warmup_ratio 0.01 \
         --max_grad_norm 1.0 \
-        --logging_steps 1\
+        --logging_steps 1 \
         --dataloader_num_workers 1 \
         --sharding "" \
         --eval_steps 1000 \
         --report_to "visualdl" \
         --disable_tqdm true \
-        --continue_training 0\
+        --continue_training 0 \
         --recompute 1 \
         --do_train \
         --do_eval \
@@ -1098,7 +1098,7 @@ function llama_auto_recompute_bs8_fp32_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.59060478
+    loss_base=9.52331257
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
