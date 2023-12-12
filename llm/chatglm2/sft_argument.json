@@ -25,5 +25,7 @@
     "recompute": true,
     "save_total_limit": 1,
     "sharding_parallel_degree": 4,
-    "sharding": "stage3"
+    "sharding": "stage3",
+    "zero_padding": false,
+    "use_flash_attention": false
   }
