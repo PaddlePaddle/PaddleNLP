@@ -1417,7 +1417,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         use_safetensors: bool | None = None,
         variant=None,
     ) -> str:
-
         """resolve model target file path from `` and `cache_dir`
 
         1. when it is file path:
@@ -2462,6 +2461,22 @@ class PipelinePretrainedModel(PretrainedModel):
         return self._single_to_pp_mapping
 
     def get_shardlayer_prefix(self, name_splited):
+        """_summary_
+            This function retrieves the prefix of a shared layer. The process involves:
+            1. Identifying all key names of shared layers, like 'shared_weight01', 'shared_weight02', etc.
+            2. For instance, given name_splited = ['shared_layers', 'shared_weight01', 'weight'],
+                the 'shared_layer_key' would be name_splited[1], which is 'shared_weight01'.
+            3. By traversing through all layers, the function checks if the specified
+                shared_layer is present in the current stage. If found, it returns the corresponding prefix.
+
+            Note: For retrieving all SharedLayer instances in Paddle, you can refer to the following Paddle code.
+            https://github.com/PaddlePaddle/Paddle/blob/2cf724d055679a1a0e48766dfb1708b920273078/python/paddle/distributed/fleet/meta_parallel/parallel_layers/pp_layers.py#L460-L513
+        Args:
+            name_splited (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
         shared_layer_names = {s.layer_name for s in self._layers_desc if isinstance(s, SharedLayerDesc)}
         assert name_splited[1] in shared_layer_names, f"The shared layer name {name_splited[1]} must be in prefixes!"
         shared_layer_key = name_splited[1]
@@ -2470,11 +2485,8 @@ class PipelinePretrainedModel(PretrainedModel):
                 if self.get_stage_from_index(idx) == self._stage_id:
                     return self.get_sequential_name_prefixes()[str(idx)]
 
-        default_prefix = self.get_sequential_name_prefixes()["0"]
-        logger.warning(
-            f"Please check! we treat this key as last layer, get {'.'.join(name_splited)}, set prefix name as {default_prefix}"
-        )
-        return default_prefix
+        # the prefix must be in the current stage, else raise error
+        raise ValueError(f"The shared layer {shared_layer_key} must be in the current stage!")
 
     def state_dict(self, *args, **kwargs):
         state_dict = super().state_dict(*args, **kwargs)
