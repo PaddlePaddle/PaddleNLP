@@ -181,7 +181,9 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         config.tensor_parallel_rank = tensor_parallel_rank
 
         self.add_sequential_layer(
-            SharedLayerDesc("gpt", GPTEmbeddingPipe, shared_weight_attr="embedding_weight", config=config),
+            SharedLayerDesc(
+                "gpt_shared_weight", GPTEmbeddingPipe, shared_weight_attr="embedding_weight", config=config
+            ),
             "gpt.embeddings",
         )
         for i in range(config.num_hidden_layers):
@@ -192,7 +194,7 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
         self.add_sequential_layer(LayerDesc(LayerNormPipe, config=config), "gpt.decoder.norm")
         self.add_sequential_layer(
-            SharedLayerDesc("gpt", GPTLMHeadPipe, shared_weight_attr="embedding_weight", config=config),
+            SharedLayerDesc("gpt_shared_weight", GPTLMHeadPipe, shared_weight_attr="embedding_weight", config=config),
             "gpt.embeddings.word_embeddings",
         )
 
