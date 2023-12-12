@@ -199,7 +199,7 @@ class QWenInferenceModel(QWenPretrainedModel):
                 state_dict["qwen.h.{}.mlp.w2.weight".format(idx)],
                 dtype=self.transformer_block.ffn1_weights[idx].dtype
             )
-            ffn1_weight = paddle.concat(x=[up_weight, gate_weight], axis=-1)
+            ffn1_weight = paddle.concat(x=[gate_weight, up_weight], axis=-1)
             ffn2_weight = paddle.to_tensor(
                 state_dict["qwen.h.{}.mlp.c_proj.weight".format(idx)],
                 dtype=self.transformer_block.ffn2_weights[idx].dtype
@@ -343,7 +343,7 @@ class QWenForCausalLMInferenceModel(GenerationInferenceModel, QWenPretrainedMode
         cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
     ):
         # TODO: Support safetensors loading.
-        kwargs["use_safetensors"] = False
+        kwargs["use_safetensors"] = True
         return super().from_pretrained(pretrained_model_name_or_path, from_hf_hub, subfolder, *args, **kwargs)
     
     @classmethod
