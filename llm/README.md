@@ -1,28 +1,28 @@
 
-## 🚣‍♂️ 大模型全流程工具链介绍 🚣
-飞桨大模型套件秉承了一站式体验、性能极致、生态兼容的设计理念，旨在提供业界主流大模型预训练、精调（含SFT、PEFT）、量化、推理等全流程统一工具链， 帮助开发者低成本、低门槛、快速实现大语言模型定制化。
+## 🚣‍♂️ 飞桨大模型套件介绍 🚣
+飞桨大模型套件秉承了一站式体验、性能极致、生态兼容的设计理念，旨在提供业界主流大模型预训练、精调（含SFT、PEFT）、量化、推理等统一流程， 帮助开发者低成本、低门槛、快速实现大语言模型定制化。
 
 <div align="center">
-    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/17710a9a-d972-4772-9bf4-19ff938b5fe9">
+    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/da10e972-260c-4925-bf49-1e0aefd2a65c">
 </div>
 
 
-##  💪🏼 工具链特色 💪🏼
+##  💪🏼 大模型套件特色 💪🏼
 
--  **飞桨4D并行分布式策略**。 PaddleNLP Trainer 封装支持了飞桨4D并行配置（数据并行、张量并行、流水线并行、Sharding 并行），屏蔽多硬件编程复杂性，用户可以修改Trainer配置组合多种预训练或精调过程的分布式策略，获得更高效、更稳定的训练体验。
+-  **飞桨4D并行分布式策略**。 PaddleNLP Trainer 封装支持飞桨4D并行配置（数据并行、张量并行、流水线并行、 分组参数切分并行），屏蔽多硬件编程复杂性，用户可以修改Trainer配置组合多种预训练或精调过程的分布式策略，充分组合大模型4D并行训练能力，能有效提升在多模型、多硬件下的训练性能。
 
--  **高效精调策略**。飞桨大模型套件提供SFT、PEFT等多种精调策略，搭载自研Intokens策略有效减少了pad token的占比，提高模型训练效率。独创PEFT结合低比特和分布式并行策略，大幅降低大模型精调硬件门槛。
-
-
-- **大模型无损量化**。工具链内置了PaddleSlim 团队自研的自适应Shift-SmoothQuant的A8W8量化算法和业界主流GPTQ的W4量化算法，实现了主流大模型的无损量化，有效加速模型推理。
+-  **高效精调策略**。飞桨大模型套件提供SFT、PEFT等多种精调策略，搭载自研Zero Padding零填充优化策略有效减少训练数据中pad token的占比，提高模型训练效率。独创PEFT结合低比特和分布式并行策略，大幅降低大模型精调硬件门槛。
 
 
-- **高性能推理**。工具链高性能推理模块内置动态插入和全环节算子融合策略，极大加快并行推理的速度。同时隐藏了底层实现的细节，实现高性能推理开箱即用。
+- **大模型无损量化**。大模型套件内置了PaddleSlim团队自研的自适应Shift-SmoothQuant的A8W8量化算法和业界主流GPTQ的W4量化算法，实现了主流大模型的无损量化，有效加速模型推理。
+
+
+- **高性能推理**。大模型套件高性能推理模块内置动态插入和全环节算子融合策略，极大加快并行推理的速度。同时隐藏了底层实现的细节，实现了开箱即用高性能并行推理能力。
 
 
 ##  🛠️ 支持模型列表 🛠️
 
-| Model | Pretrain | SFT | LoRA | Prefix Tuning |  Quantization | weight convert |
+| Model | Pretrain | SFT | LoRA | Prefix Tuning |  Quantization | Weight convert |
 | --- | --- | --- | --- | --- | --- |  --- |
 | [LLaMA/LLaMA2](./llama) | ✅  | ✅ | ✅ | ✅ | ✅  | ✅  |
 | [Baichuan/Baichuan2](./llama) | ✅  | ✅ | ✅ | ✅ | ✅  | ✅  |
@@ -62,14 +62,14 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py
 
 ### 2. 精调
 PaddleNLP支持多个主流大模型的SFT、LoRA、Prefix Tuning等精调策略，提供统一、高效精调方案：
-- 统一的使用方法，可适配任意大模型。用户只需修改配置文件即能在单卡或多卡（支持4D并行分布式策略）进行多种大模型精调。
-- 可变数据流Intokens策略。自研Intokens策略有效减少了pad token的占比，提高模型训练效率高达100%。
-- 独创PEFT结合低比特和分布式并行策略，大幅降低大模型精调硬件门槛，支持单卡（A100 80G）百亿模型微调、单机（A100 80G * 8）千亿模型微调。
-- 高效多轮对话模式精调。只需要添加一个 chat_template 的配置即可为该模型添加相应的多轮对话精调训练支持，具体的配置可看[多轮对话文档](./docs/chat_template.md)
+- **统一训练入口**。飞桨大模型套件精调方案可适配业界主流大模型，用户只需修改配置文件，即能在单卡或多卡（支持4D并行分布式策略）进行多种大模型精调。
+- **高效数据和分布式策略**。Zero Padding零填充优化策略有效减少了pad token的占比，提高模型训练效率高达100%。独创PEFT结合低比特和分布式并行策略，大幅降低大模型精调硬件门槛，支持单卡（A100 80G）百亿模型微调、单机（A100 80G * 8）千亿模型微调。
+- **支持多轮对话**。支持统一对话模板，支持多轮对话高效训练，详参[多轮对话文档](./docs/chat_template.md)。
+
 
 
 <div align="center">
-    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/b2b4db4f-0cf3-4d28-989c-e3c00d24f397">
+    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/a1d982f8-d2ef-4a78-bb49-6d6683d6ecce">
 </div>
 <div align="center">
     <font size ="1">
@@ -79,8 +79,19 @@ PaddleNLP支持多个主流大模型的SFT、LoRA、Prefix Tuning等精调策略
 
 **数据准备**：
 
+我们支持的精调数据格式是每行包含一个字典的json文件，每个字典包含以下字段：
+
+- `src` : `str, List(str)`, 模型的输入指令（instruction）、提示（prompt），模型应该执行的任务。
+- `tgt` : `str, List(str)`, 模型的输出。
+
+样例数据：
+```
+{"src": "类型#裙*颜色#蓝色*风格#清新*图案#蝴蝶结", "tgt": "裙身处采用立体蝴蝶结装饰辅以蓝色条带点缀，令衣身造型饱满富有层次的同时为其注入一丝甜美气息。将女孩清新娇俏的一面衬托而出。"}
+...
+```
+
+为了方便测试，我们也提供了广告生成数据集可以直接使用：
 ```bash
-# 下载测试数据集：
 wget https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
 tar -zxvf AdvertiseGen.tar.gz
 ```
@@ -103,7 +114,7 @@ python  finetune_generation.py ./llama/lora_argument.json
 python  finetune_generation.py ./llama/pt_argument.json
 ```
 
-更多大模型精调使用文档、训练细节和效果请参见[大模型精调教程](./docs/finetune.md)。
+更多大模型精调分布式使用文档、训练细节和效果请参见[大模型精调教程](./docs/finetune.md)。
 
 ### 3. 量化
 大模型量化将16位、32位浮点数的模型参数或激活量化为4位或8位整数能够有效降低模型存储空间和计算资源需求，同时加速推理速度。工具链量化算法包含：
@@ -147,10 +158,10 @@ python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --data_file 
 # step1 : 静态图导出
 python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --output_path ./inference --dtype float16
 # step2: 静态图推理
-python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --output_path ./inference --dtype float16
+python predictor.py --model_name_or_path ./inference --data_file ./data/dev.json --dtype float16 --mode static
 ```
 
-- **InferenceModel 高性能推理**：PaddleNLP 还提供了高性能推理模型加快并行推理的速度，同时支持fp16、Prefix Tuning、WINT8、A8W8多种推理方式。
+- **InferenceModel 高性能推理**：PaddleNLP 还提供了高性能推理模型加快并行推理的速度，同时支持FP16、Prefix Tuning、WINT8、A8W8多种推理方式。
 <div align="center">
     <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/fb248224-0ad1-4d6a-a1ca-3a8dd765c41d">
 </div>

@@ -42,6 +42,27 @@ def load_tp_params(tp_degree, path):
     return tp_state_dict_list
 
 
+def load_tp_and_pp_params(tp_degree, pp_degree, path):
+    tp_state_dict_list = []
+    for tp in range(tp_degree):
+        tp_state_dict = {}
+        for pp in range(pp_degree):
+            tmp = paddle.load(os.path.join(path, f"model_state.tp{tp:0>2d}_pp{pp:0>2d}.pdparams"), return_numpy=True)
+            for k, v in tmp.items():
+                tp_state_dict[k] = v
+        tp_state_dict_list.append(tp_state_dict)
+    return tp_state_dict_list
+
+
+def load_pp_params(pp_degree, path):
+    pp_state_dict = {}
+    for pp in range(pp_degree):
+        tmp = paddle.load(os.path.join(path, f"model_state.pp{pp:0>2d}.pdparams"), return_numpy=True)
+        for k, v in tmp.items():
+            pp_state_dict[k] = v
+    return pp_state_dict
+
+
 def merge_tensor_parallel(model_class, state_dict_list, config) -> None:
     """the entry of converting config and converting model file
 
@@ -85,11 +106,19 @@ def main():
     model_class = getattr(import_class, init_class)
 
     if config.tensor_parallel_degree > 1:
-        tp_state_dict_list = load_tp_params(config.tensor_parallel_degree, args.model_name_or_path)
+        if config.pipeline_parallel_degree > 1:
+            tp_state_dict_list = load_tp_and_pp_params(
+                config.tensor_parallel_degree, config.pipeline_parallel_degree, args.model_name_or_path
+            )
+        else:
+            tp_state_dict_list = load_tp_params(config.tensor_parallel_degree, args.model_name_or_path)
         state_dict_to_save = merge_tensor_parallel(
             model_class=model_class, state_dict_list=tp_state_dict_list, config=config
         )
-
+        logger.info("Saving")
+        paddle.save(state_dict_to_save, os.path.join(args.model_name_or_path, "model_state.pdparams"))
+    elif config.pipeline_parallel_degree > 1:
+        state_dict_to_save = load_pp_params(config.pipeline_parallel_degree, args.model_name_or_path)
         logger.info("Saving")
         paddle.save(state_dict_to_save, os.path.join(args.model_name_or_path, "model_state.pdparams"))
     else:

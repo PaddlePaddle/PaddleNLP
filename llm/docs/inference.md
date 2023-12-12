@@ -19,18 +19,35 @@ python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --data_file 
 # step1 : 静态图导出
 python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --output_path ./inference --dtype float16
 # step2: 静态图推理
-python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --output_path ./inference --dtype float16
+python predictor.py --model_name_or_path ./inference --data_file ./data/dev.json --dtype float16 --mode static
 ```
 
 ## 2. 高性能模型推理
 
-### 2.1 支持模型
+高性能推理内置动态插入和全环节算子融合策略，隐藏了底层实现的细节，实现了开箱即用高性能并行推理能力。
+<div align="center">
+    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/42174b47-f765-48d6-9fef-907b69bf6706">
+</div>
+<div align="center">
+    <font size ="1">
+    飞桨高性能推理算子融合示意图
+     </font>
+</div>
+
+<div align="center">
+    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/616b3fc5-b9b2-4b10-a5c8-2f892a65ae6b">
+</div>
+<div align="center">
+    <font size ="1">
+    动态插入图解 & 飞桨高性能模型推理性能图
+     </font>
+</div>
 
 PaddleNLP 中已经添加高性能推理模型相关实现，支持：
 
-| Model                       | Inference Model | PTuning | Wint8 | PTQ |
+| Model                       | Inference Model | PTuning | WINT8 | PTQ-A8W8 |
 |-----------------------------|-----------------|---------|-------|-----|
-| [LLaMA1/2](../llama)         | ✅               | ✅       | ✅     | 🚧   |
+| [LLaMA1/2](../llama)         | ✅               | ✅       | ✅     | ✅   |
 | [ChatGLM](../chatglm)        | ✅               | ✅       | ✅     | ❌   |
 | [ChatGLM2](../chatglm2)      | ✅               | ❌       | ❌     | ❌   |
 | [Bloom](../bloom)            | ✅               | ✅       | ✅     | ❌   |
@@ -42,6 +59,8 @@ PaddleNLP 中已经添加高性能推理模型相关实现，支持：
 * ✅: Supported
 * 🚧: In Progress
 * ❌: Not Supported
+* WINT8:指Weight-Only Quantization INT8，即对权重进行INT8量化的模型。
+* PTQ-A8W8:指使用PTQ对线性层的激活和权重都量化为INT8的模型。
 
 ### 2.2 环境准备
 
