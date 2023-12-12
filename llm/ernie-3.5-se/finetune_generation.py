@@ -94,7 +94,7 @@ def main():
 
     paddle.set_device(training_args.device)
 
-    set_seed(seed=training_args.seed)
+    set_seed(args=training_args)
 
     # Log on each process the small summary:
     logger.warning(
