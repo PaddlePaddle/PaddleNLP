@@ -30,16 +30,16 @@ function _set_params(){
     model_repo="PaddleNLP"          # (必选) 模型套件的名字
     speed_unit="tokens/s"         # (必选)速度指标单位
     skip_steps=0                  # (必选)解析日志，跳过模型前几个性能不稳定的step
-    keyword="ips:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
+    keyword="interval_samples_per_second:"  # (必选)解析日志，筛选出性能数据所在行的关键字
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
-    sharding_degree=${10:-"1"}      # (可选)分组切分并行维度
-    sharding_stage=${11:-"1"}       # (可选)切分策略；1表示仅切分优化器状态，2表示再切分梯度，3表示再切分前向参数
-    sharding_offload=${12:-"False"} # (可选)CPU offload策略
-    max_iter=${13:-500}                      # （可选）需保证模型执行时间在5分钟内，需要修改代码提前中断的直接提PR 合入套件；或使用max_epoch参数
-    eval_freq=${14:-"1000"}         # (可选)模型评估间隔
+    max_iter=${10:-500}                      # （可选）需保证模型执行时间在5分钟内，需要修改代码提前中断的直接提PR 合入套件；或使用max_epoch参数
+    use_sharding=${11:-"False"}             
+    sharding_degree=${12:-"1"}
     num_workers=0                  # (可选)
     base_batch_size=$global_batch_size
-    use_recompute=${15:-"True"}    # (可选)是否打开recompute
+    virtual_pp_degree=${13:-"2"}  # (可选) virtualpp数据并行度
+    use_recompute=${14:-"True"}    # (可选)是否打开recompute
+    eval_freq=${15:-"25"}         # (可选)模型评估间隔
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -74,24 +74,58 @@ function _train(){
         log_file=${train_log_file}
     fi
 
-    local_batch_size=`expr ${global_batch_size} / ${dp_degree} / ${sharding_degree}`
-    use_pure_fp16=False
-    if [ "fp16" = ${fp_item} ]; then use_pure_fp16=True; fi
-    train_cmd="-o Global.local_batch_size=${local_batch_size} \
-               -o Global.micro_batch_size=${micro_batch_size} \
-               -o Engine.max_steps=${max_iter} \
-               -o Engine.eval_freq=${eval_freq} \
-               -o Engine.mix_precision.enable=${use_pure_fp16} \
-               -o Engine.save_load.save_steps=100000 \
-               -o Model.use_recompute=${use_recompute} \
-               -o Distributed.dp_degree=${dp_degree} \
-               -o Distributed.mp_degree=${mp_degree} \
-               -o Distributed.pp_degree=${pp_degree} \
-               -o Distributed.sharding.sharding_degree=${sharding_degree} \
-               -o Distributed.sharding.sharding_stage=${sharding_stage} \
-               -o Distributed.sharding.sharding_offload=${sharding_offload} \
-               -o Profiler_pretrain.memory_stats=True \
-                "
+    local_batch_size=`expr ${global_batch_size} / ${dp_degree} `
+    bf16=False
+    if [ "bf16" = ${fp_item} ]; then
+        bf16=True
+    else
+        bf16=False
+    fi
+   
+    if [ "False" = ${use_sharding} ]; then
+        sharding=""
+        sharding_parallel_degree=""
+    else
+        sharding="--sharding ${use_sharding}"
+        sharding_parallel_degree="--sharding_parallel_degree ${sharding_degree}"
+    fi
+
+    model_config="gpt2-medium-en"
+    train_cmd="--model_type gpt \
+                --model_name_or_path ${model_config} \
+                --tokenizer_name_or_path ${model_config} \
+                --input_dir ./data\
+                --output_dir output\
+                ${sharding} \
+                ${sharding_parallel_degree} \
+                --split 949,50,1 \
+                --max_seq_length 1024 \
+                --seed 1234 \
+                --fuse_attention_qkv True \
+                --use_flash_attention True \
+                --bf16 ${bf16} \
+                --fp16_opt_level "O2" \
+                --amp_master_grad True \
+                --learning_rate 0.00001 \
+                --min_learning_rate 0.000005 \
+                --max_grad_norm 1.0 \
+                --logging_steps 1 \
+                --continue_training 0 \
+                --dataloader_num_workers 1 \
+                --eval_steps 1000 \
+                --disable_tqdm True \
+                --gradient_accumulation_steps 2 \
+                --weight_decay 0.01\
+                --max_steps ${max_iter}\
+                --save_steps 5000\
+                --device gpu\
+                --skip_memory_metrics 0 \
+                --warmup_ratio 0.01\
+                --scale_loss 32768\
+                --per_device_train_batch_size ${micro_batch_size}\
+                --do_train \
+                --recompute ${use_recompute}"
+
 
     if [ ${PADDLE_TRAINER_ID} ]
     then
@@ -101,34 +135,24 @@ function _train(){
     fi
     # 以下为通用执行命令，无特殊可不用修改
     case ${run_mode} in
-    DP1-MP1-PP1-Sharding2) echo "run run_mode: DP1-MP1-PP1-Sharding2"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1 ${PADDLE_RANK_OPTION}\
-            ./tools/train.py -c ppfleetx/configs/nlp/gpt/pretrain_gpt_1.3B_dp8.yaml \
-            -o Global.seed=1234 \
-            -o Model.hidden_size=1024 \
-            -o Model.num_layers=4 \
-            -o Model.num_attention_heads=4 \
-            -o Model.type_vocab_size=1 \
-            -o Optimizer.lr.max_lr=1e-4 \
-            -o Optimizer.lr.min_lr=1e-5 \
-            ${train_cmd}"
+    DP1-mbs16-acc2) echo "run run_mode: ${run_mode}"
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0 ${PADDLE_RANK_OPTION}\
+            run_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
-    DP1-MP1-PP1-Sharding16) echo "run run_mode: ${run_mode}"
+    DP8-mbs2-acc2|SD8-stage1-mbs2-acc2) echo "run run_mode: ${run_mode}"
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
-            ./tools/train.py -c ppfleetx/configs/nlp/gpt/pretrain_gpt_6.7B_sharding16.yaml \
-            -o Engine.logging_freq=1 \
-            ${train_cmd}"
+            run_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
     *) echo "choose run_mode "; exit 1;
     esac
-    cd ../
+    cd ../llm/gpt-3
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间
         ${train_cmd} > ${log_file} 2>&1
     else
-        timeout 70m ${train_cmd} > ${log_file} 2>&1
+        timeout 20m ${train_cmd} > ${log_file} 2>&1
     fi
     if [ $? -ne 0 ];then
         echo -e "${model_name}, FAIL"
@@ -137,16 +161,20 @@ function _train(){
     fi
     #kill -9 `ps -ef|grep 'python'|awk '{print $2}'`
     if [ ${device_num} != "N1C1" -a -d mylog ]; then
-        case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/model_zoo/gpt-3/benchmarks
+        case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/tests/mylog
         cp -r ${case_path}/mylog/workerlog.* ./mylog/
         rm ${log_file}
         cp ${case_path}/mylog/workerlog.${workerlog_id} ${log_file}
     fi
 }
 
-export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
+export FLAGS_cudnn_deterministic=True
+export FLAGS_cudnn_deterministic=1
+export FLAGS_embedding_deterministic=1
 
+export PYTHONPATH="../../../PaddleNLP/"
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@
 #_train       # 如果只产出训练log,不解析,可取消注释
 _run     # 该函数在run_model.sh中,执行时会调用_train; 如果不联调只产出训练log可以注掉本行,提交时需打开
+

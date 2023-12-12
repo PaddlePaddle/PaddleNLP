@@ -87,6 +87,7 @@ def launch(args):
 
         data = {
             "context": utterance,
+            "history": json.dumps(context),
             "top_k": top_k,
             "top_p": top_p,
             "temperature": temperature,
@@ -191,7 +192,13 @@ def launch(args):
                 with gr.Row():
                     raw_context_json = gr.JSON(label="Raw Context")
 
-            utt_text.submit(begin, inputs=[utt_text, state], outputs=[utt_text, context_chatbot, raw_context_json, state], queue=False, api_name="chat").then(
+            utt_text.submit(
+                begin,
+                inputs=[utt_text, state],
+                outputs=[utt_text, context_chatbot, raw_context_json, state],
+                queue=False,
+                api_name="chat",
+            ).then(
                 infer,
                 inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_length],
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
@@ -222,7 +229,13 @@ def launch(args):
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
             )
 
-            send_btn.click(begin, inputs=[utt_text, state], outputs=[utt_text, context_chatbot, raw_context_json, state], queue=False, api_name="chat").then(
+            send_btn.click(
+                begin,
+                inputs=[utt_text, state],
+                outputs=[utt_text, context_chatbot, raw_context_json, state],
+                queue=False,
+                api_name="chat",
+            ).then(
                 infer,
                 inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_length],
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
