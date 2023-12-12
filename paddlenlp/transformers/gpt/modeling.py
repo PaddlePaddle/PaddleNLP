@@ -736,7 +736,10 @@ class GPTEmbeddings(nn.Layer):
             # [bs * seq_len / n, dim] (n is mp parallelism)
             embeddings = ScatterOp.apply(embeddings)
 
-        with seed_guard_context("global_seed"):
+        # Use a ternary operator for a more concise assignment of current_seed
+        current_seed = "local_seed" if self.config.sequence_parallel else "global_seed"
+        # The 'with' block ensures the correct seed context is used
+        with seed_guard_context(current_seed):
             embeddings = self.dropout(embeddings)
 
         return embeddings
