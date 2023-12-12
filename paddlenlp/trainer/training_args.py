@@ -645,6 +645,10 @@ class TrainingArguments:
     enable_optimizer_timer: Optional[bool] = field(
         default=False,
         metadata={"help": "是否开启Optimzier的timer"},
+    ） 
+    ignore_load_lr_and_optim: Optional[bool] = field(
+        default=False,
+        metadata={"help": "热启时，不加载lr与optimizer"}
     )
 
     def __post_init__(self):

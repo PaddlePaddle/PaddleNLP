@@ -766,8 +766,10 @@ class Trainer:
         steps_trained_progress_bar = None
 
         # Check if continuing training from a checkpoint
-        if resume_from_checkpoint is not None and os.path.isfile(
-            os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
+        if (
+            not self.args.ignore_load_lr_and_optim
+            and resume_from_checkpoint is not None
+            and os.path.isfile(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
         ):
             self.state = TrainerState.load_from_json(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
@@ -2488,6 +2490,10 @@ class Trainer:
 
     def _load_optimizer_and_scheduler(self, checkpoint):
         """If optimizer and scheduler states exist, load them."""
+
+        if not self.args.load_sharded_model and self.args.ignore_load_lr_and_optim:
+            return
+
         if checkpoint is None:
             return
 
@@ -2505,7 +2511,12 @@ class Trainer:
                 opt_state_dict["LR_Scheduler"]["adaptive_norm"] = {}
 
             # Load in optimizer and scheduler states
-            self.optimizer.set_state_dict(opt_state_dict)
+            if self.args.ignore_load_lr_and_optim:
+                init_opt_state_dict = self.optimizer.state_dict()
+                init_opt_state_dict["master_weights"] = opt_state_dict["master_weights"]
+                self.optimizer.set_state_dict(init_opt_state_dict)
+            else:
+                self.optimizer.set_state_dict(opt_state_dict)
 
             # Note(GuoxiaWang): Hold correct adaptive_norm state dict
             if (
@@ -2525,7 +2536,8 @@ class Trainer:
             ):
                 sched_state_dict["adaptive_norm"] = {}
 
-            self.lr_scheduler.set_state_dict(sched_state_dict)
+            if not self.args.ignore_load_lr_and_optim:
+                self.lr_scheduler.set_state_dict(sched_state_dict)
 
             # Note(GuoxiaWang): Because the state dict of lr_scheduler has been set to the state on the global rank 0 at this time
             # so, it need restore correctly adaptive_norm state dict
