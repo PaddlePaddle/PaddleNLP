@@ -18,6 +18,7 @@ import shutil
 
 import numpy as np
 from parallel_launch import TestMultipleGpus
+from utils import get_pretrain_arguments
 
 # export NVIDIA_TF32_OVERRIDE=0
 # export NCCL_IB_GID_INDEX=3
@@ -105,24 +106,6 @@ def remove_logs(log_dir="log"):
 def remove_ckpt(ckpt_dir):
     if os.path.exists(ckpt_dir):
         shutil.rmtree(ckpt_dir)
-
-
-# [x] 单机，tp8
-# [x] 单机，tp4pp2
-# [x] 单机，tp4dp2
-# [x] 单机，tp4 shard2 stage1
-# [x] 单机，tp2pp4
-# [x] 单机，tp2 shard4 stage2
-# [x] 单机，pp8
-# [x] 单机，pp4dp2
-# [ ] 单机，pp4shard2  stage1
-# [ ] 单机，pp2dp2shard2  stage1
-# [ ] 单机，shard8, stage1
-# [ ] 单机，shard8, stage2
-# [ ] 单机，shard4dp2 stage1
-# [ ] 单机，shard4dp2 stage2
-# [ ] 单机，shard2dp4 stage1
-# [x] 单机，dp8
 
 
 class TestModelOnN1C8(TestMultipleGpus):
@@ -366,3 +349,233 @@ class TestModelOnN1C8(TestMultipleGpus):
         res = check_acc()
         assert len(res) == 2
         np.testing.assert_allclose(res[0], res[1])
+
+
+class TestModelOnN1C8Dynamic(TestMultipleGpus):
+    def setUp(self):
+        os.environ.update(environment_variables)
+        self.configs = get_pretrain_arguments(pretrain_arguments)
+
+    def testTP8(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["TP8"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+        for config_name, config in self.configs.items():
+            if config_name == "TP8":
+                continue
+            self.run_n1c8("run_pretrain.py", **config)
+            res = check_acc()
+            np.testing.assert_allclose(res[0], res[-1], rtol=1e-4)
+
+    def testTP4PP2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["TP4PP2"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+        for config_name, config in self.configs.items():
+            if config_name == "TP4PP2":
+                continue
+            self.run_n1c8("run_pretrain.py", **config)
+            res = check_acc()
+            np.testing.assert_allclose(res[0], res[-1], rtol=1e-4)
+
+    def testTP4DP2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["TP4DP2"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+        for config_name, config in self.configs.items():
+            if config_name == "TP4DP2":
+                continue
+            self.run_n1c8("run_pretrain.py", **config)
+            res = check_acc()
+            np.testing.assert_allclose(res[0], res[-1], rtol=1e-4)
+
+    def testTP4Sharding2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["TP4Sharding2"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+        for config_name, config in self.configs.items():
+            if config_name == "TP4Sharding2":
+                continue
+            self.run_n1c8("run_pretrain.py", **config)
+            res = check_acc()
+            np.testing.assert_allclose(res[0], res[-1], rtol=1e-4)
+
+    def testTP2PP4(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["TP2PP4"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+        for config_name, config in self.configs.items():
+            if config_name == "TP2PP4":
+                continue
+            self.run_n1c8("run_pretrain.py", **config)
+            res = check_acc()
+            np.testing.assert_allclose(res[0], res[-1], rtol=1e-4)
+
+    def testTP2Sharding4(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["TP2Sharding4"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+        for config_name, config in self.configs.items():
+            if config_name == "TP2Sharding4":
+                continue
+            self.run_n1c8("run_pretrain.py", **config)
+            res = check_acc()
+            np.testing.assert_allclose(res[0], res[-1], rtol=1e-4)
+
+    def testPP8(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["PP8"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+        for config_name, config in self.configs.items():
+            if config_name == "PP8":
+                continue
+            self.run_n1c8("run_pretrain.py", **config)
+            res = check_acc()
+            np.testing.assert_allclose(res[0], res[-1], rtol=1e-4)
+
+    def testPP4DP2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["PP4DP2"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+        for config_name, config in self.configs.items():
+            if config_name == "PP4DP2":
+                continue
+            self.run_n1c8("run_pretrain.py", **config)
+            res = check_acc()
+            np.testing.assert_allclose(res[0], res[-1], rtol=1e-4)
+
+    def testPP4Sharding2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["PP4Sharding2"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+        for config_name, config in self.configs.items():
+            if config_name == "PP4Sharding2":
+                continue
+            self.run_n1c8("run_pretrain.py", **config)
+            res = check_acc()
+            np.testing.assert_allclose(res[0], res[-1], rtol=1e-4)
+
+    def testSharding8S1(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["Sharding8S1"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+        for config_name, config in self.configs.items():
+            if config_name == "Sharding8S1":
+                continue
+            self.run_n1c8("run_pretrain.py", **config)
+            res = check_acc()
+            np.testing.assert_allclose(res[0], res[-1], rtol=1e-4)
+
+    def testSharding8S2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["Sharding8S2"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+        for config_name, config in self.configs.items():
+            if config_name == "Sharding8S2":
+                continue
+            self.run_n1c8("run_pretrain.py", **config)
+            res = check_acc()
+            np.testing.assert_allclose(res[0], res[-1], rtol=1e-4)
+
+    def testSharding4S1DP2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["Sharding4S1DP2"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+        for config_name, config in self.configs.items():
+            if config_name == "Sharding4S1DP2":
+                continue
+            self.run_n1c8("run_pretrain.py", **config)
+            res = check_acc()
+            np.testing.assert_allclose(res[0], res[-1], rtol=1e-4)
+
+    def testSharding4S2DP2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["Sharding4S2DP2"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+        for config_name, config in self.configs.items():
+            if config_name == "Sharding4S2DP2":
+                continue
+            self.run_n1c8("run_pretrain.py", **config)
+            res = check_acc()
+            np.testing.assert_allclose(res[0], res[-1], rtol=1e-4)
+
+    def testSharding2S1DP4(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["Sharding2S1DP4"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+        for config_name, config in self.configs.items():
+            if config_name == "Sharding2S1DP4":
+                continue
+            self.run_n1c8("run_pretrain.py", **config)
+            res = check_acc()
+            np.testing.assert_allclose(res[0], res[-1], rtol=1e-4)
+
+    def testSharding2S2DP4(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["Sharding2S2DP4"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+        for config_name, config in self.configs.items():
+            if config_name == "Sharding2S2DP4":
+                continue
+            self.run_n1c8("run_pretrain.py", **config)
+            res = check_acc()
+            np.testing.assert_allclose(res[0], res[-1], rtol=1e-4)
+
+    def testDP8(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["DP8"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+        for config_name, config in self.configs.items():
+            if config_name == "DP8":
+                continue
+            self.run_n1c8("run_pretrain.py", **config)
+            res = check_acc()
+            np.testing.assert_allclose(res[0], res[-1], rtol=1e-4)

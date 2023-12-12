@@ -410,23 +410,6 @@ def init_seed(seed: int = 1234, args=None):
             paddle.seed(args.seed)
 
 
-def validate_batch(batch, args):
-    batches = []
-    if args.pipeline_parallel_degree > 1 or args.gradient_accumulation_steps == 1:
-        batches = batch
-    else:
-        feed_names = []
-        split_batches = []
-        for n, b in batch[0].items():
-            feed_names.append(n)
-            split_batches.append(np.split(np.array(b), args.gradient_accumulation_steps, 0))
-        for i in range(len(split_batches[0])):
-            micro_batch = [split_batch[i] for split_batch in split_batches]
-            batches.append(dict(zip(feed_names, micro_batch)))
-
-    return batches
-
-
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
@@ -562,11 +545,11 @@ def main():
     def loss_func(loss, outputs):
         return loss
 
-    total_train_batch_size = (
-        training_args.per_device_train_batch_size
-        * training_args.gradient_accumulation_steps
-        * training_args.data_parallel_degree
+    total_train_batch_size_per_acc_step = (
+        training_args.per_device_train_batch_size * training_args.data_parallel_degree
     )
+    total_train_batch_size = total_train_batch_size_per_acc_step * training_args.gradient_accumulation_steps
+
     print_config(training_args)
 
     engine = auto.Engine(model, loss_func, optimizer, strategy=training_args.strategy)
@@ -582,14 +565,14 @@ def main():
         mode="train",
     )
 
-    dp_degree = training_args.data_parallel_degree
-    mp_degree = training_args.tensor_parallel_degree
-    pp_degree = training_args.pipeline_parallel_degree
+    dp_degree = max(training_args.data_parallel_degree, 1)
+    mp_degree = max(training_args.tensor_parallel_degree, 1)
+    pp_degree = max(training_args.pipeline_parallel_degree, 1)
     assert dp_degree * mp_degree * pp_degree == dist.get_world_size()
 
     train_dataloader = engine.dataloader(
         dataset=train_dataset,
-        batch_size=total_train_batch_size,
+        batch_size=total_train_batch_size_per_acc_step if pp_degree == 1 else total_train_batch_size,
         steps_per_epoch=training_args.max_steps,
         epochs=training_args.num_train_epochs,
         collate_fn=data_collator,
@@ -607,11 +590,16 @@ def main():
     global_step_last_logged = 0
     start_time_last_logged = time.time()
     tr_loss = float(0)
+    local_batches = []
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
-            batches = validate_batch(inputs, training_args)
+            local_batches.append(inputs)
+            if pp_degree == 1 and len(local_batches) < training_args.gradient_accumulation_steps:
+                continue
+            elif pp_degree > 1:
+                local_batches = inputs
 
-            for micro_batch in batches:
+            for micro_batch in local_batches:
                 outs = engine.run(micro_batch, mode="train")
 
                 if "loss" in outs:
@@ -624,11 +612,13 @@ def main():
 
                 tr_loss += tr_loss_step
 
+            local_batches = []
+
             if lr_scheduler is not None:
                 engine.optimizer._learning_rate.step()
 
             global_step += 1
-            if (step + 1) % training_args.logging_steps == 0:
+            if global_step % training_args.logging_steps == 0:
                 num_steps = global_step - global_step_last_logged
                 logs = {}
                 logs["loss"] = round(tr_loss / num_steps, 8)
@@ -648,7 +638,7 @@ def main():
                 start_time_last_logged = time.time()
                 tr_loss = float(0)
 
-            if step >= training_args.max_steps:
+            if global_step >= training_args.max_steps:
                 break
 
 
