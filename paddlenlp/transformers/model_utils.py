@@ -2138,9 +2138,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     # try to get the name-mapping info
                     logger.info(
                         f"Starting to convert pytorch weight file<{resolved_archive_file}> to "
-                        f"paddle weight file<{os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)}> ..."
+                        f"paddle weight file<{os.path.join(cache_dir, pretrained_model_name_or_path, subfolder, PADDLE_WEIGHTS_NAME)}> ..."
                     )
-                    state_dict = cls.convert(resolved_archive_file, config, cache_dir)
+                    state_dict = cls.convert(
+                        resolved_archive_file,
+                        config,
+                        cache_dir=os.path.join(cache_dir, pretrained_model_name_or_path, subfolder),
+                    )
                 else:
                     raise ValueError(f"Unexpected file: {resolved_archive_file} for weight conversion.")
             else:
