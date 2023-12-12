@@ -520,6 +520,7 @@ class Trainer:
             state_dict = self.sharding_io.load_state_dict_from_checkpoint_with_reshard(
                 resume_from_checkpoint,
                 base_weight_name=weight_name,
+                model_wrapped=self.model_wrapped,
             )
             self.model.set_state_dict(state_dict)
         else:

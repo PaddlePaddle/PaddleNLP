@@ -98,6 +98,10 @@ class LayerNameScope:
         return scope
 
 
+def register_layername_prefix(layer_name):
+    LayerNameScope.register_layer_prefix(layer_name)
+
+
 def extract_param_names_groupby_layer(
     meta,
     mp_rank=0,
@@ -150,8 +154,15 @@ class LayerReNamingManager:
 class PipeLinelayer:
     def __init__(self, layer_name, param_names):
         self._layer_name = layer_name
+
         # make sure name with the same sublayer type is ordered
-        param_names = sorted(param_names, key=lambda x: x[1])
+        def sort_key(x):
+            # assume param_name is of the type layer_type_{same_layer_index}.w_{weight_index}
+            structure_name, param_name = x
+            same_layer_index = param_name.split(".")[0].split("_")[-1]
+            return int(same_layer_index)
+
+        param_names = sorted(param_names, key=sort_key)
         self._params = OrderedDict()
         for (k, v) in param_names:
             self._params[k] = v

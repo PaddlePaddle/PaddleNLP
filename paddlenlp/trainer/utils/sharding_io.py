@@ -123,7 +123,7 @@ class ShardingIO:
     def set_optimizer(self, optimizer):
         self.optimizer = optimizer
 
-    def load_state_dict_from_checkpoint_with_reshard(self, checkpoint, base_weight_name):
+    def load_state_dict_from_checkpoint_with_reshard(self, checkpoint, base_weight_name, model_wrapped):
         """load state_dict from_checkpoint with reshard, Only load model state dict."""
         parallel_config = self._load_distributed_strategy(checkpoint)
         pp_degree = parallel_config["pp_degree"]
@@ -157,7 +157,7 @@ class ShardingIO:
 
         if self._need_reshard_pp(checkpoint):
             meta = self._load_model_meta(checkpoint)
-            reshard_context = pp_reshard.build_pipeline_context(meta, self.model_wrapped)
+            reshard_context = pp_reshard.build_pipeline_context(meta, model_wrapped)
             node_model_state = pp_reshard.reshard(node_model_state, reshard_context, self.hcg)
 
         node_model_state.drop_rank()
@@ -283,7 +283,7 @@ class ShardingIO:
             # pp reshard
             if self._need_reshard_pp(checkpoint):
                 meta = self._load_model_meta(checkpoint)
-                reshard_context = pp_reshard.build_pipeline_context(meta, self.model_wrapped)
+                reshard_context = pp_reshard.build_pipeline_context(meta, model_wrapped)
                 model_state = pp_reshard.reshard(model_state, reshard_context, self.hcg)
             return model_state
 
@@ -301,7 +301,7 @@ class ShardingIO:
                 if cur_sharding_strategy == SHARDING_STRATEGY_V1
                 else reshard_util.sharding_v2.shard
             )
-            node_model_state = shard_func(node_model_state, self.model_wrapped, self.optimizer, self.hcg)
+            node_model_state = shard_func(node_model_state, model_wrapped, self.optimizer, self.hcg)
             # drop structural name in the key
             node_model_state.unpack_keys()
             return node_model_state.get_opt_state_dict()
@@ -409,7 +409,9 @@ class ShardingIO:
         (master_weights, tmp) = (tmp, master_weights)
         # cast to before
         for (k, v) in tmp.items():
+            name = v.name
             master_weights[k] = paddle.cast(v.cuda(), paddle.bfloat16).cpu()
+            master_weights[k].name = name
 
         structure_name_map = {k: v.name for (k, v) in self.model.state_dict().items()}
         node_model_state = reshard_util.NodeModelState()
@@ -448,6 +450,8 @@ class ShardingIO:
         if group is None:
             group = self.hcg.get_sharding_parallel_group()
         res = []
+        if group.nranks < 2:
+            return [obj]
         paddle.distributed.all_gather_object(res, obj, group)
         return res
 

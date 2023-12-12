@@ -14,6 +14,7 @@
 import math
 import os
 import random
+import re
 import sys
 import time
 from dataclasses import dataclass, field
@@ -53,6 +54,53 @@ def add_start_docstrings(*docstr):
         return fn
 
     return docstring_decorator
+
+
+# register pp_reshard information to aid pp reshard
+def register_pp_reshard_information(num_hidden_layers):
+
+    from paddlenlp.trainer.utils.reshard.pp_reshard import (
+        register_index_layer_func,
+        register_layername_prefix,
+        regitser_extract_layer_name_func,
+    )
+
+    # register layer names
+    register_layername_prefix("column_sequence_parallel_linear")
+    register_layername_prefix("row_sequence_parallel_linear")
+    register_layername_prefix("linear")
+    register_layername_prefix("embedding")
+    register_layername_prefix("create_parameter")
+    register_layername_prefix("llama_lm_head")
+
+    # register func to extract layer from stuctural param name
+    # register func to extract layer index  from stuctural param name
+
+    def extract_layer_name(param_name):
+        patterns = [r"^llama\.embed_tokens", "^llama\.norm", r"^lm_head", r"^llama\.layers((\.\d+))"]
+        # match 1
+        for p in patterns:
+            match = re.search(p, param_name)
+            if match:
+                return match.group()
+
+    def index_layer(layer_name):
+        if layer_name == "llama.embed_tokens":
+            return 0
+        elif layer_name == "llama.norm":
+            return num_hidden_layers + 1
+        elif layer_name == "lm_head":
+            return num_hidden_layers + 2
+        else:
+            pattern = r"llama\.layers((\.(\d+)))"
+            match = re.search(pattern, layer_name)
+            assert match
+            index = int(match.group(3)) + 1
+            assert index <= num_hidden_layers, f"{index} {num_hidden_layers}"
+            return index
+
+    regitser_extract_layer_name_func(extract_layer_name)
+    register_index_layer_func(index_layer)
 
 
 @dataclass
@@ -460,6 +508,7 @@ def main():
     model_class = AutoModelForCausalLM
     if training_args.pipeline_parallel_degree > 1:
         model_class = AutoModelForCausalLMPipe
+        register_pp_reshard_information(config.num_hidden_layers)
 
     if model_args.continue_training:
         model = model_class.from_pretrained(

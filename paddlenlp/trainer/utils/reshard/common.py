@@ -500,6 +500,8 @@ class NodeModelState:
 
 def all_gather_simple_object(obj, group):
     res = []
+    if group.nranks < 2:
+        return [obj]
     paddle.distributed.all_gather_object(res, obj, group)
     return res
 
