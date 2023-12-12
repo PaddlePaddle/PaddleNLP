@@ -1149,11 +1149,9 @@ class Trainer:
         """print timer and clear states"""
         paddle_timer_info = ""
         try:
-            paddle_pipeline_timers = paddle_get_timers()
-            for name, timer in paddle_pipeline_timers.timers.items():
-                elapsed_time = timer.elapsed(reset=False) * 1000.0
+            for name, timer in paddle_get_timers().timers.items():
+                elapsed_time = timer.elapsed(reset=True) * 1000.0
                 paddle_timer_info += f" | {name}: {elapsed_time:.2f}"
-            paddle_pipeline_timers.log(paddle_pipeline_timers.timers.keys(), reset=True)
         except AssertionError:
             pass
 
@@ -1841,21 +1839,34 @@ class Trainer:
 
         model.train()
         inputs = self._prepare_inputs(inputs)
+
+        # obtain current acc step
+        if not hasattr(self, "_cur_acc_step"):
+            self._cur_acc_step = 0
+
+        if self._cur_acc_step == self.args.gradient_accumulation_steps:
+            self._cur_acc_step = 0
+
+        self.timers and self.timers(f"forward-acc-{self._cur_acc_step}").start()
         with self.autocast_smart_context_manager():
             loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
         if self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = map_structure(lambda x: x / self.args.gradient_accumulation_steps, loss)
+        self.timers and self.timers(f"forward-acc-{self._cur_acc_step}").stop()
 
         if isinstance(loss, dict):
             total_loss = loss["loss"]
         else:
             total_loss = loss
 
+        self.timers and self.timers(f"backward-acc-{self._cur_acc_step}").start()
         if self.do_grad_scaling:
             self.scaler.scale(total_loss).backward()
         else:
             total_loss.backward()
+        self.timers and self.timers(f"backward-acc-{self._cur_acc_step}").stop()
 
+        self._cur_acc_step += 1
         return map_structure(lambda v: v.detach(), loss), outputs
 
     def training_pipeline_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:

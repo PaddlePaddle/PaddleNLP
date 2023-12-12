@@ -642,6 +642,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "开启moe训练"},
     )
+    enable_optimizer_timer: Optional[bool] = field(
+        default=False,
+        metadata={"help": "是否开启Optimzier的timer"},
+    ） 
     ignore_load_lr_and_optim: Optional[bool] = field(
         default=False,
         metadata={"help": "热启时，不加载lr与optimizer"}
@@ -897,6 +901,8 @@ class TrainingArguments:
                     "order": order,
                     "sharding_degree": sharding_parallel_degree,
                 }
+                if self.enable_optimizer_timer:
+                    hybrid_configs["enable_optimizer_timer"] = True
 
                 if pipeline_parallel_degree > 1:
                     hybrid_configs["pp_configs"] = dygraph_pp_configs
