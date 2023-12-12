@@ -56,13 +56,12 @@ python -u  -m paddle.distributed.launch \
     --pipeline_parallel_degree 2 \
     --tensor_parallel_degree 2 \
     --sharding_parallel_degree 1 \
-    --learning_rate 0.00001 \
-    --min_learning_rate 0.000001 \
+    --learning_rate 0.0001 \
+    --min_learning_rate 0.00001 \
     --max_steps 20000 \
     --save_steps 5000000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
-    --max_grad_norm 1.0 \
     --logging_steps 1\
     --dataloader_num_workers 1 \
     --sharding "" \
@@ -74,4 +73,5 @@ python -u  -m paddle.distributed.launch \
     --do_eval \
     --device "gpu" \
     --data_impl "mmap" \
-    --parallel_mode "auto"
+    --parallel_mode "auto" \
+    --max_grad_norm -1 \

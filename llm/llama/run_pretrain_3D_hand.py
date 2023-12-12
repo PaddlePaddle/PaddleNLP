@@ -17,34 +17,25 @@ GPT/Llama auto parallel pretraining scripts.
 import os
 import random
 import sys
-import time
 import types
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import List, Optional
-from paddle.autograd import PyLayer
-from collections import OrderedDict
 
 import numpy as np
 import paddle
-import paddle.distributed.auto_parallel as auto
-from paddle.io import DataLoader, BatchSampler, DistributedBatchSampler 
-from paddle.distributed import fleet
 import paddle.distributed as dist
+from paddle.autograd import PyLayer
+from paddle.distributed import fleet
+from paddle.io import DataLoader, DistributedBatchSampler
 
-from paddlenlp.trainer import (
-    PdArgumentParser,
-    Trainer,
-    TrainingArguments,
-    speed_metrics,
+from paddlenlp.data.causal_dataset import (
+    build_train_valid_test_datasets,
+    check_data_split,
+    print_rank_0,
 )
-#from paddlenlp.transformers import (
-#    AutoTokenizer,
-#    CosineAnnealingWithWarmupDecay,
-#    LinearAnnealingWithWarmupDecay,
-#    LlamaConfig,
-#    LlamaForCausalLMPipe
-#)
-
+from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
+from paddlenlp.trainer.utils.reshard import NodeModelState, all_gather_state_dict
 from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -52,17 +43,16 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
-    register_sequence_parallel_allreduce_hooks,
 )
-
 from paddlenlp.utils.log import logger
-from paddlenlp.trainer.utils.reshard import NodeModelState, all_gather_state_dict
 
-from paddlenlp.data.causal_dataset import (
-    build_train_valid_test_datasets,
-    check_data_split,
-    print_rank_0,
-)
+# from paddlenlp.transformers import (
+#    AutoTokenizer,
+#    CosineAnnealingWithWarmupDecay,
+#    LinearAnnealingWithWarmupDecay,
+#    LlamaConfig,
+#    LlamaForCausalLMPipe
+# )
 
 
 def add_start_docstrings(*docstr):
@@ -380,34 +370,37 @@ def init_seed(seed: int = 1234, args=None):
             np.random.seed(args.seed)
             paddle.seed(args.seed)
 
+
 def get_mesh(pp_idx=0):
     mesh = fleet.auto.get_mesh()
     if "pp" in mesh.dim_names:
         mesh = mesh.get_mesh_with_dim("pp")[pp_idx]
     return mesh
 
+
 def _prepare_pipeline_inputs_func(inputs):
-   first_stage_keys = ["input_ids", "attention_mask", "position_ids"]
-   last_stage_keys = ["labels"]
+    first_stage_keys = ["input_ids", "attention_mask", "position_ids"]
+    last_stage_keys = ["labels"]
 
-   def get_expected_keys(inputs, keys):
-       ret = tuple([inputs.pop(k) for k in keys if k in inputs])
-       if len(ret) == 1:
-           ret = ret[0]
-       return ret
+    def get_expected_keys(inputs, keys):
+        ret = tuple([inputs.pop(k) for k in keys if k in inputs])
+        if len(ret) == 1:
+            ret = ret[0]
+        return ret
 
-   if type(inputs) is dict or type(inputs) is OrderedDict:
-       return [
-           get_expected_keys(inputs, first_stage_keys),
-           get_expected_keys(inputs, last_stage_keys),
-       ]
+    if type(inputs) is dict or type(inputs) is OrderedDict:
+        return [
+            get_expected_keys(inputs, first_stage_keys),
+            get_expected_keys(inputs, last_stage_keys),
+        ]
 
-   keys = list(inputs[0].keys())
-   inputs_batch = {key: [data.pop(key) for data in inputs] for key in keys}
-   return [
-       get_expected_keys(inputs_batch, first_stage_keys),
-       get_expected_keys(inputs_batch, last_stage_keys),
-   ]
+    keys = list(inputs[0].keys())
+    inputs_batch = {key: [data.pop(key) for data in inputs] for key in keys}
+    return [
+        get_expected_keys(inputs_batch, first_stage_keys),
+        get_expected_keys(inputs_batch, last_stage_keys),
+    ]
+
 
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
@@ -439,7 +432,6 @@ def main():
             "sharding_degree": 1,
         }
         fleet.init(is_collective=True, strategy=strategy)
-
 
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
@@ -547,38 +539,39 @@ def main():
 
     model = fleet.distributed_model(model)
     optimizer = fleet.distributed_optimizer(optimizer)
+    # skip grad sync
     load_model(model)
+    assert optimizer._dp_enable
+    optimizer._dp_enable = False
 
     def loss_func(loss):
         return loss
-        #hcg = fleet.get_hybrid_communicate_group()
-        #group = hcg.get_data_parallel_group()
-        #return LossMean.apply(loss, group)
+        # hcg = fleet.get_hybrid_communicate_group()
+        # group = hcg.get_data_parallel_group()
+        # return LossMean.apply(loss, group)
 
-
-    total_train_batch_size = training_args.per_device_train_batch_size \
-                             * training_args.gradient_accumulation_steps \
-                             * training_args.data_parallel_degree
     print_config(training_args)
 
     # create sampler and dataloader
     # each rank read (training_args.per_device_train_batch_size * training_args.data_parallel_degree) samples
-    print("dp_rank: ", dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree))
+    print(
+        "dp_rank: ", dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree)
+    )
     train_sampler = DistributedBatchSampler(
-            train_dataset,
-            batch_size=training_args.per_device_train_batch_size,
-            shuffle=False,
-            num_replicas=training_args.data_parallel_degree,
-            rank=dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree),
-            drop_last=training_args.dataloader_drop_last,
-        )
+        train_dataset,
+        batch_size=training_args.per_device_train_batch_size,
+        shuffle=False,
+        num_replicas=training_args.data_parallel_degree,
+        rank=dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree),
+        drop_last=training_args.dataloader_drop_last,
+    )
 
     train_dataloader = DataLoader(
-            train_dataset,
-            batch_sampler=train_sampler,
-            collate_fn=data_collator,
-            num_workers=training_args.dataloader_num_workers,
-        )
+        train_dataset,
+        batch_sampler=train_sampler,
+        collate_fn=data_collator,
+        num_workers=training_args.dataloader_num_workers,
+    )
 
     num_update_steps_per_epoch = len(train_dataloader) // training_args.gradient_accumulation_steps
     num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
@@ -587,9 +580,6 @@ def main():
     )
 
     global_step = 1
-    global_step_last_logged = 0
-    start_time_last_logged = time.time()
-    tr_loss = float(0)
     pp_data_buffer = []
     load_model(model)
     model.train()
@@ -607,22 +597,20 @@ def main():
             model.micro_batch_size = training_args.per_device_train_batch_size
             model.accumulate_steps = training_args.gradient_accumulation_steps
 
-            pp_inputs = model._prepare_training(
-                pp_inputs, optimizer, lr_scheduler
-            )
-            
-            loss = model.forward_backward_pipeline(pp_inputs)
-            print_grad(model)
+            pp_inputs = model._prepare_training(pp_inputs, optimizer, lr_scheduler)
 
+            loss = model.forward_backward_pipeline(pp_inputs)
+            sync_grad(model)
             optimizer.step()
+            # print_param(model)
             lr_scheduler.step()
             optimizer.clear_grad()
 
             print(f"global_step {global_step} loss {loss.item()}")
             pp_data_buffer.clear()
 
-            if global_step  >= 1:
-                #save_model(model)
+            if global_step >= 2:
+                # save_model(model)
                 sys.exit(0)
 
             global_step += 1
@@ -630,18 +618,16 @@ def main():
 
 def save_model(model):
     hcg = fleet.get_hybrid_communicate_group()
-    dp_degree = hcg.get_data_parallel_world_size()
     dp_rank = hcg.get_data_parallel_rank()
     mp_degree = hcg.get_model_parallel_world_size()
     mp_rank = hcg.get_model_parallel_rank()
-    pp_degree = hcg.get_pipe_parallel_world_size()
     pp_rank = hcg.get_stage_id()
     if dp_rank > 0:
-        return 
+        return
     state_dict = model.state_dict()
-    for (k,v) in state_dict.items():
+    for (k, v) in state_dict.items():
         print(f"{k}=>{v.name} {v.shape}")
-    paddle.save(state_dict, f"hand/pp{pp_rank:02d}mp{mp_rank:02d}.pdparams")    
+    paddle.save(state_dict, f"hand/pp{pp_rank:02d}mp{mp_rank:02d}.pdparams")
     group = hcg.get_model_parallel_group()
 
     # evenly ditribute param
@@ -653,7 +639,6 @@ def save_model(model):
         tensor_list = [e[1] for e in v]
         return merge_mp_tensor_list(k, tensor_list)
 
-
     node_model_state = node_model_state.even_distribute(group)
     node_model_state = node_model_state.collapse_key().merge_items(merge_func)
 
@@ -662,32 +647,29 @@ def save_model(model):
 
     all_state_dict = all_gather_state_dict(node_model_state.model_weights, filter_func, group)
     if mp_rank > 0:
-        return 
+        return
     paddle.save(all_state_dict, f"hand/pp{pp_rank:02d}.pdparams")
-    group = hcg.get_pipe_parallel_group()    
+    group = hcg.get_pipe_parallel_group()
     all_state_dict = all_gather_state_dict(all_state_dict, filter_func, group)
     if pp_rank > 0:
-        return 
-    paddle.save(all_state_dict, f"hand/all.pdparams")
+        return
+    paddle.save(all_state_dict, "hand/all.pdparams")
+
 
 def merge_tensor(tensor_list, fuse_num, axis):
     if fuse_num > 1:
-        part_list = [
-            paddle.split(e, num_or_sections=fuse_num, axis=axis)
-            for e in tensor_list
-        ]
+        part_list = [paddle.split(e, num_or_sections=fuse_num, axis=axis) for e in tensor_list]
         fuse_list = [paddle.concat(x=e, axis=axis) for e in zip(*part_list)]
         return paddle.concat(x=fuse_list, axis=axis)
     else:
         return paddle.concat(x=tensor_list, axis=axis)
 
+
 def load_model(model):
     hcg = fleet.get_hybrid_communicate_group()
-    mp_degree = hcg.get_model_parallel_world_size()
     mp_rank = hcg.get_model_parallel_rank()
-    pp_degree = hcg.get_pipe_parallel_world_size()
     pp_rank = hcg.get_stage_id()
-    state_dict=paddle.load(f"hand/pp{pp_rank:02d}mp{mp_rank:02d}.pdparams")  
+    state_dict = paddle.load(f"hand/pp{pp_rank:02d}mp{mp_rank:02d}.pdparams")
     model.set_state_dict(state_dict)
 
 
@@ -704,6 +686,15 @@ class LossMean(PyLayer):
         return grad
 
 
+def sync_grad(model):
+    model_state_dict = model.state_dict()
+    name_mapping = {v.name: k for (k, v) in model_state_dict.items()}
+    for p in model.parameters():
+        assert p.name in name_mapping
+        grad = p.grad
+        reduce_dp(grad)
+
+
 def print_grad(model):
     model_state_dict = model.state_dict()
     name_mapping = {v.name: k for (k, v) in model_state_dict.items()}
@@ -712,13 +703,22 @@ def print_grad(model):
         grad = p.grad
         reduce_dp(grad)
         grad = merge_mp(name_mapping[p.name], grad)
-        print(f"{p.name}_grad shape: {grad.shape} md5sum: {grad._md5sum()}")            
+        print(f"{name_mapping[p.name]} {p.name}_grad shape: {grad.shape} md5sum: {grad._md5sum()}")
+
+
+def print_param(model):
+    model_state_dict = model.state_dict()
+    name_mapping = {v.name: k for (k, v) in model_state_dict.items()}
+    for p in model.parameters():
+        tmp = concat_dp(p)
+        tmp = merge_mp(name_mapping[p.name], tmp)
+        print(f"{name_mapping[p.name]} {p.name}_grad shape: {tmp.shape} md5sum: {tmp._md5sum()}")
 
 
 def merge_mp(k, input):
     hcg = fleet.get_hybrid_communicate_group()
     mp_degree = hcg.get_model_parallel_world_size()
-    if mp_degree <=1:
+    if mp_degree <= 1:
         return input
     else:
         group = hcg.get_model_parallel_group()
@@ -727,16 +727,35 @@ def merge_mp(k, input):
             paddle.distributed.all_gather(inps, input, group=group)
             return merge_mp_tensor_list(k, inps)
 
+
+def concat_dp(input):
+    hcg = fleet.get_hybrid_communicate_group()
+    dp_degree = hcg.get_data_parallel_world_size()
+    if dp_degree <= 1:
+        return input
+    else:
+        group = hcg.get_data_parallel_group()
+        return concat(input, 0, group)
+
+
+def concat(input, axis, group):
+    with paddle.no_grad():
+        inps = []
+        paddle.distributed.all_gather(inps, input, group=group)
+        return paddle.concat(x=inps, axis=axis)
+
+
 def reduce_dp(input):
     hcg = fleet.get_hybrid_communicate_group()
     dp_degree = hcg.get_data_parallel_world_size()
-    if dp_degree <=1:
+    if dp_degree <= 1:
         return input
     else:
         group = hcg.get_data_parallel_group()
         with paddle.no_grad():
             paddle.distributed.all_reduce(input, group=group)
             return input
+
 
 def map_structure_name(k):
     if "_layers.llama" in k:
@@ -747,18 +766,14 @@ def map_structure_name(k):
         return k
     fs = k.split(".")
     idx = int(fs[1])
-    if idx ==0:
+    if idx == 0:
         return "_layers.llama.embed_tokens.weight"
     if idx == 33:
         return "_layers.llama.norm.weight"
     if idx == 34:
         return "_layers.lm_head.weight"
-    else: 
-        return f"_layers.llama.layers.{idx-1}." +".".join(fs[2:]) 
-
-
-
-
+    else:
+        return f"_layers.llama.layers.{idx-1}." + ".".join(fs[2:])
 
 
 def merge_mp_tensor_list(k, tensor_list):
@@ -771,9 +786,9 @@ def merge_mp_tensor_list(k, tensor_list):
     elif "self_attn.q_proj.weight" in k:
         return merge_tensor(tensor_list, 1, 1)
     elif "self_attn.k_proj.weight" in k:
-        return merge_tensor(tensor_list, 1, 1)   
+        return merge_tensor(tensor_list, 1, 1)
     elif "self_attn.v_proj.weight" in k:
-        return merge_tensor(tensor_list, 1, 1)      
+        return merge_tensor(tensor_list, 1, 1)
     elif "mlp.up_gate_proj.weight" in k:
         return merge_tensor(tensor_list, 2, 1)
     elif "mlp.up_proj.weight" in k:
@@ -790,11 +805,11 @@ def merge_mp_tensor_list(k, tensor_list):
     elif "mlp.down_proj.weight" in k:
         return merge_tensor(tensor_list, 1, 0)
     elif "embed_tokens.weight" in k:
-        return merge_tensor(tensor_list, 1, 0)    
+        return merge_tensor(tensor_list, 1, 0)
     else:
         assert "norm" in k, k
         # duplicate
-        return tensor_list[0]    
+        return tensor_list[0]
 
 
 if __name__ == "__main__":

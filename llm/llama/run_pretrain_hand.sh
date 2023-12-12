@@ -59,7 +59,6 @@ python -u  -m paddle.distributed.launch \
     --save_steps 5000000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
-    --max_grad_norm 1.0 \
     --logging_steps 1\
     --dataloader_num_workers 1 \
     --sharding "" \
@@ -70,4 +69,5 @@ python -u  -m paddle.distributed.launch \
     --do_train \
     --do_eval \
     --device "gpu" \
-    --data_impl "mmap"
+    --data_impl "mmap" \
+    --max_grad_norm -1 \
