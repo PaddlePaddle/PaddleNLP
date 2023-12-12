@@ -191,13 +191,15 @@ class QWenInferenceModel(QWenPretrainedModel):
                 dtype=self.transformer_block.ffn_ln_scales[idx].dtype
             )
 
-            up_weight = state_dict["qwen.h.{}.mlp.w1.weight".format(idx)]
-            gate_weight = state_dict["qwen.h.{}.mlp.w2.weight".format(idx)]
-            concated_ffn1_weight = np.concatenate([up_weight, gate_weight], axis=-1)
-            ffn1_weight = paddle.to_tensor(
-                concated_ffn1_weight,
+            up_weight = paddle.to_tensor(
+                state_dict["qwen.h.{}.mlp.w1.weight".format(idx)],
                 dtype=self.transformer_block.ffn1_weights[idx].dtype
             )
+            gate_weight = paddle.to_tensor(
+                state_dict["qwen.h.{}.mlp.w2.weight".format(idx)],
+                dtype=self.transformer_block.ffn1_weights[idx].dtype
+            )
+            ffn1_weight = paddle.concat(x=[up_weight, gate_weight], axis=-1)
             ffn2_weight = paddle.to_tensor(
                 state_dict["qwen.h.{}.mlp.c_proj.weight".format(idx)],
                 dtype=self.transformer_block.ffn2_weights[idx].dtype
