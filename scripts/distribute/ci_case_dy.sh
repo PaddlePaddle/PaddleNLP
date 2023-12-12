@@ -466,7 +466,7 @@ function check_result() {
     fi
 
     if [[ ! $1 =~ "llm" ]]; then
-        echo -e "\033 $1 run successfully! \033[0m" | tee -a ${log_path}/result.log
+        echo -e "\033 $1 run successfully! \033" | tee -a ${log_path}/result.log
     elif [ $# -ne 7 ]; then
         echo -e "\033[31m $1 parameter transfer failed: $@ \033[0m" | tee -a ${log_path}/result.log
         exit -1
