@@ -1,8 +1,24 @@
+codecov:
+  notify:
+    require_ci_to_pass: yes
+
 coverage:
   status:
     project:
       default:
+        tartget: auto
         informational: true
     patch:
-      default:
-        informational: true
+      default: false
+      transformers:
+        target: 75% #  Coverage < 75%  CI will fail
+        paths: "paddlenlp/transformers/"
+      trainer:
+        target: 75% 
+        paths: "paddlenlp/trainer/"
+      peft:
+       target: 75%
+       paths: "paddlenlp/peft/"
+      prompt:
+       traget: 90%
+       paths: "paddlenlp/prompt/"
