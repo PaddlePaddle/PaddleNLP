@@ -448,10 +448,6 @@ def main():
 
     # Detecting last checkpoint.
     last_checkpoint = None
-    print("training_args.output_dir:", training_args.output_dir)
-    print("os.path.isdir(training_args.output_dir):", os.path.isdir(training_args.output_dir))
-    print("training_args.do_train:", training_args.do_train)
-    print("training_args.overwrite_output_dir:", training_args.overwrite_output_dir)
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
         # if last_checkpoint is None and len(

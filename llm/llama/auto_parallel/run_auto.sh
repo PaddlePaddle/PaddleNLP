@@ -18,8 +18,6 @@ set -x
 unset CUDA_VISIBLE_DEVICES
 
 export PARALLEL_CROSS_ENTROPY=true
-export FLAGS_embedding_deterministic=1
-export FLAGS_cudnn_deterministic=1
 export FLAGS_call_stack_level=2
 
 task_name="llama_auto_dp2sharding2mp2pp2_vpp2"
