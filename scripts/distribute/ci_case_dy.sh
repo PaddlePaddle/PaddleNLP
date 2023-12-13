@@ -409,6 +409,7 @@ function gpt_eval_LAMBADA() {
 
 function llm_gpt_recompute_bs32_bf16_SD8() {
     echo "=========== $FUNCNAME run begin ==========="
+    export PYTHONPATH=$root_path/:$PYTHONPATH
     log_dir=mylog
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 run_pretrain.py \
