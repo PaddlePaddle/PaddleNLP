@@ -88,6 +88,7 @@ function _train(){
                -o Engine.max_steps=100 \
                -o Engine.eval_freq=100000 \
                -o Distributed.pipeline.schedule_mode=${schedule_mode} \
+               -o Profiler_auto.memory_stats=True \
                -o Engine.verbose=3 \
                -o Engine.logging_freq=1 "
 
@@ -135,6 +136,7 @@ function _train(){
             -o Engine.max_steps=100 \
             -o Engine.eval_freq=100000 \
             -o Distributed.pipeline.schedule_mode=${schedule_mode} \
+            -o Profiler_auto.memory_stats=True \
             -o Engine.verbose=3 \
             -o Engine.logging_freq=1 "
         workerlog_id=0
@@ -158,6 +160,7 @@ function _train(){
             -o Engine.max_steps=100 \
             -o Engine.eval_freq=100000 \
             -o Distributed.pipeline.schedule_mode=${schedule_mode} \
+            -o Profiler_auto.memory_stats=True \
             -o Engine.verbose=3 \
             -o Engine.logging_freq=1 "
         workerlog_id=0
@@ -166,7 +169,7 @@ function _train(){
     esac
     cd ../
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
-    timeout 60m ${train_cmd} > ${log_file} 2>&1
+    timeout 120m ${train_cmd} > ${log_file} 2>&1
     if [ $? -ne 0 ];then
         echo -e "${model_name}, FAIL"
     else
@@ -174,10 +177,10 @@ function _train(){
     fi
     #kill -9 `ps -ef|grep 'python'|awk '{print $2}'`
     if [ ${device_num} != "N1C1" -a -d mylog ]; then
-        mkdir -p ${run_log_path}/mylog
-        cp -r ./mylog/workerlog.* ${run_log_path}/mylog/
+        case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/model_zoo/gpt-3/benchmarks
+        cp -r ${case_path}/mylog/workerlog.* ./mylog/
         rm ${log_file}
-        cp mylog/workerlog.${workerlog_id} ${log_file}
+        cp ${case_path}/mylog/workerlog.${workerlog_id} ${log_file}
     fi
 }
 

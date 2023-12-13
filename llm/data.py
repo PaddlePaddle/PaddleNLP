@@ -159,7 +159,7 @@ def tokenize_rounds_example(tokenizer, example, data_args):
 
 
 def convert_example_common(example, tokenizer, data_args, is_test=True, intokens=False):
-    if data_args.chat_template is not None:
+    if tokenizer.chat_template is not None:
         return convert_rounds_example_common(example, tokenizer, data_args, is_test, intokens)
 
     tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
@@ -208,6 +208,7 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, i
     input_ids = rounds_inputs.pop("input_ids")
     # shift input_ids and labels
     input_ids, labels = input_ids[:-1], labels[1:]
+
     seq_length = len(input_ids)
     features = {"input_ids": input_ids, "labels": labels}
     if intokens:
@@ -221,7 +222,7 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, i
 
 
 def convert_example_chatglm(example, tokenizer, data_args, is_test=True, intokens=False):
-    if data_args.chat_template is not None:
+    if tokenizer.chat_template is not None:
         # chatglm only support single-round finetune
         example = convert_multi_rounds_to_single_round(example, tokenizer)
 
