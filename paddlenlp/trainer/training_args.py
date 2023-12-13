@@ -705,6 +705,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Whether to unify hybrid parallel checkpoint."},
     )
+    to_static: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable training under @to_static."},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))

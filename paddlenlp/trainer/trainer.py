@@ -263,6 +263,11 @@ class Trainer:
 
         if model is None:
             raise RuntimeError("`Trainer` requires either a `model` or `model_init` argument")
+            
+        if self.args.to_static:
+            print("TTTTTTTTTTTTTTTTTTTTTTTT")
+            model = paddle.jit.to_static(model)
+            logger.info("Successfully to apply @to_static to the whole model.")
 
         if self.args.should_save or self.args.should_save_model_state:
             os.makedirs(self.args.output_dir, exist_ok=True)
