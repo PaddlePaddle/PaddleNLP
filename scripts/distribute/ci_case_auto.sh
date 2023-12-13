@@ -49,7 +49,7 @@ function llama_case_list_auto() {
     llama_auto_recompute_bs16_fp32_DP2-MP1-PP1
     llama_auto_recompute_bs16_fp32_DP2-MP2-PP1
     llama_auto_recompute_bs16_fp32_DP2-MP2-PP2
-    llama_auto_recompute_bs16_fp32_DP2-PP4-VPP2
+    llama_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
 }
 
 function case_list_auto_pir() {
@@ -878,7 +878,6 @@ function llama_auto_recompute_bs8_fp32_DP1-MP1-PP1() {
         --max_grad_norm 1.0 \
         --logging_steps 1 \
         --dataloader_num_workers 1 \
-        --sharding "" \
         --eval_steps 1000 \
         --report_to "visualdl" \
         --disable_tqdm true \
@@ -945,7 +944,6 @@ function llama_auto_recompute_bs16_fp32_DP2-MP1-PP1() {
         --max_grad_norm 1.0 \
         --logging_steps 1 \
         --dataloader_num_workers 1 \
-        --sharding "" \
         --eval_steps 1000 \
         --report_to "visualdl" \
         --disable_tqdm true \
@@ -1012,7 +1010,6 @@ function llama_auto_recompute_bs16_fp32_DP2-MP2-PP1() {
         --max_grad_norm 1.0 \
         --logging_steps 1 \
         --dataloader_num_workers 1 \
-        --sharding "" \
         --eval_steps 1000 \
         --report_to "visualdl" \
         --disable_tqdm true \
@@ -1079,7 +1076,6 @@ function llama_auto_recompute_bs16_fp32_DP2-MP2-PP2() {
         --max_grad_norm 1.0 \
         --logging_steps 1 \
         --dataloader_num_workers 1 \
-        --sharding "" \
         --eval_steps 1000 \
         --report_to "visualdl" \
         --disable_tqdm true \
@@ -1102,14 +1098,12 @@ function llama_auto_recompute_bs16_fp32_DP2-MP2-PP2() {
     echo "=========== $FUNCNAME run  end ==========="
 }
 
-function llama_auto_recompute_bs16_fp32_DP2-PP4-VPP2-Sharding2_stage2() {
+function llama_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2() {
     echo "=========== $FUNCNAME run begin ==========="
-    export PYTHONPATH=../../../:$PYTHONPATH
+    export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=2
-    export FLAGS_embedding_deterministic=1
-    export FLAGS_cudnn_deterministic=1
 
-    task_name="llama_auto_bs16_dp2pp4vpp2sharding2"
+    task_name="llama_auto_bs16_dp2mp2pp2vpp2sharding2"
     case_out_dir="output/$task_name"
     case_log_dir="output/$task_name""_log"
     rm -rf $case_out_dir
@@ -1135,8 +1129,10 @@ function llama_auto_recompute_bs16_fp32_DP2-PP4-VPP2-Sharding2_stage2() {
         --fp16 0 \
         --fp16_opt_level "O2"  \
         --scale_loss 1024 \
-        --pipeline_parallel_degree 4 \
-        --tensor_parallel_degree 1 \
+        --tensor_parallel_degree 2 \
+        --pipeline_parallel_degree 2 \
+        --virtual_pp_degree 2 \
+        --pipeline_schedule_mode "VPP" \
         --sharding_parallel_degree 2 \
         --sharding "stage2" \
         --learning_rate 0.0001 \
@@ -1148,7 +1144,6 @@ function llama_auto_recompute_bs16_fp32_DP2-PP4-VPP2-Sharding2_stage2() {
         --max_grad_norm 1.0 \
         --logging_steps 1 \
         --dataloader_num_workers 1 \
-        --sharding "" \
         --eval_steps 1000 \
         --report_to "visualdl" \
         --disable_tqdm true \
@@ -1164,7 +1159,7 @@ function llama_auto_recompute_bs16_fp32_DP2-PP4-VPP2-Sharding2_stage2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.53159428
+    loss_base=9.52626514
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
