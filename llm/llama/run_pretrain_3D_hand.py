@@ -601,15 +601,16 @@ def main():
 
             loss = model.forward_backward_pipeline(pp_inputs)
             sync_grad(model)
+            print_grad(model)
             optimizer.step()
-            # print_param(model)
+            print_param(model)
             lr_scheduler.step()
             optimizer.clear_grad()
 
             print(f"global_step {global_step} loss {loss.item()}")
             pp_data_buffer.clear()
 
-            if global_step >= 2:
+            if global_step >= 4:
                 # save_model(model)
                 sys.exit(0)
 
@@ -701,7 +702,6 @@ def print_grad(model):
     for p in model.parameters():
         assert p.name in name_mapping
         grad = p.grad
-        reduce_dp(grad)
         grad = merge_mp(name_mapping[p.name], grad)
         print(f"{name_mapping[p.name]} {p.name}_grad shape: {grad.shape} md5sum: {grad._md5sum()}")
 
@@ -710,9 +710,8 @@ def print_param(model):
     model_state_dict = model.state_dict()
     name_mapping = {v.name: k for (k, v) in model_state_dict.items()}
     for p in model.parameters():
-        tmp = concat_dp(p)
-        tmp = merge_mp(name_mapping[p.name], tmp)
-        print(f"{name_mapping[p.name]} {p.name}_grad shape: {tmp.shape} md5sum: {tmp._md5sum()}")
+        tmp = merge_mp(name_mapping[p.name], p)
+        print(f"{name_mapping[p.name]} {p.name} shape: {tmp.shape} md5sum: {tmp._md5sum()}")
 
 
 def merge_mp(k, input):
