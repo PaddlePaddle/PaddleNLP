@@ -39,6 +39,8 @@ from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.io import IterableDataset
 from paddle.optimizer.lr import LambdaDecay
 
+from paddlenlp.ops import Topology
+
 from ..transformers.tokenizer_utils_base import BatchEncoding
 from ..utils.import_utils import is_paddle_cuda_available, is_psutil_available
 from ..utils.log import logger
@@ -57,13 +59,25 @@ __all__ = [
 ]
 
 
-def set_seed(seed: int = 1234):
+def get_dist_seeds(seed: int = 1234, topo: Topology = None):
+    """
+    Get the seeds from distributed environment strategy.
+    Args:
+        seed (:obj:`int`, `optional`, defaults to 1234): The seeds for initializing distributed training.
+        topo (:obj:`Topology`, `optional`, defaults to None): The topology of hybrid parallel in semi-auto mode.
+    Returns:
+        Tuple[int, int]: The global seed and local seed respectively.
+    """
+
     # NOTE: For parameter init seed:
     # seed: dp/mp_undistributed_paramter/sharding is same; others is different
     # For compute seed(dropout):
     # global seed: only mp group is same.
     # local seed: all groups are different
-    hcg = fleet.get_hybrid_communicate_group() if hasattr(fleet.fleet, "_hcg") else None
+    hcg = None
+    if hasattr(fleet.fleet, "_hcg") and topo is not None:
+        hcg = fleet.get_hybrid_communicate_group()
+
     if hcg is not None and paddle.distributed.get_world_size() > 1:
         # obtain rank message of hybrid parallel
 
@@ -77,7 +91,17 @@ def set_seed(seed: int = 1234):
         dp_size = hcg.get_data_parallel_world_size()
 
         sharding_rank = hcg.get_sharding_parallel_rank()
-        # sharding_size = hcg.get_sharding_parallel_world_size()
+    elif topo is not None and paddle.distributed.get_world_size() > 1:
+        dp_rank = topo.dp_info.rank
+        dp_size = topo.dp_info.size
+
+        pp_rank = topo.pp_info.rank
+        pp_size = topo.pp_info.size
+
+        mp_rank = topo.mp_info.rank
+        mp_size = topo.mp_info.size
+
+        sharding_rank = topo.sharding_info.rank
     else:
         mp_rank, mp_size = 0, 1
         pp_rank, pp_size = 0, 1
@@ -105,6 +129,12 @@ def set_seed(seed: int = 1234):
         + dp_rank * (mp_size * pp_size)
         + sharding_rank * (mp_size * pp_size * dp_size)
     )
+
+    return global_seed, local_seed
+
+
+def set_seed(seed: int = 1234, topo=None):
+    global_seed, local_seed = get_dist_seeds(seed, topo)
 
     tracker = get_rng_state_tracker()
     if "global_seed" not in tracker.states_:
