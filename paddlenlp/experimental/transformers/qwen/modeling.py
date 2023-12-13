@@ -15,7 +15,6 @@
 # limitations under the License.
 from __future__ import annotations
 
-import numpy as np
 import paddle
 from paddle import nn
 from paddlenlp_ops import fused_get_rotary_embedding, get_padding_offset
@@ -31,15 +30,18 @@ from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPast,
     CausalLMOutputWithPast,
 )
-from paddlenlp.transformers import QWenPretrainedModel
+from paddlenlp.transformers import QWenPretrainedModel, QWenConfig
+from paddlenlp.transformers.qwen.modeling import (
+    QWenLMHead, 
+    QWenPretrainingCriterion
+)
 from paddlenlp.transformers.model_utils import (
     dy2st_nocheck_guard_context,
     register_base_model,
 )
-from paddlenlp.transformers.qwen.configuration import QWenConfig
-from paddlenlp.transformers.qwen.modeling import QWenLMHead, QWenPretrainingCriterion
 
 __all__ = ["QWenForCausalLMInferenceModel"]
+
 
 class FusedQWenRMSNorm(nn.Layer):
     def __init__(self, config):
@@ -59,14 +61,6 @@ class FusedQWenRMSNorm(nn.Layer):
             return result[0]
         return result
 
-"""
-dict_keys(['lm_head.weight', 
-'qwen.h.0.attn.c_attn.bias', 'qwen.h.0.attn.c_attn.weight', 'qwen.h.0.attn.c_proj.weight', 'qwen.h.0.ln_1.weight', 'qwen.h.0.ln_2.weight', 'qwen.h.0.mlp.c_proj.weight', 'qwen.h.0.mlp.w1.weight', 'qwen.h.0.mlp.w2.weight', 
-'qwen.h.1.attn.c_attn.bias', 'qwen.h.1.attn.c_attn.weight', 'qwen.h.1.attn.c_proj.weight', 'qwen.h.1.ln_1.weight', 'qwen.h.1.ln_2.weight', 'qwen.h.1.mlp.c_proj.weight', 'qwen.h.1.mlp.w1.weight', 'qwen.h.1.mlp.w2.weight', 
-'qwen.h.2.attn.c_attn.bias', 'qwen.h.2.attn.c_attn.weight', 'qwen.h.2.attn.c_proj.weight', 'qwen.h.2.ln_1.weight', 'qwen.h.2.ln_2.weight', 'qwen.h.2.mlp.c_proj.weight', 'qwen.h.2.mlp.w1.weight', 'qwen.h.2.mlp.w2.weight', 
-'qwen.h.3.attn.c_attn.bias', 'qwen.h.3.attn.c_attn.weight', 'qwen.h.3.attn.c_proj.weight', 'qwen.h.3.ln_1.weight', 'qwen.h.3.ln_2.weight', 'qwen.h.3.mlp.c_proj.weight', 'qwen.h.3.mlp.w1.weight', 'qwen.h.3.mlp.w2.weight', 
-'qwen.ln_f.weight', 'qwen.wte.weight'])
-"""
 @register_base_model
 class QWenInferenceModel(QWenPretrainedModel):
     def __init__(self, config: QWenConfig):
