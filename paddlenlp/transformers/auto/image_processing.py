@@ -151,8 +151,29 @@ class AutoImageProcessor:
             for name in names:
                 all_processor_names.append(name)
 
+        # From local dir path
+        if os.path.isdir(pretrained_model_name_or_path):
+            config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.image_processor_config_file)
+            if os.path.exists(config_file):
+                processor_class = cls._get_image_processor_class_from_config(
+                    pretrained_model_name_or_path, config_file
+                )
+                logger.info("We are using %s to load '%s'." % (processor_class, pretrained_model_name_or_path))
+                return processor_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+        # From built-in pretrained models
+        elif pretrained_model_name_or_path in all_processor_names:
+            for names, processor_classes in cls._processor_mapping.items():
+                for pattern in names:
+                    if pattern == pretrained_model_name_or_path:
+                        actual_processor_class = processor_classes[0]
+                        logger.info(
+                            "We are using %s to load '%s'." % (actual_processor_class, pretrained_model_name_or_path)
+                        )
+                        return actual_processor_class.from_pretrained(
+                            pretrained_model_name_or_path, *model_args, **kwargs
+                        )
         # From AI Studio or HF Hub
-        if from_aistudio or from_hf_hub:
+        elif from_aistudio or from_hf_hub:
             if from_aistudio:
                 config_file = aistudio_download(
                     repo_id=pretrained_model_name_or_path,
@@ -175,27 +196,6 @@ class AutoImageProcessor:
                     config_file,
                 )
                 logger.info(f"We are using {processor_class} to load '{pretrained_model_name_or_path}'.")
-                return processor_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-        # From built-in pretrained models
-        elif pretrained_model_name_or_path in all_processor_names:
-            for names, processor_classes in cls._processor_mapping.items():
-                for pattern in names:
-                    if pattern == pretrained_model_name_or_path:
-                        actual_processor_class = processor_classes[0]
-                        logger.info(
-                            "We are using %s to load '%s'." % (actual_processor_class, pretrained_model_name_or_path)
-                        )
-                        return actual_processor_class.from_pretrained(
-                            pretrained_model_name_or_path, *model_args, **kwargs
-                        )
-        # From local dir path
-        elif os.path.isdir(pretrained_model_name_or_path):
-            config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.image_processor_config_file)
-            if os.path.exists(config_file):
-                processor_class = cls._get_image_processor_class_from_config(
-                    pretrained_model_name_or_path, config_file
-                )
-                logger.info("We are using %s to load '%s'." % (processor_class, pretrained_model_name_or_path))
                 return processor_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         # Assuming from community-contributed pretrained models
         else:

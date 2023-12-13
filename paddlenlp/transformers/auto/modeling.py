@@ -288,7 +288,54 @@ class _BaseAutoModelClass:
         for pretrained_model_names, model_name in cls._pretrained_model_dict.items():
             for name in pretrained_model_names:
                 all_model_names.append(name)
-        if from_aistudio:
+        # From local dir path
+        if os.path.isdir(pretrained_model_name_or_path):
+            config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.model_config_file)
+            legacy_config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.legacy_model_config_file)
+            if os.path.exists(config_file):
+                model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, config_file)
+                logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
+                return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+            elif os.path.exists(legacy_config_file):
+                logger.info("Standard config do not exist, loading from legacy config")
+                model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, legacy_config_file)
+                logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
+                return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+            else:
+                logger.warning(f"{config_file}  is not a valid path to a model config file")
+        # From built-in pretrained models
+        elif pretrained_model_name_or_path in all_model_names:
+            for pretrained_model_names, model_name in cls._pretrained_model_dict.items():
+                # From built-in pretrained models
+                for pattern in pretrained_model_names:
+                    if pattern == pretrained_model_name_or_path:
+                        init_class = cls._name_mapping[model_name + "_Import_Class"]
+                        class_name = cls._name_mapping[init_class]
+                        import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.modeling")
+                        try:
+                            model_class = getattr(import_class, init_class)
+                        except AttributeError as err:
+                            try:
+                                import_class2 = importlib.import_module(f"paddlenlp.transformers.{class_name}")
+                                model_class = getattr(import_class2, init_class)
+                            except AttributeError:
+                                logger.error(err)
+                                all_model_classes = import_class.__all__
+                                all_tasks = {
+                                    get_task_name(m) for m in all_model_classes if get_task_name(m) is not None
+                                }
+                                raise AttributeError(
+                                    f"module '{import_class.__name__}' only supports the following classes: "
+                                    + ", ".join(m for m in all_model_classes)
+                                    + "\n"
+                                    "Hint: you can use interface "
+                                    + " or ".join(task + ".from_pretrained" for task in all_tasks)
+                                    + f" to load '{pretrained_model_name_or_path}'\n"
+                                )
+                        logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
+                        return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+        # Assuming from community-contributed pretrained models
+        elif from_aistudio:
             config_file = aistudio_download(
                 repo_id=pretrained_model_name_or_path,
                 filename=cls.model_config_file,
@@ -331,53 +378,6 @@ class _BaseAutoModelClass:
                 return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
             else:
                 logger.warning(f"{config_file}  is not a valid path to a model config file")
-        # From built-in pretrained models
-        elif pretrained_model_name_or_path in all_model_names:
-            for pretrained_model_names, model_name in cls._pretrained_model_dict.items():
-                # From built-in pretrained models
-                for pattern in pretrained_model_names:
-                    if pattern == pretrained_model_name_or_path:
-                        init_class = cls._name_mapping[model_name + "_Import_Class"]
-                        class_name = cls._name_mapping[init_class]
-                        import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.modeling")
-                        try:
-                            model_class = getattr(import_class, init_class)
-                        except AttributeError as err:
-                            try:
-                                import_class2 = importlib.import_module(f"paddlenlp.transformers.{class_name}")
-                                model_class = getattr(import_class2, init_class)
-                            except AttributeError:
-                                logger.error(err)
-                                all_model_classes = import_class.__all__
-                                all_tasks = {
-                                    get_task_name(m) for m in all_model_classes if get_task_name(m) is not None
-                                }
-                                raise AttributeError(
-                                    f"module '{import_class.__name__}' only supports the following classes: "
-                                    + ", ".join(m for m in all_model_classes)
-                                    + "\n"
-                                    "Hint: you can use interface "
-                                    + " or ".join(task + ".from_pretrained" for task in all_tasks)
-                                    + f" to load '{pretrained_model_name_or_path}'\n"
-                                )
-                        logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
-                        return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-        # From local dir path
-        elif os.path.isdir(pretrained_model_name_or_path):
-            config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.model_config_file)
-            legacy_config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.legacy_model_config_file)
-            if os.path.exists(config_file):
-                model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, config_file)
-                logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
-                return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-            elif os.path.exists(legacy_config_file):
-                logger.info("Standard config do not exist, loading from legacy config")
-                model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, legacy_config_file)
-                logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
-                return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-            else:
-                logger.warning(f"{config_file}  is not a valid path to a model config file")
-        # Assuming from community-contributed pretrained models
         else:
             standard_url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
             legacy_url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.legacy_model_config_file]
