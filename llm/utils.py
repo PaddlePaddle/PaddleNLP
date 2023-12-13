@@ -29,7 +29,7 @@ from sklearn.metrics import accuracy_score
 from paddlenlp.datasets import InTokensIterableDataset
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
-from paddlenlp.transformers import LlamaForCausalLMPipe
+from paddlenlp.transformers import ChatGLMv2Tokenizer, LlamaForCausalLMPipe
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
@@ -409,7 +409,7 @@ def dybatch_preprocess(
                 padding=True,
                 max_length=src_length,
                 # if use chat_template, it will not add special_tokens
-                add_special_tokens=tokenizer.chat_template is None,
+                add_special_tokens=tokenizer.chat_template is None or isinstance(tokenizer, ChatGLMv2Tokenizer),
             )
             input_ids.append(tokens["input_ids"][0])
             position_ids.append(tokens["position_ids"][0])

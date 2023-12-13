@@ -43,6 +43,7 @@ from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
+    ChatGLMv2Tokenizer,
     LlamaTokenizer,
     PretrainedModel,
     PretrainedTokenizer,
@@ -205,7 +206,8 @@ class BasePredictor:
             return_tensors=self.return_tensors,
             padding=True,
             # when use chat_template, it should not add special tokens
-            add_special_tokens=self.config.chat_template is None,
+            # chatglm2 prefix-tokens can not be tokenized into ids
+            add_special_tokens=self.tokenizer.chat_template is None or isinstance(self.tokenizer, ChatGLMv2Tokenizer),
         )
         return tokenized_source
 
