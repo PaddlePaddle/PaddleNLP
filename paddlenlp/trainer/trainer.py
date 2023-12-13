@@ -979,6 +979,13 @@ class Trainer:
                     step_control = 0
 
                     if self.args.nvprof_start < self.args.nvprof_end:
+                        # for end
+                        if self.state.global_step - 1 >= self.args.nvprof_start:
+                            paddle.base.core.nvprof_nvtx_pop()
+                        if self.state.global_step == self.args.nvprof_end:
+                            paddle.base.core.nvprof_stop()
+                            sys.exit()
+
                         # for begin
                         if self.state.global_step == self.args.nvprof_start:
                             paddle.base.core.nvprof_start()
@@ -986,12 +993,6 @@ class Trainer:
                         if self.state.global_step >= self.args.nvprof_start:
                             paddle.base.core.nvprof_nvtx_push(str(self.state.global_step))
 
-                        # for end
-                        if self.state.global_step - 1 >= self.args.nvprof_start:
-                            paddle.base.core.nvprof_nvtx_pop()
-                        if self.state.global_step - 1 == self.args.nvprof_end - 1:
-                            paddle.base.core.nvprof_stop()
-                            sys.exit()
                 else:
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
                     step_control += 1
