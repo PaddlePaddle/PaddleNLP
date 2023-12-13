@@ -19,7 +19,7 @@ from paddle import nn
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.nn.quant import weight_only_linear
 
-from ...utils.quantization import (
+from ...quantization.quantization_linear import (
     ColumnParallelQuantizationLinear,
     QuantizationLinear,
     RowParallelQuantizationLinear,
