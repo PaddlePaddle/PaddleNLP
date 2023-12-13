@@ -21,7 +21,7 @@ import paddle.base.core as core
 import paddle.nn as nn
 from paddle.distributed.fleet import auto
 from paddle.profiler import SummaryView
-from paddle.utils.profiler import job_schedule_profiler_range
+from paddle.profiler.utils import job_schedule_profiler_range
 
 try:
     from ppfleetx.optims import build_lr_scheduler, build_optimizer
