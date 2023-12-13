@@ -445,7 +445,6 @@ class TransformerDecoder(nn.Layer):
         if config.transformer_engine_backend is not None:
             self.enable_recompute = config.use_recompute
 
-
     @paddle.jit.not_to_static
     def recompute_training(
         self,
@@ -505,7 +504,7 @@ class TransformerDecoder(nn.Layer):
             for i, mod in enumerate(self.layers):
                 has_gradient = not output.stop_gradient
                 # def forward(self, hidden_states, attention_mask=None, use_cache=False, past_key_value=None, output_attentions=False):
-                if self.enable_recompute and has_gradient and self.config.recompute_granularity == "full_attn":
+                if self.enable_recompute and has_gradient and self.config.recompute_granularity == "full":
                     outputs = self.recompute_training(
                         layer_module=mod,
                         hidden_states=output,
@@ -714,6 +713,7 @@ class GPTDecoderLayerWithNVTEBackend(nn.Layer):
             layer_type="encoder",
             activation=config.hidden_activation,
             set_parallel_mode=config.tensor_parallel_degree > 1,
+            sequence_parallel=self.config.sequence_parallel,
             backend=config.transformer_engine_backend,
         )
 
@@ -723,9 +723,7 @@ class GPTDecoderLayerWithNVTEBackend(nn.Layer):
         return self.transformer(
             hidden_states,
             attention_mask,
-            recompute_core_attention=(
-                self.config.use_recompute and self.config.recompute_granularity == "core_attn"
-            ),
+            recompute_core_attention=(self.config.use_recompute and self.config.recompute_granularity == "core_attn"),
         )
 
 

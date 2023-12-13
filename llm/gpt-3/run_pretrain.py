@@ -19,15 +19,15 @@ import sys
 import time
 from dataclasses import dataclass, field
 from typing import Optional
-import wandb
 
 import paddle
+import wandb
 
 from paddlenlp.trainer import (
     PdArgumentParser,
     Trainer,
-    TrainingArguments,
     TrainerCallback,
+    TrainingArguments,
     get_last_checkpoint,
     set_seed,
     speed_metrics,
@@ -87,10 +87,6 @@ class PreTrainingArguments(TrainingArguments):
     use_fp8: bool = field(
         default=False,
         metadata={"help": "gpt, whether to use fp8 training"},
-    )
-    recompute_granularity: str = field(
-        default="full",
-        metadata={"help": "full or core_attn."},
     )
 
 
@@ -355,19 +351,14 @@ class PretrainingTrainer(Trainer):
             drop_last=self.args.dataloader_drop_last,
         )
 
+
 class WandbCallback(TrainerCallback):
     def __init__(self):
         super().__init__()
 
-    def on_log(self,
-               args,
-               state,
-               control,
-               logs=None,
-               inputs=None,
-               timer=None,
-               **kwargs):
+    def on_log(self, args, state, control, logs=None, inputs=None, timer=None, **kwargs):
         wandb.log(logs)
+
 
 class NvtxCallback(TrainerCallback):
     def __init__(self):
@@ -383,14 +374,7 @@ class NvtxCallback(TrainerCallback):
         if self._enable_profile and self._emit_nvtx:
             paddle.fluid.core.nvprof_enable_record_event()
 
-    def on_step_begin(self,
-                    args,
-                    state,
-                    control,
-                    logs=None,
-                    inputs=None,
-                    timer=None,
-                    **kwargs):
+    def on_step_begin(self, args, state, control, logs=None, inputs=None, timer=None, **kwargs):
         if self._enable_profile and state.global_step == self._start_step:
             paddle.fluid.core.nvprof_start()
         if self._enable_profile and (state.global_step == (self._stop_step + 1)):
@@ -430,12 +414,10 @@ def main():
 
     if training_args.local_rank == 0:
         wandb.init(
-            project=os.environ['PADDLENLP_WANDB_PROJECT_NAME'],
-            group=os.environ['PADDLENLP_WANDB_EXP_NAME'],
+            project=os.environ["PADDLENLP_WANDB_PROJECT_NAME"],
+            group=os.environ["PADDLENLP_WANDB_EXP_NAME"],
             name=f"node_{node_idx}_rank_{training_args.local_rank}_device_{training_args.device}_world_size_{training_args.world_size}",
-            config={
-                **vars(model_args), **vars(data_args), **vars(training_args)
-            }
+            config={**vars(model_args), **vars(data_args), **vars(training_args)},
         )
 
     # Detecting last checkpoint.
