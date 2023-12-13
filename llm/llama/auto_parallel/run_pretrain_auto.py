@@ -32,8 +32,10 @@ from paddlenlp.trainer import (
     PdArgumentParser,
     Trainer,
     TrainingArguments,
+    get_last_checkpoint,
     speed_metrics,
 )
+from paddlenlp.trainer.trainer_utils import PREFIX_CHECKPOINT_DIR
 from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
@@ -97,6 +99,9 @@ class PreTrainingArguments(TrainingArguments):
         metadata={
             "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
         },
+    )
+    pipeline_schedule_mode: str = field(
+        default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
     )
 
     def __post_init__(self):
@@ -441,6 +446,21 @@ def main():
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
 
+    # Detecting last checkpoint.
+    last_checkpoint = None
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
+        last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        # if last_checkpoint is None and len(
+        #         os.listdir(training_args.output_dir)) > 1:
+        #     raise ValueError(
+        #         f"Output directory ({training_args.output_dir}) already exists and is not empty. "
+        #         "Use --overwrite_output_dir to overcome.")
+        if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
+            logger.info(
+                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+            )
+
     config_class, model_class = MODEL_CLASSES[model_args.model_type]
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
@@ -553,6 +573,17 @@ def main():
     print_config(training_args)
 
     engine = auto.Engine(model, loss_func, optimizer, strategy=training_args.strategy)
+
+    checkpoint = None
+    if training_args.resume_from_checkpoint is not None:
+        checkpoint = training_args.resume_from_checkpoint
+    elif last_checkpoint is not None:
+        checkpoint = last_checkpoint
+
+    if checkpoint:
+        logger.info(f"Starting training from resume_from_checkpoint : {checkpoint}")
+        engine.load(os.path.join(checkpoint, "auto"))
+
     engine.prepare(
         [
             paddle.static.InputSpec(
@@ -637,6 +668,16 @@ def main():
                 global_step_last_logged = global_step
                 start_time_last_logged = time.time()
                 tr_loss = float(0)
+
+            if training_args.save_steps > 0 and global_step % training_args.save_steps == 0:
+                paddle.device.cuda.synchronize()
+                checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{global_step}"
+                run_dir = training_args.output_dir
+                output_dir = os.path.join(run_dir, checkpoint_folder)
+                os.makedirs(output_dir, exist_ok=True)
+                logger.info(f"Saving model checkpoint to {output_dir}")
+                prefix_path = os.path.join(output_dir, "auto")
+                engine.save(prefix_path, training=True)
 
             if global_step >= training_args.max_steps:
                 break
