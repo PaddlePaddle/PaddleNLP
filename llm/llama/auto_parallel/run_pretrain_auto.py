@@ -27,7 +27,7 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 import paddle.distributed.auto_parallel as auto
-from paddle.utils.profiler import job_schedule_profiler_range
+from paddle.profiler.utils import job_schedule_profiler_range
 
 from paddlenlp.trainer import (
     PdArgumentParser,
