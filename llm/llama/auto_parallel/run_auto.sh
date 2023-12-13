@@ -17,13 +17,12 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-export PARALLEL_CROSS_ENTROPY=true
-export FLAGS_call_stack_level=2
-
 task_name="llama_auto_dp2sharding2mp2pp2_vpp2"
 # rm -rf output/$task_name/  # ckpt is saved in 'output/''
 rm -rf "output/$task_name""_log"
 
+export PARALLEL_CROSS_ENTROPY=true
+export FLAGS_call_stack_level=2
 export PYTHONPATH=../../../:$PYTHONPATH
 python -u -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
