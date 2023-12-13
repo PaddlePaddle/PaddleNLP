@@ -149,7 +149,6 @@ class QWenInferenceModel(QWenPretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
-        head_size = self.hidden_size // self.num_attention_heads
         wte_weight = paddle.to_tensor(
             state_dict["qwen.wte.weight"],
             dtype=self.wte.weight.dtype
@@ -252,10 +251,7 @@ class QWenInferenceModel(QWenPretrainedModel):
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        if input_ids is not None:
-            input_shape = input_ids.shape
-        elif inputs_embeds is not None:
-            input_shape = inputs_embeds.shape[:-1]
+        if inputs_embeds is not None:
             batch, seq_len, hidden_dim = inputs_embeds.shape
             inputs_embeds = inputs_embeds.reshape([batch * seq_len, hidden_dim])
         
