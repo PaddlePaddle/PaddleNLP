@@ -711,7 +711,7 @@ class TrainingArguments:
     )
 
     ignore_load_lr_and_optim: Optional[bool] = field(
-        default=True,
+        default=False,
         metadata={"help": "whether to ignore load optimizer and scheduler."},
     )
 
