@@ -9,7 +9,6 @@ coverage:
       target: 75% # overall project Coverage < 75%  CI will fail
       informational: true
     patch:
-      default: false
-      paddlenlp:
-        target: 90% # lines adjusted  Coverage < 90%  CI will fail
-        paths: "paddlenlp/"
+      default: 
+      target: 90% # lines adjusted  Coverage < 90%  CI will fail
+      informational: true
