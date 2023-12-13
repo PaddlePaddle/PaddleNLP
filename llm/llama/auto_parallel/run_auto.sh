@@ -24,9 +24,9 @@ rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
 export SOT_LOG_LEVEL=4
-PYTHONPATH=../../:$PYTHONPATH  \
+export PYTHONPATH=../../../:$PYTHONPATH
 
-python -u  -m paddle.distributed.launch \
+python -u -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "output/$task_name""_log" \
     run_pretrain_auto.py \
@@ -56,13 +56,13 @@ python -u  -m paddle.distributed.launch \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
     --max_grad_norm 1.0 \
-    --logging_steps 1\
+    --logging_steps 1 \
     --dataloader_num_workers 1 \
     --sharding "" \
     --eval_steps 1000 \
     --report_to "visualdl" \
     --disable_tqdm true \
-    --continue_training 0\
+    --continue_training 0 \
     --recompute 1 \
     --do_train \
     --do_eval \

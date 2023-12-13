@@ -175,19 +175,29 @@ class LlamaDecoderLayerPipe(LlamaDecoderLayer):
 
         has_gradient = not hidden_states.stop_gradient
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
-            hidden_states = recompute(
-                super().forward, hidden_states, attention_mask=attention_mask, alibi=alibi, use_reentrant=False
-            )
+            if attention_mask is not None or alibi is not None:
+                hidden_states = recompute(
+                    super().forward, hidden_states, attention_mask=attention_mask, alibi=alibi, use_reentrant=False
+                )
+            else:
+                # for pretrain
+                hidden_states = recompute(
+                    super().forward, hidden_states, use_reentrant=self.config.recompute_use_reentrant
+                )
         else:
             hidden_states = super().forward(hidden_states, attention_mask=attention_mask, alibi=alibi)
 
         return return_args(hidden_states, attention_mask, position_ids, alibi)
 
 
-class LlamaRMSNormPipe(LlamaRMSNorm):
+class LlamaRMSNormPipe(nn.Layer):
+    def __init__(self, config):
+        super().__init__()
+        self.norm = LlamaRMSNorm(config)
+
     def forward(self, args):
         hidden_states, attention_mask, position_ids, alibi = parse_args(args)
-        return super().forward(hidden_states)
+        return self.norm(hidden_states)
 
 
 class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
@@ -234,7 +244,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                 LayerDesc(LlamaDecoderLayerPipe, config=config, layerwise_recompute=i not in self.no_recompute_layers),
                 f"llama.layers.{i}",
             )
-        self.add_sequential_layer(LayerDesc(LlamaRMSNormPipe, config=config), "llama.norm")
+        self.add_sequential_layer(LayerDesc(LlamaRMSNormPipe, config=config), "llama")
         self.add_sequential_layer(LayerDesc(LlamaLMHead, config=config), "lm_head")
 
         recompute_interval = 0

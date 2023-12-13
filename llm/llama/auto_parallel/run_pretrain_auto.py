@@ -14,6 +14,7 @@
 """
 GPT/Llama auto parallel pretraining scripts.
 """
+import contextlib
 import os
 import random
 import sys
@@ -24,6 +25,7 @@ from typing import List, Optional
 
 import numpy as np
 import paddle
+import paddle.distributed as dist
 import paddle.distributed.auto_parallel as auto
 
 from paddlenlp.trainer import (
@@ -64,6 +66,18 @@ def add_start_docstrings(*docstr):
     return docstring_decorator
 
 
+@contextlib.contextmanager
+def exec_mode_guard():
+    origin_mode = "dynamic" if paddle.in_dynamic_mode() else "static"
+    try:
+        yield
+    finally:
+        if origin_mode == "dynamic":
+            paddle.disable_static()
+        else:
+            paddle.enable_static()
+
+
 @dataclass
 @add_start_docstrings(TrainingArguments.__doc__)
 class PreTrainingArguments(TrainingArguments):
@@ -77,13 +91,22 @@ class PreTrainingArguments(TrainingArguments):
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
         },
     )
-    enable_linear_fused_grad_add: bool = field(
+    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
+    fused_linear_param_grad_add: bool = field(
         default=False,
         metadata={
-            "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
+            "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
         },
     )
-    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
+
+    def __post_init__(self):
+        super().__post_init__()
+        assert self.use_auto_parallel
+        if self.fused_linear_param_grad_add:
+            fused_passes = self.strategy.fused_passes
+            fused_passes.enable = True
+            fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
+        logger.info(self.strategy)
 
 
 @dataclass
@@ -140,6 +163,21 @@ class ModelArguments:
 
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
+    )
+    vocab_size: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": ".Vocabulary size of the Llama model. Defines the number of different tokens that can be represented by the `inputs_ids`"
+        },
+    )
+    hidden_size: Optional[int] = field(default=None, metadata={"help": "Dimension of the hidden representations."})
+    intermediate_size: Optional[int] = field(default=None, metadata={"help": "Dimension of the MLP representations."})
+    num_hidden_layers: Optional[int] = field(
+        default=None, metadata={"help": "Number of hidden layers in the Transformer encoder."}
+    )
+    num_attention_heads: Optional[int] = field(
+        default=None,
+        metadata={"help": "Number of attention heads for each attention layer in the Transformer encoder."},
     )
     use_flash_attention: bool = field(
         default=False,
@@ -379,11 +417,6 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    if training_args.enable_linear_fused_grad_add:
-        from fused_layers import mock_layers
-
-        mock_layers()
-
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
 
@@ -426,6 +459,18 @@ def main():
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
 
+    config.vocab_size = model_args.vocab_size if model_args.vocab_size is not None else config.vocab_size
+    config.hidden_size = model_args.hidden_size if model_args.hidden_size is not None else config.hidden_size
+    config.intermediate_size = (
+        model_args.intermediate_size if model_args.intermediate_size is not None else config.intermediate_size
+    )
+    config.num_hidden_layers = (
+        model_args.num_hidden_layers if model_args.num_hidden_layers is not None else config.num_hidden_layers
+    )
+    config.num_attention_heads = (
+        model_args.num_attention_heads if model_args.num_attention_heads is not None else config.num_attention_heads
+    )
+
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
@@ -446,14 +491,14 @@ def main():
     print("Final pre-training config:", config)
 
     # Set the dtype for loading model
-    dtype = "float32"
-    if training_args.fp16_opt_level == "O2":
-        if training_args.fp16:
-            dtype = "float16"
-        if training_args.bf16:
-            dtype = "bfloat16"
+    # dtype = "float32"
+    # if training_args.fp16_opt_level == "O2":
+    #     if training_args.fp16:
+    #         dtype = "float16"
+    #     if training_args.bf16:
+    #         dtype = "bfloat16"
 
-    model = model_class._from_config(config, dtype=dtype)
+    model = model_class._from_config(config)
 
     if training_args.recompute:
 
@@ -500,9 +545,11 @@ def main():
     def loss_func(loss, outputs):
         return loss
 
-    total_train_batch_size = training_args.per_device_train_batch_size \
-                             * training_args.gradient_accumulation_steps \
-                             * training_args.data_parallel_degree
+    total_train_batch_size_per_acc_step = (
+        training_args.per_device_train_batch_size * training_args.data_parallel_degree
+    )
+    total_train_batch_size = total_train_batch_size_per_acc_step * training_args.gradient_accumulation_steps
+
     print_config(training_args)
 
     engine = auto.Engine(model, loss_func, optimizer, strategy=training_args.strategy)
@@ -518,9 +565,14 @@ def main():
         mode="train",
     )
 
+    dp_degree = max(training_args.data_parallel_degree, 1)
+    mp_degree = max(training_args.tensor_parallel_degree, 1)
+    pp_degree = max(training_args.pipeline_parallel_degree, 1)
+    assert dp_degree * mp_degree * pp_degree == dist.get_world_size()
+
     train_dataloader = engine.dataloader(
         dataset=train_dataset,
-        batch_size=total_train_batch_size,
+        batch_size=total_train_batch_size_per_acc_step if pp_degree == 1 else total_train_batch_size,
         steps_per_epoch=training_args.max_steps,
         epochs=training_args.num_train_epochs,
         collate_fn=data_collator,
@@ -538,25 +590,35 @@ def main():
     global_step_last_logged = 0
     start_time_last_logged = time.time()
     tr_loss = float(0)
+    local_batches = []
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
-            outs = engine.run(inputs, mode="train")
+            local_batches.append(inputs)
+            if pp_degree == 1 and len(local_batches) < training_args.gradient_accumulation_steps:
+                continue
+            elif pp_degree > 1:
+                local_batches = inputs
 
-            if "loss" in outs:
-                tr_loss_step = np.sum(outs["loss"])
-            else:
-                tr_loss_step = float(0)
+            for micro_batch in local_batches:
+                outs = engine.run(micro_batch, mode="train")
 
-            if training_args.gradient_accumulation_steps > 1:
-                tr_loss_step /= training_args.gradient_accumulation_steps
+                if "loss" in outs:
+                    tr_loss_step = np.sum(outs["loss"])
+                else:
+                    tr_loss_step = float(0)
 
-            tr_loss += tr_loss_step
+                if training_args.gradient_accumulation_steps > 1:
+                    tr_loss_step /= training_args.gradient_accumulation_steps
+
+                tr_loss += tr_loss_step
+
+            local_batches = []
 
             if lr_scheduler is not None:
                 engine.optimizer._learning_rate.step()
 
             global_step += 1
-            if (step + 1) % training_args.logging_steps == 0:
+            if global_step % training_args.logging_steps == 0:
                 num_steps = global_step - global_step_last_logged
                 logs = {}
                 logs["loss"] = round(tr_loss / num_steps, 8)
@@ -576,7 +638,7 @@ def main():
                 start_time_last_logged = time.time()
                 tr_loss = float(0)
 
-            if step >= training_args.max_steps:
+            if global_step >= training_args.max_steps:
                 break
 
 

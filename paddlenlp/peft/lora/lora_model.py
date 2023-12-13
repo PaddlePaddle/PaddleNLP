@@ -336,6 +336,9 @@ class LoRAModel(nn.Layer):
                     quant_algo=module.quant_algo,
                     dtype=module._dtype,
                     bias_attr=False if module.bias is None else None,
+                    block_size=module.block_size,
+                    double_quant_block_size=module.double_quant_block_size,
+                    double_quant=module.double_quant,
                     r=lora_config.r,
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
@@ -409,7 +412,14 @@ class LoRAModel(nn.Layer):
             )
         if getattr(lora_module, "quant_weight", None) is not None:
             lora_module.quant_weight = module.quant_weight
-            lora_module.quant_scale = module.quant_scale
+            if getattr(lora_module, "quant_scale", None) is not None:
+                lora_module.quant_scale = module.quant_scale
+            if getattr(lora_module, "qquant_scale", None) is not None:
+                lora_module.qquant_scale = module.qquant_scale
+            if getattr(lora_module, "double_quant_scale", None) is not None:
+                lora_module.double_quant_scale = module.double_quant_scale
+            if getattr(lora_module, "quant_sacle_offset", None) is not None:
+                lora_module.quant_sacle_offset = module.quant_sacle_offset
         else:
             lora_module.weight = module.weight
         if module.bias is not None:
