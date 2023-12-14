@@ -24,6 +24,7 @@ import time
 import numpy as np
 import paddle
 
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import (
     ElectraForTotalPretraining,
     ElectraPretrainingCriterion,
@@ -121,6 +122,8 @@ def parse_args():
         choices=["cpu", "gpu"],
         help="The device to select to train the model, is must be cpu/gpu.",
     )
+    parser.add_argument("--to_static", type=strtobool, default=False, help="Enable training under @to_static.")
+
     args = parser.parse_args()
     return args
 
@@ -336,6 +339,16 @@ def create_dataloader(dataset, mode="train", batch_size=1, use_gpu=True, data_co
     return dataloader
 
 
+def create_input_specs():
+    input_ids = paddle.static.InputSpec(name="input_ids", shape=[-1, -1], dtype="int64")
+    token_type_ids = None
+    position_ids = None
+    attention_mask = None
+    raw_input_ids = paddle.static.InputSpec(name="raw_input_ids", shape=[-1, -1], dtype="int64")
+    generator_labels = paddle.static.InputSpec(name="generator_labels", shape=[-1, -1], dtype="int64")
+    return [input_ids, token_type_ids, position_ids, attention_mask, raw_input_ids, generator_labels]
+
+
 def do_train(args):
     paddle.enable_static() if not args.eager_run else None
     paddle.set_device(args.device)
@@ -383,6 +396,11 @@ def do_train(args):
     criterion = ElectraPretrainingCriterion(config)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
+    # decorate @to_static for benchmark, skip it by default.
+    if args.to_static:
+        specs = create_input_specs()
+        model = paddle.jit.to_static(model, input_spec=specs)
+        logger.info("Successfully to apply @to_static to the whole model with specs: {}.".format(specs))
 
     # Loads dataset.
     tic_load_data = time.time()

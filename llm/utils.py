@@ -29,7 +29,7 @@ from sklearn.metrics import accuracy_score
 from paddlenlp.datasets import InTokensIterableDataset
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
-from paddlenlp.transformers import LlamaForCausalLMPipe
+from paddlenlp.transformers import ChatGLMv2Tokenizer, LlamaForCausalLMPipe
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
@@ -392,9 +392,9 @@ def dybatch_preprocess(
     architectures: str,
     top_p: float,
     temperature: float,
+    eos_token_id: int | list[list[int]],
     pre_caches_length: int = 0,
     benchmark: bool = False,
-    chat_template: Optional[str] = None,
 ):
     """Pre-process generation inputs."""
     inputs = {}
@@ -408,7 +408,8 @@ def dybatch_preprocess(
                 return_tensors="np",
                 padding=True,
                 max_length=src_length,
-                add_special_tokens=chat_template is None,
+                # if use chat_template, it will not add special_tokens
+                add_special_tokens=tokenizer.chat_template is None or isinstance(tokenizer, ChatGLMv2Tokenizer),
             )
             input_ids.append(tokens["input_ids"][0])
             position_ids.append(tokens["position_ids"][0])
@@ -485,16 +486,12 @@ def dybatch_preprocess(
         0,
     ] * bs
     tgt_pos = np.array(tgt_pos).astype("int64")
-    inputs["eos_token_id"] = (
-        np.array(
-            [
-                tokenizer.eos_token_id,
-            ]
-            * bs
-        )
-        .reshape(-1, 1)
-        .astype("int64")
-    )
+
+    if isinstance(eos_token_id, int):
+        eos_token_id = [eos_token_id]
+
+    inputs["eos_token_id"] = np.array(eos_token_id * bs).reshape(-1, 1).astype("int64")
+
     inputs["top_p"] = (
         np.array(
             [
@@ -610,7 +607,11 @@ def init_chat_template(
         model_name_or_path (str): _description_
         chat_template_file (Optional[str], optional): _description_. Defaults to None.
     """
+    # 1. use the default chat_template file
     if chat_template_file is None:
+        return
+
+    if str(chat_template_file).lower() == "none":
         # delete the chat_template from tokenizer if not use chat_template.
         # why do this: it will load the `chat_template.json` file by default
         tokenizer.chat_template = None
@@ -619,7 +620,7 @@ def init_chat_template(
     # it will load the `chat_template.json` file by default, so do nothing
     if chat_template_file == model_name_or_path:
         if tokenizer.chat_template is None:
-            raise ValueError(f"there is not `chat_template.json` file in the `{model_name_or_path}`")
+            logger.warning(f"there is not `chat_template.json` file in the `{model_name_or_path}`")
         return
 
     if os.path.isdir(chat_template_file):
@@ -627,7 +628,12 @@ def init_chat_template(
         if os.path.exists(local_chat_template_file_path):
             chat_template_file = local_chat_template_file_path
         else:
-            raise ValueError(f"can not find `chat_template.json` file in the `{chat_template_file}`")
+            logger.warning(f"there is not `chat_template.json` file in the `{model_name_or_path}`")
+            return
+
+    if not os.path.exists(chat_template_file):
+        logger.warning(f"there is not `chat_template.json` file from path<`{model_name_or_path}`>")
+        return
 
     logger.info(f"loading `chat_template.json` from `{chat_template_file}`")
     tokenizer.init_chat_template(chat_template_file)

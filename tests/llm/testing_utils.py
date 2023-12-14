@@ -60,9 +60,6 @@ class LLMTest:
         if config_params is None:
             config_params = {}
 
-        config_params["init_fleet_worker"] = False
-        config_params["enable_memory_optim"] = False
-
         # to avoid the same parameter
         self.disable_static()
         predict_config = load_test_config(self.config_path, "inference-predict")
@@ -108,5 +105,6 @@ class LLMTest:
         predict_result = self._read_result(predict_config["output_file"])
         infer_result = self._read_result(config["output_file"])
         assert len(predict_result) == len(infer_result)
+
         for predict_item, infer_item in zip(predict_result, infer_result):
             self.assertEqual(predict_item, infer_item)

@@ -88,6 +88,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         chunk_size: int = 500,
         thread_count: int = 32,
         queue_size: int = 32,
+        **kwargs,
     ):
         """
         A DocumentStore using Elasticsearch to store and query the documents for our search.
@@ -239,6 +240,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         self.scroll = scroll
         self.skip_missing_embeddings: bool = skip_missing_embeddings
         self.vector_type = vector_type
+        self.number_of_shards = kwargs.get("number_of_shards", 1)
+        self.number_of_replicas = kwargs.get("number_of_replicas", 2)
 
         self.similarity_check(similarity)
         if index_type in ["flat", "hnsw"]:
@@ -309,6 +312,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                 verify_certs=verify_certs,
                 timeout=timeout,
                 connection_class=connection_class,
+                max_retries=5,
+                retry_on_timeout=True,
             )
         elif aws4auth:
             # aws elasticsearch with IAM
@@ -320,6 +325,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                 use_ssl=True,
                 verify_certs=True,
                 timeout=timeout,
+                max_retries=5,
+                retry_on_timeout=True,
             )
         elif username:
             # standard http_auth
@@ -331,6 +338,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                 verify_certs=verify_certs,
                 timeout=timeout,
                 connection_class=connection_class,
+                max_retries=5,
+                retry_on_timeout=True,
             )
         else:
             # there is no authentication for this elasticsearch instance
@@ -341,6 +350,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                 verify_certs=verify_certs,
                 timeout=timeout,
                 connection_class=connection_class,
+                max_retries=5,
+                retry_on_timeout=True,
             )
 
         # Test connection
@@ -451,8 +462,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                     mapping["mappings"]["properties"].update({field: {"type": "text"}})
 
             if self.embedding_field:
-                mapping["settings"]["number_of_shards"] = 1
-                mapping["settings"]["number_of_replicas"] = 2
+                mapping["settings"]["number_of_shards"] = self.number_of_shards
+                mapping["settings"]["number_of_replicas"] = self.number_of_replicas
                 mapping["mappings"]["properties"][self.embedding_field] = {
                     "type": self.vector_type,
                     "dims": self.embedding_dim,
@@ -488,7 +499,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                     # TODO add pipeline_hash and pipeline_name once we migrated the REST API to pipelines
                 }
             },
-            "settings": {"number_of_shards": 1, "number_of_replicas": 2},
+            "settings": {"number_of_shards": self.number_of_shards, "number_of_replicas": self.number_of_replicas},
         }
         try:
             self.client.indices.create(index=index_name, body=mapping, headers=headers)
@@ -527,9 +538,15 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         to performance issues. Note that Elasticsearch limits the number of results to 10,000 documents by default.
         """
         index = index or self.index
-        query = {"size": len(ids), "query": {"ids": {"values": ids}}}
-        result = self.client.search(index=index, body=query, headers=headers)["hits"]["hits"]
-        documents = [self._convert_es_hit_to_document(hit, return_embedding=self.return_embedding) for hit in result]
+        documents = []
+        for i in range(0, len(ids), batch_size):
+            ids_for_batch = ids[i : i + batch_size]
+            query = {"size": len(ids_for_batch), "query": {"ids": {"values": ids_for_batch}}}
+            result = self.client.search(index=index, body=query, request_timeout=600, headers=headers)["hits"]["hits"]
+            # documents = [self._convert_es_hit_to_document(hit, return_embedding=self.return_embedding) for hit in result]
+            documents.extend(
+                [self._convert_es_hit_to_document(hit, return_embedding=self.return_embedding) for hit in result]
+            )
         return documents
 
     def get_metadata_values_by_key(
@@ -659,6 +676,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
             documents=document_objects, index=index, duplicate_documents=duplicate_documents, headers=headers
         )
         documents_to_index = []
+
         for doc in document_objects:
             _doc = {
                 "_op_type": "index" if duplicate_documents == "overwrite" else "create",
@@ -1203,7 +1221,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
 
         logger.debug(f"Retriever query: {body}")
         logging.getLogger("elasticsearch").setLevel(logging.CRITICAL)
-        result = self.client.search(index=index, body=body, headers=headers)["hits"]["hits"]
+        result = self.client.search(index=index, body=body, request_timeout=600, headers=headers)["hits"]["hits"]
 
         documents = [self._convert_es_hit_to_document(hit, return_embedding=self.return_embedding) for hit in result]
         return documents
@@ -1303,14 +1321,17 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         # +1 in similarity to avoid negative numbers (for cosine sim)
         body = {"size": top_k, "query": self._get_vector_similarity_query(query_emb, top_k)}
         if filters:
-            filter_ = {"bool": {"filter": LogicalFilterClause.parse(filters).convert_to_elasticsearch()}}
-            if body["query"]["script_score"]["query"] == {"match_all": {}}:
-                body["query"]["script_score"]["query"] = filter_
+            if self.index_type == "hnsw":
+                filter_ = {"filter": LogicalFilterClause.parse(filters).convert_to_elasticsearch()}
+                body["query"]["knn"][self.embedding_field].update(filter_)
             else:
-                body["query"]["script_score"]["query"]["bool"]["filter"]["bool"]["must"].append(filter_)
+                filter_ = {"bool": {"filter": LogicalFilterClause.parse(filters).convert_to_elasticsearch()}}
+                if body["query"]["script_score"]["query"] == {"match_all": {}}:
+                    body["query"]["script_score"]["query"] = filter_
+                else:
+                    body["query"]["script_score"]["query"]["bool"]["filter"]["bool"]["must"].append(filter_)
 
         excluded_meta_data: Optional[list] = None
-
         if self.excluded_meta_data:
             excluded_meta_data = deepcopy(self.excluded_meta_data)
 
@@ -1324,9 +1345,9 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         if excluded_meta_data:
             body["_source"] = {"excludes": excluded_meta_data}
 
-        logger.debug(f"Retriever query: {body}")
+        # logger.debug(f"Retriever query: {body}")
         try:
-            result = self.client.search(index=index, body=body, request_timeout=300, headers=headers)["hits"]["hits"]
+            result = self.client.search(index=index, body=body, request_timeout=600, headers=headers)["hits"]["hits"]
             if len(result) == 0:
                 count_embeddings = self.get_embedding_count(index=index, headers=headers)
                 if count_embeddings == 0:
@@ -2073,7 +2094,7 @@ class OpenSearchDocumentStore(ElasticsearchDocumentStore):
             # use default parameters
             pass
         elif self.index_type == "hnsw":
-            method["parameters"] = {"ef_construction": 80, "m": 64}
+            method["parameters"] = {"ef_construction": self.ef_construction, "m": self.m}
         else:
             logger.error("Please set index_type to either 'flat' or 'hnsw'")
 
@@ -2242,18 +2263,29 @@ class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
             script_score_query = {
                 "bool": {"filter": {"bool": {"must": [{"exists": {"field": self.embedding_field}}]}}}
             }
-
-        query = {
-            "script_score": {
-                "query": script_score_query,
-                "script": {
-                    # offset score to ensure a positive range as required by Elasticsearch
-                    "source": "bpack_knn_script",
-                    "lang": "knn",
-                    "params": {"space": self.similarity, "field": "embedding", "vector": query_emb.tolist()},
-                },
+        if self.index_type == "hnsw":
+            query = {
+                "knn": {
+                    self.embedding_field: {
+                        "vector": query_emb.tolist(),
+                        "k": 16,
+                        "ef": self.ef_construction,
+                    }
+                }
             }
-        }
+        else:
+            query = {
+                "script_score": {
+                    "query": script_score_query,
+                    "script": {
+                        # offset score to ensure a positive range as required by Elasticsearch
+                        "source": "bpack_knn_script",
+                        "lang": "knn",
+                        "params": {"space": self.similarity, "field": "embedding", "vector": query_emb.tolist()},
+                    },
+                }
+            }
+
         return query
 
     def _create_label_index(self, index_name: str, headers: Optional[Dict[str, str]] = None):
@@ -2368,8 +2400,8 @@ class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
                     mapping["mappings"]["properties"].update({field: {"type": "text"}})
 
             if self.embedding_field:
-                mapping["settings"]["number_of_shards"] = 1
-                mapping["settings"]["number_of_replicas"] = 2
+                mapping["settings"]["number_of_shards"] = self.number_of_shards
+                mapping["settings"]["number_of_replicas"] = self.number_of_replicas
                 if self.index_type == "hnsw":
                     mapping["mappings"]["properties"][self.embedding_field] = {
                         "type": self.vector_type,
@@ -2378,12 +2410,11 @@ class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
                         "space_type": self.space_type,
                         "parameters": {"ef_construction": self.ef_construction, "m": self.m},
                     }
-
-            else:
-                mapping["mappings"]["properties"][self.embedding_field] = {
-                    "type": self.vector_type,
-                    "dims": self.embedding_dim,
-                }
+                else:
+                    mapping["mappings"]["properties"][self.embedding_field] = {
+                        "type": self.vector_type,
+                        "dims": self.embedding_dim,
+                    }
 
             if self.index_type == "hnsw":
                 mapping["settings"]["index"] = {"knn": True}

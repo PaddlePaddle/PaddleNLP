@@ -40,7 +40,6 @@ setup(
             "./generation/transpose_removing_padding.cu",
             "./generation/write_cache_kv.cu",
             "./generation/encode_rotary_qk.cu",
-            "./generation/top_p_sampling.cu",
             "./generation/set_alibi_mask_value.cu",
             "./generation/quant_int8.cu",
             "./generation/dequant_int8.cu",

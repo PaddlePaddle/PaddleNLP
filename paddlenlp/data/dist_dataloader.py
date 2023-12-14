@@ -16,7 +16,6 @@ import numpy as np
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
 _MAX_DATA_DIM = 64
@@ -58,7 +57,6 @@ class DistDataLoader(paddle.io.DataLoader):
 
         if dataset is None:
             dataset = DummyDataset()
-            batch_sampler = DistributedBatchSampler(dataset, 1)
             logger.info("rank has no data, use Dummpy dataset")
 
         super().__init__(dataset=dataset, batch_sampler=batch_sampler, collate_fn=collate_fn, num_workers=num_workers)
