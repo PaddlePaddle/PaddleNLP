@@ -3,11 +3,13 @@
 ------------------------------------
 
 
-LLaMA v1/v2、GPT-3、BaiChuan、Qwen 等大模型的预训练支持。
+PaddleNLP大模型套件支持 LLaMA v1/v2、GPT-3、BaiChuan、Qwen 等大模型的预训练支持。
 
 
-数据详细制作流程可参考
-^^^^^^^^^^^^^^^^^^^
+数据详细制作流程可参考:
+-----------------------------
+
+
 .. toctree::
    :maxdepth: 1
 
@@ -55,16 +57,19 @@ LLaMA v1/v2、GPT-3、BaiChuan、Qwen 等大模型的预训练支持。
 
 
 注意：
+
 1. 建议使用paddle develop版本训练，需要安装`pip install tool_helpers visualdl==2.5.3`等相关缺失whl包
-2. `use_flash_attention` 需要在A100机器开启，建议使用cuda11.8环境。
-3. `use_fused_rms_norm` 需要安装[此目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt-3/external_ops)下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置PYTHONPATH
-4. `continue_training` 表示从现有的预训练模型加载训练。7b模型初始loss大概为2.xx, 随机初始化模型loss从11.x左右下降。
-5. 当前脚本为sharding版本，需要4D并行训练（数据、sharding、张量、流水线并行）的用户，请参考 `run_trainer_tp4pp2.sh`脚本。
+2. ``use_flash_attention`` 需要在A100机器开启，建议使用cuda11.8环境。
+3. ``use_fused_rms_norm`` 需要安装[此目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt-3/external_ops)下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置PYTHONPATH
+4. ```continue_training``` 表示从现有的预训练模型加载训练。7b模型初始loss大概为2.xx, 随机初始化模型loss从11.x左右下降。
+5. 当前脚本为sharding版本，需要4D并行训练（数据、sharding、张量、流水线并行）的用户，请参考``run_trainer_tp4pp2.sh``脚本。
 6. 多机训练时，若各机器使用的训练数据文件位置相同（例如挂载共享硬盘情况），请指定`--share_folder true`使全局0号卡制作缓存数据。否则默认各台机器的0号卡独立制作缓存数据，
-7. 若数据集文件夹中存在默认缓存文件夹`index-cache/`，则额外指定的`--data_cache`不生效，训练时优先加载默认缓存文件夹中的内容。
+7. 若数据集文件夹中存在默认缓存文件夹``index-cache/``，则额外指定的``--data_cache``不生效，训练时优先加载默认缓存文件夹中的内容。
 
 
-## 模型预训练支持的分布式能力一览
+模型预训练支持的分布式能力一览
+--------------------------------------
+
 
 .. csv-table:: 模型能力汇总
     :header: Model,Data Parallelism,Tensor Parallelism,Pipeline Parallelism,sequence parallelism,Flash Attention,Selective Recompute,Sharding Stage1 + recompute,Sharding Stage1 + DP,Stage2 + recompute,Stage2 + DP,Stage3 + recompute,Stage3 + DP
@@ -88,10 +93,14 @@ LLaMA v1/v2、GPT-3、BaiChuan、Qwen 等大模型的预训练支持。
 * ❌: 暂不支持，Not Supported
 
 
-## 模型权重支持列表
+模型权重支持列表
+-------------------------
+
+
 上表中展示的是部分模型权重，支持的所有模型如下：
 
-.. highlight:: python
+.. code-block:: text
+
   * LLaMA系列
     - facebook/llama-7b [英文]
     - facebook/llama-13b [英文]
@@ -126,12 +135,14 @@ LLaMA v1/v2、GPT-3、BaiChuan、Qwen 等大模型的预训练支持。
     - qwen/qwen-14b [中文]
     - qwen/qwen-14b-chat [中文]
 
-## 预训练性能
+预训练性能
+------------------
+
 以下测试结果基于
 
 机器环境： A100 80G * 8, CUDA 11.8, NCCL 2.15
 
-.. code-block:: bash
+.. code-block:: text
 
     paddle commit id              : 9b36e53f24ac5f471b20de99e0cc3980f38b44ab
     paddlenlp commit id           : 0b246a609a3062e3c3256d87193b70277b5b07e0
@@ -153,9 +164,6 @@ LLaMA v1/v2、GPT-3、BaiChuan、Qwen 等大模型的预训练支持。
     ``qwen/qwen-7b``                     ,4096,``tp2sd4_stage2``,3607.28,65448MB,``./qwen/pretrain-qwen_7b-tp2sd4_stage2.json``,2023-11-27 22:16:04
 
 注：
+
 1. 显存占用(MB)使用的是 ``max_memory_allocated``, 实际物理显存会占用更多，大约多2-3GB.
 2. 速度会有小幅波动，例如 ``facebook/llama-7b`` 和 ``meta-llama/Llama-2-7b`` 是相同训练配置。
-
-上述表格使用 `a tableconvert`_ 工具转换自markdown。
-
-.. _a tableconvert: https://tableconvert.com/markdown-to-restructuredtext
