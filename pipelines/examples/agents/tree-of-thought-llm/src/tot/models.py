@@ -1,6 +1,4 @@
 # coding=utf8, ErnestinaQiu
-import os
-import backoff 
 from llama2 import ChatCompletion
 
 completion_tokens = prompt_tokens = 0

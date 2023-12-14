@@ -2,13 +2,12 @@ import re
 import os
 import json
 from src.tot.tasks.base import Task, DATA_PATH
-from src.tot.prompts.crosswords import * 
+from src.tot.prompts.crosswords import standard_prompt, cot_prompt, propose_prompt, value_prompt
 from src.tot.models import gpt
 
 class MiniCrosswordsEnv:
     def __init__(self, file='mini0505.json'):
         self.file = os.path.join(DATA_PATH, 'crosswords', file)
-
         self.file = json.load(open(self.file))
         self.n = len(self.file)
         self.cache = {}
@@ -40,7 +39,6 @@ class MiniCrosswordsEnv:
     def prompt_status(self):
         count = {'sure': 0, 'maybe': 0, 'impossible': 0}
         for ans, data, status in zip(self.ans, self.data, self.status):
-            # if status != 0: continue
             if ans.count('_') >= 4: continue
             ans = ' '.join(ans.lower())
             line = f'{data}: {ans}'
@@ -50,12 +48,8 @@ class MiniCrosswordsEnv:
             else:
                 res = gpt(prompt)[0]
                 self.prompt_status_cache[prompt] = res
-            # print(line)
-            # print(res)
-            # print()
             res = res.split('\n')[-1].strip()
             if res in count: count[res] += 1
-        # print(count)
         return count
     
     def render_gt_board(self):
@@ -72,7 +66,6 @@ class MiniCrosswordsEnv:
 
     def render_clues(self, status=None):
         s = ""
-        # s += "Horizontal:\n"
         for i in range(5):
             if status is None or self.status[i] == status:
                 s += 'h' + str(i+1) + '. ' + self.data[i] + '\n'
@@ -141,7 +134,6 @@ class MiniCrosswordsEnv:
             return 'Invalid! Position should be h1-h5 or v1-v5', 0, False, {}
         
         self.new_ans = self.get_ans(self.board)
-        # self.status = [2 if (status == 1 and ans != new_ans) else status for status, ans, new_ans in zip(self.status, self.ans, self.new_ans)]
         self.status = [2 if any(letter != new_letter and letter != '_' for letter, new_letter in zip(ans, new_ans)) else status for status, ans, new_ans in zip(self.status, self.ans, self.new_ans)]
         self.status[idx] = 1
         self.ans = self.new_ans
@@ -178,14 +170,6 @@ class MiniCrosswordsTask(Task):
     def get_input(self, idx: int) -> str:
         self.env.reset(idx)
         return self.env.render_clues()
-    
-    # def test_output(self, idx: int, output: str):  # TODO: r_word for now
-    #     self.env.reset(idx)
-    #     info = {'r_word': 0}
-    #     for line in output.split('\n'):
-    #         if line.startswith('h') or line.startswith('v'):
-    #             _, _, _, info = self.env.step(line)
-    #     return info['r_word']
     
     def test_output(self, idx: int, output: str):
         self.env.reset(idx)

@@ -1,7 +1,7 @@
 import os
 import re
 from src.tot.tasks.base import Task, DATA_PATH
-from src.tot.prompts.text import *
+from src.tot.prompts.text import standard_prompt, cot_prompt, vote_prompt, compare_prompt, score_prompt
 from src.tot.models import gpt
 
 

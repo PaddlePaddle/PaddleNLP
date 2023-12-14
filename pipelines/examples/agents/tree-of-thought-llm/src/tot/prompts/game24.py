@@ -107,27 +107,27 @@ impossible
 value_last_step_prompt = '''Use numbers and basic arithmetic operations (+ - * /) to obtain 24. Given an input and an answer, give a judgement (sure/impossible) if the answer is correct, i.e. it uses each input exactly once and no other numbers, and reach 24.
 Input: 4 4 6 8
 Answer: (4 + 8) * (6 - 4) = 24
-Judge: 
+Judge:
 sure
 Input: 2 9 10 12
 Answer: 2 * 12 * (10 - 9) = 24
-Judge: 
+Judge:
 sure
 Input: 4 9 10 13
 Answer: (13 - 9) * (10 - 4) = 24
-Judge: 
+Judge:
 sure
 Input: 4 4 6 8
 Answer: (4 + 8) * (6 - 4) + 1 = 25
-Judge: 
+Judge:
 impossible
 Input: 2 9 10 12
 Answer: 2 * (12 - 10) = 24
-Judge: 
+Judge:
 impossible
 Input: 4 9 10 13
 Answer: (13 - 4) * (10 - 9) = 24
-Judge: 
+Judge:
 impossible
 Input: {input}
 Answer: {answer}

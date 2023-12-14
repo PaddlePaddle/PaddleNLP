@@ -3,7 +3,7 @@ import os
 import sympy
 import pandas as pd
 from src.tot.tasks.base import Task, DATA_PATH
-from src.tot.prompts.game24 import * 
+from src.tot.prompts.game24 import standard_prompt, cot_prompt, propose_prompt, value_prompt, value_last_step_prompt
 
 
 def get_current_numbers(y: str) -> str:
