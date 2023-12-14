@@ -72,10 +72,8 @@ class QWenInferenceModel(QWenPretrainedModel):
         self.num_layers = config.num_hidden_layers
         self.layer_norm_epsilon = config.layer_norm_epsilon
         self.max_position_embeddings = config.max_position_embeddings
-        self.emb_dropout_prob = config.emb_dropout_prob
 
         self.wte = nn.Embedding(self.vocab_size, self.hidden_size)
-        self.drop = nn.Dropout(self.emb_dropout_prob)
 
         ln_scale_attrs = [paddle.ParamAttr(name="fuseqwen.{}.ln_scale".format(i)) for i in range(self.num_layers)]
         qkv_weight_attrs = [
