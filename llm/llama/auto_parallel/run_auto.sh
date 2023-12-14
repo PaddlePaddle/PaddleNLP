@@ -17,14 +17,16 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-task_name="llama_auto_dp2mp2pp2"
+task_name="llama_auto_dp2sharding2mp2pp2_vpp2"
+# rm -rf output/$task_name/  # ckpt is saved in 'output/''
 rm -rf log_newir/$task_name/
 rm -rf "log_newir/$task_name""_log"
 rm -rf debug_program*
 
+# export PARALLEL_CROSS_ENTROPY=true
 export FLAGS_call_stack_level=2
-export SOT_LOG_LEVEL=4
-PYTHONPATH=../../:$PYTHONPATH  \
+export PYTHONPATH=../../../:$PYTHONPATH
+
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 export FLAGS_new_executor_micro_batching=True
@@ -38,17 +40,20 @@ export FLAGS_enable_prim_after_distribute=True
 # --sharding "stage1" \
 # --sharding "" \
 
-python -u  -m paddle.distributed.launch \
-    --devices "0,1,2,3" \
+python -u -m paddle.distributed.launch \
+    --gpus "0,1,2,3" \
     --log_dir "log_newir/$task_name""_log" \
-    run_pretrain_auto.py \
+    auto_parallel/run_pretrain_auto.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
     --tokenizer_name_or_path "facebook/llama-7b" \
     --input_dir "./data" \
-    --output_dir "log_newir/$task_name" \
+    --output_dir "output/$task_name" \
     --split 949,50,1 \
     --max_seq_length 256 \
+    --hidden_size 1024 \
+    --intermediate_size 256 \
+    --num_hidden_layers 2 \
     --per_device_train_batch_size 2 \
     --per_device_eval_batch_size 2 \
     --gradient_accumulation_steps 1 \
