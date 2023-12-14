@@ -81,6 +81,13 @@ function _train(){
     else
         bf16=False
     fi
+
+    fp16=False
+    if [ "fp16" = ${fp_item} ]; then
+        fp16=True
+    else
+        fp16=False
+    fi
    
     if [ "False" = ${use_sharding} ]; then
         sharding=""
@@ -104,6 +111,7 @@ function _train(){
                 --fuse_attention_qkv True \
                 --use_flash_attention True \
                 --bf16 ${bf16} \
+                --fp16 ${fp16}
                 --fp16_opt_level "O2" \
                 --amp_master_grad True \
                 --learning_rate 0.00001 \
