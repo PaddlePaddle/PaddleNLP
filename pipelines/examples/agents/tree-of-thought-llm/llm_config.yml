@@ -1,0 +1,18 @@
+llama-2-13b:
+  ckpt_dir: /mnt/e/study/dl/llama2/llama-2-13b/
+  tokenizer_path: /mnt/e/study/dl/llama2/tokenizer.model
+llama-2-13b-chat:
+  ckpt_dir: /mnt/e/study/dl/llama2/llama-2-13b-chat/
+  tokenizer_path: /mnt/e/study/dl/llama2/tokenizer.model
+llama-2-70b:
+  ckpt_dir: /mnt/e/study/dl/llama2/llama-2-70b/
+  tokenizer_path: /mnt/e/study/dl/llama2/tokenizer.model
+llama-2-70b-chat:
+  ckpt_dir: /mnt/e/study/dl/llama2/llama-2-70b/
+  tokenizer_path: /mnt/e/study/dl/llama2/tokenizer.model
+llama-2-7b:
+  ckpt_dir: /mnt/e/study/dl/llama2/llama-2-7b/
+  tokenizer_path: /mnt/e/study/dl/llama2/tokenizer.model
+llama-2-7b-chat:
+  ckpt_dir: /mnt/e/study/dl/llama2/llama-2-7b-chat/
+  tokenizer_path: /mnt/e/study/dl/llama2/tokenizer.model

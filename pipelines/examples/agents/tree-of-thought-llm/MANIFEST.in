@@ -1,0 +1,4 @@
+include src/tot/data/24/24.csv
+include src/tot/data/crosswords/mini0505_0_100_5.json
+include src/tot/data/crosswords/mini0505.json
+include src/tot/data/text/data_100_random_text.txt

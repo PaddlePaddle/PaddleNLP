@@ -1,0 +1,7 @@
+/*__pycache__/
+dist/
+src/tree_of_thoughts_llm.egg-info/
+.env
+*.pyc
+*.DS_Store
+spark/test.py

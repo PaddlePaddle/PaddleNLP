@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools >= 61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tree-of-thoughts-llm"
+version = "0.1.0"
+description = 'Official Implementation of "Tree of Thoughts: Deliberate Problem Solving with Large Language Models"'
+readme = "README.md"
+requires-python = ">= 3.7"
+authors = [{ name = "Shunyu Yao", email = "shunyuyao.cs@gmail.com" }]
+license = { text = "MIT License" }
+keywords = ["tree-search", "large-language-models", "llm", "prompting", "tree-of-thoughts"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    'Intended Audience :: Science/Research',
+    'Topic :: Scientific/Engineering :: Artificial Intelligence',
+]
+dynamic=["dependencies"]
+
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+where = ["src"]  # list of folders that contain the packages (["."] by default)
+
+[project.urls]
+Homepage = "https://github.com/princeton-nlp/tree-of-thought-llm"
