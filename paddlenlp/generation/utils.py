@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import copy
+import inspect
 from typing import Union
 
 import paddle
@@ -1203,10 +1204,13 @@ class GenerationMixin(object):
         return input_ids[:, origin_len:], scores
 
     def _get_model_inputs_spec(self, dtype: str):
-        return {
+        spec = {
             "input_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
             "attention_mask": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
         }
+        if "position_ids" in inspect.getfullargspec(self.forward).args:
+            spec["position_ids"] = paddle.static.InputSpec(shape=[None, None], dtype="int64")
+        return spec
 
     def to_static(self, path: str, config: dict):
         """export generation model to static
