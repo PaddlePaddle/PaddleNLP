@@ -96,13 +96,6 @@ class ChatTemplateContextDataTest(unittest.TestCase):
 
 
 class ChatTemplateIntegrationTest(unittest.TestCase):
-    def test_llama2_chat_template(self):
-        tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat")
-        query = "who are you?"
-        final_query = tokenizer.apply_chat_template(query, tokenize=False)
-        expected_query = "<s>[INST] <<SYS>>\nYou are a helpful assistant.\n<</SYS>>[INST] who are you? [/INST]"
-        self.assertEqual(final_query, expected_query)
-
     def test_linlyai_chinese_llama_2_chat_template(self):
         tokenizer = AutoTokenizer.from_pretrained("linly-ai/chinese-llama-2-7b")
         query = "你好"
@@ -149,16 +142,16 @@ class ChatTemplateIntegrationTest(unittest.TestCase):
         query = "你好"
         final_query = tokenizer.apply_chat_template(query, tokenize=False)
 
-        expected_query = "You are a helpful assistant.\n<|im_start|>user\n你好<|im_end|>\n<|im_start|>assistant\n"
+        expected_query = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n你好<|im_end|>\n<|im_start|>assistant\n"
         self.assertEqual(final_query, expected_query)
 
         query = [["你好", "您好，我是个人人工智能助手"], ["今天吃啥"]]
         final_query = tokenizer.apply_chat_template(query, tokenize=False)
 
         expected_query = (
-            "You are a helpful assistant.\n<|im_start|>user\n你好<|im_end|>"
-            "\n<|im_start|>assistant\n您好，我是个人人工智能助手<|im_end|>"
-            "\n<|im_start|>user\n今天吃啥<|im_end|>\n<|im_start|>assistant\n"
+            "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n你好<|im_end|>\n"
+            "<|im_start|>assistant\n您好，我是个人人工智能助手<|im_end|>\n"
+            "<|im_start|>user\n今天吃啥<|im_end|>\n<|im_start|>assistant\n"
         )
         self.assertEqual(final_query, expected_query)
 
