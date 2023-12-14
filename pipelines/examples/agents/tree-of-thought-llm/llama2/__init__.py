@@ -8,13 +8,14 @@ from typing import List, Optional
 from llama2.llama.llama import Llama, Dialog
 
 import os
-os.environ["WORLD_SIZE"] = '1'
-os.environ["RANK"] = '0'
-os.environ["MASTER_ADDR"] = 'localhost'
-os.environ["MASTER_PORT"] = '8020'
+
+os.environ["WORLD_SIZE"] = "1"
+os.environ["RANK"] = "0"
+os.environ["MASTER_ADDR"] = "localhost"
+os.environ["MASTER_PORT"] = "8020"
 
 llm_config_path = os.path.join(os.getcwd(), "llm_config.yml")
-with open(llm_config_path, 'r') as f:
+with open(llm_config_path, "r") as f:
     log_config = yaml.full_load(f.read())
 
 
@@ -22,6 +23,7 @@ class ChatCompletion:
     global log_config
     global max_seq_len
     global max_batch_size
+
     def __init__(self, model="llama-2-7b-chat") -> None:
         ckpt_dir = log_config[model]["ckpt_dir"]
         tokenizer_path = log_config[model]["tokenizer_path"]
@@ -34,19 +36,17 @@ class ChatCompletion:
             tokenizer_path=tokenizer_path,
             max_seq_len=max_seq_len,
             max_batch_size=max_batch_size,
-            )
+        )
 
     # @staticmethod
     def create(
-        self,
-        messages: List[Dialog],
-        temperature: float = 0.6,
-        top_p: float = 0.9, max_gen_len: Optional[int] = None):
+        self, messages: List[Dialog], temperature: float = 0.6, top_p: float = 0.9, max_gen_len: Optional[int] = None
+    ):
         """
         Entry point of the program for generating text using a pretrained model.
 
         Args:
-            messages (list): There are two roles including "system" and "user". 
+            messages (list): There are two roles including "system" and "user".
             --Example  [[{"role": "user", "content": "what is the recipe of mayonnaise?"}, {"role": "system", "content": "Always answer with Haiku"}]]
             ckpt_dir (str): The directory containing checkpoint files for the pretrained model.
             tokenizer_path (str): The path to the tokenizer model used for text encoding/decoding.
@@ -67,18 +67,14 @@ class ChatCompletion:
         )
 
         completion = {
-                        "choices": [],
-                        "created": time.time(),
-                        "id": "llama2_{}".format(int(time.time())),
-                        "model": "llama-2-7b-chat",
-                        "object": "chat.completion",
-                        "usage": {
-                            "completion_tokens": 0,
-                            "prompt_tokens": 0,
-                            "total_tokens": 0
-                        }
-                        }
-    
+            "choices": [],
+            "created": time.time(),
+            "id": "llama2_{}".format(int(time.time())),
+            "model": "llama-2-7b-chat",
+            "object": "chat.completion",
+            "usage": {"completion_tokens": 0, "prompt_tokens": 0, "total_tokens": 0},
+        }
+
         assert len(messages) == len(results)
         for i in range(len(results)):
             dialog = messages[i]
@@ -88,16 +84,11 @@ class ChatCompletion:
                 finish_reason = "stop"
             else:
                 finish_reason = "length"
-            tmp = {
-                    "finish_reason": finish_reason,
-                    "index": i,
-                    "message": {"content": "", "role": ""}
-                    }
-            tmp["message"]["role"] = result["generation"]['role']
-            tmp['message']['content'] = result['generation']['content'].replace("\n", "")
+            tmp = {"finish_reason": finish_reason, "index": i, "message": {"content": "", "role": ""}}
+            tmp["message"]["role"] = result["generation"]["role"]
+            tmp["message"]["content"] = result["generation"]["content"].replace("\n", "")
 
             completion["choices"].append(tmp)
             print(f"\n result: \n {result}")
-            
-    
+
         return completion
