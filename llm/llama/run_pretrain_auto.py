@@ -441,6 +441,7 @@ def main():
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
 
+    config.num_hidden_layers = 1
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
@@ -549,14 +550,14 @@ def main():
 
     #hack: create dp group for distributed input data to align dygraph parallel loss.
     dp_group = None
-    dp0_mesh = fleet.auto.get_mesh().get_mesh_with_dim("dp").mesh 
-    for i in range(dp0_mesh.shape[-1]):
-        ranks = dp0_mesh[:, i]
-        group = dist.new_group(ranks)
-        if dist.get_rank() in ranks:
-            dp_group = group
+    # dp0_mesh = fleet.auto.get_mesh().get_mesh_with_dim("dp").mesh 
+    # for i in range(dp0_mesh.shape[-1]):
+    #     ranks = dp0_mesh[:, i]
+    #     group = dist.new_group(ranks)
+    #     if dist.get_rank() in ranks:
+    #         dp_group = group
 
-    assert dp_group is not None
+    # assert dp_group is not None
     model.train()
     optimizer = dist.shard_optimizer(optimizer)
     for epoch_idx in range(num_train_epochs):
@@ -650,6 +651,27 @@ def main():
     '''
 
 def shard_model(model):
+    # pp_stage = 0
+    # for name, layer in model.named_sublayers(include_self=False):
+    #     print(name, "==>", type(layer))
+
+    #     if hasattr(layer, "ipp"):
+    #         pp_stage = layer.ipp
+    #     if "embed_tokens" in name:
+    #         # embedding only support column split now. it will update in the future
+    #         shard_fn(layer, 0, [dist.Replicate(), dist.Shard(1)])
+    #     for n in ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.qkv_proj", "gate_proj", "up_proj", "gate_up_fused_proj"]:
+    #         if n in name:
+    #             shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(1)])
+    #             break
+    #     for n in ["self_attn.o_proj", "down_proj"]:
+    #         if n in name:
+    #             shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(0)])
+    #             break
+
+    #     if "lm_head" in name:
+    #         shard_fn(layer, -1, [dist.Replicate(), dist.Shard(1)])
+
     pp_stage = 0
     for name, layer in model.named_sublayers(include_self=False):
         print(name, "==>", type(layer))
@@ -658,18 +680,22 @@ def shard_model(model):
             pp_stage = layer.ipp
         if "embed_tokens" in name:
             # embedding only support column split now. it will update in the future
-            shard_fn(layer, 0, [dist.Replicate(), dist.Shard(1)])
+            # shard_fn(layer, 0, [dist.Replicate(), dist.Shard(1)])
+            shard_fn(layer, 0, [dist.Shard(1)])
         for n in ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.qkv_proj", "gate_proj", "up_proj", "gate_up_fused_proj"]:
             if n in name:
-                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(1)])
+                # shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(1)])
+                shard_fn(layer, pp_stage, [dist.Shard(1)])
                 break
         for n in ["self_attn.o_proj", "down_proj"]:
             if n in name:
-                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(0)])
+                # shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(0)])
+                shard_fn(layer, pp_stage, [dist.Shard(0)])
                 break
 
         if "lm_head" in name:
-            shard_fn(layer, -1, [dist.Replicate(), dist.Shard(1)])
+            # shard_fn(layer, -1, [dist.Replicate(), dist.Shard(1)])
+            shard_fn(layer, -1, [dist.Shard(1)])
 
 
 def load_model(model):
@@ -692,7 +718,10 @@ def print_grad(model):
     for p in model.parameters():
         assert p.name in name_mapping
         print(f"{name_mapping[p.name]} {p.name}_grad shape: {p.grad.shape} md5sum: {p.grad._md5sum()}")    
-
+        if model.config.sequence_parallel:
+            np.save(f"np_value/auto_sp/{name_mapping[p.name]}_grad.npy", p.grad.numpy())
+        else:
+            np.save(f"np_value/auto_origin/{name_mapping[p.name]}_grad.npy", p.grad.numpy())
         
 
 
