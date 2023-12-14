@@ -980,7 +980,7 @@ def set_hyrbid_parallel_seed(basic_seed, dataset_rank, tp_rank, pp_rank=0):
 
     tracker = get_rng_state_tracker()
 
-    if "global_seed" not in tracker.states_:
+    if "global_seed" not in tracker.states_ and global_seed not in tracker.seeds_:
         tracker.add("global_seed", global_seed)
-    if "local_seed" not in tracker.states_:
+    if "local_seed" not in tracker.states_ and local_seed not in tracker.seeds_:
         tracker.add("local_seed", local_seed)
