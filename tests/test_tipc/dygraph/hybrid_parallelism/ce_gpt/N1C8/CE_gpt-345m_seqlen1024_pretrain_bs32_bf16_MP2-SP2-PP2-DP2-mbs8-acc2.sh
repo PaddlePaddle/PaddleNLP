@@ -13,9 +13,9 @@
 # limitations under the License.
 
 model_item=CE_gpt-345m_seqlen1024_pretrain
-dp_degree=1
+dp_degree=2
 mp_degree=2
-pp_degree=1
+pp_degree=2
 sharding_degree=1
 sharding=stage1
 bs_item=32
