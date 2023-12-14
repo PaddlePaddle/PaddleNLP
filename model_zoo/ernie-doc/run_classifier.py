@@ -26,8 +26,9 @@ from data import ClassifierIterator, HYPTextPreprocessor, ImdbTextPreprocessor
 from metrics import F1
 from paddle.metric import Accuracy
 from paddle.optimizer import AdamW
-from paddlenlp.trainer.argparser import strtobool
+
 from paddlenlp.ops.optimizer import layerwise_lr_decay
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import (
     ErnieDocBPETokenizer,
     ErnieDocForSequenceClassification,
@@ -175,7 +176,7 @@ def do_train(args):
     if args.to_static:
         model = paddle.jit.to_static(model)
         logger.info("Successfully to apply @to_static to the whole model.")
-        
+
     if trainer_num > 1:
         model = paddle.DataParallel(model)
 
