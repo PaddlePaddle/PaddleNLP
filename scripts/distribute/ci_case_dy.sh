@@ -53,7 +53,7 @@ function gpt_case_list_dygraph(){
 }
 
 function llm_gpt_case_list_dygraph() {
-    llm_gpt_recompute_bs32_bf16_SD8
+    llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1
 }
 
 ############ case start ############
@@ -407,7 +407,7 @@ function gpt_eval_LAMBADA() {
     echo "=========== $FUNCNAME run  end ==========="
 }
 
-function llm_gpt_recompute_bs32_bf16_SD8() {
+function llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
     log_dir=mylog
@@ -419,13 +419,15 @@ function llm_gpt_recompute_bs32_bf16_SD8() {
         --input_dir ./data \
         --output_dir output \
         --sharding stage1 \
-        --sharding_parallel_degree 8 \
+        --sharding_parallel_degree 4 \
+        --tensor_parallel_degree 2 \
         --split 949,50,1 \
         --max_seq_length 1024 \
         --seed 1234 \
         --fuse_attention_qkv True \
         --use_flash_attention True \
-        --bf16 True \
+        --bf16 False \
+        --fp16 True \
         --fp16_opt_level O2 \
         --amp_master_grad True \
         --learning_rate 0.00001 \
@@ -441,9 +443,10 @@ function llm_gpt_recompute_bs32_bf16_SD8() {
         --max_steps 30 \
         --save_steps 5000 \
         --device gpu \
+        --skip_memory_metrics 0 \
         --warmup_ratio 0.01 \
         --scale_loss 32768 \
-        --per_device_train_batch_size 2 \
+        --per_device_train_batch_size 4 \
         --do_train \
         --recompute True \
         >>${log_path}/$FUNCNAME 2>&1
