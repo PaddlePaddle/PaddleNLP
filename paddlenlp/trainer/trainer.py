@@ -201,9 +201,8 @@ def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol
             g_cpu_optimizer_state_dict[k] = v.pin_memory()
         paddle.device.cuda.synchronize()
     clear_async_save_task_queue()
-    p = multiprocessing.Process(
-        target=_save_func, args=(g_cpu_optimizer_state_dict, path, saved_signal_path, protocol)
-    )
+    ctx = multiprocessing.get_context("spawn")
+    p = ctx.Process(target=_save_func, args=(g_cpu_optimizer_state_dict, path, saved_signal_path, protocol))
     p.start()
     async_save_queue.append(p)
 
