@@ -16,13 +16,11 @@ model_item=CE_gpt-345m_seqlen1024_pretrain
 dp_degree=2
 mp_degree=2
 pp_degree=2
-sharding_degree=1
-sharding=stage1
 bs_item=32
 fp_item=bf16
 run_mode=MP2-SP2-PP2-DP2-mbs8-acc2
 device_num=N1C8
-max_iter=50000
+max_iter=100
 
 model=gpt
 micro_bs=8
