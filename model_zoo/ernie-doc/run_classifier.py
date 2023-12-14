@@ -26,7 +26,7 @@ from data import ClassifierIterator, HYPTextPreprocessor, ImdbTextPreprocessor
 from metrics import F1
 from paddle.metric import Accuracy
 from paddle.optimizer import AdamW
-
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.ops.optimizer import layerwise_lr_decay
 from paddlenlp.transformers import (
     ErnieDocBPETokenizer,
@@ -54,6 +54,8 @@ parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear
 parser.add_argument("--dataset", default="imdb", choices=["imdb", "iflytek", "thucnews", "hyp"], type=str, help="The training dataset")
 parser.add_argument("--layerwise_decay", default=1.0, type=float, help="Layerwise decay ratio")
 parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.",)
+parser.add_argument("--to_static", type=strtobool, default=False, help="Enable training under @to_static.")
+
 args = parser.parse_args()
 # fmt: on
 
@@ -169,6 +171,11 @@ def do_train(args):
             logger.info("init checkpoint from %s" % args.model_name_or_path)
     model = ErnieDocForSequenceClassification.from_pretrained(args.model_name_or_path, num_classes=num_classes)
     model_config = model.ernie_doc.config
+
+    if args.to_static:
+        model = paddle.jit.to_static(model)
+        logger.info("Successfully to apply @to_static to the whole model.")
+        
     if trainer_num > 1:
         model = paddle.DataParallel(model)
 
@@ -206,11 +213,18 @@ def do_train(args):
         preprocess_text_fn=preprocess_text_fn,
     )
 
-    train_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
+    # paddle version >= 2.5.0 or develop
+    paddle_version = float(paddle.__version__[:3])
+    if (paddle_version == 0.0) or (paddle_version >= 2.5):
+        DataLoader = paddle.base.io.reader.DataLoader
+    else:
+        DataLoader = paddle.fluid.reader.DataLoader
+
+    train_dataloader = DataLoader.from_generator(capacity=70, return_list=True)
     train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
-    eval_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
+    eval_dataloader = DataLoader.from_generator(capacity=70, return_list=True)
     eval_dataloader.set_batch_generator(eval_ds_iter, paddle.get_device())
-    test_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
+    test_dataloader = DataLoader.from_generator(capacity=70, return_list=True)
     test_dataloader.set_batch_generator(test_ds_iter, paddle.get_device())
 
     num_training_examples = train_ds_iter.get_num_examples()
@@ -267,7 +281,7 @@ def do_train(args):
             logits, labels = list(map(lambda x: paddle.gather(x, gather_idx), [logits, labels]))
             loss = criterion(logits, labels) * need_cal_loss
             mean_loss = loss.mean()
-            mean_loss.backward()
+            loss.backward()
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
