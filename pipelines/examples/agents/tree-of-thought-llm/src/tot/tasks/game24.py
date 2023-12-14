@@ -51,7 +51,7 @@ class Game24Task(Task):
             # print(sympy.simplify(expression))
             return {'r': int(sympy.simplify(expression) == 24)}
         except Exception as e:
-            # print(e)
+            print(e)
             return {'r': 0}
             
     @staticmethod
