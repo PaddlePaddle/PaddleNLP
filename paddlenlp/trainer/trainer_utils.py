@@ -57,77 +57,65 @@ __all__ = [
 ]
 
 
-def set_seed(seed: int = 1234, args=None):
-    # NOTE(shenliang03): For parameter init seed:
+def set_seed(seed: int = 1234):
+    # NOTE: For parameter init seed:
     # seed: dp/mp_undistributed_paramter/sharding is same; others is different
     # For compute seed(dropout):
     # global seed: only mp group is same.
     # local seed: all groups are different
-    if args is None:
-        random.seed(seed)
-        np.random.seed(seed)
-        paddle.seed(seed)
+    hcg = fleet.get_hybrid_communicate_group() if hasattr(fleet.fleet, "_hcg") else None
+    if hcg is not None and paddle.distributed.get_world_size() > 1:
+        # obtain rank message of hybrid parallel
 
+        mp_rank = hcg.get_model_parallel_rank()
+        mp_size = hcg.get_model_parallel_world_size()
+
+        pp_rank = hcg.get_stage_id()
+        pp_size = hcg.get_pipe_parallel_world_size()
+
+        dp_rank = hcg.get_data_parallel_rank()
+        dp_size = hcg.get_data_parallel_world_size()
+
+        sharding_rank = hcg.get_sharding_parallel_rank()
+        # sharding_size = hcg.get_sharding_parallel_world_size()
     else:
-        hcg = fleet.get_hybrid_communicate_group() if hasattr(fleet.fleet, "_hcg") else None
-        if hcg is not None and paddle.distributed.get_world_size() > 1:
-            # obtain rank message of hybrid parallel
+        mp_rank, mp_size = 0, 1
+        pp_rank, pp_size = 0, 1
+        dp_rank, dp_size = 0, 1
+        sharding_rank, _ = 0, 1
 
-            mp_rank = hcg.get_model_parallel_rank()
-            mp_size = hcg.get_model_parallel_world_size()
+    # NOTE: the commented seeds are set only for precision validation
+    # seed += 100 * pp_rank
+    random.seed(seed + 100 * pp_rank)
+    np.random.seed(seed + 100 * pp_rank)
 
-            pp_rank = hcg.get_stage_id()
-            pp_size = hcg.get_pipe_parallel_world_size()
+    seed_offset = seed
+    global_seed = (
+        seed_offset
+        + pp_rank * (mp_size)
+        + dp_rank * (mp_size * pp_size)
+        + sharding_rank * (mp_size * pp_size * dp_size)
+    )
 
-            dp_rank = hcg.get_data_parallel_rank()
-            dp_size = hcg.get_data_parallel_world_size()
+    seed_offset += paddle.distributed.get_world_size()
+    local_seed = (
+        seed_offset
+        + mp_rank
+        + pp_rank * (mp_size)
+        + dp_rank * (mp_size * pp_size)
+        + sharding_rank * (mp_size * pp_size * dp_size)
+    )
 
-            sharding_rank = hcg.get_sharding_parallel_rank()
-            # sharding_size = hcg.get_sharding_parallel_world_size()
-        else:
-            mp_rank, mp_size = 0, 1
-            pp_rank, pp_size = 0, 1
-            dp_rank, dp_size = 0, 1
-            sharding_rank, _ = 0, 1
+    tracker = get_rng_state_tracker()
+    if "global_seed" not in tracker.states_:
+        tracker.add("global_seed", global_seed)
 
-        # NOTE: the commented seeds are set only for precision validation
-        # seed += 100 * pp_rank
-        random.seed(seed + 100 * pp_rank)
-        np.random.seed(seed + 100 * pp_rank)
+    if "local_seed" not in tracker.states_:
+        tracker.add("local_seed", local_seed)
 
-        # seed = mp_rank +
-        #        pp_rank * (mp_size) +
-        #        dp_rank * (mp_size * pp_size) +
-        #        sharding_rank * (mp_size * pp_size * dp_size)
-        # seed offset is order to avoid conflicts with the parameter initialization seed
+    paddle.seed(global_seed)
 
-        seed_offset = seed + 1024 + paddle.distributed.get_world_size()
-        global_seed = (
-            seed_offset
-            + pp_rank * (mp_size)
-            + dp_rank * (mp_size * pp_size)
-            + sharding_rank * (mp_size * pp_size * dp_size)
-        )
-
-        seed_offset += paddle.distributed.get_world_size()
-        local_seed = (
-            seed_offset
-            + mp_rank
-            + pp_rank * (mp_size)
-            + dp_rank * (mp_size * pp_size)
-            + sharding_rank * (mp_size * pp_size * dp_size)
-        )
-
-        tracker = get_rng_state_tracker()
-        if "global_seed" not in tracker.states_:
-            tracker.add("global_seed", global_seed)
-
-        if "local_seed" not in tracker.states_:
-            tracker.add("local_seed", local_seed)
-
-        paddle.seed(global_seed)
-
-        logger.info("The global seed is set to {} and local seed is set to {}.".format(global_seed, local_seed))
+    logger.info("The global seed is set to {} and local seed is set to {}.".format(global_seed, local_seed))
 
 
 class ExplicitEnum(Enum):
