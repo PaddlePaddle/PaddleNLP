@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# just for debug
+# just for debug auto_parallel
 
 set -x
 unset CUDA_VISIBLE_DEVICES
@@ -67,7 +67,7 @@ python -u  -m paddle.distributed.launch \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
     --max_grad_norm 1.0 \
-    --logging_steps 1\
+    --logging_steps 1 \
     --dataloader_num_workers 1 \
     --eval_steps 1000 \
     --report_to "visualdl" \
@@ -79,3 +79,5 @@ python -u  -m paddle.distributed.launch \
     --device "gpu" \
     --data_impl "mmap" \
     --parallel_mode "auto"
+
+    # --resume_from_checkpoint "output/llama_auto_serial/checkpoint-2" \
