@@ -58,8 +58,9 @@
    :maxdepth: 1
    :caption: 大模型LLM
 
-   大规模分布式预训练 <pretrain.md>
+   大规模分布式预训练 <pretraining/index.rst>
    大模型高效微调 PEFT <peft.md>
+
 
 .. toctree::
    :maxdepth: 1

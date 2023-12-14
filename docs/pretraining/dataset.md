@@ -1,5 +1,7 @@
 # 一、Pretrain数据集
+
 ## 1. 内置数据集
+
 名称|文本类型|纯文本的大小|适配模型|制作时间|出处|下载链接bin|下载链接idx|
 |-|-|-|-|-|-|-|-|
 OpenWebText2|英文|70GB|`meta-llama/Llama-2-7b`<br> `meta-llama/Llama-2-7b-chat`<br> `meta-llama/Llama-2-13b`<br> `meta-llama/Llama-2-13b-chat` <br>`facebook/llama-7b`<br> `facebook/llama-13b`<br>| 42min |  [链接](https://skylion007.github.io/OpenWebTextCorpus/) |[*bin](https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/openwebtext2/llama/mmap/llama_mmap.bin) | [*idx](https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/openwebtext2/llama/mmap/llama_mmap.idx) |
@@ -16,7 +18,9 @@ WuDaoCorpus2.0 Base|中文|200GB|`baichuan-inc/Baichuan-7B`|2h 52min||[*bin](htt
 下载 bin 和 idx 放在同一个目录下，预训练脚本指定 input_dir即可.
 
 若需要自行制作数据集，整体制作流程如2.1所示，详细步骤如以下2.2所示。
+
 ##  2. 自定义数据集
+
 ### 2.1 数据创建流程
 
 |步骤|阶段&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|数据格式| 样例|
@@ -166,3 +170,12 @@ arguments:
 经过以上merge脚本处理，“/home/data”目录下可以得到由“/home/data/”下的小文件合并而成的merged.bin和merged.idx文件。
 
 **注意：单个数据集不宜过大，容易出现int32越界，建议单个文件docs数目不超过5亿。**
+
+
+
+
+## 常用数据集制作
+[CLUECorpus2020 语料制作](docs/CLUECorpus2020.md)
+[CLUECorpusSmall 语料制作](docs/CLUECorpusSmall.md)
+[OpenWebText2 语料制作](docs/OpenWebText2.md)
+[WuDaoCorpus2.0 Base 语料](docs/WuDaoCorpusBase.md)

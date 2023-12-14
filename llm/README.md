@@ -39,16 +39,49 @@
 - tiktoken (仅 Qwen 需要)
 
 ## 2. 预训练
-[LLaMA v1/v2](./llama)、[GPT-3](./gpt-3) 目录中提供了模型预训练的数据准备和训练细节，后续我们将支持更多的模型预训练。
+[LLaMA v1/v2](./llama)、[GPT-3](./gpt-3)、[BaiChuan]、[Qwen] 等大模型的预训练支持。
 
+数据详细制作流程可参考[此处](../../model_zoo/ernie-1.0/preprocess/README.md)，例：OpenWebText2预训练数据制作参考[此处](../../model_zoo/ernie-1.0/preprocess/docs/OpenWebText2.md)
+
+为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
+```shell
+# llama 模型数据下载
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
+
+# gpt 模型数据下载
+# wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
+# wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
+```
+
+将所有预处理得到的文件统一放入一个文件夹中，以备训练使用：
 
 ```
-# 编译自定义算子
+mkdir data
+mv llama_openwebtext_100k_ids.npy ./data
+mv llama_openwebtext_100k_idx.npz ./data
+```
+
+
+```shell
+# 编译自定义算子，可选
 cd ../model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
-# 千问模型预训练
+
+# llama 模型预训练
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./llama/pretrain-llama2_7b-tp2sd4_stage2.json
+
+# Qwen 模型预训练
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./qwen/pretrain_argument_stage2.json
 ```
 
+注意：
+1. 建议使用paddle develop版本训练，需要安装`pip install tool_helpers visualdl==2.5.3`等相关缺失whl包
+2. `use_flash_attention` 需要在A100机器开启，建议使用cuda11.8环境。
+3. `use_fused_rms_norm` 需要安装[此目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt-3/external_ops)下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置PYTHONPATH
+4. `continue_training` 表示从现有的预训练模型加载训练。7b模型初始loss大概为2.xx, 随机初始化模型loss从11.x左右下降。
+5. 当前脚本为sharding版本，需要4D并行训练（数据、sharding、张量、流水线并行）的用户，请参考 `run_trainer_tp4pp2.sh`脚本。
+6. 多机训练时，若各机器使用的训练数据文件位置相同（例如挂载共享硬盘情况），请指定`--share_folder true`使全局0号卡制作缓存数据。否则默认各台机器的0号卡独立制作缓存数据，
+7. 若数据集文件夹中存在默认缓存文件夹`index-cache/`，则额外指定的`--data_cache`不生效，训练时优先加载默认缓存文件夹中的内容。
 
 
 ## 3. 精调
