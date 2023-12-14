@@ -14,20 +14,20 @@
 
 model_item=CE_gpt-345m_seqlen1024_pretrain
 dp_degree=1
-mp_degree=2
+mp_degree=1
 pp_degree=1
-sharding_degree=4
-sharding=stage1
+sharding_degree=8
+sharding=stage2
 bs_item=32
 fp_item=bf16
-run_mode=MP2-SD4-stage1-mbs4-acc2
+run_mode=SD8-stage2-mbs2-acc2
 device_num=N1C8
-max_iter=100
+max_iter=50000
 
 model=gpt
-micro_bs=4
+micro_bs=2
 
-bash ./test_tipc/dygraph/hybrid_parallelism/ce_gpt/benchmark_common/prepare.sh
+bash ./test_tipc/dygraph/hybrid_parallelism/gpt_stage2_ce/benchmark_common/prepare.sh
 # run
-bash ./test_tipc/dygraph/hybrid_parallelism/ce_gpt/benchmark_common/run_benchmark.sh ${model_item} ${fp_item} ${dp_degree} ${mp_degree} ${pp_degree} ${micro_bs} ${bs_item} ${run_mode} ${device_num} \
+bash ./test_tipc/dygraph/hybrid_parallelism/gpt_stage2_ce/benchmark_common/run_benchmark.sh ${model_item} ${fp_item} ${dp_degree} ${mp_degree} ${pp_degree} ${micro_bs} ${bs_item} ${run_mode} ${device_num} \
 ${max_iter} ${sharding} ${sharding_degree} 2>&1;
