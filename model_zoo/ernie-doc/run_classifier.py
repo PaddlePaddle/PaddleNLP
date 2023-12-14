@@ -216,7 +216,7 @@ def do_train(args):
 
     # paddle version >= 2.5.0 or develop
     paddle_version = float(paddle.__version__[:3])
-    if (paddle_version == 0.0) or (paddle_version >= 2.5):
+    if (paddle_version == 0.0) or (paddle_version > 2.5):
         DataLoader = paddle.base.io.reader.DataLoader
     else:
         DataLoader = paddle.fluid.reader.DataLoader
