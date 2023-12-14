@@ -281,7 +281,7 @@ def do_train(args):
             logits, labels = list(map(lambda x: paddle.gather(x, gather_idx), [logits, labels]))
             loss = criterion(logits, labels) * need_cal_loss
             mean_loss = loss.mean()
-            loss.backward()
+            mean_loss.backward()
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
