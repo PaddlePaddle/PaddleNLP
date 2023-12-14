@@ -98,6 +98,7 @@ function _train(){
                 --output_dir output\
                 ${sharding} \
                 ${sharding_parallel_degree} \
+                --tensor_parallel_degree ${mp_degree} \
                 --split 949,50,1 \
                 --max_seq_length 1024 \
                 --seed 1234 \
