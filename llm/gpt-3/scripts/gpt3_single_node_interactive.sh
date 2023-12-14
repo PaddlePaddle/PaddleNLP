@@ -16,14 +16,14 @@
 
 set -ex
 
-#BASEDIR=$(dirname $(readlink -f "$0"))
-#PNLP_PATH=`realpath ${BASEDIR}/paddlenlp`
 PNLP_PATH="/workspace/PaddleNLP"
+OUTPUT_BASE=${OUTPUT_BASE:="/workspace/experiments"}
+SLURM_JOB_NUM_NODES=${SLURM_JOB_NUM_NODES:=1}
 
 export PYTHONPATH="${PNLP_PATH}:${PYTHONPATH}"
 export NVTE_FUSED_ATTN=1
-export NVTE_ASYNC_AMAX_REDUCTION=0  # enable async allreduce
-#export CUDA_DEVICE_MAX_CONNECTIONS=1
+export NVTE_ASYNC_AMAX_REDUCTION=1  # enable async allreduce
+export CUDA_DEVICE_MAX_CONNECTIONS=1
 
 per_device_batch_size=${1:-6}
 fsdp=${2:-2}
@@ -36,16 +36,20 @@ recompute=${8:-"full"}
 resume_step=${9:-"none"}
 init_weigth=${10:-"none"}
 nsys_profile=${11:-"false"}
+vp=${12:-1}
+ga=${13:-1}
+sp=${14:-"false"}
+model_name=${15:-"gpt3-175B-en"}
+tokenizer_name=${16:-"gpt3-175B-en"}
 
 
 dp=`expr $((8*SLURM_JOB_NUM_NODES)) / ${tp} / ${fsdp}`
 
-log_dir="N${SLURM_JOB_NUM_NODES}_DP${dp}_TP${tp}_FSDP${fsdp}_MBS${per_device_batch_size}_${backend}_${precision}_${recompute}"
+log_dir="N${SLURM_JOB_NUM_NODES}_DP${dp}_TP${tp}_PP${pp}_VP${vp}_GA${ga}_SP${sp}_FSDP${fsdp}_MBS${per_device_batch_size}_${backend}_${precision}_${recompute}_${model_name}"
 rm -rf $log_dir
-output_dir="${PNLP_PATH}/llm/gpt-3/output/$log_dir"
+output_dir="${OUTPUT_BASE}/$log_dir"
 
 IP_STR=${IP_STR:='127.0.0.1'}
-
 
 if [ "${backend}" == "none" ]; then
    readonly backend_flag=""
@@ -120,34 +124,40 @@ if [ "${nsys_profile}" == "false" ]; then
    export ENABLE_PROFILE=0
 elif [ "${nsys_profile}" == "true" ]; then
    export ENABLE_PROFILE=1
-   export PROFILE_START_STEP=12
-   export PROFILE_STOP_STEP=15
+   export PROFILE_START_STEP=3
+   export PROFILE_STOP_STEP=3
    export PROFILE_EMIT_NVTX=1
-   readonly nsys_cmd="nsys profile -w true -c cudaProfilerApi -t cuda,nvtx,osrt,cudnn,cublas --force-overwrite true -o profile/${log_dir} "
-   mkdir -p profile
+   readonly nsys_cmd="nsys profile -s none -c cudaProfilerApi -t cuda,nvtx --force-overwrite true --capture-range-end=stop -o ${OUTPUT_BASE}/profile/${log_dir} "
+   mkdir -p ${OUTPUT_BASE}/profile
    log_dir="profile_$log_dir"
 else
    echo "Error! nsys_profile=${nsys_profile} not supported!"
    return -1
 fi
 
+sp_flag=""
+if [ "${sp}" == "true" ]; then
+   sp_flag="--sequence_parallel"
+fi
+
 ${nsys_cmd} python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
-    --log_dir logs/${log_dir} \
+    --log_dir ${OUTPUT_BASE}/logs/${log_dir} \
     --ips="${IP_STR}" \
     ${PNLP_PATH}/llm/gpt-3/run_pretrain.py \
     --model_type "gpt" \
-    --model_name_or_path gpt3-13B-en \
-    --tokenizer_name_or_path gpt3-13B-en \
-    --input_dir "/workspace/llama_openwebtext" \
+    --model_name_or_path ${model_name} \
+    --tokenizer_name_or_path ${tokenizer_name} \
+    --input_dir "/dataset" \
     --output_dir $output_dir \
     --split 949,50,1 \
-    --max_seq_length 1024 \
+    --max_seq_length 2048 \
     --per_device_train_batch_size $per_device_batch_size \
     --per_device_eval_batch_size $per_device_batch_size \
     --tensor_parallel_degree $tp \
     --sharding_parallel_degree $fsdp \
     --pipeline_parallel_degree $pp \
+    --virtual_pp_degree ${vp} \
     --fuse_attention_qkv 1 \
     --use_flash_attention 0 \
     --bf16  \
@@ -160,14 +170,14 @@ ${nsys_cmd} python -u  -m paddle.distributed.launch \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
     --max_grad_norm 1.0 \
-    --logging_steps 100 \
+    --logging_steps 10 \
     --dataloader_num_workers 1 \
     --hidden_dropout_prob=0.1 \
     --attention_probs_dropout_prob=0.1 \
     --eval_steps 1000 \
     --report_to "visualdl" \
     --disable_tqdm true \
-    --gradient_accumulation_steps 1 \
+    --gradient_accumulation_steps ${ga} \
     --do_train \
     --do_eval \
     --continue_training 0 \
@@ -177,4 +187,5 @@ ${nsys_cmd} python -u  -m paddle.distributed.launch \
     $precision_flag \
     $recompute_flag \
     $init_weigth_flag \
+    $sp_flag \
     --device "gpu"

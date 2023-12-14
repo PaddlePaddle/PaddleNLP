@@ -82,20 +82,21 @@ bash scripts/gpt3_single_node_interactive.sh 6 1 1 2 stage2 te fp8 full none pat
 Training from scratch:
 ```bash
 # training from scratch
-MBS=6 TP_SIZE=4 PP_SIZE=1 FSDP_SIZE=2 SHARDING_STAGE=stage2 BACKEND=te PREC=bf16 RECOMPUTE=full RESUME_STEP=none sbatch -N1 ./gpt3_multi_node.sub
+MBS=6 TP_SIZE=4 PP_SIZE=1 FSDP_SIZE=2 SHARDING_STAGE=stage2 BACKEND=te PREC=bf16 RECOMPUTE=full RESUME_STEP=none MODEL_NAME=gpt3-5B-en sbatch -N1 ./gpt3_multi_node.sub
 ```
 
 Suspend the job at step 5000, then resume training from step 5000:
 ```bash
 # training from scratch
-MBS=6 TP_SIZE=4 PP_SIZE=1 FSDP_SIZE=2 SHARDING_STAGE=stage2 BACKEND=te PREC=bf16 RECOMPUTE=full RESUME_STEP=none sbatch -N1 ./gpt3_multi_node.sub
+MBS=6 TP_SIZE=4 PP_SIZE=1 FSDP_SIZE=2 SHARDING_STAGE=stage2 BACKEND=te PREC=bf16 RECOMPUTE=full RESUME_STEP=none MODEL_NAME=gpt3-5B-en sbatch -N1 ./gpt3_multi_node.sub
 # saved checkpoint at step 5000, then resume training from step 5000
-MBS=6 TP_SIZE=4 PP_SIZE=1 FSDP_SIZE=2 SHARDING_STAGE=stage2 BACKEND=te PREC=bf16 RECOMPUTE=full RESUME_STEP=5000 sbatch -N1 ./gpt3_multi_node.sub
+MBS=6 TP_SIZE=4 PP_SIZE=1 FSDP_SIZE=2 SHARDING_STAGE=stage2 BACKEND=te PREC=bf16 RECOMPUTE=full RESUME_STEP=5000 MODEL_NAME=gpt3-5B-en sbatch -N1 ./gpt3_multi_node.sub
 ```
 
 Multi-node training:
 ```bash
-MBS=6 TP_SIZE=4 PP_SIZE=1 FSDP_SIZE=8 SHARDING_STAGE=stage2 BACKEND=te PREC=fp8 RECOMPUTE=full RESUME_STEP=none sbatch -N8 ./gpt3_multi_node.sub
+MBS=1 TP_SIZE=8 PP_SIZE=8 VP_SIZE=6 GA_SIZE=128 FSDP_SIZE=1 SP=true SHARDING_STAGE=stage2 BACKEND=te PREC=fp8 RECOMPUTE=full RESUME_STEP=none MODEL_NAME=gpt3-5B-en sbatch -N8 ./gpt3_multi_node.sub
+MBS=1 TP_SIZE=8 PP_SIZE=8 VP_SIZE=6 GA_SIZE=128 FSDP_SIZE=1 SHARDING_STAGE=stage2 BACKEND=te PREC=bf16 RECOMPUTE=none SP=false NSYS=true MODEL_NAME=gpt3-175B-en sbatch -N8 ./gpt3_multi_node.sub
 ```
 
 
