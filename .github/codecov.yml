@@ -1,14 +1,14 @@
 codecov:
   notify:
-    require_ci_to_pass: yes
+    wait_for_ci: false
 
 coverage:
   status:
     project:
       default: 
-      target: 75% # overall project Coverage < 75%  CI will fail
-      informational: true
+        target: 75% # overall project Coverage < 75%  CI will fail
+
     patch:
       default: 
-      target: 90% # lines adjusted  Coverage < 90%  CI will fail
-      informational: true
+        target: 90% # lines adjusted  Coverage < 90%  CI will fail
+      
