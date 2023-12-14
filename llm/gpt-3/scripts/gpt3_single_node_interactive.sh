@@ -22,8 +22,8 @@ SLURM_JOB_NUM_NODES=${SLURM_JOB_NUM_NODES:=1}
 
 export PYTHONPATH="${PNLP_PATH}:${PYTHONPATH}"
 export NVTE_FUSED_ATTN=1
-export NVTE_ASYNC_AMAX_REDUCTION=1  # enable async allreduce
-export CUDA_DEVICE_MAX_CONNECTIONS=1
+#export NVTE_ASYNC_AMAX_REDUCTION=1  # enable async allreduce
+#export CUDA_DEVICE_MAX_CONNECTIONS=1
 
 per_device_batch_size=${1:-6}
 fsdp=${2:-2}
