@@ -119,10 +119,10 @@ def set_seed(seed: int = 1234, args=None):
         )
 
         tracker = get_rng_state_tracker()
-        if "global_seed" not in tracker.states_:
+        if "global_seed" not in tracker.states_ and global_seed not in tracker.seeds_:
             tracker.add("global_seed", global_seed)
 
-        if "local_seed" not in tracker.states_:
+        if "local_seed" not in tracker.states_ and local_seed not in tracker.seeds_:
             tracker.add("local_seed", local_seed)
 
         paddle.seed(global_seed)
