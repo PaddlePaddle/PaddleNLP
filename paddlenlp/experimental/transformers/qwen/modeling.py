@@ -17,11 +17,13 @@ from __future__ import annotations
 
 import paddle
 from paddle import nn
+from paddle.nn.quant import weight_quantize
 from paddlenlp_ops import fused_get_rotary_embedding, get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
+    FusedMultiTransformerWeightOnly,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
@@ -72,6 +74,20 @@ class QWenInferenceModel(QWenPretrainedModel):
         self.num_layers = config.num_hidden_layers
         self.layer_norm_epsilon = config.layer_norm_epsilon
         self.max_position_embeddings = config.max_position_embeddings
+        self.quant_type = config.quant_type
+        self.weight_only_quant_bits = config.weight_only_quant_bits
+
+        if self.quant_type is not None and "weight_only_int" in self.quant_type:
+            self.use_weight_only = True
+        else:
+            self.use_weight_only = False
+
+        if self.use_weight_only:
+            assert (
+                self.quant_type == "weight_only_int8" or self.quant_type == "weight_only_int4"
+            ), "Expected quant_type equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
+                self.quant_type
+            )
 
         self.wte = nn.Embedding(self.vocab_size, self.hidden_size)
 
@@ -108,33 +124,56 @@ class QWenInferenceModel(QWenPretrainedModel):
             for i in range(self.num_layers)
         ]
 
+        qkv_weight_scale_attrs = None
+        out_proj_weight_scale_attrs = None
+        ffn1_weight_scale_attrs = None
+        ffn2_weight_scale_attrs = None
+
+        if self.use_weight_only:
+            qkv_weight_scale_attrs = [
+                paddle.ParamAttr(name="fuseqwen.{}.qkv_weight_scale".format(i)) for i in range(self.num_layers)
+            ]
+            out_proj_weight_scale_attrs = [
+                paddle.ParamAttr(name="fuseqwen.{}.out_proj_weight_scale".format(i)) for i in range(self.num_layers)
+            ]
+            ffn1_weight_scale_attrs = [
+                paddle.ParamAttr(name="fuseqwen.{}.ffn1_weight_scale".format(i)) for i in range(self.num_layers)
+            ]
+            ffn2_weight_scale_attrs = [
+                paddle.ParamAttr(name="fuseqwen.{}.ffn2_weight_scale".format(i)) for i in range(self.num_layers)
+            ]
+
         transformer_config = FusedMultiTransformerConfig(
             self.hidden_size,
             self.num_attention_heads,
             self.intermediate_size // 2,
+            weight_only_quant_bits=self.weight_only_quant_bits,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
             nranks=1,
             ring_id=-1,
             ln_scale_attrs=ln_scale_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
+            qkv_weight_scale_attrs=qkv_weight_scale_attrs,
             linear_weight_attrs=out_proj_weight_attrs,
+            linear_weight_scale_attrs=out_proj_weight_scale_attrs,
             ffn_ln_scale_attrs=ffn_ln_scale_attrs,
             ffn1_weight_attrs=ffn1_weight_attrs,
+            ffn1_weight_scale_attrs=ffn1_weight_scale_attrs,
             ffn2_weight_attrs=ffn2_weight_attrs,
+            ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
             qkv_bias_attrs=qkv_bias_attrs,
             epsilon=self.layer_norm_epsilon,
             norm_type="rmsnorm",
             use_neox_rotary_style=True,
         )
 
-        self.transformer_block = FusedMultiTransformerBase(transformer_config)
+        if self.use_weight_only:
+            self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
+        else:
+            self.transformer_block = FusedMultiTransformerBase(transformer_config)
 
         self.ln_f = FusedQWenRMSNorm(config)
-        
-        self.split_size = config.hidden_size
-        self.num_heads = config.num_attention_heads
-        self.head_dim = self.hidden_size // self.num_heads
         
         self.cache_kvs = None
         self.head_dim_shape_tensor = paddle.ones((self.hidden_size // self.num_attention_heads), dtype="int8")
@@ -163,24 +202,47 @@ class QWenInferenceModel(QWenPretrainedModel):
                 state_dict["qwen.h.{}.ln_1.weight".format(idx)], 
                 dtype=self.transformer_block.ln_scales[idx].dtype
             )
+            self.transformer_block.ln_scales[idx].set_value(ln_scale)
+
+            
             qkv_weight = paddle.to_tensor(
                 state_dict["qwen.h.{}.attn.c_attn.weight".format(idx)].transpose([1, 0]),
                 dtype=self.transformer_block.qkv_weights[idx].dtype
             )
+            if self.use_weight_only:
+                qkv_weight = paddle.transpose(qkv_weight, perm=[1, 0])
+                qkv_quanted_weight, qkv_weight_scale = weight_quantize(
+                    qkv_weight, algo=self.quant_type
+                )
+                self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight)
+                self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale)
+            else:
+                self.transformer_block.qkv_weights[idx].set_value(qkv_weight)
+
             qkv_bias = paddle.to_tensor(
                 state_dict["qwen.h.{}.attn.c_attn.bias".format(idx)],
                 dtype=self.transformer_block.qkv_biases[idx].dtype
             )
+            self.transformer_block.qkv_biases[idx].set_value(qkv_bias)
 
             linear_weight = paddle.to_tensor(
                 state_dict["qwen.h.{}.attn.c_proj.weight".format(idx)],
                 dtype=self.transformer_block.linear_weights[idx].dtype
             )
+            if self.use_weight_only:
+                linear_quanted_weight, linear_weight_scale = weight_quantize(
+                    linear_weight, algo=self.quant_type
+                )
+                self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight)
+                self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale)
+            else:
+                self.transformer_block.linear_weights[idx].set_value(linear_weight)
 
             ffn_ln_scale = paddle.to_tensor(
                 state_dict["qwen.h.{}.ln_2.weight".format(idx)], 
                 dtype=self.transformer_block.ffn_ln_scales[idx].dtype
             )
+            self.transformer_block.ffn_ln_scales[idx].set_value(ffn_ln_scale)
 
             up_weight = paddle.to_tensor(
                 state_dict["qwen.h.{}.mlp.w1.weight".format(idx)],
@@ -191,22 +253,27 @@ class QWenInferenceModel(QWenPretrainedModel):
                 dtype=self.transformer_block.ffn1_weights[idx].dtype
             )
             ffn1_weight = paddle.concat(x=[gate_weight, up_weight], axis=-1)
+            if self.use_weight_only:
+                ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(
+                    ffn1_weight, algo=self.quant_type
+                )
+                self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight)
+                self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale)
+            else:
+                self.transformer_block.ffn1_weights[idx].set_value(ffn1_weight)
+
             ffn2_weight = paddle.to_tensor(
                 state_dict["qwen.h.{}.mlp.c_proj.weight".format(idx)],
                 dtype=self.transformer_block.ffn2_weights[idx].dtype
             )
-
-            self.transformer_block.ln_scales[idx].set_value(ln_scale)
-            
-            self.transformer_block.qkv_weights[idx].set_value(qkv_weight)
-            self.transformer_block.qkv_biases[idx].set_value(qkv_bias)
-
-            self.transformer_block.linear_weights[idx].set_value(linear_weight)
-
-            self.transformer_block.ffn_ln_scales[idx].set_value(ffn_ln_scale)
-
-            self.transformer_block.ffn1_weights[idx].set_value(ffn1_weight)
-            self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight)
+            if self.use_weight_only:
+                ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(
+                    ffn2_weight, algo=self.quant_type
+                )
+                self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight)
+                self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale)
+            else:
+                self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight)
     
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
