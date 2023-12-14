@@ -134,8 +134,8 @@ paddlenlp commit id           : 0b246a609a3062e3c3256d87193b70277b5b07e0
 | :-:      | :-:      | :-:      | :-:      | :-:      | :-:      | :-:      |
 |`FlagAlpha/Llama2-Chinese-13b-Chat`|      4096|`tp2sd4_stage2`|   1980.22|64323MB   |`./llama/pretrain-flagalpha_llama2_13b-tp2sd4_stage2.json`|2023-11-27 21:42:38|
 |`FlagAlpha/Llama2-Chinese-7b-Chat`|      4096|`tp2sd4_stage2`|   3744.62|52092MB   |`./llama/pretrain-flagalpha_llama2_7b-tp2sd4_stage2.json`|2023-11-27 21:44:57|
-|`baichuan-inc/Baichuan2-13B-Base`|      4096|`sd8_stage2`|   1354.99|74767MB   |`./llama/pretrain-baichuan2_13b-sd8_stage2.json`|2023-11-27 21:51:26|
-|`baichuan-inc/Baichuan2-7B-Base`|      4096|`tp2sd4_stage2`|   3542.45|58363MB   |`./llama/pretrain-baichuan2_7b-tp2sd4_stage2.json`|2023-11-27 21:53:58|
+|`baichuan-inc/Baichuan2-13B-Base`|      4096|`sd8_stage2`|   1354.99|74767MB   |`./baichuan/pretrain-baichuan2_13b-sd8_stage2.json`|2023-11-27 21:51:26|
+|`baichuan-inc/Baichuan2-7B-Base`|      4096|`tp2sd4_stage2`|   3542.45|58363MB   |`./baichuan/pretrain-baichuan2_7b-tp2sd4_stage2.json`|2023-11-27 21:53:58|
 |`facebook/llama-13b`|      4096|`tp2sd4_stage2`|   1969.64|64278MB   |`./llama/pretrain-llama_13b-tp2sd4_stage2.json`| 2023-11-27 21:58:03|
 |`facebook/llama-7b`|      4096|`tp2sd4_stage2`|   3754.73|52092MB   |`./llama/pretrain-llama_7b-tp2sd4_stage2.json`|2023-11-27 22:00:30|
 |`idea-ccnl/ziya-llama-13b-v1`|      4096|`tp2sd4_stage2`|   1968.34|63983MB   |`./llama/pretrain-ziya_llama_13b-tp2sd4_stage2.json`|2023-11-27 22:04:35|
