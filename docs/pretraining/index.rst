@@ -3,25 +3,19 @@
 ------------------------------------
 
 
-PaddleNLP大模型套件支持 LLaMA v1/v2、GPT-3、BaiChuan、Qwen 等大模型的预训练支持。
+PaddleNLP大模型套件支持 LLaMA v1/v2、GPT-3、BaiChuan、Qwen 等大模型的预训练支持。git clone 代码到本地，即可开始预训练。
 
+.. code-block:: bash
 
-数据详细制作流程可参考:
------------------------------
+    git clone https://github.com/PaddlePaddle/PaddleNLP.git
+    # pip install ./PaddleNLP 使用develop版本
+    cd PaddleNLP/llm
+    # 到达运行目录
 
+运行教程
+------------
 
-.. toctree::
-   :maxdepth: 1
-
-   预训练数据集制作 <dataset.md>
-   CLUECorpus2020 语料制作 <docs/CLUECorpus2020.md>
-   CLUECorpusSmall  语料制作 <docs/CLUECorpusSmall.md>
-   OpenWebText2 语料制作 <docs/OpenWebText2.md>
-   WuDaoCorpus2.0 Base 语料 <docs/WuDaoCorpusBase.md>
-
-
-
-为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
+数据制作我们专门提供了教程，见后文。为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
 
 .. code-block:: bash
 
@@ -65,6 +59,23 @@ PaddleNLP大模型套件支持 LLaMA v1/v2、GPT-3、BaiChuan、Qwen 等大模�
 5. 当前脚本为sharding版本，需要4D并行训练（数据、sharding、张量、流水线并行）的用户，请参考``run_trainer_tp4pp2.sh``脚本。
 6. 多机训练时，若各机器使用的训练数据文件位置相同（例如挂载共享硬盘情况），请指定`--share_folder true`使全局0号卡制作缓存数据。否则默认各台机器的0号卡独立制作缓存数据，
 7. 若数据集文件夹中存在默认缓存文件夹``index-cache/``，则额外指定的``--data_cache``不生效，训练时优先加载默认缓存文件夹中的内容。
+
+
+数据详细制作流程:
+-----------------------------
+
+数据制作请参见：
+
+.. toctree::
+   :maxdepth: 1
+
+   预训练数据集制作 <dataset.md>
+   CLUECorpus2020 语料制作 <docs/CLUECorpus2020.md>
+   CLUECorpusSmall  语料制作 <docs/CLUECorpusSmall.md>
+   OpenWebText2 语料制作 <docs/OpenWebText2.md>
+   WuDaoCorpus2.0 Base 语料 <docs/WuDaoCorpusBase.md>
+
+
 
 
 模型预训练支持的分布式能力一览

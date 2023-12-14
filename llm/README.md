@@ -39,9 +39,12 @@
 - tiktoken (仅 Qwen 需要)
 
 ## 2. 预训练
-[LLaMA v1/v2](./llama)、[GPT-3](./gpt-3)、[BaiChuan]、[Qwen] 等大模型的预训练支持。
 
-数据详细制作流程可参考[此处](../../model_zoo/ernie-1.0/preprocess/README.md)，例：OpenWebText2预训练数据制作参考[此处](../../model_zoo/ernie-1.0/preprocess/docs/OpenWebText2.md)
+我们在此处提供了更详细的预训练数据制作，性能测试报告文档，参见: https://paddlenlp.readthedocs.io/zh/latest/pretraining/index.html
+
+此项目支持了LLaMA、GPT-3、BaiChuan、Qwen 等大模型的预训练。用户切换配置config文件，即可一键运行。
+
+数据详细制作流程可参考[此处](https://paddlenlp.readthedocs.io/zh/latest/pretraining/dataset.html) : https://paddlenlp.readthedocs.io/zh/latest/pretraining/dataset.html
 
 为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
 ```shell
