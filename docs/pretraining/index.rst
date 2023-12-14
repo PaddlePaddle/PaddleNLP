@@ -1,7 +1,7 @@
 # 预训练
 
 
-[LLaMA v1/v2](./llama)、[GPT-3](./gpt-3)、[BaiChuan]、[Qwen] 等大模型的预训练支持。
+LLaMA v1/v2、GPT-3、BaiChuan、Qwen 等大模型的预训练支持。
 
 
 数据详细制作流程可参考
@@ -18,7 +18,9 @@
 
 
 为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
-.. highlight:: shell
+
+.. code-block:: bash
+
     # llama 模型数据下载
     wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
     wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
@@ -30,14 +32,16 @@
 
 将所有预处理得到的文件统一放入一个文件夹中，以备训练使用：
 
-.. highlight:: shell
+.. code-block:: bash
+
     mkdir data
     mv llama_openwebtext_100k_ids.npy ./data
     mv llama_openwebtext_100k_idx.npz ./data
 
 
 
-.. highlight:: shell
+.. code-block:: bash
+
     # 编译自定义算子，可选
     cd ../model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
 
@@ -126,12 +130,11 @@
 
 机器环境： A100 80G * 8, CUDA 11.8, NCCL 2.15
 
-.. highlight:: shell
+.. code-block:: bash
+
     paddle commit id              : 9b36e53f24ac5f471b20de99e0cc3980f38b44ab
     paddlenlp commit id           : 0b246a609a3062e3c3256d87193b70277b5b07e0
-
-
-
+  
 +-------------------------------------+------+-----------------+-----------------------+--------------+------------------------------------------------------------+---------------------+
 | 模型                                  | 序列长度 | 分布式策略           | 速度(`tokens/card/sec`) | 显存占用(`MB^1`) | 配置文件                                                       | 测试时间                |
 +=====================================+======+=================+=======================+==============+============================================================+=====================+
