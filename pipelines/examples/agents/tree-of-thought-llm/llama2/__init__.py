@@ -2,12 +2,12 @@
 author: Ernestina
 des: 1) set configure 2) initiate llama2
 """
-import time
-import yaml
-from typing import List, Optional
-from llama2.llama.llama import Llama, Dialog
-
 import os
+import time
+from typing import List, Optional
+
+import yaml
+from llama2.llama.llama import Dialog, Llama
 
 os.environ["WORLD_SIZE"] = "1"
 os.environ["RANK"] = "0"

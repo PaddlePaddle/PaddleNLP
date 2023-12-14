@@ -7,7 +7,6 @@ from typing import List
 
 from sentencepiece import SentencePieceProcessor
 
-
 logger = getLogger()
 
 

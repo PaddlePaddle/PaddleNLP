@@ -1,4 +1,5 @@
 import argparse
+
 from src.tot.methods.bfs import solve
 from src.tot.tasks.game24 import Game24Task
 

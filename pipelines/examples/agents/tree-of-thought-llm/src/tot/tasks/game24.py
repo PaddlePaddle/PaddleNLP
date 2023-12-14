@@ -1,9 +1,16 @@
-import re
 import os
-import sympy
+import re
+
 import pandas as pd
-from src.tot.tasks.base import Task, DATA_PATH
-from src.tot.prompts.game24 import standard_prompt, cot_prompt, propose_prompt, value_prompt, value_last_step_prompt
+import sympy
+from src.tot.prompts.game24 import (
+    cot_prompt,
+    propose_prompt,
+    standard_prompt,
+    value_last_step_prompt,
+    value_prompt,
+)
+from src.tot.tasks.base import DATA_PATH, Task
 
 
 def get_current_numbers(y: str) -> str:

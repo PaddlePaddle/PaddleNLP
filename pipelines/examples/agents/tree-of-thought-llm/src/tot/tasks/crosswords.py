@@ -1,9 +1,15 @@
-import re
-import os
 import json
-from src.tot.tasks.base import Task, DATA_PATH
-from src.tot.prompts.crosswords import standard_prompt, cot_prompt, propose_prompt, value_prompt
+import os
+import re
+
 from src.tot.models import gpt
+from src.tot.prompts.crosswords import (
+    cot_prompt,
+    propose_prompt,
+    standard_prompt,
+    value_prompt,
+)
+from src.tot.tasks.base import DATA_PATH, Task
 
 
 class MiniCrosswordsEnv:

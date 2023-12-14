@@ -1,10 +1,10 @@
-import os
-import json
 import argparse
+import json
+import os
 
-from src.tot.tasks import get_task
-from src.tot.methods.bfs import solve, naive_solve
+from src.tot.methods.bfs import naive_solve, solve
 from src.tot.models import gpt_usage
+from src.tot.tasks import get_task
 
 
 def run(args):

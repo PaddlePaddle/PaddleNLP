@@ -1,8 +1,15 @@
 import os
 import re
-from src.tot.tasks.base import Task, DATA_PATH
-from src.tot.prompts.text import standard_prompt, cot_prompt, vote_prompt, compare_prompt, score_prompt
+
 from src.tot.models import gpt
+from src.tot.prompts.text import (
+    compare_prompt,
+    cot_prompt,
+    score_prompt,
+    standard_prompt,
+    vote_prompt,
+)
+from src.tot.tasks.base import DATA_PATH, Task
 
 
 class TextTask(Task):
