@@ -24,6 +24,7 @@ from typing import List, Optional
 
 import numpy as np
 import paddle
+import random
 
 from paddlenlp.trainer import (
     PdArgumentParser,
@@ -263,10 +264,22 @@ def create_pretrained_dataset(
     return train_dataset, valid_dataset, test_dataset
 
 
-def get_train_data_file(args):
+def get_train_data_file(args, training_args):
     if len(args.input_dir.split()) > 1:
         # weight-1 data-prefix-1 weight-2 data-prefix-2 ...
-        return args.input_dir.split()
+        datas = args.input_dir.split()
+        weights = [datas[i] for i in range(0, len(datas), 2)]
+        prefixs = [datas[i] for i in range(1, len(datas), 2)]
+        assert len(weights) == len(prefixs)
+        random.seed(training_args.seed)
+        random.shuffle(weights)
+        random.seed(training_args.seed)
+        random.shuffle(prefixs)
+        datas = []
+        for weight, prefix in zip(weights, prefixs):
+            datas.append(weight)
+            datas.append(prefix)
+        return datas
     else:
         files = [
             os.path.join(args.input_dir, f)
@@ -275,7 +288,8 @@ def get_train_data_file(args):
         ]
         files = [x.replace("_idx.npz", "") for x in files]
         files = [x.replace(".idx", "") for x in files]  # add
-
+        np_rng = np.random.RandomState(seed=training_args.seed)
+        np_rng.shuffle(files)
         if len(files) > 1:
             ret = []
             logger.info("You are using multi-dataset:")
@@ -502,7 +516,7 @@ def main():
             last_epoch=0,
         )
 
-    data_file = get_train_data_file(data_args)
+    data_file = get_train_data_file(data_args, training_args)
     check_data_split(data_args.split, training_args.do_train, training_args.do_eval, training_args.do_predict)
     train_val_test_num_samples = [
         training_args.per_device_train_batch_size

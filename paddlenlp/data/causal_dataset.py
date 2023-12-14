@@ -124,6 +124,7 @@ def build_train_valid_test_datasets(
     *,
     data_cache_path=None,
     need_data=True,
+    load_data=True
 ):
     """Build train, valid, and test datasets."""
 
@@ -140,6 +141,7 @@ def build_train_valid_test_datasets(
             share_folder=share_folder,
             data_cache_path=data_cache_path,
             need_data=need_data,
+            load_data=load_data
         )
 
     # Blending dataset.
@@ -209,6 +211,7 @@ def _build_train_valid_test_datasets(
     *,
     data_cache_path=None,
     need_data=True,
+    load_data=True
 ):
     """Build train, valid, and test datasets."""
 
@@ -232,11 +235,11 @@ def _build_train_valid_test_datasets(
         print_split_stats("train", 0)
         print_split_stats("validation", 1)
         print_split_stats("test", 2)
-
+        
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.barrier()
-
-    def build_dataset(index, name):
+    
+    def build_dataset(index, name, load_data=True):
         documents = np.arange(splits[index], splits[index + 1], 1, np.int32) if need_data else None
         dataset = GPTDataset(
             name,
@@ -251,16 +254,17 @@ def _build_train_valid_test_datasets(
             share_folder,
             data_cache_path=data_cache_path,
             need_data=need_data,
+            load_data=load_data
         )
         if need_data:
             return dataset if splits[index + 1] > splits[index] else None
         else:
             return None
 
-    train_dataset = build_dataset(0, "train")
-    valid_dataset = build_dataset(1, "valid")
-    test_dataset = build_dataset(2, "test")
-
+    train_dataset = build_dataset(0, "train", load_data)
+    valid_dataset = build_dataset(1, "valid", load_data)
+    test_dataset = build_dataset(2, "test", load_data)
+    del indexed_dataset
     return (train_dataset, valid_dataset, test_dataset)
 
 
@@ -292,6 +296,7 @@ class GPTDataset(paddle.io.Dataset):
         *,
         data_cache_path=None,
         need_data=True,
+        load_data=True
     ):
 
         self.name = name
@@ -327,7 +332,7 @@ class GPTDataset(paddle.io.Dataset):
             paddle.distributed.barrier()
 
         # Load mappings.
-        if need_data and len(documents) > 0:
+        if load_data and need_data and len(documents) > 0:
             start_time = time.time()
             print_rank_0(f" > loading doc-idx mapping from {doc_idx_filename}")
             self.doc_idx = np.load(doc_idx_filename, allow_pickle=True, mmap_mode="r")

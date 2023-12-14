@@ -96,6 +96,7 @@ class TrainerState:
     trial_name: str = None
     trial_params: Dict[str, Union[str, float, int, bool]] = None
     dataset_samples: Dict = None
+    ready_dataset: int = 0
 
     def __post_init__(self):
         if self.log_history is None:
