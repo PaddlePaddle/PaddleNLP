@@ -197,7 +197,9 @@ class Llama:
 
             next_token = next_token.reshape(-1)
             # only replace token if prompt has already been generated
-            next_token = torch.where(input_text_mask[:, cur_pos], tokens[:, cur_pos], next_token)
+            next_token = torch.where(
+                input_text_mask[:, cur_pos], tokens[:, cur_pos], next_token
+            )
             tokens[:, cur_pos] = next_token
             if logprobs:
                 token_logprobs[:, prev_pos + 1 : cur_pos + 1] = -F.cross_entropy(
@@ -206,7 +208,9 @@ class Llama:
                     reduction="none",
                     ignore_index=pad_id,
                 )
-            eos_reached |= (~input_text_mask[:, cur_pos]) & (next_token == self.tokenizer.eos_id)
+            eos_reached |= (~input_text_mask[:, cur_pos]) & (
+                next_token == self.tokenizer.eos_id
+            )
             prev_pos = cur_pos
             if all(eos_reached):
                 break
@@ -318,12 +322,17 @@ class Llama:
         prompt_tokens = []
         unsafe_requests = []
         for dialog in dialogs:
-            unsafe_requests.append(any([tag in msg["content"] for tag in SPECIAL_TAGS for msg in dialog]))
+            unsafe_requests.append(
+                any([tag in msg["content"] for tag in SPECIAL_TAGS for msg in dialog])
+            )
             if dialog[0]["role"] == "system":
                 dialog = [
                     {
                         "role": dialog[1]["role"],
-                        "content": B_SYS + dialog[0]["content"] + E_SYS + dialog[1]["content"],
+                        "content": B_SYS
+                        + dialog[0]["content"]
+                        + E_SYS
+                        + dialog[1]["content"],
                     }
                 ] + dialog[2:]
             assert all([msg["role"] == "user" for msg in dialog[::2]]) and all(
@@ -346,7 +355,9 @@ class Llama:
                 ],
                 [],
             )
-            assert dialog[-1]["role"] == "user", f"Last message must be from user, got {dialog[-1]['role']}"
+            assert (
+                dialog[-1]["role"] == "user"
+            ), f"Last message must be from user, got {dialog[-1]['role']}"
             dialog_tokens += self.tokenizer.encode(
                 f"{B_INST} {(dialog[-1]['content']).strip()} {E_INST}",
                 bos=True,
@@ -366,12 +377,16 @@ class Llama:
                 {
                     "generation": {
                         "role": "assistant",
-                        "content": self.tokenizer.decode(t) if not unsafe else UNSAFE_ERROR,
+                        "content": self.tokenizer.decode(t)
+                        if not unsafe
+                        else UNSAFE_ERROR,
                     },
                     "tokens": [self.tokenizer.decode(x) for x in t],
                     "logprobs": logprobs_i,
                 }
-                for t, logprobs_i, unsafe in zip(generation_tokens, generation_logprobs, unsafe_requests)
+                for t, logprobs_i, unsafe in zip(
+                    generation_tokens, generation_logprobs, unsafe_requests
+                )
             ]
         return [
             {

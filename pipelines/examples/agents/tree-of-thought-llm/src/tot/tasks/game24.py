@@ -50,7 +50,9 @@ class Game24Task(Task):
         return self.data[idx]
 
     def test_output(self, idx: int, output: str):
-        expression = output.strip().split("\n")[-1].lower().replace("answer: ", "").split("=")[0]
+        expression = (
+            output.strip().split("\n")[-1].lower().replace("answer: ", "").split("=")[0]
+        )
         numbers = re.findall(r"\d+", expression)
         problem_numbers = re.findall(r"\d+", self.data[idx])
         if sorted(numbers) != sorted(problem_numbers):
@@ -96,5 +98,7 @@ class Game24Task(Task):
             return 0
         value_names = [_.split("\n")[-1] for _ in value_outputs]
         value_map = {"impossible": 0.001, "likely": 1, "sure": 20}  # TODO: ad hoc
-        value = sum(value * value_names.count(name) for name, value in value_map.items())
+        value = sum(
+            value * value_names.count(name) for name, value in value_map.items()
+        )
         return value

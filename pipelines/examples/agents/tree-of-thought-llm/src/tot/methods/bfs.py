@@ -65,7 +65,12 @@ def solve(args, task, idx, to_print=True):
         if args.method_generate == "sample":
             new_ys = [
                 get_samples(
-                    task, x, y, args.n_generate_sample, prompt_sample=args.prompt_sample, stop=task.stops[step]
+                    task,
+                    x,
+                    y,
+                    args.n_generate_sample,
+                    prompt_sample=args.prompt_sample,
+                    stop=task.stops[step],
                 )
                 for y in ys
             ]
@@ -84,18 +89,29 @@ def solve(args, task, idx, to_print=True):
             ps = np.array(values) / sum(values)
             select_ids = np.random.choice(ids, size=args.n_select_sample, p=ps).tolist()
         elif args.method_select == "greedy":
-            select_ids = sorted(ids, key=lambda x: values[x], reverse=True)[: args.n_select_sample]
+            select_ids = sorted(ids, key=lambda x: values[x], reverse=True)[
+                : args.n_select_sample
+            ]
         select_new_ys = [new_ys[select_id] for select_id in select_ids]
 
         # log
         if to_print:
-            sorted_new_ys, sorted_values = zip(*sorted(zip(new_ys, values), key=lambda x: x[1], reverse=True))
+            sorted_new_ys, sorted_values = zip(
+                *sorted(zip(new_ys, values), key=lambda x: x[1], reverse=True)
+            )
             print(
                 f"-- new_ys --: {sorted_new_ys}\n-- sol values --: {sorted_values}\n-- choices --: {select_new_ys}\n"
             )
 
         infos.append(
-            {"step": step, "x": x, "ys": ys, "new_ys": new_ys, "values": values, "select_new_ys": select_new_ys}
+            {
+                "step": step,
+                "x": x,
+                "ys": ys,
+                "new_ys": new_ys,
+                "values": values,
+                "select_new_ys": select_new_ys,
+            }
         )
         ys = select_new_ys
 

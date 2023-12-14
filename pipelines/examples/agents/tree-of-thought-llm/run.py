@@ -25,7 +25,14 @@ def run(args):
 
         # log
         infos = [task.test_output(i, y) for y in ys]
-        info.update({"idx": i, "ys": ys, "infos": infos, "usage_so_far": gpt_usage(args.backend)})
+        info.update(
+            {
+                "idx": i,
+                "ys": ys,
+                "infos": infos,
+                "usage_so_far": gpt_usage(args.backend),
+            }
+        )
         logs.append(info)
         with open(file, "w") as f:
             json.dump(logs, f, indent=4)
@@ -43,10 +50,14 @@ def run(args):
 
 def parse_args():
     args = argparse.ArgumentParser()
-    args.add_argument("--backend", type=str, choices=["llama-2-7b-chat"], default="llama-2-7b-chat")
+    args.add_argument(
+        "--backend", type=str, choices=["llama-2-7b-chat"], default="llama-2-7b-chat"
+    )
     args.add_argument("--temperature", type=float, default=0.6)
 
-    args.add_argument("--task", type=str, required=True, choices=["game24", "text", "crosswords"])
+    args.add_argument(
+        "--task", type=str, required=True, choices=["game24", "text", "crosswords"]
+    )
     args.add_argument("--task_start_index", type=int, default=900)
     args.add_argument("--task_end_index", type=int, default=1000)
 
@@ -57,8 +68,12 @@ def parse_args():
 
     args.add_argument("--method_generate", type=str, choices=["sample", "propose"])
     args.add_argument("--method_evaluate", type=str, choices=["value", "vote"])
-    args.add_argument("--method_select", type=str, choices=["sample", "greedy"], default="greedy")
-    args.add_argument("--n_generate_sample", type=int, default=1)  # only thing needed if naive_run
+    args.add_argument(
+        "--method_select", type=str, choices=["sample", "greedy"], default="greedy"
+    )
+    args.add_argument(
+        "--n_generate_sample", type=int, default=1
+    )  # only thing needed if naive_run
     args.add_argument("--n_evaluate_sample", type=int, default=1)
     args.add_argument("--n_select_sample", type=int, default=1)
 

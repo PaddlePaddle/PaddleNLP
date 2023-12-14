@@ -92,7 +92,15 @@ class MiniCrosswordsEnv:
         # s += "Vertical:\n"
         for i in range(5, 10):
             if status is None or self.status[i] == status:
-                s += "v" + str(i - 5 + 1) + ". " + self.data[i] + ": " + self.ans[i] + "\n"
+                s += (
+                    "v"
+                    + str(i - 5 + 1)
+                    + ". "
+                    + self.data[i]
+                    + ": "
+                    + self.ans[i]
+                    + "\n"
+                )
         return s
 
     def render_gt_ans(self, status=None):
@@ -100,11 +108,27 @@ class MiniCrosswordsEnv:
         # s += "Horizontal:\n"
         for i in range(5):
             if status is None or self.status[i] == status:
-                s += "h" + str(i + 1) + ". " + self.data[i] + ": " + self.ans_gt[i] + "\n"
+                s += (
+                    "h"
+                    + str(i + 1)
+                    + ". "
+                    + self.data[i]
+                    + ": "
+                    + self.ans_gt[i]
+                    + "\n"
+                )
         # s += "Vertical:\n"
         for i in range(5, 10):
             if status is None or self.status[i] == status:
-                s += "v" + str(i - 5 + 1) + ". " + self.data[i] + ": " + self.ans_gt[i] + "\n"
+                s += (
+                    "v"
+                    + str(i - 5 + 1)
+                    + ". "
+                    + self.data[i]
+                    + ": "
+                    + self.ans_gt[i]
+                    + "\n"
+                )
         return s
 
     def render(self, status=True):
@@ -151,7 +175,12 @@ class MiniCrosswordsEnv:
 
         self.new_ans = self.get_ans(self.board)
         self.status = [
-            2 if any(letter != new_letter and letter != "_" for letter, new_letter in zip(ans, new_ans)) else status
+            2
+            if any(
+                letter != new_letter and letter != "_"
+                for letter, new_letter in zip(ans, new_ans)
+            )
+            else status
             for status, ans, new_ans in zip(self.status, self.ans, self.new_ans)
         ]
         self.status[idx] = 1
@@ -226,8 +255,15 @@ class MiniCrosswordsTask(Task):
         self.set_status(x, y)
         return propose_prompt.format(input=self.env.render())
 
-    def propose_outputs_unwrap(self, x: str, y: str, outputs: list, n_max_propose: int) -> list:
-        confidence_to_value = {"certain": 1, "high": 0.5, "medium": 0.2, "low": 0.1}  # TODO: ad hoc
+    def propose_outputs_unwrap(
+        self, x: str, y: str, outputs: list, n_max_propose: int
+    ) -> list:
+        confidence_to_value = {
+            "certain": 1,
+            "high": 0.5,
+            "medium": 0.2,
+            "low": 0.1,
+        }  # TODO: ad hoc
         proposals_to_scores = {}
         for output in outputs:
             lines = output.split("\n")
@@ -238,9 +274,13 @@ class MiniCrosswordsTask(Task):
                     parts = [match.group(1), match.group(2), match.group(3)]
                     proposal = parts[0].lower() + ". " + parts[1].lower()
                     score = confidence_to_value.get(parts[2], 0)
-                    proposals_to_scores[proposal] = proposals_to_scores.get(proposal, 0) + score
+                    proposals_to_scores[proposal] = (
+                        proposals_to_scores.get(proposal, 0) + score
+                    )
 
-        proposals = sorted(proposals_to_scores.items(), key=lambda x: x[1], reverse=True)
+        proposals = sorted(
+            proposals_to_scores.items(), key=lambda x: x[1], reverse=True
+        )
         if n_max_propose != -1:
             proposals = proposals[:n_max_propose]
         proposals = [y + proposal[0] + "\n" for proposal in proposals]

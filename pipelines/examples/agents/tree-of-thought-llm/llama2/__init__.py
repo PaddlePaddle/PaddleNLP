@@ -40,7 +40,11 @@ class ChatCompletion:
 
     # @staticmethod
     def create(
-        self, messages: List[Dialog], temperature: float = 0.6, top_p: float = 0.9, max_gen_len: Optional[int] = None
+        self,
+        messages: List[Dialog],
+        temperature: float = 0.6,
+        top_p: float = 0.9,
+        max_gen_len: Optional[int] = None,
     ):
         """
         Entry point of the program for generating text using a pretrained model.
@@ -84,9 +88,15 @@ class ChatCompletion:
                 finish_reason = "stop"
             else:
                 finish_reason = "length"
-            tmp = {"finish_reason": finish_reason, "index": i, "message": {"content": "", "role": ""}}
+            tmp = {
+                "finish_reason": finish_reason,
+                "index": i,
+                "message": {"content": "", "role": ""},
+            }
             tmp["message"]["role"] = result["generation"]["role"]
-            tmp["message"]["content"] = result["generation"]["content"].replace("\n", "")
+            tmp["message"]["content"] = result["generation"]["content"].replace(
+                "\n", ""
+            )
 
             completion["choices"].append(tmp)
             print(f"\n result: \n {result}")
