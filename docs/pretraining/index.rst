@@ -7,7 +7,7 @@
 数据详细制作流程可参考
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 1
 
    预训练数据集制作 <dataset.md>
    CLUECorpus2020 语料制作 <docs/CLUECorpus2020.md>
@@ -18,7 +18,7 @@
 
 
 为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
-.. code:: shell
+.. highlight:: shell
     # llama 模型数据下载
     wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
     wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
@@ -30,14 +30,14 @@
 
 将所有预处理得到的文件统一放入一个文件夹中，以备训练使用：
 
-.. code:: shell
+.. highlight:: shell
     mkdir data
     mv llama_openwebtext_100k_ids.npy ./data
     mv llama_openwebtext_100k_idx.npz ./data
 
 
 
-.. code:: shell
+.. highlight:: shell
     # 编译自定义算子，可选
     cd ../model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
 

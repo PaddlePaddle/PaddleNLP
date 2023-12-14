@@ -53,13 +53,13 @@
    使用Trainer API进行模型压缩 <compression.md>
    一键预测功能 <model_zoo/taskflow>
    预训练词向量 <model_zoo/embeddings>
-   
+
 .. toctree::
    :maxdepth: 1
    :caption: 大模型LLM
 
-   大规模分布式预训练 <pretraining/index.rst>
-   大模型高效微调 PEFT <peft.md>
+   大规模分布式预训练 <pretraining/index>
+   大模型高效微调PEFT <peft.md>
 
 
 .. toctree::
