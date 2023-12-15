@@ -87,9 +87,11 @@ from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
     LORA_WEIGHTS_NAME,
+    PADDLE_OPTIMIZER_INDEX_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
     PREFIX_WEIGHTS_NAME,
+    SAFE_OPTIMIZER_INDEX_NAME,
 )
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
@@ -130,11 +132,12 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
 )
 from .training_args import TrainingArguments
 from .utils import reshard as reshard_util
-from .utils.helper import (  # nested_truncate,
+from .utils.helper import (
     broadcast_dp_optimizer,
     distributed_concat,
     distributed_file,
     distributed_isfile,
+    nested_cast_tensor,
     nested_concat,
     nested_detach,
     nested_numpify,
@@ -500,17 +503,25 @@ class Trainer:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
         if self.args.unified_checkpoint:
-            if "checkpoint_compatible" in self.args.unified_checkpoint_config:
-                pass
-            elif resume_from_checkpoint is not None and self.args.dataset_rank == 0:
-                load_unified_checkpoint(
-                    self.args,
-                    self.model,
-                    resume_from_checkpoint,
-                    safe_serialization=True,
-                )
-                logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
-                return
+            if not self.is_unified_checkpoint(resume_from_checkpoint):
+                if "checkpoint_compatible" in self.args.unified_checkpoint_config:
+                    pass
+                else:
+                    raise ValueError(
+                        "Can't find a valid unified checkpoint,"
+                        "add 'checkpoint_compatible' into 'unified_checkpoint_config' to load origin checkpoint"
+                    )
+            else:
+                if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
+                    load_unified_checkpoint(
+                        self.args,
+                        self.model,
+                        self.optimizer,
+                        resume_from_checkpoint,
+                        safe_serialization=True,
+                    )
+                    logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
+                    return
 
         if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
             self._load_from_peft_checkpoint(resume_from_checkpoint)
@@ -548,7 +559,7 @@ class Trainer:
                 if os.path.isfile(weights_file):
                     # We load the model state dict on the CPU to avoid an OOM error.
                     state_dict = paddle.load(weights_file, return_numpy=True)
-
+                    state_dict = nested_cast_tensor(state_dict, paddle.get_default_dtype())
                     # If the model is on the GPU, it still works!
                     self._set_state_dict_in_model(state_dict)
                     # release memory
@@ -2152,7 +2163,7 @@ class Trainer:
             paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
 
         if self.args.unified_checkpoint:
-            save_unified_checkpoint(self.args, self.model, output_dir, safe_serialization=True)
+            save_unified_checkpoint(self.args, self.model, self.optimizer, output_dir, safe_serialization=True)
             return
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
@@ -2237,18 +2248,24 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
-            if self.args.data_parallel_rank == 0:
-                if self.args.unified_checkpoint and "checkpoint_compatible" not in self.args.unified_checkpoint_config:
-                    opt_state_dict = load_unified_optimizer(
-                        args=self.args,
-                        model=self.model,
-                        optimizer=self.optimizer,
-                        resume_from_checkpoint=checkpoint,
-                        safe_serialization=True,
-                    )
-            if not self.args.unified_checkpoint:
-                if self.args.data_parallel_rank == 0:
 
+            use_unified_checkpoint = False
+
+            if self.args.unified_checkpoint:
+                if not self.is_unified_checkpoint(checkpoint):
+                    if "checkpoint_compatible" in self.args.unified_checkpoint_config:
+                        use_unified_checkpoint = False
+                        logger.info("Loding checkpoint, the next ckeckpoint will be saved as unified checkpoint")
+                    else:
+                        raise ValueError(
+                            "Can't find a valid unified checkpoint,"
+                            "add 'checkpoint_compatible' into 'unified_checkpoint_config' to load checkpoint"
+                        )
+                else:
+                    use_unified_checkpoint = True
+
+            if not use_unified_checkpoint:
+                if self.args.data_parallel_rank == 0:
                     optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
                     path = os.path.join(checkpoint, optimizer_name)
                     if os.path.isfile(path):
@@ -2886,3 +2903,10 @@ class Trainer:
                     logger.info("{:30}: {}".format(a, v))
 
         logger.info("")
+
+    def is_unified_checkpoint(self, checkpoint_path):
+        checkpoints = os.listdir(checkpoint_path)
+        if SAFE_OPTIMIZER_INDEX_NAME in checkpoints or PADDLE_OPTIMIZER_INDEX_NAME in checkpoints:
+            return True
+        else:
+            return False

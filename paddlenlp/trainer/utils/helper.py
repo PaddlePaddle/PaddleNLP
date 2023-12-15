@@ -226,6 +226,20 @@ def nested_broadcast_tensor(tensor, src=0, group=None):
     return tensor
 
 
+def nested_cast_tensor(tensors, dtype=paddle.float16):
+    "Recursively convert the values of a nested list/tuple/dict of tensors to dtype `dtype`."
+    if isinstance(tensors, dict):
+        for key in list(tensors.keys()):
+            tensors[key] = nested_cast_tensor(tensors[key], dtype=dtype)
+    if isinstance(tensors, (list, tuple)):
+        return type(tensors)(nested_cast_tensor(t, dtype) for t in tensors)
+    if isinstance(tensors, paddle.Tensor):
+        tensors = paddle.cast(tensors, dtype)
+    if isinstance(tensors, np.ndarray):
+        tensors = tensors.astype(dtype)
+    return tensors
+
+
 def broadcast_dp_optimizer(state_dict):
     if paddle.distributed.get_world_size() <= 1:
         return state_dict
