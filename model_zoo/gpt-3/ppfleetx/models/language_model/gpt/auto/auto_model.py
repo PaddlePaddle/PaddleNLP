@@ -533,7 +533,8 @@ class TransformerDecoderLayer(nn.Layer):
         residual = tgt
         if self.normalize_before:
             tgt = self.norm2(tgt)
-
+        # with paddle.amp.auto_cast(False):
+        #     print("++++ use auto_cast False TransformerDecoderLayer")
         if self.sequence_parallel:
             # Enter TP Region
             auto.shard_tensor(tgt, auto_env.get_mesh()[self.ipp], [None, auto_env.get_mesh().dp_dim, None])
@@ -810,7 +811,12 @@ class GPTForPretrainingAuto(nn.Layer):
             x_dims_mapping = [auto_env.get_mesh().dp_dim] + [None] * (len(encoder_outputs.shape) - 1)
         w_dims_mapping = [auto_env.get_mesh().mp_dim, None]
         matmul = auto.shard_op(paddle.matmul, auto_env.get_mesh()[-1], [x_dims_mapping, w_dims_mapping, None])
-        logits = matmul(encoder_outputs, get_attr(self.gpt.embeddings.word_embeddings, "weight"), transpose_y=True)
+        with paddle.amp.auto_cast(False):
+            print("++++ use auto_cast False matmul")
+        with paddle.amp.auto_cast(False):
+            logits = matmul(encoder_outputs.astype("float32"), get_attr(self.gpt.embeddings.word_embeddings, "weight").astype("float32"), transpose_y=True)
+
+        # logits = matmul(encoder_outputs, get_attr(self.gpt.embeddings.word_embeddings, "weight"), transpose_y=True)
 
         if use_cache:
             return logits, cached_kvs
@@ -856,12 +862,18 @@ class GPTPretrainingCriterionAuto(nn.Layer):
             # [s, b, h] --> [b, s, h]
             prediction_scores = prediction_scores.transpose([1, 0, 2])
 
-        masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
+        with paddle.amp.auto_cast(False):
+            masked_lm_loss = self.loss_func(prediction_scores.astype('float32'), masked_lm_labels.unsqueeze(2))
 
-        loss_mask = loss_mask.reshape([-1])
-        masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
+            loss_mask = loss_mask.reshape([-1])
+            masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
+            loss = masked_lm_loss / loss_mask.sum()
+        # masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
 
-        loss = masked_lm_loss / loss_mask.sum()
+        # loss_mask = loss_mask.reshape([-1])
+        # masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
+
+        # loss = masked_lm_loss / loss_mask.sum()
         return loss
 
 
