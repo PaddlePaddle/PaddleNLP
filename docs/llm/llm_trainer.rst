@@ -28,8 +28,8 @@ Trainer进阶分布式能力使用介绍
 
 注：
 
-1. 总卡数=sharding_parallel_dergee * tensor_parallel_dergee * pipeline_parallel_degree * data_parallel_degree
-2. data_parallel_degree 不需要传入参数设置，由 总卡数/(sharding_parallel_dergee * tensor_parallel_dergee * pipeline_parallel_degree) 计算得来 
+* 总卡数=sharding_parallel_dergee * tensor_parallel_dergee * pipeline_parallel_degree * data_parallel_degree
+* data_parallel_degree 不需要传入参数设置，由 总卡数/(sharding_parallel_dergee * tensor_parallel_dergee * pipeline_parallel_degree) 计算得来 
 
 .. code-block:: bash
 
@@ -76,12 +76,12 @@ Trainer 分布式能力
 
 功能特色：
 
-1. TP
+* TP
    
   * 简单配置即可实现参数自动切分加载 合并
   * 组网改造简便，容易对齐精度
 
-2. PP 
+* PP 
    
   * 同时继承 PaddleNLP PertrainedModel
   * 模型参数自动加载，参数名映射到单卡模型。
@@ -99,7 +99,7 @@ DP 或者sharding，这类功能无需用户修改组网, 直接多卡即可运�
 
 
 混合并行分布式能力: TP + PP 
-------------------------
+------------------------------
 
 飞桨4D并行, 即: ``data parallel`` + ``sharding parallel`` + ``tensor parallel`` + ``pipeline parallel`` .
 混合并行这里, 主要添加了 ``tensor parallel`` (TP) 和 ``pipeline parallel`` (PP)支持. 
@@ -117,11 +117,11 @@ Tensor Parallel接入:
 
 当前大模型接入 张量并行（TP） 主要有以下步骤
 
-1. 模型config配置
+* 模型config配置
    
   * 此部分只需要配置一些默认参数，比如tensor_parallel_output之类的（是否合并最后TP计算出来的logits）
 
-2. 模型组网修改
+* 模型组网修改
   
   * 核心工作：主要修改的点有，
 
@@ -132,18 +132,18 @@ Tensor Parallel接入:
   
   * 此时修改较多，建议用户可以先修改 MLP模块 ，简单对齐之后，再去修改其他模块。参数转换对齐见后文。
 
-3. 参数切分自动转换mappings
+*  参数切分自动转换mappings
 
-  a. 当我们修改了网络的时候，需要与单卡模型对齐，验证正确性。
-  b. 如llama代码，我们自提供了自动转换的接入函数，用户只需要配置 state_dict 中一些 linear 是 行切分或者列切分即可。 is_column 
-  c. `参考代码 <https://github.com/PaddlePaddle/PaddleNLP/blob/acfd537f3c859d80bf5d1f0a2fb26f485ef015b5/paddlenlp/transformers/llama/modeling.py#L565-L602>`_
+  * 当我们修改了网络的时候，需要与单卡模型对齐，验证正确性。
+  * 如llama代码，我们自提供了自动转换的接入函数，用户只需要配置 state_dict 中一些 linear 是 行切分或者列切分即可。 is_column 
+  * `参考代码 <https://github.com/PaddlePaddle/PaddleNLP/blob/acfd537f3c859d80bf5d1f0a2fb26f485ef015b5/paddlenlp/transformers/llama/modeling.py#L565-L602>`_
 
 .. image:: https://github.com/PaddlePaddle/PaddleNLP/assets/16911935/1d6be372-e9de-4ec2-a8aa-705a4bafb097
 
-4. 对齐TP与单卡精度
+* 对齐TP与单卡精度
 
-  a. 注意建议使用上文自动转换的mappinng配置，将极大减小工作量
-  b. 注意使用float32进行精度对齐，需要 export NVIDIA_TF32_OVERRIDE=0 关闭TF32
+  * 注意建议使用上文自动转换的mappinng配置，将极大减小工作量
+  * 注意使用float32进行精度对齐，需要 export NVIDIA_TF32_OVERRIDE=0 关闭TF32
 
 
 Tensor Parallel 使用
@@ -192,20 +192,20 @@ PP接入的本质是把模型写成一个 sequential 的形式，即模型之间
 
 当前大模型接入 流水线并行（PP） 主要有以下步骤：
 
-1. 模型基类集成
-   
-  a. 注意，模型需要同时继承 PipelinePretrainedModel 和 PipelineLayer
-  b. 模型的 config_class _get_tensor_parallel_mappings  _init_weights与原模型相同
-  c. `参考此处代码 <https://github.com/PaddlePaddle/PaddleNLP/blob/b5ca5bc767eddf2593839e47665e6b4abf2de91b/examples/language_model/llama/modeling_pp.py#L192-L202>`_ 
+* 模型基类集成
+
+  * 注意，模型需要同时继承 PipelinePretrainedModel 和 PipelineLayer
+  * 模型的 config_class _get_tensor_parallel_mappings  _init_weights与原模型相同
+  * `参考此处代码 <https://github.com/PaddlePaddle/PaddleNLP/blob/b5ca5bc767eddf2593839e47665e6b4abf2de91b/examples/language_model/llama/modeling_pp.py#L192-L202>`_ 
 
 .. image:: https://github.com/PaddlePaddle/PaddleNLP/assets/16911935/92b99bd6-90e4-45d0-8723-cf14fc258466
 
 
-2. 添加模型的层。
+* 添加模型的层。
 
-  a. 模型layer 通过 LayerDesc 包裹
-  b.  Layer的初始化，只接受模型config一个参数
-  c. add_sequential_layer 最后一个str参数是这一层模型，在原来网络中的前缀名
+  * 模型layer 通过 LayerDesc 包裹
+  * Layer的初始化，只接受模型config一个参数
+  * add_sequential_layer 最后一个str参数是这一层模型，在原来网络中的前缀名
 
     i. 比如 embedding 层。原来在模型中是 llama.embeding.weight 这里的前缀是 llama
     ii. 后面的Decoder层，就是 llama.layers.0  llama.layers.1 之类
@@ -214,7 +214,7 @@ PP接入的本质是把模型写成一个 sequential 的形式，即模型之间
 .. image:: https://github.com/PaddlePaddle/PaddleNLP/assets/16911935/a511bc41-1ab3-414b-a076-09d17f06d94b
   
 
-3. 其他。配置一些其他选项，如：
+* 其他。配置一些其他选项，如：
 
   a. 指定切分pp的层
   b. virtual_pp
@@ -224,10 +224,9 @@ PP接入的本质是把模型写成一个 sequential 的形式，即模型之间
 
 
 Pipeline Parallel 使用
-------------
+------------------------
 
-参见 `此处单测 <https://github.com/PaddlePaddle/PaddleNLP/blob/6c6e72bab2d5282df5a36d5e283f729fa89bccc6/examples/language_model/llama/tests/test_pipeline_parallel.py#L28-L67
-    >`_ ， 使用LlamaForCausalLMPipe.from_pretrained 即可加载好模型。
+参见 `此处单测 <https://github.com/PaddlePaddle/PaddleNLP/blob/6c6e72bab2d5282df5a36d5e283f729fa89bccc6/examples/language_model/llama/tests/test_pipeline_parallel.py#L28-L67>`_ ， 使用LlamaForCausalLMPipe.from_pretrained 即可加载好模型。
 
 .. code-block:: python
 
