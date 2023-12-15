@@ -136,7 +136,9 @@ Tensor Parallel接入:
 
   a. 当我们修改了网络的时候，需要与单卡模型对齐，验证正确性。
   b. 如llama代码，我们自提供了自动转换的接入函数，用户只需要配置 state_dict 中一些 linear 是 行切分或者列切分即可。 is_column 
-  c. https://github.com/PaddlePaddle/PaddleNLP/blob/acfd537f3c859d80bf5d1f0a2fb26f485ef015b5/paddlenlp/transformers/llama/modeling.py#L565-L602
+  c. `参考代码 <https://github.com/PaddlePaddle/PaddleNLP/blob/acfd537f3c859d80bf5d1f0a2fb26f485ef015b5/paddlenlp/transformers/llama/modeling.py#L565-L602>`_
+
+.. image:: https://github.com/PaddlePaddle/PaddleNLP/assets/16911935/1d6be372-e9de-4ec2-a8aa-705a4bafb097
 
 4. 对齐TP与单卡精度
 
@@ -203,7 +205,10 @@ PP接入的本质是把模型写成一个 sequential 的形式，即模型之间
    
   a. 注意，模型需要同时继承 PipelinePretrainedModel 和 PipelineLayer
   b. 模型的 config_class _get_tensor_parallel_mappings  _init_weights与原模型相同
-  c. https://github.com/PaddlePaddle/PaddleNLP/blob/b5ca5bc767eddf2593839e47665e6b4abf2de91b/examples/language_model/llama/modeling_pp.py#L192-L202
+  c. `参考此处代码 <https://github.com/PaddlePaddle/PaddleNLP/blob/b5ca5bc767eddf2593839e47665e6b4abf2de91b/examples/language_model/llama/modeling_pp.py#L192-L202>`_ 
+
+.. image:: https://github.com/PaddlePaddle/PaddleNLP/assets/16911935/92b99bd6-90e4-45d0-8723-cf14fc258466
+
 
 2. 添加模型的层。
 
@@ -215,21 +220,26 @@ PP接入的本质是把模型写成一个 sequential 的形式，即模型之间
     ii. 后面的Decoder层，就是 llama.layers.0  llama.layers.1 之类
     iii. 此处的名字，可以将模型的命名结构映射到单卡
 
+.. image:: https://github.com/PaddlePaddle/PaddleNLP/assets/16911935/a511bc41-1ab3-414b-a076-09d17f06d94b
+  
+
 3. 其他。配置一些其他选项，如：
 
   a. 指定切分pp的层
   b. virtual_pp
   c. 初始化权重
 
+.. image:: https://github.com/PaddlePaddle/PaddleNLP/assets/16911935/a1085022-d3c7-4b0c-9046-73af5a39231d
+
 
 Pipeline Parallel 使用
 ------------
 
-参见此处单测， 使用LlamaForCausalLMPipe.from_pretrained 即可加载好模型。
+参见 `此处单测 <https://github.com/PaddlePaddle/PaddleNLP/blob/6c6e72bab2d5282df5a36d5e283f729fa89bccc6/examples/language_model/llama/tests/test_pipeline_parallel.py#L28-L67
+    >`_ ， 使用LlamaForCausalLMPipe.from_pretrained 即可加载好模型。
 
 .. code-block:: python
 
-    # https://github.com/PaddlePaddle/PaddleNLP/blob/6c6e72bab2d5282df5a36d5e283f729fa89bccc6/examples/language_model/llama/tests/test_pipeline_parallel.py#L28-L67
     world_size = paddle.distributed.get_world_size()
     pp_degree = world_size
     tp_degree = 1

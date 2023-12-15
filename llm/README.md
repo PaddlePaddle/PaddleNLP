@@ -40,7 +40,10 @@
 
 ## 2. 预训练
 
-我们在此处提供了更详细的预训练数据制作，性能测试报告文档，参见: https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html
+我们在此处提供了更详细的[预训练数据制作]()，[分布式策略支持情况]( https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-capability)，[性能测试报告文档](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-performance)，参见: https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html
+
+大模型列表参见[此处](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-weight)
+
 
 此项目支持了LLaMA、GPT-3、BaiChuan、Qwen 等大模型的预训练。用户切换配置config文件，即可一键运行。
 

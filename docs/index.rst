@@ -48,7 +48,7 @@
    :maxdepth: 1
    :caption: 大模型LLM
 
-   分布式预训练 <llm/pretraining/index>
+   大模型预训练 <llm/pretraining/index>
    大模型微调SFT <llm/sft>
    大模型高效微调PEFT <llm/peft.md>
    大模型混合并行训练教程 <llm/llm_trainer.rst>
