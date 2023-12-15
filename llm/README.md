@@ -34,7 +34,7 @@
 
 ## 1. 环境准备
 
-- paddlepaddle-gpu >= 2.5.1
+- paddlepaddle-gpu >= 2.5.2
 - paddlenlp >= 2.6.1
 - tiktoken (仅 Qwen 需要)
 
