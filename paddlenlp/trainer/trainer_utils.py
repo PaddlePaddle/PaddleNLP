@@ -59,7 +59,7 @@ __all__ = [
 ]
 
 
-def get_dist_seeds(seed: int = 1234, topo: Topology = None):
+def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
     """
     Get the seeds from distributed environment strategy.
     Args:
@@ -78,7 +78,18 @@ def get_dist_seeds(seed: int = 1234, topo: Topology = None):
     if hasattr(fleet.fleet, "_hcg") and topo is not None:
         hcg = fleet.get_hybrid_communicate_group()
 
-    if hcg is not None and paddle.distributed.get_world_size() > 1:
+    if topo is not None and paddle.distributed.get_world_size() > 1:
+        dp_rank = topo.dp_info.rank
+        dp_size = topo.dp_info.size
+
+        pp_rank = topo.pp_info.rank
+        pp_size = topo.pp_info.size
+
+        mp_rank = topo.mp_info.rank
+        mp_size = topo.mp_info.size
+
+        sharding_rank = topo.sharding_info.rank
+    elif hcg is not None and paddle.distributed.get_world_size() > 1:
         # obtain rank message of hybrid parallel
 
         mp_rank = hcg.get_model_parallel_rank()
@@ -91,27 +102,11 @@ def get_dist_seeds(seed: int = 1234, topo: Topology = None):
         dp_size = hcg.get_data_parallel_world_size()
 
         sharding_rank = hcg.get_sharding_parallel_rank()
-    elif topo is not None and paddle.distributed.get_world_size() > 1:
-        dp_rank = topo.dp_info.rank
-        dp_size = topo.dp_info.size
-
-        pp_rank = topo.pp_info.rank
-        pp_size = topo.pp_info.size
-
-        mp_rank = topo.mp_info.rank
-        mp_size = topo.mp_info.size
-
-        sharding_rank = topo.sharding_info.rank
     else:
         mp_rank, mp_size = 0, 1
         pp_rank, pp_size = 0, 1
         dp_rank, dp_size = 0, 1
         sharding_rank, _ = 0, 1
-
-    # NOTE: the commented seeds are set only for precision validation
-    # seed += 100 * pp_rank
-    random.seed(seed + 100 * pp_rank)
-    np.random.seed(seed + 100 * pp_rank)
 
     seed_offset = seed
     global_seed = (
@@ -130,11 +125,14 @@ def get_dist_seeds(seed: int = 1234, topo: Topology = None):
         + sharding_rank * (mp_size * pp_size * dp_size)
     )
 
-    return global_seed, local_seed
+    # NOTE: the commented seeds are set only for precision validation
+    random_seed = seed + 100 * pp_rank
+
+    return global_seed, local_seed, random_seed
 
 
 def set_seed(seed: int = 1234, topo=None):
-    global_seed, local_seed = get_dist_seeds(seed, topo)
+    global_seed, local_seed, random_seed = _get_distributed_seeds(seed, topo)
 
     tracker = get_rng_state_tracker()
     if "global_seed" not in tracker.states_ and global_seed not in tracker.seeds_:
@@ -144,8 +142,13 @@ def set_seed(seed: int = 1234, topo=None):
         tracker.add("local_seed", local_seed)
 
     paddle.seed(global_seed)
+    random.seed(random_seed)
+    np.random.seed(random_seed)
 
-    logger.info("The global seed is set to {} and local seed is set to {}.".format(global_seed, local_seed))
+    logger.info(
+        "The global seed is set to {}, local seed is set to {} and "
+        "random seed is set to {}.".format(global_seed, local_seed, random_seed)
+    )
 
 
 class ExplicitEnum(Enum):

@@ -22,7 +22,7 @@ import paddle.distributed as dist
 import paddle.distributed.auto_parallel as auto
 
 from paddlenlp.ops import Topology
-from paddlenlp.trainer.trainer_utils import get_dist_seeds
+from paddlenlp.trainer.trainer_utils import _get_distributed_seeds
 from ppfleetx.utils.log import logger
 
 _mesh = None
@@ -135,11 +135,18 @@ def set_seed(seed):
             sharding_degree=1, # auto_parallel's sharding is not orthogonal with dp, mp and pp
         )
 
-    global_seed, local_seed = get_dist_seeds(seed, topo)
+    global_seed, local_seed, random_seed = _get_distributed_seeds(seed, topo)
+
+    # NOTE: add (1024 + world_size) to seed for CI cases
+    global_seed = global_seed + 1024 + paddle.distributed.get_world_size()
+    local_seed = local_seed + 1024 + paddle.distributed.get_world_size()
 
     paddle.seed(global_seed)
+    random.seed(random_seed)
+    np.random.seed(random_seed)
 
-    logger.info("The global seed is set to {} and local seed is set to {}.".format(global_seed, local_seed))
+    logger.info("The global seed is set to {}, local seed is set to {} and "
+                "random seed is set to {}.".format(global_seed, local_seed, random_seed))
 
     global _seed
     global _dp_seed

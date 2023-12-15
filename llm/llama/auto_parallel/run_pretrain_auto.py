@@ -37,7 +37,10 @@ from paddlenlp.trainer import (
     get_last_checkpoint,
     speed_metrics,
 )
-from paddlenlp.trainer.trainer_utils import PREFIX_CHECKPOINT_DIR, get_dist_seeds
+from paddlenlp.trainer.trainer_utils import (
+    PREFIX_CHECKPOINT_DIR,
+    _get_distributed_seeds,
+)
 from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
@@ -416,9 +419,16 @@ def init_seed(seed: int = 1234, args=None):
                 sharding_degree=1,  # auto_parallel's sharding is not orthogonal with dp, mp and pp
             )
 
-            global_seed, local_seed = get_dist_seeds(args.seed, topo)
+            global_seed, local_seed, random_seed = _get_distributed_seeds(args.seed, topo)
+
             paddle.seed(local_seed)
-            logger.info("The global seed is set to {} and local seed is set to {}.".format(global_seed, local_seed))
+            random.seed(random_seed)
+            np.random.seed(random_seed)
+
+            logger.info(
+                "The global seed is set to {}, local seed is set to {} and "
+                "random seed is set to {}.".format(global_seed, local_seed, random_seed)
+            )
         else:
             random.seed(args.seed)
             np.random.seed(args.seed)
