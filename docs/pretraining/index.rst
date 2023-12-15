@@ -1,21 +1,27 @@
 ------------------------------------
-大模型预训练介绍
+大模型预训练介绍(Introduction)
 ------------------------------------
 
 
-PaddleNLP大模型套件支持 LLaMA v1/v2、GPT-3、BaiChuan、Qwen 等大模型的预训练支持。git clone 代码到本地，即可开始预训练。
+PaddleNLP大模型套件支持 LLaMA v1/v2、GPT-3、BaiChuan、Qwen 等大模型的预训练支持。
 
-.. code-block:: bash
 
-    git clone https://github.com/PaddlePaddle/PaddleNLP.git
-    # pip install ./PaddleNLP 使用develop版本
-    cd PaddleNLP/llm
-    # 到达运行目录
+数据详细制作流程可参考:
+-----------------------------
 
-运行教程
-------------
 
-数据制作我们专门提供了教程，见后文。为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
+.. toctree::
+   :maxdepth: 1
+
+   内置预练数据集及自定义数据制作 <dataset.md>
+   CLUECorpus2020 语料制作 <docs/CLUECorpus2020.md>
+   CLUECorpusSmall  语料制作 <docs/CLUECorpusSmall.md>
+   OpenWebText2 语料制作 <docs/OpenWebText2.md>
+   WuDaoCorpus2.0 Base 语料 <docs/WuDaoCorpusBase.md>
+
+
+
+为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
 
 .. code-block:: bash
 
@@ -52,30 +58,13 @@ PaddleNLP大模型套件支持 LLaMA v1/v2、GPT-3、BaiChuan、Qwen 等大模�
 
 注意：
 
-1. 建议使用paddle develop版本训练，需要安装`pip install tool_helpers visualdl==2.5.3`等相关缺失whl包
+1. 建议使用paddle develop版本训练，需要安装 ``pip install tool_helpers visualdl==2.5.3`` 等相关缺失whl包。
 2. ``use_flash_attention`` 需要在A100机器开启，建议使用cuda11.8环境。
-3. ``use_fused_rms_norm`` 需要安装[此目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt-3/external_ops)下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置PYTHONPATH
-4. ```continue_training``` 表示从现有的预训练模型加载训练。7b模型初始loss大概为2.xx, 随机初始化模型loss从11.x左右下降。
-5. 当前脚本为sharding版本，需要4D并行训练（数据、sharding、张量、流水线并行）的用户，请参考``run_trainer_tp4pp2.sh``脚本。
-6. 多机训练时，若各机器使用的训练数据文件位置相同（例如挂载共享硬盘情况），请指定`--share_folder true`使全局0号卡制作缓存数据。否则默认各台机器的0号卡独立制作缓存数据，
-7. 若数据集文件夹中存在默认缓存文件夹``index-cache/``，则额外指定的``--data_cache``不生效，训练时优先加载默认缓存文件夹中的内容。
-
-
-数据详细制作流程:
------------------------------
-
-数据制作请参见：
-
-.. toctree::
-   :maxdepth: 1
-
-   预训练数据集制作 <dataset.md>
-   CLUECorpus2020 语料制作 <docs/CLUECorpus2020.md>
-   CLUECorpusSmall  语料制作 <docs/CLUECorpusSmall.md>
-   OpenWebText2 语料制作 <docs/OpenWebText2.md>
-   WuDaoCorpus2.0 Base 语料 <docs/WuDaoCorpusBase.md>
-
-
+3. ``use_fused_rms_norm`` 需要安装[此目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt-3/external_ops)下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置 ``PYTHONPATH``。
+4. ``continue_training`` 表示从现有的预训练模型加载训练。7b模型初始loss大概为2.xx, 随机初始化模型loss从11.x左右下降。
+5. 当前脚本为sharding版本，需要4D并行训练（数据、sharding、张量、流水线并行）的用户，请参考 ``run_trainer_tp4pp2.sh`` 脚本。
+6. 多机训练时，若各机器使用的训练数据文件位置相同（例如挂载共享硬盘情况），请指定 ``--share_folder true`` 使全局0号卡制作缓存数据。否则默认各台机器的0号卡独立制作缓存数据，
+7. 若数据集文件夹中存在默认缓存文件夹 ``index-cache/`` ，则额外指定的 ``--data_cache`` 不生效，训练时优先加载默认缓存文件夹中的内容。
 
 
 模型预训练支持的分布式能力一览
@@ -84,7 +73,7 @@ PaddleNLP大模型套件支持 LLaMA v1/v2、GPT-3、BaiChuan、Qwen 等大模�
 
 .. csv-table:: 模型能力汇总
     :header: Model,Data Parallelism,Tensor Parallelism,Pipeline Parallelism,sequence parallelism,Flash Attention,Selective Recompute,Sharding Stage1 + recompute,Sharding Stage1 + DP,Stage2 + recompute,Stage2 + DP,Stage3 + recompute,Stage3 + DP
-    :widths: 20 5 5 5 5 5 5 5 5 5 5 5 5
+    :widths: 5 2 2 2 2 2 2 2 2 2 2 2 2
 
     ``LLaMA-65B``   ,✅,✅,✅,✅,✅,✅,✅,✅,✅,✅,✅,✅
     ``LLaMA2-70B``  ,✅,✅,✅,✅,✅,✅,✅,✅,✅,✅,✅,✅
@@ -160,7 +149,8 @@ PaddleNLP大模型套件支持 LLaMA v1/v2、GPT-3、BaiChuan、Qwen 等大模�
   
 
 .. csv-table:: 模型性能测试汇总
-    :header: 模型,序列长度,分布式策略,速度(``tokens/card/sec``),显存占用(``MB^1``),配置文件,测试时间
+    :header: 模型,序列长度,分布式策略,速度(``^1``),显存占用(``MB^2``),配置文件,测试时间
+    :widths: 10 2 4 2 2 15 5
    
     ``FlagAlpha/Llama2-Chinese-13b-Chat``,4096,``tp2sd4_stage2``,1980.22,64323MB,``./llama/pretrain-flagalpha_llama2_13b-tp2sd4_stage2.json``,2023-11-27 21:42:38
     ``FlagAlpha/Llama2-Chinese-7b-Chat`` ,4096,``tp2sd4_stage2``,3744.62,52092MB,``./llama/pretrain-flagalpha_llama2_7b-tp2sd4_stage2.json``,2023-11-27 21:44:57
@@ -175,6 +165,10 @@ PaddleNLP大模型套件支持 LLaMA v1/v2、GPT-3、BaiChuan、Qwen 等大模�
     ``qwen/qwen-7b``                     ,4096,``tp2sd4_stage2``,3607.28,65448MB,``./qwen/pretrain-qwen_7b-tp2sd4_stage2.json``,2023-11-27 22:16:04
 
 注：
+1. 速度的单位是 ``tokens/card/sec`` ，每张卡每秒需训练的token数。
+2. 显存占用(MB)使用的是 ``max_memory_allocated``, 实际物理显存会占用更多，大约多2-3GB.
+3. 速度会有小幅波动，例如 ``facebook/llama-7b`` 和 ``meta-llama/Llama-2-7b`` 是相同训练配置。
 
-1. 显存占用(MB)使用的是 ``max_memory_allocated``, 实际物理显存会占用更多，大约多2-3GB.
-2. 速度会有小幅波动，例如 ``facebook/llama-7b`` 和 ``meta-llama/Llama-2-7b`` 是相同训练配置。
+上述表格使用 `a tableconvert`_ 工具转换自markdown。
+
+.. _a tableconvert: https://tableconvert.com/markdown-to-restructuredtext
