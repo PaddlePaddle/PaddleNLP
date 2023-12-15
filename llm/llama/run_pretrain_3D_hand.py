@@ -299,7 +299,11 @@ def get_train_data_file(args):
 
 
 def create_optimizer(model, lr_scheduler, training_args):
-    decay_parameters = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
+    decay_parameters = [
+        p.name
+        for n, p in model.named_parameters()
+        if (not any(nd in n for nd in ["bias", "norm"])) or "llama.norm.weight" in n
+    ]
 
     def apply_decay_param_fun(x):
         return x in decay_parameters
@@ -542,7 +546,8 @@ def main():
     # skip grad sync
     load_model(model)
     assert optimizer._dp_enable
-    optimizer._dp_enable = False
+    # hack for align with auto
+    # optimizer._dp_enable = False
 
     def loss_func(loss):
         return loss
@@ -600,17 +605,18 @@ def main():
             pp_inputs = model._prepare_training(pp_inputs, optimizer, lr_scheduler)
 
             loss = model.forward_backward_pipeline(pp_inputs)
-            sync_grad(model)
-            print_grad(model)
+            # hack for align with auto
+            # sync_grad(model)
+            # print_grad(model)
             optimizer.step()
-            print_param(model)
+            # print_param(model)
             lr_scheduler.step()
             optimizer.clear_grad()
 
-            print(f"global_step {global_step} loss {loss.item()}")
+            print(f"global_step {global_step}; loss {loss.item()}; ls {optimizer.get_lr()}")
             pp_data_buffer.clear()
 
-            if global_step >= 4:
+            if global_step >= 1:
                 # save_model(model)
                 sys.exit(0)
 

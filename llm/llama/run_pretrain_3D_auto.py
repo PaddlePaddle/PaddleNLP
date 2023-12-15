@@ -17,48 +17,43 @@ GPT/Llama auto parallel pretraining scripts.
 import os
 import random
 import sys
-import time
 import types
 from dataclasses import dataclass, field
 from typing import List, Optional
 
 import numpy as np
 import paddle
-import paddle.distributed.auto_parallel as auto
-from paddle.io import DataLoader, BatchSampler, DistributedBatchSampler 
-from paddle.distributed import fleet
+import paddle.autograd as imperative_base
 import paddle.distributed as dist
+from paddle import _C_ops
+from paddle.base import core
+from paddle.distributed import fleet
+from paddle.io import DataLoader, DistributedBatchSampler
 
-from paddlenlp.trainer import (
-    PdArgumentParser,
-    Trainer,
-    TrainingArguments,
-    speed_metrics,
-)
+from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
 from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
     LlamaConfig,
-    LlamaForCausalLM3DAuto
+    LlamaForCausalLM3DAuto,
 )
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "llama": (
-        LlamaConfig,
-        LlamaForCausalLM3DAuto
-    ),
+    "llama": (LlamaConfig, LlamaForCausalLM3DAuto),
 }
 
+
+from collections import OrderedDict
+
+from paddle.framework import in_dynamic_mode
 
 from paddlenlp.data.causal_dataset import (
     build_train_valid_test_datasets,
     check_data_split,
     print_rank_0,
 )
-
-from collections import OrderedDict
 
 
 def add_start_docstrings(*docstr):
@@ -204,6 +199,119 @@ class ModelArguments:
     )
 
 
+class AutoClipGradByGlobalNorm(paddle.nn.ClipGradByGlobalNorm):
+    def __init__(self, clip_norm):
+        super().__init__(clip_norm)
+        pp_group = None
+        if "pp" in fleet.auto.get_mesh().dim_names:
+            global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("dp").mesh
+            mesh_shape = global_mesh.shape
+            for id in range(mesh_shape[0]):
+                dp0_mesh = global_mesh[id]
+                for i in range(dp0_mesh.shape[-1]):
+                    ranks = dp0_mesh[:, i]
+                    print("pp ranks: ", ranks)
+                    group = dist.new_group(ranks)
+                    if dist.get_rank() in ranks:
+                        pp_group = group
+            assert pp_group is not None
+        self.pp_group = pp_group
+
+    @imperative_base.no_grad()
+    def _dygraph_clip(self, params_grads):
+        params_and_grads = []
+        sum_square_list = []
+        sum_square_list_fp16 = []
+        sum_square_list_fp32 = []
+        for p, g in params_grads:
+            if g is None:
+                continue
+            if getattr(p, "need_clip", True) is False:
+                continue
+            merge_grad = g
+
+            if in_dynamic_mode() and g.is_selected_rows():
+                assert False, "not suppored"
+
+            elif g.type == core.VarDesc.VarType.SELECTED_ROWS:
+                assert False, "not suppored"
+
+            sum_square = _C_ops.squared_l2_norm(merge_grad)
+            if sum_square.dtype == core.VarDesc.VarType.FP16 or sum_square.dtype == core.VarDesc.VarType.BF16:
+                sum_square_list_fp16.append(sum_square)
+            elif sum_square.dtype == core.VarDesc.VarType.FP32:
+                sum_square_list_fp32.append(sum_square)
+            else:
+                sum_square_list.append(sum_square)
+
+        # all parameters have been filterd out
+        if len(sum_square_list) + len(sum_square_list_fp16) + len(sum_square_list_fp32) == 0:
+            return params_grads
+
+        def async_add_n(var_list):
+            return paddle.stack(var_list).sum()
+
+        sum_dtype = "float64" if len(sum_square_list) > 0 else "float32"
+        global_norm_var = []
+        if len(sum_square_list_fp16) > 0:
+            global_norm_var_fp16 = async_add_n(sum_square_list_fp16)
+            if self.pp_group is not None:
+                # sync pp
+                global_norm_var_fp16 = paddle.to_tensor(global_norm_var_fp16.numpy())
+                paddle.distributed.all_reduce(global_norm_var_fp16, group=self.pp_group)
+            global_norm_var.append(global_norm_var_fp16.astype(sum_dtype))
+        if len(sum_square_list_fp32) > 0:
+            global_norm_var_fp32 = async_add_n(sum_square_list_fp32)
+
+            if self.pp_group is not None:
+                # sync pp
+                global_norm_var_fp32 = paddle.to_tensor(global_norm_var_fp32.numpy())
+                paddle.distributed.all_reduce(global_norm_var_fp32, group=self.pp_group)
+
+            if sum_dtype == "float32":
+                global_norm_var.append(global_norm_var_fp32)
+            else:
+                global_norm_var.append(global_norm_var_fp32.astype(sum_dtype))
+        if len(sum_square_list) > 0:
+            global_norm_var_fp64 = async_add_n(sum_square_list)
+            if self.pp_group is not None:
+                # sync pp
+                global_norm_var_fp32 = paddle.to_tensor(global_norm_var_fp64.numpy())
+                paddle.distributed.all_reduce(global_norm_var_fp64, group=self.pp_group)
+            global_norm_var.append(global_norm_var_fp64)
+        global_norm_var = async_add_n(global_norm_var)
+        global_norm_var = paddle.sqrt(global_norm_var)
+        max_global_norm = paddle.full(shape=[], dtype=global_norm_var.dtype, fill_value=self.clip_norm)
+
+        need_clip = False
+        if not self.auto_skip_clip:  # always apply clip
+            need_clip = True
+            clip_var = paddle.divide(
+                x=max_global_norm,
+                y=paddle.maximum(x=global_norm_var, y=max_global_norm),
+            )
+        elif global_norm_var > max_global_norm:
+            # only when global_norm_var > max_global_norm, grad need clip
+            need_clip = True
+            clip_var = paddle.divide(x=max_global_norm, y=global_norm_var)
+
+        for p, g in params_grads:
+            if g is None:
+                continue
+            if getattr(p, "need_clip", True) is False:
+                params_and_grads.append((p, g))
+                continue
+            # TODO(wangxi): use inplace elementwise_mul
+            if need_clip:
+                clip_input = clip_var.astype(g.dtype) if clip_var.dtype != g.dtype else clip_var
+                new_grad = paddle.multiply(g, clip_input)
+                params_and_grads.append((p, new_grad))
+            else:
+                params_and_grads.append((p, g))
+
+        return params_and_grads
+
+
 def create_pretrained_dataset(
     data_args,
     training_args,
@@ -306,7 +414,11 @@ def get_train_data_file(args):
 
 
 def create_optimizer(model, lr_scheduler, training_args):
-    decay_parameters = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
+    decay_parameters = [
+        p.name
+        for n, p in model.named_parameters()
+        if (not any(nd in n for nd in ["bias", "norm"])) or n == "llama.norm.weight"
+    ]
 
     def apply_decay_param_fun(x):
         return x in decay_parameters
@@ -317,9 +429,7 @@ def create_optimizer(model, lr_scheduler, training_args):
         apply_decay_param_fun=apply_decay_param_fun,
         parameters=model.parameters(),
         weight_decay=training_args.weight_decay,
-        grad_clip=paddle.nn.ClipGradByGlobalNorm(training_args.max_grad_norm)
-        if training_args.max_grad_norm > 0
-        else None,
+        grad_clip=AutoClipGradByGlobalNorm(training_args.max_grad_norm) if training_args.max_grad_norm > 0 else None,
         **optimizer_kwargs,
     )
 
@@ -377,16 +487,19 @@ def init_seed(seed: int = 1234, args=None):
             np.random.seed(args.seed)
             paddle.seed(args.seed)
 
+
 def get_mesh(pp_idx=0):
     mesh = fleet.auto.get_mesh()
     if "pp" in mesh.dim_names:
         mesh = mesh.get_mesh_with_dim("pp")[pp_idx]
     return mesh
 
+
 def shard_fn(layer, mesh_idx, placements):
     paran_name = layer.weight.name
     layer.weight = dist.shard_tensor(layer.weight, get_mesh(mesh_idx), placements)
     layer.weight.name = paran_name
+
 
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
@@ -507,34 +620,37 @@ def main():
     )
 
     optimizer = create_optimizer(model, lr_scheduler, training_args)
+    for (k, v) in model.named_parameters():
+        print(f"named_parameters {k} => {v.name}")
 
     def loss_func(loss, outputs):
         return loss
 
-    total_train_batch_size = training_args.per_device_train_batch_size \
-                             * training_args.gradient_accumulation_steps \
-                             * training_args.data_parallel_degree
     print_config(training_args)
 
     # create sampler and dataloader
     # each rank read (training_args.per_device_train_batch_size * training_args.data_parallel_degree) samples
-    print("dp_rank: ", dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree))
-    print(f"===> worldsize = {training_args.per_device_train_batch_size}  rank: {dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree)}")
+    print(
+        "dp_rank: ", dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree)
+    )
+    print(
+        f"===> worldsize = {training_args.per_device_train_batch_size}  rank: {dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree)}"
+    )
     train_sampler = DistributedBatchSampler(
-            train_dataset,
-            batch_size=training_args.per_device_train_batch_size,
-            shuffle=False,
-            num_replicas=training_args.data_parallel_degree,
-            rank=dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree),
-            drop_last=training_args.dataloader_drop_last,
-        )
+        train_dataset,
+        batch_size=training_args.per_device_train_batch_size,
+        shuffle=False,
+        num_replicas=training_args.data_parallel_degree,
+        rank=dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree),
+        drop_last=training_args.dataloader_drop_last,
+    )
 
     train_dataloader = DataLoader(
-            train_dataset,
-            batch_sampler=train_sampler,
-            collate_fn=data_collator,
-            num_workers=training_args.dataloader_num_workers,
-        )
+        train_dataset,
+        batch_sampler=train_sampler,
+        collate_fn=data_collator,
+        num_workers=training_args.dataloader_num_workers,
+    )
 
     num_update_steps_per_epoch = len(train_dataloader) // training_args.gradient_accumulation_steps
     num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
@@ -543,14 +659,11 @@ def main():
     )
 
     global_step = 1
-    global_step_last_logged = 0
-    start_time_last_logged = time.time()
     tr_loss = float(0)
 
-
-    #hack: create dp group for distributed input data to align dygraph parallel loss.
+    # hack: create dp group for distributed input data to align dygraph parallel loss.
     dp_group = None
-    global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("dp").mesh 
+    global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("dp").mesh
     mesh_shape = global_mesh.shape
     for id in range(mesh_shape[0]):
         dp0_mesh = global_mesh[id]
@@ -571,7 +684,7 @@ def main():
             input_id = input_ids[0][0].numpy()
             label = labels[0][0].numpy()
 
-            #hack for align dygraph parallel.
+            # hack for align dygraph parallel.
             if dp_group is not None:
                 cur_rank = dist.get_rank()
                 res = []
@@ -584,12 +697,11 @@ def main():
                 labels = paddle.concat(res)
                 labels = dist.shard_tensor(labels, get_mesh(-1), [dist.Shard(0), dist.Replicate()])
 
-            
             res = model(input_ids, labels=labels)
 
             # add criterion in the future.
-            tr_loss_step = res[0] 
-            
+            tr_loss_step = res[0]
+
             if training_args.gradient_accumulation_steps > 1:
                 tr_loss_step /= training_args.gradient_accumulation_steps
 
@@ -598,11 +710,14 @@ def main():
             tr_loss += tr_loss_step
 
             if global_step % training_args.gradient_accumulation_steps == 0:
-                print_grad(model)
+                # print_grad(model)
                 optimizer.step()
                 lr_scheduler.step()
+                # print_param(model)
                 optimizer.clear_grad()
-                print(f"global_step {global_step // training_args.gradient_accumulation_steps};input id {input_id}; label {label}; loss {tr_loss.numpy()}  lr: {optimizer.get_lr()}")
+                print(
+                    f"global_step {global_step // training_args.gradient_accumulation_steps};input id {input_id}; label {label}; loss {tr_loss.numpy()}  lr: {optimizer.get_lr()}"
+                )
                 tr_loss = 0
 
             if global_step // training_args.gradient_accumulation_steps >= 1:
@@ -610,7 +725,7 @@ def main():
 
             global_step += 1
 
-    '''
+    """
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
             print(inputs.keys())
@@ -653,17 +768,27 @@ def main():
 
             if step >= training_args.max_steps:
                 break
-    '''
+    """
+
+
 def shard_model(model):
     pp_stage = 0
     for name, layer in model.named_sublayers(include_self=False):
         if hasattr(layer, "ipp"):
             pp_stage = layer.ipp
-       #print(f"name {name},pp_stage {pp_stage}==>", type(layer))    
+        # print(f"name {name},pp_stage {pp_stage}==>", type(layer))
         if "embed_tokens" in name:
             # embedding only support column split now. it will update in the future
-            shard_fn(layer, 0, [dist.Replicate(), dist.Shard(1)])    
-        for n in ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.qkv_proj", "gate_proj", "up_proj", "gate_up_fused_proj"]:
+            shard_fn(layer, 0, [dist.Replicate(), dist.Shard(1)])
+        for n in [
+            "self_attn.q_proj",
+            "self_attn.k_proj",
+            "self_attn.v_proj",
+            "self_attn.qkv_proj",
+            "gate_proj",
+            "up_proj",
+            "gate_up_fused_proj",
+        ]:
             if n in name:
                 shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(1)])
                 break
@@ -677,7 +802,7 @@ def shard_model(model):
 
 def load_model(model):
     model_state_dict = model.state_dict()
-    state_dict=paddle.load(f"hand/all.pdparams") 
+    state_dict = paddle.load("hand/all.pdparams")
     tmp = OrderedDict()
     (tmp, state_dict) = (state_dict, tmp)
     for (k, v) in tmp.items():
@@ -689,11 +814,12 @@ def load_model(model):
     print("=======model_state_dict=======")
     for (k,v) in model_state_dict.items():
         print(f"{k}=>{v.shape}")
-    """    
+    """
     print("=======state_dict=======")
-    for (k,v) in state_dict.items():
+    for (k, v) in state_dict.items():
         assert k in model_state_dict
-        print(f"{k}=>{v.shape}")    
+        print(f"{k}=>{v.shape}")
+
 
 def print_grad(model):
     model_state_dict = model.state_dict()
@@ -701,19 +827,30 @@ def print_grad(model):
     for p in model.parameters():
         assert p.name in name_mapping
         if p.grad is not None:
-            print(f"{p.name}_grad shape: {p.grad.shape} md5sum: {p.grad._md5sum()}")    
+            print(f"{name_mapping[p.name]} {p.name}_grad shape: {p.grad.shape} md5sum: {p.grad._md5sum()}")
+
+
+def print_param(model):
+    model_state_dict = model.state_dict()
+    name_mapping = {v.name: k for (k, v) in model_state_dict.items()}
+    for p in model.parameters():
+        assert p.name in name_mapping
+        if p.grad is not None:
+            print(f"{name_mapping[p.name]} {p.name} shape: {p.shape} md5sum: {p._md5sum()}")
+
 
 def map_structure_name(k):
     fs = k.split(".")
     idx = int(fs[1])
-    if idx ==0:
+    if idx == 0:
         return "llama.embed_tokens.weight"
     if idx == 33:
         return "llama.norm.weight"
     if idx == 34:
         return "lm_head.weight"
-    else: 
-        return f"llama.layers.{idx-1}." +".".join(fs[2:])         
+    else:
+        return f"llama.layers.{idx-1}." + ".".join(fs[2:])
+
 
 if __name__ == "__main__":
     main()

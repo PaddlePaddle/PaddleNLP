@@ -31,7 +31,7 @@ export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
 export FLAGS_embedding_deterministic=1        
 export FLAGS_cudnn_deterministic=1
 export NVIDIA_TF32_OVERRIDE=0
-python -u  -m paddle.distributed.launch \
+python3.8 -u  -m paddle.distributed.launch \
     --gpus "0, 1,2,3,4,5,6,7" \
     --log_dir "hand_3d" \
     run_pretrain_3D_hand.py \
@@ -70,4 +70,4 @@ python -u  -m paddle.distributed.launch \
     --do_eval \
     --device "gpu" \
     --data_impl "mmap" \
-    --max_grad_norm -1 \
+    --max_grad_norm 1.0 \
