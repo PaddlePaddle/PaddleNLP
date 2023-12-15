@@ -145,15 +145,6 @@ Tensor Parallel接入:
   a. 注意建议使用上文自动转换的mappinng配置，将极大减小工作量
   b. 注意使用float32进行精度对齐，需要 export NVIDIA_TF32_OVERRIDE=0 关闭TF32
 
-.. code-block:: python
-
-    config.tensor_parallel_degree 
-    config.tensor_parallel_rank
-    config.tensor_parallel_output
-
-    # https://github.com/PaddlePaddle/PaddleNLP/blob/acfd537f3c859d80bf5d1f0a2fb26f485ef015b5/paddlenlp/transformers/llama/modeling.py#L565
-    cls._get_tensor_parallel_mappings
-
 
 Tensor Parallel 使用
 ------------------------------
