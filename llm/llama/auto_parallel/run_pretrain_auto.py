@@ -27,6 +27,7 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 import paddle.distributed.auto_parallel as auto
+from paddle.profiler.utils import job_schedule_profiler_range
 
 from paddlenlp.trainer import (
     PdArgumentParser,
@@ -100,6 +101,17 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
         },
     )
+
+    job_schedule_profiler_start: int = field(
+        default=-1,
+        metadata={"help": "The step to start job_schedule_profiler."},
+    )
+    job_schedule_profiler_end: int = field(
+        default=-1,
+        metadata={"help": "The step to end job_schedule_profiler."},
+    )
+    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
+
     pipeline_schedule_mode: str = field(
         default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
     )
@@ -621,6 +633,10 @@ def main():
     global_step_last_logged = 0
     start_time_last_logged = time.time()
     tr_loss = float(0)
+
+    job_schedule_profiler_start = training_args.job_schedule_profiler_start
+    job_schedule_profiler_end = training_args.job_schedule_profiler_end
+
     local_batches = []
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
@@ -629,6 +645,9 @@ def main():
                 continue
             elif pp_degree > 1:
                 local_batches = inputs
+
+            with job_schedule_profiler_range(step, job_schedule_profiler_start, job_schedule_profiler_end) as status:
+                engine.enable_job_schedule_profiler = status
 
             for micro_batch in local_batches:
                 outs = engine.run(micro_batch, mode="train")
