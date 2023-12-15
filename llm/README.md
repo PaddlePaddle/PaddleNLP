@@ -40,7 +40,7 @@
 
 ## 2. 预训练
 
-我们在此处提供了更详细的预训练数据制作，性能测试报告文档，参见: https://paddlenlp.readthedocs.io/zh/latest/pretraining/index.html
+我们在此处提供了更详细的预训练数据制作，性能测试报告文档，参见: https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html
 
 此项目支持了LLaMA、GPT-3、BaiChuan、Qwen 等大模型的预训练。用户切换配置config文件，即可一键运行。
 
@@ -88,7 +88,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py
 
 
 ## 3. 精调
-目前精调统一脚本只支持[LLaMA v1/v2](./llama)、[ChatGLM-6B](./chatglm)、[ChatGLM2-6B](./chatglm2)、[Bloom](./bloom)、[OPT](./opt)、[Qwen](./qwen)，其他模型精调使用详见对应模型目录。接下来我们将以**Llama 2**为例介绍如何使用统一脚本进行SFT、LoRA、Prefix Tuning。更多LoRA、Prefix Tuning请参见[PEFT文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/peft.md)。
+目前精调统一脚本只支持[LLaMA v1/v2](./llama)、[ChatGLM-6B](./chatglm)、[ChatGLM2-6B](./chatglm2)、[Bloom](./bloom)、[OPT](./opt)、[Qwen](./qwen)，其他模型精调使用详见对应模型目录。接下来我们将以**Llama 2**为例介绍如何使用统一脚本进行SFT、LoRA、Prefix Tuning。更多LoRA、Prefix Tuning请参见[PEFT文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/llm/peft.md)。
 
 ### 3.1 精调训练数据格式
 
