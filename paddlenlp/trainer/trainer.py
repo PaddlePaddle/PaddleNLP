@@ -1834,9 +1834,11 @@ class Trainer:
         else:
             labels = None
 
+        model = paddle.jit.to_static(model)
         outputs = model(**inputs)
 
         if self.criterion is not None:
+            self.criterion = paddle.jit.to_static(self.criterion)
             loss = self.criterion(outputs, labels)
             outputs = (loss, outputs)
 

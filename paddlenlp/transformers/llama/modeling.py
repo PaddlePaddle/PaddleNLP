@@ -256,8 +256,8 @@ def scaled_dot_product_attention(
         if not paddle.in_dynamic_mode():
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
         else:
-            with paddle.amp.auto_cast(False):
-                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+            # with paddle.amp.auto_cast(False):
+            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
@@ -335,9 +335,9 @@ class LlamaRMSNorm(nn.Layer):
             return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
 
         if paddle.in_dynamic_mode():
-            with paddle.amp.auto_cast(False):
-                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
-                hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
+            # with paddle.amp.auto_cast(False):
+            variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
+            hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
         else:
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
             hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
@@ -1379,11 +1379,11 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
                 )
                 self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
-        with paddle.amp.auto_cast(False):
-            masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
-            # skip ignore_index which loss == 0
-            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
-            loss = paddle.mean(masked_lm_loss)
+        # with paddle.amp.auto_cast(False):
+        masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
+        # skip ignore_index which loss == 0
+        masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
+        loss = paddle.mean(masked_lm_loss)
 
         return loss
 
