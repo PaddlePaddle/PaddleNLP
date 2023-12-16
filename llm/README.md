@@ -287,6 +287,29 @@ python finetune_generation.py ... --chat_template ./qwen_14b_chat_template.json
 1. 当 `chat_template` 参数为文件路径时，此时将使用该文件中的 `chat_template` 配置。
 1. 当 `chat_template` 参数为空时，此时不使用 `chat_template` 配置进行训练。
 
+#### 3.8.3 如何自定义system prompt
+
+如果想要在训练或者推理的过程中动态调整 system prompt，需要进行以下调整：
+
+1. 则需要保证 `chat_template.json` 文件中的 system 配置是包含jinja2 中的变量占位符（比如：`<|im_start|>user\n{{user}}<|im_end|>` 中的 {{user}} 就是一个变量占位符），同时尽量让其保留默认参数，比如上述配置可调整成：
+
+```json
+{
+    "system": "{{system | 'You are a helpful assistant.'}}",
+    "conversation": ["\n<|im_start|>user\n{{user}}<|im_end|>\n<|im_start|>assistant\n", "{{bot}}<|im_end|>"],
+    "query": "\n<|im_start|>user\n{{query}}<|im_end|>\n<|im_start|>assistant\n",
+}
+```
+
+2. 训练文本数据中需要配置 `context_data` 字段将 `system` 字段给传递进去，示例数据为：
+
+```json
+{"src": ["user-1", "user-2", ..., "user-n"], "tgt": ["bot-1", "bot-2", ..., "bot-n"], "context_data": {"system": "你是一个擅长做任务的人工智能助手"}}
+...
+```
+
+在渲染 chat_template 的时候将以上数据中的`context_data` 作为jinja2 的上下文数据，这样就可以在训练数据集中定制每个训练数据的 system prompt。
+
 ## 4. 模型推理
 
 此外 PaddleNLP 还提供了高性能推理模型，从而加速 LLM 模型的部署落地，详细文档请看：[Inference Model](./inference.md)
