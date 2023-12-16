@@ -174,7 +174,7 @@ if __name__ == "__main__":
     predictor_args, model_args, server_args = parser.parse_args_into_dataclasses()
     # check port
     if server_args.base_port is not None:
-        logger.warning("base_port is deprecated, please use `--flask_port` instead.")
+        logger.warning("`--base_port` is deprecated, please use `--flask_port` instead after 2023.12.30.")
 
         if server_args.flask_port is None:
             server_args.flask_port = server_args.base_port
