@@ -425,7 +425,7 @@ function llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1() {
         --max_seq_length 1024 \
         --seed 1234 \
         --fuse_attention_qkv True \
-        --use_flash_attention True \
+        --use_flash_attention False \
         --bf16 False \
         --fp16 True \
         --fp16_opt_level O2 \
