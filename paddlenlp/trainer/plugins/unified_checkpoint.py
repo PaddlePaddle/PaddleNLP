@@ -1624,23 +1624,13 @@ def select_model_weight_index(args, model, resume_from_checkpoint, safe_serializ
     if distributed_isfile(index_filename_path):
         return index_filename
     else:
-        if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
-            index_filename = (
-                PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
-            )
-            index_filename = os.path.join(resume_from_checkpoint, index_filename)
+        index_filename = PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
+        index_filename = os.path.join(resume_from_checkpoint, index_filename)
 
-            if distributed_isfile(index_filename_path):
-                return index_filename
-            else:
-                raise ValueError("Can't find a valid unified model or master weight checkpoint to load.")
-
+        if distributed_isfile(index_filename_path):
+            return index_filename
         else:
-            raise ValueError(
-                "Can't find a valid unified model weight checkpoint, "
-                f"add '{UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value}' into 'unified_checkpoint_config' to "
-                "load master weight checkpoint as model weights"
-            )
+            raise ValueError("Can't find a valid unified model or master weight checkpoint to load.")
 
 
 def update_optimizer_weight_status(args, optimizer, safe_serialization):
