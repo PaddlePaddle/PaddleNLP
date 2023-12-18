@@ -100,7 +100,7 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
     else:
         raise ValueError("Unified checkpoint only supports PretrainedModel")
 
-    if "ignore_save_model_weight" in args.unified_checkpoint_config:
+    if "skip_save_model_weight" in args.unified_checkpoint_config:
         if "master_weight" in optimizer.state_dict():
             # not save model weight, load from master weight
             return
@@ -114,7 +114,7 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
     os.makedirs(save_directory, exist_ok=True)
 
     is_sync_save = True
-    if "async_save_to_disk" in args.unified_checkpoint_config:
+    if "async_save" in args.unified_checkpoint_config:
         is_sync_save = False
     file_save_async_or_sync(
         state_dict, os.path.join(save_directory, shard_file), safe_serialization, is_sync=is_sync_save
@@ -164,7 +164,7 @@ def load_unified_checkpoint_locally(args, model, optimizer, resume_from_checkpoi
     Only dataset_rank == 0 can enter this function.
     """
     index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
-    if "ignore_save_model_weight" in args.unified_checkpoint_config:
+    if "skip_save_model_weight" in args.unified_checkpoint_config:
         if is_has_master_weight(optimizer):
             index_filename = (
                 PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
@@ -319,7 +319,7 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
     os.makedirs(save_directory, exist_ok=True)
 
     is_sync_save = True
-    if "async_save_to_disk" in args.unified_checkpoint_config:
+    if "async_save" in args.unified_checkpoint_config:
         is_sync_save = False
 
     file_save_async_or_sync(

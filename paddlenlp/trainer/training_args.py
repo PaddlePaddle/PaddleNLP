@@ -711,17 +711,17 @@ class TrainingArguments:
     )
 
     unified_checkpoint_config: Optional[str] = field(
-        default=None,
+        default="checkpoint_compatible",
         metadata={
             "help": (
                 "Configs to unify hybrid parallel checkpoint.\n"
                 "Following options are supports:\n"
-                "- ignore_data_type_error: ignore the data type and convert to fp16, bf16 or fp32\n"
-                "- ignore_save_model_weight: do not save model weight when the master weight exists\n"
+                "- skip_data_type_error: ignore the data type and convert to fp16, bf16 or fp32\n"
+                "- skip_save_model_weight: do not save model weight when the master weight exists\n"
                 "- master_weight_compatible: 1. if the master weight exists, only load when needed\n"
                 "                            2. if master weight does not exit, convert model weight to master weight when needed\n"
                 "- checkpoint_compatible: enable loading old checkpoints, new checkpoint will be saved with aunified checkpoint type\n"
-                "- async_save_to_disk: enable asynchronous saving checkpoints to disk\n"
+                "- async_save: enable asynchronous saving checkpoints to disk\n"
                 "- enable_all_options: enable all optimization configurations\n"
             )
         },
@@ -1231,19 +1231,19 @@ class TrainingArguments:
             for x in unified_checkpoint_config:
                 if len(x) > 0:
                     if x not in [
-                        "ignore_data_type_error",
-                        "ignore_save_model_weight",
+                        "skip_data_type_error",
+                        "skip_save_model_weight",
                         "master_weight_compatible",
                         "checkpoint_compatible",
-                        "async_save_to_disk",
+                        "async_save",
                         "enable_all_options",
                     ]:
                         raise ValueError(
-                            f"Found unknown unified_checkpoint config {x}, accpet config is ignore_data_type_error, ignore_save_model_weight, "
-                            + "master_weight_compatible, checkpoint_compatible, async_save_to_disk, enable_all_options."
+                            f"Found unknown unified_checkpoint config {x}, accpet config is skip_data_type_error, skip_save_model_weight, "
+                            + "master_weight_compatible, checkpoint_compatible, async_save, enable_all_options."
                         )
             if "enable_all_options" in unified_checkpoint_config:
-                self.unified_checkpoint_config = "ignore_data_type_error ignore_save_model_weight master_weight_compatible checkpoint_compatible async_save_to_disk"
+                self.unified_checkpoint_config = "skip_data_type_error skip_save_model_weight master_weight_compatible checkpoint_compatible async_save"
 
         if self.report_to is None:
             logger.info(

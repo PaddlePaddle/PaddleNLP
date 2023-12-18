@@ -109,13 +109,13 @@ def remove_ckpt(ckpt_dir):
         shutil.rmtree(ckpt_dir)
 
 
-def add_ignore_save_model_weight(train_args):
-    train_args["unified_checkpoint_config"] = "ignore_save_model_weight"
+def add_skip_save_model_weight(train_args):
+    train_args["unified_checkpoint_config"] = "skip_save_model_weight"
     return train_args
 
 
-def add_async_save_to_disk(train_args):
-    train_args["unified_checkpoint_config"] = "async_save_to_disk"
+def add_async_save(train_args):
+    train_args["unified_checkpoint_config"] = "async_save"
     return train_args
 
 
@@ -152,7 +152,7 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
         train_args = copy.deepcopy(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 8
         train_args["pipeline_parallel_degree"] = 1
-        train_args = add_ignore_save_model_weight(train_args)
+        train_args = add_skip_save_model_weight(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -166,7 +166,7 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
         train_args = copy.deepcopy(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 4
         train_args["pipeline_parallel_degree"] = 2
-        train_args = add_ignore_save_model_weight(train_args)
+        train_args = add_skip_save_model_weight(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -182,7 +182,7 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding"] = ""
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
-        train_args = add_ignore_save_model_weight(train_args)
+        train_args = add_skip_save_model_weight(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -198,7 +198,7 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding"] = "stage1"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
-        train_args = add_ignore_save_model_weight(train_args)
+        train_args = add_skip_save_model_weight(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -212,7 +212,7 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
         train_args = copy.deepcopy(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 2
         train_args["pipeline_parallel_degree"] = 4
-        train_args = add_ignore_save_model_weight(train_args)
+        train_args = add_skip_save_model_weight(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -228,7 +228,7 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding"] = "stage1"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 4
-        train_args = add_ignore_save_model_weight(train_args)
+        train_args = add_skip_save_model_weight(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -243,7 +243,7 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
         train_args = copy.deepcopy(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 1
         train_args["pipeline_parallel_degree"] = 8
-        train_args = add_ignore_save_model_weight(train_args)
+        train_args = add_skip_save_model_weight(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -259,7 +259,7 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
         train_args["pipeline_parallel_degree"] = 4
         train_args["sharding"] = ""
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
-        train_args = add_ignore_save_model_weight(train_args)
+        train_args = add_skip_save_model_weight(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -275,7 +275,7 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
         train_args["pipeline_parallel_degree"] = 4
         train_args["sharding"] = "stage1"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
-        train_args = add_ignore_save_model_weight(train_args)
+        train_args = add_skip_save_model_weight(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -291,7 +291,7 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding"] = "stage1"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_ignore_save_model_weight(train_args)
+        train_args = add_skip_save_model_weight(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -307,7 +307,7 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding"] = "stage2"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_ignore_save_model_weight(train_args)
+        train_args = add_skip_save_model_weight(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -324,7 +324,7 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
         train_args["sharding_parallel_degree"] = 4
         train_args["sharding"] = "stage1"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_ignore_save_model_weight(train_args)
+        train_args = add_skip_save_model_weight(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -341,7 +341,7 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
         train_args["sharding_parallel_degree"] = 4
         train_args["sharding"] = "stage2"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_ignore_save_model_weight(train_args)
+        train_args = add_skip_save_model_weight(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -358,7 +358,7 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
         train_args["sharding_parallel_degree"] = 2
         train_args["sharding"] = "stage1"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_ignore_save_model_weight(train_args)
+        train_args = add_skip_save_model_weight(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -375,7 +375,7 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
         train_args["sharding_parallel_degree"] = 2
         train_args["sharding"] = "stage2"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_ignore_save_model_weight(train_args)
+        train_args = add_skip_save_model_weight(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -392,7 +392,7 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
         train_args["sharding_parallel_degree"] = 1
         train_args["sharding"] = "stage2"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_ignore_save_model_weight(train_args)
+        train_args = add_skip_save_model_weight(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -783,7 +783,7 @@ class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
         train_args = copy.deepcopy(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 8
         train_args["pipeline_parallel_degree"] = 1
-        train_args = add_async_save_to_disk(train_args)
+        train_args = add_async_save(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -797,7 +797,7 @@ class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
         train_args = copy.deepcopy(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 4
         train_args["pipeline_parallel_degree"] = 2
-        train_args = add_async_save_to_disk(train_args)
+        train_args = add_async_save(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -813,7 +813,7 @@ class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding"] = ""
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
-        train_args = add_async_save_to_disk(train_args)
+        train_args = add_async_save(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -829,7 +829,7 @@ class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding"] = "stage1"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
-        train_args = add_async_save_to_disk(train_args)
+        train_args = add_async_save(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -843,7 +843,7 @@ class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
         train_args = copy.deepcopy(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 2
         train_args["pipeline_parallel_degree"] = 4
-        train_args = add_async_save_to_disk(train_args)
+        train_args = add_async_save(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -859,7 +859,7 @@ class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding"] = "stage1"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 4
-        train_args = add_async_save_to_disk(train_args)
+        train_args = add_async_save(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -874,7 +874,7 @@ class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
         train_args = copy.deepcopy(pretrain_arguments)
         train_args["tensor_parallel_degree"] = 1
         train_args["pipeline_parallel_degree"] = 8
-        train_args = add_async_save_to_disk(train_args)
+        train_args = add_async_save(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -890,7 +890,7 @@ class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
         train_args["pipeline_parallel_degree"] = 4
         train_args["sharding"] = ""
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
-        train_args = add_async_save_to_disk(train_args)
+        train_args = add_async_save(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -906,7 +906,7 @@ class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
         train_args["pipeline_parallel_degree"] = 4
         train_args["sharding"] = "stage1"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
-        train_args = add_async_save_to_disk(train_args)
+        train_args = add_async_save(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -922,7 +922,7 @@ class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding"] = "stage1"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_async_save_to_disk(train_args)
+        train_args = add_async_save(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -938,7 +938,7 @@ class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
         train_args["pipeline_parallel_degree"] = 1
         train_args["sharding"] = "stage2"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_async_save_to_disk(train_args)
+        train_args = add_async_save(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -955,7 +955,7 @@ class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
         train_args["sharding_parallel_degree"] = 4
         train_args["sharding"] = "stage1"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_async_save_to_disk(train_args)
+        train_args = add_async_save(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -972,7 +972,7 @@ class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
         train_args["sharding_parallel_degree"] = 4
         train_args["sharding"] = "stage2"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_async_save_to_disk(train_args)
+        train_args = add_async_save(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -989,7 +989,7 @@ class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
         train_args["sharding_parallel_degree"] = 2
         train_args["sharding"] = "stage1"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_async_save_to_disk(train_args)
+        train_args = add_async_save(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -1006,7 +1006,7 @@ class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
         train_args["sharding_parallel_degree"] = 2
         train_args["sharding"] = "stage2"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_async_save_to_disk(train_args)
+        train_args = add_async_save(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -1023,7 +1023,7 @@ class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
         train_args["sharding_parallel_degree"] = 1
         train_args["sharding"] = "stage2"
         train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_async_save_to_disk(train_args)
+        train_args = add_async_save(train_args)
 
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
