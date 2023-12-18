@@ -87,17 +87,16 @@ from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
     LORA_WEIGHTS_NAME,
-    PADDLE_OPTIMIZER_INDEX_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
     PREFIX_WEIGHTS_NAME,
-    SAFE_OPTIMIZER_INDEX_NAME,
 )
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
 from .plugins.unified_checkpoint import (
+    UnifiedCheckpointOption,
     load_unified_checkpoint,
     load_unified_optimizer,
     save_unified_checkpoint,
@@ -132,12 +131,11 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
 )
 from .training_args import TrainingArguments
 from .utils import reshard as reshard_util
-from .utils.helper import (
+from .utils.helper import (  # nested_cast_tensor,
     broadcast_dp_optimizer,
     distributed_concat,
     distributed_file,
     distributed_isfile,
-    nested_cast_tensor,
     nested_concat,
     nested_detach,
     nested_numpify,
@@ -503,15 +501,18 @@ class Trainer:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
         if self.args.unified_checkpoint:
-            if not self.is_unified_checkpoint(resume_from_checkpoint):
-                if "checkpoint_compatible" in self.args.unified_checkpoint_config:
-                    pass
+            use_unified_checkpoint = True
+            if self.check_origin_checkpoint(resume_from_checkpoint):
+                if UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value in self.args.unified_checkpoint_config:
+                    use_unified_checkpoint = False
                 else:
-                    raise ValueError(
-                        "Can't find a valid unified checkpoint,"
-                        "add 'checkpoint_compatible' into 'unified_checkpoint_config' to load origin checkpoint"
+                    logger.warning(
+                        "Origin checkpoints exist, if you want to load from origin checkpoint, "
+                        f"add '{UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value}' "
+                        "to 'unified_checkpoint_config'."
                     )
-            else:
+
+            if use_unified_checkpoint:
                 if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
                     load_unified_checkpoint(
                         self.args,
@@ -559,7 +560,7 @@ class Trainer:
                 if os.path.isfile(weights_file):
                     # We load the model state dict on the CPU to avoid an OOM error.
                     state_dict = paddle.load(weights_file, return_numpy=True)
-                    state_dict = nested_cast_tensor(state_dict, paddle.get_default_dtype())
+                    # state_dict = nested_cast_tensor(state_dict, paddle.get_default_dtype())
                     # If the model is on the GPU, it still works!
                     self._set_state_dict_in_model(state_dict)
                     # release memory
@@ -2252,14 +2253,15 @@ class Trainer:
             use_unified_checkpoint = False
 
             if self.args.unified_checkpoint:
-                if not self.is_unified_checkpoint(checkpoint):
-                    if "checkpoint_compatible" in self.args.unified_checkpoint_config:
+                if self.check_origin_checkpoint(checkpoint):
+                    if UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value in self.args.unified_checkpoint_config:
                         use_unified_checkpoint = False
                         logger.info("Loding checkpoint, the next ckeckpoint will be saved as unified checkpoint")
                     else:
-                        raise ValueError(
-                            "Can't find a valid unified checkpoint,"
-                            "add 'checkpoint_compatible' into 'unified_checkpoint_config' to load checkpoint"
+                        logger.warning(
+                            "Origin checkpoint is found, if you want to load origin checkpoint, "
+                            f"add '{UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value}' "
+                            "to 'unified_checkpoint_config'."
                         )
                 else:
                     use_unified_checkpoint = True
@@ -2904,9 +2906,36 @@ class Trainer:
 
         logger.info("")
 
-    def is_unified_checkpoint(self, checkpoint_path):
-        checkpoints = os.listdir(checkpoint_path)
-        if SAFE_OPTIMIZER_INDEX_NAME in checkpoints or PADDLE_OPTIMIZER_INDEX_NAME in checkpoints:
-            return True
-        else:
-            return False
+    def check_origin_checkpoint(self, resume_from_checkpoint):
+        is_origin_checkpoint_type = True
+        if self.args.dataset_rank == 0:
+            hcg = fleet.get_hybrid_communicate_group()
+            tp_group = hcg.get_model_parallel_group()
+            pp_group = hcg.get_pipe_parallel_group()
+
+            weight_name = PADDLE_WEIGHTS_NAME
+            weight_index_name = PADDLE_WEIGHTS_INDEX_NAME
+            weights_file = os.path.join(
+                resume_from_checkpoint,
+                _add_variant(weight_name, self.args.weight_name_suffix),
+            )
+            weights_index_file = os.path.join(
+                resume_from_checkpoint,
+                _add_variant(weight_index_name, self.args.weight_name_suffix),
+            )
+
+            origin_checkpoint_list = len([f for f in [weights_file, weights_index_file] if os.path.isfile(f)])
+            num_origin_checkpoint = paddle.to_tensor([origin_checkpoint_list])
+            if tp_group.nranks > 1:
+                dist.all_reduce(num_origin_checkpoint, op=dist.ReduceOp.SUM, group=tp_group)
+            if pp_group.nranks > 1:
+                dist.all_reduce(num_origin_checkpoint, op=dist.ReduceOp.SUM, group=pp_group)
+            if num_origin_checkpoint.item() > 0:
+                is_origin_checkpoint_type = True
+            else:
+                is_origin_checkpoint_type = False
+        is_origin_checkpoint_type = paddle.to_tensor([is_origin_checkpoint_type])
+        dist.all_reduce(is_origin_checkpoint_type, op=dist.ReduceOp.SUM)
+        is_origin_checkpoint_type = is_origin_checkpoint_type.item() > 0
+
+        return is_origin_checkpoint_type
