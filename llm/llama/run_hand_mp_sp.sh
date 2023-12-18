@@ -27,15 +27,15 @@ export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../:$PYTHONPATH
 #ulimit -c unlimited
 #export GLOG_v=10
-export CUDA_VISIBLE_DEVICES="0,1,2,3"
+export CUDA_VISIBLE_DEVICES="0,1"
 export FLAGS_embedding_deterministic=1        
 export FLAGS_cudnn_deterministic=1
 export NVIDIA_TF32_OVERRIDE=0
 
-rm -rf hand_load
+rm -rf hand_mp_sp
 python -u  -m paddle.distributed.launch \
-    --gpus "0,1,2,3" \
-    --log_dir "hand_load" \
+    --gpus "0,1" \
+    --log_dir "hand_mp_sp" \
     run_pretrain_hand.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
@@ -44,6 +44,7 @@ python -u  -m paddle.distributed.launch \
     --output_dir "output/$task_name" \
     --split 949,50,1 \
     --max_seq_length 2048 \
+    --sequence_parallel 1 \
     --per_device_train_batch_size 2 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \

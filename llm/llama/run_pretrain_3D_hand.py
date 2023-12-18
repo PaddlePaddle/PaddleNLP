@@ -461,6 +461,7 @@ def main():
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
 
+    # config.num_hidden_layers = 2
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
@@ -540,7 +541,7 @@ def main():
     model = fleet.distributed_model(model)
     optimizer = fleet.distributed_optimizer(optimizer)
     # skip grad sync
-    load_model(model)
+    # load_model(model)
     assert optimizer._dp_enable
     optimizer._dp_enable = False
 
@@ -581,7 +582,7 @@ def main():
 
     global_step = 1
     pp_data_buffer = []
-    load_model(model)
+    # load_model(model)
     model.train()
     model._prepare_pipeline_inputs_func = _prepare_pipeline_inputs_func
     for epoch_idx in range(num_train_epochs):
@@ -610,7 +611,7 @@ def main():
             pp_data_buffer.clear()
 
             if global_step >= 2:
-                # save_model(model)
+                save_model(model)
                 sys.exit(0)
 
             global_step += 1

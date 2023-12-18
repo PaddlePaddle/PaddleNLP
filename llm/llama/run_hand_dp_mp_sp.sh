@@ -19,7 +19,7 @@ unset CUDA_VISIBLE_DEVICES
 
 export FLAGS_call_stack_level=3
 export FLAGS_use_cuda_managed_memory=true
-task_name="llama_auto_dp2mp2pp2"
+task_name="llama_hand_sp"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
@@ -32,10 +32,10 @@ export FLAGS_embedding_deterministic=1
 export FLAGS_cudnn_deterministic=1
 export NVIDIA_TF32_OVERRIDE=0
 
-rm -rf hand_load
+rm -rf hand_dp_mp
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3" \
-    --log_dir "hand_load" \
+    --log_dir "hand_dp_mp" \
     run_pretrain_hand.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \

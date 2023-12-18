@@ -442,6 +442,7 @@ def main():
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
 
+    # config.num_hidden_layers = 1
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
@@ -598,14 +599,17 @@ def main():
             tr_loss += tr_loss_step
 
             if global_step % training_args.gradient_accumulation_steps == 0:
-                print_grad(model)
+                # print_grad(model)
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
                 print(f"global_step {global_step // training_args.gradient_accumulation_steps};input id {input_id}; label {label}; loss {tr_loss.numpy()}  lr: {optimizer.get_lr()}")
                 tr_loss = 0
 
-            if global_step // training_args.gradient_accumulation_steps >= 1:
+            # if global_step // training_args.gradient_accumulation_steps >= 1:
+            #     sys.exit(0)
+
+            if global_step  == 20:
                 sys.exit(0)
 
             global_step += 1

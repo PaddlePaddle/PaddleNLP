@@ -445,6 +445,7 @@ def main():
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
 
+    config.num_hidden_layers = 1
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
@@ -568,7 +569,7 @@ def main():
             # do backward every micro step.
             tr_loss_step = loss_func(tr_loss_step)
             tr_loss_step.backward()
-            print_grad(model)
+            # print_grad(model)
 
             tr_loss += tr_loss_step
 
@@ -580,8 +581,11 @@ def main():
                 tr_loss = 0
 
             global_step += 1
-            if global_step // training_args.gradient_accumulation_steps >= 0:
-                #save_model(model)
+            # if global_step // training_args.gradient_accumulation_steps >= 0:
+            #     # save_model(model)
+            #     sys.exit(0)
+            if global_step == 20:
+                # save_model(model)
                 sys.exit(0)
 
     '''
@@ -701,8 +705,15 @@ def print_grad(model):
         assert p.name in name_mapping
         grad = p.grad
         reduce_dp(grad)
+        if "norm" in name_mapping[p.name]:
+            print("p.name: ", p.name)
+            reduce_mp(grad)
         grad = merge_mp(name_mapping[p.name], grad)
         print(f"{name_mapping[p.name]} {p.name}_grad shape: {grad.shape} md5sum: {grad._md5sum()}")            
+        if model._layers.config.sequence_parallel:
+            np.save(f"np_value/hand_sp/{name_mapping[p.name]}_grad.npy", grad.numpy())
+        else:
+            np.save(f"np_value/hand_origin/{name_mapping[p.name]}_grad.npy", grad.numpy())     
 
 
 def merge_mp(k, input):
@@ -728,6 +739,12 @@ def reduce_dp(input):
             paddle.distributed.all_reduce(input, group=group)
             return input
 
+def reduce_mp(input):
+    hcg = fleet.get_hybrid_communicate_group()
+    group = hcg.get_model_parallel_group()
+    with paddle.no_grad():
+        paddle.distributed.all_reduce(input, group=group)
+        return input
 
 
 

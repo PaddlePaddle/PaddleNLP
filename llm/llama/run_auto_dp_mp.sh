@@ -32,9 +32,12 @@ export PYTHONPATH=../../:$PYTHONPATH
 export FLAGS_embedding_deterministic=1        
 export FLAGS_cudnn_deterministic=1
 export NVIDIA_TF32_OVERRIDE=0
+# export GLOG_v=10
+
+rm -rf auto
 
 python -u  -m paddle.distributed.launch \
-    --gpus "0,1,2,3,4,5,6,7" \
+    --gpus "0,1,2,3" \
     --log_dir "auto" \
     run_pretrain_auto.py \
     --model_type "llama" \
@@ -53,7 +56,7 @@ python -u  -m paddle.distributed.launch \
     --fp16_opt_level "O2"  \
     --scale_loss 1024 \
     --pipeline_parallel_degree 1 \
-    --tensor_parallel_degree 4 \
+    --tensor_parallel_degree 2 \
     --sharding_parallel_degree 1 \
     --sharding "stage1" \
     --learning_rate 0.0001 \
