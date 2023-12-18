@@ -208,6 +208,7 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, i
     input_ids = rounds_inputs.pop("input_ids")
     # shift input_ids and labels
     input_ids, labels = input_ids[:-1], labels[1:]
+
     seq_length = len(input_ids)
     features = {"input_ids": input_ids, "labels": labels}
     if intokens:
