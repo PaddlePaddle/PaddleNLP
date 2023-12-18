@@ -663,13 +663,13 @@ def main():
 
     # hack: create dp group for distributed input data to align dygraph parallel loss.
     dp_group = None
-    global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("dp").mesh
+    global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("pp").mesh
     mesh_shape = global_mesh.shape
     for id in range(mesh_shape[0]):
-        dp0_mesh = global_mesh[id]
-        for i in range(dp0_mesh.shape[-1]):
-            ranks = dp0_mesh[:, i]
-            print("ranks: ", ranks)
+        pp_mesh = global_mesh[id]
+        for i in range(pp_mesh.shape[-1]):
+            ranks = pp_mesh[:, i]
+            print("dp ranks: ", ranks)
             group = dist.new_group(ranks)
             if dist.get_rank() in ranks:
                 dp_group = group
