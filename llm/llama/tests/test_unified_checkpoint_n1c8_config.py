@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 import os
 import shutil
-from itertools import product
 
 import numpy as np
 from parallel_launch import TestMultipleGpus
+from utils import get_pretrain_arguments
+
+from paddlenlp.trainer.plugins.unified_checkpoint import UnifiedCheckpointOption
 
 # export NVIDIA_TF32_OVERRIDE=0
 # export NCCL_IB_GID_INDEX=3
@@ -85,6 +86,7 @@ pretrain_arguments = {
     "save_total_limit": 2,
 }
 
+
 # GBS: 16 MAX_steps: 30
 
 
@@ -109,24 +111,14 @@ def remove_ckpt(ckpt_dir):
         shutil.rmtree(ckpt_dir)
 
 
-def add_skip_save_model_weight(train_args):
-    train_args["unified_checkpoint_config"] = "skip_save_model_weight"
-    return train_args
-
-
-def add_async_save(train_args):
-    train_args["unified_checkpoint_config"] = "async_save"
-    return train_args
-
-
 def run_fp16_O1(fn, train_args):
-    train_args["unified_checkpoint_config"] = "master_weight_compatible"
+    train_args["unified_checkpoint_config"] = UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value
     train_args["fp16_opt_level"] = "O1"
     fn("run_pretrain.py", **train_args)
 
 
 def run_fp16_O2(fn, train_args):
-    train_args["unified_checkpoint_config"] = "master_weight_compatible"
+    train_args["unified_checkpoint_config"] = UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value
     train_args["fp16_opt_level"] = "O2"
     fn("run_pretrain.py", **train_args)
 
@@ -138,22 +130,25 @@ def run_normal(fn, train_args):
 
 def run_unified_checkpoint(fn, train_args):
     train_args["unified_checkpoint"] = 1
-    train_args["unified_checkpoint_config"] = "checkpoint_compatible"
+    train_args["unified_checkpoint_config"] = UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value
     fn("run_pretrain.py", **train_args)
 
 
-class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
+class TestModelOnN1C8SkipSaveModelWeight(TestMultipleGpus):
     def setUp(self):
+        self.configs = get_pretrain_arguments(pretrain_arguments)
+        for config_key in self.configs:
+            self.configs[config_key]["unified_checkpoint"] = 1
+            self.configs[config_key][
+                "unified_checkpoint_config"
+            ] = UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value
         os.environ.update(environment_variables)
 
     def testTP8(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 8
-        train_args["pipeline_parallel_degree"] = 1
-        train_args = add_skip_save_model_weight(train_args)
 
+        train_args = self.configs["TP8"]
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
         res = check_acc()
@@ -163,11 +158,8 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
     def testTP4PP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 4
-        train_args["pipeline_parallel_degree"] = 2
-        train_args = add_skip_save_model_weight(train_args)
 
+        train_args = self.configs["TP4PP2"]
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
         res = check_acc()
@@ -177,13 +169,8 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
     def testTP4DP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 4
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding"] = ""
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
-        train_args = add_skip_save_model_weight(train_args)
 
+        train_args = self.configs["TP4DP2"]
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
         res = check_acc()
@@ -193,13 +180,8 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
     def testTP4Sharding2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 4
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
-        train_args = add_skip_save_model_weight(train_args)
 
+        train_args = self.configs["TP4Sharding2"]
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
         res = check_acc()
@@ -209,11 +191,8 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
     def testTP2PP4(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 2
-        train_args["pipeline_parallel_degree"] = 4
-        train_args = add_skip_save_model_weight(train_args)
 
+        train_args = self.configs["TP2PP4"]
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
         res = check_acc()
@@ -223,13 +202,8 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
     def testTP2Sharding4(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 2
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 4
-        train_args = add_skip_save_model_weight(train_args)
 
+        train_args = self.configs["TP2Sharding4"]
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
         res = check_acc()
@@ -240,11 +214,7 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
 
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 8
-        train_args = add_skip_save_model_weight(train_args)
-
+        train_args = self.configs["PP8"]
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
         res = check_acc()
@@ -254,13 +224,8 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
     def testPP4DP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 4
-        train_args["sharding"] = ""
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
-        train_args = add_skip_save_model_weight(train_args)
 
+        train_args = self.configs["PP4DP2"]
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
         res = check_acc()
@@ -270,13 +235,8 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
     def testPP4Sharding2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 4
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
-        train_args = add_skip_save_model_weight(train_args)
 
+        train_args = self.configs["PP4Sharding2"]
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
         res = check_acc()
@@ -286,13 +246,8 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
     def testSharding8S1(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_skip_save_model_weight(train_args)
 
+        train_args = self.configs["Sharding8S1"]
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
         res = check_acc()
@@ -302,13 +257,8 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
     def testSharding8S2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding"] = "stage2"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_skip_save_model_weight(train_args)
 
+        train_args = self.configs["Sharding8S2"]
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
         res = check_acc()
@@ -318,14 +268,8 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
     def testSharding4S1DP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding_parallel_degree"] = 4
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_skip_save_model_weight(train_args)
 
+        train_args = self.configs["Sharding4S1DP2"]
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
         res = check_acc()
@@ -335,14 +279,8 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
     def testSharding4S2DP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding_parallel_degree"] = 4
-        train_args["sharding"] = "stage2"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_skip_save_model_weight(train_args)
 
+        train_args = self.configs["Sharding4S2DP2"]
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
         res = check_acc()
@@ -352,14 +290,8 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
     def testSharding2S1DP4(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding_parallel_degree"] = 2
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_skip_save_model_weight(train_args)
 
+        train_args = self.configs["Sharding2S1DP4"]
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
         res = check_acc()
@@ -369,14 +301,8 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
     def testSharding2S2DP4(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding_parallel_degree"] = 2
-        train_args["sharding"] = "stage2"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_skip_save_model_weight(train_args)
 
+        train_args = self.configs["Sharding2S2DP4"]
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
         res = check_acc()
@@ -386,14 +312,8 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
     def testDP8(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding_parallel_degree"] = 1
-        train_args["sharding"] = "stage2"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_skip_save_model_weight(train_args)
 
+        train_args = self.configs["DP8"]
         self.run_n1c8("run_pretrain.py", **train_args)
         self.run_n1c8("run_pretrain.py", **train_args)
         res = check_acc()
@@ -403,16 +323,20 @@ class TestModelOnN1C8IgnoreSaveModelWeight(TestMultipleGpus):
 
 class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
     def setUp(self):
+        self.configs = get_pretrain_arguments(pretrain_arguments)
+        for config_key in self.configs:
+            self.configs[config_key]["unified_checkpoint"] = 1
+            self.configs[config_key][
+                "unified_checkpoint_config"
+            ] = UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value
         os.environ.update(environment_variables)
 
     def testTP8(self):
-        for run1, run2 in product(["O1", "O2"], ["O1", "O2"]):
+        for run1, run2 in [["O1", "O2"], ["O2", "O1"]]:
             remove_logs()
             remove_ckpt(pretrain_arguments["output_dir"])
-            train_args = copy.deepcopy(pretrain_arguments)
-            train_args["tensor_parallel_degree"] = 8
-            train_args["pipeline_parallel_degree"] = 1
 
+            train_args = self.configs["TP8"]
             if run1 == "O1":
                 run_fp16_O1(self.run_n1c8, train_args)
             else:
@@ -424,16 +348,13 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
                 run_fp16_O2(self.run_n1c8, train_args)
             res = check_acc()
             assert len(res) == 2
-            # np.testing.assert_allclose(res[0], res[1])
 
     def testTP4PP2(self):
-        for run1, run2 in product(["O1", "O2"], ["O1", "O2"]):
+        for run1, run2 in [["O1", "O2"], ["O2", "O1"]]:
             remove_logs()
             remove_ckpt(pretrain_arguments["output_dir"])
-            train_args = copy.deepcopy(pretrain_arguments)
-            train_args["tensor_parallel_degree"] = 4
-            train_args["pipeline_parallel_degree"] = 2
 
+            train_args = self.configs["TP4PP2"]
             if run1 == "O1":
                 run_fp16_O1(self.run_n1c8, train_args)
             else:
@@ -443,21 +364,15 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
                 run_fp16_O1(self.run_n1c8, train_args)
             else:
                 run_fp16_O2(self.run_n1c8, train_args)
-
             res = check_acc()
             assert len(res) == 2
-            # np.testing.assert_allclose(res[0], res[1])
 
     def testTP4DP2(self):
-        for run1, run2 in product(["O1", "O2"], ["O1", "O2"]):
+        for run1, run2 in [["O1", "O2"], ["O2", "O1"]]:
             remove_logs()
             remove_ckpt(pretrain_arguments["output_dir"])
-            train_args = copy.deepcopy(pretrain_arguments)
-            train_args["tensor_parallel_degree"] = 4
-            train_args["pipeline_parallel_degree"] = 1
-            train_args["sharding"] = ""
-            train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
 
+            train_args = self.configs["TP4DP2"]
             if run1 == "O1":
                 run_fp16_O1(self.run_n1c8, train_args)
             else:
@@ -469,18 +384,13 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
                 run_fp16_O2(self.run_n1c8, train_args)
             res = check_acc()
             assert len(res) == 2
-            # np.testing.assert_allclose(res[0], res[1])
 
     def testTP4Sharding2(self):
-        for run1, run2 in product(["O1", "O2"], ["O1", "O2"]):
+        for run1, run2 in [["O1", "O2"], ["O2", "O1"]]:
             remove_logs()
             remove_ckpt(pretrain_arguments["output_dir"])
-            train_args = copy.deepcopy(pretrain_arguments)
-            train_args["tensor_parallel_degree"] = 4
-            train_args["pipeline_parallel_degree"] = 1
-            train_args["sharding"] = "stage1"
-            train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
 
+            train_args = self.configs["TP4Sharding2"]
             if run1 == "O1":
                 run_fp16_O1(self.run_n1c8, train_args)
             else:
@@ -492,16 +402,13 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
                 run_fp16_O2(self.run_n1c8, train_args)
             res = check_acc()
             assert len(res) == 2
-            # np.testing.assert_allclose(res[0], res[1])
 
     def testTP2PP4(self):
-        for run1, run2 in product(["O1", "O2"], ["O1", "O2"]):
+        for run1, run2 in [["O1", "O2"], ["O2", "O1"]]:
             remove_logs()
             remove_ckpt(pretrain_arguments["output_dir"])
-            train_args = copy.deepcopy(pretrain_arguments)
-            train_args["tensor_parallel_degree"] = 2
-            train_args["pipeline_parallel_degree"] = 4
 
+            train_args = self.configs["TP2PP4"]
             if run1 == "O1":
                 run_fp16_O1(self.run_n1c8, train_args)
             else:
@@ -513,18 +420,13 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
                 run_fp16_O2(self.run_n1c8, train_args)
             res = check_acc()
             assert len(res) == 2
-            # np.testing.assert_allclose(res[0], res[1])
 
     def testTP2Sharding4(self):
-        for run1, run2 in product(["O1", "O2"], ["O1", "O2"]):
+        for run1, run2 in [["O1", "O2"], ["O2", "O1"]]:
             remove_logs()
             remove_ckpt(pretrain_arguments["output_dir"])
-            train_args = copy.deepcopy(pretrain_arguments)
-            train_args["tensor_parallel_degree"] = 2
-            train_args["pipeline_parallel_degree"] = 1
-            train_args["sharding"] = "stage1"
-            train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 4
 
+            train_args = self.configs["TP2Sharding4"]
             if run1 == "O1":
                 run_fp16_O1(self.run_n1c8, train_args)
             else:
@@ -536,17 +438,13 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
                 run_fp16_O2(self.run_n1c8, train_args)
             res = check_acc()
             assert len(res) == 2
-            # np.testing.assert_allclose(res[0], res[1])
 
     def testPP8(self):
-        for run1, run2 in product(["O1", "O2"], ["O1", "O2"]):
+        for run1, run2 in [["O1", "O2"], ["O2", "O1"]]:
             remove_logs()
             remove_ckpt(pretrain_arguments["output_dir"])
 
-            train_args = copy.deepcopy(pretrain_arguments)
-            train_args["tensor_parallel_degree"] = 1
-            train_args["pipeline_parallel_degree"] = 8
-
+            train_args = self.configs["PP8"]
             if run1 == "O1":
                 run_fp16_O1(self.run_n1c8, train_args)
             else:
@@ -558,18 +456,13 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
                 run_fp16_O2(self.run_n1c8, train_args)
             res = check_acc()
             assert len(res) == 2
-            # np.testing.assert_allclose(res[0], res[1])
 
     def testPP4DP2(self):
-        for run1, run2 in product(["O1", "O2"], ["O1", "O2"]):
+        for run1, run2 in [["O1", "O2"], ["O2", "O1"]]:
             remove_logs()
             remove_ckpt(pretrain_arguments["output_dir"])
-            train_args = copy.deepcopy(pretrain_arguments)
-            train_args["tensor_parallel_degree"] = 1
-            train_args["pipeline_parallel_degree"] = 4
-            train_args["sharding"] = ""
-            train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
 
+            train_args = self.configs["PP4DP2"]
             if run1 == "O1":
                 run_fp16_O1(self.run_n1c8, train_args)
             else:
@@ -581,18 +474,13 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
                 run_fp16_O2(self.run_n1c8, train_args)
             res = check_acc()
             assert len(res) == 2
-            # np.testing.assert_allclose(res[0], res[1])
 
     def testPP4Sharding2(self):
-        for run1, run2 in product(["O1", "O2"], ["O1", "O2"]):
+        for run1, run2 in [["O1", "O2"], ["O2", "O1"]]:
             remove_logs()
             remove_ckpt(pretrain_arguments["output_dir"])
-            train_args = copy.deepcopy(pretrain_arguments)
-            train_args["tensor_parallel_degree"] = 1
-            train_args["pipeline_parallel_degree"] = 4
-            train_args["sharding"] = "stage1"
-            train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
 
+            train_args = self.configs["PP4Sharding2"]
             if run1 == "O1":
                 run_fp16_O1(self.run_n1c8, train_args)
             else:
@@ -604,18 +492,13 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
                 run_fp16_O2(self.run_n1c8, train_args)
             res = check_acc()
             assert len(res) == 2
-            # np.testing.assert_allclose(res[0], res[1])
 
     def testSharding8S1(self):
-        for run1, run2 in product(["O1", "O2"], ["O1", "O2"]):
+        for run1, run2 in [["O1", "O2"], ["O2", "O1"]]:
             remove_logs()
             remove_ckpt(pretrain_arguments["output_dir"])
-            train_args = copy.deepcopy(pretrain_arguments)
-            train_args["tensor_parallel_degree"] = 1
-            train_args["pipeline_parallel_degree"] = 1
-            train_args["sharding"] = "stage1"
-            train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
 
+            train_args = self.configs["Sharding8S1"]
             if run1 == "O1":
                 run_fp16_O1(self.run_n1c8, train_args)
             else:
@@ -627,18 +510,13 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
                 run_fp16_O2(self.run_n1c8, train_args)
             res = check_acc()
             assert len(res) == 2
-            # np.testing.assert_allclose(res[0], res[1])
 
     def testSharding8S2(self):
-        for run1, run2 in product(["O1", "O2"], ["O1", "O2"]):
+        for run1, run2 in [["O1", "O2"], ["O2", "O1"]]:
             remove_logs()
             remove_ckpt(pretrain_arguments["output_dir"])
-            train_args = copy.deepcopy(pretrain_arguments)
-            train_args["tensor_parallel_degree"] = 1
-            train_args["pipeline_parallel_degree"] = 1
-            train_args["sharding"] = "stage2"
-            train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
 
+            train_args = self.configs["Sharding8S2"]
             if run1 == "O1":
                 run_fp16_O1(self.run_n1c8, train_args)
             else:
@@ -650,19 +528,13 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
                 run_fp16_O2(self.run_n1c8, train_args)
             res = check_acc()
             assert len(res) == 2
-            # np.testing.assert_allclose(res[0], res[1])
 
     def testSharding4S1DP2(self):
-        for run1, run2 in product(["O1", "O2"], ["O1", "O2"]):
+        for run1, run2 in [["O1", "O2"], ["O2", "O1"]]:
             remove_logs()
             remove_ckpt(pretrain_arguments["output_dir"])
-            train_args = copy.deepcopy(pretrain_arguments)
-            train_args["tensor_parallel_degree"] = 1
-            train_args["pipeline_parallel_degree"] = 1
-            train_args["sharding_parallel_degree"] = 4
-            train_args["sharding"] = "stage1"
-            train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
 
+            train_args = self.configs["Sharding4S1DP2"]
             if run1 == "O1":
                 run_fp16_O1(self.run_n1c8, train_args)
             else:
@@ -674,19 +546,13 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
                 run_fp16_O2(self.run_n1c8, train_args)
             res = check_acc()
             assert len(res) == 2
-            # np.testing.assert_allclose(res[0], res[1])
 
     def testSharding4S2DP2(self):
-        for run1, run2 in product(["O1", "O2"], ["O1", "O2"]):
+        for run1, run2 in [["O1", "O2"], ["O2", "O1"]]:
             remove_logs()
             remove_ckpt(pretrain_arguments["output_dir"])
-            train_args = copy.deepcopy(pretrain_arguments)
-            train_args["tensor_parallel_degree"] = 1
-            train_args["pipeline_parallel_degree"] = 1
-            train_args["sharding_parallel_degree"] = 4
-            train_args["sharding"] = "stage2"
-            train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
 
+            train_args = self.configs["Sharding4S2DP2"]
             if run1 == "O1":
                 run_fp16_O1(self.run_n1c8, train_args)
             else:
@@ -698,19 +564,13 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
                 run_fp16_O2(self.run_n1c8, train_args)
             res = check_acc()
             assert len(res) == 2
-            # np.testing.assert_allclose(res[0], res[1])
 
     def testSharding2S1DP4(self):
-        for run1, run2 in product(["O1", "O2"], ["O1", "O2"]):
+        for run1, run2 in [["O1", "O2"], ["O2", "O1"]]:
             remove_logs()
             remove_ckpt(pretrain_arguments["output_dir"])
-            train_args = copy.deepcopy(pretrain_arguments)
-            train_args["tensor_parallel_degree"] = 1
-            train_args["pipeline_parallel_degree"] = 1
-            train_args["sharding_parallel_degree"] = 2
-            train_args["sharding"] = "stage1"
-            train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
 
+            train_args = self.configs["Sharding2S1DP4"]
             if run1 == "O1":
                 run_fp16_O1(self.run_n1c8, train_args)
             else:
@@ -722,19 +582,13 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
                 run_fp16_O2(self.run_n1c8, train_args)
             res = check_acc()
             assert len(res) == 2
-            # np.testing.assert_allclose(res[0], res[1])
 
     def testSharding2S2DP4(self):
-        for run1, run2 in product(["O1", "O2"], ["O1", "O2"]):
+        for run1, run2 in [["O1", "O2"], ["O2", "O1"]]:
             remove_logs()
             remove_ckpt(pretrain_arguments["output_dir"])
-            train_args = copy.deepcopy(pretrain_arguments)
-            train_args["tensor_parallel_degree"] = 1
-            train_args["pipeline_parallel_degree"] = 1
-            train_args["sharding_parallel_degree"] = 2
-            train_args["sharding"] = "stage2"
-            train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
 
+            train_args = self.configs["Sharding2S2DP4"]
             if run1 == "O1":
                 run_fp16_O1(self.run_n1c8, train_args)
             else:
@@ -746,19 +600,13 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
                 run_fp16_O2(self.run_n1c8, train_args)
             res = check_acc()
             assert len(res) == 2
-            # np.testing.assert_allclose(res[0], res[1])
 
     def testDP8(self):
-        for run1, run2 in product(["O1", "O2"], ["O1", "O2"]):
+        for run1, run2 in [["O1", "O2"], ["O2", "O1"]]:
             remove_logs()
             remove_ckpt(pretrain_arguments["output_dir"])
-            train_args = copy.deepcopy(pretrain_arguments)
-            train_args["tensor_parallel_degree"] = 1
-            train_args["pipeline_parallel_degree"] = 1
-            train_args["sharding_parallel_degree"] = 1
-            train_args["sharding"] = "stage2"
-            train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
 
+            train_args = self.configs["DP8"]
             if run1 == "O1":
                 run_fp16_O1(self.run_n1c8, train_args)
             else:
@@ -770,279 +618,21 @@ class TestModelOnN1C8MasterWeightCompatible(TestMultipleGpus):
                 run_fp16_O2(self.run_n1c8, train_args)
             res = check_acc()
             assert len(res) == 2
-            # np.testing.assert_allclose(res[0], res[1])
-
-
-class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
-    def setUp(self):
-        os.environ.update(environment_variables)
-
-    def testTP8(self):
-        remove_logs()
-        remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 8
-        train_args["pipeline_parallel_degree"] = 1
-        train_args = add_async_save(train_args)
-
-        self.run_n1c8("run_pretrain.py", **train_args)
-        self.run_n1c8("run_pretrain.py", **train_args)
-        res = check_acc()
-        assert len(res) == 2
-        np.testing.assert_allclose(res[0], res[1])
-
-    def testTP4PP2(self):
-        remove_logs()
-        remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 4
-        train_args["pipeline_parallel_degree"] = 2
-        train_args = add_async_save(train_args)
-
-        self.run_n1c8("run_pretrain.py", **train_args)
-        self.run_n1c8("run_pretrain.py", **train_args)
-        res = check_acc()
-        assert len(res) == 2
-        np.testing.assert_allclose(res[0], res[1])
-
-    def testTP4DP2(self):
-        remove_logs()
-        remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 4
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding"] = ""
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
-        train_args = add_async_save(train_args)
-
-        self.run_n1c8("run_pretrain.py", **train_args)
-        self.run_n1c8("run_pretrain.py", **train_args)
-        res = check_acc()
-        assert len(res) == 2
-        np.testing.assert_allclose(res[0], res[1])
-
-    def testTP4Sharding2(self):
-        remove_logs()
-        remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 4
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
-        train_args = add_async_save(train_args)
-
-        self.run_n1c8("run_pretrain.py", **train_args)
-        self.run_n1c8("run_pretrain.py", **train_args)
-        res = check_acc()
-        assert len(res) == 2
-        np.testing.assert_allclose(res[0], res[1])
-
-    def testTP2PP4(self):
-        remove_logs()
-        remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 2
-        train_args["pipeline_parallel_degree"] = 4
-        train_args = add_async_save(train_args)
-
-        self.run_n1c8("run_pretrain.py", **train_args)
-        self.run_n1c8("run_pretrain.py", **train_args)
-        res = check_acc()
-        assert len(res) == 2
-        np.testing.assert_allclose(res[0], res[1])
-
-    def testTP2Sharding4(self):
-        remove_logs()
-        remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 2
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 4
-        train_args = add_async_save(train_args)
-
-        self.run_n1c8("run_pretrain.py", **train_args)
-        self.run_n1c8("run_pretrain.py", **train_args)
-        res = check_acc()
-        assert len(res) == 2
-        np.testing.assert_allclose(res[0], res[1])
-
-    def testPP8(self):
-        remove_logs()
-        remove_ckpt(pretrain_arguments["output_dir"])
-
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 8
-        train_args = add_async_save(train_args)
-
-        self.run_n1c8("run_pretrain.py", **train_args)
-        self.run_n1c8("run_pretrain.py", **train_args)
-        res = check_acc()
-        assert len(res) == 2
-        np.testing.assert_allclose(res[0], res[1])
-
-    def testPP4DP2(self):
-        remove_logs()
-        remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 4
-        train_args["sharding"] = ""
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
-        train_args = add_async_save(train_args)
-
-        self.run_n1c8("run_pretrain.py", **train_args)
-        self.run_n1c8("run_pretrain.py", **train_args)
-        res = check_acc()
-        assert len(res) == 2
-        np.testing.assert_allclose(res[0], res[1])
-
-    def testPP4Sharding2(self):
-        remove_logs()
-        remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 4
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
-        train_args = add_async_save(train_args)
-
-        self.run_n1c8("run_pretrain.py", **train_args)
-        self.run_n1c8("run_pretrain.py", **train_args)
-        res = check_acc()
-        assert len(res) == 2
-        np.testing.assert_allclose(res[0], res[1])
-
-    def testSharding8S1(self):
-        remove_logs()
-        remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_async_save(train_args)
-
-        self.run_n1c8("run_pretrain.py", **train_args)
-        self.run_n1c8("run_pretrain.py", **train_args)
-        res = check_acc()
-        assert len(res) == 2
-        np.testing.assert_allclose(res[0], res[1])
-
-    def testSharding8S2(self):
-        remove_logs()
-        remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding"] = "stage2"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_async_save(train_args)
-
-        self.run_n1c8("run_pretrain.py", **train_args)
-        self.run_n1c8("run_pretrain.py", **train_args)
-        res = check_acc()
-        assert len(res) == 2
-        np.testing.assert_allclose(res[0], res[1])
-
-    def testSharding4S1DP2(self):
-        remove_logs()
-        remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding_parallel_degree"] = 4
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_async_save(train_args)
-
-        self.run_n1c8("run_pretrain.py", **train_args)
-        self.run_n1c8("run_pretrain.py", **train_args)
-        res = check_acc()
-        assert len(res) == 2
-        np.testing.assert_allclose(res[0], res[1])
-
-    def testSharding4S2DP2(self):
-        remove_logs()
-        remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding_parallel_degree"] = 4
-        train_args["sharding"] = "stage2"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_async_save(train_args)
-
-        self.run_n1c8("run_pretrain.py", **train_args)
-        self.run_n1c8("run_pretrain.py", **train_args)
-        res = check_acc()
-        assert len(res) == 2
-        np.testing.assert_allclose(res[0], res[1])
-
-    def testSharding2S1DP4(self):
-        remove_logs()
-        remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding_parallel_degree"] = 2
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_async_save(train_args)
-
-        self.run_n1c8("run_pretrain.py", **train_args)
-        self.run_n1c8("run_pretrain.py", **train_args)
-        res = check_acc()
-        assert len(res) == 2
-        np.testing.assert_allclose(res[0], res[1])
-
-    def testSharding2S2DP4(self):
-        remove_logs()
-        remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding_parallel_degree"] = 2
-        train_args["sharding"] = "stage2"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_async_save(train_args)
-
-        self.run_n1c8("run_pretrain.py", **train_args)
-        self.run_n1c8("run_pretrain.py", **train_args)
-        res = check_acc()
-        assert len(res) == 2
-        np.testing.assert_allclose(res[0], res[1])
-
-    def testDP8(self):
-        remove_logs()
-        remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding_parallel_degree"] = 1
-        train_args["sharding"] = "stage2"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
-        train_args = add_async_save(train_args)
-
-        self.run_n1c8("run_pretrain.py", **train_args)
-        self.run_n1c8("run_pretrain.py", **train_args)
-        res = check_acc()
-        assert len(res) == 2
-        np.testing.assert_allclose(res[0], res[1])
 
 
 class TestModelOnN1C8CheckpointCompatible(TestMultipleGpus):
     def setUp(self):
+        self.configs = get_pretrain_arguments(pretrain_arguments)
+        for config_key in self.configs:
+            self.configs[config_key]["unified_checkpoint"] = 1
+            self.configs[config_key]["unified_checkpoint_config"] = UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value
         os.environ.update(environment_variables)
 
     def testTP8(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 8
-        train_args["pipeline_parallel_degree"] = 1
 
+        train_args = self.configs["TP8"]
         run_normal(self.run_n1c8, train_args)
         run_unified_checkpoint(self.run_n1c8, train_args)
         res = check_acc()
@@ -1052,10 +642,8 @@ class TestModelOnN1C8CheckpointCompatible(TestMultipleGpus):
     def testTP4PP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 4
-        train_args["pipeline_parallel_degree"] = 2
 
+        train_args = self.configs["TP4PP2"]
         run_normal(self.run_n1c8, train_args)
         run_unified_checkpoint(self.run_n1c8, train_args)
         res = check_acc()
@@ -1065,12 +653,8 @@ class TestModelOnN1C8CheckpointCompatible(TestMultipleGpus):
     def testTP4DP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 4
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding"] = ""
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
 
+        train_args = self.configs["TP4DP2"]
         run_normal(self.run_n1c8, train_args)
         run_unified_checkpoint(self.run_n1c8, train_args)
         res = check_acc()
@@ -1080,12 +664,8 @@ class TestModelOnN1C8CheckpointCompatible(TestMultipleGpus):
     def testTP4Sharding2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 4
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
 
+        train_args = self.configs["TP4Sharding2"]
         run_normal(self.run_n1c8, train_args)
         run_unified_checkpoint(self.run_n1c8, train_args)
         res = check_acc()
@@ -1095,10 +675,8 @@ class TestModelOnN1C8CheckpointCompatible(TestMultipleGpus):
     def testTP2PP4(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 2
-        train_args["pipeline_parallel_degree"] = 4
 
+        train_args = self.configs["TP2PP4"]
         run_normal(self.run_n1c8, train_args)
         run_unified_checkpoint(self.run_n1c8, train_args)
         res = check_acc()
@@ -1108,12 +686,8 @@ class TestModelOnN1C8CheckpointCompatible(TestMultipleGpus):
     def testTP2Sharding4(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 2
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 4
 
+        train_args = self.configs["TP2Sharding4"]
         run_normal(self.run_n1c8, train_args)
         run_unified_checkpoint(self.run_n1c8, train_args)
         res = check_acc()
@@ -1124,10 +698,7 @@ class TestModelOnN1C8CheckpointCompatible(TestMultipleGpus):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
 
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 8
-
+        train_args = self.configs["PP8"]
         run_normal(self.run_n1c8, train_args)
         run_unified_checkpoint(self.run_n1c8, train_args)
         res = check_acc()
@@ -1137,12 +708,8 @@ class TestModelOnN1C8CheckpointCompatible(TestMultipleGpus):
     def testPP4DP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 4
-        train_args["sharding"] = ""
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
 
+        train_args = self.configs["PP4DP2"]
         run_normal(self.run_n1c8, train_args)
         run_unified_checkpoint(self.run_n1c8, train_args)
         res = check_acc()
@@ -1152,12 +719,8 @@ class TestModelOnN1C8CheckpointCompatible(TestMultipleGpus):
     def testPP4Sharding2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 4
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 2
 
+        train_args = self.configs["PP4Sharding2"]
         run_normal(self.run_n1c8, train_args)
         run_unified_checkpoint(self.run_n1c8, train_args)
         res = check_acc()
@@ -1167,12 +730,8 @@ class TestModelOnN1C8CheckpointCompatible(TestMultipleGpus):
     def testSharding8S1(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
 
+        train_args = self.configs["Sharding8S1"]
         run_normal(self.run_n1c8, train_args)
         run_unified_checkpoint(self.run_n1c8, train_args)
         res = check_acc()
@@ -1182,12 +741,8 @@ class TestModelOnN1C8CheckpointCompatible(TestMultipleGpus):
     def testSharding8S2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding"] = "stage2"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
 
+        train_args = self.configs["Sharding8S2"]
         run_normal(self.run_n1c8, train_args)
         run_unified_checkpoint(self.run_n1c8, train_args)
         res = check_acc()
@@ -1197,13 +752,8 @@ class TestModelOnN1C8CheckpointCompatible(TestMultipleGpus):
     def testSharding4S1DP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding_parallel_degree"] = 4
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
 
+        train_args = self.configs["Sharding4S1DP2"]
         run_normal(self.run_n1c8, train_args)
         run_unified_checkpoint(self.run_n1c8, train_args)
         res = check_acc()
@@ -1213,13 +763,8 @@ class TestModelOnN1C8CheckpointCompatible(TestMultipleGpus):
     def testSharding4S2DP2(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding_parallel_degree"] = 4
-        train_args["sharding"] = "stage2"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
 
+        train_args = self.configs["Sharding4S2DP2"]
         run_normal(self.run_n1c8, train_args)
         run_unified_checkpoint(self.run_n1c8, train_args)
         res = check_acc()
@@ -1229,13 +774,8 @@ class TestModelOnN1C8CheckpointCompatible(TestMultipleGpus):
     def testSharding2S1DP4(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding_parallel_degree"] = 2
-        train_args["sharding"] = "stage1"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
 
+        train_args = self.configs["Sharding2S1DP4"]
         run_normal(self.run_n1c8, train_args)
         run_unified_checkpoint(self.run_n1c8, train_args)
         res = check_acc()
@@ -1245,31 +785,206 @@ class TestModelOnN1C8CheckpointCompatible(TestMultipleGpus):
     def testSharding2S2DP4(self):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
-        train_args = copy.deepcopy(pretrain_arguments)
-        train_args["tensor_parallel_degree"] = 1
-        train_args["pipeline_parallel_degree"] = 1
-        train_args["sharding_parallel_degree"] = 2
-        train_args["sharding"] = "stage2"
-        train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
 
+        train_args = self.configs["Sharding2S2DP4"]
         run_normal(self.run_n1c8, train_args)
         run_unified_checkpoint(self.run_n1c8, train_args)
         res = check_acc()
         assert len(res) == 2
         np.testing.assert_allclose(res[0], res[1])
 
-    # def testDP8(self):
-    #     remove_logs()
-    #     remove_ckpt(pretrain_arguments["output_dir"])
-    #     train_args = copy.deepcopy(pretrain_arguments)
-    #     train_args["tensor_parallel_degree"] = 1
-    #     train_args["pipeline_parallel_degree"] = 1
-    #     train_args["sharding_parallel_degree"] = 1
-    #     train_args["sharding"] = "stage2"
-    #     train_args["gradient_accumulation_steps"] = train_args["gradient_accumulation_steps"] // 8
+    def testDP8(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
 
-    #     run_normal(self.run_n1c8, train_args)
-    #     run_unified_checkpoint(self.run_n1c8, train_args)
-    #     res = check_acc()
-    #     assert len(res) == 2
-    #     np.testing.assert_allclose(res[0], res[1])
+        train_args = self.configs["DP8"]
+        run_normal(self.run_n1c8, train_args)
+        run_unified_checkpoint(self.run_n1c8, train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
+
+
+class TestModelOnN1C8AsyncSaveToDisk(TestMultipleGpus):
+    def setUp(self):
+        self.configs = get_pretrain_arguments(pretrain_arguments)
+        for config_key in self.configs:
+            self.configs[config_key]["unified_checkpoint"] = 1
+            self.configs[config_key]["unified_checkpoint_config"] = UnifiedCheckpointOption.ASYNC_SAVE.value
+        os.environ.update(environment_variables)
+
+    def testTP8(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["TP8"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
+
+    def testTP4PP2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["TP4PP2"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
+
+    def testTP4DP2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["TP4DP2"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
+
+    def testTP4Sharding2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["TP4Sharding2"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
+
+    def testTP2PP4(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["TP2PP4"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
+
+    def testTP2Sharding4(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["TP2Sharding4"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
+
+    def testPP8(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["PP8"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
+
+    def testPP4DP2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["PP4DP2"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
+
+    def testPP4Sharding2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["PP4Sharding2"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
+
+    def testSharding8S1(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["Sharding8S1"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
+
+    def testSharding8S2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["Sharding8S2"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
+
+    def testSharding4S1DP2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["Sharding4S1DP2"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
+
+    def testSharding4S2DP2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["Sharding4S2DP2"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
+
+    def testSharding2S1DP4(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["Sharding2S1DP4"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
+
+    def testSharding2S2DP4(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["Sharding2S2DP4"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
+
+    def testDP8(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["DP8"]
+        self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
+        res = check_acc()
+        assert len(res) == 2
+        np.testing.assert_allclose(res[0], res[1])
