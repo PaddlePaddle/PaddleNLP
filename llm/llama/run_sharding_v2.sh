@@ -19,7 +19,10 @@ export FLAGS_selected_gpus="0,1,2,3,4,5,6,7"
 
 rm -rf log
 rm -rf output
-#export LD_LIBRARY_PATH=/usr/local/cuda/compat:$LD_LIBRARY_PATH
+cuda_version=`nvidia-smi \|grep "CUDA Version" \|awk '{print $9}' \|awk -F'.' '{print $1}'`
+if [ ${cuda_version} != "12" ];then
+    export LD_LIBRARY_PATH=/usr/local/cuda/compat:$LD_LIBRARY_PATH
+fi
 export PYTHONPATH=../../:$PYTHONPATH
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
@@ -72,9 +75,6 @@ python -u  -m paddle.distributed.launch \
     --save_sharded_model true \
     --ignore_data_skip 0 \
     --force_reshard_pp true \
-    #--same_data True \
-    #--sep_parallel_degree 1 \
-    #--rope_fusion_level "core" \
-    #--resume_from_checkpoint "./sharding_v2/checkpoint-60" \
+
 
 

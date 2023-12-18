@@ -124,12 +124,19 @@ class ShardingIO:
         self.optimizer = optimizer
 
     def load_state_dict_from_checkpoint_with_reshard(self, checkpoint, base_weight_name, model_wrapped):
-        """load state_dict from_checkpoint with reshard, Only load model state dict."""
+        """load state_dict from_checkpoint with reshard, Only load model state dict.
+        Args:
+            checkpoint (str): The directory of the checkpoint.
+            base_weight_name (str): The name of the checkpoint file.
+            model_wrapped (nn.Layer): The wrapped model.
+        """
         parallel_config = self._load_distributed_strategy(checkpoint)
         pp_degree = parallel_config["pp_degree"]
         mp_degree = parallel_config["mp_degree"]
         sharding_degree = parallel_config["sharding_degree"]
-        assert self.args.tensor_parallel_degree == mp_degree
+        assert (
+            self.args.tensor_parallel_degree == mp_degree
+        ), f"mp_degree of the script {self.args.tensor_parallel_degree} and mp of the model {mp_degree} are not matched"
         cur_sharding_degree = self.args.sharding_parallel_degree
         cur_pp_degree = self.args.pipeline_parallel_degree
         if pp_degree > 1:

@@ -47,6 +47,10 @@ def get_index_layer_func():
 
 
 class LayerNameScope:
+    """
+    layer name scope for a layer, layer name of the same kind of layer will be named consecutively
+    """
+
     registered_layers = []
 
     def __init__(self, prefix, template):
