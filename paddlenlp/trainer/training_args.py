@@ -1112,7 +1112,7 @@ class TrainingArguments:
                 pipeline.enable_send_recv_overlap = "enable_send_recv_overlap" in pipeline_parallel_config
                 pipeline.accumulate_steps = self.gradient_accumulation_steps
                 pipeline.micro_batch_size = self.per_device_train_batch_size
-                pipeline.schedule_mode = "1F1B"
+                pipeline.schedule_mode = self.pipeline_schedule_mode
 
                 if self.amp_master_grad:
                     warnings.warn("`amp_master_grad` is not supported NOW in AutoParallel!")
