@@ -113,6 +113,7 @@ function _train(){
             --benchmark 1 \
             --skip_memory_metrics 0 \
             --intokens 1 \
+            --use_flash_attention 1 \
             --device gpu"
 
     # 以下为通用执行命令，无特殊可不用修改
