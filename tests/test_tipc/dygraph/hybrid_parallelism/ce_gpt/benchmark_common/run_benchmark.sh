@@ -68,7 +68,7 @@ function _train(){
 
     echo "current CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}, model_name=${model_name}, device_num=${device_num}, is profiling=${profiling}"
 
-    if [ ${profiling} = "true" ];then
+    if [ ${profiling} = "True" ];then
         add_options="--profiler_options=\"batch_range=[10,20];state=GPU;tracer_option=Default;profile_path=model.profile\""
         log_file=${profiling_log_file}
     else

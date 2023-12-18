@@ -25,7 +25,7 @@ virtual_pp_degree=1
 use_recompute=True
 eval_freq=25
 use_pipeline_parallel=True
-sequence_parallel=true
+sequence_parallel=True
 
 model=gpt
 micro_bs=8
