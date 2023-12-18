@@ -1575,14 +1575,12 @@ def file_save_async_or_sync(state_dict, path, safe_serialization, is_sync=True):
                 state_dict[k] = state_dict.pop(k).cpu().numpy()
 
     if is_sync:
-        # 同步
         if safe_serialization:
             safe_save_file(state_dict, path, metadata={"format": "np"})
         else:
             paddle.save(state_dict, path)
 
     else:
-        # 异步
         clear_async_save_task_queue()
         ctx = multiprocessing.get_context("spawn")
         if safe_serialization:
