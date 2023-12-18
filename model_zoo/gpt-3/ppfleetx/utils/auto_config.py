@@ -240,6 +240,8 @@ def process_strategy(config):
         pipeline.schedule_mode = pipeline_cfg.get("schedule_mode", "1F1B")
         pipeline.micro_batch_size = config.Global.micro_batch_size
         pipeline.accumulate_steps = accumulate_steps
+        pipeline.job_schedule_profiler_start = pipeline_cfg.get("job_schedule_profiler_start", -1)
+        pipeline.job_schedule_profiler_stop = pipeline_cfg.get("job_schedule_profiler_stop", -1)
         
     elif accumulate_steps > 1:
         # gradient merge config

@@ -1103,7 +1103,7 @@ class TrainingArguments:
                 pipeline.enable_send_recv_overlap = "enable_send_recv_overlap" in pipeline_parallel_config
                 pipeline.accumulate_steps = self.gradient_accumulation_steps
                 pipeline.micro_batch_size = self.per_device_train_batch_size
-                pipeline.schedule_mode = "1F1B"
+                pipeline.schedule_mode = self.pipeline_schedule_mode
 
                 if self.amp_master_grad:
                     warnings.warn("`amp_master_grad` is not supported NOW in AutoParallel!")
@@ -1309,15 +1309,19 @@ class TrainingArguments:
 
     @property
     def dataset_rank(self):
-        if self.use_hybrid_parallel or self.use_auto_parallel:
+        if self.use_hybrid_parallel:
             return max(self.sharding_parallel_degree, 1) * self.data_parallel_rank + self.sharding_parallel_rank
+        elif self.use_auto_parallel:
+            return self.data_parallel_rank
         else:
             return paddle.distributed.get_rank()
 
     @property
     def dataset_world_size(self):
-        if self.use_hybrid_parallel or self.use_auto_parallel:
+        if self.use_hybrid_parallel:
             return max(self.sharding_parallel_degree, 1) * max(self.data_parallel_degree, 1)
+        elif self.use_auto_parallel:
+            return max(self.data_parallel_degree, 1)
         else:
             return paddle.distributed.get_world_size()
 
