@@ -709,6 +709,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Whether to unify hybrid parallel checkpoint."},
     )
+    to_static: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable training under @to_static."},
+    )
 
     unified_checkpoint_config: Optional[str] = field(
         default="checkpoint_compatible",
