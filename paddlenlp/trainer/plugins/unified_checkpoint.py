@@ -1650,7 +1650,7 @@ def update_optimizer_weight_status(args, optimizer, safe_serialization):
 def update_master_weight_status(args, optimizer, has_master_weight, safe_serialization):
     if is_need_master_weight(optimizer):
         if not has_master_weight:
-            if "master_weight_compatible" in args.unified_checkpoint_config:
+            if UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value in args.unified_checkpoint_config:
                 index_filename_master_weights = (
                     PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
                 )
@@ -1658,9 +1658,14 @@ def update_master_weight_status(args, optimizer, has_master_weight, safe_seriali
             else:
                 raise ValueError(
                     "Can't find a valid unified master weight checkpoint,"
-                    "add 'master_weight_compatible' into 'unified_checkpoint_config' to "
+                    f"add '{UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value}' into 'unified_checkpoint_config' to "
                     "load model checkpoint as master weight"
                 )
+        else:
+            has_master_weight = True
+            index_filename_master_weights = (
+                PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
+            )
     else:
         has_master_weight = False
         index_filename_master_weights = None
