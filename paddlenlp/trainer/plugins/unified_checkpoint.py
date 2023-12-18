@@ -929,8 +929,8 @@ def load_unified_optimizer_dynamically(args, model, optimizer, resume_from_check
 
     has_master_weights = index["master_weights"]
     # update has_master_weights and index_filename_master_weights
-    # 1. if the master weight exists, only has_master_weights is set True and loaded when needed
-    # 2. if master weight does not exit, convert model weight to master weight when needed
+    # 1. if the master weights exists, only has_master_weights is set True and load master weights when needed
+    # 2. if master weights does not exit, convert model weights to master weights when needed
     has_master_weights, index_filename_mw = master_weight_compatible_status(
         args, optimizer, has_master_weights, safe_serialization
     )
