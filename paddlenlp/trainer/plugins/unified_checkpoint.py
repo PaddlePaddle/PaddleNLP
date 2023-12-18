@@ -18,12 +18,12 @@ import json
 import multiprocessing
 import os
 
-import ExplicitEnum
 import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
 from tqdm.auto import tqdm
 
+from paddlenlp.trainer.trainer_utils import ExplicitEnum
 from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
 from paddlenlp.transformers.model_utils import (
     PretrainedModel,
@@ -119,7 +119,7 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
     else:
         raise ValueError("Unified checkpoint only supports PretrainedModel")
 
-    if "skip_save_model_weight" in args.unified_checkpoint_config:
+    if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
         if "master_weight" in optimizer.state_dict():
             # not save model weight, load from master weight
             return
@@ -168,7 +168,7 @@ def load_unified_checkpoint(
         None
     """
 
-    local_resume = check_unified_checkpoint(args, model, optimizer, resume_from_checkpoint, safe_serialization)
+    local_resume = check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serialization)
     if not local_resume:
         logger.info("Begin to dynamically load unified checkpoint!")
         load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_checkpoint, safe_serialization)
@@ -1621,7 +1621,7 @@ def update_model_weight_status(args, model, safe_serialization):
             will load master weights as model weights
     """
 
-    if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT in args.unified_checkpoint_config:
+    if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
         index_filename = PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
     else:
         index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
