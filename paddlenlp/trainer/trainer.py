@@ -505,12 +505,16 @@ class Trainer:
             if self.check_origin_checkpoint(resume_from_checkpoint):
                 if UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value in self.args.unified_checkpoint_config:
                     use_unified_checkpoint = False
+                    logger.info("Loding checkpoint, the next ckeckpoint will be saved as unified checkpoint")
                 else:
+                    use_unified_checkpoint = True
                     logger.warning(
                         "Origin checkpoints exist, if you want to load from origin checkpoint, "
                         f"add '{UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value}' "
                         "to 'unified_checkpoint_config'."
                     )
+            else:
+                use_unified_checkpoint = True
 
             if use_unified_checkpoint:
                 if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
@@ -2258,6 +2262,7 @@ class Trainer:
                         use_unified_checkpoint = False
                         logger.info("Loding checkpoint, the next ckeckpoint will be saved as unified checkpoint")
                     else:
+                        use_unified_checkpoint = True
                         logger.warning(
                             "Origin checkpoint is found, if you want to load origin checkpoint, "
                             f"add '{UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value}' "
