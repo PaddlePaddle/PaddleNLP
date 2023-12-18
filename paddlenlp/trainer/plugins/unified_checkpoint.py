@@ -156,7 +156,7 @@ def load_unified_checkpoint(
         return
 
     if args.dataset_rank == 0:
-        load_unified_checkpoint_locally(args, model, resume_from_checkpoint, safe_serialization)
+        load_unified_checkpoint_locally(args, model, optimizer, resume_from_checkpoint, safe_serialization)
 
 
 def load_unified_checkpoint_locally(args, model, optimizer, resume_from_checkpoint: str, safe_serialization=False):
@@ -165,7 +165,7 @@ def load_unified_checkpoint_locally(args, model, optimizer, resume_from_checkpoi
     """
     index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
     if "skip_save_model_weight" in args.unified_checkpoint_config:
-        if is_has_master_weight(optimizer):
+        if is_need_master_weight(optimizer):
             index_filename = (
                 PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
             )
@@ -405,22 +405,12 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
     if len(resolved_archive_file) > 1:
         resolved_archive_file = tqdm(resolved_archive_file, desc="Loading optimizer shards")
 
-    need_master_weights = is_has_master_weight(optimizer)
-    if need_master_weights:
-        if not has_master_weights:
-            if "master_weight_compatible" in args.unified_checkpoint_config:
-                index_filename_master_weights = (
-                    PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
-                )
-                has_master_weights = True
-            else:
-                raise ValueError(
-                    "Can't find a valid unified master weight checkpoint,"
-                    "add 'master_weight_compatible' into 'unified_checkpoint_config' to "
-                    "load model checkpoint as master weight"
-                )
-    else:
-        has_master_weights = False
+    # update has_master_weights and index_filename_master_weights
+    # 1. if the master weight exists, only has_master_weights is set True and loaded when needed
+    # 2. if master weight does not exit, convert model weight to master weight when needed
+    has_master_weights, index_filename_master_weights = master_weight_compatible_status(
+        args, optimizer, has_master_weights, safe_serialization
+    )
 
     if has_master_weights:
         returned_optim_state_dict["master_weights"] = {}
@@ -866,9 +856,14 @@ def create_optimizer_dispatch_table(
     return send_table, recv_table
 
 
-def load_unified_checkpoint_dynamically(args, model, resume_from_checkpoint, safe_serialization=False):
+def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
 
     index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+    if "skip_save_model_weight" in args.unified_checkpoint_config:
+        if is_need_master_weight(optimizer):
+            index_filename = (
+                PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
+            )
     index_filename = os.path.join(resume_from_checkpoint, index_filename)
 
     with open(index_filename, "r") as f:
@@ -933,6 +928,13 @@ def load_unified_optimizer_dynamically(args, model, optimizer, resume_from_check
     file_keyname_mappings, file_machine_mappings = get_file_mappings(index, resume_from_checkpoint)
 
     has_master_weights = index["master_weights"]
+    # update has_master_weights and index_filename_master_weights
+    # 1. if the master weight exists, only has_master_weights is set True and loaded when needed
+    # 2. if master weight does not exit, convert model weight to master weight when needed
+    has_master_weights, index_filename_mw = master_weight_compatible_status(
+        args, optimizer, has_master_weights, safe_serialization
+    )
+
     if has_master_weights:
         with open(os.path.join(resume_from_checkpoint, index_filename_mw), "r") as f:
             index_mw = json.loads(f.read())
@@ -1592,7 +1594,28 @@ def file_save_async_or_sync(state_dict, path, safe_serialization, is_sync=True):
         async_save_queue.append(p)
 
 
-def is_has_master_weight(optimizer):
+def master_weight_compatible_status(args, optimizer, has_master_weight, safe_serialization):
+    if is_need_master_weight(optimizer):
+        if not has_master_weight:
+            if "master_weight_compatible" in args.unified_checkpoint_config:
+                index_filename_master_weights = (
+                    PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+                )
+                has_master_weight = True
+            else:
+                raise ValueError(
+                    "Can't find a valid unified master weight checkpoint,"
+                    "add 'master_weight_compatible' into 'unified_checkpoint_config' to "
+                    "load model checkpoint as master weight"
+                )
+    else:
+        has_master_weight = False
+        index_filename_master_weights = None
+
+    return has_master_weight, index_filename_master_weights
+
+
+def is_need_master_weight(optimizer):
     """
     https://github.com/PaddlePaddle/Paddle/blob/4a9991fb6744443333638b65fb7e225fb2b00a13/python/paddle/amp/auto_cast.py#L485
     """
