@@ -994,7 +994,10 @@ class TrainingArguments:
                     import inspect
 
                     members = [name for (name, date) in inspect.getmembers(fleet.HybridCommunicateGroup)]
-                    return "get_sep_parallel_world_size" in members
+                    support_sep = "get_sep_parallel_world_size" in members
+                    if not support_sep:
+                        logger.warning("segment parallel is not supported!!!, Ignore it.")
+                    return support_sep
 
                 if self.hybrid_parallel_topo_order == "pp_first":
                     if is_segment_parallel_supported():
@@ -1007,14 +1010,23 @@ class TrainingArguments:
                     else:
                         order = ["dp", "sharding", "pp", "mp"]
 
-                hybrid_configs = {
-                    "dp_degree": self.data_parallel_degree,
-                    "mp_degree": self.tensor_parallel_degree,
-                    "pp_degree": self.pipeline_parallel_degree,
-                    "sharding_degree": self.sharding_parallel_degree,
-                    "sep_degree": self.sep_parallel_degree,
-                    "order": order,
-                }
+                if is_segment_parallel_supported():
+                    hybrid_configs = {
+                        "dp_degree": self.data_parallel_degree,
+                        "mp_degree": self.tensor_parallel_degree,
+                        "pp_degree": self.pipeline_parallel_degree,
+                        "sharding_degree": self.sharding_parallel_degree,
+                        "sep_degree": self.sep_parallel_degree,
+                        "order": order,
+                    }
+                else:
+                    hybrid_configs = {
+                        "dp_degree": self.data_parallel_degree,
+                        "mp_degree": self.tensor_parallel_degree,
+                        "pp_degree": self.pipeline_parallel_degree,
+                        "sharding_degree": self.sharding_parallel_degree,
+                        "order": order,
+                    }
 
                 if self.pipeline_parallel_degree > 1:
                     hybrid_configs["pp_configs"] = dygraph_pp_configs

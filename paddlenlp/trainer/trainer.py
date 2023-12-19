@@ -827,10 +827,7 @@ class Trainer:
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
-                if (
-                    self.args.use_hybrid_parallel
-                    and fleet.get_hybrid_communicate_group().get_sep_parallel_world_size() > 1
-                ):
+                if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim(inputs)
                 self.timers and self.timers("read-data").stop()
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
@@ -948,7 +945,7 @@ class Trainer:
                                 assert reshard_util.is_sharding_opt(self.optimizer)
                                 self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
-                            if self.optimizer._dp_enable or self.optimizer._sep_enable:
+                            if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
                                 fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
 
                     self.timers and self.timers("all-reduce").stop()
