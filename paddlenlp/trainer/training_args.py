@@ -709,6 +709,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Whether to unify hybrid parallel checkpoint."},
     )
+    to_static: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable training under @to_static."},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -1051,14 +1055,14 @@ class TrainingArguments:
 
         elif self.use_auto_parallel:
             world_size = paddle.distributed.get_world_size()
-            tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
-            pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
+            self.tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
+            self.pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
 
             assert (
-                world_size % (tensor_parallel_degree * pipeline_parallel_degree) == 0
+                world_size % (self.tensor_parallel_degree * self.pipeline_parallel_degree) == 0
             ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
 
-            self.data_parallel_degree = world_size // (tensor_parallel_degree * pipeline_parallel_degree)
+            self.data_parallel_degree = world_size // (self.tensor_parallel_degree * self.pipeline_parallel_degree)
 
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
@@ -1073,7 +1077,7 @@ class TrainingArguments:
                 warnings.warn("`offload` is not supported NOW!")
 
             strategy = fleet.auto.Strategy()
-            if pipeline_parallel_degree > 1:
+            if self.pipeline_parallel_degree > 1:
                 pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
                 for x in pipeline_parallel_config:
                     if len(x) > 0:
@@ -1095,7 +1099,7 @@ class TrainingArguments:
                 pipeline.enable_send_recv_overlap = "enable_send_recv_overlap" in pipeline_parallel_config
                 pipeline.accumulate_steps = self.gradient_accumulation_steps
                 pipeline.micro_batch_size = self.per_device_train_batch_size
-                pipeline.schedule_mode = "1F1B"
+                pipeline.schedule_mode = self.pipeline_schedule_mode
 
                 if self.amp_master_grad:
                     warnings.warn("`amp_master_grad` is not supported NOW in AutoParallel!")
@@ -1116,7 +1120,7 @@ class TrainingArguments:
                 gradient_merge.k_steps = self.gradient_accumulation_steps
                 gradient_merge.avg = True
 
-            if tensor_parallel_degree > 1:
+            if self.tensor_parallel_degree > 1:
                 mp_optimization = strategy.mp_optimization
 
                 if " " in self.tensor_parallel_config:
@@ -1193,7 +1197,7 @@ class TrainingArguments:
 
             self.strategy = strategy
             order = ["dp", "pp", "mp"]
-            degree = [self.data_parallel_degree, pipeline_parallel_degree, tensor_parallel_degree]
+            degree = [self.data_parallel_degree, self.pipeline_parallel_degree, self.tensor_parallel_degree]
             mesh_dims = list(filter(lambda x: x[1] > 1, list(zip(order, degree))))
             if not mesh_dims:
                 mesh_dims = [("dp", 1)]

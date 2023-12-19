@@ -27,12 +27,19 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 import paddle.distributed.auto_parallel as auto
+from paddle.profiler.utils import job_schedule_profiler_range
 
+from paddlenlp.ops import Topology
 from paddlenlp.trainer import (
     PdArgumentParser,
     Trainer,
     TrainingArguments,
+    get_last_checkpoint,
     speed_metrics,
+)
+from paddlenlp.trainer.trainer_utils import (
+    PREFIX_CHECKPOINT_DIR,
+    _get_distributed_seeds,
 )
 from paddlenlp.transformers import (
     AutoTokenizer,
@@ -97,6 +104,20 @@ class PreTrainingArguments(TrainingArguments):
         metadata={
             "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
         },
+    )
+
+    job_schedule_profiler_start: int = field(
+        default=-1,
+        metadata={"help": "The step to start job_schedule_profiler."},
+    )
+    job_schedule_profiler_end: int = field(
+        default=-1,
+        metadata={"help": "The step to end job_schedule_profiler."},
+    )
+    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
+
+    pipeline_schedule_mode: str = field(
+        default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
     )
 
     def __post_init__(self):
@@ -386,24 +407,28 @@ def init_seed(seed: int = 1234, args=None):
         random.seed(seed)
         np.random.seed(seed)
         paddle.seed(seed)
+    else:
+        assert not args.use_hybrid_parallel and args.use_auto_parallel
+        if dist.get_world_size() > 1:
+            topo = Topology(
+                dist.get_rank(),
+                dist.get_world_size(),
+                dp_degree=args.data_parallel_degree,
+                pp_degree=args.pipeline_parallel_degree,
+                mp_degree=args.tensor_parallel_degree,
+                sharding_degree=1,  # auto_parallel's sharding is not orthogonal with dp, mp and pp
+            )
 
-    if args is not None:
-        if args.use_hybrid_parallel:
-            from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+            global_seed, local_seed, random_seed = _get_distributed_seeds(args.seed, topo)
 
-            random.seed(args.seed + args.dataset_rank)
-            np.random.seed(args.seed + args.dataset_rank)
-            paddle.seed(args.seed + args.dataset_rank)
+            paddle.seed(local_seed)
+            random.seed(random_seed)
+            np.random.seed(random_seed)
 
-            # local_seed/ global_seed is used to control dropout in ModelParallel
-            local_seed = args.seed + 59999 + args.tensor_parallel_rank * 10 + args.pipeline_parallel_rank * 1000
-            global_seed = args.seed + 100003 + args.dataset_rank
-            tracker = get_rng_state_tracker()
-
-            if "global_seed" not in tracker.states_:
-                tracker.add("global_seed", global_seed)
-            if "local_seed" not in tracker.states_:
-                tracker.add("local_seed", local_seed)
+            logger.info(
+                "The global seed is set to {}, local seed is set to {} and "
+                "random seed is set to {}.".format(global_seed, local_seed, random_seed)
+            )
         else:
             random.seed(args.seed)
             np.random.seed(args.seed)
@@ -440,6 +465,21 @@ def main():
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: {training_args.world_size}, "
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
+
+    # Detecting last checkpoint.
+    last_checkpoint = None
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
+        last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        # if last_checkpoint is None and len(
+        #         os.listdir(training_args.output_dir)) > 1:
+        #     raise ValueError(
+        #         f"Output directory ({training_args.output_dir}) already exists and is not empty. "
+        #         "Use --overwrite_output_dir to overcome.")
+        if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
+            logger.info(
+                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+            )
 
     config_class, model_class = MODEL_CLASSES[model_args.model_type]
 
@@ -553,6 +593,17 @@ def main():
     print_config(training_args)
 
     engine = auto.Engine(model, loss_func, optimizer, strategy=training_args.strategy)
+
+    checkpoint = None
+    if training_args.resume_from_checkpoint is not None:
+        checkpoint = training_args.resume_from_checkpoint
+    elif last_checkpoint is not None:
+        checkpoint = last_checkpoint
+
+    if checkpoint:
+        logger.info(f"Starting training from resume_from_checkpoint : {checkpoint}")
+        engine.load(os.path.join(checkpoint, "auto"))
+
     engine.prepare(
         [
             paddle.static.InputSpec(
@@ -565,10 +616,7 @@ def main():
         mode="train",
     )
 
-    dp_degree = max(training_args.data_parallel_degree, 1)
-    mp_degree = max(training_args.tensor_parallel_degree, 1)
-    pp_degree = max(training_args.pipeline_parallel_degree, 1)
-    assert dp_degree * mp_degree * pp_degree == dist.get_world_size()
+    pp_degree = training_args.pipeline_parallel_degree
 
     train_dataloader = engine.dataloader(
         dataset=train_dataset,
@@ -590,6 +638,10 @@ def main():
     global_step_last_logged = 0
     start_time_last_logged = time.time()
     tr_loss = float(0)
+
+    job_schedule_profiler_start = training_args.job_schedule_profiler_start
+    job_schedule_profiler_end = training_args.job_schedule_profiler_end
+
     local_batches = []
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
@@ -598,6 +650,9 @@ def main():
                 continue
             elif pp_degree > 1:
                 local_batches = inputs
+
+            with job_schedule_profiler_range(step, job_schedule_profiler_start, job_schedule_profiler_end) as status:
+                engine.enable_job_schedule_profiler = status
 
             for micro_batch in local_batches:
                 outs = engine.run(micro_batch, mode="train")
@@ -637,6 +692,16 @@ def main():
                 global_step_last_logged = global_step
                 start_time_last_logged = time.time()
                 tr_loss = float(0)
+
+            if training_args.save_steps > 0 and global_step % training_args.save_steps == 0:
+                paddle.device.cuda.synchronize()
+                checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{global_step}"
+                run_dir = training_args.output_dir
+                output_dir = os.path.join(run_dir, checkpoint_folder)
+                os.makedirs(output_dir, exist_ok=True)
+                logger.info(f"Saving model checkpoint to {output_dir}")
+                prefix_path = os.path.join(output_dir, "auto")
+                engine.save(prefix_path, training=True)
 
             if global_step >= training_args.max_steps:
                 break
