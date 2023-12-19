@@ -46,14 +46,17 @@
 
 .. toctree::
    :maxdepth: 1
-   :caption: 大模型LLM
+   :caption: 飞桨大模型
 
-   大模型预训练 <llm/pretraining/index>
-   大模型精调 <../llm/docs/finetune.md>
-   大模型精调in docs <./llm/finetune.md>
-   大模型高效微调PEFT <llm/peft.md>
+   大模型预训练文档 <llm/pretraining/index.rst>
+   大模型精调文档 <llm/finetune.md>
+   大模型量化教程 <llm/quantization.md>
+   大模型推理 <llm/inference.md>
    大模型混合并行训练教程 <llm/llm_trainer.rst>
-   
+   模型权重转换教程<llm/torch2paddle.md>
+
+.. 多轮对话精调教程 <llm/chat_template.md>
+.. 高效微调原理 <llm/peft.md>
 
 .. toctree::
    :maxdepth: 1
