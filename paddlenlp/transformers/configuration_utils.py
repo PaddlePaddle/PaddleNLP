@@ -787,6 +787,7 @@ class PretrainedConfig:
                 legacy_url_list.insert(2, subfolder)
             community_url = "/".join(url_list)
             legacy_community_url = "/".join(legacy_url_list)
+
             if url_file_exists(community_url):
                 resolved_config_file = get_path_from_url_with_filelock(
                     community_url,
