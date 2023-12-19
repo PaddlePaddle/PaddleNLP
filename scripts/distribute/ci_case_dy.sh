@@ -608,6 +608,8 @@ function before_hook_for_gpt() {
 
 function before_hook_for_llm_gpt() {
     echo -e "\033[31m ---- Set FLAGS for llm GPT cases  \033[0m"
+    export FLAGS_cudnn_deterministic=1
+    export FLAGS_embedding_deterministic=1
     env | grep FLAGS
     export http_proxy=${proxy}
     export https_proxy=${proxy}
