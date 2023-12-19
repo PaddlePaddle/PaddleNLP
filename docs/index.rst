@@ -49,7 +49,8 @@
    :caption: 大模型LLM
 
    大模型预训练 <llm/pretraining/index>
-   大模型微调SFT <llm/sft>
+   大模型精调 <../llm/docs/finetune.md>
+   大模型精调in docs <./llm/finetune.md>
    大模型高效微调PEFT <llm/peft.md>
    大模型混合并行训练教程 <llm/llm_trainer.rst>
    
