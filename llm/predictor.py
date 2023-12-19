@@ -20,6 +20,7 @@ import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from threading import Thread
+from typing import List, Optional
 
 import numpy as np
 import paddle
@@ -34,7 +35,7 @@ from utils import (
     load_real_time_tokens,
 )
 
-from paddlenlp.generation import TextIteratorStreamer
+from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.trainer import PdArgumentParser
@@ -42,6 +43,7 @@ from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
+    ChatGLMv2Tokenizer,
     LlamaTokenizer,
     PretrainedModel,
     PretrainedTokenizer,
@@ -94,16 +96,12 @@ class PredictorArgument:
     chat_template: str = field(
         default=None,
         metadata={
-            "help": "the path of `chat_template.json` file to handle multi-rounds conversation. If is None, it will not use `chat_template.json`; If is equal with `model_name_or_path`, it will use the default loading; If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
+            "help": "the path of `chat_template.json` file to handle multi-rounds conversation. "
+            "If is None(do not set --chat_template argument), it will use the default `chat_template.json`;"
+            "If is equal with `model_name_or_path`, it will use the default loading; "
+            "If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
+            "If is none string, it will not use chat_template.json."
         },
-    )
-    enable_memory_optim: bool = field(
-        default=True,
-        metadata={"help": "whether use `enable_memory_optim` in inference predictor"},
-    )
-    init_fleet_worker: bool = field(
-        default=True,
-        metadata={"help": "whether use `init_fleet_worker` in inference predictor"},
     )
 
     @property
@@ -152,6 +150,20 @@ def init_dist_env():
     return tensor_parallel_rank, tensor_parallel_degree
 
 
+def get_eos_token_id(
+    tokenizer: PretrainedTokenizer, generation_config: Optional[GenerationConfig] = None
+) -> int | List[List[int]]:
+    """get eos_token_id from generation_config or tokenizer
+
+    Returns:
+        int | List[int]: eos_token_id to stop the generation
+    """
+    if generation_config is None or generation_config.eos_token_id is None:
+        return tokenizer.eos_token_id
+
+    return generation_config.eos_token_id
+
+
 class BasePredictor:
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
         self.model_config = AutoConfig.from_pretrained(config.model_name_or_path)
@@ -165,17 +177,18 @@ class BasePredictor:
         self.tensor_parallel_rank, self.tensor_parallel_degree = init_dist_env()
         self.model_config.tensor_parallel_rank, self.model_config.tensor_parallel_degree = init_dist_env()
 
+        try:
+            self.generation_config = GenerationConfig.from_pretrained(config.model_name_or_path)
+        except:
+            logger.warning(
+                "Can't find generation config, so it will not use generation_config field in the model config"
+            )
+            self.generation_config = None
+
     def _preprocess(self, source):
-        if self.config.chat_template is not None:
-            if self.tokenizer.chat_template is None:
-                logger.warning(
-                    f"Tokenizer<{self.tokenizer}> doesn't have chat_template field, so it will not use chat_template."
-                    "Or you can customize your tokenizer, please refer to:"
-                    "https://paddlenlp.readthedocs.io/zh/latest/get_started/chat_template.html"
-                )
-            else:
-                source = [source] if isinstance(source, str) else source
-                source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
+        if self.tokenizer.chat_template is not None:
+            source = [source] if isinstance(source, str) else source
+            source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
         tokenized_source = self.tokenizer(
             source,
@@ -185,7 +198,8 @@ class BasePredictor:
             return_tensors=self.return_tensors,
             padding=True,
             # when use chat_template, it should not add special tokens
-            add_special_tokens=self.config.chat_template is None,
+            # chatglm2 prefix-tokens can not be tokenized into ids
+            add_special_tokens=self.tokenizer.chat_template is None or isinstance(self.tokenizer, ChatGLMv2Tokenizer),
         )
         return tokenized_source
 
@@ -251,7 +265,7 @@ class DygraphPredictor(BasePredictor):
             **inputs,
             max_new_tokens=self.config.max_length,
             bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=self.tokenizer.eos_token_id,
+            eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
             pad_token_id=self.tokenizer.pad_token_id,
             decode_strategy=self.config.decode_strategy,
             temperature=self.config.temperature,
@@ -270,7 +284,7 @@ class DygraphPredictor(BasePredictor):
             streamer=text_streamer,
             max_new_tokens=self.config.max_length,
             bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=self.tokenizer.eos_token_id,
+            eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
             pad_token_id=self.tokenizer.pad_token_id,
             decode_strategy="greedy_search"
             if self.config.top_k == 1 and self.config.top_p == 1.0
@@ -302,6 +316,7 @@ class StaticGraphPredictor(BasePredictor):
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             inference_config.disable_gpu()
         inference_config.disable_glog_info()
+        inference_config.enable_new_executor()
 
         with static_mode_guard():
             self.predictor = paddle.inference.create_predictor(inference_config)
@@ -392,6 +407,14 @@ class InferencePredictorMixin:
                 )
                 self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, self.num_layers, axis=0)]
 
+        try:
+            self.generation_config = GenerationConfig.from_pretrained(config.model_name_or_path)
+        except:
+            logger.warning(
+                "Can't find generation config, so it will not use generation_config field in the model config"
+            )
+            self.generation_config = None
+
     def _postprocess(self, predictions):
         if paddle.distributed.get_rank() == 0:
             tokens: np.ndarray = load_real_time_tokens()
@@ -407,7 +430,7 @@ class InferencePredictorMixin:
         self.tgt_generation_mask[:] = 0
         pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
 
-        if self.config.chat_template is not None:
+        if self.tokenizer.chat_template is not None:
             source = [source] if isinstance(source, str) else source
             source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
@@ -419,9 +442,9 @@ class InferencePredictorMixin:
             self.architectures,
             top_p=self.config.top_p,
             temperature=self.config.temperature,
+            eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
             benchmark=self.config.benchmark,
             pre_caches_length=pre_caches_length,
-            chat_template=self.config.chat_template,
         )
 
         if "chatglmforcausallm" == self.architectures.lower():
@@ -611,10 +634,9 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
 
         device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
         config.enable_use_gpu(100, device_id)
-        if predictor_args.enable_memory_optim:
-            config.enable_memory_optim()
+        config.enable_new_executor()
 
-        if predictor_args.init_fleet_worker or self.tensor_parallel_degree > 1:
+        if self.tensor_parallel_degree > 1:
             trainer_endpoints = fleet.worker_endpoints()
             current_endpoint = trainer_endpoints[self.tensor_parallel_rank]
 
@@ -657,7 +679,7 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
         model: PretrainedModel = None,
         tokenizer: PretrainedTokenizer = None,
     ):
-        self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size)
+        self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size, config.total_max_length)
         BasePredictor.__init__(self, config, tokenizer)
         InferencePredictorMixin.__init__(self, config, tokenizer)
         self.model = model
@@ -898,7 +920,7 @@ def predict():
     paddle.set_default_dtype(predictor_args.dtype)
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
-    if predictor_args.init_fleet_worker or tensor_parallel_degree > 1:
+    if tensor_parallel_degree > 1:
         strategy = fleet.DistributedStrategy()
         strategy.hybrid_configs = {
             "dp_degree": 1,

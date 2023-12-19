@@ -14,31 +14,30 @@
 from __future__ import annotations
 
 import json
-from contextlib import closing
 import os
 import socket
+from contextlib import closing
 from dataclasses import dataclass, field
 from time import sleep
-from filelock import FileLock
 
 import requests
-
+from filelock import FileLock
 from predictor import BasePredictor, ModelArgument, PredictorArgument, create_predictor
 
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.utils.log import logger
-from filelock import FileLock
 
 STOP_SIGNAL = "[END]"
 port_interval = 200
 PORT_FILE = "port-info"
 FILE_LOCK = "port-lock"
 
+
 def find_free_ports(port_l, port_u):
     def __free_port(port):
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
             try:
-                s.bind(('', port))
+                s.bind(("", port))
                 return port
             except:
                 return -1
@@ -50,18 +49,23 @@ def find_free_ports(port_l, port_u):
 
     return -1
 
+
 @dataclass
 class ServerArgument:
     port: int = field(default=8011, metadata={"help": "The port of ui service"})
     base_port: int = field(default=8010, metadata={"help": "The port of flask service"})
     title: str = field(default="LLM", metadata={"help": "The title of gradio"})
 
+
 class PredictorServer:
     def __init__(self, args: ServerArgument, predictor: BasePredictor):
 
         self.predictor = predictor
         self.args = args
-        scan_l, scan_u = self.args.base_port + port_interval * predictor.tensor_parallel_rank, self.args.base_port + port_interval * (predictor.tensor_parallel_rank+1)
+        scan_l, scan_u = (
+            self.args.base_port + port_interval * predictor.tensor_parallel_rank,
+            self.args.base_port + port_interval * (predictor.tensor_parallel_rank + 1),
+        )
 
         if self.predictor.tensor_parallel_rank == 0:
             # fetch port info
@@ -69,7 +73,7 @@ class PredictorServer:
             self.peer_ports = {}
             while True and self.predictor.tensor_parallel_degree > 1:
                 if os.path.exists(PORT_FILE):
-                    with FileLock(FILE_LOCK), open(PORT_FILE, 'r') as f:
+                    with FileLock(FILE_LOCK), open(PORT_FILE, "r") as f:
                         cnt = 1
                         for line in f:
                             data = json.loads(line)
@@ -85,14 +89,13 @@ class PredictorServer:
             # save port info
             self.port = find_free_ports(scan_l, scan_u)
             data = {"rank": predictor.tensor_parallel_rank, "port": self.port}
-            with FileLock(FILE_LOCK), open(PORT_FILE, 'a') as f:
-                f.write(json.dumps(data) + '\n')
+            with FileLock(FILE_LOCK), open(PORT_FILE, "a") as f:
+                f.write(json.dumps(data) + "\n")
             print("rank: ", predictor.tensor_parallel_rank, " port info saving done.")
-
 
     def predict(self, input_texts: str | list[str]):
         return self.predictor.stream_predict(input_texts)
-    
+
     def broadcast_msg(self, data):
         for _, peer_port in self.peer_ports.items():
             if peer_port != self.port:
@@ -113,9 +116,20 @@ class PredictorServer:
 
             def streaming(data):
                 query = data.pop("context", "")
+                history = data.pop("history", "")
                 data.pop("extra_info", None)
 
-                generation_args = data 
+                # build chat template
+                if self.predictor.tokenizer.chat_template is not None:
+                    history = json.loads(history)
+                    assert len(history) % 2 == 0
+                    chat_query = []
+                    for idx in range(0, len(history), 2):
+                        chat_query.append(["", ""])
+                        chat_query[-1][0], chat_query[-1][1] = history[idx]["utterance"], history[idx + 1]["utterance"]
+                    query = [chat_query]
+
+                generation_args = data
                 self.predictor.config.max_length = generation_args["max_length"]
                 self.predictor.config.top_p = generation_args["top_p"]
                 self.predictor.config.temperature = generation_args["temperature"]
@@ -138,7 +152,7 @@ class PredictorServer:
                 else:
                     return "done"
 
-            return app.response_class(stream_with_context(streaming(data))) 
+            return app.response_class(stream_with_context(streaming(data)))
 
         app.run(host="0.0.0.0", port=self.port)
 
@@ -152,6 +166,7 @@ class PredictorServer:
         p.daemon = True
         p.start()
 
+
 if __name__ == "__main__":
 
     parser = PdArgumentParser((PredictorArgument, ModelArgument, ServerArgument))
@@ -162,7 +177,6 @@ if __name__ == "__main__":
     if os.path.exists(PORT_FILE):
         os.remove(PORT_FILE)
 
-
     predictor = create_predictor(predictor_args, model_args)
 
     server = PredictorServer(server_args, predictor)
@@ -171,4 +185,3 @@ if __name__ == "__main__":
         server.start_ui_service(server_args)
 
     server.start_flask_server()
-
