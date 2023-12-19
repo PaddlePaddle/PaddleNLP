@@ -689,8 +689,8 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
     has_master_weights, index_filename_master_weights = update_master_weight_status(
         args, optimizer, has_master_weights, safe_serialization
     )
-    index_filename_master_weights = os.path.join(resume_from_checkpoint, index_filename_master_weights)
     if has_master_weights:
+        index_filename_master_weights = os.path.join(resume_from_checkpoint, index_filename_master_weights)
         if distributed_isfile(index_filename_master_weights):
             distributed_file(index_filename_master_weights)
         else:
