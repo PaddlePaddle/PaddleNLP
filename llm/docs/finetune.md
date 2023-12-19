@@ -4,7 +4,7 @@
 
 - **Zero Padding策略**
 
-模型的输入是定长序列数据，每个文本的序列长度不一样，所以是变长的序列，一般的做法是使用pad token进行填充，通常会占训练token 50%或更多。Zero Padding策略提出在单条数据中拼接多个文本为长文本，通常使用Zero Padding策略时会将batch size设为1，训练过程中没有pad token参与计算，有效提高模型训练效率。精调训练只需要添加一个`zero_padding`为`True`的配置，即可开启Zero Padding训练。
+模型的输入是定长序列数据，每个文本的序列长度不一样，所以是变长的序列，一般的做法是使用pad token进行填充，通常会占训练token 50%或更多。Zero Padding策略提出在单条数据中拼接多个文本为长文本，使用attention_mask保证精度对齐。通常使用Zero Padding策略时会将batch size设为1，训练过程中没有pad token参与计算，有效提高模型训练效率。精调训练只需要添加一个`zero_padding`为`True`的配置，即可开启Zero Padding训练。
 
 
 <div align="center">
