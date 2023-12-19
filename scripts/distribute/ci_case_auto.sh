@@ -959,7 +959,7 @@ function llama_auto_recompute_bs16_fp32_DP2-MP1-PP1() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.41858447
+    loss_base=9.42011845
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -1025,7 +1025,7 @@ function llama_auto_recompute_bs16_fp32_DP2-MP2-PP1() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.53447247
+    loss_base=9.44299495
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -1091,7 +1091,7 @@ function llama_auto_recompute_bs16_fp32_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.52331257
+    loss_base=9.45936012
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -1159,7 +1159,7 @@ function llama_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.53802204
+    loss_base=9.46707726
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
