@@ -115,7 +115,7 @@ class LanguageModule(BasicModule):
         )
         logger.info(
             "[train] epoch: [%d/%d], batch: [%d/%d], loss: %.9f, avg_batch_cost: %.5f sec, speed: %.2f step/s, "
-            "ips_total: %.0f tokens/s, ips: %.0f tokens/s, ipspd:%.0f tokens/s/card, %s learning rate: %.5e, found_inf: %.0f %s"
+            "ips_total: %.0f tokens/s, ips: %.0f tokens/s, ips_per_device:%.0f tokens/s/device, %s learning rate: %.5e, found_inf: %.0f %s"
             % (
                 log_dict["epoch"],
                 log_dict["total_epoch"],
