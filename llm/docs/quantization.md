@@ -30,6 +30,15 @@
 - PaddlePaddle develop
 - PaddleNLP  develop
 
+git clone 代码到本地，即可开始。
+
+```bash
+    git clone https://github.com/PaddlePaddle/PaddleNLP.git
+    # pip install ./PaddleNLP 使用develop版本
+    cd PaddleNLP/llm
+    # 到达运行目录
+```
+
 ### 2.2 数据准备
 
 量化中默认使用训练集作为校正（Calibartion）数据集，开发集作为评估数据集。为了方便用户测试，我们也提供示例数据集[广告生成数据集](https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz)。如果希望使用其他数据作为校正数据集，则在数据目录下新增`quant.json`文件，用户也可以仿照数据集的格式制作自己的数据集进行精调。我们支持的数据格式是每行包含一个字典，每个字典包含以下字段：

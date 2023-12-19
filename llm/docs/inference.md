@@ -2,6 +2,15 @@
 
 PaddleNLP除了提供常用模型推理外，还提供了高性能推理，内置动态插入和全环节算子融合策略，极大加快并行推理的速度。
 
+git clone 代码到本地，即可开始。
+
+```bash
+    git clone https://github.com/PaddlePaddle/PaddleNLP.git
+    # pip install ./PaddleNLP 使用develop版本
+    cd PaddleNLP/llm
+    # 到达运行目录
+```
+
 ## 1. 常用模型推理
 PaddleNLP 提供了动态图推理和静态图推理两种方式，方便用户快速验证模型推理效果（包含LoRA、PrefixTuning）
 
