@@ -1454,6 +1454,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         from_hf_hub = kwargs.pop("from_hf_hub", False)
         from_aistudio = kwargs.pop("from_aistudio", False)
         subfolder = kwargs.pop("subfolder", "")
+        return_tokenizer_file_dir = kwargs.pop("return_tokenizer_file_dir", False)
+
         if subfolder is None:
             subfolder = ""
 
@@ -1558,7 +1560,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         # Did we saved some inputs and kwargs to reload ?
         has_tokenizer_file = resolved_vocab_files.get("tokenizer_file", None) is not None
         tokenizer_config_file = resolved_vocab_files.pop("tokenizer_config_file", None)
+        tokenizer_config_file_dir = None
         if tokenizer_config_file is not None:
+            tokenizer_config_file_dir = os.path.dirname(tokenizer_config_file)
             with io.open(tokenizer_config_file, encoding="utf-8") as f:
                 init_kwargs = json.load(f)
         else:
@@ -1665,6 +1669,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             tokenizer.save_pretrained(os.path.join(cache_dir, pretrained_model_name_or_path, subfolder))
 
+        if return_tokenizer_file_dir:
+            return tokenizer, tokenizer_config_file_dir
         return tokenizer
 
     def save_pretrained(self, save_directory, filename_prefix: Optional[str] = None, **kwargs):
