@@ -505,23 +505,23 @@ class Trainer:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
         if self.args.unified_checkpoint:
-            use_unified_checkpoint = True
-            if self.check_origin_checkpoint(resume_from_checkpoint):
-                if UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value in self.args.unified_checkpoint_config:
-                    use_unified_checkpoint = False
-                    logger.info("Loding checkpoint, the next ckeckpoint will be saved as unified checkpoint")
+            if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
+                use_unified_checkpoint = True
+                if self.check_origin_checkpoint(resume_from_checkpoint):
+                    if UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value in self.args.unified_checkpoint_config:
+                        use_unified_checkpoint = False
+                        logger.info("Loding checkpoint, the next ckeckpoint will be saved as unified checkpoint")
+                    else:
+                        use_unified_checkpoint = True
+                        logger.warning(
+                            "Origin checkpoints exist, if you want to load from origin checkpoint, "
+                            f"add '{UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value}' "
+                            "to 'unified_checkpoint_config'."
+                        )
                 else:
                     use_unified_checkpoint = True
-                    logger.warning(
-                        "Origin checkpoints exist, if you want to load from origin checkpoint, "
-                        f"add '{UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value}' "
-                        "to 'unified_checkpoint_config'."
-                    )
-            else:
-                use_unified_checkpoint = True
 
-            if use_unified_checkpoint:
-                if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
+                if use_unified_checkpoint:
                     load_unified_checkpoint(
                         self.args,
                         self.model,
@@ -2257,40 +2257,38 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
-
-            use_unified_checkpoint = False
-
-            if self.args.unified_checkpoint:
-                if self.check_origin_checkpoint(checkpoint):
-                    if UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value in self.args.unified_checkpoint_config:
-                        use_unified_checkpoint = False
-                        logger.info("Loding checkpoint, the next ckeckpoint will be saved as unified checkpoint")
+            if self.args.data_parallel_rank == 0:
+                use_unified_checkpoint = False
+                if self.args.unified_checkpoint:
+                    if self.check_origin_checkpoint(checkpoint):
+                        if UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value in self.args.unified_checkpoint_config:
+                            use_unified_checkpoint = False
+                            logger.info("Loding checkpoint, the next ckeckpoint will be saved as unified checkpoint")
+                        else:
+                            use_unified_checkpoint = True
+                            logger.warning(
+                                "Origin checkpoint is found, if you want to load origin checkpoint, "
+                                f"add '{UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value}' "
+                                "to 'unified_checkpoint_config'."
+                            )
                     else:
                         use_unified_checkpoint = True
-                        logger.warning(
-                            "Origin checkpoint is found, if you want to load origin checkpoint, "
-                            f"add '{UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value}' "
-                            "to 'unified_checkpoint_config'."
-                        )
-                else:
-                    use_unified_checkpoint = True
 
-            if not use_unified_checkpoint:
-                if self.args.data_parallel_rank == 0:
+                if not use_unified_checkpoint:
                     optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
                     path = os.path.join(checkpoint, optimizer_name)
                     if os.path.isfile(path):
                         opt_state_dict = paddle.load(path)
                 else:
-                    opt_state_dict = None
+                    opt_state_dict = load_unified_optimizer(
+                        args=self.args,
+                        model=self.model,
+                        optimizer=self.optimizer,
+                        resume_from_checkpoint=checkpoint,
+                        safe_serialization=True,
+                    )
             else:
-                opt_state_dict = load_unified_optimizer(
-                    args=self.args,
-                    model=self.model,
-                    optimizer=self.optimizer,
-                    resume_from_checkpoint=checkpoint,
-                    safe_serialization=True,
-                )
+                opt_state_dict = None
 
         # broadcast optimizer state in dp group
         opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
