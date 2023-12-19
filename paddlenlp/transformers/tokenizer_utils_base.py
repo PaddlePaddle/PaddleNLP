@@ -1555,14 +1555,15 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                                 "- or a correct model-identifier of community-contributed pretrained models,\n"
                                 "- or the correct path to a directory containing relevant tokenizer files.\n"
                             )
-
+        tokenizer_config_file_dir_list = set()
+        for k, v in resolved_vocab_files.items():
+            tokenizer_config_file_dir_list.add(os.path.dirname(v))
+        assert len(tokenizer_config_file_dir_list) <= 1, "All tokenizer files should be in the same directory."
         # Prepare tokenizer initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
         has_tokenizer_file = resolved_vocab_files.get("tokenizer_file", None) is not None
         tokenizer_config_file = resolved_vocab_files.pop("tokenizer_config_file", None)
-        tokenizer_config_file_dir = None
         if tokenizer_config_file is not None:
-            tokenizer_config_file_dir = os.path.dirname(tokenizer_config_file)
             with io.open(tokenizer_config_file, encoding="utf-8") as f:
                 init_kwargs = json.load(f)
         else:
@@ -1670,7 +1671,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             tokenizer.save_pretrained(os.path.join(cache_dir, pretrained_model_name_or_path, subfolder))
 
         if return_tokenizer_file_dir:
-            return tokenizer, tokenizer_config_file_dir
+            return tokenizer, tokenizer_config_file_dir_list[0]
         return tokenizer
 
     def save_pretrained(self, save_directory, filename_prefix: Optional[str] = None, **kwargs):

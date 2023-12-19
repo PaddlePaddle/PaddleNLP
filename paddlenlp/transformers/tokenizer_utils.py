@@ -692,7 +692,6 @@ class ChatTemplateMixin:
         tokenizer, tokenizer_config_file_dir = super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
 
         # load chat-template
-        # breakpoint()
         chat_template_file = os.path.join(tokenizer_config_file_dir, CHAT_TEMPLATE_CONFIG_NAME)
         if not os.path.exists(chat_template_file):
             return tokenizer
