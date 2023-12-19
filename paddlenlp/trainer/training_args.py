@@ -1091,14 +1091,14 @@ class TrainingArguments:
 
         elif self.use_auto_parallel:
             world_size = paddle.distributed.get_world_size()
-            tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
-            pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
+            self.tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
+            self.pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
 
             assert (
-                world_size % (tensor_parallel_degree * pipeline_parallel_degree) == 0
+                world_size % (self.tensor_parallel_degree * self.pipeline_parallel_degree) == 0
             ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
 
-            self.data_parallel_degree = world_size // (tensor_parallel_degree * pipeline_parallel_degree)
+            self.data_parallel_degree = world_size // (self.tensor_parallel_degree * self.pipeline_parallel_degree)
 
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
@@ -1113,7 +1113,7 @@ class TrainingArguments:
                 warnings.warn("`offload` is not supported NOW!")
 
             strategy = fleet.auto.Strategy()
-            if pipeline_parallel_degree > 1:
+            if self.pipeline_parallel_degree > 1:
                 pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
                 for x in pipeline_parallel_config:
                     if len(x) > 0:
@@ -1156,7 +1156,7 @@ class TrainingArguments:
                 gradient_merge.k_steps = self.gradient_accumulation_steps
                 gradient_merge.avg = True
 
-            if tensor_parallel_degree > 1:
+            if self.tensor_parallel_degree > 1:
                 mp_optimization = strategy.mp_optimization
 
                 if " " in self.tensor_parallel_config:
@@ -1233,7 +1233,7 @@ class TrainingArguments:
 
             self.strategy = strategy
             order = ["dp", "pp", "mp"]
-            degree = [self.data_parallel_degree, pipeline_parallel_degree, tensor_parallel_degree]
+            degree = [self.data_parallel_degree, self.pipeline_parallel_degree, self.tensor_parallel_degree]
             mesh_dims = list(filter(lambda x: x[1] > 1, list(zip(order, degree))))
             if not mesh_dims:
                 mesh_dims = [("dp", 1)]
