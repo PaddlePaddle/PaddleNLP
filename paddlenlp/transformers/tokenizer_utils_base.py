@@ -1671,7 +1671,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             tokenizer.save_pretrained(os.path.join(cache_dir, pretrained_model_name_or_path, subfolder))
 
         if return_tokenizer_file_dir:
-            return tokenizer, tokenizer_config_file_dir_list[0]
+            return tokenizer, list(tokenizer_config_file_dir_list)[0]
         return tokenizer
 
     def save_pretrained(self, save_directory, filename_prefix: Optional[str] = None, **kwargs):
