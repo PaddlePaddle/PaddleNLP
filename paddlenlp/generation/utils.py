@@ -1313,7 +1313,6 @@ class GenerationMixin(object):
 
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
-            logits = paddle.cast(logits, "float32")
 
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)

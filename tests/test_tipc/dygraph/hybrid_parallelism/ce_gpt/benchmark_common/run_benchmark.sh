@@ -40,6 +40,8 @@ function _set_params(){
     virtual_pp_degree=${13:-"2"}  # (可选) virtualpp数据并行度
     use_recompute=${14:-"True"}    # (可选)是否打开recompute
     eval_freq=${15:-"25"}         # (可选)模型评估间隔
+    use_pipeline_parallel=${16:-"False"}  # (可选)是否开启pipeline_parallel_config
+    sequence_parallel=${17:-"False"}  # (可选)是否开启sequence_parallel
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -66,7 +68,7 @@ function _train(){
 
     echo "current CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}, model_name=${model_name}, device_num=${device_num}, is profiling=${profiling}"
 
-    if [ ${profiling} = "true" ];then
+    if [ ${profiling} = "True" ];then
         add_options="--profiler_options=\"batch_range=[10,20];state=GPU;tracer_option=Default;profile_path=model.profile\""
         log_file=${profiling_log_file}
     else
@@ -90,6 +92,12 @@ function _train(){
         sharding_parallel_degree="--sharding_parallel_degree ${sharding_degree}"
     fi
 
+    if [ "False" = ${use_pipeline_parallel} ]; then
+        pp_config_disable_partial_send_recv = ""
+    else
+        pp_config_disable_partial_send_recv = "--pipeline_parallel_config \"disable_partial_send_recv\""
+    fi
+
     model_config="gpt2-medium-en"
     train_cmd="--model_type gpt \
                 --model_name_or_path ${model_config} \
@@ -99,6 +107,9 @@ function _train(){
                 ${sharding} \
                 ${sharding_parallel_degree} \
                 --tensor_parallel_degree ${mp_degree} \
+                --pipeline_parallel_degree ${pp_degree} \
+                ${pp_config_disable_partial_send_recv} \
+                --sequence_parallel ${sequence_parallel} \
                 --split 949,50,1 \
                 --max_seq_length 1024 \
                 --seed 1234 \

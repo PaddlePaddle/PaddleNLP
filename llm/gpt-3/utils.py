@@ -110,7 +110,10 @@ def set_seed(seed):
 
     paddle.seed(global_seed)
 
-    logger.info("The global seed is set to {} and local seed is set to {}.".format(global_seed, local_seed))
+    logger.info(
+        "The global seed is set to {}, local seed is set to {} and "
+        "random seed is set to {}.".format(global_seed, local_seed, random_seed)
+    )
 
 
 def create_hcg(strategy, hcg_name="HybridCommunicateGroup"):
