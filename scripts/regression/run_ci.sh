@@ -118,9 +118,6 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
         elif [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
             P0case_list[${#P0case_list[*]}]=${dir2}
         elif [[ ${dir2} =~ "transformers" ]];then
-            if [[ ${dir3##*.} == "py" ]] && [[ ${!all_P0case_dic[*]} =~ ${dir3%.*} ]];then
-                P0case_list[${#P0case_list[*]}]=${dir3%.*}
-            fi
             P0case_list[${#P0case_list[*]}]=llm
             if [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
                 P0case_list[${#P0case_list[*]}]=${dir3}

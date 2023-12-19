@@ -59,7 +59,6 @@ def prepare_data(batch_major=True, dim_size=4, batch_size=2, seq_len=2, num_head
     input_data = input_data_list[dist.get_rank()]
     expected_output_data = [t[local_rank] for t in split_tensor_list]
     expected_output_data = paddle.concat(expected_output_data, axis=concat_axis)
-    # print(f"input_data:{input_data}, expected_output_data:{expected_output_data}")
     return input_data, expected_output_data
 
 
@@ -131,9 +130,6 @@ class TestReshardLayer(unittest.TestCase):
                     for seq_len in [4096, 4096 * 2, 4096 * 4]:
                         for num_head in [32, 64]:
                             for hidden_size in [num_head * 16, num_head * 32]:
-                                print(
-                                    f"batch_major:{batch_major}, dim_size:{dim_size}, batch_size:{batch_size}, seq_len:{seq_len}, num_head:{num_head}, hidden_size:{hidden_size}"
-                                )
                                 if dim_size == 3:
                                     # check reshard before flash attn, shaped: [b, s, h]
                                     input_data, expected_output_data = prepare_data(
