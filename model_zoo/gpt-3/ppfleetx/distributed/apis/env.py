@@ -104,15 +104,9 @@ def set_seed(seed):
     logger.info("The global seed is set to {} and local seed is set to {}.".format(global_seed, local_seed))
 
     global _seed
-    _seed = seed
-
     global _dp_seed
-    _dp_seed = (
-        seed_offset
-        + pp_rank * (mp_size)
-        + dp_rank * (mp_size * pp_size)
-        + sharding_rank * (mp_size * pp_size * dp_size)
-    )
+    _seed = seed
+    _dp_seed = global_seed
 
 
 def set_hcg(hcg):
