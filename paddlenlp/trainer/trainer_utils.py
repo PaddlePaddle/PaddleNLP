@@ -88,12 +88,18 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
         mp_rank = topo.mp_info.rank
         mp_size = topo.mp_info.size
 
+        sep_rank = topo.sep_info.rank
+        sep_size = topo.sep_info.size
+
         sharding_rank = topo.sharding_info.rank
     elif hcg is not None and paddle.distributed.get_world_size() > 1:
         # obtain rank message of hybrid parallel
 
         mp_rank = hcg.get_model_parallel_rank()
         mp_size = hcg.get_model_parallel_world_size()
+
+        sep_rank = hcg.get_sep_parallel_rank()
+        sep_size = hcg.get_sep_parallel_world_size()
 
         pp_rank = hcg.get_stage_id()
         pp_size = hcg.get_pipe_parallel_world_size()
@@ -104,6 +110,7 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
         sharding_rank = hcg.get_sharding_parallel_rank()
     else:
         mp_rank, mp_size = 0, 1
+        sep_rank, sep_size = 0, 1
         pp_rank, pp_size = 0, 1
         dp_rank, dp_size = 0, 1
         sharding_rank, _ = 0, 1
@@ -111,18 +118,20 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
     seed_offset = seed
     global_seed = (
         seed_offset
-        + pp_rank * (mp_size)
-        + dp_rank * (mp_size * pp_size)
-        + sharding_rank * (mp_size * pp_size * dp_size)
+        + sep_rank * (mp_size)
+        + pp_rank * (mp_size * sep_size)
+        + dp_rank * (mp_size * sep_size * pp_size)
+        + sharding_rank * (mp_size * sep_size * pp_size * dp_size)
     )
 
     seed_offset += paddle.distributed.get_world_size()
     local_seed = (
         seed_offset
         + mp_rank
-        + pp_rank * (mp_size)
-        + dp_rank * (mp_size * pp_size)
-        + sharding_rank * (mp_size * pp_size * dp_size)
+        + sep_rank * (mp_size)
+        + pp_rank * (mp_size * sep_size)
+        + dp_rank * (mp_size * sep_size * pp_size)
+        + sharding_rank * (mp_size * sep_size * pp_size * dp_size)
     )
 
     # NOTE: the commented seeds are set only for precision validation
