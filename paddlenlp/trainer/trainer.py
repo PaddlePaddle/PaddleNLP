@@ -2914,35 +2914,19 @@ class Trainer:
         logger.info("")
 
     def check_origin_checkpoint(self, resume_from_checkpoint):
-        is_origin_checkpoint_type = True
-        if self.args.dataset_rank == 0:
-            hcg = fleet.get_hybrid_communicate_group()
-            tp_group = hcg.get_model_parallel_group()
-            pp_group = hcg.get_pipe_parallel_group()
+        is_origin_checkpoint_type = False
 
-            weight_name = PADDLE_WEIGHTS_NAME
-            weight_index_name = PADDLE_WEIGHTS_INDEX_NAME
-            weights_file = os.path.join(
-                resume_from_checkpoint,
-                _add_variant(weight_name, self.args.weight_name_suffix),
-            )
-            weights_index_file = os.path.join(
-                resume_from_checkpoint,
-                _add_variant(weight_index_name, self.args.weight_name_suffix),
-            )
-
-            origin_checkpoint_list = len([f for f in [weights_file, weights_index_file] if os.path.isfile(f)])
-            num_origin_checkpoint = paddle.to_tensor([origin_checkpoint_list])
-            if tp_group.nranks > 1:
-                dist.all_reduce(num_origin_checkpoint, op=dist.ReduceOp.SUM, group=tp_group)
-            if pp_group.nranks > 1:
-                dist.all_reduce(num_origin_checkpoint, op=dist.ReduceOp.SUM, group=pp_group)
-            if num_origin_checkpoint.item() > 0:
-                is_origin_checkpoint_type = True
-            else:
-                is_origin_checkpoint_type = False
-        is_origin_checkpoint_type = paddle.to_tensor([is_origin_checkpoint_type])
-        dist.all_reduce(is_origin_checkpoint_type, op=dist.ReduceOp.SUM)
-        is_origin_checkpoint_type = is_origin_checkpoint_type.item() > 0
+        weight_name = PADDLE_WEIGHTS_NAME
+        weight_index_name = PADDLE_WEIGHTS_INDEX_NAME
+        weights_file = os.path.join(
+            resume_from_checkpoint,
+            _add_variant(weight_name, self.args.weight_name_suffix),
+        )
+        weights_index_file = os.path.join(
+            resume_from_checkpoint,
+            _add_variant(weight_index_name, self.args.weight_name_suffix),
+        )
+        if distributed_isfile(weights_file) or distributed_isfile(weights_index_file):
+            is_origin_checkpoint_type = True
 
         return is_origin_checkpoint_type
