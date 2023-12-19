@@ -40,6 +40,7 @@ from .lora_config import LoRAConfig
 from .lora_layers import (
     ColumnParallelLoRALinear,
     ColumnParallelLoRAMergedLinear,
+    LoRAConv2D,
     LoRALinear,
     LoRAMergedLinear,
     RowParallelLoRALinear,
@@ -70,6 +71,7 @@ class LoRAModel(nn.Layer):
     restore_layer_map: Dict[nn.Layer, nn.Layer] = {
         LoRALinear: nn.Linear,
         LoRAMergedLinear: nn.Linear,
+        LoRAConv2D: nn.Conv2D,
         # ColumnParallelLoRALinear: ColumnParallelLinear,
         # ColumnParallelLoRAMergedLinear: ColumnParallelLinear,
         # RowParallelLoRALinear: RowParallelLinear,
@@ -285,6 +287,23 @@ class LoRAModel(nn.Layer):
                     merge_weights=lora_config.merge_weights,
                     bias_attr=False if module.bias is None else None,
                 )
+            if isinstance(module, nn.Conv2D):
+                lora_module = LoRAConv2D(
+                    in_channels=module._in_channels,
+                    out_channels=module._out_channels,
+                    kernel_size=module._kernel_size,
+                    stride=module._stride,
+                    padding=module._padding,
+                    dilation=module._dilation,
+                    groups=module._groups,
+                    padding_mode=module._padding_mode,
+                    data_format=module._data_format,
+                    r=lora_config.r,
+                    lora_alpha=lora_config.lora_alpha,
+                    lora_dropout=lora_config.lora_dropout,
+                    merge_weights=lora_config.merge_weights,
+                    bias_attr=module._bias_attr,
+                )
             elif isinstance(module, ColumnParallelLinear):
                 # recover the original output_features
                 output_features = module.weight.shape[1] * module.world_size
@@ -463,6 +482,7 @@ class LoRAModel(nn.Layer):
         for _, layer in self.model.named_sublayers():
             if (
                 isinstance(layer, LoRALinear)
+                or isinstance(layer, LoRAConv2D)
                 or isinstance(layer, ColumnParallelLoRALinear)
                 or isinstance(layer, RowParallelLoRALinear)
                 or isinstance(layer, LoRAMergedLinear)
@@ -552,6 +572,7 @@ class LoRAModel(nn.Layer):
                 self._find_and_restore_module(layer_name)
             elif (
                 isinstance(layer, ColumnParallelLoRALinear)
+                or isinstance(layer, LoRAConv2D)
                 or isinstance(layer, ColumnParallelLoRAMergedLinear)
                 or isinstance(layer, RowParallelLoRALinear)
                 or (QuantizationLoRALinear is not None and isinstance(layer, QuantizationLoRALinear))
