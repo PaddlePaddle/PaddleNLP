@@ -159,7 +159,7 @@ class AutoConfig(PretrainedConfig):
             config = AutoConfig.from_pretrained("bert-base-uncased")
             config.save_pretrained('./bert-base-uncased')
         """
-        subfolder = kwargs.pop("subfolder", "")
+        subfolder = kwargs.get("subfolder", "")
         if subfolder is None:
             subfolder = ""
         from_aistudio = kwargs.pop("from_aistudio", False)

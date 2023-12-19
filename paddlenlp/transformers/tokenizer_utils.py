@@ -688,14 +688,12 @@ class ChatTemplateMixin:
         kwargs["cache_dir"] = cache_dir
         kwargs["from_hf_hub"] = from_hf_hub
         kwargs["from_aistudio"] = from_aistudio
-        tokenizer = super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
+        kwargs["return_tokenizer_file_dir"] = True
+        tokenizer, tokenizer_config_file_dir = super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
 
         # load chat-template
-        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
-
-        chat_template_file = os.path.join(
-            cache_dir, pretrained_model_name_or_path, subfolder, CHAT_TEMPLATE_CONFIG_NAME
-        )
+        # breakpoint()
+        chat_template_file = os.path.join(tokenizer_config_file_dir, CHAT_TEMPLATE_CONFIG_NAME)
         if not os.path.exists(chat_template_file):
             return tokenizer
 
