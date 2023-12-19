@@ -46,7 +46,7 @@ from .lora_layers import (
 )
 
 try:
-    from ...utils.quantization import (
+    from ...quantization.quantization_linear import (
         ColumnParallelQuantizationLinear,
         QuantizationLinear,
         RowParallelQuantizationLinear,
