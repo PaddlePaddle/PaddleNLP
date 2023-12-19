@@ -120,10 +120,13 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
         raise ValueError("Unified checkpoint only supports PretrainedModel")
 
     if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
-        if "master_weight" in optimizer.state_dict():
+        if is_need_master_weight(optimizer):
+            logger.info(
+                f"With {UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value}, skip the model checkpoint save."
+                "The master weight will be loaded as model weights for next resumption."
+            )
             # not save model weight, load from master weight
             return
-
     config_to_save = None
     state_dict, config_to_save, shard_file, sharded_index = unified_checkpoint_into_shards(
         args, model_to_save, safe_serialization=safe_serialization
@@ -686,6 +689,7 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
     has_master_weights, index_filename_master_weights = update_master_weight_status(
         args, optimizer, has_master_weights, safe_serialization
     )
+    index_filename_master_weights = os.path.join(resume_from_checkpoint, index_filename_master_weights)
     if has_master_weights:
         if distributed_isfile(index_filename_master_weights):
             distributed_file(index_filename_master_weights)
@@ -1625,7 +1629,7 @@ def select_model_weight_index(args, model, resume_from_checkpoint, safe_serializ
         return index_filename
     else:
         index_filename = PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
-        index_filename = os.path.join(resume_from_checkpoint, index_filename)
+        index_filename_path = os.path.join(resume_from_checkpoint, index_filename)
 
         if distributed_isfile(index_filename_path):
             return index_filename
