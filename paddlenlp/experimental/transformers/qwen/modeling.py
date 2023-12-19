@@ -28,16 +28,16 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
+from paddlenlp.transformers import QWenConfig, QWenPretrainedModel
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPast,
     CausalLMOutputWithPast,
 )
-from paddlenlp.transformers import QWenPretrainedModel, QWenConfig
-from paddlenlp.transformers.qwen.modeling import QWenLMHead, QWenPretrainingCriterion
 from paddlenlp.transformers.model_utils import (
     dy2st_nocheck_guard_context,
     register_base_model,
 )
+from paddlenlp.transformers.qwen.modeling import QWenLMHead, QWenPretrainingCriterion
 
 __all__ = ["QWenForCausalLMInferenceModel"]
 
