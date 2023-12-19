@@ -88,6 +88,9 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
         mp_rank = topo.mp_info.rank
         mp_size = topo.mp_info.size
 
+        sep_rank = topo.sep_info.rank
+        sep_size = topo.sep_info.size
+
         sharding_rank = topo.sharding_info.rank
     elif hcg is not None and paddle.distributed.get_world_size() > 1:
         # obtain rank message of hybrid parallel
