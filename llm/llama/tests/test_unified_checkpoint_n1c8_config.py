@@ -130,7 +130,6 @@ def run_normal(fn, train_args):
 
 def run_unified_checkpoint(fn, train_args):
     train_args["unified_checkpoint"] = 1
-    train_args["unified_checkpoint_config"] = UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value
     fn("run_pretrain.py", **train_args)
 
 
