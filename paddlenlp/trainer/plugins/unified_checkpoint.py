@@ -22,6 +22,7 @@ import paddle.distributed as dist
 from paddle.distributed import fleet
 from tqdm.auto import tqdm
 
+from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
 from paddlenlp.transformers.model_utils import (
     PretrainedModel,
@@ -90,10 +91,13 @@ def save_unified_checkpoint(args, model, output_dir, safe_serialization=False):
     Raises:
         ValueError: if model is not an instance of `PretrainedModel` and the model cannot be saved
     """
+
     if isinstance(model, PretrainedModel):
         model_to_save = model
     elif isinstance(unwrap_model(model), PretrainedModel):
         model_to_save = unwrap_model(model)
+    elif isinstance(model, PrefixModelForCausalLM) or isinstance(model, LoRAModel):
+        model_to_save = model
     else:
         raise ValueError("Unified checkpoint only supports PretrainedModel")
 
@@ -241,7 +245,12 @@ def unified_checkpoint_into_shards(
     """
     assert hasattr(model_to_save, "config")
 
-    state_dict = model_to_save.state_dict()
+    if isinstance(model_to_save, PretrainedModel):
+        state_dict = model_to_save.state_dict()
+    elif isinstance(model_to_save, LoRAModel):
+        state_dict = model_to_save.get_trainable_state_dict()
+    elif isinstance(model_to_save, PrefixModelForCausalLM):
+        state_dict = model_to_save.prefix_encoder.state_dict()
 
     all_filter_keys = filter_params(model_to_save, state_dict)
 
