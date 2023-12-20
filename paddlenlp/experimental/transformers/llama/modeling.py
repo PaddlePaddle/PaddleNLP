@@ -12,16 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import annotations
-from typing_extensions import Self
 
 import json
 import os
-
+from functools import partial
 
 import numpy as np
-import time
 import paddle
-from functools import partial
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
@@ -30,22 +27,24 @@ from paddlenlp_ops import (
     get_padding_offset,
     get_padding_offset_v2,
 )
-from paddlenlp.utils.log import logger
 
-
-from paddlenlp.experimental.model_utils import ActScalesLoader, WeightScalesLoader, CacheScaleLoader
+from paddlenlp.experimental.model_utils import (
+    ActScalesLoader,
+    CacheScaleLoader,
+    WeightScalesLoader,
+)
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
+    FusedBlockMultiTransformer,
+    FusedBlockMultiTransformerA8W8,
+    FusedBlockMultiTransformerWeightOnly,
     FusedMultiTransformerA8W8,
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
-    FusedBlockMultiTransformer,
-    FusedBlockMultiTransformerWeightOnly,
-    FusedBlockMultiTransformerA8W8,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
-    GenerationInferenceModel,
     GenerationBlockInferenceModel,
+    GenerationInferenceModel,
 )
 from paddlenlp.transformers import LlamaConfig, LlamaPretrainedModel
 from paddlenlp.transformers.llama.modeling import LlamaLMHead
@@ -57,8 +56,14 @@ from paddlenlp.transformers.model_utils import (
     dy2st_nocheck_guard_context,
     register_base_model,
 )
+from paddlenlp.utils.log import logger
 
-__all__ = ["LlamaInferenceModel", "LlamaForCausalLMInferenceModel", "LlamaForCausalLMBlockInferenceModel", "LlamaForMiniGPT4InferenceModel"]
+__all__ = [
+    "LlamaInferenceModel",
+    "LlamaForCausalLMInferenceModel",
+    "LlamaForCausalLMBlockInferenceModel",
+    "LlamaForMiniGPT4InferenceModel",
+]
 
 
 class FusedLlamaRMSNorm(nn.Layer):
@@ -103,7 +108,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
         self.use_weight_only = False
         self.weight_only_quant_bits = config.weight_only_quant_bits
-
 
         if self.quant_type is not None and "weight_only_int" in self.quant_type:
             self.use_weight_only = True
@@ -256,18 +260,25 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             ffn2_weight_scale_attrs = [
                 paddle.ParamAttr(name="fusellama.{}.ffn2_weight_scale".format(i)) for i in range(self.num_layers)
             ]
-        
-        cache_k_scale_attrs = None 
-        cache_v_scale_attrs = None 
-        cache_k_out_scale_attrs = None 
-        cache_v_out_scale_attrs = None 
-        
+
+        cache_k_scale_attrs = None
+        cache_v_scale_attrs = None
+        cache_k_out_scale_attrs = None
+        cache_v_out_scale_attrs = None
+
         if config.use_cachekv_int8 == "static":
-            cache_k_scale_attrs = [paddle.ParamAttr(name="fusellama.{}.cache_k_scale".format(i)) for i in range(self.num_layers)]
-            cache_v_scale_attrs = [paddle.ParamAttr(name="fusellama.{}.cache_v_scale".format(i)) for i in range(self.num_layers)]
-            cache_k_out_scale_attrs = [paddle.ParamAttr(name="fusellama.{}.cache_k_out_scale".format(i)) for i in range(self.num_layers)]
-            cache_v_out_scale_attrs = [paddle.ParamAttr(name="fusellama.{}.cache_v_out_scale".format(i)) for i in range(self.num_layers)]
-            
+            cache_k_scale_attrs = [
+                paddle.ParamAttr(name="fusellama.{}.cache_k_scale".format(i)) for i in range(self.num_layers)
+            ]
+            cache_v_scale_attrs = [
+                paddle.ParamAttr(name="fusellama.{}.cache_v_scale".format(i)) for i in range(self.num_layers)
+            ]
+            cache_k_out_scale_attrs = [
+                paddle.ParamAttr(name="fusellama.{}.cache_k_out_scale".format(i)) for i in range(self.num_layers)
+            ]
+            cache_v_out_scale_attrs = [
+                paddle.ParamAttr(name="fusellama.{}.cache_v_out_scale".format(i)) for i in range(self.num_layers)
+            ]
 
         transformer_config = FusedMultiTransformerConfig(
             self.hidden_size,
@@ -313,8 +324,12 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             rank_id=config.tensor_parallel_rank,
         )
 
-
-        self.set_transformer_block(transformer_config)
+        if self.use_weight_only:
+            self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
+        elif self.quant_type == "a8w8":
+            self.transformer_block = FusedMultiTransformerA8W8(transformer_config)
+        else:
+            self.transformer_block = FusedMultiTransformerBase(transformer_config)
 
         self.norm = FusedLlamaRMSNorm(config)
 
@@ -330,7 +345,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             self.transformer_block = FusedMultiTransformerA8W8(transformer_config)
         else:
             self.transformer_block = FusedMultiTransformerBase(transformer_config)
-        
+
     def get_input_embeddings(self):
         return self.embed_tokens
 
@@ -480,7 +495,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 "llama.layers.{}.self_attn.v_proj.weight".format(idx)
             ]
 
-            
             concated_qkv_weight = (
                 np.concatenate(
                     [
@@ -512,9 +526,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 qkv_quanted_weight_tensor, qkv_weight_scale_tensor = weight_quantize(
                     qkv_weight_tensor.cuda(), algo=self.quant_type
                 )
-                qkv_quanted_weight_tensor=qkv_quanted_weight_tensor.cpu()
-                qkv_weight_scale_tensor=qkv_weight_scale_tensor.cpu()
-                qkv_weight_scale_tensor=qkv_weight_scale_tensor.cast(qkv_weight_tensor.dtype)
+                qkv_quanted_weight_tensor = qkv_quanted_weight_tensor.cpu()
+                qkv_weight_scale_tensor = qkv_weight_scale_tensor.cpu()
+                qkv_weight_scale_tensor = qkv_weight_scale_tensor.cast(qkv_weight_tensor.dtype)
                 self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor)
                 self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor)
             elif self.quant_type == "a8w8":
@@ -531,7 +545,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 )
                 linear_quanted_weight_tensor = linear_quanted_weight_tensor.cpu()
                 linear_weight_scale_tensor = linear_weight_scale_tensor.cpu()
-                linear_weight_scale_tensor=linear_weight_scale_tensor.cast(linear_weight_tensor.dtype)
+                linear_weight_scale_tensor = linear_weight_scale_tensor.cast(linear_weight_tensor.dtype)
                 self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor)
                 self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor)
             elif self.quant_type == "a8w8":
@@ -679,8 +693,12 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
                 weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
                 if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
-                    act_scale_json_path = os.path.join(self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json")
-                    weight_scale_json_path = os.path.join(self.quant_model_path, f"weight_scales_{self.config.tensor_parallel_rank}.json")
+                    act_scale_json_path = os.path.join(
+                        self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json"
+                    )
+                    weight_scale_json_path = os.path.join(
+                        self.quant_model_path, f"weight_scales_{self.config.tensor_parallel_rank}.json"
+                    )
                 act_scale_loader = ActScalesLoader(
                     act_scale_json_path, act_scale_map_dict, num_of_layers=self.config.num_hidden_layers
                 )
@@ -693,11 +711,13 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     concat_qkv=True,
                     concat_ffn1=True,
                 )
-                
+
                 if self.config.use_cachekv_int8 == "static":
                     cache_scale_json_path = os.path.join(self.quant_model_path, "cachekv_act_scales.json")
                     if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
-                        cache_scale_json_path = os.path.join(self.quant_model_path, f"cachekv_act_scales_{self.config.tensor_parallel_rank}.json")
+                        cache_scale_json_path = os.path.join(
+                            self.quant_model_path, f"cachekv_act_scales_{self.config.tensor_parallel_rank}.json"
+                        )
                     cache_scales_loader = CacheScaleLoader(
                         cache_scale_json_path,
                         cache_scale_map_dict,
@@ -715,36 +735,48 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                                 self.transformer_block.cache_k_out_scales[i_layer].set_value(weight_scale)
                             else:
                                 self.transformer_block.cache_v_out_scales[i_layer].set_value(weight_scale)
-                                
+
                 for k, v in weight_scales_loader.scale.items():
                     if "qkv_" in k:
                         for i_layer, weight_scale in enumerate(v):
                             tmp = paddle.to_tensor(
-                                weight_scale / (127.0 * 127.0 * act_scale_loader.scale["qkv_in_scale"][i_layer]) # [3 * num_head * dim_head]
+                                weight_scale
+                                / (
+                                    127.0 * 127.0 * act_scale_loader.scale["qkv_in_scale"][i_layer]
+                                )  # [3 * num_head * dim_head]
                             ).reshape([-1])
 
                             if self.config.tensor_parallel_degree > 1 and self.config.single_card_ptq:
-                                tmp = tmp.reshape([3, self.num_attention_heads, head_size]).split(self.config.tensor_parallel_degree, axis=1)[self.config.tensor_parallel_rank].reshape([-1])
+                                tmp = (
+                                    tmp.reshape([3, self.num_attention_heads, head_size])
+                                    .split(self.config.tensor_parallel_degree, axis=1)[
+                                        self.config.tensor_parallel_rank
+                                    ]
+                                    .reshape([-1])
+                                )
                             self.transformer_block.qkv_out_scales[i_layer].set_value(tmp)
                         pass
                     elif "out_linear_" in k:
                         for i_layer, weight_scale in enumerate(v):
                             tmp = paddle.to_tensor(
-                                    weight_scale
-                                    / (127.0 * 127.0 * act_scale_loader.scale["out_linear_in_scale"][i_layer])
-                                )
+                                weight_scale / (127.0 * 127.0 * act_scale_loader.scale["out_linear_in_scale"][i_layer])
+                            )
                             self.transformer_block.linear_out_scales[i_layer].set_value(tmp)
                     elif "ffn1_weight_scale" in k:
                         for i_layer, weight_scale in enumerate(v):
                             tmp = paddle.to_tensor(
-                                    weight_scale / (127.0 * 127.0 * act_scale_loader.scale["ffn1_in_scale"][i_layer])
-                                )
+                                weight_scale / (127.0 * 127.0 * act_scale_loader.scale["ffn1_in_scale"][i_layer])
+                            )
                             if self.config.tensor_parallel_degree > 1 and self.config.single_card_ptq:
                                 tmp = paddle.split(tmp, self.config.tensor_parallel_degree * 2)
-                                tmp = paddle.concat([tmp[self.config.tensor_parallel_rank], tmp[self.config.tensor_parallel_rank + self.config.tensor_parallel_degree]], axis=0)
-                            self.transformer_block.ffn1_out_scales[i_layer].set_value(
-                                tmp
-                            )
+                                tmp = paddle.concat(
+                                    [
+                                        tmp[self.config.tensor_parallel_rank],
+                                        tmp[self.config.tensor_parallel_rank + self.config.tensor_parallel_degree],
+                                    ],
+                                    axis=0,
+                                )
+                            self.transformer_block.ffn1_out_scales[i_layer].set_value(tmp)
                     elif "ffn2" in k:
                         for i_layer, weight_scale in enumerate(v):
                             self.transformer_block.ffn2_out_scales[i_layer].set_value(
@@ -752,6 +784,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                                     weight_scale / (127.0 * 127.0 * act_scale_loader.scale["ffn2_in_scale"][i_layer])
                                 )
                             )
+
 
 @register_base_model
 class LlamaBlockInferenceModel(LlamaInferenceModel):
@@ -787,13 +820,13 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         output_hidden_states=None,
         return_dict=False,
         **kwargs,
-    ):  
+    ):
 
         seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
         rope_emb = kwargs.get("rope_emb", None)
         ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
-                input_ids, seq_lens_this_time
-            )
+            input_ids, seq_lens_this_time
+        )
         kwargs["cu_seqlens_q"] = cu_seqlens_q
         kwargs["cu_seqlens_k"] = cu_seqlens_k
         kwargs["padding_offsets"] = padding_offset
@@ -820,6 +853,7 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
             hidden_states=None,
             attentions=None,
         )
+
 
 class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedModel):
     """
@@ -994,11 +1028,10 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         self.llama = LlamaBlockInferenceModel(config)
         self.lm_head = LlamaLMHead(config)
 
-    
     @classmethod
     def _get_tensor_parallel_mappings(cls, config: LlamaConfig, is_split=True):
 
-        logger.info(f"llama inference model _get_tensor_parallel_mappings")
+        logger.info("llama inference model _get_tensor_parallel_mappings")
 
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
@@ -1045,8 +1078,6 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
                         base_actions["layers.0.mlp.gate_proj.bias"] = partial(fn, is_column=True)
                         base_actions["layers.0.mlp.up_proj.bias"] = partial(fn, is_column=True)
 
-
-
             # Column Linear
             if config.fuse_attention_qkv:
                 base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
@@ -1083,13 +1114,13 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
     ):
         # TODO: Support safetensors loading.
         kwargs["use_safetensors"] = False
-        from paddlenlp.transformers.utils import resolve_cache_dir, is_paddle_support_lazy_init, ContextManagers, is_safetensors_available
-        from paddlenlp.transformers.configuration_utils import PretrainedConfig
-        from paddlenlp.transformers.model_utils import no_init_weights, dtype_guard
+        from paddlenlp.transformers.utils import (
+            ContextManagers,
+            is_safetensors_available,
+            resolve_cache_dir,
+        )
 
         config = kwargs.pop("config", None)
-        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
-        dtype = kwargs.pop("dtype", None)
         from_aistudio = kwargs.get("from_aistudio", False)
         subfolder = kwargs.get("subfolder", None)
         variant = kwargs.pop("variant", None)
@@ -1097,31 +1128,12 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         convert_from_torch = kwargs.pop("convert_from_torch", None)
         cache_dir = kwargs.pop("cache_dir", None)
 
-        model_kwargs = kwargs
-
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
-        # if not isinstance(config, PretrainedConfig):
-        #     config_path = config if config is not None else pretrained_model_name_or_path
-        #     config, model_kwargs = cls.config_class.from_pretrained(
-        #         config_path,
-        #         cache_dir=cache_dir,
-        #         return_unused_kwargs=True,
-        #         **kwargs,
-        #     )
 
         init_contexts = []
-        # if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
-        #     # Instantiate model.
-        #     init_contexts.append(no_init_weights(_enable=True))
-        #     if is_paddle_support_lazy_init():
-        #         init_contexts.append(paddle.LazyGuard())
-        # if dtype:
-        #     init_contexts.append(dtype_guard(dtype))
-
-        init_args = config["init_args"] or ()
         with ContextManagers(init_contexts):
             model = cls(config)
-            
+
         if not config.single_card_ptq:
             resolved_archive_file = pretrained_model_name_or_path
         else:
@@ -1142,7 +1154,9 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             logger.info(f"convert_tensor_parallel {config.tensor_parallel_degree}")
             model.state_dict = model.convert_tensor_parallel(resolved_archive_file, config)
         elif config.tensor_parallel_degree > 1:
-            resolved_archive_file = os.path.join(resolved_archive_file, f"mp_{config.tensor_parallel_rank:0>2d}_sharding_00_pp_00", "model.pdparams")
+            resolved_archive_file = os.path.join(
+                resolved_archive_file, f"mp_{config.tensor_parallel_rank:0>2d}_sharding_00_pp_00", "model.pdparams"
+            )
             model.state_dict = paddle.load(resolved_archive_file, return_numpy=True)
         else:
             model.state_dict = paddle.load(resolved_archive_file, return_numpy=True)
@@ -1260,7 +1274,6 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         if "lm_head.weight" in state_dict:
             self.lm_head.weight.set_value(state_dict["lm_head.weight"])
         self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
-
 
 
 class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):

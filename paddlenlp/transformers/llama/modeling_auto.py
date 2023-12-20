@@ -831,12 +831,14 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             # 1. infer spmd does not support [seq_len] --> [batch, seq_len] in data_parallel
             fleet.auto.shard_tensor(position_ids, get_mesh(), [None, None])
 
-        attention_mask = self._prepare_decoder_attention_mask(
-            attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
-        )  # [bs, 1, seq_len, seq_len]
         if self.config.use_flash_attention:
             # attention_mask in flash_attn is always None for pretrain
             attention_mask = None
+        else:
+            attention_mask = self._prepare_decoder_attention_mask(
+                attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
+            )  # [bs, 1, seq_len, seq_len]
+
         hidden_states = inputs_embeds
 
         # decoder layers

@@ -400,11 +400,7 @@ class WeightScalesLoader:
 
 class CacheScaleLoader:
     def __init__(
-        self,
-        scale_json_file_path="cache_scales.json",
-        key_map_dict=None,
-        num_of_layers=None,
-        num_heads=None
+        self, scale_json_file_path="cache_scales.json", key_map_dict=None, num_of_layers=None, num_heads=None
     ):
         with open(scale_json_file_path) as json_file:
             self.scale_dict = json.load(json_file)
@@ -413,7 +409,7 @@ class CacheScaleLoader:
         for scale_type, key_template in self.key_map.items():
             print("scale_type: ", scale_type)
             print("key_template: ", key_template)
-            if ("cache_k" in scale_type):
+            if "cache_k" in scale_type:
                 scale_type_out = "cache_k_out_scale"
             else:
                 scale_type_out = "cache_v_out_scale"
@@ -422,5 +418,7 @@ class CacheScaleLoader:
 
             for i in range(num_of_layers):
                 if key_template.replace("#", str(i)) in self.scale_dict.keys():
-                    self.scale[scale_type][i, :] = [127.0 / num for num in self.scale_dict[key_template.replace("#", str(i))]]
+                    self.scale[scale_type][i, :] = [
+                        127.0 / num for num in self.scale_dict[key_template.replace("#", str(i))]
+                    ]
                     self.scale[scale_type_out][i, :] = [1.0 / self.scale[scale_type][i, j] for j in range(num_heads)]

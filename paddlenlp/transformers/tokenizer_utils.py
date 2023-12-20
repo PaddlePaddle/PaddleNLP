@@ -1712,7 +1712,8 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             # from byte fallback tokenization.
             # If it's in the middle, it's probably a real invalid id generated
             # by the model
-            new_text = new_text[len(prefix_text) :]
+            prefix_index = new_text.index(prefix_text)
+            new_text = new_text[prefix_index + len(prefix_text) :]
             return new_text, read_offset, len(all_input_ids)
         else:
             return "", prefix_offset, read_offset

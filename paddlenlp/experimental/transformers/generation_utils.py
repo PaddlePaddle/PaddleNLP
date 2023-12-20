@@ -12,30 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import annotations
-import pdb
 
 from typing import List, Union
 
 import paddle
 import paddle.nn.functional as F
 from paddlenlp_ops import (
+    get_token_penalty_multi_scores,
+    get_token_penalty_multi_scores_v2,
     save_output,
     save_with_output,
     set_alibi_mask_value,
     set_mask_value,
-    set_value_by_flags_and_idx,
     set_stop_value_multi_ends,
     set_stop_value_multi_ends_v2,
+    set_value_by_flags_and_idx,
     set_value_by_flags_and_idx_v2,
-    get_token_penalty_multi_scores,
     update_inputs,
-    get_token_penalty_multi_scores_v2,
 )
 
 from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList
 
 __all__ = ["GenerationInferenceModel", "GenerationBlockInferenceModel"]
-
 
 
 class ForcedDecodingEOSTokenLogitsProcessor(LogitsProcessor):
@@ -440,7 +438,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
 
         if use_cachekv_int8 == "static" or use_cachekv_int8 == "dynamic":
             cachekv_dtype = "uint8"
-            
+
         if use_cachekv_int8 == "dynamic":
             cache_k_quant_scales = [
                 paddle.static.InputSpec(
@@ -496,7 +494,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             )
         if export_precache:
             src_mask_spec = paddle.static.InputSpec(shape=[None, 1, None, None], dtype=dtype, name="src_mask")
-        else :
+        else:
             src_mask_spec = None
         input_spec = [
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),  # input_ids
@@ -546,7 +544,6 @@ class GenerationBlockInferenceModel(GenerationMixin):
             batch_size = encoder_output.shape[0]
             seq_len = encoder_output.shape[1]
         return paddle.ones([batch_size, seq_len], dtype="int64") * bos_token_id
-
 
     @paddle.no_grad()
     def generate(
@@ -653,7 +650,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 model_kwargs["seq_lens_encoder"],
                 model_kwargs["seq_lens_decoder"],
                 step_idx,
-                model_kwargs["stop_flags"])
+                model_kwargs["stop_flags"],
+            )
 
             logits = paddle.cast(outputs, paddle.float32)
 
@@ -668,7 +666,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 model_kwargs["bad_tokens"],
                 step_idx,
                 model_kwargs["min_dec_len"],
-                eos_token_id)
+                eos_token_id,
+            )
 
             # sample
             probs = F.softmax(logits)
@@ -683,11 +682,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             length_cond = paddle.greater_equal(model_kwargs["step_idx"], model_kwargs["max_dec_len"])
             stop_flags = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
             set_stop_value_multi_ends_v2(
-                next_tokens, 
-                stop_flags, 
-                model_kwargs["seq_lens_this_time"], 
-                eos_token_id,
-                model_kwargs["next_tokens"]
+                next_tokens, stop_flags, model_kwargs["seq_lens_this_time"], eos_token_id, model_kwargs["next_tokens"]
             )  # multi ends
             paddle.assign(stop_flags, model_kwargs["stop_flags"])
             # update inputs
@@ -700,7 +695,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 model_kwargs["input_ids"],
                 model_kwargs["stop_nums"],
                 next_tokens,
-                model_kwargs["is_block_step"]
+                model_kwargs["is_block_step"],
             )
             save_output(next_tokens, model_kwargs["not_need_stop"], self.config.tensor_parallel_rank)
             return next_tokens

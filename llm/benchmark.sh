@@ -22,20 +22,10 @@ export FLAGS_fraction_of_gpu_memory_to_use=0.92
 export FLAGS_use_autotune=1
 export FLAGS_cublaslt_exhaustive_search_times=10
 export FLAGS_cache_inference_while_scope=1
-export FLAGS_dynamic_static_unified_comm=0
-# export FLAGS_benchmark=1
-
-model_dir=${1:-"checkpoints/llama65b_ptq_smooth_mp8"}
-src_len=${2:-1100}
-dec_len=${3:-330}
-
-total_len=`expr ${src_len} + ${dec_len}`
 
 
-python -m paddle.distributed.launch \
-    --gpus "0,1,2,3,4,5,6,7" \
-    predictor.py \
-    --model_name_or_path ./inference_model/${model_dir} \
+python predictor.py \
+    --model_name_or_path ./llama7b-inference_model_fp16 \
     --dtype float16 \
     --src_length ${total_len} \
     --max_length ${dec_len} \
@@ -43,7 +33,4 @@ python -m paddle.distributed.launch \
     --mode "static" \
     --batch_size 128 \
     --benchmark \
-    --block_attn \
-    --block_size 64 \
-    --inference_model \
-    --use_cachekv_int8 static
+    --inference_model 

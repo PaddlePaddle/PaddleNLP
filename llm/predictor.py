@@ -94,13 +94,15 @@ class PredictorArgument:
         },
     )
 
-    enable_memory_optim: bool = field(
-        default=True,
-        metadata={"help": "whether use `enable_memory_optim` in inference predictor"},
-    )
-    init_fleet_worker: bool = field(
-        default=True,
-        metadata={"help": "whether use `init_fleet_worker` in inference predictor"},
+    chat_template: str = field(
+        default=None,
+        metadata={
+            "help": "the path of `chat_template.json` file to handle multi-rounds conversation. "
+            "If is None(do not set --chat_template argument), it will use the default `chat_template.json`;"
+            "If is equal with `model_name_or_path`, it will use the default loading; "
+            "If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
+            "If is none string, it will not use chat_template.json."
+        },
     )
     block_attn: bool = field(default=False, metadata={"help": "whether use block attention"})
     block_size: int = field(default=64, metadata={"help": "the block size for cache_kvs."})
@@ -697,7 +699,7 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
         model: PretrainedModel = None,
         tokenizer: PretrainedTokenizer = None,
     ):
-        self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size)
+        self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size, config.total_max_length)
         BasePredictor.__init__(self, config, tokenizer)
         InferencePredictorMixin.__init__(self, config, tokenizer)
         self.model = model
@@ -1447,6 +1449,14 @@ def create_predictor(
                 cache_kvs_shape = ChatGLMv2ForCausalLMInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
+            elif "chatglmv2forcausallm" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    ChatGLMv2ForCausalLMInferenceModel,
+                )
+
+                cache_kvs_shape = ChatGLMv2ForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
+                )
             elif "chatglmforcausallm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     ChatGLMForCausalLMInferenceModel,
@@ -1510,20 +1520,8 @@ def predict():
                 source_texts.append(example["src"])
                 target_texts.append(example["tgt"])
     else:
-        # source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
-        source_texts = []
-
-        data_file = open("humaneval_solution.json", "r")
-
-        dataset = []
-        for line in data_file.readlines():
-            dataset.append(json.loads(line))
-
-        for i in range(predictor_args.batch_size):
-            data = dataset[i % 164]
-            source_texts.append(data["prompt"])
-
-        target_texts = [""] * predictor_args.batch_size
+        source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
+        target_texts = ["", ""]
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)

@@ -39,6 +39,8 @@ from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.io import IterableDataset
 from paddle.optimizer.lr import LambdaDecay
 
+from paddlenlp.ops import Topology
+
 from ..transformers.tokenizer_utils_base import BatchEncoding
 from ..utils.import_utils import is_paddle_cuda_available, is_psutil_available
 from ..utils.log import logger
@@ -57,18 +59,47 @@ __all__ = [
 ]
 
 
-def set_seed(seed: int = 1234):
+def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
+    """
+    Get the seeds from distributed environment strategy.
+    Args:
+        seed (:obj:`int`, `optional`, defaults to 1234): The seeds for initializing distributed training.
+        topo (:obj:`Topology`, `optional`, defaults to None): The topology of hybrid parallel in semi-auto mode.
+    Returns:
+        Tuple[int, int]: The global seed and local seed respectively.
+    """
+
     # NOTE: For parameter init seed:
     # seed: dp/mp_undistributed_paramter/sharding is same; others is different
     # For compute seed(dropout):
     # global seed: only mp group is same.
     # local seed: all groups are different
-    hcg = fleet.get_hybrid_communicate_group() if hasattr(fleet.fleet, "_hcg") else None
-    if hcg is not None and paddle.distributed.get_world_size() > 1:
+    hcg = None
+    if hasattr(fleet.fleet, "_hcg") and topo is not None:
+        hcg = fleet.get_hybrid_communicate_group()
+
+    if topo is not None and paddle.distributed.get_world_size() > 1:
+        dp_rank = topo.dp_info.rank
+        dp_size = topo.dp_info.size
+
+        pp_rank = topo.pp_info.rank
+        pp_size = topo.pp_info.size
+
+        mp_rank = topo.mp_info.rank
+        mp_size = topo.mp_info.size
+
+        sep_rank = topo.sep_info.rank
+        sep_size = topo.sep_info.size
+
+        sharding_rank = topo.sharding_info.rank
+    elif hcg is not None and paddle.distributed.get_world_size() > 1:
         # obtain rank message of hybrid parallel
 
         mp_rank = hcg.get_model_parallel_rank()
         mp_size = hcg.get_model_parallel_world_size()
+
+        sep_rank = hcg.get_sep_parallel_rank()
+        sep_size = hcg.get_sep_parallel_world_size()
 
         pp_rank = hcg.get_stage_id()
         pp_size = hcg.get_pipe_parallel_world_size()
@@ -77,45 +108,56 @@ def set_seed(seed: int = 1234):
         dp_size = hcg.get_data_parallel_world_size()
 
         sharding_rank = hcg.get_sharding_parallel_rank()
-        # sharding_size = hcg.get_sharding_parallel_world_size()
     else:
         mp_rank, mp_size = 0, 1
+        sep_rank, sep_size = 0, 1
         pp_rank, pp_size = 0, 1
         dp_rank, dp_size = 0, 1
         sharding_rank, _ = 0, 1
 
-    # NOTE: the commented seeds are set only for precision validation
-    # seed += 100 * pp_rank
-    random.seed(seed + 100 * pp_rank)
-    np.random.seed(seed + 100 * pp_rank)
-
     seed_offset = seed
     global_seed = (
         seed_offset
-        + pp_rank * (mp_size)
-        + dp_rank * (mp_size * pp_size)
-        + sharding_rank * (mp_size * pp_size * dp_size)
+        + sep_rank * (mp_size)
+        + pp_rank * (mp_size * sep_size)
+        + dp_rank * (mp_size * sep_size * pp_size)
+        + sharding_rank * (mp_size * sep_size * pp_size * dp_size)
     )
 
     seed_offset += paddle.distributed.get_world_size()
     local_seed = (
         seed_offset
         + mp_rank
-        + pp_rank * (mp_size)
-        + dp_rank * (mp_size * pp_size)
-        + sharding_rank * (mp_size * pp_size * dp_size)
+        + sep_rank * (mp_size)
+        + pp_rank * (mp_size * sep_size)
+        + dp_rank * (mp_size * sep_size * pp_size)
+        + sharding_rank * (mp_size * sep_size * pp_size * dp_size)
     )
 
+    # NOTE: the commented seeds are set only for precision validation
+    random_seed = seed + 100 * pp_rank
+
+    return global_seed, local_seed, random_seed
+
+
+def set_seed(seed: int = 1234, topo=None):
+    global_seed, local_seed, random_seed = _get_distributed_seeds(seed, topo)
+
     tracker = get_rng_state_tracker()
-    if "global_seed" not in tracker.states_:
+    if "global_seed" not in tracker.states_ and global_seed not in tracker.seeds_:
         tracker.add("global_seed", global_seed)
 
-    if "local_seed" not in tracker.states_:
+    if "local_seed" not in tracker.states_ and local_seed not in tracker.seeds_:
         tracker.add("local_seed", local_seed)
 
     paddle.seed(global_seed)
+    random.seed(random_seed)
+    np.random.seed(random_seed)
 
-    logger.info("The global seed is set to {} and local seed is set to {}.".format(global_seed, local_seed))
+    logger.info(
+        "The global seed is set to {}, local seed is set to {} and "
+        "random seed is set to {}.".format(global_seed, local_seed, random_seed)
+    )
 
 
 class ExplicitEnum(Enum):
@@ -980,7 +1022,7 @@ def set_hyrbid_parallel_seed(basic_seed, dataset_rank, tp_rank, pp_rank=0):
 
     tracker = get_rng_state_tracker()
 
-    if "global_seed" not in tracker.states_:
+    if "global_seed" not in tracker.states_ and global_seed not in tracker.seeds_:
         tracker.add("global_seed", global_seed)
-    if "local_seed" not in tracker.states_:
+    if "local_seed" not in tracker.states_ and local_seed not in tracker.seeds_:
         tracker.add("local_seed", local_seed)
