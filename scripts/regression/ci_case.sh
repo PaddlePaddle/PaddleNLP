@@ -1083,7 +1083,7 @@ python setup_cuda.py install
 
 echo ' Testing all LLMs '
 cd ${nlp_dir}
-python -m pytest -v -s tests/llm/test_*.py >${log_path}/llm >>${log_path}/llm 2>&1
+python -m pytest tests/llm/test_*.py --alluredir=result >${log_path}/llm >>${log_path}/llm 2>&1
 print_info $? llm
 }
 fast_generation(){
@@ -1208,10 +1208,5 @@ ernie_doc(){
 
 ernie_health(){
     ernie-health
-}
-
-gpt-3() {
-    bash ${nlp_dir}/scripts/regression/ci_gpt-3.sh
-    print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'`
 }
 $1

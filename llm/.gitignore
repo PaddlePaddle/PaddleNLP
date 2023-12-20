@@ -1,0 +1,20 @@
+
+max_len.txt 
+
+# tmp files
+infer.json
+output.json 
+
+# data
+data/
+AdvertiseGen.tar.gz
+
+# checkpoints
+checkpoints/
+
+# inference_model
+inference*/
+
+# log 
+log/
+

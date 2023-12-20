@@ -91,11 +91,16 @@ from ..utils.env import (
     PADDLE_WEIGHTS_NAME,
     PREFIX_WEIGHTS_NAME,
 )
-from ..utils.import_utils import is_datasets_available
+from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
-from .plugins.unified_checkpoint import load_unified_checkpoint, save_unified_checkpoint
+from .plugins.unified_checkpoint import (
+    load_unified_checkpoint,
+    load_unified_optimizer,
+    save_unified_checkpoint,
+    save_unified_optimizer,
+)
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -162,10 +167,6 @@ try:
     from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
 except:
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
-
-
-def is_dp_group_support_in_group_sharded_parallel():
-    return "dp_group" in set(inspect.signature(paddle.distributed.sharding.group_sharded_parallel).parameters.keys())
 
 
 __all__ = ["Trainer"]
@@ -259,7 +260,7 @@ class Trainer:
         self._memory_tracker.start()
 
         # Seed must be set before instantiating the model when using model
-        set_seed(args=self.args)
+        set_seed(seed=self.args.seed)
 
         if model is None:
             raise RuntimeError("`Trainer` requires either a `model` or `model_init` argument")
@@ -372,9 +373,6 @@ class Trainer:
                         )
 
                         if self.args.amp_master_grad:
-                            assert (
-                                ShardingOption.SHARD_GRAD_OP in self.args.sharding
-                            ), "Main grad doesn't support sharding stage 3 for now."
                             mix_precision_utils.MixPrecisionScaler(self.scaler)  # return value has no use
 
                         self.scaler = GroupShardedScaler(self.scaler)
@@ -502,8 +500,9 @@ class Trainer:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
         if self.args.unified_checkpoint:
-            if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
+            if resume_from_checkpoint is not None:
                 load_unified_checkpoint(
+                    self.args,
                     self.model,
                     resume_from_checkpoint,
                     safe_serialization=True,
@@ -873,6 +872,13 @@ class Trainer:
                 # sharding
                 # stage1. the same as ddp
                 # stage2. manualy collect gradient on dp group
+
+                dp_master_grad = (
+                    self.args.world_size > 1 and self.args.amp_master_grad and not self.args.use_hybrid_parallel
+                )
+                if dp_master_grad:
+                    is_no_sync = True
+
                 if is_no_sync:
                     # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
                     with model.no_sync():
@@ -888,33 +894,30 @@ class Trainer:
                     and (step + 1) == steps_in_epoch
                 ):
                     self.timers and self.timers("forward-backward").stop()
-                    # Maunally collect gradients when group_sharded_parallel can't accept dp_group
-                    # Case 1: Use sharding stage 2/3 with dp
-                    # Case 2: Use recompute and dp
+                    # Maunally collect gradients
+                    # Case 1: Use recompute and dp
+                    # Case 2: Hack dp with master_grad
+                    # Case 3: Pipeline or sharding overlap
                     # local_rank != -1 don't means dp in networks.
                     self.timers and self.timers("all-reduce").start()
 
-                    if self.sharding and ShardingOption.SHARD_OP not in self.args.sharding:
-                        if self.args.data_parallel_degree > 1 and not is_dp_group_support_in_group_sharded_parallel():
-                            fused_allreduce_gradients(model.parameters(), fleet.get_hybrid_communicate_group())
-                            if ShardingOption.FULL_SHARD in self.args.sharding:
-                                # Why need sync on parm again ?
-                                # TODO: fix this.
-                                for p in model.parameters():
-                                    if hasattr(p, "bw_storage"):
-                                        assert p.grad is None, "This case shouldn't happen."
-                                        p.bw_storage.scale_(1.0 / self.dp_group.nranks)
-                                        paddle.distributed.all_reduce(p.bw_storage, group=self.dp_group)
-
-                    # Case 2: Use recompute and dp / sharding stage1,
+                    # Case 1: Use recompute and dp / sharding stage1,
                     # manualy collect gradient for dp.
-                    elif args.recompute and availiable_no_sync:
+                    if args.recompute and availiable_no_sync:
                         fused_allreduce_gradients(list(model.parameters()), None)
 
-                    pipeline_parallel_config = set(args.pipeline_parallel_config.split(" "))
+                    # Case 2: hack dp with master_grad
+                    if dp_master_grad and not (args.recompute and availiable_no_sync):
+                        fused_allreduce_gradients(list(model.parameters()), None)
+
+                    # Pipeline parallel mode,  handle gradient reduce here to overlap
+                    pipeline_parallel_config = (
+                        set(args.pipeline_parallel_config.split(" ")) if args.pipeline_parallel_degree > 1 else set()
+                    )
                     enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
 
+                    # Case 3: Pipeline parallel mode, overlap with dp
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
                         parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
 
@@ -925,10 +928,10 @@ class Trainer:
 
                             if self.optimizer._dp_enable:
                                 fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
+
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
 
-                    # pipeline parallel mode,  handle gradient merge here
                     if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
                         for p in model._layers.parameters():
                             with paddle.no_grad():
@@ -1158,6 +1161,22 @@ class Trainer:
             self._globalstep_last_logged = self.state.global_step
             self._globalstep_last_start_time = time.time()
 
+            # Add additional memory in log.
+            if not self.args.skip_memory_metrics:
+                logs.update(
+                    {
+                        "cpu_mem_used": self._memory_tracker.cpu_mem_used() >> 20,
+                        "cpu_mem_used_peak": self._memory_tracker.cpu_mem_used_peak >> 20,
+                    }
+                )
+                if is_paddle_cuda_available():
+                    logs.update(
+                        {
+                            "gpu_max_memory_allocated": paddle.device.cuda.max_memory_allocated() >> 20,
+                            "gpu_max_memory_reserved": paddle.device.cuda.max_memory_reserved() >> 20,
+                        }
+                    )
+
             self.log(logs, **kwargs)
 
         metrics = None
@@ -1221,10 +1240,7 @@ class Trainer:
                 num_workers=self.args.dataloader_num_workers,
             )
 
-        if self.args.should_load_dataset:
-            train_sampler = self._get_train_sampler()
-        else:
-            train_sampler = None
+        train_sampler = self._get_train_sampler()
 
         if self.args.distributed_dataloader:
             logger.info("Training using DistDataLoader.")
@@ -1301,10 +1317,7 @@ class Trainer:
                 num_workers=self.args.dataloader_num_workers,
             )
 
-        if self.args.should_load_dataset:
-            eval_sampler = self._get_eval_sampler(eval_dataset)
-        else:
-            eval_sampler = None
+        eval_sampler = self._get_eval_sampler(eval_dataset)
 
         if self.args.distributed_dataloader:
             logger.info("Eval using DistDataLoader.")
@@ -1354,10 +1367,7 @@ class Trainer:
                 num_workers=self.args.dataloader_num_workers,
             )
 
-        if self.args.should_load_dataset:
-            test_sampler = self._get_eval_sampler(test_dataset)
-        else:
-            test_sampler = None
+        test_sampler = self._get_eval_sampler(test_dataset)
 
         if self.args.distributed_dataloader:
             logger.info("Test using DistDataLoader.")
@@ -1596,14 +1606,29 @@ class Trainer:
             else:
                 model, self.optimizer = decorated
 
-        # Multi-gpu training
-        if self.args.world_size > 1 and not self.args.use_hybrid_parallel:
-            model = paddle.DataParallel(model)
-            # Distributed training (should be after fp16 initialization)
+        if self.args.world_size == 1:
+            if self.args.amp_master_grad:
+                mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
+                assert self.optimizer is not None, "optimizer is empty!"
+                self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
 
         in_pipeline_parallel_mode = self.args.pipeline_parallel_degree > 1
         in_sharding_parallel_mode = self.sharding is not None
-        in_tensor_parallel_model = self.args.tensor_parallel_degree > 1
+        in_tensor_parallel_mode = self.args.tensor_parallel_degree > 1
+
+        # Multi-gpu training
+        if (
+            self.args.world_size > 1
+            and not self.args.use_hybrid_parallel
+            or not (in_pipeline_parallel_mode or in_sharding_parallel_mode or in_tensor_parallel_mode)
+        ):
+            model = paddle.DataParallel(model)
+            # Distributed training (should be after fp16 initialization)
+
+            if self.args.amp_master_grad:
+                mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
+                assert self.optimizer is not None, "optimizer is empty!"
+                self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
 
         # Pipeline mode
         if in_pipeline_parallel_mode:
@@ -1673,14 +1698,6 @@ class Trainer:
                     self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
                 self.optimizer = fleet.distributed_optimizer(self.optimizer)
             else:
-                # sync params (broadcast) buffers in dp group
-                if not is_dp_group_support_in_group_sharded_parallel() and self.args.data_parallel_degree > 1:
-                    from paddle.distributed.parallel import sync_params_buffers
-
-                    hcg = fleet.get_hybrid_communicate_group()
-                    dp_group = hcg.get_data_parallel_group()
-                    sync_params_buffers(model, comm_group=dp_group, src_rank=dp_group.ranks[0])
-
                 cpu_offload = ShardingOption.OFFLOAD in self.args.sharding
                 assert self.optimizer is not None, "optimizer is empty!"
                 level = None
@@ -1694,15 +1711,13 @@ class Trainer:
                 # add dp_group and exclude_layer params
                 # https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/distributed/sharding/group_sharded_parallel_cn.html#group-sharded-parallel
                 extra_kwargs = {}
-                if is_dp_group_support_in_group_sharded_parallel():
-                    extra_kwargs["dp_group"] = self.dp_group
-                    extra_kwargs["exclude_layer"] = ["GroupNorm"]
+                extra_kwargs["dp_group"] = self.dp_group
+                extra_kwargs["exclude_layer"] = ["GroupNorm"]
 
                 if self.args.amp_master_grad:
-                    assert level == "os_g", "Main grad doesn't support sharding stage 3 for now."
                     assert (
                         self.args.data_parallel_degree == 1
-                    ), "Sharding stage 2 main grad is not compatible with dp for now."
+                    ), "Sharding stage 2 / Sharding stage 3 main grad is not compatible with dp for now."
                     mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
                     self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
 
@@ -1715,7 +1730,7 @@ class Trainer:
                     offload=cpu_offload,
                     **extra_kwargs,
                 )
-                if self.args.amp_master_grad:
+                if ShardingOption.SHARD_GRAD_OP in self.args.sharding and self.args.amp_master_grad:
                     assert hasattr(optimizer, "use_main_grad"), (
                         "Current installed paddle doesn't support sharding stage 2 with main grad, "
                         "please upgrade your paddle (using nightly version)."
@@ -1729,7 +1744,7 @@ class Trainer:
                 self.optimizer = optimizer
 
         # pure tesnor parallel mode, no pipeline_parallel, no sharding.
-        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and in_tensor_parallel_model:
+        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and in_tensor_parallel_mode:
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
 
@@ -1974,17 +1989,26 @@ class Trainer:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
                 logger.info("Saving optimizer files.")
-                paddle.save(
-                    self.optimizer.state_dict(),
-                    os.path.join(output_dir, optimizer_name),
-                )
+                if self.args.unified_checkpoint:
+                    save_unified_optimizer(
+                        self.args,
+                        self.model,
+                        self.optimizer,
+                        output_dir,
+                        safe_serialization=True,
+                    )
+                else:
+                    paddle.save(
+                        self.optimizer.state_dict(),
+                        os.path.join(output_dir, optimizer_name),
+                    )
 
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
                 logger.info("Saving optimizer files.")
                 paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
-            # FIXME: manybe only save one copy
+            # FIXME: maybe only save one copy
             paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
 
             if self.do_grad_scaling:
@@ -2034,7 +2058,16 @@ class Trainer:
 
         # Maybe delete some older checkpoints.
         # For hybrid parallel training, the checkpoint files maybe on different node.
-        if self.args.should_save_model_state and self.args.local_rank == 0:
+        need_to_rotate_checkpoints = False
+        if self.args.use_hybrid_parallel:
+            if self.dp_group.rank <= 0:
+                need_to_rotate_checkpoints = True
+        else:
+            need_to_rotate_checkpoints = self.args.should_save_model_state
+
+        # Delete only by one process
+        need_to_rotate_checkpoints = need_to_rotate_checkpoints and self.args.local_rank == 0
+        if need_to_rotate_checkpoints:
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
 
     def set_optimizer_grouped_parameters(self, optimizer_grouped_parameters=None):
@@ -2193,7 +2226,6 @@ class Trainer:
 
     def _load_optimizer_and_scheduler(self, checkpoint):
         """If optimizer and scheduler states exist, load them."""
-        # TODO: Support DP broadcast optimizer.
         if checkpoint is None:
             return
 
@@ -2203,11 +2235,22 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
-            optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
-            if self.args.data_parallel_rank == 0:
-                path = os.path.join(checkpoint, optimizer_name)
-                if os.path.isfile(path):
-                    opt_state_dict = paddle.load(path)
+            if not self.args.unified_checkpoint:
+                if self.args.data_parallel_rank == 0:
+                    optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+                    path = os.path.join(checkpoint, optimizer_name)
+                    if os.path.isfile(path):
+                        opt_state_dict = paddle.load(path)
+                else:
+                    opt_state_dict = None
+            else:
+                opt_state_dict = load_unified_optimizer(
+                    args=self.args,
+                    model=self.model,
+                    optimizer=self.optimizer,
+                    resume_from_checkpoint=checkpoint,
+                    safe_serialization=True,
+                )
 
         # broadcast optimizer state in dp group
         opt_state_dict = broadcast_dp_optimizer(opt_state_dict)

@@ -265,6 +265,11 @@ def process_strategy(config):
     tuning.run_after_tuning = tuning_cfg.get("run_after_tuning", True)
     tuning.debug = tuning_cfg.get("debug", True)
 
+    # sequence parallel config
+    if config.Model.get("sequence_parallel", False):
+        sp_optimization = strategy.sp_optimization
+        sp_optimization.enable = True
+
     engine_cfg = config["Engine"]
     engine_cfg["strategy"] = strategy
 

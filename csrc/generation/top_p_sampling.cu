@@ -505,7 +505,7 @@ std::vector<paddle::Tensor> top_p_sampling_kernel(const paddle::Tensor& x, const
 
     int bs = shape[0];
     int p_num = top_ps.numel();
-    PD_CHECK(bs == p_num, "PD_CHECK returns ", false, ", expected bs == p_num.");
+    
     int vocab_size = shape[1];
     auto topp_ids = paddle::full({bs, 1}, 1, paddle::DataType::INT64, x.place());
     auto topp_probs = paddle::full({bs, 1}, 1, x.dtype(), x.place());

@@ -85,7 +85,9 @@ class LoRAModel(nn.Layer):
             self.lora_config.dtype = paddle.get_default_dtype()
         with dtype_guard(self.lora_config.dtype):
             self.model = self.get_lora_model(model, lora_config)
-        if isinstance(self.model, PipelineLayer):
+        self.is_pipelinemodel = False
+        if issubclass(type(self.model), PipelineLayer):
+            self.is_pipelinemodel = True
             self.model._single_to_pp_mapping = None
         if self.lora_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
             self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
@@ -190,7 +192,12 @@ class LoRAModel(nn.Layer):
             if key in trainable_name_action_mappings:
                 ret = distributed_gather(tensor, group=mp_group, offload=True)
                 action = trainable_name_action_mappings[key]
-                tensor = action(ret) if is_dst else None
+                is_collumn = self.lora_split_mapping[key]
+                if "_scale" in key and not is_collumn and is_dst:
+                    ret = paddle.to_tensor(ret)
+                    tensor = paddle.max(ret, axis=0)
+                else:
+                    tensor = action(ret) if is_dst else None
                 trainable_state_dict[key] = tensor
             else:
                 trainable_state_dict[key] = tensor.cpu().numpy() if is_dst else None
@@ -214,16 +221,14 @@ class LoRAModel(nn.Layer):
         return lora_state_dict
 
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
+        if self.is_pipelinemodel:
+            self.model._single_to_pp_mapping = None
         if self.quantized and merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
             merge_tensor_parallel = False
             logger.warning(
                 "Quantized strategy does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
             )
-        if (
-            isinstance(self.model, PipelineLayer)
-            and merge_tensor_parallel
-            and self.model.config.tensor_parallel_degree > 1
-        ):
+        if self.is_pipelinemodel and merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
             merge_tensor_parallel = False
             logger.warning(
                 "Pipeline parallism does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
@@ -300,6 +305,11 @@ class LoRAModel(nn.Layer):
                 )
                 # Lora column parallel will spilt lora B matrix
                 self.add_lora_split_mapping(module_name + ".lora_B", is_column=True)
+
+                # for lora qat
+                self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=True)
+                self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
+                self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
             elif isinstance(module, RowParallelLinear):
                 # recover the original output_features
                 lora_module = RowParallelLoRALinear(
@@ -314,6 +324,11 @@ class LoRAModel(nn.Layer):
                 )
                 # Lora column parallel will spilt lora A matrix
                 self.add_lora_split_mapping(module_name + ".lora_A", is_column=False)
+
+                # for lora qat
+                self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=False)
+                self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
+                self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
             elif QuantizationLinear is not None and isinstance(module, QuantizationLinear):
                 lora_module = QuantizationLoRALinear(
                     in_features=module.in_features,
@@ -321,6 +336,9 @@ class LoRAModel(nn.Layer):
                     quant_algo=module.quant_algo,
                     dtype=module._dtype,
                     bias_attr=False if module.bias is None else None,
+                    block_size=module.block_size,
+                    double_quant_block_size=module.double_quant_block_size,
+                    double_quant=module.double_quant,
                     r=lora_config.r,
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
@@ -394,7 +412,14 @@ class LoRAModel(nn.Layer):
             )
         if getattr(lora_module, "quant_weight", None) is not None:
             lora_module.quant_weight = module.quant_weight
-            lora_module.quant_scale = module.quant_scale
+            if getattr(lora_module, "quant_scale", None) is not None:
+                lora_module.quant_scale = module.quant_scale
+            if getattr(lora_module, "qquant_scale", None) is not None:
+                lora_module.qquant_scale = module.qquant_scale
+            if getattr(lora_module, "double_quant_scale", None) is not None:
+                lora_module.double_quant_scale = module.double_quant_scale
+            if getattr(lora_module, "quant_sacle_offset", None) is not None:
+                lora_module.quant_sacle_offset = module.quant_sacle_offset
         else:
             lora_module.weight = module.weight
         if module.bias is not None:

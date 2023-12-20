@@ -20,20 +20,23 @@ import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from threading import Thread
+from typing import List, Optional
 
 import numpy as np
 import paddle
 import paddle.distributed.fleet.base.topology as tp
 from paddle.distributed import fleet
+from paddlenlp_ops import reset_stop_value
 from utils import (
     dybatch_preprocess,
     get_alibi_slopes,
     get_infer_model_path,
     get_prefix_tuning_params,
+    init_chat_template,
     load_real_time_tokens,
 )
 
-from paddlenlp.generation import TextIteratorStreamer
+from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.trainer import PdArgumentParser
@@ -41,11 +44,13 @@ from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
+    ChatGLMv2Tokenizer,
     LlamaTokenizer,
     PretrainedModel,
     PretrainedTokenizer,
 )
 from paddlenlp.utils.import_utils import import_module, is_paddlenlp_ops_available
+from paddlenlp.utils.log import logger
 
 
 @dataclass
@@ -77,9 +82,10 @@ class PredictorArgument:
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     quant_type: str = field(
-        default="None",
-        metadata={"help": "The quant type of inference model, support `weight_only_int8`, `weight_only_int4`."},
+        default=None,
+        metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"},
     )
+
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     benchmark: bool = field(
         default=False,
@@ -95,6 +101,25 @@ class PredictorArgument:
     init_fleet_worker: bool = field(
         default=True,
         metadata={"help": "whether use `init_fleet_worker` in inference predictor"},
+    )
+    block_attn: bool = field(default=False, metadata={"help": "whether use block attention"})
+    block_size: int = field(default=64, metadata={"help": "the block size for cache_kvs."})
+    use_cachekv_int8: str = field(
+        default="None",
+        metadata={
+            "help": "If use_cachekv_int8 set as `dynamic`, dynamic cache kv quantization will be applied; if set as `static`, static cache kv will be applied"
+        },
+    )
+
+    chat_template: str = field(
+        default=None,
+        metadata={
+            "help": "the path of `chat_template.json` file to handle multi-rounds conversation. "
+            "If is None(do not set --chat_template argument), it will use the default `chat_template.json`;"
+            "If is equal with `model_name_or_path`, it will use the default loading; "
+            "If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
+            "If is none string, it will not use chat_template.json."
+        },
     )
 
     @property
@@ -143,6 +168,20 @@ def init_dist_env():
     return tensor_parallel_rank, tensor_parallel_degree
 
 
+def get_eos_token_id(
+    tokenizer: PretrainedTokenizer, generation_config: Optional[GenerationConfig] = None
+) -> int | List[List[int]]:
+    """get eos_token_id from generation_config or tokenizer
+
+    Returns:
+        int | List[int]: eos_token_id to stop the generation
+    """
+    if generation_config is None or generation_config.eos_token_id is None:
+        return tokenizer.eos_token_id
+
+    return generation_config.eos_token_id
+
+
 class BasePredictor:
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
         self.model_config = AutoConfig.from_pretrained(config.model_name_or_path)
@@ -156,7 +195,19 @@ class BasePredictor:
         self.tensor_parallel_rank, self.tensor_parallel_degree = init_dist_env()
         self.model_config.tensor_parallel_rank, self.model_config.tensor_parallel_degree = init_dist_env()
 
+        try:
+            self.generation_config = GenerationConfig.from_pretrained(config.model_name_or_path)
+        except:
+            logger.warning(
+                "Can't find generation config, so it will not use generation_config field in the model config"
+            )
+            self.generation_config = None
+
     def _preprocess(self, source):
+        if self.tokenizer.chat_template is not None:
+            source = [source] if isinstance(source, str) else source
+            source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
+
         tokenized_source = self.tokenizer(
             source,
             max_length=self.config.src_length,
@@ -164,7 +215,9 @@ class BasePredictor:
             truncation_side="left",
             return_tensors=self.return_tensors,
             padding=True,
-            add_special_tokens=True,
+            # when use chat_template, it should not add special tokens
+            # chatglm2 prefix-tokens can not be tokenized into ids
+            add_special_tokens=self.tokenizer.chat_template is None or isinstance(self.tokenizer, ChatGLMv2Tokenizer),
         )
         return tokenized_source
 
@@ -230,7 +283,7 @@ class DygraphPredictor(BasePredictor):
             **inputs,
             max_new_tokens=self.config.max_length,
             bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=self.tokenizer.eos_token_id,
+            eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
             pad_token_id=self.tokenizer.pad_token_id,
             decode_strategy=self.config.decode_strategy,
             temperature=self.config.temperature,
@@ -242,14 +295,14 @@ class DygraphPredictor(BasePredictor):
         return result
 
     def stream_predict(self, inputs: dict[str, paddle.Tensor]):
-        text_streamer = TextIteratorStreamer(self.tokenizer)
+        text_streamer = TextIteratorStreamer(self.tokenizer, skip_special_tokens=True)
         input_features = self._preprocess(inputs)
         generation_kwargs = dict(
             **input_features,
             streamer=text_streamer,
             max_new_tokens=self.config.max_length,
             bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=self.tokenizer.eos_token_id,
+            eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
             pad_token_id=self.tokenizer.pad_token_id,
             decode_strategy="greedy_search"
             if self.config.top_k == 1 and self.config.top_p == 1.0
@@ -281,6 +334,7 @@ class StaticGraphPredictor(BasePredictor):
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             inference_config.disable_gpu()
         inference_config.disable_glog_info()
+        inference_config.enable_new_executor()
 
         with static_mode_guard():
             self.predictor = paddle.inference.create_predictor(inference_config)
@@ -371,6 +425,14 @@ class InferencePredictorMixin:
                 )
                 self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, self.num_layers, axis=0)]
 
+        try:
+            self.generation_config = GenerationConfig.from_pretrained(config.model_name_or_path)
+        except:
+            logger.warning(
+                "Can't find generation config, so it will not use generation_config field in the model config"
+            )
+            self.generation_config = None
+
     def _postprocess(self, predictions):
         if paddle.distributed.get_rank() == 0:
             tokens: np.ndarray = load_real_time_tokens()
@@ -385,6 +447,11 @@ class InferencePredictorMixin:
         self.attention_mask[:] = 0
         self.tgt_generation_mask[:] = 0
         pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
+
+        if self.tokenizer.chat_template is not None:
+            source = [source] if isinstance(source, str) else source
+            source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
+
         inputs = dybatch_preprocess(
             self.tokenizer,
             source,
@@ -393,6 +460,7 @@ class InferencePredictorMixin:
             self.architectures,
             top_p=self.config.top_p,
             temperature=self.config.temperature,
+            eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
             benchmark=self.config.benchmark,
             pre_caches_length=pre_caches_length,
         )
@@ -584,12 +652,9 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
 
         device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
         config.enable_use_gpu(100, device_id)
-        # config.disable_glog_info()
-        if predictor_args.enable_memory_optim:
-            config.enable_memory_optim()
+        config.enable_new_executor()
 
-        # Note(zhengzekang): Force to use fleet executor
-        if predictor_args.init_fleet_worker or self.tensor_parallel_degree > 1:
+        if self.tensor_parallel_degree > 1:
             trainer_endpoints = fleet.worker_endpoints()
             current_endpoint = trainer_endpoints[self.tensor_parallel_rank]
 
@@ -656,6 +721,526 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
         return None
 
 
+class DygraphBlockInferencePredictor(BasePredictor):
+    def __init__(
+        self,
+        config: PredictorArgument,
+        model: PretrainedModel = None,
+        tokenizer: PretrainedTokenizer = None,
+    ):
+        BasePredictor.__init__(self, config, tokenizer)
+        self.cache_kvs_shape = []
+        self.total_max_length = config.src_length + config.max_length
+        self.block_size = model.config.block_size
+        self.num_layers = model.config.num_hidden_layers
+        pre_max_block_num = (self.total_max_length + self.block_size - 1) // self.block_size
+        self.max_block_nums = config.batch_size * pre_max_block_num
+        self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size)
+
+        self.architectures = self.model_config.architectures[0].lower()
+
+        self.dtype = config.dtype or self.model_config
+        if config.use_cachekv_int8 == "dynamic" or config.use_cachekv_int8 == "static":
+            self.cache_kvs = [paddle.zeros(shape, dtype="uint8") for shape in self.cache_kvs_shape]
+        else:
+            self.cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.cache_kvs_shape]
+        self.num_attention_heads, self.head_dim = (
+            self.cache_kvs[0].shape[-3],
+            self.cache_kvs[0].shape[-1],
+        )
+
+        self.inputs = {}
+        self.pre_cache_length = 0
+        if config.export_precache:
+            pre_cache_npy = np.load(config.prefix_path)
+            self.pre_cache_length = pre_cache_npy.shape[-2]
+            config.max_length -= self.pre_cache_length
+            self.pre_caches = [
+                paddle.zeros(
+                    [config.batch_size, self.num_attention_heads, self.pre_cache_length, self.head_dim],
+                    dtype=self.dtype,
+                )
+                for _ in range(2 * self.num_layers)
+            ]
+            print("pre_cache_length: ", self.pre_cache_length)
+            for i in range(self.num_layers):
+                self.pre_caches[2 * i][:, :, :, :] = paddle.to_tensor(pre_cache_npy[i][0], dtype=self.dtype).unsqueeze(
+                    0
+                )
+                self.pre_caches[2 * i + 1][:, :, :, :] = paddle.to_tensor(
+                    pre_cache_npy[i][1], dtype=self.dtype
+                ).unsqueeze(0)
+            self.inputs["pre_caches"] = self.pre_caches
+            pre_cache_mask = paddle.zeros(
+                shape=[config.batch_size, 1, config.src_length, config.src_length + self.pre_cache_length],
+                dtype=self.dtype,
+            )
+            pre_cache_mask[:, :, :, : self.pre_cache_length] = 1
+            pre_cache_mask[:, :, :, self.pre_cache_length :] = paddle.tril(
+                paddle.ones(shape=[config.batch_size, 1, config.src_length, config.src_length], dtype=self.dtype)
+            )
+            self.inputs["src_mask"] = (pre_cache_mask - 1) * 1e4
+
+        if config.use_cachekv_int8 == "dynamic":
+            self.k_quant_scales = [
+                paddle.zeros([config.batch_size, self.num_attention_heads], dtype="float32")
+                for _ in range(self.num_layers)
+            ]
+            self.v_quant_scales = [
+                paddle.zeros([config.batch_size, self.num_attention_heads], dtype="float32")
+                for _ in range(self.num_layers)
+            ]
+            self.k_dequant_scales = [
+                paddle.zeros([config.batch_size, self.num_attention_heads], dtype="float32")
+                for _ in range(self.num_layers)
+            ]
+            self.v_dequant_scales = [
+                paddle.zeros([config.batch_size, self.num_attention_heads], dtype="float32")
+                for _ in range(self.num_layers)
+            ]
+
+        # not update
+        self.inputs["cache_kvs"] = self.cache_kvs
+
+        self.inputs["pre_ids"] = paddle.full([config.batch_size, self.total_max_length], -1, dtype="int64")
+        self.inputs["bad_tokens"] = paddle.to_tensor(
+            [
+                -1,
+            ],
+            dtype="int64",
+        )
+        self.inputs["penalty_score"] = paddle.full(shape=[config.batch_size, 1], fill_value=1.0, dtype="float32")
+        self.inputs["frequency_score"] = paddle.full(shape=[config.batch_size, 1], fill_value=0.0, dtype="float32")
+        self.inputs["presence_score"] = paddle.full(shape=[config.batch_size, 1], fill_value=0.0, dtype="float32")
+
+        if config.use_cachekv_int8 == "dynamic":
+            self.inputs["k_quant_scales"] = self.k_quant_scales
+            self.inputs["v_quant_scales"] = self.v_quant_scales
+            self.inputs["k_dequant_scales"] = self.k_dequant_scales
+            self.inputs["v_dequant_scales"] = self.v_dequant_scales
+
+        if config.benchmark:
+            min_length = config.max_length
+        else:
+            min_length = 2
+        self.inputs["min_length"] = paddle.full(shape=[config.batch_size, 1], fill_value=min_length, dtype="int64")
+        self.inputs["max_length"] = paddle.full(
+            shape=[config.batch_size, 1], fill_value=config.max_length, dtype="int64"
+        )
+        self.inputs["stop_nums"] = paddle.full(shape=[1], fill_value=config.batch_size, dtype="int64")
+        tmp_position_ids = paddle.arange(self.total_max_length).reshape((1, -1))
+        self.inputs["rope_emb"] = self._get_rotary_position_embedding(tmp_position_ids, self.head_dim)
+        self.inputs["eos_token_id"] = paddle.to_tensor(
+            [
+                self.tokenizer.eos_token_id,
+            ],
+            "int64",
+        )
+        # need update
+        self.inputs["block_tables"] = paddle.full(
+            shape=[config.batch_size, pre_max_block_num], fill_value=-1, dtype="int32"
+        )
+        self.inputs["input_ids"] = paddle.full(
+            shape=[config.batch_size, config.src_length], fill_value=-1, dtype="int64"
+        )
+        self.inputs["top_p"] = paddle.full(shape=[config.batch_size, 1], fill_value=config.top_p, dtype="float32")
+        self.inputs["temperature"] = paddle.full(shape=[config.batch_size, 1], fill_value=1.0, dtype="float32")
+        self.inputs["seq_lens_this_time"] = paddle.full(shape=[config.batch_size, 1], fill_value=0, dtype="int32")
+        self.inputs["seq_lens_encoder"] = paddle.full(shape=[config.batch_size, 1], fill_value=0, dtype="int32")
+        self.inputs["seq_lens_decoder"] = paddle.full(shape=[config.batch_size, 1], fill_value=0, dtype="int32")
+        self.inputs["step_idx"] = paddle.full(shape=[config.batch_size, 1], fill_value=0, dtype="int64")
+        self.inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=False, dtype="bool").cpu()
+        self.inputs["stop_flags"] = paddle.full(shape=[config.batch_size, 1], fill_value=True, dtype="bool")
+        self.inputs["next_tokens"] = paddle.full(shape=[config.batch_size, 1], fill_value=-1, dtype="int64")
+        self.inputs["is_block_step"] = paddle.full(shape=[config.batch_size], fill_value=False, dtype="bool")
+        free_list = list(range(pre_max_block_num - 1, int(pre_max_block_num * 0.75) - 1, -1))
+        self.inputs["encoder_block_lens"] = paddle.full(shape=[config.batch_size], fill_value=0, dtype="int32")
+        self.inputs["step_block_list"] = paddle.full(shape=[config.batch_size], fill_value=-1, dtype="int32")
+        self.inputs["step_lens"] = paddle.full(shape=[1], fill_value=0, dtype="int32")
+        self.inputs["recover_block_list"] = paddle.full(shape=[config.batch_size], fill_value=-1, dtype="int32")
+        self.inputs["recover_lens"] = paddle.full(shape=[1], fill_value=0, dtype="int32")
+        self.inputs["need_block_list"] = paddle.full(shape=[config.batch_size], fill_value=-1, dtype="int32")
+        self.inputs["need_block_len"] = paddle.full(shape=[1], fill_value=0, dtype="int32")
+        self.inputs["used_list_len"] = paddle.full(shape=[config.batch_size], fill_value=0, dtype="int32")
+        self.inputs["free_list"] = paddle.to_tensor(free_list, dtype="int32")
+        self.inputs["free_list_len"] = paddle.full(shape=[1], fill_value=pre_max_block_num * 0.25, dtype="int32")
+
+        self.free_list = [i for i in range(self.max_block_nums)][::-1]
+        self.used_list = [[] for _ in range(config.batch_size)]
+
+        self.model = model
+
+    def _get_rotary_position_embedding(self, position_ids, head_dim):
+        """
+        Pre-calculate rotary position embedding for position_ids.
+
+        Args:
+            position_ids: [1, S]
+            head_dim: D
+
+        Returns:
+            rot_emb: [2, 1, S, 1, D], cos + sin
+        """
+        bsz, max_seq_len = position_ids.shape[:2]
+        rot_emb = paddle.zeros((2, bsz, max_seq_len, 1, head_dim), dtype="float32")
+        inv_freq = 10000 ** (-paddle.arange(0, head_dim, 2, dtype="float32") / head_dim)
+
+        # shape: [B, S, D/2]
+        freqs = paddle.einsum("ij,k->ijk", position_ids.cast("float32"), inv_freq)
+        # shape: [B, S, 1, D]
+        emb = paddle.concat([freqs, freqs], axis=-1).reshape((bsz, max_seq_len, 1, head_dim))
+
+        rot_emb[0] = paddle.cos(emb)
+        rot_emb[1] = paddle.sin(emb)
+        return rot_emb
+
+    @paddle.no_grad()
+    def _infer(self, inputs: dict[str, paddle.Tensor]):
+        self.model.generate(
+            **inputs,
+        )
+
+    @paddle.no_grad()
+    def predict(self, input_texts: str | list[str]):
+        self._preprocess(input_texts)
+        while self.inputs["not_need_stop"]:
+            self._infer(self.inputs)
+        # reset free_list
+        for i in range(self.config.batch_size):
+            self.free_list.extend(self.used_list[i])
+            self.used_list[i] = []
+        reset_stop_value(self.inputs["not_need_stop"])
+        return
+
+    def _preprocess(self, source):
+        for i, text in enumerate(source):
+            print("text: ", text)
+            tokens = self.tokenizer(text, return_tensors="np", padding=False, max_length=self.config.src_length)
+            input_ids = tokens["input_ids"][0]
+            length = len(input_ids)
+            print("input_ids: ", input_ids)
+            print("length: ", length)
+            self.inputs["input_ids"][i : i + 1, :length] = input_ids
+            self.inputs["penalty_score"][i : i + 1] = self.config.repetition_penalty
+            self.inputs["frequency_score"][i : i + 1] = 0.0
+            self.inputs["presence_score"][i : i + 1] = 0.0
+            self.inputs["top_p"][i : i + 1] = self.config.top_p
+            self.inputs["temperature"][i : i + 1] = self.config.temperature
+            self.inputs["seq_lens_this_time"][i : i + 1] = length
+            self.inputs["seq_lens_encoder"][i : i + 1] = length
+            self.inputs["seq_lens_decoder"][i : i + 1] = 0
+            self.inputs["step_idx"][i : i + 1] = 0
+            self.inputs["stop_flags"][i : i + 1] = False
+            reset_stop_value(self.inputs["not_need_stop"])
+            need_block_nums = (
+                length + self.config.max_length + self.pre_cache_length + self.block_size - 1
+            ) // self.block_size
+            for bi in range(need_block_nums):
+                bi_now = self.free_list.pop()
+                self.used_list[i].append(bi_now)
+                self.inputs["block_tables"][i : i + 1, bi] = bi_now
+
+
+class StaticBlockInferencePredictor(BasePredictor):
+    def __init__(
+        self,
+        config: PredictorArgument,
+        cache_kvs_shape: list[list[int]],
+        tokenizer: PretrainedTokenizer = None,
+    ):
+        self.cache_kvs_shape = cache_kvs_shape
+        BasePredictor.__init__(self, config, tokenizer)
+
+        self.inputs = {}
+        self.num_attention_heads = self.cache_kvs_shape[0][-3]
+        self.head_dim = self.cache_kvs_shape[0][-1]
+        self.max_block_nums = self.cache_kvs_shape[0][0]
+        self.block_size = config.block_size
+        self.total_max_length = config.src_length + config.max_length
+        self.num_layers = len(self.cache_kvs_shape) // 2
+        pre_max_block_num = (self.total_max_length + config.block_size - 1) // config.block_size
+        # not update
+        self.pre_cache_length = 0
+        if config.export_precache:
+            pre_cache_npy = np.load(config.prefix_path)
+            self.pre_cache_length = pre_cache_npy.shape[-2]
+            config.max_length -= self.pre_cache_length
+            for i in range(self.num_layers):
+                self.inputs["pre_caches_{}".format(2 * i)] = (
+                    paddle.to_tensor(pre_cache_npy[i][0], dtype=config.dtype)
+                    .unsqueeze(0)
+                    .broadcast_to([config.batch_size, self.num_attention_heads, self.pre_cache_length, self.head_dim])
+                )
+                self.inputs["pre_caches_{}".format(2 * i + 1)] = (
+                    paddle.to_tensor(pre_cache_npy[i][1], dtype=config.dtype)
+                    .unsqueeze(0)
+                    .broadcast_to([config.batch_size, self.num_attention_heads, self.pre_cache_length, self.head_dim])
+                )
+            pre_cache_mask = paddle.zeros(
+                shape=[config.batch_size, 1, config.src_length, config.src_length + self.pre_cache_length],
+                dtype=config.dtype,
+            )
+            pre_cache_mask[:, :, :, : self.pre_cache_length] = 1
+            pre_cache_mask[:, :, :, self.pre_cache_length :] = paddle.tril(
+                paddle.ones(shape=[config.batch_size, 1, config.src_length, config.src_length], dtype=config.dtype)
+            )
+            self.inputs["src_mask"] = (pre_cache_mask - 1) * 1e4
+
+        self.cache_kvs = {}
+        if config.use_cachekv_int8 == "dynamic" or config.use_cachekv_int8 == "static":
+            for i in range(len(self.cache_kvs_shape) // 2):
+                self.cache_kvs["key_caches_{}".format(i)] = paddle.zeros(self.cache_kvs_shape[2 * i], dtype="uint8")
+                self.cache_kvs["value_caches_{}".format(i)] = paddle.zeros(
+                    self.cache_kvs_shape[2 * i + 1], dtype="uint8"
+                )
+        else:
+            for i in range(len(self.cache_kvs_shape) // 2):
+                self.cache_kvs["key_caches_{}".format(i)] = paddle.zeros(
+                    self.cache_kvs_shape[2 * i], dtype=config.dtype
+                )
+                self.cache_kvs["value_caches_{}".format(i)] = paddle.zeros(
+                    self.cache_kvs_shape[2 * i + 1], dtype=config.dtype
+                )
+
+        if config.use_cachekv_int8 == "dynamic":
+            self.k_quant_scales = [
+                paddle.zeros([config.batch_size, self.num_attention_heads], dtype="float32")
+                for _ in range(self.num_layers)
+            ]
+            self.v_quant_scales = [
+                paddle.zeros([config.batch_size, self.num_attention_heads], dtype="float32")
+                for _ in range(self.num_layers)
+            ]
+            self.k_dequant_scales = [
+                paddle.zeros([config.batch_size, self.num_attention_heads], dtype="float32")
+                for _ in range(self.num_layers)
+            ]
+            self.v_dequant_scales = [
+                paddle.zeros([config.batch_size, self.num_attention_heads], dtype="float32")
+                for _ in range(self.num_layers)
+            ]
+
+        if config.benchmark:
+            min_length = config.max_length
+        else:
+            min_length = 2
+        self.inputs["min_length"] = paddle.full(shape=[config.batch_size, 1], fill_value=min_length, dtype="int64")
+        self.inputs["max_length"] = paddle.full(
+            shape=[config.batch_size, 1], fill_value=config.max_length, dtype="int64"
+        )
+
+        self.inputs["pre_ids"] = paddle.full([config.batch_size, self.total_max_length], -1, dtype="int64")
+        self.inputs["bad_tokens"] = paddle.to_tensor(
+            [
+                -1,
+            ],
+            dtype="int64",
+        )
+        self.inputs["penalty_score"] = paddle.full(shape=[config.batch_size, 1], fill_value=1.0, dtype="float32")
+        self.inputs["frequency_score"] = paddle.full(shape=[config.batch_size, 1], fill_value=0.0, dtype="float32")
+        self.inputs["presence_score"] = paddle.full(shape=[config.batch_size, 1], fill_value=0.0, dtype="float32")
+
+        self.inputs["stop_nums"] = paddle.full(shape=[1], fill_value=config.batch_size, dtype="int64")
+        tmp_position_ids = paddle.arange(self.total_max_length).reshape((1, -1))
+        self.inputs["rope_emb"] = self._get_rotary_position_embedding(tmp_position_ids, self.head_dim)
+        self.inputs["eos_token_id"] = paddle.to_tensor(
+            [
+                self.tokenizer.eos_token_id,
+            ],
+            "int64",
+        )
+        # need update
+        self.inputs["block_tables"] = paddle.full(
+            shape=[config.batch_size, pre_max_block_num], fill_value=-1, dtype="int32"
+        )
+        self.inputs["input_ids"] = paddle.full(
+            shape=[config.batch_size, config.src_length], fill_value=-1, dtype="int64"
+        )
+        self.inputs["top_p"] = paddle.full(shape=[config.batch_size, 1], fill_value=config.top_p, dtype="float32")
+        self.inputs["temperature"] = paddle.full(shape=[config.batch_size, 1], fill_value=1.0, dtype="float32")
+        self.inputs["seq_lens_this_time"] = paddle.full(shape=[config.batch_size, 1], fill_value=0, dtype="int32")
+        self.inputs["seq_lens_encoder"] = paddle.full(shape=[config.batch_size, 1], fill_value=0, dtype="int32")
+        self.inputs["seq_lens_decoder"] = paddle.full(shape=[config.batch_size, 1], fill_value=0, dtype="int32")
+        self.inputs["step_idx"] = paddle.full(shape=[config.batch_size, 1], fill_value=0, dtype="int64")
+        self.inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=False, dtype="bool").cpu()
+        self.inputs["stop_flags"] = paddle.full(shape=[config.batch_size, 1], fill_value=True, dtype="bool")
+
+        self.inputs["step_seq_lens_encoder"] = paddle.full(shape=[config.batch_size, 1], fill_value=0, dtype="int32")
+        self.inputs["next_tokens"] = paddle.full(shape=[config.batch_size, 1], fill_value=-1, dtype="int64")
+        self.inputs["is_block_step"] = paddle.full(shape=[config.batch_size], fill_value=False, dtype="bool")
+        free_list = list(range(pre_max_block_num - 1, int(pre_max_block_num * 0.75) - 1, -1))
+        self.inputs["encoder_block_lens"] = paddle.full(shape=[config.batch_size], fill_value=0, dtype="int32")
+        self.inputs["step_block_list"] = paddle.full(shape=[config.batch_size], fill_value=-1, dtype="int32")
+        self.inputs["step_lens"] = paddle.full(shape=[1], fill_value=0, dtype="int32")
+        self.inputs["recover_block_list"] = paddle.full(shape=[config.batch_size], fill_value=-1, dtype="int32")
+        self.inputs["recover_lens"] = paddle.full(shape=[1], fill_value=0, dtype="int32")
+        self.inputs["need_block_list"] = paddle.full(shape=[config.batch_size], fill_value=-1, dtype="int32")
+        self.inputs["need_block_len"] = paddle.full(shape=[1], fill_value=0, dtype="int32")
+        self.inputs["used_list_len"] = paddle.full(shape=[config.batch_size], fill_value=0, dtype="int32")
+        self.inputs["free_list"] = paddle.to_tensor(free_list, dtype="int32")
+        self.inputs["free_list_len"] = paddle.full(shape=[1], fill_value=pre_max_block_num * 0.25, dtype="int32")
+
+        for i in range(self.num_layers):
+            if self.config.use_cachekv_int8 == "dynamic":
+                self.inputs["k_quant_scales_" + str(i)] = self.k_quant_scales[i]
+                self.inputs["v_quant_scales_" + str(i)] = self.v_quant_scales[i]
+                self.inputs["k_dequant_scales_" + str(i)] = self.k_dequant_scales[i]
+                self.inputs["v_dequant_scales_" + str(i)] = self.v_dequant_scales[i]
+
+        self.free_list = [i for i in range(self.max_block_nums)][::-1]
+        self.used_list = [[] for _ in range(config.batch_size)]
+
+        self._create_predictor(config)
+        self.input_names = self.predictor.get_input_names()
+
+        self._share_data()
+        self.seq_lens_handle = self.predictor.get_input_handle("seq_lens_this_time")
+
+    def _get_rotary_position_embedding(self, position_ids, head_dim):
+        """
+        Pre-calculate rotary position embedding for position_ids.
+
+        Args:
+            position_ids: [1, S]
+            head_dim: D
+
+        Returns:
+            rot_emb: [2, 1, S, 1, D], cos + sin
+        """
+        bsz, max_seq_len = position_ids.shape[:2]
+        rot_emb = paddle.zeros((2, bsz, max_seq_len, 1, head_dim), dtype="float32")
+        inv_freq = 10000 ** (-paddle.arange(0, head_dim, 2, dtype="float32") / head_dim)
+
+        # shape: [B, S, D/2]
+        freqs = paddle.einsum("ij,k->ijk", position_ids.cast("float32"), inv_freq)
+        # shape: [B, S, 1, D]
+        emb = paddle.concat([freqs, freqs], axis=-1).reshape((bsz, max_seq_len, 1, head_dim))
+
+        rot_emb[0] = paddle.cos(emb)
+        rot_emb[1] = paddle.sin(emb)
+        return rot_emb
+
+    def _create_predictor(self, predictor_args: PredictorArgument):
+        if not is_paddlenlp_ops_available():
+            raise ValueError(
+                "you should install the paddlenlp ops to run inference predictor, "
+                "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
+            )
+
+        infer_model_path = get_infer_model_path(predictor_args.model_name_or_path, predictor_args.model_prefix)
+
+        config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
+
+        config.switch_ir_optim(False)
+        device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
+        config.enable_use_gpu(100, device_id)
+        # config.disable_glog_info()
+        # config.enable_memory_optim()
+
+        if self.tensor_parallel_degree >= 1:
+            trainer_endpoints = fleet.worker_endpoints()
+            current_endpoint = trainer_endpoints[self.tensor_parallel_rank]
+
+            dist_config = config.dist_config()
+            dist_config.set_ranks(self.tensor_parallel_degree, self.tensor_parallel_rank)
+            dist_config.set_endpoints(trainer_endpoints, current_endpoint)
+            dist_config.enable_dist_model(True)
+
+            dist_config.set_comm_init_config(os.path.join(predictor_args.model_name_or_path, "rank_mapping.csv"))
+            config.set_dist_config(dist_config)
+
+        self.predictor = paddle.inference.create_predictor(config)
+
+    def _share_data(self):
+        """
+        分享不拷贝数据
+        """
+        for name in self.input_names:
+            if "pre_key_" in name or "pre_value_" in name:
+                input_tensor = self.predictor.get_input_handle(name)
+                input_tensor.share_external_data(self.inputs[name])
+                continue
+            if "caches" in name:
+                input_tensor = self.predictor.get_input_handle(name)
+                input_tensor.share_external_data(self.cache_kvs[name])
+                continue
+            if "seq_lens_this_time" in name:
+                continue
+            input_tensor = self.predictor.get_input_handle(name)
+            input_tensor.share_external_data(self.inputs[name])
+
+    def _infer(self):
+        self.predictor.run()
+
+    def predict(self, input_texts: str | list[str]):
+
+        s_time = time.time()
+        self._preprocess(input_texts)
+        real_bsz = len(input_texts)
+
+        import copy
+
+        seq_lens_this_time = copy.deepcopy(self.inputs["seq_lens_this_time"][:real_bsz])
+        self.seq_lens_handle.share_external_data(seq_lens_this_time)
+        logger.info(f"preprocess spend {time.time()  -  s_time}")
+
+        s_time = time.time()
+        while self.inputs["not_need_stop"]:
+            self.predictor.run()
+        logger.info(f"running spend {time.time()  -  s_time}")
+
+        # reset free_list
+        for i in range(self.config.batch_size):
+            self.free_list.extend(self.used_list[i])
+            self.used_list[i] = []
+        reset_stop_value(self.inputs["not_need_stop"])
+        return
+
+    def _preprocess(self, source):
+        for i, text in enumerate(source):
+            # print("text: ", text)
+            tokens = self.tokenizer(
+                text, return_tensors="np", padding=False, max_length=(self.config.src_length - self.config.max_length)
+            )
+            input_ids = tokens["input_ids"][0]
+            length = len(input_ids)
+            # print("input_ids: ", input_ids)
+            print("length: ", length)
+            self.inputs["input_ids"][i : i + 1, :length] = input_ids
+            self.inputs["penalty_score"][i : i + 1] = self.config.repetition_penalty
+            self.inputs["frequency_score"][i : i + 1] = 0.0
+            self.inputs["presence_score"][i : i + 1] = 0.0
+            self.inputs["top_p"][i : i + 1] = self.config.top_p
+            self.inputs["temperature"][i : i + 1] = self.config.temperature
+            self.inputs["seq_lens_this_time"][i : i + 1] = length
+            self.inputs["step_seq_lens_encoder"][i : i + 1] = length
+            self.inputs["seq_lens_encoder"][i : i + 1] = length
+            self.inputs["seq_lens_decoder"][i : i + 1] = 0
+            self.inputs["step_idx"][i : i + 1] = 0
+            self.inputs["stop_flags"][i : i + 1] = False
+            reset_stop_value(self.inputs["not_need_stop"])
+            need_block_nums = (
+                length + self.config.max_length + self.pre_cache_length + self.block_size - 1
+            ) // self.block_size
+            # print("self.free_list",  self.free_list)
+            for bi in range(need_block_nums):
+                bi_now = self.free_list.pop()
+                self.used_list[i].append(bi_now)
+                self.inputs["block_tables"][i : i + 1, bi] = bi_now
+
+            # encoder_block_num = len(task['block_tables'])
+            self.inputs["encoder_block_lens"][i : i + 1] = need_block_nums
+
+
+def get_ptq_multicards_num(directory):
+    count = 0
+    prefix = "act_scales_"
+    for filename in os.listdir(directory):
+        if filename.startswith(prefix):
+            count += 1
+    return count
+
+
 def create_predictor(
     predictor_args: PredictorArgument,
     model_args: ModelArgument,
@@ -663,6 +1248,9 @@ def create_predictor(
     tensor_parallel_rank: int = 0,
 ):
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
+    # init chat_template for tokenizer
+    init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
+
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer) and not tokenizer.pad_token:
         tokenizer.pad_token = tokenizer.unk_token
@@ -716,16 +1304,29 @@ def create_predictor(
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
             config.tensor_parallel_degree = tensor_parallel_degree
             config.tensor_parallel_rank = tensor_parallel_rank
-            config.quant_bits = -1
+            config.weight_only_quant_bits = -1
+            config.quant_type = None
+            config.model_name_or_path = ""
+            config.use_cachekv_int8 = predictor_args.use_cachekv_int8
+            config.single_card_ptq = True
 
-            if predictor_args.quant_type.startswith("weight_only_int"):
-                quant_bits = int(predictor_args.quant_type[-1])
-                config.quant_bits = quant_bits
+            if predictor_args.quant_type is not None and predictor_args.quant_type.startswith("weight_only_int"):
+                weight_only_quant_bits = int(predictor_args.quant_type[-1])
+                config.weight_only_quant_bits = weight_only_quant_bits
+                config.quant_type = predictor_args.quant_type
 
-            config.quant_bits = -1
-            if predictor_args.quant_type.startswith("weight_only_int"):
-                quant_bits = int(predictor_args.quant_type[-1])
-                config.quant_bits = quant_bits
+            if config.quantization_config.quant_type is not None and "a8w8" in config.quantization_config.quant_type:
+                config.model_name_or_path = predictor_args.model_name_or_path
+                config.quant_type = config.quantization_config.quant_type
+
+                ptq_multicards_num = get_ptq_multicards_num(config.model_name_or_path)
+                logger.info(f"PTQ from {ptq_multicards_num} cards, so we will not split")
+                if ptq_multicards_num > 1:
+                    config.single_card_ptq = False
+
+                # Turn on GEMM int8 kernel tuning
+                paddle.base.core.enable_autotune()
+                paddle.base.core.update_autotune_status()
 
             if "llama" in config.architectures[0].lower():
                 if model_args.model_type == "llama-img2txt":
@@ -733,12 +1334,22 @@ def create_predictor(
                     from paddlenlp.experimental.transformers import (
                         LlamaForMiniGPT4InferenceModel as LlamaInferenceModel,
                     )
+                elif predictor_args.block_attn:
+                    config.max_seq_len = predictor_args.src_length
+                    config.block_size = predictor_args.block_size
+                    from paddlenlp.experimental.transformers import (
+                        LlamaForCausalLMBlockInferenceModel as LlamaInferenceModel,
+                    )
                 else:
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMInferenceModel as LlamaInferenceModel,
                     )
                 model = LlamaInferenceModel.from_pretrained(
-                    predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
+                    predictor_args.model_name_or_path,
+                    config=config,
+                    dtype=predictor_args.dtype,
+                    tensor_parallel_degree=tensor_parallel_degree,
+                    tensor_parallel_rank=tensor_parallel_rank,
                 )
                 model.eval()
 
@@ -805,18 +1416,38 @@ def create_predictor(
                 model.eval()
             else:
                 raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt]")
-            predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
+            if predictor_args.block_attn:
+                predictor = DygraphBlockInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
+            else:
+                predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
+
         elif predictor_args.mode == "static":
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
             if "llama" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    LlamaForCausalLMInferenceModel,
-                )
+                if predictor_args.block_attn:
+                    config.block_size = predictor_args.block_size
+                    config.max_seq_len = predictor_args.src_length
+                    config.use_dynamic_cachekv_quant = predictor_args.use_cachekv_int8 == "dynamic"
+                    from paddlenlp.experimental.transformers import (
+                        LlamaForCausalLMBlockInferenceModel as LlamaInferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        LlamaForCausalLMInferenceModel as LlamaInferenceModel,
+                    )
 
-                cache_kvs_shape = LlamaForCausalLMInferenceModel.get_cache_kvs_shape(
+                cache_kvs_shape = LlamaInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
-            elif "chatglm" in config.architectures[0].lower():
+            elif "chatglmv2forcausallm" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    ChatGLMv2ForCausalLMInferenceModel,
+                )
+
+                cache_kvs_shape = ChatGLMv2ForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
+                )
+            elif "chatglmforcausallm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     ChatGLMForCausalLMInferenceModel,
                 )
@@ -842,7 +1473,10 @@ def create_predictor(
                 )
             else:
                 raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt]")
-            predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
+            if predictor_args.block_attn:
+                predictor = StaticBlockInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
+            else:
+                predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
         else:
             raise ValueError("the `mode` should be one of [dynamic, static]")
     return predictor
@@ -856,8 +1490,7 @@ def predict():
     paddle.set_default_dtype(predictor_args.dtype)
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
-    # Note(zhengzekang): force to use fleet executor.
-    if predictor_args.init_fleet_worker or tensor_parallel_degree > 1:
+    if tensor_parallel_degree > 1:
         strategy = fleet.DistributedStrategy()
         strategy.hybrid_configs = {
             "dp_degree": 1,
@@ -877,8 +1510,20 @@ def predict():
                 source_texts.append(example["src"])
                 target_texts.append(example["tgt"])
     else:
-        source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
-        target_texts = ["", ""]
+        # source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
+        source_texts = []
+
+        data_file = open("humaneval_solution.json", "r")
+
+        dataset = []
+        for line in data_file.readlines():
+            dataset.append(json.loads(line))
+
+        for i in range(predictor_args.batch_size):
+            data = dataset[i % 164]
+            source_texts.append(data["prompt"])
+
+        target_texts = [""] * predictor_args.batch_size
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
@@ -887,7 +1532,7 @@ def predict():
         for bs, batch_source_text in enumerate(batch_source_texts):
             outputs = predictor.predict(batch_source_text)
 
-            if predictor.tensor_parallel_rank > 0:
+            if predictor.tensor_parallel_rank > 0 or predictor_args.block_attn:
                 continue
             for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
                 print("***********Source**********")
@@ -905,27 +1550,45 @@ def predict():
 
 def benchmark(predictor, predictor_args, model_args):
     # Just construct a simple benchmark input. We pad input to the src_length.
-    test_texts = "hello world, how are you?"
-    benchmark_texts = [test_texts + "<pad>" * predictor_args.src_length for _ in range(predictor_args.batch_size)]
+    test_texts = "who are you"
+    benchmark_texts = [
+        test_texts + "<pad>" * (predictor_args.src_length - predictor_args.max_length)
+        for _ in range(predictor_args.batch_size)
+    ]
 
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
-    warmup_time = 10
-    test_time = 100
+    warmup_time = 2
+    test_time = 10
 
     print("***********Start Warmup**********")
-    for _ in range(warmup_time):
-        for bs, batch_source_text in enumerate(batch_benchmark_texts):
-            outputs = predictor.predict(batch_source_text)
+    for i in range(warmup_time):
+        print("warm up ", i)
+        for _, batch_source_text in enumerate(batch_benchmark_texts):
+            predictor.predict(batch_source_text)
+
+    from paddle import profiler
+
+    # 创建性能分析器相关的代码
+    def my_on_trace_ready(prof):  # 定义回调函数，性能分析器结束采集数据时会被调用
+        callback = profiler.export_chrome_tracing("./profiler_demo")  # 创建导出性能数据到profiler_demo文件夹的回调函数
+        callback(prof)  # 执行该导出函数
+        prof.summary(sorted_by=profiler.SortedKeys.GPUTotal)  # 打印表单，按GPUTotal排序表单项
+
+    p = profiler.Profiler(scheduler=[3, 4], on_trace_ready=my_on_trace_ready, timer_only=False)  # 初始化Profiler对象
 
     print("***********Start Speed Test**********")
     start = time.perf_counter()
     output_tokens = 0
-    for _ in range(test_time):
-        for bs, batch_source_text in enumerate(batch_benchmark_texts):
-            outputs = predictor.predict(batch_source_text)
-            output_tokens += sum([len(output) for output in outputs])
+    p.start()
+    for i in range(test_time):
+        print("test ", i)
+        for _, batch_source_text in enumerate(batch_benchmark_texts):
+            predictor.predict(batch_source_text)
+            output_tokens += predictor_args.max_length * predictor_args.batch_size
+        p.step()
+    p.stop()
     end = time.perf_counter()
     print("Avg Elapse time is: ", (end - start) / test_time)
     print("Output tokens is: ", output_tokens)
