@@ -677,10 +677,10 @@ def main():
                     else:
                         tr_loss_step = float(0)
 
-                        if training_args.gradient_accumulation_steps > 1:
-                            tr_loss_step /= training_args.gradient_accumulation_steps
+                    if training_args.gradient_accumulation_steps > 1:
+                        tr_loss_step /= training_args.gradient_accumulation_steps
 
-                        tr_loss += tr_loss_step
+                    tr_loss += tr_loss_step
 
             local_batches = []
 
