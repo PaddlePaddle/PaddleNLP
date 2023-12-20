@@ -96,7 +96,6 @@ from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
 from .plugins.unified_checkpoint import (
-    UnifiedCheckpointOption,
     load_unified_checkpoint,
     load_unified_optimizer,
     save_unified_checkpoint,
@@ -505,21 +504,11 @@ class Trainer:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
         if self.args.unified_checkpoint:
-            if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
+            if resume_from_checkpoint is not None:
                 use_unified_checkpoint = True
                 if self.check_origin_checkpoint(resume_from_checkpoint):
-                    if UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value in self.args.unified_checkpoint_config:
-                        use_unified_checkpoint = False
-                        logger.info("Loding checkpoint, the next ckeckpoint will be saved as unified checkpoint")
-                    else:
-                        use_unified_checkpoint = True
-                        logger.warning(
-                            "Origin checkpoints exist, if you want to load from origin checkpoint, "
-                            f"add '{UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value}' "
-                            "to 'unified_checkpoint_config'."
-                        )
-                else:
-                    use_unified_checkpoint = True
+                    use_unified_checkpoint = False
+                    logger.info("Loding origin checkpoint, the next ckeckpoint will be saved as unified checkpoint")
 
                 if use_unified_checkpoint:
                     load_unified_checkpoint(
@@ -2257,38 +2246,29 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
-            if self.args.data_parallel_rank == 0:
-                use_unified_checkpoint = False
-                if self.args.unified_checkpoint:
-                    if self.check_origin_checkpoint(checkpoint):
-                        if UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value in self.args.unified_checkpoint_config:
-                            use_unified_checkpoint = False
-                            logger.info("Loding checkpoint, the next ckeckpoint will be saved as unified checkpoint")
-                        else:
-                            use_unified_checkpoint = True
-                            logger.warning(
-                                "Origin checkpoint is found, if you want to load origin checkpoint, "
-                                f"add '{UnifiedCheckpointOption.CHECKPOINT_COMPATIBLE.value}' "
-                                "to 'unified_checkpoint_config'."
-                            )
-                    else:
-                        use_unified_checkpoint = True
+            use_unified_checkpoint = False
+            if self.args.unified_checkpoint:
+                use_unified_checkpoint = True
+                if self.check_origin_checkpoint(checkpoint):
+                    use_unified_checkpoint = False
+                    logger.info("Loding checkpoint, the next ckeckpoint will be saved as unified checkpoint")
 
-                if not use_unified_checkpoint:
+            if not use_unified_checkpoint:
+                if self.args.data_parallel_rank == 0:
                     optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
                     path = os.path.join(checkpoint, optimizer_name)
                     if os.path.isfile(path):
                         opt_state_dict = paddle.load(path)
                 else:
-                    opt_state_dict = load_unified_optimizer(
-                        args=self.args,
-                        model=self.model,
-                        optimizer=self.optimizer,
-                        resume_from_checkpoint=checkpoint,
-                        safe_serialization=True,
-                    )
+                    opt_state_dict = None
             else:
-                opt_state_dict = None
+                opt_state_dict = load_unified_optimizer(
+                    args=self.args,
+                    model=self.model,
+                    optimizer=self.optimizer,
+                    resume_from_checkpoint=checkpoint,
+                    safe_serialization=True,
+                )
 
         # broadcast optimizer state in dp group
         opt_state_dict = broadcast_dp_optimizer(opt_state_dict)

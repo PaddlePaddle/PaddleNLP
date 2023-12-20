@@ -715,7 +715,7 @@ class TrainingArguments:
     )
 
     unified_checkpoint_config: Optional[str] = field(
-        default="checkpoint_compatible",
+        default="",
         metadata={
             "help": (
                 "Configs to unify hybrid parallel checkpoint.\n"
@@ -724,7 +724,6 @@ class TrainingArguments:
                 "- skip_save_model_weight: do not save model weights when the masters weight exist\n"
                 "- master_weight_compatible: 1. if the master weights exist, only load when needed\n"
                 "                            2. if master weights does not exit, convert model weights to master weights when needed\n"
-                "- checkpoint_compatible: enable loading old checkpoints, new checkpoint will be saved with aunified checkpoint type\n"
                 "- async_save: enable asynchronous saving checkpoints to disk\n"
                 "- enable_all_options: enable all optimization configurations\n"
             )
@@ -1238,20 +1237,18 @@ class TrainingArguments:
                         "skip_data_type_error",
                         "skip_save_model_weight",
                         "master_weight_compatible",
-                        "checkpoint_compatible",
                         "async_save",
                         "enable_all_options",
                     ]:
                         raise ValueError(
                             f"Found unknown unified_checkpoint config {x}, accpet config is skip_data_type_error, skip_save_model_weight, "
-                            + "master_weight_compatible, checkpoint_compatible, async_save, enable_all_options."
+                            + "master_weight_compatible, async_save, enable_all_options."
                         )
             if "enable_all_options" in unified_checkpoint_config:
                 self.unified_checkpoint_config = [
                     "skip_data_type_error",
                     "skip_save_model_weight",
                     "master_weight_compatible",
-                    "checkpoint_compatible",
                     "async_save",
                 ]
 
