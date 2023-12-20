@@ -112,6 +112,12 @@ class QuantArgument:
     do_ptq: bool = field(default=False, metadata={"help": "Whether to use PTQ"})
     ptq_step: int = field(default=32, metadata={"help": "Step for PTQ"})
 
+    weight_quant_method: str = field(
+        default="abs_max_channel_wise",
+        metadata={"help": "Weight quantization method, choosen from ['abs_max_channel_wise', 'groupwise']"},
+    )
+
+    # Pre-quant method Shift related parameters
     shift: bool = field(default=False, metadata={"help": "Whether to use Shift"})
     shift_all_linears: bool = field(default=False, metadata={"help": "Whether to shift all linears"})
     shift_sampler: str = field(
@@ -119,6 +125,7 @@ class QuantArgument:
     )
     shift_step: int = field(default=32, metadata={"help": "Sample steps when shift"})
 
+    # Pre-quant methos Smooth related parameters
     smooth: bool = field(default=False, metadata={"help": "Whether to use Smooth"})
     smooth_all_linears: bool = field(default=False, metadata={"help": "Whether to smooth all linears"})
     smooth_sampler: str = field(
@@ -134,6 +141,12 @@ class QuantArgument:
     # GPTQ related parameters
     do_gptq: bool = field(default=False, metadata={"help": "Whether to use GPTQ"})
     gptq_step: int = field(default=8, metadata={"help": "Step for GPTQ"})
+
+    # AWQ related parameters, default for WINT4
+    do_awq: bool = field(default=False, metadata={"help": "Whether to use AWQ Search"})
+    auto_clip: bool = field(default=False, metadata={"help": "Whether to use AutoClip from AWQ"})
+    awq_step: int = field(default=8, metadata={"help": "Step for AWQ Search"})
+    autoclip_step: int = field(default=8, metadata={"help": "Step for AutoClip"})
 
 
 @dataclass
