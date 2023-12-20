@@ -49,9 +49,10 @@ function llama_case_list_auto() {
     llama_auto_recompute_bs16_fp32_DP2-MP1-PP1
     llama_auto_recompute_bs16_fp32_DP2-MP2-PP1
     llama_auto_recompute_bs16_fp32_DP2-MP2-PP2
+    llama_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
 }
 
-function case_list_auto_pir() {
+function gpt_case_list_auto_pir() {
     gpt_auto_recompute_bs16_fp16_o2_DP1-MP1-PP8_pir
     gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_pir
     gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage1_pir
@@ -837,7 +838,6 @@ function llama_auto_recompute_bs8_fp32_DP1-MP1-PP1() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=2
-    export SOT_LOG_LEVEL=4
 
     task_name="llama_auto_bs8_dp1mp1pp1"
     case_out_dir="output/$task_name"
@@ -878,7 +878,6 @@ function llama_auto_recompute_bs8_fp32_DP1-MP1-PP1() {
         --max_grad_norm 1.0 \
         --logging_steps 1 \
         --dataloader_num_workers 1 \
-        --sharding "" \
         --eval_steps 1000 \
         --report_to "visualdl" \
         --disable_tqdm true \
@@ -905,7 +904,6 @@ function llama_auto_recompute_bs16_fp32_DP2-MP1-PP1() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=2
-    export SOT_LOG_LEVEL=4
 
     task_name="llama_auto_bs16_dp2mp1pp1"
     case_out_dir="output/$task_name"
@@ -946,7 +944,6 @@ function llama_auto_recompute_bs16_fp32_DP2-MP1-PP1() {
         --max_grad_norm 1.0 \
         --logging_steps 1 \
         --dataloader_num_workers 1 \
-        --sharding "" \
         --eval_steps 1000 \
         --report_to "visualdl" \
         --disable_tqdm true \
@@ -962,7 +959,7 @@ function llama_auto_recompute_bs16_fp32_DP2-MP1-PP1() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.41858447
+    loss_base=9.42011845
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -973,7 +970,6 @@ function llama_auto_recompute_bs16_fp32_DP2-MP2-PP1() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=2
-    export SOT_LOG_LEVEL=4
 
     task_name="llama_auto_bs16_dp2mp2pp1"
     case_out_dir="output/$task_name"
@@ -1014,7 +1010,6 @@ function llama_auto_recompute_bs16_fp32_DP2-MP2-PP1() {
         --max_grad_norm 1.0 \
         --logging_steps 1 \
         --dataloader_num_workers 1 \
-        --sharding "" \
         --eval_steps 1000 \
         --report_to "visualdl" \
         --disable_tqdm true \
@@ -1030,7 +1025,7 @@ function llama_auto_recompute_bs16_fp32_DP2-MP2-PP1() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.53447247
+    loss_base=9.44299495
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -1041,9 +1036,8 @@ function llama_auto_recompute_bs16_fp32_DP2-MP2-PP2() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=2
-    export SOT_LOG_LEVEL=4
 
-    task_name="llama_auto_bs16_dp2mp2pp1"
+    task_name="llama_auto_bs16_dp2mp2pp2"
     case_out_dir="output/$task_name"
     case_log_dir="output/$task_name""_log"
     rm -rf $case_out_dir
@@ -1082,7 +1076,6 @@ function llama_auto_recompute_bs16_fp32_DP2-MP2-PP2() {
         --max_grad_norm 1.0 \
         --logging_steps 1 \
         --dataloader_num_workers 1 \
-        --sharding "" \
         --eval_steps 1000 \
         --report_to "visualdl" \
         --disable_tqdm true \
@@ -1098,17 +1091,84 @@ function llama_auto_recompute_bs16_fp32_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.52331257
+    loss_base=9.45936012
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
+function llama_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2() {
+    echo "=========== $FUNCNAME run begin ==========="
+    export PYTHONPATH=$root_path/:$PYTHONPATH
+    export FLAGS_call_stack_level=2
+
+    task_name="llama_auto_bs16_dp2mp2pp2vpp2sharding2"
+    case_out_dir="output/$task_name"
+    case_log_dir="output/$task_name""_log"
+    rm -rf $case_out_dir
+    rm -rf $case_log_dir
+
+    python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto.py \
+        --model_type "llama" \
+        --model_name_or_path "facebook/llama-7b" \
+        --tokenizer_name_or_path "facebook/llama-7b" \
+        --hidden_size 1024 \
+        --intermediate_size 3072 \
+        --num_hidden_layers 8 \
+        --num_attention_heads 32 \
+        --input_dir "./data" \
+        --output_dir $case_out_dir \
+        --split 949,50,1 \
+        --max_seq_length 2048 \
+        --per_device_train_batch_size 1 \
+        --per_device_eval_batch_size 8 \
+        --gradient_accumulation_steps 8 \
+        --use_flash_attention 0 \
+        --use_fused_rms_norm 0 \
+        --fp16 0 \
+        --fp16_opt_level "O2"  \
+        --scale_loss 1024 \
+        --tensor_parallel_degree 2 \
+        --pipeline_parallel_degree 2 \
+        --virtual_pp_degree 2 \
+        --pipeline_schedule_mode "VPP" \
+        --sharding_parallel_degree 2 \
+        --sharding "stage2" \
+        --learning_rate 0.0001 \
+        --min_learning_rate 0.00001 \
+        --max_steps 10 \
+        --save_steps 5000 \
+        --weight_decay 0.01 \
+        --warmup_ratio 0.01 \
+        --max_grad_norm 1.0 \
+        --logging_steps 1 \
+        --dataloader_num_workers 1 \
+        --eval_steps 1000 \
+        --report_to "visualdl" \
+        --disable_tqdm true \
+        --continue_training 0 \
+        --recompute 1 \
+        --do_train \
+        --do_eval \
+        --device "gpu" \
+        --data_impl "mmap" \
+        --parallel_mode "auto" \
+        >>${log_path}/$FUNCNAME 2>&1
+    loss=`cat $case_log_dir/workerlog.3 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    ips=-1
+    mem=-1
+    echo "result: loss=$loss ips=$ips mem=$mem"
+    loss_base=9.46707726
+    ips_base=-1
+    mem_base=-1
+    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    echo "=========== $FUNCNAME run  end ==========="
+}
 ############ case end ############
 
 function check_result() {
-    echo -e "$1" | tee -a ${log_path}/result.log
+    echo -e "$1" >> ${log_path}/result.log
     if [ $? -ne 0 ];then
         echo -e "\033[31m $1 run failed! \033[0m" | tee -a ${log_path}/result.log
         exit -1
@@ -1131,7 +1191,7 @@ function check_result() {
     v1=$(echo $diff_ips 5.0|awk '{print($1>=$2)?"0":"1"}')
     v2=$(echo $diff_ips -5.0|awk '{print($1<=$2)?"0":"1"}')
     if [[ $v1 == 0 ]];then
-        echo -e " $1 IPS increase greater than 5%, not exit " | tee -a $log_path/result.log
+        echo -e "$1 IPS increase greater than 5%, not exit " | tee -a $log_path/result.log
     fi
     if [[ $v2 == 0 ]];then
         echo -e "\033[31m $1 IPS diff check failed! \033[0m" | tee -a $log_path/result.log
@@ -1147,7 +1207,7 @@ function check_result() {
         exit -1
     fi
     if [[ $w2 == 0 ]];then
-        echo -e " $1 MEM decreases greater than 5%, not exit " | tee -a $log_path/result.log
+        echo -e "$1 MEM decreases greater than 5%, not exit " | tee -a $log_path/result.log
     fi
 }
 
@@ -1163,6 +1223,7 @@ function before_hook_for_gpt() {
     if [[ $FLAGS_install_deps == 0 ]];then
         echo -e "\033[31m ---- Install requirements for GPT auto cases  \033[0m"
         python -m pip install -r requirements.txt --force-reinstall
+        python -m pip install --no-cache-dir https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl --force-reinstall --no-dependencies
         python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
     else
         echo -e "\033[31m ---- Skip install requirements for GPT auto cases  \033[0m"

@@ -286,7 +286,7 @@ def naive_fuse_merge_tp(weight_list, is_column=True, fuse_tensor_parts=2):
     if isinstance(weight_list[0], np.ndarray):
         return np.concatenate([reorder[i] for i in index], axis=axis)
 
-    return paddle.concatenate([reorder[i] for i in index], axis=axis)._copy_to(paddle.CPUPlace(), False)
+    return paddle.concat([reorder[i] for i in index], axis=axis)._copy_to(paddle.CPUPlace(), False)
 
 
 def naive_fuse_split_tp(
