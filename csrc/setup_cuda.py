@@ -52,7 +52,6 @@ setup(
             "./generation/save_with_output_msg.cc",
             "./generation/write_int8_cache_kv.cu",
             "./generation/step.cu",
-            "./generation/get_max_len.cu",
             "./generation/quant_int8.cu",
             "./generation/dequant_int8.cu",
         ],

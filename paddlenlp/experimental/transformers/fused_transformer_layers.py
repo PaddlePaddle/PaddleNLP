@@ -33,7 +33,6 @@ if is_paddlenlp_ops_available():
     from paddlenlp_ops import (
         dequant_int8,
         encode_rotary_qk,
-        get_max_len,
         qkv_transpose_split,
         quant_int8,
         rebuild_padding,
@@ -1406,19 +1405,14 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             kwargs.get("block_size", 64),
             self.use_neox_rotary_style,
             self.config.use_dynamic_cachekv_quant,
-            quant_round_type=self.quant_round_type,
-            quant_max_bound=self.quant_max_bound,
-            quant_min_bound=self.quant_min_bound,
+            quant_round_type=self.config.quant_round_type,
+            quant_max_bound=self.config.quant_max_bound,
+            quant_min_bound=self.config.quant_min_bound,
         )[0]
 
         out_linear_out = self.compute_out_linear(fmha_out, i)
 
         return out_linear_out
-
-    def pre_process(self, **kwargs):
-        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
-        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
-        get_max_len(seq_lens_encoder, seq_lens_decoder)
 
     def post_process(self, **kwargs):
         multi_block_output = kwargs.get("multi_block_output", None)

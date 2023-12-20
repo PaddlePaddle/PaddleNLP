@@ -324,13 +324,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             rank_id=config.tensor_parallel_rank,
         )
 
-        if self.use_weight_only:
-            self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
-        elif self.quant_type == "a8w8":
-            self.transformer_block = FusedMultiTransformerA8W8(transformer_config)
-        else:
-            self.transformer_block = FusedMultiTransformerBase(transformer_config)
-
+        self.set_transformer_block(transformer_config)
         self.norm = FusedLlamaRMSNorm(config)
 
         self.cache_kvs = None
@@ -484,6 +478,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
         for idx in range(self.config.num_hidden_layers):
             logger.info(f"set state for layer {idx}")
+
+            if self.use_weight_only:
+                logger.info("weight only is enabled")
             unfused_state_dict = {}
             unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
                 "llama.layers.{}.self_attn.q_proj.weight".format(idx)

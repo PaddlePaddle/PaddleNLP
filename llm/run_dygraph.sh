@@ -25,16 +25,17 @@ export FLAGS_new_executor_serial_run=1
 export FLAGS_allocator_strategy=naive_best_fit
 export FLAGS_fraction_of_gpu_memory_to_use=0.92
 
-model_dir=${1:-"checkpoints/llama65b_ptq_smooth"}
+model_dir=${1:-"checkpoints/quant_model_Llama-2-13b"}
 src_len=${2:-1024}
 dec_len=${3:-1024}
 quant_type=${4:-"a8w8"}
 # quant_type=${4:-"None"}
+# quant_type=${4:-"weight_only_int8"}
 
 total_len=`expr ${src_len} + ${dec_len}`
 
 python -m paddle.distributed.launch \
-    --gpus "0,1,2,3,4,5,6,7" \
+    --gpus "0" \
     predictor.py \
     --model_name_or_path ${model_dir} \
     --dtype float16 \
@@ -47,4 +48,19 @@ python -m paddle.distributed.launch \
     --quant_type ${quant_type}  \
     --block_attn \
     --use_cachekv_int8 static
+
+# python -m paddle.distributed.launch \
+#     --gpus "0,1,2,3,4,5,6,7" \
+#     predictor.py \
+#     --model_name_or_path ${model_dir} \
+#     --dtype float16 \
+#     --src_length ${total_len} \
+#     --max_length ${dec_len} \
+#     --output_file "infer.json" \
+#     --mode "dynamic" \
+#     --batch_size 2 \
+#     --inference_model \
+#     --quant_type ${quant_type}  \
+#     --block_attn \
+#     --use_cachekv_int8 static
 
