@@ -166,7 +166,7 @@ def do_train():
         eval_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
         id2corpus = gen_id2corpus(args.corpus_file)
         label2id = label2ids(args.corpus_file)
-        # conver_example function's input must be dict
+        # convert_example function's input must be dict
         corpus_list = [{idx: text} for idx, text in id2corpus.items()]
         corpus_ds = MapDataset(corpus_list)
         corpus_data_loader = create_dataloader(
