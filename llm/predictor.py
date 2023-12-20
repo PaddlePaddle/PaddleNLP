@@ -1342,17 +1342,24 @@ def create_predictor(
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMBlockInferenceModel as LlamaInferenceModel,
                     )
+
+                    model = LlamaInferenceModel.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        config=config,
+                        dtype=predictor_args.dtype,
+                        tensor_parallel_degree=tensor_parallel_degree,
+                        tensor_parallel_rank=tensor_parallel_rank,
+                    )
                 else:
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMInferenceModel as LlamaInferenceModel,
                     )
-                model = LlamaInferenceModel.from_pretrained(
-                    predictor_args.model_name_or_path,
-                    config=config,
-                    dtype=predictor_args.dtype,
-                    tensor_parallel_degree=tensor_parallel_degree,
-                    tensor_parallel_rank=tensor_parallel_rank,
-                )
+
+                    model = LlamaInferenceModel.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        config=config,
+                        dtype=predictor_args.dtype,
+                    )
                 model.eval()
 
             elif "opt" in config.architectures[0].lower():

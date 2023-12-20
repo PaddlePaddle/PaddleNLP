@@ -83,15 +83,19 @@ def main():
 
     predictor.model.to_static(
         get_infer_model_path(export_args.output_path, predictor_args.model_prefix),
-        {"dtype": predictor_args.dtype, "export_precache": predictor_args.export_precache, "use_cachekv_int8": predictor_args.use_cachekv_int8},
+        {
+            "dtype": predictor_args.dtype,
+            "export_precache": predictor_args.export_precache,
+            "use_cachekv_int8": predictor_args.use_cachekv_int8,
+        },
     )
     predictor.model.config.save_pretrained(export_args.output_path)
     predictor.tokenizer.save_pretrained(export_args.output_path)
     generate_rank_mapping(os.path.join(export_args.output_path, "rank_mapping.csv"))
 
-    # if tensor_parallel_degree > 1:
-    #     export_args.output_path = os.path.join(export_args.output_path, f"rank_{tensor_parallel_rank}")
-    # validate_pdmodel(export_args.output_path, predictor_args.model_prefix)
+    if tensor_parallel_degree > 1:
+        export_args.output_path = os.path.join(export_args.output_path, f"rank_{tensor_parallel_rank}")
+    validate_pdmodel(export_args.output_path, predictor_args.model_prefix)
 
 
 if __name__ == "__main__":

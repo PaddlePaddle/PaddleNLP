@@ -734,7 +734,6 @@ def paddlenlp_load(path, map_location="cpu"):
                 return _parse_every_object(state_dict, _transformed_from_lodtensor, _ndarray_to_tensor)
 
             else:
-
                 return paddle.load(path)
 
 

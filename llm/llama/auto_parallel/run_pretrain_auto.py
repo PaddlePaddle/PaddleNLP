@@ -650,6 +650,7 @@ def main():
                 continue
             elif pp_degree > 1:
                 local_batches = inputs
+
             with job_schedule_profiler_range(step, job_schedule_profiler_start, job_schedule_profiler_end) as status:
                 engine.enable_job_schedule_profiler = status
 
