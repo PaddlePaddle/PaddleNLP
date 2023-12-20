@@ -437,6 +437,14 @@ class LlamaAttentionAuto(nn.Layer):
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
         # print(f"attention input md5sum {hidden_states._md5sum()}")
+
+        if self.config.sequence_parallel:
+            hidden_states = dist.reshard(
+                hidden_states,
+                get_mesh(self.ipp),
+                [dist.Shard(1), dist.Replicate()],
+            )
+        
         if self.fuse_attention_qkv:
             target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
             mix_layer = self.qkv_proj(hidden_states)
@@ -450,13 +458,18 @@ class LlamaAttentionAuto(nn.Layer):
             key_states = self.k_proj(hidden_states).reshape(shape=target_key_value_shape)
             value_states = self.v_proj(hidden_states).reshape(shape=target_key_value_shape)
 
+        if self.config.sequence_parallel:
+            query_states = paddle.transpose(query_states, [1, 0, 2, 3])
+            key_states = paddle.transpose(key_states, [1, 0, 2, 3])
+            value_states = paddle.transpose(value_states, [1, 0, 2, 3])
+            
         kv_seq_len = key_states.shape[-3]
 
         if past_key_value is not None:
             kv_seq_len += past_key_value[0].shape[-3]
 
         if self.config.rope:
-            print("rope")
+            # print("rope")
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
@@ -526,6 +539,11 @@ class LlamaAttentionAuto(nn.Layer):
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
         attn_output = self.o_proj(attn_output)
+        if self.config.sequence_parallel:
+            attn_output = paddle.transpose(attn_output, [1, 0, 2])
+            attn_output = dist.reshard(
+                attn_output, get_mesh(self.ipp), [dist.Shard(1), dist.Shard(0)]
+            )
 
         if not output_attentions:
             attn_weights = None
@@ -593,6 +611,12 @@ class LlamaDecoderLayerAuto(nn.Layer):
         if self.idx == 0:
             print(f"input_layernorm_{self.idx} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()}")
         """
+        if self.config.sequence_parallel:
+            hidden_states = dist.reshard(
+                hidden_states,
+                get_mesh(self.ipp),
+                [dist.Shard(1), dist.Replicate()],
+            )
         # Self Attention
         has_gradient = not hidden_states.stop_gradient
         if (
@@ -647,7 +671,19 @@ class LlamaDecoderLayerAuto(nn.Layer):
                 f"post_attention_layernorm_{self.idx} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()}"
             )
         """
+        if self.config.sequence_parallel:
+            hidden_states = dist.reshard(
+                hidden_states,
+                get_mesh(self.ipp),
+                [dist.Shard(1), dist.Replicate()],
+            )
         hidden_states = self.mlp(hidden_states)
+        if self.config.sequence_parallel:
+            hidden_states = dist.reshard(
+                hidden_states,
+                get_mesh(self.ipp),
+                [dist.Shard(1), dist.Shard(0)],
+            )
         hidden_states = residual + hidden_states
         # md5 = hidden_states._md5sum()
         # print(f"decoder_{self.idx} shape: {hidden_states.shape} md5sum: {md5}")
@@ -843,6 +879,13 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         self.norm = LlamaRMSNormAuto(config)
 
         self.gradient_checkpointing = False
+    
+        print(f"sequence_parallel: {self.config.sequence_parallel}")
+        self.placements = (
+            [dist.Shard(1), dist.Shard(0)]
+            if self.config.sequence_parallel
+            else [dist.Shard(0), dist.Replicate()]
+        )
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -949,7 +992,13 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                 attention_mask = None
         hidden_states = inputs_embeds
         hidden_states = dist.reshard(hidden_states, get_mesh(), [dist.Shard(0), dist.Replicate()])
-
+        
+        if self.config.sequence_parallel:
+            # [B, S, H] -> [S, B, H]
+            hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
+            hidden_states = dist.reshard(hidden_states, get_mesh(), [dist.Shard(1), dist.Shard(0)])
+            
+        
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
@@ -967,7 +1016,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                 hidden_states = dist.reshard(
                     hidden_states,
                     get_mesh(decoder_layer.ipp),
-                    [dist.Shard(0), dist.Replicate()],
+                    self.placements,
                 )
                 position_ids = dist.reshard(
                     position_ids,
@@ -1229,7 +1278,13 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
         )
 
         hidden_states = outputs[0]  # [bs, seq_len, dim]
-
+        if self.config.sequence_parallel:
+            hidden_states = dist.reshard(
+                hidden_states, get_mesh(-1), [dist.Shard(1), dist.Replicate()]
+            )
+            hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
+        
+        
         # if labels is None，means we need full output, instead of tensor_parallel_output
         # tensor_parallel_output is togather with ParallelCrossEntropy
         tensor_parallel_output = (

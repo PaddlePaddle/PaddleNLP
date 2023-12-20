@@ -663,7 +663,7 @@ def main():
 
     # hack: create dp group for distributed input data to align dygraph parallel loss.
     dp_group = None
-    global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("pp").mesh
+    global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("pp").mesh 
     mesh_shape = global_mesh.shape
     for id in range(mesh_shape[0]):
         pp_mesh = global_mesh[id]
@@ -720,8 +720,8 @@ def main():
                 )
                 tr_loss = 0
 
-            if global_step // training_args.gradient_accumulation_steps >= 1:
-                sys.exit(0)
+            # if global_step // training_args.gradient_accumulation_steps >= 1:
+            #     sys.exit(0)
 
             global_step += 1
 
