@@ -34,7 +34,7 @@ target_path_for_ci_scripts="scripts/distribute"
 ####################################
 install_paddle(){
     echo -e "\033[31m ---- Install paddlepaddle-gpu  \033"
-    python -m pip install --user ${paddle} --force-reinstall --no-dependencies;
+    python -m pip install --no-cache-dir --user ${paddle} --force-reinstall --no-dependencies;
     python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
 }
 
