@@ -170,6 +170,8 @@ def load_unified_checkpoint(
     """
 
     local_resume = check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serialization)
+    logger.debug(f"local_resume: {local_resume}")
+
     if not local_resume:
         logger.info("Begin to dynamically load unified checkpoint!")
         load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_checkpoint, safe_serialization)
@@ -183,7 +185,8 @@ def load_unified_checkpoint_locally(args, model, optimizer, resume_from_checkpoi
     """
     Only dataset_rank == 0 can enter this function.
     """
-    index_filename = select_model_weight_index(args, model, resume_from_checkpoint, safe_serialization)
+    index_filename = select_model_weight_index(args, model, resume_from_checkpoint, safe_serialization, local=True)
+
     resolved_archive_file, sharded_metadata = get_checkpoint_shard_files(
         pretrained_model_name_or_path=resume_from_checkpoint,
         index_filename=os.path.join(resume_from_checkpoint, index_filename),
@@ -604,7 +607,7 @@ def unified_optimizer_into_shards(
 
 
 def check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serialization=False):
-    index_filename = select_model_weight_index(args, model, resume_from_checkpoint, safe_serialization)
+    index_filename = select_model_weight_index(args, model, resume_from_checkpoint, safe_serialization, local=True)
     index_filename = os.path.join(resume_from_checkpoint, index_filename)
 
     # Find index json file and distribute this file in global group.
@@ -878,7 +881,7 @@ def create_optimizer_dispatch_table(
 
 
 def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
-    index_filename = select_model_weight_index(args, model, resume_from_checkpoint, safe_serialization)
+    index_filename = select_model_weight_index(args, model, resume_from_checkpoint, safe_serialization, local=False)
     index_filename = os.path.join(resume_from_checkpoint, index_filename)
 
     with open(index_filename, "r") as f:
@@ -1609,7 +1612,7 @@ def file_save_async_or_sync(state_dict, path, safe_serialization, is_sync=True):
         async_save_queue.append(p)
 
 
-def select_model_weight_index(args, model, resume_from_checkpoint, safe_serialization):
+def select_model_weight_index(args, model, resume_from_checkpoint, safe_serialization, local=True):
     """
 
     SKIP_SAVE_MODEL_WEIGHT (if config):
@@ -1622,14 +1625,15 @@ def select_model_weight_index(args, model, resume_from_checkpoint, safe_serializ
     # find model weight index file
     index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
     index_filename_path = os.path.join(resume_from_checkpoint, index_filename)
+    identify_func = os.path.isfile if local else distributed_isfile
 
-    if distributed_isfile(index_filename_path):
+    if identify_func(index_filename_path):
         return index_filename
     else:
         index_filename = PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
         index_filename_path = os.path.join(resume_from_checkpoint, index_filename)
 
-        if distributed_isfile(index_filename_path):
+        if identify_func(index_filename_path):
             return index_filename
         else:
             raise ValueError("Can't find a valid unified model or master weight checkpoint to load.")
