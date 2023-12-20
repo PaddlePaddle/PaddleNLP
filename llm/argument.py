@@ -25,12 +25,12 @@ class TrainingArguments(TrainingArguments):
 class DataArgument:
     dataset_name_or_path: str = field(default=None, metadata={"help": "Name or path for dataset"})
     task_name: str = field(default=None, metadata={"help": "Additional name to select a more specific task."})
-    intokens: bool = field(default=False, metadata={"help": "Whether to use InTokens data stream"})
+    zero_padding: bool = field(default=False, metadata={"help": "Whether to use Zero Padding data stream"})
     src_length: int = field(default=1024, metadata={"help": "The maximum length of source(context) tokens."})
     max_length: int = field(
         default=2048,
         metadata={
-            "help": "The maximum length that model input tokens can have. When intokens is set to True, it's also the maximum length for InTokens data stream"
+            "help": "The maximum length that model input tokens can have. When Zero Padding is set to True, it's also the maximum length for Zero Padding data stream"
         },
     )
     eval_with_do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
