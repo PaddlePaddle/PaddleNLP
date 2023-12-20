@@ -1359,10 +1359,13 @@ class TrainingArguments:
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
+                assert self.tensor_parallel_degree < 100, "tensor parallel degree should be less than 100."
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
+                assert self.pipeline_parallel_degree < 100, "pipeline parallel degree should be less than 100."
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
             if self.sharding_parallel_degree > 1:
+                assert self.sharding_parallel_degree < 100, "sharding parallel degree should be less than 100."
                 name.append(f"shard{self.sharding_parallel_rank:0>2d}")
 
             return "_".join(name)
@@ -1374,8 +1377,10 @@ class TrainingArguments:
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
+                assert self.tensor_parallel_rank < 100, "tensor parallel rank should be less than 100."
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
+                assert self.pipeline_parallel_degree < 100, "tensor parallel rank should be less than 100."
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
             return "_".join(name)
 
@@ -1386,16 +1391,19 @@ class TrainingArguments:
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
+                assert self.tensor_parallel_rank < 100, "tensor parallel rank should be less than 100."
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
                 if pp_id is None:
                     pp_id = self.pipeline_parallel_rank
                 assert isinstance(pp_id, int)
+                assert pp_id < 100, "pp_id should be less than 100."
                 name.append(f"pp{pp_id:0>2d}")
             if self.sharding_parallel_degree > 1:
                 if shard_id is None:
                     shard_id = self.sharding_parallel_rank
                 assert isinstance(shard_id, int)
+                assert shard_id < 100, "shard_id should be less than 100."
                 name.append(f"shard{shard_id:0>2d}")
             return "_".join(name)
         else:
