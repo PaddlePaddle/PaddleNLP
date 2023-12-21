@@ -13,13 +13,11 @@
 # limitations under the License.
 import math
 import os
-import random
 import sys
 import time
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-import numpy as np
 import paddle
 
 from paddlenlp.data.causal_dataset import (
@@ -32,6 +30,7 @@ from paddlenlp.trainer import (
     Trainer,
     TrainingArguments,
     get_last_checkpoint,
+    set_seed,
     speed_metrics,
 )
 from paddlenlp.transformers import (
@@ -125,12 +124,9 @@ class ModelArguments:
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
 
-    config_name: Optional[str] = field(
-        default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
-    )
     use_flash_attention: bool = field(
         default=False,
-        metadata={"help": "use_flash_attention"},
+        metadata={"help": "Whether to use flash attention"},
     )
     use_fused_rms_norm: bool = field(
         default=False,
@@ -152,6 +148,9 @@ class ModelArguments:
         default=1,
         metadata={"help": "virtual_pp_degree"},
     )
+    hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
+    attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
+
     continue_training: bool = field(
         default=False,
         metadata={
@@ -271,7 +270,7 @@ def get_train_data_file(args):
             if (os.path.isfile(os.path.join(args.input_dir, f)) and ("_idx.npz" in str(f) or ".idx" in str(f)))
         ]
         files = [x.replace("_idx.npz", "") for x in files]
-        files = [x.replace(".idx", "") for x in files]  # add
+        files = [x.replace(".idx", "") for x in files]
 
         if len(files) > 1:
             ret = []
@@ -283,16 +282,6 @@ def get_train_data_file(args):
             return ret
 
     return files
-
-
-def set_seed(args):
-    if args.device == "cpu":
-        idx = 0
-    else:
-        idx = paddle.distributed.get_rank()
-    random.seed(args.seed + idx)
-    np.random.seed(args.seed + idx)
-    paddle.seed(args.seed + idx)
 
 
 class PretrainingTrainer(Trainer):
@@ -378,10 +367,8 @@ def main():
     if data_args.data_cache is not None:
         os.makedirs(data_args.data_cache, exist_ok=True)
 
-    set_seed(training_args)
     paddle.set_device(training_args.device)
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
+    set_seed(seed=training_args.seed)
 
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
@@ -435,13 +422,18 @@ def main():
     config.sequence_parallel = model_args.sequence_parallel
     config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
     config.use_fused_rope = model_args.use_fused_rope
+
     config.no_recompute_layers = model_args.no_recompute_layers
     config.pp_recompute_interval = model_args.pp_recompute_interval
     config.recompute_use_reentrant = model_args.recompute_use_reentrant
-
     config.use_recompute = training_args.recompute
+
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
+
+    # Config for model using dropout, such as GPT.
+    config.hidden_dropout_prob = model_args.hidden_dropout_prob
+    config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
 
     print("Final pre-training config:", config)
 

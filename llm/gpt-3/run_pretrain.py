@@ -10,9 +10,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-GPT/Llama pretraining scripts.
-"""
 import math
 import os
 import sys
@@ -22,6 +19,11 @@ from typing import Optional
 
 import paddle
 
+from paddlenlp.data.causal_dataset import (
+    build_train_valid_test_datasets,
+    check_data_split,
+    print_rank_0,
+)
 from paddlenlp.trainer import (
     PdArgumentParser,
     Trainer,
@@ -31,29 +33,16 @@ from paddlenlp.trainer import (
     speed_metrics,
 )
 from paddlenlp.transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoModelForCausalLMPipe,
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
-    GPTConfig,
-    GPTForCausalLM,
-    GPTForCausalLMPipe,
     LinearAnnealingWithWarmupDecay,
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
-
-MODEL_CLASSES = {
-    "gpt": (
-        GPTConfig,
-        GPTForCausalLM,
-    ),
-}
-
-from paddlenlp.data.causal_dataset import (
-    build_train_valid_test_datasets,
-    check_data_split,
-    print_rank_0,
-)
 
 
 def add_start_docstrings(*docstr):
@@ -118,7 +107,6 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to pre-train from.
     """
 
-    model_type: Optional[str] = field(default="gpt", metadata={"help": "Only support for gpt pre-training for now."})
     model_name_or_path: str = field(
         default="gpt2-medium-en",
         metadata={
@@ -128,19 +116,13 @@ class ModelArguments:
     tokenizer_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
-    output_attentions: bool = field(default=False, metadata={"help": "Whether output attention weights"})
-    use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
-    virtual_pp_degree: int = field(
-        default=1,
-        metadata={"help": "virtual_pp_degree"},
-    )
-    fused_linear: bool = field(
+    use_flash_attention: bool = field(
         default=False,
-        metadata={"help": "gpt, whether to fuse linear projection"},
+        metadata={"help": "Whether to use flash attention"},
     )
     fuse_attention_qkv: bool = field(
         default=False,
-        metadata={"help": "gpt, whether to fuse attention qkv"},
+        metadata={"help": "whether to fuse attention qkv"},
     )
     fuse_attention_ffn: bool = field(
         default=False,
@@ -150,12 +132,13 @@ class ModelArguments:
         default="full",
         metadata={"help": "Choose among ['full', 'core_attn', 'full_attn']"},
     )
-    enable_fuse_transformer: bool = field(
-        default=False,
-        metadata={"help": "gpt, enable_fuse_transformer"},
+    virtual_pp_degree: int = field(
+        default=1,
+        metadata={"help": "virtual_pp_degree"},
     )
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
+
     continue_training: bool = field(
         default=False,
         metadata={
@@ -376,11 +359,10 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    config_class, model_class = MODEL_CLASSES[model_args.model_type]
-
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
+    config = AutoConfig.from_pretrained(model_args.model_name_or_path)
 
-    config = config_class.from_pretrained(model_args.model_name_or_path)
+    config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
     if not model_args.continue_training:
         config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
@@ -388,20 +370,17 @@ def main():
     if not model_args.continue_training:
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
         logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
-    config.seq_length = data_args.max_seq_length
     config.use_flash_attention = model_args.use_flash_attention
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.fuse_attention_ffn = model_args.fuse_attention_ffn
+    config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
     config.sequence_parallel = model_args.sequence_parallel
     config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
-    config.output_attentions = model_args.output_attentions
-    config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
+
     config.hidden_dropout_prob = model_args.hidden_dropout_prob
     config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
-    config.enable_fuse_transformer = model_args.enable_fuse_transformer
 
-    config.recompute_granularity = model_args.recompute_granularity
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
@@ -416,8 +395,9 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
+    model_class = AutoModelForCausalLM
     if training_args.pipeline_parallel_degree > 1:
-        model_class = GPTForCausalLMPipe
+        model_class = AutoModelForCausalLMPipe
 
     if model_args.continue_training:
         model = model_class.from_pretrained(
@@ -439,7 +419,11 @@ def main():
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
-    warmup_steps = training_args.warmup_ratio * training_args.max_steps
+
+    if training_args.warmup_steps > 0:
+        warmup_steps = training_args.warmup_steps
+    else:
+        warmup_steps = training_args.warmup_ratio * training_args.max_steps
 
     lr_scheduler = None
     if training_args.lr_scheduler_type.value == "cosine":
