@@ -1,5 +1,5 @@
 # coding=utf8, ErnestinaQiu
-from llama2 import ChatCompletion
+from src.llama2 import llamaChatCompletion
 
 completion_tokens = prompt_tokens = 0
 
@@ -16,7 +16,7 @@ def gpt(
     prompt, model="llama-2-7b-chat", temperature=0.6, max_tokens=1000, n=1, stop=None
 ) -> list:
     messages = [
-        [{"role": "system", "content": ""}, {"role": "user", "content": prompt}]
+        [{"role": "user", "content": prompt}]
     ]
     return chatgpt(
         messages=messages,
@@ -32,15 +32,12 @@ def chatgpt(
     messages, model="llama-2-7b-chat", temperature=0.7, max_tokens=1000, n=1, stop=None
 ) -> list:
     global completion_tokens, prompt_tokens
-    if model == "llama-2-7b-chat":
-        chatter = ChatCompletion()
-    elif model == "llama2-13b-chat":
-        chatter = ChatCompletion(model)
-    elif model == "llama2-70b-chat":
-        chatter = ChatCompletion(model)
+    models_included = ["llama-2-7b-chat", "llama-2-7b", "llama2-13b-chat", "llama2-13b", "llama2-70b-chat", "llama2-70b"]
+    if model in models_included:
+        chatter = llamaChatCompletion(model)
     else:
         print(f"Not support for llm {model}, and use llama-2-7b-chat instead.")
-        chatter = ChatCompletion()
+        chatter = llamaChatCompletion(model="llama-2-7b-chat")
 
     outputs = []
     while n > 0:
