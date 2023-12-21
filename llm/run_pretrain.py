@@ -456,9 +456,12 @@ def main():
     if training_args.pipeline_parallel_degree > 1:
         model_class = AutoModelForCausalLMPipe
         if "LLama" in str(config.architectures):
-            from register_reshard import register_pp_reshard_information
+            try:
+                from register_reshard import register_pp_reshard_information
 
-            register_pp_reshard_information(config.num_hidden_layers)
+                register_pp_reshard_information(config.num_hidden_layers)
+            except:
+                print("Not register llama pp reshard information.")
 
     if model_args.continue_training:
         model = model_class.from_pretrained(
