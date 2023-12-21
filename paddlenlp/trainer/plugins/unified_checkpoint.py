@@ -86,7 +86,7 @@ class UnifiedCheckpointOption(ExplicitEnum):
     """
     "- skip_save_model_weight: do not save model weights when the masters weight exist\n"
     "- master_weight_compatible: 1. if the master weights exist, only load when needed\n"
-    "                            2. if master weights does not exit, convert model weights to master weights when needed\n"
+    "                            2. if master weights does not exist, convert model weights to master weights when needed\n"
     "- async_save: enable asynchronous saving checkpoints to disk\n"
     "- enable_all_options: enable all optimization configurations\n"
     """
@@ -944,7 +944,7 @@ def load_unified_optimizer_dynamically(args, model, optimizer, resume_from_check
     has_master_weights = index["master_weights"]
     # update has_master_weights and index_filename_master_weights
     # 1. if the master weights exists, only has_master_weights is set True and load master weights when needed
-    # 2. if master weights does not exit, convert model weights to master weights when needed
+    # 2. if master weights does not exist, convert model weights to master weights when needed
     has_master_weights, index_filename_mw = update_master_weight_status(
         args, optimizer, has_master_weights, safe_serialization
     )
@@ -1610,12 +1610,7 @@ def file_save_async_or_sync(state_dict, path, safe_serialization, is_sync=True):
 
 def select_model_weight_index(args, model, resume_from_checkpoint, safe_serialization, local=True):
     """
-
-    SKIP_SAVE_MODEL_WEIGHT (if config):
-        step 1: the index_filename is set as master weights in check_unified_checkpoint
-        step 2/3: the master weights are loaded from checkpoint
-            load_unified_checkpoint_locally() and load_unified_checkpoint_dynamically()
-            will load master weights as model weights
+    try select model weight index from model weight or master weight index.
     """
 
     # find model weight index file
@@ -1633,10 +1628,6 @@ def select_model_weight_index(args, model, resume_from_checkpoint, safe_serializ
             return index_filename
         else:
             raise ValueError("Can't find a valid unified model or master weight checkpoint to load.")
-
-
-def update_optimizer_weight_status(args, optimizer, safe_serialization):
-    pass
 
 
 def update_master_weight_status(args, optimizer, has_master_weight, safe_serialization):
