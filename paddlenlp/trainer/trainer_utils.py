@@ -41,6 +41,7 @@ from paddle.optimizer.lr import LambdaDecay
 
 from paddlenlp.ops import Topology
 
+from ..trainer.argparser import strtobool
 from ..transformers.tokenizer_utils_base import BatchEncoding
 from ..utils.import_utils import is_paddle_cuda_available, is_psutil_available
 from ..utils.log import logger
@@ -217,12 +218,16 @@ def get_last_checkpoint(folder):
     ]
     if len(checkpoints) == 0:
         return
-    for i in sorted(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0]), reverse=True):
-        current_path = os.path.join(folder, i)
-        # make sure the checkpoint is valid
-        if os.path.exists(os.path.join(current_path, ".checkpoint_done")):
-            return current_path
-    return
+
+    if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
+        for i in sorted(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0]), reverse=True):
+            current_path = os.path.join(folder, i)
+            # make sure the checkpoint is valid
+            if os.path.exists(os.path.join(current_path, ".checkpoint_done")):
+                return current_path
+        return
+    else:
+        return os.path.join(folder, max(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0])))
 
 
 class IntervalStrategy(ExplicitEnum):

@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import warnings
 from dataclasses import dataclass, field
 
 from paddlenlp.trainer import TrainingArguments
@@ -50,6 +51,33 @@ class DataArgument:
             "help": "the path of `chat_template.json` file to handle multi-rounds conversation. If is None, it will not use `chat_template.json`; If is equal with `model_name_or_path`, it will use the default loading; If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
         },
     )
+    # NOTE(gongenlei): for autotuner
+    autotuner_benchmark: bool = field(
+        default=False,
+        metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
+    )
+    # NOTE(gongenlei): deprecated params
+    task_name_or_path: str = field(
+        default=None,
+        metadata={
+            "help": "@deprecated Please use `dataset_name_or_path`. Name or path for dataset, same as `dataset_name_or_path`."
+        },
+    )  # Alias for dataset_name_or_path
+    intokens: bool = field(
+        default=None,
+        metadata={
+            "help": "@deprecated Please use `zero_padding`. Whether to use InTokens data stream, same as `zero_padding`."
+        },
+    )  # Alias for zero_padding
+
+    def __post_init__(self):
+        if self.task_name_or_path is not None:
+            warnings.warn("`--task_name_or_path` is deprecated, please use `--dataset_name_or_path`.")
+            self.dataset_name_or_path = self.task_name_or_path
+
+        if self.intokens is not None:
+            warnings.warn("`--intokens` is deprecated, please use `--zero_padding`.")
+            self.zero_padding = self.intokens
 
 
 @dataclass
