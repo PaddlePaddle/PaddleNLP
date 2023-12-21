@@ -259,3 +259,23 @@ class PdArgumentParser(ArgumentParser):
             obj = dtype(**inputs)
             outputs.append(obj)
         return (*outputs,)
+
+    def parse_integer_list(self, args: list) -> list:
+        """
+        Alternative helper method to parse integer or string list to integer list.
+        """
+        assert isinstance(args, list)
+        outputs = []
+        for elem in args:
+            print(f"-- parsing {elem}, type is {type(elem)}")
+            if isinstance(elem, str):
+                if ":" in elem:
+                    info = elem.split(":")
+                    start, end, step = int(info[0]), int(info[1]), int(info[2]) if len(info) > 2 else 1
+                    for i in range(start, end, step):
+                        outputs.append(i)
+                else:
+                    outputs.append(int(elem))
+            else:
+                raise ArgumentTypeError(f"Truthy value expected: {elem} is expected to be either int or str.")
+        return outputs
