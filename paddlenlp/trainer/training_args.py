@@ -727,6 +727,16 @@ class TrainingArguments:
         metadata={"help": "Enable training under @to_static."},
     )
 
+    ignore_load_lr_and_optim: Optional[bool] = field(
+        default=False,
+        metadata={"help": "whether to ignore load optimizer and scheduler."},
+    )
+
+    force_reshard_pp: Optional[bool] = field(
+        default=False,
+        metadata={"help": "reshard pp even if pp degree in the model and pp degree in script match"},
+    )
+
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
         if env_local_rank != -1 and env_local_rank != self.local_rank and paddle.distributed.get_world_size() > 1:
@@ -1389,10 +1399,13 @@ class TrainingArguments:
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
+                assert self.tensor_parallel_degree < 100, "tensor parallel degree should be less than 100."
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
+                assert self.pipeline_parallel_degree < 100, "pipeline parallel degree should be less than 100."
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
             if self.sharding_parallel_degree > 1:
+                assert self.sharding_parallel_degree < 100, "sharding parallel degree should be less than 100."
                 name.append(f"shard{self.sharding_parallel_rank:0>2d}")
 
             return "_".join(name)
@@ -1404,25 +1417,33 @@ class TrainingArguments:
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
+                assert self.tensor_parallel_rank < 100, "tensor parallel rank should be less than 100."
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
+                assert self.pipeline_parallel_degree < 100, "tensor parallel rank should be less than 100."
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
             return "_".join(name)
 
         else:
             return None
 
-    def sharded_name_suffix(self, shard_id=None):
+    def sharded_name_suffix(self, shard_id=None, pp_id=None):
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
+                assert self.tensor_parallel_rank < 100, "tensor parallel rank should be less than 100."
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
-                name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
+                if pp_id is None:
+                    pp_id = self.pipeline_parallel_rank
+                assert isinstance(pp_id, int)
+                assert pp_id < 100, "pp_id should be less than 100."
+                name.append(f"pp{pp_id:0>2d}")
             if self.sharding_parallel_degree > 1:
                 if shard_id is None:
                     shard_id = self.sharding_parallel_rank
                 assert isinstance(shard_id, int)
+                assert shard_id < 100, "shard_id should be less than 100."
                 name.append(f"shard{shard_id:0>2d}")
             return "_".join(name)
         else:
