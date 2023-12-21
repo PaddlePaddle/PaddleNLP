@@ -244,7 +244,7 @@ def load_torch(path: str, **pickle_load_args):
         state_dict = {}
         for k, v in flat:
             dtype = _TYPES[v["dtype"]]
-            if dtype == "BF16":
+            if v["dtype"] == "BF16":
                 arr = paddle.to_tensor(np.frombuffer(v["data"], dtype=dtype).reshape(v["shape"]), dtype="bfloat16")
             else:
                 arr = paddle.to_tensor(np.frombuffer(v["data"], dtype=dtype).reshape(v["shape"]))
