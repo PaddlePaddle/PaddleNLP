@@ -1519,9 +1519,12 @@ class Trainer:
                     core.default_custom_device_generator(i).manual_seed(checkpoint_rng_state["cuda"][i])
 
         if self.args.use_hybrid_parallel:
-            fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
-                checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
-            )
+            if "hybrid_parallel_rng_state_tracker" in checkpoint_rng_state:
+                fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
+                    checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
+                )
+            else:
+                logger.warning("Not found hybrid parallel RNG state.")
 
     @staticmethod
     def get_optimizer_cls_and_kwargs(args: TrainingArguments) -> Tuple[Any, Any]:
