@@ -11,11 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import warnings
 from dataclasses import dataclass, field
 
 from paddlenlp.trainer import TrainingArguments
 from paddlenlp.trainer.trainer_utils import EvaluationStrategy, IntervalStrategy
+from paddlenlp.utils.log import logger
 
 
 @dataclass
@@ -90,11 +90,11 @@ class DataArgument:
 
     def __post_init__(self):
         if self.task_name_or_path is not None:
-            warnings.warn("`--task_name_or_path` is deprecated, please use `--dataset_name_or_path`.")
+            logger.warn("`--task_name_or_path` is deprecated, please use `--dataset_name_or_path`.")
             self.dataset_name_or_path = self.task_name_or_path
 
         if self.intokens is not None:
-            warnings.warn("`--intokens` is deprecated, please use `--zero_padding`.")
+            logger.warn("`--intokens` is deprecated, please use `--zero_padding`.")
             self.zero_padding = self.intokens
 
 

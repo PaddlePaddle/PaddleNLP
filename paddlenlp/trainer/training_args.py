@@ -959,13 +959,17 @@ class TrainingArguments:
                         raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
 
                     if self.do_eval:
-                        assert (
+                        if (
                             self.per_device_train_batch_size * self.gradient_accumulation_steps
-                            == self.per_device_eval_batch_size
-                        ), (
-                            "In pipeline model, the evaluation also shares same setting with training. "
-                            "Please set per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
-                        )
+                            != self.per_device_eval_batch_size
+                        ):
+                            logger.warn(
+                                "In pipeline model, the evaluation also shares same setting with training. "
+                                "We will enforce that per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
+                            )
+                            self.per_device_eval_batch_size = (
+                                self.per_device_train_batch_size * self.gradient_accumulation_steps
+                            )
 
                 if self.tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
@@ -1165,7 +1169,7 @@ class TrainingArguments:
                         self.per_device_train_batch_size * self.gradient_accumulation_steps
                         != self.per_device_eval_batch_size
                     ):
-                        warnings.warn(
+                        logger.warn(
                             "In pipeline model, the evaluation also shares same setting with training. "
                             "We will enforce that per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
                         )
