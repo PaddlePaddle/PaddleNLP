@@ -435,6 +435,13 @@ def main():
     config.hidden_dropout_prob = model_args.hidden_dropout_prob
     config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
 
+    config.sep_parallel_degree = training_args.sep_parallel_degree
+    if config.sequence_parallel:
+        assert config.tensor_parallel_degree > 1, "tensor_parallel_degree must be larger than 1 for sequence parallel."
+    assert (
+        config.num_attention_heads % config.sep_parallel_degree == 0
+    ), f"num_attention_heads:{config.num_attention_heads} must be divisible by sep_parallel_degree {config.sep_parallel_degree}"
+
     print("Final pre-training config:", config)
 
     # Set the dtype for loading model
@@ -448,6 +455,10 @@ def main():
     model_class = AutoModelForCausalLM
     if training_args.pipeline_parallel_degree > 1:
         model_class = AutoModelForCausalLMPipe
+        if "LLama" in str(config.architectures):
+            from register_reshard import register_pp_reshard_information
+
+            register_pp_reshard_information(config.num_hidden_layers)
 
     if model_args.continue_training:
         model = model_class.from_pretrained(
