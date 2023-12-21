@@ -87,7 +87,10 @@ def init_dist_env(config):
     def is_segment_parallel_supported():
         import inspect
         members = [name for (name, date) in inspect.getmembers(fleet.HybridCommunicateGroup)]
-        return "get_sep_parallel_world_size" in members
+        support_sep = "get_sep_parallel_world_size" in members
+        if not support_sep:
+            logger.warning("segment parallel is not supported!!!, Ignore it.")
+        return support_sep
 
     if config.Distributed.mp_degree == 1 and config.Distributed.sharding.sharding_degree == 1:
         if is_segment_parallel_supported():
@@ -100,13 +103,23 @@ def init_dist_env(config):
         else:
             order = ["dp", "pp", "sharding", "mp"]
 
-    strategy.hybrid_configs = {
-        "dp_degree": config.Distributed.dp_degree,
-        "mp_degree": config.Distributed.mp_degree,
-        "pp_degree": config.Distributed.pp_degree,
-        "sharding_degree": config.Distributed.sharding.sharding_degree,
-        "order": order,
-    }
+    if is_segment_parallel_supported():
+        strategy.hybrid_configs = {
+            "dp_degree": config.Distributed.dp_degree,
+            "mp_degree": config.Distributed.mp_degree,
+            "pp_degree": config.Distributed.pp_degree,
+            "sharding_degree": config.Distributed.sharding.sharding_degree,
+            "sep_degree": config.Distributed.sep_degree,
+            "order": order,
+        }
+    else:
+        strategy.hybrid_configs = {
+            "dp_degree": config.Distributed.dp_degree,
+            "mp_degree": config.Distributed.mp_degree,
+            "pp_degree": config.Distributed.pp_degree,
+            "sharding_degree": config.Distributed.sharding.sharding_degree,
+            "order": order,
+        }
 
     if config.Distributed.pp_degree > 1:
         if "sequence_parallel" in config.Model:

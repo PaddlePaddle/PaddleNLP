@@ -34,7 +34,7 @@ target_path_for_ci_scripts="scripts/distribute"
 ####################################
 install_paddle(){
     echo -e "\033[31m ---- Install paddlepaddle-gpu  \033"
-    python -m pip install --user ${paddle} --force-reinstall --no-dependencies;
+    python -m pip install --no-cache-dir --user ${paddle} --force-reinstall --no-dependencies;
     python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
 }
 
@@ -71,11 +71,6 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
         continue
     elif [[ ${dir1} =~ "paddlenlp" ]];then
 	    export FLAGS_paddlenlp=1
-    elif [[ ${file_item} == *${target_path_for_ci_scripts}* ]];then
-        case_list[${#case_list[*]}]=llama_auto
-        case_list[${#case_list[*]}]=gpt-3_auto
-        case_list[${#case_list[*]}]=gpt-3_dygraph
-        continue
     else
         for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
             if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
