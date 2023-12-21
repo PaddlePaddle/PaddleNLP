@@ -508,7 +508,7 @@ class Trainer:
                 use_unified_checkpoint = True
                 if self.check_origin_checkpoint(resume_from_checkpoint):
                     use_unified_checkpoint = False
-                    logger.info("Loding origin checkpoint, the next ckeckpoint will be saved as unified checkpoint")
+                    logger.info("Loading origin checkpoint, the next checkpoint will be saved as unified checkpoint")
 
                 if use_unified_checkpoint:
                     load_unified_checkpoint(
@@ -2254,7 +2254,7 @@ class Trainer:
                 use_unified_checkpoint = True
                 if self.check_origin_checkpoint(checkpoint):
                     use_unified_checkpoint = False
-                    logger.info("Loding checkpoint, the next ckeckpoint will be saved as unified checkpoint")
+                    logger.info("Loading checkpoint, the next checkpoint will be saved as unified checkpoint")
 
             if not use_unified_checkpoint:
                 if self.args.data_parallel_rank == 0:

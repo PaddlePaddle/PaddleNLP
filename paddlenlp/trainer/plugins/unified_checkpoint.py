@@ -84,7 +84,6 @@ async_save_queue = []
 
 class UnifiedCheckpointOption(ExplicitEnum):
     """
-    "- skip_data_type_error: ignore the data type and convert to fp16, bf16 or fp32\n"
     "- skip_save_model_weight: do not save model weights when the masters weight exist\n"
     "- master_weight_compatible: 1. if the master weights exist, only load when needed\n"
     "                            2. if master weights does not exit, convert model weights to master weights when needed\n"
@@ -92,7 +91,6 @@ class UnifiedCheckpointOption(ExplicitEnum):
     "- enable_all_options: enable all optimization configurations\n"
     """
 
-    SKIP_DATA_TYPE_ERROR = "skip_data_type_error"
     SKIP_SAVE_MODEL_WEIGHT = "skip_save_model_weight"
     MASTER_WEIGHT_COMPATIBLE = "master_weight_compatible"
     ASYNC_SAVE = "async_save"

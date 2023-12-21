@@ -720,10 +720,9 @@ class TrainingArguments:
             "help": (
                 "Configs to unify hybrid parallel checkpoint.\n"
                 "Following options are supports:\n"
-                "- skip_data_type_error: ignore the data type and convert to fp16, bf16 or fp32\n"
                 "- skip_save_model_weight: do not save model weights when the masters weight exist\n"
                 "- master_weight_compatible: 1. if the master weights exist, only load when needed\n"
-                "                            2. if master weights does not exit, convert model weights to master weights when needed\n"
+                "                            2. if master weights does not exist, convert model weights to master weights when needed\n"
                 "- async_save: enable asynchronous saving checkpoints to disk\n"
                 "- enable_all_options: enable all optimization configurations\n"
             )
@@ -1234,19 +1233,17 @@ class TrainingArguments:
             for x in unified_checkpoint_config:
                 if len(x) > 0:
                     if x not in [
-                        "skip_data_type_error",
                         "skip_save_model_weight",
                         "master_weight_compatible",
                         "async_save",
                         "enable_all_options",
                     ]:
                         raise ValueError(
-                            f"Found unknown unified_checkpoint config {x}, accpet config is skip_data_type_error, skip_save_model_weight, "
+                            f"Found unknown unified_checkpoint config {x}, accpet config is skip_save_model_weight, "
                             + "master_weight_compatible, async_save, enable_all_options."
                         )
             if "enable_all_options" in unified_checkpoint_config:
                 self.unified_checkpoint_config = [
-                    "skip_data_type_error",
                     "skip_save_model_weight",
                     "master_weight_compatible",
                     "async_save",
