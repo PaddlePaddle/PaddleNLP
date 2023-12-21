@@ -47,7 +47,6 @@ environment_variables = {
 }
 
 pretrain_arguments = {
-    "pretrain_arguments_name": "default",
     "model_name_or_path": "./tests/unified-ckpt-llama-500m",
     "tokenizer_name_or_path": "facebook/llama-7b",
     "input_dir": "./data",
@@ -404,8 +403,6 @@ class TestUnifiedCheckpointOnN1C8Dynamic(TestUnifiedCheckpointBase):
 
     def rerun(self, train_args):
         for config_name, config in self.configs.items():
-            if config_name == train_args["pretrain_arguments_name"]:
-                continue
             self.run_n1c8("run_pretrain.py", **config)
             res = check_acc()
             np.testing.assert_allclose(res[0], res[-1], rtol=self.rtol)
@@ -423,8 +420,6 @@ class TestUnifiedCheckpointOnN2C4Dynamic(TestUnifiedCheckpointBase):
 
     def rerun(self, train_args):
         for config_name, config in self.configs.items():
-            if config_name == train_args["pretrain_arguments_name"]:
-                continue
             self.run_n2c4("run_pretrain.py", **config)
             res = check_acc()
             np.testing.assert_allclose(res[0], res[-1], rtol=self.rtol)
