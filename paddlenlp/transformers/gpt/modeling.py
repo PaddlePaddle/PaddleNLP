@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import collections
-import contextlib
 import math
 from functools import partial
 
@@ -40,7 +39,7 @@ from ..model_outputs import (
     SequenceClassifierOutputWithPast,
     TokenClassifierOutput,
 )
-from ..model_utils import dy2st_nocheck_guard_context
+from ..model_utils import _seed_guard_context, dy2st_nocheck_guard_context
 from ..sequence_parallel_utils import (
     ColumnSequenceParallelLinear,
     GatherOp,
@@ -114,13 +113,6 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, transpose_y=True, tensor
     else:
         logits = paddle.matmul(x, y, transpose_y=transpose_y)
         return logits
-
-
-def seed_guard_context(name=None):
-    if name in get_rng_state_tracker().states_:
-        return get_rng_state_tracker().rng_state(name)
-    else:
-        return contextlib.nullcontext()
 
 
 def _make_causal_mask(input_ids_shape, past_key_values_length):
@@ -306,7 +298,7 @@ class MultiHeadAttention(nn.Layer):
         return query_states, key_states, value_states, past_key_value
 
     def _flash_attention(self, q, k, v, attention_mask=None, output_attentions=False):
-        with seed_guard_context("local_seed"):
+        with _seed_guard_context("local_seed"):
             out, weights = flash_attention(
                 query=q,
                 key=k,
@@ -342,7 +334,7 @@ class MultiHeadAttention(nn.Layer):
             weights = incubate.softmax_mask_fuse_upper_triangle(product)
 
         if self.config.attention_probs_dropout_prob:
-            with seed_guard_context("local_seed"):
+            with _seed_guard_context("local_seed"):
                 weights = F.dropout(
                     weights, self.config.attention_probs_dropout_prob, training=self.training, mode="upscale_in_train"
                 )
@@ -644,7 +636,7 @@ class GPTDecoderLayer(nn.Layer):
         current_seed = "local_seed" if self.config.sequence_parallel else "global_seed"
 
         # The 'with' block ensures the correct seed context is used
-        with seed_guard_context(current_seed):
+        with _seed_guard_context(current_seed):
             if self.config.use_fused_dropout_add:
                 hidden_states = self.fused_dropout_add1(hidden_states, residual)
             else:
@@ -659,7 +651,7 @@ class GPTDecoderLayer(nn.Layer):
 
         # when sequence_parallel=True:
         # hidden_states => [bs * seq_len / n, embed_dim]
-        with seed_guard_context(current_seed):
+        with _seed_guard_context(current_seed):
             if not self.config.use_fused_dropout_add:
                 hidden_states = residual + self.dropout2(
                     self.linear2(self.activation(self.linear1(hidden_states), approximate=True))
@@ -739,7 +731,7 @@ class GPTEmbeddings(nn.Layer):
         # Use a ternary operator for a more concise assignment of current_seed
         current_seed = "local_seed" if self.config.sequence_parallel else "global_seed"
         # The 'with' block ensures the correct seed context is used
-        with seed_guard_context(current_seed):
+        with _seed_guard_context(current_seed):
             embeddings = self.dropout(embeddings)
 
         return embeddings

@@ -14,7 +14,6 @@
 """
 GPT/Llama auto parallel pretraining scripts.
 """
-import contextlib
 import os
 import random
 import sys
@@ -27,6 +26,7 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 import paddle.distributed.auto_parallel as auto
+from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.profiler.utils import job_schedule_profiler_range
 
 from paddlenlp.ops import Topology
@@ -47,7 +47,10 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     LlamaConfig,
     LlamaForCausalLMAuto,
+    PretrainedModel,
 )
+from paddlenlp.transformers.model_utils import no_init_weights
+from paddlenlp.transformers.utils import ContextManagers
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
@@ -71,18 +74,6 @@ def add_start_docstrings(*docstr):
         return fn
 
     return docstring_decorator
-
-
-@contextlib.contextmanager
-def exec_mode_guard():
-    origin_mode = "dynamic" if paddle.in_dynamic_mode() else "static"
-    try:
-        yield
-    finally:
-        if origin_mode == "dynamic":
-            paddle.disable_static()
-        else:
-            paddle.enable_static()
 
 
 @dataclass
@@ -420,8 +411,11 @@ def init_seed(seed: int = 1234, args=None):
             )
 
             global_seed, local_seed, random_seed = _get_distributed_seeds(args.seed, topo)
+            tracker = get_rng_state_tracker()
+            tracker.add("global_seed", global_seed)
+            tracker.add("local_seed", local_seed)
 
-            paddle.seed(local_seed)
+            paddle.seed(global_seed)
             random.seed(random_seed)
             np.random.seed(random_seed)
 
@@ -538,7 +532,8 @@ def main():
     #     if training_args.bf16:
     #         dtype = "bfloat16"
 
-    model = model_class._from_config(config)
+    with ContextManagers([no_init_weights(_enable=True)]):
+        model = model_class._from_config(config)
 
     if training_args.recompute:
 
@@ -615,6 +610,9 @@ def main():
         ],
         mode="train",
     )
+
+    if model.__class__.init_weights is PretrainedModel.init_weights:
+        model.init_weights()
 
     pp_degree = training_args.pipeline_parallel_degree
 

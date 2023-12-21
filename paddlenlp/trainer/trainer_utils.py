@@ -79,7 +79,7 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
         hcg = fleet.get_hybrid_communicate_group()
 
     if topo is not None and paddle.distributed.get_world_size() > 1:
-        dp_rank = topo.dp_info.rank
+        dp_rank = 0  # topo.dp_info.rank
         dp_size = topo.dp_info.size
 
         pp_rank = topo.pp_info.rank
