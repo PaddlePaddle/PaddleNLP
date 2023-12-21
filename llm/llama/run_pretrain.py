@@ -576,6 +576,23 @@ def main():
         * training_args.gradient_accumulation_steps
         * data_args.max_seq_length
     )
+    def compute_metrics(evals_dict):
+        preds = evals_dict.predictions
+        labels = evals_dict.label_ids
+        all = preds.size
+        equal = np.equal(preds, labels).sum()
+        accuracy = equal * 1.0 / all
+        metrics_dict = {
+            "equal_num" : str(equal),
+            "all_num": str(all),
+            "accuracy": str(accuracy),
+        }
+        return metrics_dict
+
+    
+    def preprocess_logits_for_metrics(logits, labels):
+        logits = paddle.argmax(logits, axis=-1)
+        return logits
 
     trainer = PretrainingTrainer(
         model=model,
@@ -585,6 +602,8 @@ def main():
         eval_dataset=eval_dataset if training_args.do_eval else None,
         optimizers=(None, lr_scheduler),
         tokenizer=tokenizer,
+        compute_metrics=compute_metrics,
+        preprocess_logits_for_metrics= preprocess_logits_for_metrics,
     )
 
     checkpoint = None
@@ -595,7 +614,7 @@ def main():
 
     # Training
     if training_args.do_train:
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        train_result = trainer.train()
         metrics = train_result.metrics
         if not int(os.getenv("test_ci_no_save_model", 0)):
             trainer.save_model()
@@ -603,9 +622,12 @@ def main():
         trainer.save_metrics("train", metrics)
         trainer.save_state()
 
-    if training_args.do_predict:
-        test_ret = trainer.predict(test_dataset)
-        trainer.log_metrics("test", test_ret.metrics)
+    test_ret = trainer.predict(test_dataset)
+    trainer.log_metrics("test", test_ret.metrics)
+
+    # if training_args.do_predict:
+    #     test_ret = trainer.predict(test_dataset)
+    #     trainer.log_metrics("test", test_ret.metrics)
 
     if training_args.should_load_dataset:
         effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
