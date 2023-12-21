@@ -152,7 +152,7 @@ def launch(args):
         return shown_context
 
     with gr.Blocks(title="LLM", theme=gr.themes.Soft()) as block:
-        gr.Markdown(f"# {args.title}")
+        gr.Markdown(f"# {args.title} <font style='color: red !important' size=2>{args.sub_title}</font>")
         with gr.Row():
             with gr.Column(scale=1):
                 top_k = gr.Slider(

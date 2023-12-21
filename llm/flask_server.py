@@ -55,6 +55,7 @@ class ServerArgument:
     port: int = field(default=8011, metadata={"help": "The port of ui service"})
     base_port: int = field(default=8010, metadata={"help": "The port of flask service"})
     title: str = field(default="LLM", metadata={"help": "The title of gradio"})
+    sub_title: str = field(default="LLM-subtitle", metadata={"help": "The sub-title of gradio"})
 
 
 class PredictorServer:
