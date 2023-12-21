@@ -168,9 +168,7 @@ def load_unified_checkpoint(
     Returns:
         None
     """
-
     local_resume = check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serialization)
-    logger.debug(f"local_resume: {local_resume}")
 
     if not local_resume:
         logger.info("Begin to dynamically load unified checkpoint!")
@@ -424,7 +422,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
 
     # update has_master_weights and index_filename_master_weights
     # 1. if the master weight exists, only has_master_weights is set True and loaded when needed
-    # 2. if master weight does not exit, convert model weight to master weight when needed
+    # 2. if master weight does not exist, convert model weight to master weight when needed
     has_master_weights, index_filename_master_weights = update_master_weight_status(
         args, optimizer, has_master_weights, safe_serialization
     )
@@ -686,7 +684,7 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
     has_master_weights = index["master_weights"]
     # update has_master_weights and index_filename_master_weights
     # 1. if the master weight exists, only has_master_weights is set True and loaded when needed
-    # 2. if master weight does not exit, convert model weight to master weight when needed
+    # 2. if master weight does not exist, convert model weight to master weight when needed
     has_master_weights, index_filename_master_weights = update_master_weight_status(
         args, optimizer, has_master_weights, safe_serialization
     )
@@ -1678,12 +1676,18 @@ def is_need_master_weight(optimizer):
         DygraphShardingOptimizer,
         DygraphShardingOptimizerV2,
     )
-
-    optimizer = (
-        optimizer._inner_opt
-        if isinstance(optimizer, (DygraphShardingOptimizer, DygraphShardingOptimizerV2))
-        else optimizer
+    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
+        HybridParallelOptimizer,
     )
+    from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_optimizer_stage2 import (
+        GroupShardedOptimizerStage2,
+    )
+
+    if isinstance(optimizer, (DygraphShardingOptimizer, DygraphShardingOptimizerV2, HybridParallelOptimizer)):
+        optimizer = optimizer._inner_opt
+    elif isinstance(optimizer, GroupShardedOptimizerStage2):
+        optimizer = optimizer._optim
+
     if hasattr(optimizer, "_multi_precision"):
         return optimizer._multi_precision
     else:
