@@ -557,7 +557,6 @@ class Trainer:
                 if os.path.isfile(weights_file):
                     # We load the model state dict on the CPU to avoid an OOM error.
                     state_dict = paddle.load(weights_file, return_numpy=True)
-                    # state_dict = nested_cast_tensor(state_dict, paddle.get_default_dtype())
                     # If the model is on the GPU, it still works!
                     self._set_state_dict_in_model(state_dict)
                     # release memory
