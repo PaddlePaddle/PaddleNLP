@@ -165,7 +165,11 @@ git clone 代码到本地，即可开始。
 
 以下测试结果基于
 
-机器环境： A100 80G * 8, CUDA 11.8, NCCL 2.15
+机器环境：
+
+- GPU: A100 80G * 8, CUDA 11.8, NCCL 2.15
+- CPU: Intel(R) Xeon(R) Platinum 8350C CPU @ 2.60GHz
+- 内存：1 TB
 
 .. code-block:: text
 
