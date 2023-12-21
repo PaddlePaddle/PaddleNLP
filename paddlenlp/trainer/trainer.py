@@ -83,6 +83,7 @@ from ..transformers.model_utils import (
     load_sharded_checkpoint,
     unwrap_model,
 )
+from ..transformers.segment_parallel_utils import split_inputs_sequence_dim
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
@@ -264,6 +265,10 @@ class Trainer:
 
         if model is None:
             raise RuntimeError("`Trainer` requires either a `model` or `model_init` argument")
+
+        if self.args.to_static:
+            model = paddle.jit.to_static(model)
+            logger.info("Successfully to apply @to_static to the whole model.")
 
         if self.args.should_save or self.args.should_save_model_state:
             os.makedirs(self.args.output_dir, exist_ok=True)
@@ -521,7 +526,9 @@ class Trainer:
             state_dict = self.sharding_io.load_state_dict_from_checkpoint_with_reshard(
                 resume_from_checkpoint,
                 base_weight_name=weight_name,
+                model_wrapped=self.model_wrapped,
             )
+            self.model.set_state_dict(state_dict)
         else:
             if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
 
@@ -717,6 +724,8 @@ class Trainer:
                 trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
                 paddle.distributed.all_reduce(trainable_numel_tensor)
                 trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
+                if self.args.sep_parallel_degree > 0:
+                    trainable_numel = trainable_numel // self.args.sep_parallel_degree
                 # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
                 # so, the trainable numel is a little bigger than real.
                 logger.info(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
@@ -729,8 +738,10 @@ class Trainer:
         steps_trained_progress_bar = None
 
         # Check if continuing training from a checkpoint
-        if resume_from_checkpoint is not None and distributed_isfile(
-            os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
+        if (
+            resume_from_checkpoint is not None
+            and distributed_isfile(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
+            and not self.args.ignore_load_lr_and_optim
         ):
             self.state = TrainerState.load_from_json(
                 distributed_file(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
@@ -821,6 +832,8 @@ class Trainer:
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
+                if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
+                    inputs = split_inputs_sequence_dim(inputs)
                 self.timers and self.timers("read-data").stop()
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
@@ -926,7 +939,7 @@ class Trainer:
                                 assert reshard_util.is_sharding_opt(self.optimizer)
                                 self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
-                            if self.optimizer._dp_enable:
+                            if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
                                 fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
 
                     self.timers and self.timers("all-reduce").stop()
@@ -1615,12 +1628,18 @@ class Trainer:
         in_pipeline_parallel_mode = self.args.pipeline_parallel_degree > 1
         in_sharding_parallel_mode = self.sharding is not None
         in_tensor_parallel_mode = self.args.tensor_parallel_degree > 1
+        in_sep_parallel_mode = self.args.sep_parallel_degree > 1
 
         # Multi-gpu training
         if (
             self.args.world_size > 1
             and not self.args.use_hybrid_parallel
-            or not (in_pipeline_parallel_mode or in_sharding_parallel_mode or in_tensor_parallel_mode)
+            or not (
+                in_pipeline_parallel_mode
+                or in_sharding_parallel_mode
+                or in_tensor_parallel_mode
+                or in_sep_parallel_mode
+            )
         ):
             model = paddle.DataParallel(model)
             # Distributed training (should be after fp16 initialization)
@@ -1744,7 +1763,11 @@ class Trainer:
                 self.optimizer = optimizer
 
         # pure tesnor parallel mode, no pipeline_parallel, no sharding.
-        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and in_tensor_parallel_mode:
+        if (
+            not in_pipeline_parallel_mode
+            and not in_sharding_parallel_mode
+            and (in_tensor_parallel_mode or in_sep_parallel_mode)
+        ):
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
 
@@ -2229,6 +2252,9 @@ class Trainer:
         if checkpoint is None:
             return
 
+        if (not self.args.should_load_sharding_stage1_model) and self.args.ignore_load_lr_and_optim:
+            return
+
         opt_state_dict = None
         if self.args.should_load_sharding_stage1_model:
             opt_state_dict = self.sharding_io.load_optimizer_state_with_reshard(
@@ -2252,6 +2278,11 @@ class Trainer:
                     safe_serialization=True,
                 )
 
+        if self.args.ignore_load_lr_and_optim and opt_state_dict:
+            tmp = self.optimizer.state_dict()
+            tmp["master_weights"] = opt_state_dict["master_weights"]
+            opt_state_dict = tmp
+
         # broadcast optimizer state in dp group
         opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
 
@@ -2261,15 +2292,18 @@ class Trainer:
         else:
             raise ValueError(f"optimizer-state-dict not found, opt: {os.path.join(checkpoint, optimizer_name)}.")
 
-        if distributed_isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
-            self.lr_scheduler.set_state_dict(paddle.load(distributed_file(os.path.join(checkpoint, SCHEDULER_NAME))))
-        else:
-            raise ValueError(f"scheduler-file not found, scheduler:{os.path.join(checkpoint, SCHEDULER_NAME)}")
+        if not self.args.ignore_load_lr_and_optim:
+            if distributed_isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
+                self.lr_scheduler.set_state_dict(
+                    paddle.load(distributed_file(os.path.join(checkpoint, SCHEDULER_NAME)))
+                )
+            else:
+                raise ValueError(f"scheduler-file not found, scheduler:{os.path.join(checkpoint, SCHEDULER_NAME)}")
 
-        if self.do_grad_scaling and distributed_isfile(os.path.join(checkpoint, SCALER_NAME)):
-            self.scaler.load_state_dict(
-                paddle.load(distributed_file(os.path.join(checkpoint, SCALER_NAME)), return_numpy=True)
-            )
+            if self.do_grad_scaling and distributed_isfile(os.path.join(checkpoint, SCALER_NAME)):
+                self.scaler.load_state_dict(
+                    paddle.load(distributed_file(os.path.join(checkpoint, SCALER_NAME)), return_numpy=True)
+                )
 
     def log(self, logs: Dict[str, float], **kwargs) -> None:
         """
