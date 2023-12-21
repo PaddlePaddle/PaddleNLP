@@ -1,8 +1,30 @@
-====================================
-大模型 Trainer 混合并行训练教程
-====================================
+=====================================================
+飞桨大模型统一训练器 PaddleNLP Trainer 训练教程
+=====================================================
+
+
+Trainer 特色能力简介
+==========================
+
+- **全策略分布式策略支持**
+
+随着模型的复杂度越来越大，大规模分布式训练能力对LLM至关重要。
+Trainer 提供了多种策略支持，支持从单卡、多卡数据并行，到 sharding 并行（stage1、2、3），到张量并行、流水线并行。做到了分布式训练的全策略支持。
+Trainer 提供了简单易用的接口，可以轻松实现不同策略的训练。支持了混合精度训练、master weight/gradient、梯度累积等特性, 方便用户使用。
+
+
+- **大模型统一断点存储支持**
+
+大模型时代，模型使用张量并行、流水线并行等策略训练，需要将模型切分为多个部分存储。
+与单模型存储格式不同，无法适配分布式切分策略改变，无法直接用于下游精调、推理等场景。
+Trainer的 ``unified_checkpoint`` 技术 提供了统一断点存储接口，统一了分布式各种情况下模型存储格式，与单卡一致。
+同时还支持了跨分布式策略断点续训，支持多机动态扩、缩容启动、支持异步保存等特性。
+
+
 
 Trainer进阶分布式能力使用介绍
+============================
+
 本教程将以PaddleNLP中的LLaMA模型预训练为例，详细介绍 Trainer 使用。
 
 
@@ -279,7 +301,7 @@ Pipeline Parallel 使用
 附录并行能力简介
 ==================
 
-* 数据并行
-* sharding 并行
-* 张量并行
-* 流水线并行
+* `数据并行 <https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/06_distributed_training/data_parallel/index_cn.html>`_
+* `sharding 并行 <https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/06_distributed_training/group_sharded_parallel_cn.html#fenzuqiefenbingxing>`_ 
+* `张量并行 <https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/06_distributed_training/model_parallel_cn.html#zhangliangmoxingbingxing>`_
+* `流水线并行 <https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/06_distributed_training/pipeline_parallel_cn.html>`_
