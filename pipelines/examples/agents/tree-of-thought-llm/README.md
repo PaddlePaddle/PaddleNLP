@@ -26,6 +26,8 @@ pip install -e .  # install `tot` package
 ```
 3. Intall meta/llama2 according to facebook tutorial. And then modify the model path in the llm_config.yaml
 
+4. Please get test data from https://github.com/ErnestinaQiu/tree-of-thought-llm/tree/master/src/tot/data, and put them under pipelines/examples/agents/tree-of-thought-llm/tree/master/src/tot/data
+
 ## Quick Start
 The following minimal script will attempt to solve the game of 24 with `4 5 6 10` (might be a bit slow as it's using llama-7b-chat):
 
