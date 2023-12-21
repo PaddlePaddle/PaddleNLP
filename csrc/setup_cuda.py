@@ -17,9 +17,20 @@ from paddle.utils.cpp_extension import CUDAExtension, setup
 
 
 def get_gencode_flags():
-    prop = paddle.device.cuda.get_device_properties()
-    cc = prop.major * 10 + prop.minor
-    return ["-gencode", "arch=compute_{0},code=sm_{0}".format(cc)]
+    try:
+        prop = paddle.device.cuda.get_device_properties()
+        cc = prop.major * 10 + prop.minor
+        return ["-gencode", "arch=compute_{0},code=sm_{0}".format(cc)]
+    except:
+        # support more cuda archs
+        return [
+            "-gencode",
+            "arch=compute_80,code=sm_80",
+            "-gencode",
+            "arch=compute_75,code=sm_75",
+            "-gencode",
+            "arch=compute_70,code=sm_70",
+        ]
 
 
 gencode_flags = get_gencode_flags()
