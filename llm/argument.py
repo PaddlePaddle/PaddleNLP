@@ -15,11 +15,34 @@ import warnings
 from dataclasses import dataclass, field
 
 from paddlenlp.trainer import TrainingArguments
+from paddlenlp.trainer.trainer_utils import EvaluationStrategy, IntervalStrategy
 
 
 @dataclass
 class TrainingArguments(TrainingArguments):
     benchmark: bool = field(default=False, metadata={"help": "Whether runs benchmark"})
+    # NOTE(gongenlei): new add autotuner_benchmark
+    autotuner_benchmark: bool = field(
+        default=False,
+        metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
+    )
+
+    def __post_init__(self):
+        super().__post_init__()
+        # NOTE(gongenlei): new add autotuner_benchmark
+        if self.autotuner_benchmark:
+            self.max_steps = 5
+            self.do_train = True
+            self.do_export = False
+            self.do_predict = False
+            self.do_eval = False
+            self.overwrite_output_dir = True
+            self.load_best_model_at_end = False
+            self.report_to = []
+            if self.save_strategy in [IntervalStrategy.STEPS, IntervalStrategy.EPOCH]:
+                self.save_strategy = IntervalStrategy.NO
+            if self.evaluation_strategy in [EvaluationStrategy.STEPS, EvaluationStrategy.EPOCH]:
+                self.evaluation_strategy = IntervalStrategy.NO
 
 
 @dataclass
@@ -50,11 +73,6 @@ class DataArgument:
         metadata={
             "help": "the path of `chat_template.json` file to handle multi-rounds conversation. If is None, it will not use `chat_template.json`; If is equal with `model_name_or_path`, it will use the default loading; If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
         },
-    )
-    # NOTE(gongenlei): for autotuner
-    autotuner_benchmark: bool = field(
-        default=False,
-        metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
     )
     # NOTE(gongenlei): deprecated params
     task_name_or_path: str = field(

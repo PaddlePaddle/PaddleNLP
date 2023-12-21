@@ -742,6 +742,14 @@ class TrainingArguments:
         if env_local_rank != -1 and env_local_rank != self.local_rank and paddle.distributed.get_world_size() > 1:
             self.local_rank = env_local_rank
 
+        # NOTE(gongenlei): new add, disable sharding when we have only single gpu
+        if paddle.distributed.get_world_size() <= 1:
+            self.sharding = ""
+            self.sharding_degree = -1
+            self.sharding_parallel_degree = -1
+            self.tensor_parallel_degree = -1
+            self.pipeline_parallel_degree = -1
+
         # convert to int
         self.log_level = -1
         self.log_level_replica = -1
@@ -1153,13 +1161,18 @@ class TrainingArguments:
                 logger.info(f"PP configs:{strategy.pipeline}, use master_grad: {self.amp_master_grad}")
 
                 if self.do_eval:
-                    assert (
+                    if (
                         self.per_device_train_batch_size * self.gradient_accumulation_steps
-                        == self.per_device_eval_batch_size
-                    ), (
-                        "In pipeline model, the evaluation also shares same setting with training. "
-                        "Please set per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
-                    )
+                        != self.per_device_eval_batch_size
+                    ):
+                        warnings.warn(
+                            "In pipeline model, the evaluation also shares same setting with training. "
+                            "We will enforce that per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
+                        )
+                        self.per_device_eval_batch_size = (
+                            self.per_device_train_batch_size * self.gradient_accumulation_steps
+                        )
+
             elif self.gradient_accumulation_steps > 1:
                 gradient_merge = strategy.gradient_merge
                 gradient_merge.enable = True

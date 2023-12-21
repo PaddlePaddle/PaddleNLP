@@ -34,6 +34,7 @@ from paddlenlp.trainer import (
     get_last_checkpoint,
     speed_metrics,
 )
+from paddlenlp.trainer.trainer_utils import EvaluationStrategy, IntervalStrategy
 from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -74,6 +75,28 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
     )
+    # NOTE(gongenlei): new add autotuner_benchmark
+    autotuner_benchmark: bool = field(
+        default=False,
+        metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
+    )
+
+    def __post_init__(self):
+        super().__post_init__()
+        # NOTE(gongenlei): new add autotuner_benchmark
+        if self.autotuner_benchmark:
+            self.max_steps = 5
+            self.do_train = True
+            self.do_export = False
+            self.do_predict = False
+            self.do_eval = False
+            self.overwrite_output_dir = True
+            self.load_best_model_at_end = False
+            self.report_to = []
+            if self.save_strategy in [IntervalStrategy.STEPS, IntervalStrategy.EPOCH]:
+                self.save_strategy = IntervalStrategy.NO
+            if self.evaluation_strategy in [EvaluationStrategy.STEPS, EvaluationStrategy.EPOCH]:
+                self.evaluation_strategy = IntervalStrategy.NO
 
 
 @dataclass
@@ -458,11 +481,15 @@ def main():
         model_class = AutoModelForCausalLMPipe
 
     if model_args.continue_training:
-        model = model_class.from_pretrained(
-            model_args.model_name_or_path,
-            config=config,
-            dtype=dtype,
-        )
+        # NOTE(gongenlei): new add
+        if training_args.autotuner_benchmark:
+            model = model_class.from_config(config, dtype=dtype)
+        else:
+            model = model_class.from_pretrained(
+                model_args.model_name_or_path,
+                config=config,
+                dtype=dtype,
+            )
     else:
         model = model_class.from_config(config, dtype=dtype)
 
@@ -537,11 +564,14 @@ def main():
     # Training
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
-        metrics = train_result.metrics
-        trainer.save_model()
-        trainer.log_metrics("train", metrics)
-        trainer.save_metrics("train", metrics)
-        trainer.save_state()
+
+        # NOTE(gongenlei): new add
+        if not training_args.autotuner_benchmark:
+            metrics = train_result.metrics
+            trainer.save_model()
+            trainer.log_metrics("train", metrics)
+            trainer.save_metrics("train", metrics)
+            trainer.save_state()
 
     if training_args.do_predict:
         test_ret = trainer.predict(test_dataset)
