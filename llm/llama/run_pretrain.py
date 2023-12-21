@@ -13,14 +13,11 @@
 # limitations under the License.
 import math
 import os
-import random
-import re
 import sys
 import time
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-import numpy as np
 import paddle
 
 from paddlenlp.data.causal_dataset import (
@@ -33,6 +30,7 @@ from paddlenlp.trainer import (
     Trainer,
     TrainingArguments,
     get_last_checkpoint,
+    set_seed,
     speed_metrics,
 )
 from paddlenlp.transformers import (
@@ -54,53 +52,6 @@ def add_start_docstrings(*docstr):
         return fn
 
     return docstring_decorator
-
-
-# register pp_reshard information to aid pp reshard
-def register_pp_reshard_information(num_hidden_layers):
-
-    from paddlenlp.trainer.utils.reshard.pp_reshard import (
-        register_index_layer_func,
-        register_layername_prefix,
-        regitser_extract_layer_name_func,
-    )
-
-    # register layer names
-    register_layername_prefix("column_sequence_parallel_linear")
-    register_layername_prefix("row_sequence_parallel_linear")
-    register_layername_prefix("linear")
-    register_layername_prefix("embedding")
-    register_layername_prefix("create_parameter")
-    register_layername_prefix("llama_lm_head")
-
-    # register func to extract layer from stuctural param name
-    # register func to extract layer index  from stuctural param name
-
-    def extract_layer_name(param_name):
-        patterns = [r"^llama\.embed_tokens", "^llama\.norm", r"^lm_head", r"^llama\.layers((\.\d+))"]
-        # match 1
-        for p in patterns:
-            match = re.search(p, param_name)
-            if match:
-                return match.group()
-
-    def index_layer(layer_name):
-        if layer_name == "llama.embed_tokens":
-            return 0
-        elif layer_name == "llama.norm":
-            return num_hidden_layers + 1
-        elif layer_name == "lm_head":
-            return num_hidden_layers + 2
-        else:
-            pattern = r"llama\.layers((\.(\d+)))"
-            match = re.search(pattern, layer_name)
-            assert match
-            index = int(match.group(3)) + 1
-            assert index <= num_hidden_layers, f"{index} {num_hidden_layers}"
-            return index
-
-    regitser_extract_layer_name_func(extract_layer_name)
-    register_index_layer_func(index_layer)
 
 
 @dataclass
@@ -163,9 +114,6 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to pre-train from.
     """
 
-    model_type: Optional[str] = field(
-        default="llama", metadata={"help": "Only support for llama pre-training for now."}
-    )
     model_name_or_path: str = field(
         default="__internal_testing__/tiny-random-llama",
         metadata={
@@ -176,9 +124,6 @@ class ModelArguments:
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
 
-    config_name: Optional[str] = field(
-        default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
-    )
     use_flash_attention: bool = field(
         default=False,
         metadata={"help": "use_flash_attention"},
@@ -337,16 +282,6 @@ def get_train_data_file(args):
     return files
 
 
-def set_seed(args):
-    if args.device == "cpu":
-        idx = 0
-    else:
-        idx = paddle.distributed.get_rank()
-    random.seed(args.seed + idx)
-    np.random.seed(args.seed + idx)
-    paddle.seed(args.seed + idx)
-
-
 class PretrainingTrainer(Trainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -494,6 +429,7 @@ def main():
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
+
     config.sep_parallel_degree = training_args.sep_parallel_degree
     if config.sequence_parallel:
         assert config.tensor_parallel_degree > 1, "tensor_parallel_degree must be larger than 1 for sequence parallel."
@@ -514,7 +450,10 @@ def main():
     model_class = AutoModelForCausalLM
     if training_args.pipeline_parallel_degree > 1:
         model_class = AutoModelForCausalLMPipe
-        register_pp_reshard_information(config.num_hidden_layers)
+        if "LLama" in str(config.architectures):
+            from register_reshard import register_pp_reshard_information
+
+            register_pp_reshard_information(config.num_hidden_layers)
 
     if model_args.continue_training:
         model = model_class.from_pretrained(
