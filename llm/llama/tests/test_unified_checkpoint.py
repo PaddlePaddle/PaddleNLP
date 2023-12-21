@@ -149,6 +149,7 @@ def move_checkpoint_N2C4_to_N1C8():
         os.system("mv -f %s/* %s" % (node1_ckpt_path, base_ckpt_path))
 
 
+# Test Unified Checkpoint Hybrid Parallel Strategy on N1C8 and N2C4
 class TestUnifiedCheckpointBase(TestMultipleGpus):
     def setUp(self):
         """
@@ -164,12 +165,10 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
         self.rtol = 1e-7
 
     def runfrist(self, train_args):
-        raise NotImplementedError
-        # self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
 
     def rerun(self, train_args):
-        raise NotImplementedError
-        # self.run_n1c8("run_pretrain.py", **train_args)
+        self.run_n1c8("run_pretrain.py", **train_args)
 
     def testTP8(self):
         remove_logs()
@@ -378,20 +377,6 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
             res = check_acc()
             assert len(res) == 2
             np.testing.assert_allclose(res[0], res[1], self.rtol)
-
-
-# Test Unified Checkpoint Hybrid Parallel Strategy on N1C8 and N2C4
-class TestUnifiedCheckpointOnN1C8(TestUnifiedCheckpointBase):
-    def setUp(self):
-        super().setUp()
-        self.need_allclose = True
-        self.rtol = 1e-7
-
-    def runfrist(self, train_args):
-        self.run_n1c8("run_pretrain.py", **train_args)
-
-    def rerun(self, train_args):
-        self.run_n1c8("run_pretrain.py", **train_args)
 
 
 class TestUnifiedCheckpointOnN2C4(TestUnifiedCheckpointBase):
