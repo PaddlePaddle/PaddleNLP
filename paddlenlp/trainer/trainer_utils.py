@@ -217,7 +217,12 @@ def get_last_checkpoint(folder):
     ]
     if len(checkpoints) == 0:
         return
-    return os.path.join(folder, max(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0])))
+    for i in sorted(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0]), reverse=True):
+        current_path = os.path.join(folder, i)
+        # make sure the checkpoint is valid
+        if os.path.exists(os.path.join(current_path, ".checkpoint_done")):
+            return current_path
+    return
 
 
 class IntervalStrategy(ExplicitEnum):

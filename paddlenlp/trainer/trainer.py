@@ -2093,6 +2093,11 @@ class Trainer:
         if need_to_rotate_checkpoints:
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
 
+        # save checkpoint_done file to ensure checkpoint is complete
+        if self.args.should_save_model_state and self.args.should_save:
+            # For ckpt integrity
+            paddle.save(self.state.global_step, os.path.join(output_dir, ".checkpoint_done"))
+
     def set_optimizer_grouped_parameters(self, optimizer_grouped_parameters=None):
         """
         set optimizer grouped parameters:
