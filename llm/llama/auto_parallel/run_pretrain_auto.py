@@ -105,7 +105,6 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
         },
     )
-
     job_schedule_profiler_start: int = field(
         default=-1,
         metadata={"help": "The step to start job_schedule_profiler."},
@@ -115,9 +114,12 @@ class PreTrainingArguments(TrainingArguments):
         metadata={"help": "The step to end job_schedule_profiler."},
     )
     parallel_mode: str = field(default="hybrid", metadata={"help": ""})
-
     pipeline_schedule_mode: str = field(
         default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
+    )
+    sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
+    refined_ops_patterns: Optional[List[str]] = field(
+        default=None, metadata={"help": "The pattern of refined recompute."}
     )
 
     def __post_init__(self):
