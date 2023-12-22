@@ -56,6 +56,7 @@ def chatgpt(
         # log completion tokens
         completion_tokens += res["usage"]["completion_tokens"]
         prompt_tokens += res["usage"]["prompt_tokens"]
+    outputs = outputs[0]
     return outputs
 
 
