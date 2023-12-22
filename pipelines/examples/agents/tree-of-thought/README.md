@@ -1,6 +1,6 @@
 # Tree of Thoughts (ToT)
 
-![teaser](https://github.com/PaddlePaddle/PaddleNLP/pull/7660#issuecomment-1867279637)
+![teaser](https://github.com/PaddlePaddle/PaddleNLP/assets/48557439/30f9e365-398a-4822-b3c2-a0768f70e310)
 
 Official implementation for paper [Tree of Thoughts: Deliberate Problem Solving with Large Language Models](https://arxiv.org/abs/2305.10601) with code, prompts, model outputs.
 Also check [its tweet thread](https://twitter.com/ShunyuYao12/status/1659357547474681857) in 1min.
@@ -10,14 +10,7 @@ Also check [its tweet thread](https://twitter.com/ShunyuYao12/status/16593575474
 
 
 ## Setup
-1. Set up OpenAI API key and store in environment variable ``OPENAI_API_KEY`` (see [here](https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety)). 
-
-2. Install `tot` package in two ways:
-- Option 1: Install from PyPI
-```bash
-pip install tree-of-thoughts-llm
-```
-- Option 2: Install from source
+1. Install from source
 ```bash
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
 cd pipelines/examples/agents
@@ -25,7 +18,7 @@ pip install -r requirements.txt
 pip install -e .  # install `tot` package
 ```
 
-3. Please get test data from https://github.com/ErnestinaQiu/tree-of-thought-llm/tree/master/src/tot/data, and put them under pipelines/examples/agents/tree-of-thought-llm/tree/master/src/tot/data
+2. Please get test data from https://github.com/ErnestinaQiu/tree-of-thought-llm/tree/master/src/tot/data, and put them under pipelines/examples/agents/tree-of-thought/tree/master/src/tot/data
 
 ## Quick Start
 The following minimal script will attempt to solve the game of 24 with `4 5 6 10` (might be a bit slow as it's using llama-7b-chat):

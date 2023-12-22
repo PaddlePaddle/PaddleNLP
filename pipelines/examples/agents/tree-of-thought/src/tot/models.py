@@ -1,5 +1,5 @@
 # coding=utf8, ErnestinaQiu
-from src.llama2 import llamaChatCompletion
+from src.llm import llamaChatCompletion
 
 completion_tokens = prompt_tokens = 0
 
