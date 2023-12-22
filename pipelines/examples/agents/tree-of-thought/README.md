@@ -1,6 +1,6 @@
 # Tree of Thoughts (ToT)
 
-![teaser](pics/teaser.png)
+![teaser](https://github.com/PaddlePaddle/PaddleNLP/pull/7660#issuecomment-1867279637)
 
 Official implementation for paper [Tree of Thoughts: Deliberate Problem Solving with Large Language Models](https://arxiv.org/abs/2305.10601) with code, prompts, model outputs.
 Also check [its tweet thread](https://twitter.com/ShunyuYao12/status/1659357547474681857) in 1min.
@@ -24,9 +24,8 @@ cd pipelines/examples/agents
 pip install -r requirements.txt
 pip install -e .  # install `tot` package
 ```
-3. Intall meta/llama2 according to facebook tutorial. And then modify the model path in the llm_config.yaml
 
-4. Please get test data from https://github.com/ErnestinaQiu/tree-of-thought-llm/tree/master/src/tot/data, and put them under pipelines/examples/agents/tree-of-thought-llm/tree/master/src/tot/data
+3. Please get test data from https://github.com/ErnestinaQiu/tree-of-thought-llm/tree/master/src/tot/data, and put them under pipelines/examples/agents/tree-of-thought-llm/tree/master/src/tot/data
 
 ## Quick Start
 The following minimal script will attempt to solve the game of 24 with `4 5 6 10` (might be a bit slow as it's using llama-7b-chat):
@@ -84,4 +83,19 @@ Setting up a new task is easy, and mainly involves two steps.
 * Set up a new task class in ``tot/tasks/`` and task files in ``tot/data/``. See ``tot/tasks/game24.py`` for an example. Add the task to ``tot/tasks/__init__.py``.
 * Set up task-specific prompts in ``tot/prompts/``. See ``tot/prompts/game24.py`` for an example. Depending on the nature of the task, choose ``--method_generate`` (choices=[``sample``, ``propose``]) and ``--method_evaluate`` (choices=[``value``, ``vote``]) and their corresponding prompts. 
 
-If there are any questions, please contact ErnestinaQiu by ernestinaqiu@gmail.com
+
+
+Acknowledge
+
+我们借鉴了 Shunyu Yao 优秀的框架设计，在此对Tree of Thoughts作者及其开源社区表示感谢。
+
+We learn form the excellent framework design of Shunyu Yao, and we would like to express our thanks to the authors of Tree of Thoughts and their open source community.
+
+@misc{yao2023tree,
+      title={{Tree of Thoughts}: Deliberate Problem Solving with Large Language Models}, 
+      author={Shunyu Yao and Dian Yu and Jeffrey Zhao and Izhak Shafran and Thomas L. Griffiths and Yuan Cao and Karthik Narasimhan},
+      year={2023},
+      eprint={2305.10601},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}

@@ -1,3 +1,4 @@
+#coding=utf8, ErnestinaQiu
 import argparse
 import json
 import os
@@ -47,11 +48,25 @@ def run(args):
     print(cnt_avg / n, cnt_any / n)
     print("usage_so_far", gpt_usage(args.backend))
 
+llm_backend_choices = [
+              "llama-2-7b", "llama-2-7b-chat",
+              "llama-2-13b", "llama-2-13b-chat",
+              "llama-2-70b", "llama-2-70b-chat",
+              "llama-7b", "llama-13b", "llama-30b",
+              "llama-65b", "ziqingyang/chinese-llama-7b", "ziqingyang/chinese-llama-13b",
+              "ziqingyang/chinese-alpaca-7b", "ziqingyang/chinese-alpaca-13b",
+              "idea-ccnl/ziya-llama-13b-v1", "linly-ai/chinese-llama-2-7b", "linly-ai/chinese-llama-2-13b",
+              "baichuan-inc/Baichuan-7B", "baichuan-inc/Baichuan-13B-Base",
+              "baichuan-inc/Baichuan-13B-Chat", "baichuan-inc/Baichuan2-7B-Base",
+              "baichuan-inc/Baichuan2-7B-Chat",  "baichuan-inc/Baichuan2-13B-Base",
+              "baichuan-inc/Baichuan2-13B-Chat", "FlagAlpha/Llama2-Chinese-7b-Chat",
+              "FlagAlpha/Llama2-Chinese-13b-Chat"
+                ]
 
 def parse_args():
     args = argparse.ArgumentParser()
     args.add_argument(
-        "--backend", type=str, choices=["llama-2-7b-chat"], default="llama-2-7b-chat"
+        "--backend", type=str, choices=llm_backend_choices, default="llama-2-7b-chat"
     )
     args.add_argument("--temperature", type=float, default=0.6)
 
