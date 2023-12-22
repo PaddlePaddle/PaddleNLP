@@ -1,4 +1,19 @@
-#coding=utf8, ErnestinaQiu
+# coding=utf8, ErnestinaQiu
+
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import argparse
 import json
 import os
@@ -48,31 +63,43 @@ def run(args):
     print(cnt_avg / n, cnt_any / n)
     print("usage_so_far", gpt_usage(args.backend))
 
+
 llm_backend_choices = [
-              "llama-2-7b", "llama-2-7b-chat",
-              "llama-2-13b", "llama-2-13b-chat",
-              "llama-2-70b", "llama-2-70b-chat",
-              "llama-7b", "llama-13b", "llama-30b",
-              "llama-65b", "ziqingyang/chinese-llama-7b", "ziqingyang/chinese-llama-13b",
-              "ziqingyang/chinese-alpaca-7b", "ziqingyang/chinese-alpaca-13b",
-              "idea-ccnl/ziya-llama-13b-v1", "linly-ai/chinese-llama-2-7b", "linly-ai/chinese-llama-2-13b",
-              "baichuan-inc/Baichuan-7B", "baichuan-inc/Baichuan-13B-Base",
-              "baichuan-inc/Baichuan-13B-Chat", "baichuan-inc/Baichuan2-7B-Base",
-              "baichuan-inc/Baichuan2-7B-Chat",  "baichuan-inc/Baichuan2-13B-Base",
-              "baichuan-inc/Baichuan2-13B-Chat", "FlagAlpha/Llama2-Chinese-7b-Chat",
-              "FlagAlpha/Llama2-Chinese-13b-Chat"
-                ]
+    "llama-2-7b",
+    "llama-2-7b-chat",
+    "llama-2-13b",
+    "llama-2-13b-chat",
+    "llama-2-70b",
+    "llama-2-70b-chat",
+    "llama-7b",
+    "llama-13b",
+    "llama-30b",
+    "llama-65b",
+    "ziqingyang/chinese-llama-7b",
+    "ziqingyang/chinese-llama-13b",
+    "ziqingyang/chinese-alpaca-7b",
+    "ziqingyang/chinese-alpaca-13b",
+    "idea-ccnl/ziya-llama-13b-v1",
+    "linly-ai/chinese-llama-2-7b",
+    "linly-ai/chinese-llama-2-13b",
+    "baichuan-inc/Baichuan-7B",
+    "baichuan-inc/Baichuan-13B-Base",
+    "baichuan-inc/Baichuan-13B-Chat",
+    "baichuan-inc/Baichuan2-7B-Base",
+    "baichuan-inc/Baichuan2-7B-Chat",
+    "baichuan-inc/Baichuan2-13B-Base",
+    "baichuan-inc/Baichuan2-13B-Chat",
+    "FlagAlpha/Llama2-Chinese-7b-Chat",
+    "FlagAlpha/Llama2-Chinese-13b-Chat",
+]
+
 
 def parse_args():
     args = argparse.ArgumentParser()
-    args.add_argument(
-        "--backend", type=str, choices=llm_backend_choices, default="llama-2-7b-chat"
-    )
+    args.add_argument("--backend", type=str, choices=llm_backend_choices, default="llama-2-7b-chat")
     args.add_argument("--temperature", type=float, default=0.6)
 
-    args.add_argument(
-        "--task", type=str, required=True, choices=["game24", "text", "crosswords"]
-    )
+    args.add_argument("--task", type=str, required=True, choices=["game24", "text", "crosswords"])
     args.add_argument("--task_start_index", type=int, default=900)
     args.add_argument("--task_end_index", type=int, default=1000)
 
@@ -83,12 +110,8 @@ def parse_args():
 
     args.add_argument("--method_generate", type=str, choices=["sample", "propose"])
     args.add_argument("--method_evaluate", type=str, choices=["value", "vote"])
-    args.add_argument(
-        "--method_select", type=str, choices=["sample", "greedy"], default="greedy"
-    )
-    args.add_argument(
-        "--n_generate_sample", type=int, default=1
-    )  # only thing needed if naive_run
+    args.add_argument("--method_select", type=str, choices=["sample", "greedy"], default="greedy")
+    args.add_argument("--n_generate_sample", type=int, default=1)  # only thing needed if naive_run
     args.add_argument("--n_evaluate_sample", type=int, default=1)
     args.add_argument("--n_select_sample", type=int, default=1)
 
