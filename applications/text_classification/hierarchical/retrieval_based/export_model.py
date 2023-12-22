@@ -30,7 +30,7 @@ args = parser.parse_args()
 # fmt: on
 
 if __name__ == "__main__":
-    # If you want to use ernie1.0 model, plesace uncomment the following code
+    # If you want to use ernie1.0 model, please uncomment the following code
     pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     model = SemanticIndexBaseStatic(pretrained_model, output_emb_size=args.output_emb_size)
