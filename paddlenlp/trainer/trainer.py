@@ -94,6 +94,7 @@ from ..utils.env import (
 )
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
+from .argparser import strtobool
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import get_timers, set_timers
 from .plugins.unified_checkpoint import (
@@ -2092,6 +2093,12 @@ class Trainer:
         need_to_rotate_checkpoints = need_to_rotate_checkpoints and self.args.local_rank == 0
         if need_to_rotate_checkpoints:
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
+
+        if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
+            # save checkpoint_done file to ensure checkpoint is complete
+            if self.args.should_save_model_state and self.args.should_save:
+                # For ckpt integrity
+                paddle.save(self.state.global_step, os.path.join(output_dir, ".checkpoint_done"))
 
     def set_optimizer_grouped_parameters(self, optimizer_grouped_parameters=None):
         """
