@@ -117,7 +117,7 @@ class PredictorServer:
 
             def streaming(data):
                 query = data.pop("context", "")
-                history = data.pop("history", "")
+                history = data.pop("history", json.dumps([{"role": "user", "utterance": query}, {"role": "bot", "utterance": ""}]))
                 data.pop("extra_info", None)
 
                 # build chat template
