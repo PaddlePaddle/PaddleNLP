@@ -121,6 +121,9 @@ class PreTrainingArguments(TrainingArguments):
     refined_ops_patterns: Optional[List[str]] = field(
         default=None, metadata={"help": "The pattern of refined recompute."}
     )
+    virtual_pipeline_seg_method: str = field(
+        default="LlamaDecoderLayerAuto", metadata={"help": "The seg method of spliting pp layer for virtual pipeline."}
+    )
 
     def __post_init__(self):
         super().__post_init__()
@@ -529,6 +532,11 @@ def main():
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
+
+    if training_args.strategy.pipeline.enable and config.virtual_pp_degree > 1:
+        pipeline = training_args.strategy.pipeline
+        pipeline.vpp_degree = config.virtual_pp_degree
+        pipeline.vpp_seg_method = training_args.virtual_pipeline_seg_method
 
     print("Final pre-training config:", config)
 
