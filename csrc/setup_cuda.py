@@ -32,7 +32,7 @@ def strtobool(v):
 
 
 def get_gencode_flags():
-    if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
+    if not strtobool(os.getenv("FLAG_LLM_PDC", "False")):
         prop = paddle.device.cuda.get_device_properties()
         cc = prop.major * 10 + prop.minor
         return ["-gencode", "arch=compute_{0},code=sm_{0}".format(cc)]
