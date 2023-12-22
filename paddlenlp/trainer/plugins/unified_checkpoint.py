@@ -603,7 +603,7 @@ def unified_optimizer_into_shards(
 
 
 def check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serialization=False):
-    index_filename = select_model_weight_index(args, model, resume_from_checkpoint, safe_serialization, local=True)
+    index_filename = select_model_weight_index(args, model, resume_from_checkpoint, safe_serialization, local=False)
     index_filename = os.path.join(resume_from_checkpoint, index_filename)
 
     # Find index json file and distribute this file in global group.
