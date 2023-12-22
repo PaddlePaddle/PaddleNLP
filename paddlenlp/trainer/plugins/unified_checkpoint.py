@@ -154,9 +154,7 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
             json.dump(sharded_index, f, indent=4)
 
 
-def load_unified_checkpoint(
-    args, model, optimizer, resume_from_checkpoint: str, safe_serialization=False, can_resume_from_master_weight=False
-) -> None:
+def load_unified_checkpoint(args, model, optimizer, resume_from_checkpoint: str, safe_serialization=False) -> None:
     """Load potential model checkpoint
 
     Args:
@@ -174,10 +172,10 @@ def load_unified_checkpoint(
         return
 
     if args.dataset_rank == 0:
-        load_unified_checkpoint_locally(args, model, optimizer, resume_from_checkpoint, safe_serialization)
+        load_unified_checkpoint_locally(args, model, resume_from_checkpoint, safe_serialization)
 
 
-def load_unified_checkpoint_locally(args, model, optimizer, resume_from_checkpoint: str, safe_serialization=False):
+def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, safe_serialization=False):
     """
     Only dataset_rank == 0 can enter this function.
     """
@@ -240,6 +238,7 @@ def load_unified_checkpoint_locally(args, model, optimizer, resume_from_checkpoi
             )
 
         # confirm parameter cast is executed on the same device as model
+        # TODO: cast(FP32 -> FP16) has diff on different devices, need to fix it
         state_dict = nested_copy_place(state_dict, place=paddle.framework._current_expected_place())
         error_msgs += _load_state_dict_into_model(model, state_dict, "")
 
@@ -1544,8 +1543,7 @@ def nested_copy_place(inputs, place=None):
             outputs[key] = nested_copy_place(inputs[key], place)
         return outputs
     if isinstance(inputs, paddle.Tensor):
-        inputs = inputs._copy_to(place, False)
-
+        inputs = inputs if inputs.place == place else inputs._copy_to(place, False)
     return inputs
 
 
