@@ -67,15 +67,15 @@ Answer: (5 * (10 - 4)) - 6 = 24
 ``logs/`` 包含论文实验的所有轨迹，除了 ``logs/game24/gpt-4_0.7_propose1_value3_greedy5_start900_end1000.json``，该文件是在论文之后重新生成的（因为原始实验是在笔记本中进行的），由于 GPT 解码中的随机性，得分从原来的 74\% 下降到了 69\%。我们希望将来汇总多次运行以考虑抽样随机性，并更新论文，但这不应影响论文的主要结论。
 
 ## 论文实验的任务脚本
-### crosswords
+### crosswords（填字游戏）
 ```
 python run.py \
-    --task crosswords \
-    --task_start_index 0 \
-    --task_end_index 20 \
+    --task crosswords \      # 任务名：填字游戏
+    --task_start_index 0 \   # 填字游戏任务数据集中开始的序号
+    --task_end_index 20 \    # 填字游戏任务数据集中结束的序号
     --naive_run \
-    --prompt_sample cot \
-    --n_generate_sample 10
+    --prompt_sample cot \    # 抽样提示的方式, cot
+    --n_generate_sample 10   # 提示进行思维生成的次数, 10次
 ```
 
 ```
@@ -83,23 +83,22 @@ python run.py \
     --task crosswords \
     --task_start_index 0 \
     --task_end_index 20 \
-    --naive_run \
-    --prompt_sample standard \
+    --naive_run \               # 运行朴素的 IO/CoT 抽样
+    --prompt_sample standard \  # 抽样提示的方式, standard
     --n_generate_sample 10
 ```
 
-### game24
+### game24（24点游戏）
 ```
 python run.py \
-    --task game24 \
-    --task_start_index 900 \
-    --task_end_index 1000 \
-    --method_generate propose \
-    --method_evaluate value \
-    --method_select greedy \
-    --n_evaluate_sample 3 \
-    --n_select_sample 5 \
-    ${@}
+    --task game24 \             # 任务名：24点游戏
+    --task_start_index 900 \    # 24点游戏任务数据集中开始的序号
+    --task_end_index 1000 \     # 24点游戏任务数据集中结束的序号
+    --method_generate propose \ # 思维生成器，是抽样独立思维（用于创意写作）还是提出连续思维（用于24点游戏）
+    --method_evaluate value \   # 状态评估器，独立使用价值状态（用于24点游戏）
+    --method_select greedy \    # 策略选择，"greedy"（贪婪）
+    --n_evaluate_sample 3 \     # 提示进行状态评估的次数
+    --n_select_sample 5 \       # 每一步保留的状态数量（即论文中的 ``b`` 在 ToT + BFS 算法中）
 ```
 
 ```
@@ -107,10 +106,9 @@ python run.py \
     --task game24 \
     --task_start_index 900 \
     --task_end_index 1000 \
-    --naive_run \
-    --prompt_sample cot \
+    --naive_run \                # 运行朴素的 IO/CoT 抽样
+    --prompt_sample cot \        # 抽样提示的方式, cot
     --n_generate_sample 100 \
-    ${@}
 ```
 
 ```
@@ -121,24 +119,22 @@ python run.py \
     --naive_run \
     --prompt_sample standard \
     --n_generate_sample 100 \
-    ${@}
 ```
 
-### text
+### text(创意写作)
 ```
 python run.py \
-    --task text \
-    --task_start_index 0 \
-    --task_end_index 100 \
-    --method_generate sample \
-    --method_evaluate vote \
-    --method_select greedy \
-    --n_generate_sample 5 \
-    --n_evaluate_sample 5 \
-    --n_select_sample 1 \
+    --task text \            # 任务名：创意写作
+    --task_start_index 0 \   # 创意写作任务数据集中开始的序号
+    --task_end_index 100 \   # 创意写作任务数据集中结束的序号
+    --method_generate sample \  # 思维生成器，是抽样独立思维（用于创意写作）还是提出连续思维（用于24点游戏）
+    --method_evaluate vote \   # 状态评估器，对状态进行投票（用于创意写作）
+    --method_select greedy \   # 策略选择，"sample"（举例）
+    --n_generate_sample 5 \    # 提示进行思维生成的次数
+    --n_evaluate_sample 5 \    # 提示进行状态评估的次数
+    --n_select_sample 1 \      # 每一步保留的状态数量（即论文中的 ``b`` 在 ToT + BFS 算法中）
     --prompt_sample cot \
     --temperature 1.0 \
-    ${@}
 ```
 
 ```
@@ -146,11 +142,10 @@ python run.py \
     --task text \
     --task_start_index 0 \
     --task_end_index 100 \
-    --naive_run \
-    --prompt_sample cot \
+    --naive_run \                # 运行朴素的 IO/CoT 抽样
+    --prompt_sample cot \        # 抽样提示的方式, cot
     --n_generate_sample 10 \
     --temperature 1.0 \
-    ${@}
 ```
 
 ```
@@ -158,11 +153,10 @@ python run.py \
     --task text \
     --task_start_index 0 \
     --task_end_index 100 \
-    --naive_run \
-    --prompt_sample standard \
+    --naive_run \                # 运行朴素的 IO/CoT 抽样
+    --prompt_sample standard \   # 抽样提示的方式, standard
     --n_generate_sample 10 \
     --temperature 1.0 \
-    ${@}
 ```
 
 
