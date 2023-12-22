@@ -43,6 +43,15 @@ PEFT(Parameter-Efficient Fine-Tuning)相比于全量参数大大降低了所需�
 - PaddleNLP  develop
 - PaddleSlim develop
 
+git clone 代码到本地，即可开始。
+
+```bash
+    git clone https://github.com/PaddlePaddle/PaddleNLP.git
+    # pip install ./PaddleNLP 使用develop版本
+    cd PaddleNLP/llm
+    # 到达运行目录
+```
+
 ### 2.2 精调数据准备
 
 为了方便用户测试，我们也提供示例数据集[广告生成数据集](https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz)，用户也可以仿照数据集的格式制作自己的数据集进行精调。我们支持的数据格式是每行包含一个字典，每个字典包含以下字段：
