@@ -676,6 +676,8 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
     """
 
     _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
+    _ignore_fliter_dict_keys_check = True
+    _need_set_full_state_dict = True
 
     def __init__(self, config):
         super().__init__(config)

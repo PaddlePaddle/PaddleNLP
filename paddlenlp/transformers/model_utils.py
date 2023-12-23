@@ -878,6 +878,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
     # trained, but which are either deterministic or tied variables)
     _keys_to_ignore_on_save = None
     _tied_weights_keys = None
+    # when calling load_state_dict(), ignore fliter_dict_keys checking
+    _ignore_fliter_dict_keys_check = False
+    # when calling set_state_dict(), need to set full state dict instead of sharded state dict
+    _need_set_full_state_dict = False
 
     def __init__(self, *args, **kwargs):
         super(PretrainedModel, self).__init__()
@@ -1851,6 +1855,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if len(resolved_archive_file) > 1:
                 resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
 
+            if cls._need_set_full_state_dict:
+                full_state_dict = {}
+
             for shard_file in resolved_archive_file:
                 pre_tensor_parallel_split = False
                 if (
@@ -1865,7 +1872,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 state_dict = load_state_dict(
                     shard_file,
                     tp_actions if pre_tensor_parallel_split else None,
-                    None if config.quantization_config.is_weight_quantize() else set(expected_keys),
+                    None if config.quantization_config.is_weight_quantize() or cls._ignore_fliter_dict_keys_check else set(expected_keys),
                 )
                 if config.quantization_config.is_weight_quantize():
                     state_dict = convert_to_quantize_state_dict(
@@ -1894,6 +1901,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
                     logger.info("Converted state_dict to Tensor Parallel Format")
 
+                if cls._need_set_full_state_dict:
+                    full_state_dict.update(state_dict)
+                    continue
+
                 if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
                     new_error_msgs = _load_state_dict_into_meta_model(
                         model_to_load,
@@ -1912,6 +1923,25 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 # force memory release
                 del state_dict
                 gc.collect()
+
+        if cls._need_set_full_state_dict:
+            if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
+                error_msgs += _load_state_dict_into_meta_model(
+                    model_to_load,
+                    full_state_dict,
+                    loaded_keys,
+                    start_prefix,
+                    expected_keys,
+                    dtype=dtype,
+                    is_safetensors=is_safetensors,
+                    keep_in_fp32_modules=keep_in_fp32_modules,
+                )
+            else:
+                error_msgs += _load_state_dict_into_model(model_to_load, full_state_dict, start_prefix)
+
+            # force memory release
+            del state_dict
+            gc.collect()
 
         if len(error_msgs) > 0:
             error_msg = "\n\t".join(error_msgs)
