@@ -1872,7 +1872,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 state_dict = load_state_dict(
                     shard_file,
                     tp_actions if pre_tensor_parallel_split else None,
-                    None if config.quantization_config.is_weight_quantize() or cls._ignore_fliter_dict_keys_check else set(expected_keys),
+                    None
+                    if config.quantization_config.is_weight_quantize() or cls._ignore_fliter_dict_keys_check
+                    else set(expected_keys),
                 )
                 if config.quantization_config.is_weight_quantize():
                     state_dict = convert_to_quantize_state_dict(
