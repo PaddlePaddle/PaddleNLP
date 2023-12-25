@@ -74,6 +74,8 @@ class PretrainTest(LLMTest, unittest.TestCase):
 
             main()
 
-        if self.model_dir != "qwen":
+        # Now, only work for llama, not gpt or qwen
+        if self.model_dir == "llama":
             self.run_predictor({"inference_model": True})
+
         self.run_predictor({"inference_model": False})
