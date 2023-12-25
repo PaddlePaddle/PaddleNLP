@@ -99,8 +99,7 @@ function _train(){
     fi
 
     model_config="gpt2-medium-en"
-    train_cmd="--model_type gpt \
-                --model_name_or_path ${model_config} \
+    train_cmd="--model_name_or_path ${model_config} \
                 --tokenizer_name_or_path ${model_config} \
                 --input_dir ./data\
                 --output_dir output\
