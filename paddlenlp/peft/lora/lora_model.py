@@ -222,7 +222,7 @@ class LoRAModel(nn.Layer):
                 tensor = lora_state_dict.pop(name)
                 lora_state_dict[name] = action(tensor)
             else:
-                logger.warning(f"{name} not found!")
+                logger.warning(f"{name} not found in lora_state_dict!")
         return lora_state_dict
 
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
