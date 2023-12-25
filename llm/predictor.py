@@ -43,6 +43,7 @@ from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
+    ChatGLMv2Tokenizer,
     LlamaTokenizer,
     PretrainedModel,
     PretrainedTokenizer,
@@ -197,7 +198,8 @@ class BasePredictor:
             return_tensors=self.return_tensors,
             padding=True,
             # when use chat_template, it should not add special tokens
-            add_special_tokens=self.config.chat_template is None,
+            # chatglm2 prefix-tokens can not be tokenized into ids
+            add_special_tokens=self.tokenizer.chat_template is None or isinstance(self.tokenizer, ChatGLMv2Tokenizer),
         )
         return tokenized_source
 
@@ -677,7 +679,7 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
         model: PretrainedModel = None,
         tokenizer: PretrainedTokenizer = None,
     ):
-        self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size)
+        self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size, config.total_max_length)
         BasePredictor.__init__(self, config, tokenizer)
         InferencePredictorMixin.__init__(self, config, tokenizer)
         self.model = model

@@ -22,15 +22,15 @@ from paddle.distributed.fleet.meta_parallel import (
 from paddle.distributed.fleet.utils import recompute
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
-from paddlenlp.transformers.sequence_parallel_utils import GatherOp
 
+from ..sequence_parallel_utils import mark_as_sequence_parallel_parameter
 from .modeling import (
     GPTConfig,
     GPTDecoderLayer,
     GPTEmbeddings,
+    GPTLMHead,
     GPTPretrainedModel,
     GPTPretrainingCriterion,
-    parallel_matmul,
 )
 
 __all__ = [
@@ -128,6 +128,9 @@ class GPTDecoderLayerPipe(GPTDecoderLayer):
 class LayerNormPipe(nn.LayerNorm):
     def __init__(self, config):
         super(LayerNormPipe, self).__init__(config.hidden_size, epsilon=1e-05)
+        if config.sequence_parallel:
+            mark_as_sequence_parallel_parameter(self.weight)
+            mark_as_sequence_parallel_parameter(self.bias)
 
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
@@ -135,27 +138,13 @@ class LayerNormPipe(nn.LayerNorm):
         return hidden_states
 
 
-class GPTLMHeadPipe(GPTEmbeddings):
+class GPTLMHeadPipe(GPTLMHead):
     def __init__(self, config):
         super(GPTLMHeadPipe, self).__init__(config)
 
     @property
     def embedding_weight(self):
-        return get_attr(self.word_embeddings, "weight")
-
-    def forward(self, output):
-        if self.config.sequence_parallel:
-            output = GatherOp.apply(output)
-            output = paddle.reshape_(output, [-1, self.config.seq_length, self.config.hidden_size])
-
-        tensor_parallel_output = False if self.config.tensor_parallel_degree > 1 else True
-        output = parallel_matmul(
-            output,
-            self.embedding_weight,
-            transpose_y=True,
-            tensor_parallel_output=tensor_parallel_output,
-        )
-        return output
+        return get_attr(self, "weight")
 
 
 class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
@@ -192,7 +181,9 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         config.tensor_parallel_rank = tensor_parallel_rank
 
         self.add_sequential_layer(
-            SharedLayerDesc("gpt", GPTEmbeddingPipe, shared_weight_attr="embedding_weight", config=config),
+            SharedLayerDesc(
+                "gpt_shared_weight", GPTEmbeddingPipe, shared_weight_attr="embedding_weight", config=config
+            ),
             "gpt.embeddings",
         )
         for i in range(config.num_hidden_layers):
@@ -203,8 +194,8 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
         self.add_sequential_layer(LayerDesc(LayerNormPipe, config=config), "gpt.decoder.norm")
         self.add_sequential_layer(
-            SharedLayerDesc("gpt", GPTLMHeadPipe, shared_weight_attr="embedding_weight", config=config),
-            "gpt.embeddings",
+            SharedLayerDesc("gpt_shared_weight", GPTLMHeadPipe, shared_weight_attr="embedding_weight", config=config),
+            "gpt.embeddings.word_embeddings",
         )
 
         recompute_interval = 0

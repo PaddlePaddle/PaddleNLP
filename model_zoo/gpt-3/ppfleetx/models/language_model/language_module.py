@@ -32,6 +32,7 @@ from ppfleetx.utils.log import logger
 # TODO(haohongxiang): to solve the problem of cross-reference
 import paddlenlp  # noqa: F401
 from paddlenlp.transformers.gpt.tokenizer import GPTChineseTokenizer
+from paddlenlp.transformers.segment_parallel_utils  import split_inputs_sequence_dim
 
 from .metrics import Accuracy, AccuracyAndF1, Mcc, PearsonAndSpearman
 from .utils import process_configs
@@ -86,6 +87,10 @@ class LanguageModule(BasicModule):
 
     def training_step(self, batch):
         tokens, position_ids, labels, loss_mask = batch
+        if self.nranks > 1 and paddle.distributed.fleet.get_hybrid_communicate_group().get_sep_parallel_world_size() > 1:
+            tokens = split_inputs_sequence_dim(tokens)
+            position_ids = split_inputs_sequence_dim(position_ids)
+            labels = split_inputs_sequence_dim(labels)
 
         loss_mask.stop_gradient = True
         labels.stop_gradient = True
@@ -110,7 +115,7 @@ class LanguageModule(BasicModule):
         )
         logger.info(
             "[train] epoch: [%d/%d], batch: [%d/%d], loss: %.9f, avg_batch_cost: %.5f sec, speed: %.2f step/s, "
-            "ips_total: %.0f tokens/s, ips: %.0f tokens/s, %s learning rate: %.5e, found_inf: %.0f %s"
+            "ips_total: %.0f tokens/s, ips: %.0f tokens/s, ips_per_device:%.0f tokens/s/device, %s learning rate: %.5e, found_inf: %.0f %s"
             % (
                 log_dict["epoch"],
                 log_dict["total_epoch"],
@@ -121,6 +126,7 @@ class LanguageModule(BasicModule):
                 speed,
                 speed * default_global_tokens_num,
                 speed * default_global_tokens_num / self.data_world_size,
+                speed * default_global_tokens_num / paddle.distributed.get_world_size(),
                 loss_scale_str,
                 log_dict["lr"],
                 log_dict["found_inf"],
