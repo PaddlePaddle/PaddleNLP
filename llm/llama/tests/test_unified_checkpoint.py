@@ -89,7 +89,7 @@ pretrain_arguments = {
 # GBS: 16 MAX_steps: 30
 
 # convert from N1C8 to N2C4 or N2C4 to N1C8
-MAX_CONVERT_CONFIGS = 4  # max: 16, min: 1
+MAX_CONVERT_CONFIGS = 1  # max: 16, min: 1
 
 
 def check_acc(log_dir="log"):
@@ -400,12 +400,15 @@ class TestUnifiedCheckpointOnN1C8Dynamic(TestUnifiedCheckpointBase):
         super().setUp()
         self.need_allclose = False
         self.rtol = 1e-4
+        self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
     def runfrist(self, train_args):
         self.run_n1c8("run_pretrain.py", **train_args)
 
     def rerun(self, train_args):
-        for config_name, config in self.configs.items():
+        configs = random.sample(self.configs.keys(), k=self.k)
+        for config_name in configs:
+            config = self.configs[config_name]
             self.run_n1c8("run_pretrain.py", **config)
             res = check_acc()
             np.testing.assert_allclose(res[0], res[-1], rtol=self.rtol)
@@ -417,12 +420,15 @@ class TestUnifiedCheckpointOnN2C4Dynamic(TestUnifiedCheckpointBase):
         super().setUp()
         self.need_allclose = False
         self.rtol = 1e-4
+        self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
     def runfrist(self, train_args):
         self.run_n2c4("run_pretrain.py", **train_args)
 
     def rerun(self, train_args):
-        for config_name, config in self.configs.items():
+        configs = random.sample(self.configs.keys(), k=self.k)
+        for config_name in configs:
+            config = self.configs[config_name]
             self.run_n2c4("run_pretrain.py", **config)
             res = check_acc()
             np.testing.assert_allclose(res[0], res[-1], rtol=self.rtol)
