@@ -240,6 +240,8 @@ def process_strategy(config):
         pipeline.schedule_mode = pipeline_cfg.get("schedule_mode", "1F1B")
         pipeline.micro_batch_size = config.Global.micro_batch_size
         pipeline.accumulate_steps = accumulate_steps
+        pipeline.job_schedule_profiler_start = pipeline_cfg.get("job_schedule_profiler_start", -1)
+        pipeline.job_schedule_profiler_stop = pipeline_cfg.get("job_schedule_profiler_stop", -1)
         
     elif accumulate_steps > 1:
         # gradient merge config
@@ -264,6 +266,11 @@ def process_strategy(config):
     tuning.profile_end_step = tuning_cfg.get("profile_end_step", 1)
     tuning.run_after_tuning = tuning_cfg.get("run_after_tuning", True)
     tuning.debug = tuning_cfg.get("debug", True)
+
+    # sequence parallel config
+    if config.Model.get("sequence_parallel", False):
+        sp_optimization = strategy.sp_optimization
+        sp_optimization.enable = True
 
     engine_cfg = config["Engine"]
     engine_cfg["strategy"] = strategy
