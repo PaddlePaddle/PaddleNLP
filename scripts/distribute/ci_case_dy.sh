@@ -413,7 +413,6 @@ function llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1() {
     log_dir=mylog
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 run_pretrain.py \
-        --model_type gpt \
         --model_name_or_path gpt2-medium-en \
         --tokenizer_name_or_path gpt2-medium-en \
         --input_dir ./data \
