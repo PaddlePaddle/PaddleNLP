@@ -12,14 +12,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 import paddle
 from paddle.utils.cpp_extension import CUDAExtension, setup
 
 
+def strtobool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise ValueError(
+            f"Truthy value expected: got {v} but expected one of yes/no, true/false, t/f, y/n, 1/0 (case insensitive)."
+        )
+
+
 def get_gencode_flags():
-    prop = paddle.device.cuda.get_device_properties()
-    cc = prop.major * 10 + prop.minor
-    return ["-gencode", "arch=compute_{0},code=sm_{0}".format(cc)]
+    if not strtobool(os.getenv("FLAG_LLM_PDC", "False")):
+        prop = paddle.device.cuda.get_device_properties()
+        cc = prop.major * 10 + prop.minor
+        return ["-gencode", "arch=compute_{0},code=sm_{0}".format(cc)]
+    else:
+        # support more cuda archs
+        return [
+            "-gencode",
+            "arch=compute_80,code=sm_80",
+            "-gencode",
+            "arch=compute_75,code=sm_75",
+            "-gencode",
+            "arch=compute_70,code=sm_70",
+        ]
 
 
 gencode_flags = get_gencode_flags()
