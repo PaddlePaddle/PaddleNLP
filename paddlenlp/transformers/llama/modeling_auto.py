@@ -24,6 +24,7 @@ import paddle
 import paddle.nn.functional as F
 from paddle import nn
 from paddle.distributed import fleet
+from paddle.static import global_scope
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -38,7 +39,13 @@ from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
 )
-from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
+from paddlenlp.transformers.model_utils import (
+    PretrainedModel,
+    _exec_mode_guard,
+    _seed_guard_context,
+    register_base_model,
+)
+from paddlenlp.transformers.utils import ContextManagers
 
 from .configuration import (
     LLAMA_PRETRAINED_INIT_CONFIGURATION,
@@ -678,6 +685,88 @@ class LlamaPretrainedModelAuto(PretrainedModel):
         mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
 
         return mappings
+
+    def _init_weights(self, layer):
+        """Initialization hook"""
+
+        if paddle.in_dynamic_mode():
+            if isinstance(
+                layer,
+                (
+                    nn.Linear,
+                    nn.Embedding,
+                    LlamaLMHeadAuto,
+                ),
+            ) and isinstance(layer.weight, paddle.Tensor):
+
+                # Currently in dynamic-semi mode, init_weight consists of 2 parts:
+                # 1. initialize a paddle.Tensor with full shape
+                # 2. call shard_tensor to convert it into a dist_tensor in set_value
+                with _seed_guard_context("global_seed"):
+                    layer.weight.set_value(
+                        paddle.tensor.normal(
+                            mean=0.0,
+                            std=self.config.initializer_range
+                            if hasattr(self.config, "initializer_range")
+                            else self.llama.config.initializer_range,
+                            shape=layer.weight.shape,
+                        )
+                    )
+
+            # Layer.apply is DFS https://github.com/PaddlePaddle/Paddle/blob/a6f5021fcc58b21f4414bae6bf4731ef6971582c/python/paddle/nn/layer/layers.py#L527-L530
+            # sublayer is init first
+            # scale RowParallelLinear weight
+            with paddle.no_grad():
+                if isinstance(layer, LlamaMLPAuto):
+                    factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
+                    layer.down_proj.weight.scale_(factor)
+                if isinstance(layer, LlamaAttentionAuto):
+                    factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
+                    layer.o_proj.weight.scale_(factor)
+
+        else:
+
+            if isinstance(
+                layer,
+                (
+                    nn.Linear,
+                    nn.Embedding,
+                    LlamaLMHeadAuto,
+                ),
+            ) and isinstance(layer.weight, paddle.Tensor):
+
+                scope_var = global_scope().find_var(layer.weight.name)
+                buffer_tensor = global_scope().var(layer.weight.name).get_tensor()
+                norm_init_std = (
+                    self.config.initializer_range
+                    if hasattr(self.config, "initializer_range")
+                    else self.llama.config.initializer_range
+                )
+                dist_seed = "global_seed"
+
+                if scope_var and buffer_tensor._is_initialized():
+                    # if scope_var.shape != weight.shape, this param must be sharded under tensor parallel.
+                    if list(layer.weight.shape) != list(buffer_tensor.shape()):
+                        dist_seed = "local_seed"
+
+                        # if layer.weight.shape[0] > scope_var.shape()[0], this param must be sharded under row tensor parallel.
+                        # Only row_parallel_linear in LlamaMLPAuto and LlamaAttentionAuto need to scale norm_std
+                        if (
+                            isinstance(layer, nn.Linear)
+                            and layer.weight.shape[0] > buffer_tensor.shape()[0]
+                            and isinstance(layer, nn.Linear)
+                        ):
+                            norm_init_std = norm_init_std / math.sqrt(2 * self.config.num_hidden_layers)
+
+                    init_contexts = [_seed_guard_context(dist_seed), _exec_mode_guard("dynamic")]
+                    with ContextManagers(init_contexts):
+                        buffer_tensor._clear()
+                        new_value = paddle.tensor.normal(
+                            mean=0.0,
+                            std=norm_init_std,
+                            shape=buffer_tensor.shape(),
+                        )
+                        buffer_tensor._share_data_with(new_value.value().get_tensor())
 
 
 @register_base_model

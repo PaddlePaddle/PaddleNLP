@@ -42,6 +42,7 @@ from huggingface_hub import (
 )
 from huggingface_hub.utils import EntryNotFoundError
 from paddle import Tensor
+from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.meta_parallel.parallel_layers import SharedLayerDesc
 from paddle.nn import Embedding, Layer
 
@@ -260,6 +261,31 @@ def _add_variant(weights_name: str, variant=None) -> str:
         weights_name = ".".join(splits)
 
     return weights_name
+
+
+def _seed_guard_context(name=None):
+    if name in get_rng_state_tracker().states_:
+        return get_rng_state_tracker().rng_state(name)
+    else:
+        return contextlib.nullcontext()
+
+
+def _switch_mode(mode="dynamic"):
+    assert mode in ["dynamic", "static"]
+    if mode == "dynamic":
+        paddle.disable_static()
+    else:
+        paddle.enable_static()
+
+
+@contextmanager
+def _exec_mode_guard(mode="dynamic"):
+    origin_mode = "dynamic" if paddle.in_dynamic_mode() else "static"
+    _switch_mode(mode)
+    try:
+        yield
+    finally:
+        _switch_mode(origin_mode)
 
 
 @contextmanager
