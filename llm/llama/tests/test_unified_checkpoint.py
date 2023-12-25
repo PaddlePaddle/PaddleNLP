@@ -88,6 +88,9 @@ pretrain_arguments = {
 
 # GBS: 16 MAX_steps: 30
 
+# convert from N1C8 to N2C4 or N2C4 to N1C8
+MAX_CONVERT_CONFIGS = 4  # max: 16, min: 1
+
 
 def check_acc(log_dir="log"):
     file_path = os.path.join(log_dir, "workerlog.n0.c0")
@@ -431,7 +434,7 @@ class TestUnifiedCheckpointOnN1C8ToN2C4(TestUnifiedCheckpointBase):
         super().setUp()
         self.need_allclose = False
         self.rtol = 1e-4
-        self.k = 16  # max: 16, min: 1
+        self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
     def runfrist(self, train_args):
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -451,7 +454,7 @@ class TestUnifiedCheckpointOnN2C4ToN1C8(TestUnifiedCheckpointBase):
         super().setUp()
         self.need_allclose = False
         self.rtol = 1e-4
-        self.k = 16  # max: 16, min: 1
+        self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
     def runfrist(self, train_args):
         self.run_n2c4("run_pretrain.py", **train_args)
@@ -669,7 +672,7 @@ class TestUnifiedCheckpointOnN1C8ToN2C4SkipSaveModelWeight(TestUnifiedCheckpoint
 
         self.need_allclose = False
         self.rtol = 1e-4
-        self.k = 16  # max: 16, min: 1
+        self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
     def runfrist(self, train_args):
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -695,7 +698,7 @@ class TestUnifiedCheckpointOnN1C8ToN2C4MasterWeightCompatibleO1ToO2(TestUnifiedC
 
         self.need_allclose = False
         self.rtol = 1e-4
-        self.k = 16  # max: 16, min: 1
+        self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
     def runfrist(self, train_args):
         train_args["fp16_opt_level"] = "O1"
@@ -723,7 +726,7 @@ class TestUnifiedCheckpointOnN1C8ToN2C4MasterWeightCompatibleO2ToO1(TestUnifiedC
 
         self.need_allclose = False
         self.rtol = 1e-4
-        self.k = 16  # max: 16, min: 1
+        self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
     def runfrist(self, train_args):
         train_args["fp16_opt_level"] = "O2"
@@ -749,7 +752,7 @@ class TestUnifiedCheckpointOnN1C8ToN2C4AsyncSaveToDisk(TestUnifiedCheckpointBase
 
         self.need_allclose = False
         self.rtol = 1e-4
-        self.k = 16  # max: 16, min: 1
+        self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
     def runfrist(self, train_args):
         self.run_n1c8("run_pretrain.py", **train_args)
@@ -775,7 +778,7 @@ class TestUnifiedCheckpointOnN2C4ToN1C8SkipSaveModelWeight(TestUnifiedCheckpoint
 
         self.need_allclose = False
         self.rtol = 1e-4
-        self.k = 16  # max: 16, min: 1
+        self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
     def runfrist(self, train_args):
         self.run_n2c4("run_pretrain.py", **train_args)
@@ -801,7 +804,7 @@ class TestUnifiedCheckpointOnN2C4ToN1C8MasterWeightCompatibleO1ToO2(TestUnifiedC
 
         self.need_allclose = False
         self.rtol = 1e-4
-        self.k = 16  # max: 16, min: 1
+        self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
     def runfrist(self, train_args):
         train_args["fp16_opt_level"] = "O1"
@@ -829,7 +832,7 @@ class TestUnifiedCheckpointOnN2C4ToN1C8MasterWeightCompatibleO2ToO1(TestUnifiedC
 
         self.need_allclose = False
         self.rtol = 1e-4
-        self.k = 16  # max: 16, min: 1
+        self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
     def runfrist(self, train_args):
         train_args["fp16_opt_level"] = "O2"
@@ -855,7 +858,7 @@ class TestUnifiedCheckpointOnN2C4ToN1C8AsyncSaveToDisk(TestUnifiedCheckpointBase
 
         self.need_allclose = False
         self.rtol = 1e-4
-        self.k = 16  # max: 16, min: 1
+        self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
     def runfrist(self, train_args):
         self.run_n2c4("run_pretrain.py", **train_args)
