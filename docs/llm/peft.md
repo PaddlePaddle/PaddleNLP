@@ -2,8 +2,8 @@
 
 PaddleNLP PEFT API提供单卡/分布式LoRA和Prefix-Tuning，用户定义好模型，数据集, 以及相应的配置，就可以快速使用PEFT适配模型进行低参数模型微调。
 
-# 预备知识
-## LoRA
+## 预备知识
+### LoRA
 <div align="center">
 <img src=https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/63d56558-247a-4a8d-a6ca-121c820f7534 width=30% height=30% />
 </div>
@@ -17,7 +17,7 @@ $$
 由于训练参数的减少，训练过程会减少很多中间变量的存储，由此节约大量的训练显存消耗。
 更多算法细节参考LoRA[论文](https://arxiv.org/abs/2106.09685)
 
-## Prefix-tuning
+### Prefix-tuning
 
 <div align="center">
 <img src=https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/8baf6943-4540-4c02-8540-35f977acc077 width=40% height=40% />
@@ -27,8 +27,8 @@ $$
 Prefix-tuning是一个针对NLG类型下游任务的轻量级微调方案，受提示学习（Prompt learning）的影响，加入的一部分 prefix embedding 作为连续型提示进行训练。prefix embedding是由专门的 prefix encoder 网络生成的数个张量，会以 past_key_value的方式被插入到语言模型每一层的 hidden_state之前。和 LoRA 类似，它也会冻结整个预训练模型的所有参数权重，只对prefix embedding进行梯度更新，因此训练参数量只有常规 SFT 的 0.1%。Prefix-tuning可以在全样本下获得与 SFT 比肩的训练效果，在小样本环境下甚至可以超越 SFT。更多算法细节参考
 Prefix-tuning[论文](https://arxiv.org/abs/2101.00190)
 
-# 快速开始
-## LoRA
+## 快速开始
+### LoRA
 
 1. 要对 model 进行 LoRA 微调，首先需要定义LoRAConfig， 再通过 LoRAConfig 对 LoRAModel 进行构建，再通过 mark_only_lora_as_trainable函数冻结主干参数：
 ```python
@@ -68,8 +68,10 @@ Paddle会将 LoRAModel 的矩阵 AB 权重保存为lora_mode_state.pdparams文�
     + model = LoRAModel.from_pretrained(model, 'lora_path')
       model.eval()
 ```
-## class LoRAConfig
-```python
+
+### class LoRAConfig
+
+```text
 Parameters:
 
     --r
@@ -109,8 +111,9 @@ Parameters:
                         多头注意力的头数，只有`LoRAMergedLinear`和
                         `ColumnParallelLoRAMergedLinear`使用
 ```
-## class LoRAModel
-```python
+### class LoRAModel
+
+```text
 Parameters:
 
     --model
@@ -150,7 +153,7 @@ key function:
 ```
 
 
-## Prefix-tuning
+### Prefix-tuning
 1. 设置Prefix-tuning参数
 ```python
     from paddlenlp.transformers import AutoModelForCausalLM
@@ -190,8 +193,8 @@ Paddle会将 PrefixModel 中用到的 prefix_encoder(里面包含 Embedding laye
       model.eval()
 ```
 
-## class PrefixConfig
-```python
+### class PrefixConfig
+```text
 Parameters:
 
     --prefix_dropout
@@ -227,8 +230,8 @@ Parameters:
 
 ```
 
-## class PrefixModelForCausalLM
-```python
+### class PrefixModelForCausalLM
+```text
 Parameters:
 
     --model

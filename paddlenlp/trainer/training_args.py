@@ -622,10 +622,6 @@ class TrainingArguments:
             "Only support for networks with transformer blocks."
         },
     )
-    sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
-    refined_ops_patterns: Optional[List[str]] = field(
-        default=None, metadata={"help": "The pattern of refined recompute."}
-    )
 
     scale_loss: float = field(default=2**15, metadata={"help": "The value of initial scale_loss for fp16."})
 
@@ -735,10 +731,28 @@ class TrainingArguments:
         metadata={"help": "The step to end nv_profiler."},
     )
 
+    ignore_load_lr_and_optim: Optional[bool] = field(
+        default=False,
+        metadata={"help": "whether to ignore load optimizer and scheduler."},
+    )
+
+    force_reshard_pp: Optional[bool] = field(
+        default=False,
+        metadata={"help": "reshard pp even if pp degree in the model and pp degree in script match"},
+    )
+
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
         if env_local_rank != -1 and env_local_rank != self.local_rank and paddle.distributed.get_world_size() > 1:
             self.local_rank = env_local_rank
+
+        # NOTE(gongenlei): new add, disable sharding when we have only single gpu
+        if paddle.distributed.get_world_size() <= 1:
+            self.sharding = ""
+            self.sharding_degree = -1
+            self.sharding_parallel_degree = -1
+            self.tensor_parallel_degree = -1
+            self.pipeline_parallel_degree = -1
 
         # convert to int
         self.log_level = -1
@@ -949,13 +963,17 @@ class TrainingArguments:
                         raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
 
                     if self.do_eval:
-                        assert (
+                        if (
                             self.per_device_train_batch_size * self.gradient_accumulation_steps
-                            == self.per_device_eval_batch_size
-                        ), (
-                            "In pipeline model, the evaluation also shares same setting with training. "
-                            "Please set per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
-                        )
+                            != self.per_device_eval_batch_size
+                        ):
+                            logger.warn(
+                                "In pipeline model, the evaluation also shares same setting with training. "
+                                "We will enforce that per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
+                            )
+                            self.per_device_eval_batch_size = (
+                                self.per_device_train_batch_size * self.gradient_accumulation_steps
+                            )
 
                 if self.tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
@@ -1151,13 +1169,18 @@ class TrainingArguments:
                 logger.info(f"PP configs:{strategy.pipeline}, use master_grad: {self.amp_master_grad}")
 
                 if self.do_eval:
-                    assert (
+                    if (
                         self.per_device_train_batch_size * self.gradient_accumulation_steps
-                        == self.per_device_eval_batch_size
-                    ), (
-                        "In pipeline model, the evaluation also shares same setting with training. "
-                        "Please set per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
-                    )
+                        != self.per_device_eval_batch_size
+                    ):
+                        logger.warn(
+                            "In pipeline model, the evaluation also shares same setting with training. "
+                            "We will enforce that per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
+                        )
+                        self.per_device_eval_batch_size = (
+                            self.per_device_train_batch_size * self.gradient_accumulation_steps
+                        )
+
             elif self.gradient_accumulation_steps > 1:
                 gradient_merge = strategy.gradient_merge
                 gradient_merge.enable = True
@@ -1397,10 +1420,13 @@ class TrainingArguments:
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
+                assert self.tensor_parallel_degree < 100, "tensor parallel degree should be less than 100."
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
+                assert self.pipeline_parallel_degree < 100, "pipeline parallel degree should be less than 100."
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
             if self.sharding_parallel_degree > 1:
+                assert self.sharding_parallel_degree < 100, "sharding parallel degree should be less than 100."
                 name.append(f"shard{self.sharding_parallel_rank:0>2d}")
 
             return "_".join(name)
@@ -1412,25 +1438,33 @@ class TrainingArguments:
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
+                assert self.tensor_parallel_rank < 100, "tensor parallel rank should be less than 100."
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
+                assert self.pipeline_parallel_degree < 100, "tensor parallel rank should be less than 100."
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
             return "_".join(name)
 
         else:
             return None
 
-    def sharded_name_suffix(self, shard_id=None):
+    def sharded_name_suffix(self, shard_id=None, pp_id=None):
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
+                assert self.tensor_parallel_rank < 100, "tensor parallel rank should be less than 100."
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
-                name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
+                if pp_id is None:
+                    pp_id = self.pipeline_parallel_rank
+                assert isinstance(pp_id, int)
+                assert pp_id < 100, "pp_id should be less than 100."
+                name.append(f"pp{pp_id:0>2d}")
             if self.sharding_parallel_degree > 1:
                 if shard_id is None:
                     shard_id = self.sharding_parallel_rank
                 assert isinstance(shard_id, int)
+                assert shard_id < 100, "shard_id should be less than 100."
                 name.append(f"shard{shard_id:0>2d}")
             return "_".join(name)
         else:

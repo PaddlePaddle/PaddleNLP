@@ -21,12 +21,29 @@ from typing import Union
 from zipfile import ZipFile
 
 import numpy as np
+import paddle
 from _io import BufferedReader
-from safetensors import safe_open
+from safetensors import deserialize
 
 from paddlenlp.utils.env import PYTORCH_WEIGHTS_NAME, SAFE_WEIGHTS_NAME
 
 MZ_ZIP_LOCAL_DIR_HEADER_SIZE = 30
+
+_TYPES = {
+    "F64": np.float64,
+    "F32": np.float32,
+    "F16": np.float16,
+    "I64": np.int64,
+    "U64": np.uint64,
+    "I32": np.int32,
+    "U32": np.uint32,
+    "I16": np.int16,
+    "U16": np.uint16,
+    "BF16": np.uint16,
+    "I8": np.int8,
+    "U8": np.uint8,
+    "BOOL": bool,
+}
 
 
 class SerializationError(Exception):
@@ -219,17 +236,18 @@ def load_torch(path: str, **pickle_load_args):
         state_dict = unpickler_stage.load()
         torch_zip.close()
     elif path.endswith(SAFE_WEIGHTS_NAME) or os.path.split(path)[-1].startswith("model-"):
-        # Check format of the archive
-        with safe_open(path, framework="pt") as f:
-            metadata = f.metadata()
-        if metadata.get("format") not in ["pt"]:
-            raise OSError(
-                f"You have open the `convert_from_torch` flag but the safetensors archive passed at {path} does not contain the 'pt' metadata."
-            )
+        # torch safetensors -> numpy -> paddle.Tensor
+        with open(path, "rb") as f:
+            data = f.read()
+
+        flat = deserialize(data)
         state_dict = {}
-        with safe_open(path, framework="pt") as f:
-            for key in f.keys():
-                weight = f.get_tensor(key)
-                state_dict[key] = weight.numpy()
+        for k, v in flat:
+            dtype = _TYPES[v["dtype"]]
+            if v["dtype"] == "BF16":
+                arr = paddle.to_tensor(np.frombuffer(v["data"], dtype=dtype).reshape(v["shape"]), dtype="bfloat16")
+            else:
+                arr = paddle.to_tensor(np.frombuffer(v["data"], dtype=dtype).reshape(v["shape"]))
+            state_dict[k] = arr
 
     return state_dict
