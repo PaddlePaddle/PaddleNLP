@@ -612,6 +612,7 @@ def get_checkpoint_shard_files(
     cache_dir=None,
     subfolder="",
     from_aistudio=False,
+    from_hf_hub=False,
 ):
     """
     For a given model:
@@ -661,6 +662,13 @@ def get_checkpoint_shard_files(
         try:
             if from_aistudio:
                 cached_filename = aistudio_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=shard_filename,
+                    subfolder=subfolder,
+                    cache_dir=cache_dir,
+                )
+            elif from_hf_hub:
+                cached_filename = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=shard_filename,
                     subfolder=subfolder,
