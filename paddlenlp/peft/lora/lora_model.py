@@ -218,8 +218,9 @@ class LoRAModel(nn.Layer):
                 lora_name_action_mappings[v] = name_action_mappings[k]
 
         for name, action in lora_name_action_mappings.items():
-            tensor = lora_state_dict.pop(name)
-            lora_state_dict[name] = action(tensor)
+            if name in lora_state_dict:
+                tensor = lora_state_dict.pop(name)
+                lora_state_dict[name] = action(tensor)
         return lora_state_dict
 
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
