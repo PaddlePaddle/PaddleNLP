@@ -341,8 +341,12 @@ def _expand_2d_mask(mask, dtype, tgt_length):
 
 
 def rms_norm_fused(x_in, w, eps):
-    fused_ln = try_import("fused_ln")
-    return fused_ln.fused_rms_norm(x_in, w, eps)[0]
+    if paddle.is_compiled_with_xpu():
+        import paddle_xpu_nn
+        return paddle_xpu_nn.xpu_rms_norm(x_in, w, eps)[0]
+    else:
+        fused_ln = try_import("fused_ln")
+        return fused_ln.fused_rms_norm(x_in, w, eps)[0]
 
 
 class LlamaRMSNorm(nn.Layer):
@@ -566,8 +570,12 @@ class LlamaMLP(nn.Layer):
 
     def forward(self, x):
         if self.fuse_attention_ffn:
-            gate_out, up_out = paddle.chunk(self.gate_up_fused_proj(x), chunks=2, axis=-1)
-            out = self.down_proj(F.silu(gate_out) * up_out)
+            # gate_out, up_out = paddle.chunk(self.gate_up_fused_proj(x), chunks=2, axis=-1)
+            # out = self.down_proj(F.silu(gate_out) * up_out)
+            import paddle_xpu_nn
+            out = self.gate_up_fused_proj(x)
+            out = paddle_xpu_nn.swiglu(out, axis=-1, turn=True)
+            out = self.down_proj(out)
         else:
             out = self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
         return out
@@ -624,7 +632,7 @@ class LlamaAttention(nn.Layer):
 
         self.use_fused_rope = config.use_fused_rope
         if self.use_fused_rope:
-            if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
+            if "xpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
                     "Will disable fuse rope. Try using latest gpu version of Paddle."
