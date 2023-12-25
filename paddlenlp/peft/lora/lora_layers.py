@@ -666,11 +666,24 @@ class LoRAConv2D(nn.Conv2D):
 
         # Actual trainable parameters
         lora_A = nn.Conv2D(
-            in_channels, r, kernel_size=self._kernel_size, stride=self._stride, padding=self._padding, bias_attr=False
+            in_channels,
+            r,
+            kernel_size=self._kernel_size,
+            stride=self._stride,
+            padding=self._padding,
+            weight_attr=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu"),
+            bias_attr=False,
         )
         self.lora_A = lora_A.weight
         self.lora_A_forward = lambda x: nn.Conv2D.__call__(lora_A, x)
-        lora_B = nn.Conv2D(r, out_channels, kernel_size=(1, 1), stride=(1, 1), bias_attr=False)
+        lora_B = nn.Conv2D(
+            r,
+            out_channels,
+            kernel_size=(1, 1),
+            stride=(1, 1),
+            weight_attr=nn.initializer.Constant(value=0.0),
+            bias_attr=False,
+        )
         self.lora_B_forward = lambda x: nn.Conv2D.__call__(lora_B, x)
         self.lora_B = lora_B.weight
         self.scaling = lora_alpha / r
@@ -753,5 +766,5 @@ class LoRAConv2D(nn.Conv2D):
             main_str += ", dilation={_dilation}"
         if self._groups != 1:
             main_str += ", groups={_groups}"
-        main_str += ", data_format={_data_format}, rank={r}, alpha={lora_alpha} "
+        main_str += ", data_format={_data_format}, rank={r}, alpha={lora_alpha}"
         return main_str.format(**self.__dict__)
