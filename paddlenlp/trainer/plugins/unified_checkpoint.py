@@ -1389,7 +1389,6 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
             tensor = state_dict[key]
             if key in tp_actions:
                 ret = distributed_gather(tensor, dst=j, group=tp_group, offload=False)
-                dist.barrier(group=tp_group)
                 action = tp_actions.pop(key)
                 tensor = action(ret) if is_dst else None
             else:
@@ -1430,7 +1429,6 @@ def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys)
                     )  # Need broadcast when loaded
                 else:
                     ret = distributed_gather(tensor, dst=j, group=tp_group, offload=False)
-                    dist.barrier(group=tp_group)
                     action = tp_actions[model_key]
                     tensor = action(ret) if is_dst else None
             else:
