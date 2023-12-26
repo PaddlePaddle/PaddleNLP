@@ -1656,9 +1656,28 @@ def update_master_weight_status(args, optimizer, has_master_weight, safe_seriali
     return has_master_weight, index_filename_master_weights
 
 
-def is_need_master_weight(optimizer, is_fp16_or_bp16):
-    optimizer = unwrap_optimizer(optimizer)
+def is_need_master_weight(args, optimizer):
+    """
+    https://github.com/PaddlePaddle/Paddle/blob/4a9991fb6744443333638b65fb7e225fb2b00a13/python/paddle/amp/auto_cast.py#L485
+    """
+
+    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
+        DygraphShardingOptimizer,
+        DygraphShardingOptimizerV2,
+    )
+    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
+        HybridParallelOptimizer,
+    )
+    from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_optimizer_stage2 import (
+        GroupShardedOptimizerStage2,
+    )
+
+    if isinstance(optimizer, (DygraphShardingOptimizer, DygraphShardingOptimizerV2, HybridParallelOptimizer)):
+        optimizer = optimizer._inner_opt
+    elif isinstance(optimizer, GroupShardedOptimizerStage2):
+        optimizer = optimizer._optim
+
     if hasattr(optimizer, "_multi_precision"):
-        return optimizer._multi_precision and is_fp16_or_bp16
+        return optimizer._multi_precision and (args.bf16 or args.fp16)
     else:
         return False
