@@ -76,6 +76,7 @@ std::vector<paddle::Tensor> SetMaskValue(const paddle::Tensor& input_data,
                                           const paddle::Tensor& alibi_slopes,
                                           const paddle::Tensor& tgt_pos) {
     switch (input_data.type()) {
+#if CUDA_VERSION >= 11000
         case paddle::DataType::BFLOAT16: {
             return set_mask_value<paddle::DataType::BFLOAT16>(
                 input_data,
@@ -85,6 +86,7 @@ std::vector<paddle::Tensor> SetMaskValue(const paddle::Tensor& input_data,
                 tgt_pos
             );
         }
+#endif 
         case paddle::DataType::FLOAT16: {
             return set_mask_value<paddle::DataType::FLOAT16>(
                 input_data,

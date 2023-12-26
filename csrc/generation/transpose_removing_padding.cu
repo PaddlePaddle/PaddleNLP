@@ -125,6 +125,7 @@ std::vector<paddle::Tensor> ApplyTransposeRemovingPadding(const paddle::Tensor& 
                                                           const paddle::Tensor& seq_lens, 
                                                           const paddle::Tensor& padding_offset) {
     switch (input.type()) {
+#if CUDA_VERSION >= 11000
         case paddle::DataType::BFLOAT16: {
             return apply_transpose_remove_padding<paddle::DataType::BFLOAT16>(
                 input,
@@ -132,6 +133,7 @@ std::vector<paddle::Tensor> ApplyTransposeRemovingPadding(const paddle::Tensor& 
                 padding_offset
             );
         }
+#endif 
         case paddle::DataType::FLOAT16: {
             return apply_transpose_remove_padding<paddle::DataType::FLOAT16>(
                 input,
