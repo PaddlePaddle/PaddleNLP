@@ -51,6 +51,7 @@ from .modeling import (
     LlamaNTKScalingRotaryEmbedding,
     LlamaRotaryEmbedding,
     _expand_2d_mask,
+    _make_causal_mask,
     apply_rotary_pos_emb,
     build_alibi_tensor,
     get_triangle_upper_mask,
@@ -71,11 +72,17 @@ __all__ = [
 ]
 
 
-def get_dist_attr(shard_specs, pp_idx=0):
+def get_mesh(pp_idx=None):
     mesh = fleet.auto.get_mesh()
+    if pp_idx is None:
+        return mesh
     if "pp" in mesh.dim_names:
         mesh = mesh.get_mesh_with_dim("pp")[pp_idx]
+    return mesh
 
+
+def get_dist_attr(shard_specs, pp_idx=None):
+    mesh = get_mesh(pp_idx)
     new_spec = []
     for spec in shard_specs:
         if not spec:
@@ -87,22 +94,6 @@ def get_dist_attr(shard_specs, pp_idx=0):
                 new_spec.append(None)
 
     return mesh, new_spec
-
-
-def _make_causal_mask(input_ids_shape, past_key_values_length):
-    """
-    Make causal mask used for self-attention
-    """
-    batch_size, target_length = input_ids_shape  # target_length: seq_len
-
-    mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
-
-    if past_key_values_length > 0:
-        # [tgt_len, tgt_len + past_len]
-        mask = paddle.concat([paddle.ones([target_length, past_key_values_length], dtype="bool"), mask], axis=-1)
-
-    # [bs, 1, tgt_len, tgt_len + past_len]
-    return mask[None, None, :, :].expand([batch_size, 1, target_length, target_length + past_key_values_length])
 
 
 def scaled_dot_product_attention(
@@ -118,14 +109,13 @@ def scaled_dot_product_attention(
     _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention:
-        # Flash Attention now ignore attention mask
-        # Current Flash Attention doesn't support attn maskt
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
-        if alibi is not None:
-            attention_mask = attention_mask.cast(alibi.dtype) + alibi
+
         version = paddle.version.full_version
         if version != "0.0.0" and version <= "2.5.2":
+            if alibi is not None:
+                raise ValueError("Flash Attention doesn't support alibi")
             attn_output, attn_weights = flash_attention(
                 query_states,
                 key_states,
@@ -134,6 +124,9 @@ def scaled_dot_product_attention(
                 return_softmax=output_attentions,
             )
         else:
+            if alibi is not None:
+                alibi = alibi.reshape([bsz, num_heads, 1, -1])
+                attention_mask = attention_mask.cast(alibi.dtype) + alibi
             attn_output = F.scaled_dot_product_attention(
                 query_states,
                 key_states,
@@ -229,7 +222,6 @@ class LlamaMLPAuto(nn.Layer):
         self.intermediate_size = config.intermediate_size
         self.fuse_attention_ffn = config.fuse_attention_ffn
         self.ipp = ipp
-        self.config = config
 
         if config.fuse_attention_ffn:
             self.gate_up_fused_proj = nn.Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
@@ -240,7 +232,7 @@ class LlamaMLPAuto(nn.Layer):
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
 
     def forward(self, x):
-        if self.config.fuse_attention_ffn:
+        if self.fuse_attention_ffn:
             fleet.auto.shard_tensor(self.gate_up_fused_proj.weight, *get_dist_attr([None, "mp"], self.ipp))
         else:
             fleet.auto.shard_tensor(self.gate_proj.weight, *get_dist_attr([None, "mp"], self.ipp))
@@ -707,18 +699,19 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             self.hidden_size,
         )
 
-        def get_layer_ipp(layer_index):
-            mesh = fleet.auto.get_mesh()
-            if "pp" not in mesh.dim_names:
-                return None
-            else:
-                pp_degree = mesh.get_dim_size("pp")
-                layer_per_stage = math.ceil(config.num_hidden_layers / pp_degree)
-                return layer_index // layer_per_stage
+        mesh = get_mesh()
+        if "pp" not in mesh.dim_names:
+            pp_degree = 1
+        else:
+            pp_degree = mesh.get_dim_size("pp")
+        virtual_pp_degree = getattr(self.config, "virtual_pp_degree", 1)
+        assert config.num_hidden_layers % (pp_degree * virtual_pp_degree) == 0
 
+        num_layer_per_chunk = math.ceil(config.num_hidden_layers / pp_degree / virtual_pp_degree)
+        self.layer_to_ipp = [(i // num_layer_per_chunk) % pp_degree for i in range(config.num_hidden_layers)]
         self.layers = nn.LayerList(
             [
-                LlamaDecoderLayerAuto(config, i not in self.no_recompute_layers, get_layer_ipp(i))
+                LlamaDecoderLayerAuto(config, i not in self.no_recompute_layers, self.layer_to_ipp[i])
                 for i in range(config.num_hidden_layers)
             ]
         )
@@ -744,7 +737,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                         input_shape, past_key_values_length=past_key_values_length
                     )
                     # NOTE(zhaoyingli): infer spmd does not support [seq_len, seq_len] --> [batch, 1, seq_len, seq_len] in data_parallel
-                    fleet.auto.shard_tensor(combined_attention_mask, *get_dist_attr([None, None, None, None]))
+                    fleet.auto.shard_tensor(combined_attention_mask, get_mesh(), [None, None, None, None])
                     expanded_attn_mask = expanded_attn_mask & combined_attention_mask
             # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
             elif len(attention_mask.shape) == 3:
@@ -779,6 +772,10 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
+        # NOTE(zhaoyingli): temprorary method to guarantee the later ops are placed all ranks until meeting new annotaion.
+        full = fleet.auto.shard_op(paddle.full, get_mesh())
+        full(shape=[1], fill_value=0)
+
         # retrieve input_ids and inputs_embeds
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time")
@@ -798,9 +795,14 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             cache_length = paddle.shape(past_key_values[0][0])[1]
             seq_length_with_past += cache_length
 
-        fleet.auto.shard_tensor(self.embed_tokens.weight, *get_dist_attr(["mp", None], 0))
         if inputs_embeds is None:
-            inputs_embeds = self.embed_tokens(input_ids)
+            fleet.auto.shard_tensor(self.embed_tokens.weight, *get_dist_attr(["mp", None], 0))
+            embed_tokens = fleet.auto.shard_op(self.embed_tokens, get_mesh(0))
+            inputs_embeds = embed_tokens(input_ids)
+
+        # NOTE(zhaoyingli): temprorary method to guarantee the later ops are placed all ranks until meeting new annotaion.
+        full = fleet.auto.shard_op(paddle.full, get_mesh())
+        full(shape=[1], fill_value=0)
 
         # embed positions
         if attention_mask is None:
@@ -815,15 +817,18 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
         if position_ids is None:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
-            # NOTE(zhaoyingli): infer spmd does not support [seq_len] --> [batch, seq_len] in data_parallel
-            fleet.auto.shard_tensor(position_ids, *get_dist_attr([None, None]))
+            # NOTE(zhaoyingli):
+            # 1. infer spmd does not support [seq_len] --> [batch, seq_len] in data_parallel
+            fleet.auto.shard_tensor(position_ids, get_mesh(), [None, None])
 
-        attention_mask = self._prepare_decoder_attention_mask(
-            attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
-        )  # [bs, 1, seq_len, seq_len]
         if self.config.use_flash_attention:
             # attention_mask in flash_attn is always None for pretrain
             attention_mask = None
+        else:
+            attention_mask = self._prepare_decoder_attention_mask(
+                attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
+            )  # [bs, 1, seq_len, seq_len]
+
         hidden_states = inputs_embeds
 
         # decoder layers
@@ -832,12 +837,15 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         next_decoder_cache = () if use_cache else None
 
         for idx, (decoder_layer) in enumerate(self.layers):
+            ipp = decoder_layer.ipp
+            fleet.auto.shard_tensor(hidden_states, *get_dist_attr(["dp", None, None], ipp))
+            decoder_layer = fleet.auto.shard_op(decoder_layer, get_mesh(ipp))
+
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
             past_key_value = past_key_values[idx] if past_key_values is not None else None
 
             has_gradient = not hidden_states.stop_gradient
-            fleet.auto.shard_tensor(hidden_states, *get_dist_attr(["dp", None, None], decoder_layer.ipp))
             if (
                 self.enable_recompute
                 and idx not in self.no_recompute_layers
@@ -875,6 +883,34 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
 
+        hidden_states = self.norm(hidden_states)
+
+        # add hidden states from the last decoder layer
+        if output_hidden_states:
+            all_hidden_states += (hidden_states,)
+
+        next_cache = next_decoder_cache if use_cache else None
+
+        if not return_dict:
+            return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None)
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=hidden_states,
+            past_key_values=next_cache,
+            hidden_states=all_hidden_states,
+            attentions=all_self_attns,
+            cross_attentions=None,
+        )
+
+    def _post_output(
+        self,
+        hidden_states,
+        output_hidden_states,
+        next_decoder_cache,
+        all_self_attns,
+        all_hidden_states,
+        use_cache,
+        return_dict,
+    ):
         hidden_states = self.norm(hidden_states)
 
         # add hidden states from the last decoder layer

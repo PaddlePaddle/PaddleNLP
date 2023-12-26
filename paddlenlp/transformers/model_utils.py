@@ -41,6 +41,7 @@ from huggingface_hub import (
 )
 from huggingface_hub.utils import EntryNotFoundError
 from paddle import Tensor
+from paddle.distributed.fleet.meta_parallel.parallel_layers import SharedLayerDesc
 from paddle.nn import Embedding, Layer
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
@@ -1433,7 +1434,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         use_safetensors: bool | None = None,
         variant=None,
     ) -> str:
-
         """resolve model target file path from `` and `cache_dir`
 
         1. when it is file path:
@@ -2431,7 +2431,7 @@ class PipelinePretrainedModel(PretrainedModel):
     def get_sequential_layers(self):
         return [x["layer"] for x in self._sequential_layers]
 
-    def get_sequential_name_prefixs(self):
+    def get_sequential_name_prefixes(self):
         return {str(index): x["name_prefix"] for index, x in enumerate(self._sequential_layers)}
 
     def _set_pipeline_name_mapping(self, mappings=None):
@@ -2452,43 +2452,35 @@ class PipelinePretrainedModel(PretrainedModel):
             # else it will be like 0.xxx
             use_virtual_pp_degree = first_key[0].isdigit() and first_key[1].isdigit()
 
-            prefixs = self.get_sequential_name_prefixs()
+            prefixes = self.get_sequential_name_prefixes()
             for k in state_dict_keys:
                 name_splited = k.split(".")
                 if use_virtual_pp_degree:
                     if name_splited[0].isdigit():
                         if name_splited[1].isdigit():
                             idx = str(int(name_splited[0]) + int(name_splited[1]))
-                            single_name = [prefixs[idx]]
+                            single_name = [prefixes[idx]]
                             single_name.extend(name_splited[2:])
                         else:
-                            single_name = [prefixs[str(len(prefixs) - 1)]]
+                            single_name = [prefixes[str(len(prefixes) - 1)]]
                             single_name.extend(name_splited[2:])
                             logger.warning(
                                 f"Please check! we treat this key as last layer, get {k}, set origin name as {'.'.join(single_name)}"
                             )
                     elif name_splited[0] == "shared_layers":
-                        # TODO: it treat shared_layers as first layer
-                        single_name = [prefixs["0"]]
+                        single_name = [self.get_shardlayer_prefix(name_splited)]
                         single_name.extend(name_splited[2:])
-                        logger.warning(
-                            f"Please check! we treat shared_layers as first layer, get {k}, set origin name as {'.'.join(single_name)}"
-                        )
                     else:
                         raise ValueError(f"Unexpected key: {k} for pp layer.")
                 else:
                     idx = name_splited[0]
                     # for normal pp layer
                     if idx.isdigit():
-                        single_name = [prefixs[idx]]
+                        single_name = [prefixes[idx]]
                         single_name.extend(name_splited[1:])
                     elif idx == "shared_layers":
-                        # TODO: it treat shared_layers as first layer
-                        single_name = [prefixs["0"]]
+                        single_name = [self.get_shardlayer_prefix(name_splited)]
                         single_name.extend(name_splited[2:])
-                        logger.warning(
-                            f"Please check! we treat shared_layers as first layer, get {k}, set origin name as {'.'.join(single_name)}"
-                        )
                     else:
                         raise ValueError(f"Unexpected key: {k} for pp layer.")
 
@@ -2499,6 +2491,34 @@ class PipelinePretrainedModel(PretrainedModel):
             self._pp_to_single_mapping = pp_to_single_mapping
 
         return self._single_to_pp_mapping
+
+    def get_shardlayer_prefix(self, name_splited):
+        """_summary_
+            This function retrieves the prefix of a shared layer. The process involves:
+            1. Identifying all key names of shared layers, like 'shared_weight01', 'shared_weight02', etc.
+            2. For instance, given name_splited = ['shared_layers', 'shared_weight01', 'weight'],
+                the 'shared_layer_key' would be name_splited[1], which is 'shared_weight01'.
+            3. By traversing through all layers, the function checks if the specified
+                shared_layer is present in the current stage. If found, it returns the corresponding prefix.
+
+            Note: For retrieving all SharedLayer instances in Paddle, you can refer to the following Paddle code.
+            https://github.com/PaddlePaddle/Paddle/blob/2cf724d055679a1a0e48766dfb1708b920273078/python/paddle/distributed/fleet/meta_parallel/parallel_layers/pp_layers.py#L460-L513
+        Args:
+            name_splited (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        shared_layer_names = {s.layer_name for s in self._layers_desc if isinstance(s, SharedLayerDesc)}
+        assert name_splited[1] in shared_layer_names, f"The shared layer name {name_splited[1]} must be in prefixes!"
+        shared_layer_key = name_splited[1]
+        for idx, layer in enumerate(self._layers_desc):
+            if isinstance(layer, SharedLayerDesc) and layer.layer_name == shared_layer_key:
+                if self.get_stage_from_index(idx) == self._stage_id:
+                    return self.get_sequential_name_prefixes()[str(idx)]
+
+        # the prefix must be in the current stage, else raise error
+        raise ValueError(f"The shared layer {shared_layer_key} must be in the current stage!")
 
     def state_dict(self, *args, **kwargs):
         state_dict = super().state_dict(*args, **kwargs)

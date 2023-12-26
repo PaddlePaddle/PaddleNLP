@@ -53,7 +53,7 @@ class QuantizationLinear(nn.Layer):
         double_quant=False,
         qquant_scale_attr=None,
         double_quant_scale_attr=None,
-        quant_sacle_offset_attr=None,
+        quant_scale_offset_attr=None,
         quant_scale_attr=None,
         llm_int8_threshold=6.0,
     ):
@@ -106,9 +106,9 @@ class QuantizationLinear(nn.Layer):
                     dtype="float32",
                     is_bias=False,
                 )
-                self.quant_sacle_offset = self.create_parameter(
+                self.quant_scale_offset = self.create_parameter(
                     shape=[],
-                    attr=quant_sacle_offset_attr,
+                    attr=quant_scale_offset_attr,
                     dtype="float32",
                     is_bias=False,
                 )
@@ -141,7 +141,7 @@ class QuantizationLinear(nn.Layer):
                     x,
                     self.quant_weight.reshape([-1, 1]),
                     self.quant_algo,
-                    (self.qquant_scale, self.double_quant_scale, self.quant_sacle_offset)
+                    (self.qquant_scale, self.double_quant_scale, self.quant_scale_offset)
                     if self.double_quant
                     else self.quant_scale,
                     self.double_quant,

@@ -166,14 +166,25 @@ class QWenAttention(nn.Layer):
             # Current Flash Attention doesn't support attn maskt
             # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
             # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
-            attn_output, attn_weights = flash_attention(
-                query,
-                key,
-                value,
-                causal=query.shape[1] != 1,
-                dropout=self.config.attn_dropout_prob,
-                return_softmax=self.config.attn_dropout_prob > 0.0,
-            )
+            version = paddle.version.full_version
+            if version != "0.0.0" and version <= "2.5.2":
+                attn_output, attn_weights = flash_attention(
+                    query,
+                    key,
+                    value,
+                    causal=query.shape[1] != 1,
+                    dropout=self.config.attn_dropout_prob,
+                    return_softmax=self.config.attn_dropout_prob > 0.0,
+                )
+            else:
+                attn_output = F.scaled_dot_product_attention(
+                    query,
+                    key,
+                    value,
+                    attn_mask=attention_mask,
+                    is_causal=attention_mask is None,
+                )
+                attn_weights = None
             return attn_output, attn_weights
         else:
             # [bz, sql, nh, hid] ==> [bz, nh, sql hdim]
@@ -982,7 +993,8 @@ class RotaryEmbedding(nn.Layer):
             self._seq_len_cached = max(2 * seqlen, 16)
             self._ntk_alpha_cached = ntk_alpha
             seq = paddle.arange(self._seq_len_cached)
-            freqs = paddle.outer(seq.astype(self.inv_freq.dtype), self.inv_freq)
+            with paddle.amp.auto_cast(enable=False):
+                freqs = paddle.outer(seq.astype(self.inv_freq.dtype), self.inv_freq)
             emb = paddle.concat([freqs, freqs], axis=-1)
             self.cos_cached = emb.cos()[None, :, None, :]
             self.sin_cached = emb.sin()[None, :, None, :]
