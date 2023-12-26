@@ -23,6 +23,8 @@ pretrain:
       model_name_or_path: __internal_testing__/tiny-random-llama
     qwen:
       model_name_or_path: __internal_testing__/tiny-fused-qwen
+    gpt:
+      model_name_or_path: __internal_testing__/gpt 
 
 inference-predict:
   default:
