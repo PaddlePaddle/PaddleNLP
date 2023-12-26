@@ -64,6 +64,8 @@ python finetune_generation.py ... --chat_template ./qwen_14b_chat_template.json
 
 1. 则需要保证 `chat_template.json` 文件中的 system 配置是包含jinja2 中的变量占位符（比如：`<|im_start|>user\n{{user}}<|im_end|>` 中的 {{user}} 就是一个变量占位符），同时尽量让其保留默认参数，比如上述配置可调整成：
 
+> 需要开发者手动调整 `chat_template.json` 实现动态调整 system prompt。
+
 ```json
 {
     "system": "{{system | 'You are a helpful assistant.'}}",
@@ -72,11 +74,11 @@ python finetune_generation.py ... --chat_template ./qwen_14b_chat_template.json
 }
 ```
 
-2. 训练文本数据中需要配置 `context_data` 字段将 `system` 字段给传递进去，示例数据为：
+2. 训练文本数据中需要配置 `context` 字段将 `system` 字段给传递进去，示例数据为：
 
 ```json
-{"src": ["user-1", "user-2", ..., "user-n"], "tgt": ["bot-1", "bot-2", ..., "bot-n"], "context_data": {"system": "你是一个擅长做任务的人工智能助手"}}
+{"src": ["user-1", "user-2", ..., "user-n"], "tgt": ["bot-1", "bot-2", ..., "bot-n"], "context": {"system": "你是一个擅长做任务的人工智能助手"}}
 ...
 ```
 
-在渲染 chat_template 的时候将以上数据中的`context_data` 作为jinja2 的上下文数据，这样就可以在训练数据集中定制每个训练数据的 system prompt。
+在渲染 chat_template 的时候将以上数据中的`context` 作为jinja2 的上下文数据，这样就可以在训练数据集中定制每个训练数据的 system prompt。
