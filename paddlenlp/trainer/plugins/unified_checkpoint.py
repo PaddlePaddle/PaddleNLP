@@ -116,7 +116,7 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
         raise ValueError("Unified checkpoint only supports PretrainedModel")
 
     if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
-        if is_need_master_weight(optimizer):
+        if is_need_master_weight(args, optimizer):
             logger.info(
                 f"With {UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value}, skip the model checkpoint save."
                 "The master weight will be loaded as model weights for next resumption."
@@ -1631,7 +1631,7 @@ def select_model_weight_index(args, model, resume_from_checkpoint, safe_serializ
 
 
 def update_master_weight_status(args, optimizer, has_master_weight, safe_serialization):
-    if is_need_master_weight(optimizer):
+    if is_need_master_weight(args, optimizer):
         if not has_master_weight:
             if UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value in args.unified_checkpoint_config:
                 index_filename_master_weights = (
@@ -1656,7 +1656,7 @@ def update_master_weight_status(args, optimizer, has_master_weight, safe_seriali
     return has_master_weight, index_filename_master_weights
 
 
-def is_need_master_weight(optimizer):
+def is_need_master_weight(args, optimizer):
     """
     https://github.com/PaddlePaddle/Paddle/blob/4a9991fb6744443333638b65fb7e225fb2b00a13/python/paddle/amp/auto_cast.py#L485
     """
@@ -1678,6 +1678,6 @@ def is_need_master_weight(optimizer):
         optimizer = optimizer._optim
 
     if hasattr(optimizer, "_multi_precision"):
-        return optimizer._multi_precision
+        return optimizer._multi_precision and (args.bf16 or args.fp16)
     else:
         return False
