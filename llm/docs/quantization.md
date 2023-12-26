@@ -3,7 +3,7 @@
 ## 1.算法介绍
 
 大模型量化将16位、32位浮点数的模型参数或激活量化为4位或8位整数能够有效降低模型存储空间和计算资源需求，同时加速推理速度。工具链量化算法包含：
-- **PTQ**。PaddleSlim 团队自研的自适应PiecewiseSmooth量化算法，在[SmoothQuant](https://arxiv.org/abs/2211.10438)和[Outlier Suppression+](https://arxiv.org/abs/2304.09145)基础上
+- **PTQ**。PaddleSlim 团队自研的自适应PiecewiseSearchSmooth(PSS)量化算法，在[SmoothQuant](https://arxiv.org/abs/2211.10438)和[Outlier Suppression+](https://arxiv.org/abs/2304.09145)基础上
 新增PieceWiseSearch参数搜索算法并将算法扩展至**所有线性层**，对模型权重和激活分布进行调整，减少后续A8W8 PTQ量化损失。
 
 
