@@ -131,11 +131,11 @@ class ModelLoadTester(unittest.TestCase):
         logger.info("Download model from local")
         bert_model_bos.save_pretrained("./paddlenlp-test-model/tiny-bert", safe_serialization=True)
         bert_model_local = BertModel.from_pretrained(
-            "./paddlenlp-test-model/", subfolder="tiny-bert", use_safetensors=False
+            "./paddlenlp-test-model/", subfolder="tiny-bert", use_safetensors=True
         )
         self.test_config_diff(bert_model_bos.config, bert_model_local.config)
         bert_model_local_auto = AutoModel.from_pretrained(
-            "./paddlenlp-test-model/", subfolder="tiny-bert", use_safetensors=False
+            "./paddlenlp-test-model/", subfolder="tiny-bert", use_safetensors=True
         )
         self.test_config_diff(bert_model_local.config, bert_model_local_auto.config)
 
@@ -395,11 +395,11 @@ class ModelLoadTester(unittest.TestCase):
         logger.info("Download model from local")
         clip_model_bos.save_pretrained("./paddlenlp-test-model/tiny-clip", safe_serialization=True)
         clip_model_local = CLIPTextModel.from_pretrained(
-            "./paddlenlp-test-model/", subfolder="tiny-clip", use_safetensors=False
+            "./paddlenlp-test-model/", subfolder="tiny-clip", use_safetensors=True
         )
         self.test_config_diff(clip_model_bos.config, clip_model_local.config)
         clip_model_local_auto = AutoModel.from_pretrained(
-            "./paddlenlp-test-model/", subfolder="tiny-clip", use_safetensors=False
+            "./paddlenlp-test-model/", subfolder="tiny-clip", use_safetensors=True
         )
         self.test_config_diff(clip_model_local.config, clip_model_local_auto.config)
 
@@ -676,10 +676,10 @@ class ModelLoadTester(unittest.TestCase):
         # local
         logger.info("Download model from local")
         t5_model_bos.save_pretrained("./paddlenlp-test-model/tiny-t5", safe_serialization=True)
-        t5_model_local = T5Model.from_pretrained("./paddlenlp-test-model/", subfolder="tiny-t5", use_safetensors=False)
+        t5_model_local = T5Model.from_pretrained("./paddlenlp-test-model/", subfolder="tiny-t5", use_safetensors=True)
         self.test_config_diff(t5_model_bos.config, t5_model_local.config)
         t5_model_local_auto = AutoModel.from_pretrained(
-            "./paddlenlp-test-model/", subfolder="tiny-t5", use_safetensors=False
+            "./paddlenlp-test-model/", subfolder="tiny-t5", use_safetensors=True
         )
         self.test_config_diff(t5_model_local.config, t5_model_local_auto.config)
 
