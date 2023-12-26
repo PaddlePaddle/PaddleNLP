@@ -124,6 +124,7 @@ def build_train_valid_test_datasets(
     *,
     data_cache_path=None,
     need_data=True,
+    load_data=True
 ):
     """Build train, valid, and test datasets."""
 
@@ -140,6 +141,7 @@ def build_train_valid_test_datasets(
             share_folder=share_folder,
             data_cache_path=data_cache_path,
             need_data=need_data,
+            load_data=load_data
         )
 
     # Blending dataset.
@@ -209,9 +211,10 @@ def _build_train_valid_test_datasets(
     *,
     data_cache_path=None,
     need_data=True,
+    load_data=True
 ):
     """Build train, valid, and test datasets."""
-
+    print(data_prefix)
     # Indexed dataset.
     if need_data:
         indexed_dataset = get_indexed_dataset_(data_prefix, data_impl, skip_warmup)
@@ -233,10 +236,10 @@ def _build_train_valid_test_datasets(
         print_split_stats("validation", 1)
         print_split_stats("test", 2)
 
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.barrier()
-
-    def build_dataset(index, name):
+    # if paddle.distributed.get_world_size() > 1:
+    #     paddle.distributed.barrier()
+    
+    def build_dataset(index, name, load_data=True):
         documents = np.arange(splits[index], splits[index + 1], 1, np.int32) if need_data else None
         dataset = GPTDataset(
             name,
@@ -251,16 +254,17 @@ def _build_train_valid_test_datasets(
             share_folder,
             data_cache_path=data_cache_path,
             need_data=need_data,
+            load_data=load_data
         )
         if need_data:
             return dataset if splits[index + 1] > splits[index] else None
         else:
             return None
 
-    train_dataset = build_dataset(0, "train")
-    valid_dataset = build_dataset(1, "valid")
-    test_dataset = build_dataset(2, "test")
-
+    train_dataset = build_dataset(0, "train", load_data)
+    valid_dataset = build_dataset(1, "valid", load_data)
+    test_dataset = build_dataset(2, "test", load_data)
+    del indexed_dataset
     return (train_dataset, valid_dataset, test_dataset)
 
 
@@ -292,12 +296,12 @@ class GPTDataset(paddle.io.Dataset):
         *,
         data_cache_path=None,
         need_data=True,
+        load_data=True
     ):
 
         self.name = name
         self.indexed_dataset = indexed_dataset
         self.return_doc_ids = return_doc_ids
-
         # Build index mappings.
         if need_data and len(documents) > 0:
             assert np.min(documents) >= 0
@@ -323,11 +327,11 @@ class GPTDataset(paddle.io.Dataset):
                 data_cache_path=data_cache_path,
             )
 
-        if paddle.distributed.get_world_size() > 1:
-            paddle.distributed.barrier()
+        # if paddle.distributed.get_world_size() > 1:
+        #     paddle.distributed.barrier()
 
         # Load mappings.
-        if need_data and len(documents) > 0:
+        if load_data and need_data and len(documents) > 0:
             start_time = time.time()
             print_rank_0(f" > loading doc-idx mapping from {doc_idx_filename}")
             self.doc_idx = np.load(doc_idx_filename, allow_pickle=True, mmap_mode="r")
@@ -342,8 +346,8 @@ class GPTDataset(paddle.io.Dataset):
             print_rank_0("    total number of samples: {}".format(self.sample_idx.shape[0]))
             print_rank_0("    total number of epochs: {}".format(num_epochs))
 
-        if paddle.distributed.get_world_size() > 1:
-            paddle.distributed.barrier()
+        # if paddle.distributed.get_world_size() > 1:
+        #     paddle.distributed.barrier()
 
     def __len__(self):
         # -1 is due to data structure used to retieve the index:
@@ -419,7 +423,10 @@ def _build_index_mappings(
     # duplication, then look in data-cache-path if specified,
     # If nothing is found, use the last path looked in
     build_indices = True
-    prefixes = [os.path.join(os.path.dirname(data_prefix), "index-cache")]
+    # prefixes = [os.path.join(os.path.dirname(data_prefix), "index-cache")]
+    # print([os.path.join(os.path.dirname(data_prefix), "index-cache")])
+    prefixes = ['../data/index-cache']
+    
     if data_cache_path is not None:
         prefixes.append(data_cache_path)
     for prefix in prefixes:
@@ -542,6 +549,9 @@ def _build_index_mappings(
             # data_cache_success = False
     else:
         while True:
+            print(idx_path["doc"], not os.path.isfile(idx_path["doc"]))
+            print(idx_path["sample"], not os.path.isfile(idx_path["sample"]))
+            print(idx_path["shuffle"], not os.path.isfile(idx_path["shuffle"]))
             if (
                 (not os.path.isfile(idx_path["doc"]))
                 or (not os.path.isfile(idx_path["sample"]))
