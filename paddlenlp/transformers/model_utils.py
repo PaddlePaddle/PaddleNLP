@@ -100,8 +100,13 @@ def dy2st_nocheck_guard_context():
 def unwrap_optimizer(optimizer, optimizer_instances=()):
     if optimizer is None:
         return None
-    while hasattr(optimizer, "_inner_opt") and not isinstance(optimizer, optimizer_instances):
-        optimizer = optimizer._inner_opt
+    while hasattr(optimizer, "_inner_opt") or hasattr(optimizer, "_optim"):
+        if isinstance(optimizer, optimizer_instances):
+            break
+        if hasattr(optimizer, "_inner_opt"):
+            optimizer = optimizer._inner_opt
+        if hasattr(optimizer, "_optim"):
+            optimizer = optimizer._optim
     if isinstance(optimizer, optimizer_instances):
         return optimizer
     return None
