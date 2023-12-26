@@ -216,8 +216,11 @@ class LoRAModel(nn.Layer):
                 lora_name_action_mappings[v] = name_action_mappings[k]
 
         for name, action in lora_name_action_mappings.items():
-            tensor = lora_state_dict.pop(name)
-            lora_state_dict[name] = action(tensor)
+            if name in lora_state_dict:
+                tensor = lora_state_dict.pop(name)
+                lora_state_dict[name] = action(tensor)
+            else:
+                logger.warning(f"{name} not found in lora_state_dict!")
         return lora_state_dict
 
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
@@ -307,9 +310,10 @@ class LoRAModel(nn.Layer):
                 self.add_lora_split_mapping(module_name + ".lora_B", is_column=True)
 
                 # for lora qat
-                self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=True)
-                self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
-                self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
+                if self.lora_config.do_qat:
+                    self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=True)
+                    self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
+                    self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
             elif isinstance(module, RowParallelLinear):
                 # recover the original output_features
                 lora_module = RowParallelLoRALinear(
@@ -326,9 +330,10 @@ class LoRAModel(nn.Layer):
                 self.add_lora_split_mapping(module_name + ".lora_A", is_column=False)
 
                 # for lora qat
-                self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=False)
-                self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
-                self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
+                if self.lora_config.do_qat:
+                    self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=False)
+                    self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
+                    self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
             elif QuantizationLinear is not None and isinstance(module, QuantizationLinear):
                 lora_module = QuantizationLoRALinear(
                     in_features=module.in_features,
