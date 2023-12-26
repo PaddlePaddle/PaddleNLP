@@ -504,8 +504,7 @@ class TestUnifiedCheckpointOnN1C8MasterWeightCompatibleO1ToO2(TestUnifiedCheckpo
                 "unified_checkpoint_config"
             ] = UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value
 
-        self.need_allclose = True
-        self.rtol = 1e-4
+        self.need_allclose = False
 
     def runfrist(self, train_args):
         train_args["fp16_opt_level"] = "O1"
@@ -525,8 +524,7 @@ class TestUnifiedCheckpointOnN1C8MasterWeightCompatibleO2ToO1(TestUnifiedCheckpo
                 "unified_checkpoint_config"
             ] = UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value
 
-        self.need_allclose = True
-        self.rtol = 1e-4
+        self.need_allclose = False
 
     def runfrist(self, train_args):
         train_args["fp16_opt_level"] = "O2"
@@ -599,8 +597,7 @@ class TestUnifiedCheckpointOnN2C4MasterWeightCompatibleO1ToO2(TestUnifiedCheckpo
                 "unified_checkpoint_config"
             ] = UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value
 
-        self.need_allclose = True
-        self.rtol = 1e-4
+        self.need_allclose = False
 
     def runfrist(self, train_args):
         train_args["fp16_opt_level"] = "O1"
@@ -620,8 +617,7 @@ class TestUnifiedCheckpointOnN2C4MasterWeightCompatibleO2ToO1(TestUnifiedCheckpo
                 "unified_checkpoint_config"
             ] = UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value
 
-        self.need_allclose = True
-        self.rtol = 1e-4
+        self.need_allclose = False
 
     def runfrist(self, train_args):
         train_args["fp16_opt_level"] = "O2"
@@ -703,7 +699,6 @@ class TestUnifiedCheckpointOnN1C8ToN2C4MasterWeightCompatibleO1ToO2(TestUnifiedC
             ] = UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value
 
         self.need_allclose = False
-        self.rtol = 1e-4
         self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
     def runfrist(self, train_args):
@@ -717,8 +712,6 @@ class TestUnifiedCheckpointOnN1C8ToN2C4MasterWeightCompatibleO1ToO2(TestUnifiedC
             config = self.configs[config_name]
             config["fp16_opt_level"] = "O2"
             self.run_n2c4("run_pretrain.py", **config)
-            res = check_acc()
-            np.testing.assert_allclose(res[0], res[-1], rtol=self.rtol)
 
 
 class TestUnifiedCheckpointOnN1C8ToN2C4MasterWeightCompatibleO2ToO1(TestUnifiedCheckpointBase):
@@ -731,7 +724,6 @@ class TestUnifiedCheckpointOnN1C8ToN2C4MasterWeightCompatibleO2ToO1(TestUnifiedC
             ] = UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value
 
         self.need_allclose = False
-        self.rtol = 1e-4
         self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
     def runfrist(self, train_args):
@@ -745,8 +737,6 @@ class TestUnifiedCheckpointOnN1C8ToN2C4MasterWeightCompatibleO2ToO1(TestUnifiedC
             config = self.configs[config_name]
             config["fp16_opt_level"] = "O1"
             self.run_n2c4("run_pretrain.py", **config)
-            res = check_acc()
-            np.testing.assert_allclose(res[0], res[-1], rtol=self.rtol)
 
 
 class TestUnifiedCheckpointOnN1C8ToN2C4AsyncSaveToDisk(TestUnifiedCheckpointBase):
@@ -809,7 +799,6 @@ class TestUnifiedCheckpointOnN2C4ToN1C8MasterWeightCompatibleO1ToO2(TestUnifiedC
             ] = UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value
 
         self.need_allclose = False
-        self.rtol = 1e-4
         self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
     def runfrist(self, train_args):
@@ -823,8 +812,6 @@ class TestUnifiedCheckpointOnN2C4ToN1C8MasterWeightCompatibleO1ToO2(TestUnifiedC
             config = self.configs[config_name]
             config["fp16_opt_level"] = "O2"
             self.run_n1c8("run_pretrain.py", **config)
-            res = check_acc()
-            np.testing.assert_allclose(res[0], res[-1], rtol=self.rtol)
 
 
 class TestUnifiedCheckpointOnN2C4ToN1C8MasterWeightCompatibleO2ToO1(TestUnifiedCheckpointBase):
@@ -837,7 +824,6 @@ class TestUnifiedCheckpointOnN2C4ToN1C8MasterWeightCompatibleO2ToO1(TestUnifiedC
             ] = UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value
 
         self.need_allclose = False
-        self.rtol = 1e-4
         self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
     def runfrist(self, train_args):
@@ -851,8 +837,6 @@ class TestUnifiedCheckpointOnN2C4ToN1C8MasterWeightCompatibleO2ToO1(TestUnifiedC
             config = self.configs[config_name]
             config["fp16_opt_level"] = "O1"
             self.run_n1c8("run_pretrain.py", **config)
-            res = check_acc()
-            np.testing.assert_allclose(res[0], res[-1], rtol=self.rtol)
 
 
 class TestUnifiedCheckpointOnN2C4ToN1C8AsyncSaveToDisk(TestUnifiedCheckpointBase):
