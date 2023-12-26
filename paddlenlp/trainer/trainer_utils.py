@@ -76,7 +76,7 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
     # global seed: only mp group is same.
     # local seed: all groups are different
     hcg = None
-    if hasattr(fleet.fleet, "_hcg") and topo is not None:
+    if hasattr(fleet.fleet, "_hcg") and topo is None:
         hcg = fleet.get_hybrid_communicate_group()
 
     if topo is not None and paddle.distributed.get_world_size() > 1:
