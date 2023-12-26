@@ -417,6 +417,7 @@ def main():
                 merge_weights=False,
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 dtype=dtype,
+                do_qat=quant_args.do_qat,
             )
             model = LoRAModel(model, lora_config)
         else:
