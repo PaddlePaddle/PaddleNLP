@@ -971,7 +971,7 @@ class TrainingArguments:
                             self.per_device_train_batch_size * self.gradient_accumulation_steps
                             != self.per_device_eval_batch_size
                         ):
-                            logger.warn(
+                            logger.warning(
                                 "In pipeline model, the evaluation also shares same setting with training. "
                                 "We will enforce that per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
                             )
@@ -1177,7 +1177,7 @@ class TrainingArguments:
                         self.per_device_train_batch_size * self.gradient_accumulation_steps
                         != self.per_device_eval_batch_size
                     ):
-                        logger.warn(
+                        logger.warning(
                             "In pipeline model, the evaluation also shares same setting with training. "
                             "We will enforce that per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
                         )

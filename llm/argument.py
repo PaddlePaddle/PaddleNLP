@@ -14,7 +14,7 @@
 from dataclasses import dataclass, field
 
 from paddlenlp.trainer import TrainingArguments
-from paddlenlp.trainer.trainer_utils import EvaluationStrategy, IntervalStrategy
+from paddlenlp.trainer.trainer_utils import IntervalStrategy
 from paddlenlp.utils.log import logger
 
 
@@ -39,10 +39,8 @@ class TrainingArguments(TrainingArguments):
             self.overwrite_output_dir = True
             self.load_best_model_at_end = False
             self.report_to = []
-            if self.save_strategy in [IntervalStrategy.STEPS, IntervalStrategy.EPOCH]:
-                self.save_strategy = IntervalStrategy.NO
-            if self.evaluation_strategy in [EvaluationStrategy.STEPS, EvaluationStrategy.EPOCH]:
-                self.evaluation_strategy = IntervalStrategy.NO
+            self.save_strategy = IntervalStrategy.NO
+            self.evaluation_strategy = IntervalStrategy.NO
 
 
 @dataclass
@@ -90,11 +88,11 @@ class DataArgument:
 
     def __post_init__(self):
         if self.task_name_or_path is not None:
-            logger.warn("`--task_name_or_path` is deprecated, please use `--dataset_name_or_path`.")
+            logger.warning("`--task_name_or_path` is deprecated, please use `--dataset_name_or_path`.")
             self.dataset_name_or_path = self.task_name_or_path
 
         if self.intokens is not None:
-            logger.warn("`--intokens` is deprecated, please use `--zero_padding`.")
+            logger.warning("`--intokens` is deprecated, please use `--zero_padding`.")
             self.zero_padding = self.intokens
 
 
