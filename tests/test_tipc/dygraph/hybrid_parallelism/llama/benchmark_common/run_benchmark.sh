@@ -104,8 +104,7 @@ function _train(){
     fi
 
     use_pure_fp16=False
-    train_cmd="--model_type llama \
-    --model_name_or_path ${model_name_or_path} \
+    train_cmd="--model_name_or_path ${model_name_or_path} \
     --tokenizer_name_or_path ${model_name_or_path} \
     --input_dir ./data \
     --output_dir ./output \

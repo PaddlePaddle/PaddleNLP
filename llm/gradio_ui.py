@@ -95,7 +95,7 @@ def launch(args):
             "max_length": max_length,
             "min_length": 1,
         }
-        res = requests.post(f"http://0.0.0.0:{args.base_port}/api/chat", json=data, stream=True)
+        res = requests.post(f"http://0.0.0.0:{args.flask_port}/api/chat", json=data, stream=True)
         for line in res.iter_lines():
             result = json.loads(line)
             bot_response = result["result"]["response"]
@@ -152,7 +152,7 @@ def launch(args):
         return shown_context
 
     with gr.Blocks(title="LLM", theme=gr.themes.Soft()) as block:
-        gr.Markdown(f"# {args.title}")
+        gr.Markdown(f"# {args.title} <font style='color: red !important' size=2>{args.sub_title}</font>")
         with gr.Row():
             with gr.Column(scale=1):
                 top_k = gr.Slider(

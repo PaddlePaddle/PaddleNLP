@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import sys
 import numpy as np
 
 import paddle
@@ -20,6 +21,7 @@ import paddle.base.core as core
 import paddle.nn as nn
 from paddle.distributed.fleet import auto
 from paddle.profiler import SummaryView
+from paddle.profiler.utils import job_schedule_profiler_range
 
 try:
     from ppfleetx.optims import build_lr_scheduler, build_optimizer
@@ -80,7 +82,10 @@ class AutoEngine(BasicEngine):
 
         # Distributed
         self._pp_degree = configs["Distributed"]["pp_degree"]
-
+        pipeline_cfg = configs.Distributed.get("pipeline", {})
+        self._job_schedule_profiler_start = pipeline_cfg.get("job_schedule_profiler_start", -1)
+        self._job_schedule_profiler_end = pipeline_cfg.get("job_schedule_profiler_end", -1)
+        
         # engine configs
         self._configs = configs["Engine"]
 
@@ -140,6 +145,9 @@ class AutoEngine(BasicEngine):
         self.memory_stats = configs.get("Profiler_auto", {}).get("memory_stats", False)
         self.nvprof_start = configs.get("Profiler_auto", {}).get("nvprof_start", -1)
         self.nvprof_end = configs.get("Profiler_auto", {}).get("nvprof_end", -1)
+        
+        if (self._job_schedule_profiler_start != -1) and use_new_executor():
+            logger.info("Schedule Profiler start at step {} and end at step {}".format(self._job_schedule_profiler_start, self._job_schedule_profiler_end))
 
     def _validate_batch(self, batch):
         if self._pp_degree > 1 or self._accumulate_steps == 1:
@@ -174,6 +182,9 @@ class AutoEngine(BasicEngine):
         self._auto_engine.prepare(mode="train")
 
         for step, batch in enumerate(train_data_loader):
+            with job_schedule_profiler_range(step, self._job_schedule_profiler_start, self._auto_engine.enable_job_schedule_profiler) as status:
+                self._auto_engine.enable_job_schedule_profiler = status
+
             if epoch_index == self._load_recovery["epoch"]:
                 if step < self._load_recovery["step"]:
                     continue
