@@ -25,6 +25,7 @@ from paddlenlp.transformers import (  # ChatGLMForCausalLM,
     ChatGLMForCausalLM,
     ChatGLMv2ForCausalLM,
     LlamaForCausalLM,
+    QWenForCausalLM,
 )
 from paddlenlp.utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
@@ -42,6 +43,7 @@ from .testing_utils import LLMTest
         ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
         ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
         ["__internal_testing__/tiny-fused-chatglm2", ChatGLMv2ForCausalLM],
+        ["__internal_testing__/tiny-fused-qwen", QWenForCausalLM]
     ],
 )
 class PredictorTest(LLMTest, unittest.TestCase):
