@@ -322,7 +322,8 @@ class Trainer:
                 "Passing `optimizers` is not allowed if sharding is enabled."
                 "You should subclass `Trainer` and override the `create_optimizer_and_scheduler` method."
             )
-        if self.args.pipeline_parallel_degree > 1:
+
+        if self.args.pipeline_parallel_degree > 1 and self.args.use_hybrid_parallel:
             from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
             assert (isinstance(model, LoRAModel) and isinstance(model.model, PipelineLayer)) or isinstance(
@@ -629,6 +630,8 @@ class Trainer:
 
         train_dataloader = self.get_train_dataloader()
 
+        print("train_dataloader :", train_dataloader)
+
         total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.dataset_world_size
         len_dataloader = None
         if has_length(train_dataloader):
@@ -695,12 +698,18 @@ class Trainer:
             self._load_optimizer_and_scheduler(resume_from_checkpoint)
         else:
             model = self._wrap_model(self.model_wrapped)
+
             # for the rest of this function `model` is the outside model, whether it was wrapped or not
             if model is not self.model:
                 self.model_wrapped = model
             if delay_optimizer_creation:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
             self._load_optimizer_and_scheduler(resume_from_checkpoint)
+
+        if self.args.use_auto_parallel and self.args.run_static_semi_auto:
+            model, train_dataloader = self._wrap_for_static(model, train_dataloader)
+
+        self.model = model
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples:,}")
@@ -873,7 +882,7 @@ class Trainer:
                 forbidden_no_sync = False
                 # stage2 and stage3 should not no_sync, because the is no DDP wrapper and no_sync API
                 # hybrid_parallel (tp or pp or sharding stage 1) should not no_sync
-                if self.args.use_hybrid_parallel:
+                if self.args.use_hybrid_parallel or self.args.use_auto_parallel:
                     forbidden_no_sync = True
 
                 availiable_no_sync = dp_enabled and not forbidden_no_sync
@@ -915,82 +924,38 @@ class Trainer:
                     # local_rank != -1 don't means dp in networks.
                     self.timers and self.timers("all-reduce").start()
 
-                    # Case 1: Use recompute and dp / sharding stage1,
-                    # manualy collect gradient for dp.
-                    if args.recompute and availiable_no_sync:
-                        fused_allreduce_gradients(list(model.parameters()), None)
-
-                    # Case 2: hack dp with master_grad
-                    if dp_master_grad and not (args.recompute and availiable_no_sync):
-                        fused_allreduce_gradients(list(model.parameters()), None)
-
-                    # Pipeline parallel mode,  handle gradient reduce here to overlap
-                    pipeline_parallel_config = (
-                        set(args.pipeline_parallel_config.split(" ")) if args.pipeline_parallel_degree > 1 else set()
-                    )
-                    enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
-                    enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
-
-                    # Case 3: Pipeline parallel mode, overlap with dp
-                    if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
-                        parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
-
-                        if not enable_dp_comm_overlap:
-                            if self.optimizer._sharding_enable:
-                                assert reshard_util.is_sharding_opt(self.optimizer)
-                                self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
-
-                            if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
-                                fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
+                    self.synchronize_gradients(availiable_no_sync, dp_master_grad)
 
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
-
-                    if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
-                        for p in model._layers.parameters():
-                            with paddle.no_grad():
-                                if hasattr(p, "main_grad") and p.main_grad is not None:
-                                    assert p.grad is None
-                                    p.main_grad.scale_(1.0 / self.args.gradient_accumulation_steps)
-                                elif p.grad is not None:
-                                    p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
 
                     # Optimizer step
                     self.callback_handler.on_optimizer_begin(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
                     )
-                    optimizer_was_run = True
-                    if self.do_grad_scaling:
-                        scale_before = paddle.assign(self.scaler._scale)
-                        self.scaler.step(self.optimizer)
-                        self.scaler.update()
-                        scale_after = self.scaler._scale
-                        optimizer_was_run = not self.scaler._cache_founf_inf
-                        if not optimizer_was_run:
-                            scale_before_value = scale_before.cpu().numpy()
-                            scale_after_value = scale_after.cpu().numpy()
-                            logger.warning(
-                                f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
-                            )
-                    elif isinstance(self.optimizer, HybridParallelOptimizer):
-                        self.optimizer._step(parameters_list)
-                    else:
-                        self.optimizer.step()
+
+                    self.optimizer_step()
 
                     self.timers and self.timers("optimizer-step").stop()
 
-                    if optimizer_was_run:
-                        self.lr_scheduler.step()
+                    print("---- after optimizer_step ----")
 
-                    self.optimizer.clear_grad()
                     self.callback_handler.on_optimizer_end(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
                     )
 
+                    print("---- after callback_handler.on_optimizer_end ----")
+
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
+
+                    print("---- after callback_handler.on_step_end ----")
+
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+
+                    print("---- after maybe_log_save_evaluate ----")
+
                     self._print_timer()
                     step_control = 0
                 else:
@@ -1061,6 +1026,85 @@ class Trainer:
         self.control = self.callback_handler.on_train_end(args, self.state, self.control)
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
+
+    def _wrap_for_static(self, model, train_dataloader):
+        strategy = None
+        if self.args.gradient_accumulation_steps > 1:
+            strategy = dist.Strategy()
+            strategy.pipeline.accumulate_steps = self.args.gradient_accumulation_steps
+
+        # TODO: convert fleet.auto.Strategy to dist.Strategy
+        # TODO: fix bugs in paddle/distributed/auto_parallel/api.py#L981 about sample_split of engine._prepare_data_spec
+        model, dist_loader = dist.to_static(model, train_dataloader, self.criterion, self.optimizer, strategy=strategy)
+        return model, dist_loader
+
+    def synchronize_gradients(self, availiable_no_sync, dp_master_grad):
+        # Case 1: Use recompute and dp / sharding stage1,
+        # manualy collect gradient for dp.
+        if self.args.recompute and availiable_no_sync:
+            fused_allreduce_gradients(list(self.model.parameters()), None)
+
+        # Case 2: hack dp with master_grad
+        if dp_master_grad and not (self.args.recompute and availiable_no_sync):
+            fused_allreduce_gradients(list(self.model.parameters()), None)
+
+        # Pipeline parallel mode,  handle gradient reduce here to overlap
+        pipeline_parallel_config = (
+            set(self.args.pipeline_parallel_config.split(" ")) if self.args.pipeline_parallel_degree > 1 else set()
+        )
+        enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
+
+        # Case 3: Pipeline parallel mode, overlap with dp
+        if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
+            parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
+
+            if not enable_dp_comm_overlap:
+                if self.optimizer._sharding_enable:
+                    assert reshard_util.is_sharding_opt(self.optimizer)
+                    self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
+
+                if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
+                    fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
+
+    def optimizer_step(self):
+        if self.args.pipeline_parallel_degree > 1 and "enable_delay_scale_loss" in self.args.pipeline_parallel_config:
+            for p in self.model._layers.parameters():
+                with paddle.no_grad():
+                    if hasattr(p, "main_grad") and p.main_grad is not None:
+                        assert p.grad is None
+                        p.main_grad.scale_(1.0 / self.args.gradient_accumulation_steps)
+                    elif p.grad is not None:
+                        p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
+
+        optimizer_was_run = True
+        if self.do_grad_scaling:
+            scale_before = paddle.assign(self.scaler._scale)
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+            scale_after = self.scaler._scale
+            optimizer_was_run = not self.scaler._cache_founf_inf
+            if not optimizer_was_run:
+                scale_before_value = scale_before.cpu().numpy()
+                scale_after_value = scale_after.cpu().numpy()
+                logger.warning(
+                    f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
+                )
+        elif isinstance(self.optimizer, HybridParallelOptimizer):
+            parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
+            self.optimizer._step(parameters_list)
+        else:
+            self.optimizer.step()
+
+        if optimizer_was_run:
+            self.lr_scheduler.step()
+
+        if self.args.pipeline_parallel_degree > 1 and "enable_release_grads" in self.args.pipeline_parallel_config:
+            self.optimizer.clear_grad(set_to_zero=False)
+            for _, buffers in self.model._chunk_2_comm_buffers.items():
+                for buffer in buffers:
+                    buffer._clear_grad_storage()
+        else:
+            self.optimizer.clear_grad()
 
     def _load_best_model_from_peft_checkpoint(self):
         convert_tp = False
@@ -1258,6 +1302,8 @@ class Trainer:
 
         if self.args.distributed_dataloader:
             logger.info("Training using DistDataLoader.")
+
+        print("data_collator :", self.data_collator)
 
         return _DataLoader(
             train_dataset,

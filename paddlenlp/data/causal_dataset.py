@@ -358,6 +358,9 @@ class GPTDataset(paddle.io.Dataset):
         doc_index_l = self.sample_idx[idx + 1][0]
         offset_f = self.sample_idx[idx][1]
         offset_l = self.sample_idx[idx + 1][1]
+
+        print("offset_l :", offset_l, "    offset_f :", offset_f)
+
         # If we are within the same document, just extract the chunk.
         doc_ids = []
         if doc_index_f == doc_index_l:
@@ -380,6 +383,9 @@ class GPTDataset(paddle.io.Dataset):
             sample = np.concatenate(sample_list)
         # print(sample)
         if self.return_doc_ids:  # for retro preprocessing
+
+            print("sample.shape :", len(sample), "    doc_ids.shape :", len(doc_ids))
+
             return {"text": np.array(sample, dtype=np.int64), "doc_ids": np.array(doc_ids, dtype=np.int64)}
         else:
             return {"text": np.array(sample, dtype=np.int64)}

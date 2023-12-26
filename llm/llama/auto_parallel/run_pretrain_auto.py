@@ -18,7 +18,6 @@ import contextlib
 import os
 import random
 import sys
-import time
 import types
 from dataclasses import dataclass, field
 from typing import List, Optional
@@ -26,33 +25,25 @@ from typing import List, Optional
 import numpy as np
 import paddle
 import paddle.distributed as dist
-import paddle.distributed.auto_parallel as auto
-from paddle.profiler.utils import job_schedule_profiler_range
 
 from paddlenlp.ops import Topology
-from paddlenlp.trainer import (
-    PdArgumentParser,
-    Trainer,
-    TrainingArguments,
-    get_last_checkpoint,
-    speed_metrics,
-)
-from paddlenlp.trainer.trainer_utils import (
-    PREFIX_CHECKPOINT_DIR,
-    _get_distributed_seeds,
-)
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
+from paddlenlp.trainer.auto_trainer import SemiAutoTrainer
+from paddlenlp.trainer.trainer_utils import _get_distributed_seeds
 from paddlenlp.transformers import (
+    AutoConfig,
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
-    LlamaConfig,
     LlamaForCausalLMAuto,
+    LlamaPretrainingCriterionAuto,
+    set_global_mesh,
 )
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
     "llama": (
-        LlamaConfig,
+        AutoConfig,
         LlamaForCausalLMAuto,
     ),
 }
@@ -98,7 +89,6 @@ class PreTrainingArguments(TrainingArguments):
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
         },
     )
-    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
     fused_linear_param_grad_add: bool = field(
         default=False,
         metadata={
@@ -113,7 +103,6 @@ class PreTrainingArguments(TrainingArguments):
         default=-1,
         metadata={"help": "The step to end job_schedule_profiler."},
     )
-    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
     pipeline_schedule_mode: str = field(
         default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
     )
@@ -305,6 +294,7 @@ def create_pretrained_dataset(
         share_folder=data_args.share_folder,
         data_cache_path=data_args.data_cache,
         need_data=need_data,
+        # return_doc_ids=True,
     )
 
     def print_dataset(data, mode="train"):
@@ -363,25 +353,9 @@ def get_train_data_file(args):
     return files
 
 
-def create_optimizer(model, lr_scheduler, training_args):
-    decay_parameters = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
-
-    def apply_decay_param_fun(x):
-        return x in decay_parameters
-
-    optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(training_args)
-    optimizer = optimizer_cls(
-        learning_rate=lr_scheduler if lr_scheduler is None else lr_scheduler,
-        apply_decay_param_fun=apply_decay_param_fun,
-        parameters=model.parameters(),
-        weight_decay=training_args.weight_decay,
-        grad_clip=paddle.nn.ClipGradByGlobalNorm(training_args.max_grad_norm)
-        if training_args.max_grad_norm > 0
-        else None,
-        **optimizer_kwargs,
-    )
-
-    return optimizer
+class PretrainingTrainer(SemiAutoTrainer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 
 def print_config(args, key=""):
@@ -457,6 +431,8 @@ def main():
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
+
+    set_global_mesh(training_args.global_mesh)
 
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
@@ -541,14 +517,15 @@ def main():
     print("Final pre-training config:", config)
 
     # Set the dtype for loading model
-    # dtype = "float32"
-    # if training_args.fp16_opt_level == "O2":
-    #     if training_args.fp16:
-    #         dtype = "float16"
-    #     if training_args.bf16:
-    #         dtype = "bfloat16"
+    dtype = "float32"
+    if training_args.fp16_opt_level == "O2":
+        if training_args.fp16:
+            dtype = "float16"
+        if training_args.bf16:
+            dtype = "bfloat16"
 
-    model = model_class._from_config(config)
+    model = model_class.from_config(config, dtype=dtype)
+    criterion = LlamaPretrainingCriterionAuto(config)
 
     if training_args.recompute:
 
@@ -582,7 +559,7 @@ def main():
         )
 
     data_file = get_train_data_file(data_args)
-    train_dataset, _, _, data_collator = create_pretrained_dataset(
+    train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(
         data_args,
         training_args,
         data_file,
@@ -590,19 +567,16 @@ def main():
         need_data=training_args.should_load_dataset,
     )
 
-    optimizer = create_optimizer(model, lr_scheduler, training_args)
-
-    def loss_func(loss, outputs):
-        return loss
-
-    total_train_batch_size_per_acc_step = (
-        training_args.per_device_train_batch_size * training_args.data_parallel_degree
+    trainer = PretrainingTrainer(
+        model=model,
+        criterion=criterion,
+        args=training_args,
+        data_collator=data_collator,
+        train_dataset=train_dataset if training_args.do_train else None,
+        eval_dataset=eval_dataset if training_args.do_eval else None,
+        optimizers=(None, lr_scheduler),
+        tokenizer=tokenizer,
     )
-    total_train_batch_size = total_train_batch_size_per_acc_step * training_args.gradient_accumulation_steps
-
-    print_config(training_args)
-
-    engine = auto.Engine(model, loss_func, optimizer, strategy=training_args.strategy)
 
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:
@@ -610,111 +584,27 @@ def main():
     elif last_checkpoint is not None:
         checkpoint = last_checkpoint
 
-    if checkpoint:
-        logger.info(f"Starting training from resume_from_checkpoint : {checkpoint}")
-        engine.load(os.path.join(checkpoint, "auto"))
+    # Training
+    if training_args.do_train:
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
 
-    engine.prepare(
-        [
-            paddle.static.InputSpec(
-                shape=[total_train_batch_size, data_args.max_seq_length], dtype="int64", name="input_ids"
-            ),
-            paddle.static.InputSpec(
-                shape=[total_train_batch_size, data_args.max_seq_length], dtype="int64", name="labels"
-            ),
-        ],
-        mode="train",
-    )
+        # NOTE(gongenlei): new add
+        if not training_args.autotuner_benchmark:
+            metrics = train_result.metrics
+            if not int(os.getenv("test_ci_no_save_model", 0)):
+                trainer.save_model()
+            trainer.log_metrics("train", metrics)
+            trainer.save_metrics("train", metrics)
+            trainer.save_state()
 
-    pp_degree = training_args.pipeline_parallel_degree
+    if training_args.do_predict:
+        test_ret = trainer.predict(test_dataset)
+        trainer.log_metrics("test", test_ret.metrics)
 
-    train_dataloader = engine.dataloader(
-        dataset=train_dataset,
-        batch_size=total_train_batch_size_per_acc_step if pp_degree == 1 else total_train_batch_size,
-        steps_per_epoch=training_args.max_steps,
-        epochs=training_args.num_train_epochs,
-        collate_fn=data_collator,
-        num_workers=training_args.dataloader_num_workers,
-        mode="train",
-    )
-
-    num_update_steps_per_epoch = len(train_dataloader) // training_args.gradient_accumulation_steps
-    num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
-    num_train_epochs = training_args.max_steps // num_update_steps_per_epoch + int(
-        training_args.max_steps % num_update_steps_per_epoch > 0
-    )
-
-    global_step = 0
-    global_step_last_logged = 0
-    start_time_last_logged = time.time()
-    tr_loss = float(0)
-
-    job_schedule_profiler_start = training_args.job_schedule_profiler_start
-    job_schedule_profiler_end = training_args.job_schedule_profiler_end
-
-    local_batches = []
-    for epoch_idx in range(num_train_epochs):
-        for step, inputs in enumerate(train_dataloader):
-            local_batches.append(inputs)
-            if pp_degree == 1 and len(local_batches) < training_args.gradient_accumulation_steps:
-                continue
-            elif pp_degree > 1:
-                local_batches = inputs
-
-            with job_schedule_profiler_range(step, job_schedule_profiler_start, job_schedule_profiler_end) as status:
-                engine.enable_job_schedule_profiler = status
-
-            for micro_batch in local_batches:
-                outs = engine.run(micro_batch, mode="train")
-
-                if "loss" in outs:
-                    tr_loss_step = np.sum(outs["loss"])
-                else:
-                    tr_loss_step = float(0)
-
-                if training_args.gradient_accumulation_steps > 1:
-                    tr_loss_step /= training_args.gradient_accumulation_steps
-
-                tr_loss += tr_loss_step
-
-            local_batches = []
-
-            if lr_scheduler is not None:
-                engine.optimizer._learning_rate.step()
-
-            global_step += 1
-            if global_step % training_args.logging_steps == 0:
-                num_steps = global_step - global_step_last_logged
-                logs = {}
-                logs["loss"] = round(tr_loss / num_steps, 8)
-                logs["learning_rate"] = float("{0:.3e}".format(engine.optimizer.get_lr()))
-                logs["global_step"] = int(global_step)
-                logs.update(
-                    speed_metrics(
-                        split="interval",
-                        start_time=start_time_last_logged,
-                        num_samples=total_train_batch_size * num_steps,
-                        num_steps=num_steps,
-                    )
-                )
-                logger.info(", ".join(f"{k}: {v}" for k, v in logs.items()))
-
-                global_step_last_logged = global_step
-                start_time_last_logged = time.time()
-                tr_loss = float(0)
-
-            if training_args.save_steps > 0 and global_step % training_args.save_steps == 0:
-                paddle.device.cuda.synchronize()
-                checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{global_step}"
-                run_dir = training_args.output_dir
-                output_dir = os.path.join(run_dir, checkpoint_folder)
-                os.makedirs(output_dir, exist_ok=True)
-                logger.info(f"Saving model checkpoint to {output_dir}")
-                prefix_path = os.path.join(output_dir, "auto")
-                engine.save(prefix_path, training=True)
-
-            if global_step >= training_args.max_steps:
-                break
+    # if training_args.should_load_dataset:
+    #     effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
+    #     print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
+    #     print(f"ips: {effective_tokens_per_second:.2f} tokens/s")
 
 
 if __name__ == "__main__":

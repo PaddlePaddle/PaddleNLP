@@ -24,9 +24,12 @@ import types
 import warnings
 from dataclasses import asdict, dataclass, field
 from enum import Enum
+from functools import reduce
 from typing import Any, Dict, List, Optional
 
+import numpy as np
 import paddle
+import paddle.distributed as dist
 from paddle.distributed import fleet
 
 from ..utils.log import logger
@@ -243,6 +246,7 @@ class TrainingArguments:
               enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
               enable_dp_comm_overlap, fuse data parallel gradient communication.
               enable_sharding_comm_overlap, fuse sharding stage 1 parallel gradient communication.
+              enable_release_grads, reduce peak memory usage by releasing gradients after each iteration. The creation of gradients will be postponed until backward propagation of the next iteration.
         sharding_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
             following config is support:
@@ -732,6 +736,8 @@ class TrainingArguments:
         default=False,
         metadata={"help": "reshard pp even if pp degree in the model and pp degree in script match"},
     )
+    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
+    run_static_semi_auto: bool = field(default=True, metadata={"help": ""})
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -930,6 +936,7 @@ class TrainingArguments:
                                 "enable_dp_comm_overlap",
                                 "enable_sharding_comm_overlap",
                                 "enable_timer",
+                                "enable_release_grads",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -950,6 +957,7 @@ class TrainingArguments:
                         "sharding_comm_overlap": "enable_sharding_comm_overlap" in pipeline_parallel_config
                         and self.sharding_parallel_degree > 1,
                         "enable_timer": "enable_timer" in pipeline_parallel_config,
+                        "release_gradients": "enable_release_grads" in pipeline_parallel_config,
                     }
                     if dygraph_pp_configs["dp_comm_overlap"]:
                         raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
@@ -1122,8 +1130,8 @@ class TrainingArguments:
                 if len(self.sharding) > 0:
                     self.sharding_parallel_degree = self.data_parallel_degree
 
-            sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
-            if sharding_parallel_degree == 1 and len(self.sharding) > 0:
+            self.sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
+            if self.sharding_parallel_degree == 1 and len(self.sharding) > 0:
                 logger.warning("sharding_parallel_degree=1 means no sharding, please set sharding to empty!")
                 self.sharding = []
 
@@ -1207,10 +1215,10 @@ class TrainingArguments:
                         "by current version of Paddle. Please try latest develop Paddle."
                     )
 
-            if sharding_parallel_degree > 1:
+            if self.sharding_parallel_degree > 1:
                 sharding = strategy.sharding
                 sharding.enable = True
-                sharding.degree = sharding_parallel_degree
+                sharding.degree = self.sharding_parallel_degree
                 if ShardingOption.SHARD_OP in self.sharding:
                     sharding.stage = 1
                 elif ShardingOption.SHARD_GRAD_OP in self.sharding:
@@ -1260,6 +1268,23 @@ class TrainingArguments:
             mesh_dims = list(filter(lambda x: x[1] > 1, list(zip(order, degree))))
             if not mesh_dims:
                 mesh_dims = [("dp", 1)]
+
+            dim_names = [mesh_dim[0] for mesh_dim in mesh_dims]
+            mesh_shape = [mesh_dim[1] for mesh_dim in mesh_dims]
+            mesh_arr = np.arange(0, reduce(lambda x, y: x * y, mesh_shape, 1)).reshape(mesh_shape)
+            self.global_mesh = dist.ProcessMesh(mesh_arr, dim_names)
+
+            from paddlenlp.ops import Topology
+
+            self.topo = Topology(
+                dist.get_rank(),
+                dist.get_world_size(),
+                dp_degree=self.data_parallel_degree,
+                pp_degree=self.pipeline_parallel_degree,
+                mp_degree=self.tensor_parallel_degree,
+                sharding_degree=self.sharding_parallel_degree,
+            )
+
             fleet.auto.create_mesh(mesh_dims)
         else:
             world_size = paddle.distributed.get_world_size()
@@ -1359,6 +1384,8 @@ class TrainingArguments:
             if dp_group.rank == -1:
                 return 0
             return dp_group.rank
+        elif self.use_auto_parallel:
+            return int(self.topo.dp_info.rank)
         else:
             return paddle.distributed.get_rank()
 
