@@ -31,13 +31,13 @@ from paddlenlp.transformers.model_utils import (
     get_parameter_dtype,
     load_state_dict,
     unwrap_model,
+    unwrap_optimizer,
 )
 from paddlenlp.transformers.utils import (
     device_guard,
     dtype_byte_size,
     get_checkpoint_shard_files,
     is_safetensors_available,
-    unwrap_optimizer,
 )
 from paddlenlp.utils.distributed import distributed_gather
 from paddlenlp.utils.env import (
@@ -117,7 +117,7 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
         raise ValueError("Unified checkpoint only supports PretrainedModel")
 
     if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
-        if is_need_master_weight(args, optimizer):
+        if is_need_master_weight(optimizer, is_fp16_or_bp16=(args.fp16 or args.bf16)):
             logger.info(
                 f"With {UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value}, skip the model checkpoint save."
                 "The master weight will be loaded as model weights for next resumption."
@@ -238,9 +238,6 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
                 None, model.config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
             )
 
-        # confirm parameter cast is executed on the same device as model
-        # TODO: cast(FP32 -> FP16) has diff on different devices, need to fix it
-        state_dict = nested_copy_place(state_dict, place=paddle.framework._current_expected_place())
         error_msgs += _load_state_dict_into_model(model, state_dict, "")
 
         # force memory release
@@ -1630,7 +1627,7 @@ def select_model_weight_index(args, model, resume_from_checkpoint, safe_serializ
 
 
 def update_master_weight_status(args, optimizer, has_master_weight, safe_serialization):
-    if is_need_master_weight(args, optimizer):
+    if is_need_master_weight(optimizer, is_fp16_or_bp16=(args.fp16 or args.bf16)):
         if not has_master_weight:
             if UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value in args.unified_checkpoint_config:
                 index_filename_master_weights = (

@@ -740,15 +740,23 @@ def _convert_state_dict_dtype_and_shape(state_dict, model_to_load):
     def is_0d_or_1d(tensor):
         return len(tensor.shape) == 0 or list(tensor.shape) == [1]
 
+    expected_place = paddle.framework._current_expected_place()
     for key, value in model_to_load.state_dict().items():
         if key in state_dict:
             if isinstance(state_dict[key], np.ndarray):
                 raise ValueError(
                     "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, plase convert numpy.ndarray to paddle.Tensor"
                 )
+            # confirm parameter cast is executed on the same device as model
+            # TODO: cast(FP32 -> FP16) has diff on different devices, need to fix it
             if state_dict[key].is_floating_point() and state_dict[key].dtype != value.dtype:
-                state_dict[key] = paddle.cast(state_dict.pop(key), value.dtype)
-
+                value_pop = state_dict.pop(key)
+                value_new_place = (
+                    value_pop if value_pop.place == expected_place else value_pop._copy_to(expected_place, False)
+                )
+                # print(f"convert dtype from {value_pop.place} to {expected_place}")
+                state_dict[key] = paddle.cast(value_new_place, value.dtype)._copy_to(value_pop.place, False)
+                # print(f"convert dtype from {expected_place} to {value_pop.place}")
             # unified 0d and 1d tensor
             if is_0d_or_1d(value) and is_0d_or_1d(state_dict[key]):
                 if list(value.shape) != list(state_dict[key].shape):
