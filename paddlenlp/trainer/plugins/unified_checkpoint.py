@@ -1637,6 +1637,10 @@ def update_master_weight_status(args, optimizer, has_master_weight, safe_seriali
                     PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
                 )
                 has_master_weight = True
+                logger.warning(
+                    "The unified checkpoint does not contain master weight, "
+                    "the model weight will be loaded as master weight."
+                )
             else:
                 raise ValueError(
                     "Can't find a valid unified master weight checkpoint,"
