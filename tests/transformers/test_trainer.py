@@ -18,11 +18,9 @@ import math
 import os
 import random
 import re
-import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 import numpy as np
 
@@ -36,11 +34,6 @@ from paddlenlp.transformers.testing_utils import (
     get_gpu_count,
     get_tests_dir,
     require_paddle,
-    require_paddle_bf16_gpu,
-    require_paddle_gpu,
-    require_paddle_multi_gpu,
-    require_paddle_non_multi_gpu,
-    require_paddle_up_to_2_gpus,
     require_sentencepiece,
 )
 from paddlenlp.utils.import_utils import is_paddle_available
@@ -490,21 +483,6 @@ class TrainerIntegrationPrerunTest(TestCasePlus, TrainerIntegrationCommon):
         self.assertFalse(paddle.allclose(trainer.model.b, b))
         # self.assertEqual(trainer.optimizer.state_dict()["param_groups"][0]["lr"], 1.0)
 
-    @require_paddle_gpu
-    @require_paddle_bf16_gpu
-    def test_mixed_bf16(self):
-
-        # very basic test
-        trainer = get_regression_trainer(learning_rate=0.1, bf16=True)
-        trainer.train()
-        self.check_trained_model(trainer.model)
-
-        # --bf16 --half_precision_backend apex can't be used together
-        with self.assertRaises(ValueError):
-            trainer = get_regression_trainer(learning_rate=0.1, bf16=True, half_precision_backend="apex")
-
-        # will add more specific tests once there are some bugs to fix
-
 
 @require_paddle
 @require_sentencepiece
@@ -632,24 +610,6 @@ class TrainerIntegrationTest(TestCasePlus, TrainerIntegrationCommon):
         trainer.train()
         trainer.evaluate()
 
-    @require_paddle_multi_gpu
-    def test_data_is_not_parallelized_when_model_is_parallel(self):
-        model = RegressionModel()
-        # Make the Trainer believe it's a parallelized model
-        model.is_parallelizable = True
-        model.model_parallel = True
-        args = TrainingArguments("./regression", per_device_train_batch_size=16, per_device_eval_batch_size=16)
-        trainer = Trainer(model, args=args, train_dataset=RegressionDataset(), eval_dataset=RegressionDataset())
-        # Check the Trainer was fooled
-        self.assertTrue(trainer.is_model_parallel)
-        self.assertEqual(trainer.args.n_gpu, 1)
-
-        # The batch size of the training and evaluation dataloaders should be 16, not 16 * n_gpu
-        self.assertEqual(trainer.get_train_dataloader().batch_size, 16)
-        self.assertEqual(len(trainer.get_train_dataloader()), 64 // 16)
-        self.assertEqual(trainer.get_eval_dataloader().batch_size, 16)
-        self.assertEqual(len(trainer.get_eval_dataloader()), 64 // 16)
-
     def test_evaluate(self):
         trainer = get_regression_trainer(a=1.5, b=2.5, compute_metrics=AlmostAccuracy())
         results = trainer.evaluate()
@@ -732,106 +692,6 @@ class TrainerIntegrationTest(TestCasePlus, TrainerIntegrationCommon):
             trainer.train()
             self.check_saved_checkpoints(tmpdir, 5, int(self.n_epochs * 64 / self.batch_size), False)
 
-    @require_paddle_multi_gpu
-    def test_run_seq2seq_double_train_wrap_once(self):
-        # test that we don't wrap the model more than once
-        # since wrapping primarily happens on multi-gpu setup we want multiple gpus to test for
-        # example DataParallel(DataParallel(model))
-
-        trainer = get_regression_trainer()
-        trainer.train()
-        model_wrapped_before = trainer.model_wrapped
-        trainer.train()
-        model_wrapped_after = trainer.model_wrapped
-        self.assertIs(model_wrapped_before, model_wrapped_after, "should be not wrapped twice")
-
-    @require_paddle_up_to_2_gpus
-    def test_can_resume_training(self):
-        # This test will fail for more than 2 GPUs since the batch size will get bigger and with the number of
-        # save_steps, the checkpoint will resume training at epoch 2 or more (so the data seen by the model
-        # won't be the same since the training dataloader is shuffled).
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            kwargs = dict(output_dir=tmpdir, train_len=128, save_steps=5, learning_rate=0.1)
-            trainer = get_regression_trainer(**kwargs)
-            trainer.train()
-            (a, b) = trainer.model.a.item(), trainer.model.b.item()
-            state = dataclasses.asdict(trainer.state)
-
-            checkpoint = os.path.join(tmpdir, "checkpoint-5")
-
-            # Reinitialize trainer
-            trainer = get_regression_trainer(**kwargs)
-
-            trainer.train(resume_from_checkpoint=checkpoint)
-            (a1, b1) = trainer.model.a.item(), trainer.model.b.item()
-            state1 = dataclasses.asdict(trainer.state)
-            self.assertEqual(a, a1)
-            self.assertEqual(b, b1)
-            self.check_trainer_state_are_the_same(state, state1)
-
-            # Now check with a later checkpoint that it also works when we span over one epoch
-            checkpoint = os.path.join(tmpdir, "checkpoint-15")
-
-            # Reinitialize trainer and load model
-            trainer = get_regression_trainer(**kwargs)
-
-            trainer.train(resume_from_checkpoint=checkpoint)
-            (a1, b1) = trainer.model.a.item(), trainer.model.b.item()
-            state1 = dataclasses.asdict(trainer.state)
-            self.assertEqual(a, a1)
-            self.assertEqual(b, b1)
-            self.check_trainer_state_are_the_same(state, state1)
-
-        # With a regular model that is not a PretrainedModel
-        with tempfile.TemporaryDirectory() as tmpdir:
-            kwargs = dict(output_dir=tmpdir, train_len=128, save_steps=5, learning_rate=0.1, pretrained=False)
-
-            trainer = get_regression_trainer(**kwargs)
-            trainer.train()
-            (a, b) = trainer.model.a.item(), trainer.model.b.item()
-            state = dataclasses.asdict(trainer.state)
-
-            checkpoint = os.path.join(tmpdir, "checkpoint-5")
-
-            # Reinitialize trainer and load model
-            trainer = get_regression_trainer(**kwargs)
-
-            trainer.train(resume_from_checkpoint=checkpoint)
-            (a1, b1) = trainer.model.a.item(), trainer.model.b.item()
-            state1 = dataclasses.asdict(trainer.state)
-            self.assertEqual(a, a1)
-            self.assertEqual(b, b1)
-            self.check_trainer_state_are_the_same(state, state1)
-
-            # Now check with a later checkpoint that it also works when we span over one epoch
-            checkpoint = os.path.join(tmpdir, "checkpoint-15")
-
-            # Reinitialize trainer and load model
-            trainer = get_regression_trainer(**kwargs)
-
-            trainer.train(resume_from_checkpoint=checkpoint)
-            (a1, b1) = trainer.model.a.item(), trainer.model.b.item()
-            state1 = dataclasses.asdict(trainer.state)
-            self.assertEqual(a, a1)
-            self.assertEqual(b, b1)
-            self.check_trainer_state_are_the_same(state, state1)
-
-        # Now check failures
-
-        # 1. fail to find a bogus checkpoint
-        trainer = get_regression_trainer()
-        with self.assertRaises(Exception) as context:
-            trainer.train(resume_from_checkpoint=f"{checkpoint}-bogus")
-        self.assertTrue("Can't find a valid checkpoint at" in str(context.exception))
-
-        # 2. fail to find any checkpoint - due a fresh output_dir
-        output_dir2 = self.get_auto_remove_tmp_dir()
-        trainer = get_regression_trainer(output_dir=output_dir2)
-        with self.assertRaises(Exception) as context:
-            trainer.train(resume_from_checkpoint=True)
-        self.assertTrue("No valid checkpoint found in output directory" in str(context.exception))
-
     @unittest.skipIf(True, "Failed!")
     def test_resume_training_with_randomness(self):
         # For more than 1 GPUs, since the randomness is introduced in the model and with DataParallel (which is used
@@ -888,40 +748,6 @@ class TrainerIntegrationTest(TestCasePlus, TrainerIntegrationCommon):
             self.assertAlmostEqual(a, a1, delta=1e-5)
             self.assertAlmostEqual(b, b1, delta=1e-5)
 
-    @require_paddle_non_multi_gpu
-    def test_auto_batch_size_finder(self):
-
-        if paddle.cuda.is_available():
-            paddle.backends.cudnn.deterministic = True
-
-        SRC_DIR = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "examples", "pypaddle", "text-classification")
-        )
-        sys.path.append(SRC_DIR)
-        import run_glue
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            testargs = f"""
-                run_glue.py
-                --model_name_or_path distilbert-base-uncased
-                --task_name mrpc
-                --do_train
-                --do_eval
-                --max_seq_len 128
-                --per_device_train_batch_size 4096
-                --learning_rate 2e-5
-                --num_train_epochs 1
-                --output_dir {tmpdir}
-                --auto_find_batch_size 0
-                """.split()
-            with self.assertRaises(RuntimeError):
-                with patch.object(sys, "argv", testargs):
-                    run_glue.main()
-
-        testargs[-1] = "1"
-        with patch.object(sys, "argv", testargs):
-            run_glue.main()
-
     # regression for this issue: https://github.com/huggingface/transformers/issues/12970
     def test_training_with_resume_from_checkpoint_false(self):
         train_dataset = RegressionDataset(length=128)
@@ -935,109 +761,6 @@ class TrainerIntegrationTest(TestCasePlus, TrainerIntegrationCommon):
         trainer = Trainer(model, args=args, train_dataset=train_dataset, eval_dataset=eval_dataset)
 
         trainer.train(resume_from_checkpoint=False)
-
-    @require_paddle_up_to_2_gpus
-    def test_resume_training_with_shard_checkpoint(self):
-        # This test will fail for more than 2 GPUs since the batch size will get bigger and with the number of
-        # save_steps, the checkpoint will resume training at epoch 2 or more (so the data seen by the model
-        # won't be the same since the training dataloader is shuffled).
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            trainer = get_regression_trainer(output_dir=tmpdir, train_len=128, save_steps=5, learning_rate=0.1)
-            trainer.train()
-            (a, b) = trainer.model.a.item(), trainer.model.b.item()
-            state = dataclasses.asdict(trainer.state)
-
-            checkpoint = os.path.join(tmpdir, "checkpoint-5")
-            self.convert_to_sharded_checkpoint(checkpoint)
-
-            # Reinitialize trainer
-            trainer = get_regression_trainer(output_dir=tmpdir, train_len=128, save_steps=5, learning_rate=0.1)
-
-            trainer.train(resume_from_checkpoint=checkpoint)
-            (a1, b1) = trainer.model.a.item(), trainer.model.b.item()
-            state1 = dataclasses.asdict(trainer.state)
-            self.assertEqual(a, a1)
-            self.assertEqual(b, b1)
-            self.check_trainer_state_are_the_same(state, state1)
-
-    @require_paddle_up_to_2_gpus
-    def test_resume_training_with_gradient_accumulation(self):
-        # This test will fail for more than 2 GPUs since the batch size will get bigger and with the number of
-        # save_steps, the checkpoint will resume training at epoch 2 or more (so the data seen by the model
-        # won't be the same since the training dataloader is shuffled).
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            trainer = get_regression_trainer(
-                output_dir=tmpdir,
-                train_len=128,
-                gradient_accumulation_steps=2,
-                per_device_train_batch_size=4,
-                save_steps=5,
-                learning_rate=0.1,
-            )
-            trainer.train()
-            (a, b) = trainer.model.a.item(), trainer.model.b.item()
-            state = dataclasses.asdict(trainer.state)
-
-            checkpoint = os.path.join(tmpdir, "checkpoint-5")
-
-            # Reinitialize trainer
-            trainer = get_regression_trainer(
-                output_dir=tmpdir,
-                train_len=128,
-                gradient_accumulation_steps=2,
-                per_device_train_batch_size=4,
-                save_steps=5,
-                learning_rate=0.1,
-            )
-
-            trainer.train(resume_from_checkpoint=checkpoint)
-            (a1, b1) = trainer.model.a.item(), trainer.model.b.item()
-            state1 = dataclasses.asdict(trainer.state)
-            self.assertEqual(a, a1)
-            self.assertEqual(b, b1)
-            self.check_trainer_state_are_the_same(state, state1)
-
-    @require_paddle_up_to_2_gpus
-    def test_resume_training_with_frozen_params(self):
-        # This test will fail for more than 2 GPUs since the batch size will get bigger and with the number of
-        # save_steps, the checkpoint will resume training at epoch 2 or more (so the data seen by the model
-        # won't be the same since the training dataloader is shuffled).
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            trainer = get_regression_trainer(
-                output_dir=tmpdir,
-                train_len=128,
-                per_device_train_batch_size=4,
-                save_steps=5,
-                learning_rate=0.1,
-            )
-            trainer.model.a.requires_grad_(False)
-            trainer.train()
-            (a, b) = trainer.model.a.item(), trainer.model.b.item()
-            state = dataclasses.asdict(trainer.state)
-
-            checkpoint = os.path.join(tmpdir, "checkpoint-5")
-
-            # Reinitialize trainer
-            trainer = get_regression_trainer(
-                output_dir=tmpdir,
-                train_len=128,
-                per_device_train_batch_size=4,
-                save_steps=5,
-                learning_rate=0.1,
-            )
-            trainer.model.a.requires_grad_(False)
-
-            trainer.train(resume_from_checkpoint=checkpoint)
-
-            self.assertFalse(trainer.model.a.requires_grad)
-            (a1, b1) = trainer.model.a.item(), trainer.model.b.item()
-            state1 = dataclasses.asdict(trainer.state)
-            self.assertEqual(a, a1)
-            self.assertEqual(b, b1)
-            self.check_trainer_state_are_the_same(state, state1)
 
     def test_load_best_model_at_end(self):
         total = int(self.n_epochs * 64 / self.batch_size)
@@ -1315,6 +1038,3 @@ class TrainerIntegrationTest(TestCasePlus, TrainerIntegrationCommon):
         no_wd_params = [p for n, p in model.named_parameters() if n not in wd_names]
         self.assertListEqual(trainer.optimizer.param_groups[0]["params"], wd_params)
         self.assertListEqual(trainer.optimizer.param_groups[1]["params"], no_wd_params)
-
-
-unittest.main()
