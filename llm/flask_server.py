@@ -53,7 +53,8 @@ def find_free_ports(port_l, port_u):
 @dataclass
 class ServerArgument:
     port: int = field(default=8011, metadata={"help": "The port of ui service"})
-    base_port: int = field(default=8010, metadata={"help": "The port of flask service"})
+    base_port: int = field(default=None, metadata={"help": "The port of flask service"})
+    flask_port: int = field(default=None, metadata={"help": "The port of flask service"})
     title: str = field(default="LLM", metadata={"help": "The title of gradio"})
     sub_title: str = field(default="LLM-subtitle", metadata={"help": "The sub-title of gradio"})
 
@@ -64,8 +65,8 @@ class PredictorServer:
         self.predictor = predictor
         self.args = args
         scan_l, scan_u = (
-            self.args.base_port + port_interval * predictor.tensor_parallel_rank,
-            self.args.base_port + port_interval * (predictor.tensor_parallel_rank + 1),
+            self.args.flask_port + port_interval * predictor.tensor_parallel_rank,
+            self.args.flask_port + port_interval * (predictor.tensor_parallel_rank + 1),
         )
 
         if self.predictor.tensor_parallel_rank == 0:
@@ -174,6 +175,14 @@ if __name__ == "__main__":
 
     parser = PdArgumentParser((PredictorArgument, ModelArgument, ServerArgument))
     predictor_args, model_args, server_args = parser.parse_args_into_dataclasses()
+    # check port
+    if server_args.base_port is not None:
+        logger.warning("`--base_port` is deprecated, please use `--flask_port` instead after 2023.12.30.")
+
+        if server_args.flask_port is None:
+            server_args.flask_port = server_args.base_port
+        else:
+            logger.warning("`--base_port` and `--flask_port` are both set, `--base_port` will be ignored.")
 
     log_dir = os.getenv("PADDLE_LOG_DIR", "./")
     PORT_FILE = os.path.join(log_dir, PORT_FILE)
