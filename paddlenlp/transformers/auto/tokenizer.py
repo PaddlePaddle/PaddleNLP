@@ -281,7 +281,7 @@ class AutoTokenizer:
                 all_tokenizer_names.append(name)
         # From local dir path
         if os.path.isdir(pretrained_model_name_or_path):
-            config_file = os.path.join(pretrained_model_name_or_path, cls.tokenizer_config_file)
+            config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.tokenizer_config_file)
             if os.path.exists(config_file):
                 tokenizer_class = cls._get_tokenizer_class_from_config(
                     pretrained_model_name_or_path, config_file, use_fast

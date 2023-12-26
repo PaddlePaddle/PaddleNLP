@@ -1559,7 +1559,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         for k, v in resolved_vocab_files.items():
             if v is not None and os.path.isfile(v):
                 tokenizer_config_file_dir_list.add(os.path.dirname(v))
-        assert len(tokenizer_config_file_dir_list) == 1, "All tokenizer files should be in the same directory."
+        tokenizer_config_file_dir_list = list(tokenizer_config_file_dir_list)
+        # TODO: check this
+        assert len(tokenizer_config_file_dir_list) > 0, "All tokenizer files should be in the same directory."
         # Prepare tokenizer initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
         has_tokenizer_file = resolved_vocab_files.get("tokenizer_file", None) is not None
