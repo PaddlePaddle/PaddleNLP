@@ -70,6 +70,8 @@ from paddle.distributed.fleet.utils.hybrid_parallel_util import (
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from tqdm.auto import tqdm
 
+from paddlenlp.trainer.trainer_utils import check_memory_usage
+
 from ..data import (
     DataCollator,
     DataCollatorWithPadding,
@@ -639,6 +641,7 @@ class Trainer:
                 f"args.max_steps must be set to a positive value if dataloader does not have a length, was {args.max_steps}"
             )
 
+        print("=" * 20, "memory usage after init_train_model_opt", check_memory_usage("before"))
         # delay_optimizer_creation = (
         #     self.sharding is not None
         #     and ShardingOption.SHARD_OP in self.args.sharding
@@ -674,6 +677,10 @@ class Trainer:
             if delay_optimizer_creation:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
             self._load_optimizer_and_scheduler(resume_from_checkpoint)
+
+        print("=" * 20, "memory usage after init_train_model_opt", check_memory_usage("before"))
+        paddle.device.cuda.empty_cache()
+        print("=" * 20, "memory usage after init_train_model_opt", check_memory_usage("empty"))
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples:,}")
@@ -841,6 +848,7 @@ class Trainer:
                     and availiable_no_sync
                     and args._no_sync_in_gradient_accumulation
                 ) or (args.recompute and availiable_no_sync)
+                print("=" * 20, "memory usage after full_train_step", check_memory_usage("before"))
                 # sharding
                 # stage1. the same as ddp
                 # stage2. manualy collect gradient on dp group
@@ -938,6 +946,9 @@ class Trainer:
                     self.callback_handler.on_optimizer_end(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
                     )
+                    print("=" * 20, "memory usage after full_train_step", check_memory_usage("before"))
+                    paddle.device.cuda.empty_cache()
+                    print("=" * 20, "memory usage after full_train_step", check_memory_usage("empty"))
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
@@ -1051,7 +1062,7 @@ class Trainer:
         if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
                 dataset=self.train_dataset,
-                shuffle=False,
+                shuffle=True,
                 batch_size=self.args.per_device_train_batch_size,
                 drop_last=self.args.dataloader_drop_last,
             )
@@ -1059,7 +1070,7 @@ class Trainer:
         return DistributedBatchSampler(
             self.train_dataset,
             batch_size=self.args.per_device_train_batch_size,
-            shuffle=False,
+            shuffle=True,
             num_replicas=self.args.dataset_world_size,
             rank=self.args.dataset_rank,
             drop_last=self.args.dataloader_drop_last,

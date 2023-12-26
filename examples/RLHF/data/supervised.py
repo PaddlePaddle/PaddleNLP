@@ -96,11 +96,18 @@ class SupervisedDataset(TokenizedDataset):
             "labels": labels,  # size = (L,)
         }
 
-    def get_collator(self) -> Callable[[list[dict[str, paddle.Tensor]]], dict[str, paddle.Tensor]]:
-        return SupervisedCollator(self.tokenizer.pad_token_id)
+    def get_collator(
+        self, shift: bool = False
+    ) -> Callable[[list[dict[str, paddle.Tensor]]], dict[str, paddle.Tensor]]:
+        return SupervisedCollator(self.tokenizer.pad_token_id, shift)
 
 
 class SupervisedCollator(CollatorBase):
+    def __init__(self, pad_token_id: int, shift: bool = False) -> None:
+        """Initialize a collator."""
+        super().__init__(pad_token_id)
+        self._shift = shift
+
     def __call__(self, samples: list[SupervisedSample]) -> SupervisedBatch:
         input_ids = right_padding(
             [sample["input_ids"] for sample in samples],
@@ -110,6 +117,9 @@ class SupervisedCollator(CollatorBase):
             [sample["labels"] for sample in samples],
             padding_value=IGNORE_INDEX,
         )
+        if self._shift:
+            input_ids = input_ids[:, :-1]
+            labels = labels[:, 1:]
         attention_mask = input_ids != self.pad_token_id
         return {
             "input_ids": input_ids,  # size = (B, L)

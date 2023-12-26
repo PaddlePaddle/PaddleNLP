@@ -72,17 +72,31 @@ print_bak = print
 _log_file = None
 
 
+# def print(*args, debug=True, **kwargs):  # pylint: disable=invalid-name
 def print(*args, **kwargs):  # pylint: disable=invalid-name
     if args[0] == "=" * 20:
+        import inspect
+
+        if "debug" not in inspect.getfullargspec(print).kwonlyargs:
+            return
         assert not kwargs
+        # from paddlenlp.trainer.trainer_utils import check_memory_usage
+
         if len(args) == 2 and isinstance(args[1], str):
+            # print(*args, check_memory_usage("memory usage before empty_cache"))
+            # paddle.device.cuda.empty_cache()
+            # print(*args, check_memory_usage("memory usage after empty_cache"))
             return
         global _log_file
         if _log_file is None:
-            _log_file = open(f"train.log.{dist.get_rank()}", "w")
+            if dist.is_initialized():
+                _log_file = open(f"train.log.{dist.get_rank()}", "w")
+            else:
+                _log_file = open("train.log", "w")
         txt = " ".join([str(arg) for arg in args])
         _log_file.write(txt + "\n")
-        if dist.get_rank() == 0:
+        _log_file.flush()
+        if True:  # dist.get_rank() == 0:
             print_bak(*args, **kwargs)
         return
     return print_bak(*args, **kwargs)
@@ -1191,6 +1205,13 @@ class GenerationMixin(object):
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
         generate_end = False
+        # paddle.framework.core.default_cpu_generator().manual_seed(42 * 2)
+        # pd_cpu_seed = paddle.framework.core.default_cpu_generator().get_state(
+        # ).current_seed()
+        # paddle.framework.core.default_cuda_generator(0).manual_seed(42 * 2)
+        # pd_cpu_seed = paddle.framework.core.default_cuda_generator(0).get_state(
+        # ).current_seed()
+        # print("=" * 20, "pd_cpu_seed:", pd_cpu_seed)
         while True:
             if synced_gpus:
                 # Under synced_gpus the `forward` call must continue until all gpus complete their sequence.
@@ -1204,6 +1225,9 @@ class GenerationMixin(object):
             # prepare model inputs & get model output
             print("=" * 20, f"cur_len: {cur_len}")
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
+            # NOTE: to decrease ref-count and clear outdate cache in-time
+            model_kwargs["cache"] = None
+            model_kwargs["past_key_values"] = None
             print("=" * 20, "after prepare_inputs_for_generation")
             outputs = self(**model_inputs)
             print("=" * 20, "after model call")
@@ -1219,6 +1243,7 @@ class GenerationMixin(object):
 
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
+            print("=" * 20, f"next_token_logits {cur_len}: ", logits)
 
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
@@ -1231,11 +1256,14 @@ class GenerationMixin(object):
             if temperature is not None and temperature != 1.0:
                 logits = logits / temperature
             probs = F.softmax(logits)
+            print("=" * 20, "next_token_logits dtype: ", logits.dtype, probs.dtype)
             print("=" * 20, "after probs")
             if top_k is not None and top_k != 0:
                 probs = TopKProcess(probs, top_k, min_tokens_to_keep)
+                print("=" * 20, f"next_token_scores {cur_len} topk {top_k}: ", probs)
             if top_p is not None and top_p < 1.0:
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
+                print("=" * 20, f"next_token_scores {cur_len} top_p {top_p}: ", probs)
             print("=" * 20, "after top_k probs")
 
             # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
@@ -1243,8 +1271,17 @@ class GenerationMixin(object):
                 probs = probs.astype("float32")
                 next_tokens = paddle.unsqueeze(paddle.argmax(probs, axis=-1), -1)
             else:
-                next_tokens = paddle.multinomial(probs)
+                # print("=" * 20, f"probs {cur_len}: ", probs)
+                print("=" * 20, f"probs {cur_len}: ", probs, paddle.topk(probs, 50)[0])
+                # next_tokens = paddle.multinomial(probs)
+                probs = probs.cpu()
+                from paddlenlp.transformers.utils import device_guard
+
+                with device_guard("cpu"):
+                    next_tokens = paddle.multinomial(probs)
             print("=" * 20, "after next_tokens")
+            print("=" * 20, f"next_tokens_by_pd {cur_len}: ", next_tokens.squeeze())
+            # exit(0)
 
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)

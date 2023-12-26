@@ -83,6 +83,107 @@ exit(0)
 """
 
 import os
+import re
+
+import wandb
+
+step_align = True
+
+os.environ["WANDB_MODE"] = "offline"
+
+log_project = "Safe-RLHF-PPO"
+log_run_name = "paddle-1225-cpumul-fixclip-detemb_gradclip-stepalign"
+log_dir = "./paddle-ppo-wandb"
+config = {}
+self_wandb = wandb.init(
+    project=log_project,
+    name=log_run_name,
+    dir=log_dir,
+    config=config,
+)
+
+log_path = "/root/paddlejob/workspace/guosheng/share/paddlenlp-rlhf/PaddleNLP/examples/RLHF/log_ep1_1225_cpumul_fixclip_detemb_gradclip_8gpu/workerlog.0"
+with open(log_path, "r") as f:
+    global_step = None
+    for line in f.readlines():
+        if "eval_accuracy:" in line:
+            # print(line.strip())
+            pattern = re.compile(
+                r"eval_accuracy: (\d+\.\d+), eval_rewards_mean: -?(\d+\.\d+), eval_rewards_std: (\d+\.\d+),"
+            )
+            rs = re.search(pattern, line)
+            if rs:
+                eval_accuracy = rs.group(1)
+                eval_rewards_mean = rs.group(2)
+                eval_rewards_std = rs.group(3)
+                print(eval_accuracy, eval_rewards_mean, eval_rewards_std)
+                metrics = {
+                    "eval/accuracy": float(eval_accuracy),
+                    "eval/rewards_mean": float(eval_rewards_mean),
+                    "eval/rewards_std": float(eval_rewards_std),
+                }
+                # print(metrics)
+                self_wandb.log(metrics, step=int(global_step))
+        elif "loss: " in line:
+            # print(line.strip())
+            # pattern = re.compile(
+            #     r"train/actor_loss: (-?\d+\.\d+), train/reward_critic_loss: (-?\d+\.\d+), train/reward: (-?\d+\.\d+), "
+            #     r"train/kl_divergence: (-?\d+\.\d+), train/mean_generated_length: (\d+\.\d+), train/max_generated_length: (\d+\.\d+), "
+            #     r"train/actor_lr: ((\d+)(\.\d+)?(e-\d+)?), train/reward_critic_lr: ((\d+)(\.\d+)?(e-\d+)?), train/ptx_loss: (-?\d+\.\d+), "
+            #     r"global_step: (\d+),")
+            pattern = re.compile(
+                r"train/actor_loss: ([^,]+), train/reward_critic_loss: ([^,]+), train/reward: ([^,]+), "
+                r"train/kl_divergence: ([^,]+), train/mean_generated_length: ([^,]+), train/max_generated_length: ([^,]+), "
+                r"train/actor_lr: ([^,]+), train/reward_critic_lr: ([^,]+), train/ptx_loss: ([^,]+), "
+                r"global_step: (\d+),"
+            )
+            rs = re.search(pattern, line)
+            if rs:
+                # actor_loss = rs.group(1)
+                # reward_critic_loss = rs.group(2)
+                # reward = rs.group(3)
+                # kl_divergence = rs.group(4)
+                # mean_generated_length = rs.group(5)
+                # max_generated_length = rs.group(6)
+                # actor_lr = rs.group(7)
+                # reward_critic_lr = rs.group(11)
+                # ptx_loss = rs.group(15)
+                # global_step = rs.group(16)
+                actor_loss = rs.group(1)
+                reward_critic_loss = rs.group(2)
+                reward = rs.group(3)
+                kl_divergence = rs.group(4)
+                mean_generated_length = rs.group(5)
+                max_generated_length = rs.group(6)
+                actor_lr = rs.group(7)
+                reward_critic_lr = rs.group(8)
+                ptx_loss = rs.group(9)
+                global_step = rs.group(10)
+                # print(rs.groups())
+                # print(loss, accuracy, learning_rate, global_step)
+                metrics = {
+                    "train/actor_loss": float(actor_loss),
+                    "train/reward_critic_loss": float(reward_critic_loss),
+                    "train/reward": float(reward),
+                    "train/kl_divergence": float(kl_divergence),
+                    "train/mean_generated_length": float(mean_generated_length),
+                    "train/max_generated_length": float(max_generated_length),
+                    "train/actor_lr": float(actor_lr),
+                    "train/reward_critic_lr": float(reward_critic_lr),
+                    "train/ptx_loss": float(ptx_loss),
+                }
+                print(metrics)
+                self_wandb.log(metrics, step=int(global_step) - 1 if step_align else int(global_step))
+                # exit(0)
+            else:
+                print("=" * 20, "not match", line.strip())
+                exit(0)
+self_wandb.finish()
+
+exit(0)
+
+
+import os
 
 # import numpy as np
 import paddle

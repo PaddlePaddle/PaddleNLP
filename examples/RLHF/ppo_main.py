@@ -36,8 +36,12 @@ from paddlenlp.utils.log import logger
 
 # launch would unset http_proxy
 # export https_proxy=http://172.19.57.45:3128
-os.environ["http_proxy"] = "http://172.19.56.199:3128"
-os.environ["https_proxy"] = "http://172.19.56.199:3128"
+# os.environ["http_proxy"] = "http://172.19.56.199:3128"
+# os.environ["https_proxy"] = "http://172.19.56.199:3128"
+# os.environ["http_proxy"] = "http://172.19.57.45:3128"
+# os.environ["https_proxy"] = "http://172.19.57.45:3128"
+os.environ["http_proxy"] = "http://10.162.37.16:8128"
+os.environ["https_proxy"] = "http://10.162.37.16:8128"
 
 
 @dataclass
@@ -153,6 +157,7 @@ class DataArgument:
     task_name: str = field(default=None, metadata={"help": "Additional name to select a more specific task."})
     train_datasets: str = field(default=None, metadata={"help": "Dataset name(s) registered in the raw dataset."})
     eval_datasets: str = field(default=None, metadata={"help": "Dataset name(s) registered in the raw dataset."})
+    eval_split_ratio: float = field(default=None, metadata={"help": "Ratio of eval data to train data"})
     ptx_datasets: str = field(default=None, metadata={"help": "Dataset name(s) registered in the raw dataset."})
     intokens: bool = field(default=False, metadata={"help": "Whether to use InTokens data stream"})
     src_length: int = field(default=1024, metadata={"help": "The maximum length of source(context) tokens."})
@@ -182,11 +187,15 @@ class DataArgument:
     @property
     def parsed_eval_datasets(self) -> Tuple[str, Dict[str, Any]]:
         """Parse dataset path and its proportion and optionally additional arguments from `eval_datasets`."""
+        if self.eval_datasets is None:
+            return None
         return [parse_dataset(string) for string in self.eval_datasets.split(",")]
 
     @property
     def parsed_ptx_datasets(self) -> Tuple[str, Dict[str, Any]]:
         """Parse dataset path and its proportion and optionally additional arguments from `ptx_datasets`."""
+        if self.ptx_datasets is None:
+            return None
         return [parse_dataset(string) for string in self.ptx_datasets.split(",")]
 
 
@@ -206,6 +215,14 @@ def main():
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: {training_args.world_size}, "
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
+
+    prop = paddle.device.cuda.get_device_properties()
+    if prop.total_memory > 40 * 1024 * 1024 * 1024:
+        memory_size = 75 * 1024 * 1024 * 1024
+    else:
+        memory_size = 30 * 1024 * 1024 * 1024
+    x = paddle.empty([memory_size], dtype=paddle.uint8)
+    del x
 
     # Detecting last checkpoint.
     # last_checkpoint = None
@@ -239,8 +256,8 @@ def main():
     else:
         # actor model
         model_config = AutoConfig.from_pretrained(
-            # model_args.actor_model_name_or_path,
-            "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced/",
+            model_args.actor_model_name_or_path,
+            # "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced/",
             tensor_parallel_output=False,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             tensor_parallel_rank=training_args.tensor_parallel_rank,
@@ -249,15 +266,15 @@ def main():
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
         actor_model = LlamaForCausalLM.from_pretrained(
-            # model_args.actor_model_name_or_path,
-            "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced/",
+            model_args.actor_model_name_or_path,
+            # "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced/",
             config=model_config,
         )
-        print("=" * 20, "lm_head.weight after create", actor_model.lm_head.weight)
+        # print("=" * 20, "lm_head.weight after create", actor_model.lm_head.weight)
         # reference model
         actor_reference_model = LlamaForCausalLM.from_pretrained(
-            # model_args.actor_model_name_or_path,
-            "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced/",
+            model_args.actor_model_name_or_path,
+            # "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced/",
             config=model_config,
         )
         # print("=" * 20, actor_reference_model.lm_head.weight)
@@ -301,12 +318,24 @@ def main():
             tokenizer.pad_token_id = 32000  # tokenizer.eos_token_id
 
     train_ds = PromptOnlyDataset(data_args.parsed_train_datasets, tokenizer=actor_tokenizer)
-    dev_ds = PromptOnlyDataset(data_args.parsed_eval_datasets, tokenizer=actor_tokenizer)
+    if data_args.eval_datasets is None and data_args.eval_split_ratio:
+        train_ds, dev_ds = train_ds.split_train_test(split_ratio=data_args.eval_split_ratio)
+        print("=" * 20, "dev_ds: ", dev_ds[0])
+    elif data_args.eval_datasets is not None:
+        dev_ds = PromptOnlyDataset(data_args.parsed_eval_datasets, tokenizer=actor_tokenizer)
+    else:
+        dev_ds = None
+
     ptx_ds = (
         SupervisedDataset(data_args.parsed_ptx_datasets, tokenizer=actor_tokenizer)
         if data_args.ptx_datasets is not None
         else None
     )
+    # trainer = Trainer(model=actor_model,
+    #                   args=training_args,
+    #                   train_dataset=ptx_ds,
+    #                   tokenizer=actor_tokenizer,
+    #                   data_collator=ptx_ds.get_collator())
 
     trainer = PPOTrainer(
         model=(actor_model, actor_reference_model, reward_model, reward_critic_model),

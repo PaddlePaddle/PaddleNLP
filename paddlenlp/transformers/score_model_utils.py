@@ -164,8 +164,14 @@ class ScoreModelMixin:
     ) -> ScoreModelOutput:
         """Forward pass of the score model."""
         print("=" * 20, "score hidden", hidden_state)
+        import inspect
+
+        if self.training and "debug" in inspect.getfullargspec(print).kwonlyargs:
+            self._hidden_states = hidden_state
+            hidden_state.retain_grads()
         scores = self.score_head(hidden_state)  # size = (B, L, D)
         # print("=" * 20, "after LlamaModelForScore.score_head")
+        print("=" * 20, "scores", scores)
 
         # if dist.get_rank() == 0:
         #     # print("=" * 20, "hidden_state", hidden_state.numpy(), hidden_state.shape,
