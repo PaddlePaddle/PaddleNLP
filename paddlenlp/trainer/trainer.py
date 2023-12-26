@@ -507,14 +507,21 @@ class Trainer:
 
         if self.args.unified_checkpoint:
             if resume_from_checkpoint is not None:
-                load_unified_checkpoint(
-                    self.args,
-                    self.model,
-                    resume_from_checkpoint,
-                    safe_serialization=True,
-                )
-                logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
-                return
+                use_unified_checkpoint = True
+                if self.check_origin_checkpoint(resume_from_checkpoint):
+                    use_unified_checkpoint = False
+                    logger.info("Loading origin checkpoint, the next checkpoint will be saved as unified checkpoint")
+
+                if use_unified_checkpoint:
+                    load_unified_checkpoint(
+                        self.args,
+                        self.model,
+                        self.optimizer,
+                        resume_from_checkpoint,
+                        safe_serialization=True,
+                    )
+                    logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
+                    return
 
         if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
             self._load_from_peft_checkpoint(resume_from_checkpoint)
@@ -554,7 +561,6 @@ class Trainer:
                 if os.path.isfile(weights_file):
                     # We load the model state dict on the CPU to avoid an OOM error.
                     state_dict = paddle.load(weights_file, return_numpy=True)
-
                     # If the model is on the GPU, it still works!
                     self._set_state_dict_in_model(state_dict)
                     # release memory
@@ -1530,9 +1536,12 @@ class Trainer:
                     core.default_custom_device_generator(i).manual_seed(checkpoint_rng_state["cuda"][i])
 
         if self.args.use_hybrid_parallel:
-            fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
-                checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
-            )
+            if "hybrid_parallel_rng_state_tracker" in checkpoint_rng_state:
+                fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
+                    checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
+                )
+            else:
+                logger.warning("Not found hybrid parallel RNG state.")
 
     @staticmethod
     def get_optimizer_cls_and_kwargs(args: TrainingArguments) -> Tuple[Any, Any]:
@@ -2188,7 +2197,7 @@ class Trainer:
             paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
 
         if self.args.unified_checkpoint:
-            save_unified_checkpoint(self.args, self.model, output_dir, safe_serialization=True)
+            save_unified_checkpoint(self.args, self.model, self.optimizer, output_dir, safe_serialization=True)
             return
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
@@ -2276,7 +2285,14 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
-            if not self.args.unified_checkpoint:
+            use_unified_checkpoint = False
+            if self.args.unified_checkpoint:
+                use_unified_checkpoint = True
+                if self.check_origin_checkpoint(checkpoint):
+                    use_unified_checkpoint = False
+                    logger.info("Loading checkpoint, the next checkpoint will be saved as unified checkpoint")
+
+            if not use_unified_checkpoint:
                 if self.args.data_parallel_rank == 0:
                     optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
                     path = os.path.join(checkpoint, optimizer_name)
@@ -2923,3 +2939,21 @@ class Trainer:
                     logger.info("{:30}: {}".format(a, v))
 
         logger.info("")
+
+    def check_origin_checkpoint(self, resume_from_checkpoint):
+        is_origin_checkpoint_type = False
+
+        weight_name = PADDLE_WEIGHTS_NAME
+        weight_index_name = PADDLE_WEIGHTS_INDEX_NAME
+        weights_file = os.path.join(
+            resume_from_checkpoint,
+            _add_variant(weight_name, self.args.weight_name_suffix),
+        )
+        weights_index_file = os.path.join(
+            resume_from_checkpoint,
+            _add_variant(weight_index_name, self.args.weight_name_suffix),
+        )
+        if distributed_isfile(weights_file) or distributed_isfile(weights_index_file):
+            is_origin_checkpoint_type = True
+
+        return is_origin_checkpoint_type

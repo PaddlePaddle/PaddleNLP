@@ -723,12 +723,24 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Enable training under @to_static."},
     )
-
+    unified_checkpoint_config: Optional[str] = field(
+        default="",
+        metadata={
+            "help": (
+                "Configs to unify hybrid parallel checkpoint.\n"
+                "Following options are supports:\n"
+                "- skip_save_model_weight: do not save model weights when the masters weight exist\n"
+                "- master_weight_compatible: 1. if the master weights exist, only load when needed\n"
+                "                            2. if master weights does not exist, convert model weights to master weights when needed\n"
+                "- async_save: enable asynchronous saving checkpoints to disk\n"
+                "- enable_all_options: enable all optimization configurations\n"
+            )
+        },
+    )
     ignore_load_lr_and_optim: Optional[bool] = field(
         default=False,
         metadata={"help": "whether to ignore load optimizer and scheduler."},
     )
-
     force_reshard_pp: Optional[bool] = field(
         default=False,
         metadata={"help": "reshard pp even if pp degree in the model and pp degree in script match"},
@@ -1275,11 +1287,26 @@ class TrainingArguments:
                     else:
                         paddle.distributed.init_parallel_env()
 
-        # if self.unified_checkpoint and not self.use_hybrid_parallel:
-        #     logger.warning(
-        #         "The unified_checkpoint only avaliable for hybrid_parallel. Set unified_checkpoint to False for not using hybrid_parallel."
-        #     )
-        #     self.unified_checkpoint = False
+        if self.unified_checkpoint:
+            unified_checkpoint_config = set(self.unified_checkpoint_config.split(" "))
+            for x in unified_checkpoint_config:
+                if len(x) > 0:
+                    if x not in [
+                        "skip_save_model_weight",
+                        "master_weight_compatible",
+                        "async_save",
+                        "enable_all_options",
+                    ]:
+                        raise ValueError(
+                            f"Found unknown unified_checkpoint config {x}, accpet config is skip_save_model_weight, "
+                            + "master_weight_compatible, async_save, enable_all_options."
+                        )
+            if "enable_all_options" in unified_checkpoint_config:
+                self.unified_checkpoint_config = [
+                    "skip_save_model_weight",
+                    "master_weight_compatible",
+                    "async_save",
+                ]
 
         if self.report_to is None:
             logger.info(
