@@ -154,7 +154,9 @@ class PredictorServer:
 
             return app.response_class(stream_with_context(streaming(data)))
 
-        app.run(host="0.0.0.0", port=self.port)
+        # set single thread to do prediction
+        # refer to: https://github.com/pallets/flask/blob/main/src/flask/app.py#L605
+        app.run(host="0.0.0.0", port=self.port, threaded=False)
 
     def start_ui_service(self, args):
         # do not support start ui service in one command
