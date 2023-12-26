@@ -601,7 +601,7 @@ def _build_train_valid_test_datasets(
         raise ValueError("Invalid dataset_type: ", dataset_type)
 
     # Indexed dataset.
-    indexed_dataset = get_indexed_dataset_(data_prefix, None, skip_warmup)
+    indexed_dataset = get_indexed_dataset_(data_prefix, args.data_impl, skip_warmup)
 
     # Get start and end indices of train/valid/train into doc-idx
     # Note that doc-idx is desinged to be num-docs + 1 so we can

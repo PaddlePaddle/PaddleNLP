@@ -93,6 +93,7 @@ function _train(){
                -o Model.sequence_parallel=${sequence_parallel}  \
                -o Distributed.sharding.reduce_overlap=False \
                -o Distributed.sharding.broadcast_overlap=False \
+               -o Profiler_pretrain.memory_stats=True \
                -o Optimizer.tensor_fusion=False "
 
     if [ ${PADDLE_TRAINER_ID} ]
@@ -137,8 +138,10 @@ function _train(){
     fi
     #kill -9 `ps -ef|grep 'python'|awk '{print $2}'`
     if [ ${device_num} != "N1C1" -a -d mylog ]; then
+        case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/model_zoo/gpt-3/benchmarks
+        cp -r ${case_path}/mylog/workerlog.* ./mylog/
         rm ${log_file}
-        cp mylog/workerlog.${workerlog_id} ${log_file}
+        cp ${case_path}/mylog/workerlog.${workerlog_id} ${log_file}
     fi
 }
 

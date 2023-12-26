@@ -42,14 +42,22 @@ def launch(args):
         shown_context = get_shown_context(context)
         return utterance, shown_context, context, state
 
-    def regen(state, version, top_k, top_p, temperature, repetition_penalty):
+    def regen(state, top_k, top_p, temperature, repetition_penalty, max_length):
         """Regenerate response."""
         context = state.setdefault("context", [])
+        if len(context) < 2:
+            gr.Warning("don't have chat history")
+            shown_context = get_shown_context(context)
+            return None, shown_context, context, state
+
         context.pop()
         user_turn = context.pop()
-        return infer(user_turn["utterance"], state, version, top_k, top_p, temperature, repetition_penalty)
+        context.append({"role": "user", "utterance": user_turn["utterance"]})
+        context.append({"role": "bot", "utterance": ""})
+        shown_context = get_shown_context(context)
+        return user_turn["utterance"], shown_context, context, state
 
-    def infer(utterance, state, top_k, top_p, temperature, repetition_penalty, max_length):
+    def begin(utterance, state):
         """Model inference."""
         utterance = utterance.strip().replace("<br>", "\n")
         context = state.setdefault("context", [])
@@ -61,8 +69,25 @@ def launch(args):
             return None, shown_context, context, state
 
         context.append({"role": "user", "utterance": utterance})
+        context.append({"role": "bot", "utterance": ""})
+
+        shown_context = get_shown_context(context)
+        return utterance, shown_context, context, state
+
+    def infer(utterance, state, top_k, top_p, temperature, repetition_penalty, max_length):
+        """Model inference."""
+        utterance = utterance.strip().replace("<br>", "\n")
+        context = state.setdefault("context", [])
+
+        if not utterance:
+            gr.Warning("invalid inputs111")
+            # gr.Warning("请输入有效问题")
+            shown_context = get_shown_context(context)
+            return None, shown_context, context, state
+
         data = {
             "context": utterance,
+            "history": json.dumps(context),
             "top_k": top_k,
             "top_p": top_p,
             "temperature": temperature,
@@ -70,11 +95,21 @@ def launch(args):
             "max_length": max_length,
             "min_length": 1,
         }
-        result = requests.post(f"http://0.0.0.0:{args.flask_port}/api/chat", json=data).json()
-        bot_response = result["result"]["response"]
-        context.append(bot_response)
-        shown_context = get_shown_context(context)
-        return None, shown_context, context, state
+        res = requests.post(f"http://0.0.0.0:{args.base_port}/api/chat", json=data, stream=True)
+        for line in res.iter_lines():
+            result = json.loads(line)
+            bot_response = result["result"]["response"]
+
+            # replace \n with br: https://github.com/gradio-app/gradio/issues/4344
+            bot_response["utterance"] = bot_response["utterance"].replace("\n", "<br>")
+
+            if bot_response["utterance"].endswith("[END]"):
+                bot_response["utterance"] = bot_response["utterance"][:-5]
+
+            context[-1]["utterance"] += bot_response["utterance"]
+            shown_context = get_shown_context(context)
+
+            yield None, shown_context, context, state
 
     def clean_context(context):
         """Clean context for EB input."""
@@ -117,7 +152,7 @@ def launch(args):
         return shown_context
 
     with gr.Blocks(title="LLM", theme=gr.themes.Soft()) as block:
-        gr.Markdown(f"# {args.title}")
+        gr.Markdown(f"# {args.title} <font style='color: red !important' size=2>{args.sub_title}</font>")
         with gr.Row():
             with gr.Column(scale=1):
                 top_k = gr.Slider(
@@ -158,11 +193,17 @@ def launch(args):
                     raw_context_json = gr.JSON(label="Raw Context")
 
             utt_text.submit(
+                begin,
+                inputs=[utt_text, state],
+                outputs=[utt_text, context_chatbot, raw_context_json, state],
+                queue=False,
+                api_name="chat",
+            ).then(
                 infer,
                 inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_length],
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
-                api_name="chat",
             )
+
             clear_btn.click(
                 lambda _: (None, None, None, {}),
                 inputs=clear_btn,
@@ -180,14 +221,27 @@ def launch(args):
                 regen,
                 inputs=[state, top_k, top_p, temperature, repetition_penalty, max_length],
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
-            )
-            send_btn.click(
+                queue=False,
+                api_name="chat",
+            ).then(
                 infer,
                 inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_length],
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
             )
 
-    block.queue(default_enabled=True).launch(server_name="0.0.0.0", server_port=args.port, debug=True)
+            send_btn.click(
+                begin,
+                inputs=[utt_text, state],
+                outputs=[utt_text, context_chatbot, raw_context_json, state],
+                queue=False,
+                api_name="chat",
+            ).then(
+                infer,
+                inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_length],
+                outputs=[utt_text, context_chatbot, raw_context_json, state],
+            )
+
+    block.queue().launch(server_name="0.0.0.0", server_port=args.port, debug=True)
 
 
 def main(args):

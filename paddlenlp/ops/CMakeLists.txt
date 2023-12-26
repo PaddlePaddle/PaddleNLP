@@ -441,7 +441,7 @@ set(FT_UPDATE_COMMAND git checkout nccl_dependent_refine && git checkout . && ${
 
 ExternalProject_Add(
   extern_${THIRD_PARTY_NAME}
-  GIT_REPOSITORY    https://github.com/NVIDIA/FasterTransformer.git
+  GIT_REPOSITORY    https://gitee.com/paddlepaddle/FasterTransformer.git
   GIT_TAG           nccl_dependent_refine
   PREFIX            ${THIRD_PATH}
   SOURCE_DIR        ${THIRD_PATH}/source/${THIRD_PARTY_NAME}

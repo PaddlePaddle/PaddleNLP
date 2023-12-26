@@ -677,6 +677,11 @@ TASKS = {
                 "task_flag": "feature_extraction-moka-ai/m3e-base",
                 "task_priority_path": "moka-ai/m3e-base",
             },
+            "BAAI/bge-small-zh-v1.5": {
+                "task_class": SentenceFeatureExtractionTask,
+                "task_flag": "feature_extraction-BAAI/bge-small-zh-v1.5",
+                "task_priority_path": "BAAI/bge-small-zh-v1.5",
+            },
             "__internal_testing__/tiny-random-m3e": {
                 "task_class": SentenceFeatureExtractionTask,
                 "task_flag": "__internal_testing__/tiny-random-m3e",

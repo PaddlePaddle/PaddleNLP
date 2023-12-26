@@ -24,7 +24,7 @@ from utils import CustomTrainer, ProfilerCallback
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import InTokensMapDataset
 from paddlenlp.peft import LoRAConfig, LoRAModel
-from paddlenlp.trainer import PdArgumentParser, TrainingArguments
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments, set_seed
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, GPTForCausalLM
 
 """
@@ -71,7 +71,7 @@ class ModelArguments:
 def main():
     parser = PdArgumentParser((ModelArguments, TrainingArguments))
     model_args, training_args = parser.parse_args_into_dataclasses()
-
+    set_seed(args=training_args)
     # Set the dtype for loading model
     dtype = None
     if training_args.fp16_opt_level == "O2":
@@ -92,7 +92,6 @@ def main():
     if model_args.model_name_or_path in ["gpt3-6.7B-en", "gpt3-13B-en"]:
         model = GPTForCausalLM.from_pretrained(
             model_args.model_name_or_path,
-            low_cpu_mem_usage=True,
             use_flash_attention=model_args.use_flash_attention,
             dtype=dtype,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
@@ -104,7 +103,6 @@ def main():
     else:
         model = AutoModelForCausalLM.from_pretrained(
             model_args.model_name_or_path,
-            low_cpu_mem_usage=True,
             use_flash_attention=model_args.use_flash_attention,
             dtype=dtype,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
@@ -123,6 +121,15 @@ def main():
                 ".*linear1.*",
                 ".*linear2.*",
                 ".*out_proj.*",
+            ]
+        elif "chatglm2" in model_args.model_name_or_path:
+            target_modules = [
+                ".*query.*",
+                ".*key.*",
+                ".*value.*",
+                ".*dense.*",
+                ".*dense_h_to_4h.*",
+                ".*dense_4h_to_h.*",
             ]
         else:
             target_modules = [".*query_key_value.*"]
@@ -285,7 +292,6 @@ def main():
             tokenizer=tokenizer,
             max_length=model_args.intokens_length,
         )
-
     if model_args.profiler:
         prof = profiler.Profiler(
             targets=[profiler.ProfilerTarget.CPU, profiler.ProfilerTarget.GPU],

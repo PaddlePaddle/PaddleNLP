@@ -73,8 +73,6 @@ class Predictor(object):
 
         self.model = GPTForCausalLM.from_pretrained(
             args.model_name_or_path,
-            load_state_as_np=True,
-            low_cpu_mem_usage=True,
             dtype=dtype,
             tensor_parallel_degree=tensor_parallel_degree,
             tensor_parallel_rank=tensor_parallel_rank,

@@ -25,6 +25,7 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
+from paddle.utils import map_structure
 
 from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
@@ -97,10 +98,8 @@ class RotaryEmbeddings(nn.Layer):
     def __init__(self, hidden_size, base=10000.0, position_encoding_2d=True):
         super().__init__()
         self.default_dtype = paddle.get_default_dtype()
-        inv_freq = 1.0 / (base ** (paddle.arange(0, hidden_size, 2).astype("float32") / hidden_size))
-        inv_freq = inv_freq.astype(self.default_dtype)
+        self.inv_freq = 1.0 / (base ** (paddle.arange(0, hidden_size, 2).astype("float32") / hidden_size))
         self.position_encoding_2d = position_encoding_2d
-        self.register_buffer("inv_freq", inv_freq)
         self.max_seq_len_cached = -1
         self.cos_cached = None
         self.sin_cached = None
@@ -122,30 +121,14 @@ class RotaryEmbeddings(nn.Layer):
             # x.shape = [b, s, n, h/n/2]
             # TODO(duanyanhui): npu arange kernel don't support fp16, and
             # it can't be fallbacked to cpu. It will be fixed in future.
-            if paddle.get_device().split(":")[0] == "npu":
-                t = paddle.arange(start=0, end=seq_len, dtype="float32")
-                t = t.cast(self.inv_freq.dtype)
-            else:
-                t = paddle.arange(start=0, end=seq_len, dtype=self.inv_freq.dtype)
+            t = paddle.arange(start=0, end=seq_len, dtype="float32")
             # [s, h/n/2]
-            if not paddle.in_dynamic_mode():
-                inv_freq = paddle.cast(self.inv_freq, "float32")
-                t = paddle.cast(t, "float32")
-                freqs = paddle.einsum("i,j->ij", t, inv_freq)
-            else:
-                freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
-            freqs = freqs.cast(self.default_dtype)
+            freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
             # [s, h/n]
             emb = paddle.concat([freqs, freqs], axis=-1)
-            if self.default_dtype == paddle.bfloat16:
-                emb = emb.cast("float32")
             # [s, 1, h/n]
-            cos_cached = emb.cos().unsqueeze(1)
-            sin_cached = emb.sin().unsqueeze(1)
-
-            if self.default_dtype == paddle.bfloat16:
-                cos_cached = cos_cached.astype(self.default_dtype)
-                sin_cached = sin_cached.astype(self.default_dtype)
+            cos_cached = emb.cos().unsqueeze(1).cast(self.default_dtype)
+            sin_cached = emb.sin().unsqueeze(1).cast(self.default_dtype)
 
             if hasattr(paddle.framework, "_no_check_dy2st_diff"):
                 # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
@@ -262,67 +245,108 @@ class ChatGLMAttention(nn.Layer):
         q_layer, k_layer, v_layer = paddle.split(mixed_layer, 3, axis=-1)
         # [s, b, n, h/n]
         q_layer, k_layer = self._core_attention(q_layer, k_layer, position_ids, rotary_embeds)
+        version = paddle.version.full_version
+        version_check = True
+        if version != "0.0.0" and version <= "2.5.2":
+            logger.warning(
+                "PaddlePaddle version 2.5.3 or higher is required, please upgrade your PaddlePaddle to 2.5.3 or other higher version."
+            )
+            version_check = False
+        if self.config.use_flash_attention and version_check:
+            # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
+            # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
+            if cache is not None:
+                cache_k, cache_v = cache[0], cache[1]
+                # [s + c, b, n, h/n]
+                k_layer = paddle.concat([cache_k, k_layer], axis=0)
+                v_layer = paddle.concat([cache_v, v_layer], axis=0)
+            cache_kv = None
+            if use_cache:
+                cache_kv = (k_layer, v_layer)
 
-        if cache is not None:
-            cache_k, cache_v = cache[0], cache[1]
-            # [s + c, b, n, h/n]
-            k_layer = paddle.concat([cache_k, k_layer], axis=0)
-            v_layer = paddle.concat([cache_v, v_layer], axis=0)
+            # [s, b, n, h/n] = > [batch_size, seq_len, num_heads, head_dim]
+            q_layer = paddle.transpose(q_layer, [1, 0, 2, 3])
+            k_layer = paddle.transpose(k_layer, [1, 0, 2, 3])
+            v_layer = paddle.transpose(v_layer, [1, 0, 2, 3])
+            query_states, key_states, value_states = q_layer, k_layer, v_layer
 
-        seq_length, batch_size, num_heads, hidden_size = k_layer.shape
+            attn_output = F.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=attention_mask,
+                is_causal=False,
+            )
+            attn_weights = None
+            # [batch_size, seq_len, num_heads, head_dim] => [ batch_size, seq_len, hidden_size]
+            attn_output = paddle.reshape(attn_output, [attn_output.shape[0], attn_output.shape[1], -1])
+            # [ batch_size, seq_len, hidden_size] = > [ seq_len, batch_size, hidden_size]
+            attn_output = paddle.transpose(attn_output, [1, 0, 2])
+            attn_output = self.dense(attn_output)
 
-        cache_kv = None
-        if use_cache:
-            cache_kv = (k_layer, v_layer)
-
-        attention_scale_coeff = float(layer_id) + 1.0
-        if self.attention_scale:
-            # [s, b, n, h/n]
-            q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
-            q_layer = q_layer.astype(self.default_dtype)
-
-        # [b, n, s, s]
-        output_shape = [q_layer.shape[1], q_layer.shape[2], q_layer.shape[0], k_layer.shape[0]]
-
-        # [s, b * n, h/n]
-        q_layer = q_layer.reshape([output_shape[2], output_shape[0] * output_shape[1], -1])
-        k_layer = k_layer.reshape([output_shape[3], output_shape[0] * output_shape[1], -1])
-
-        # [b * n , s, s] = matmul([b * n, s, h/n],  [b * n, h/n, s])
-        attention_scores = paddle.matmul(q_layer.transpose([1, 0, 2]), k_layer.transpose([1, 2, 0]))
-        # [b, n, s, s]
-        attention_scores = attention_scores.reshape(output_shape)
-
-        if self.scale_mask_softmax:
-            self.scale_mask_softmax.scale = attention_scale_coeff
-            attention_probs = self.scale_mask_softmax(attention_scores, attention_mask)
+            output, attention_probs = attn_output, attn_weights
         else:
-            attention_scores = attention_scores + attention_mask
-            attention_scores = attention_scores.astype("float32")
-            attention_scores = attention_scores * attention_scale_coeff
-            attention_probs = F.softmax(attention_scores, axis=-1)
-            attention_probs = attention_probs.astype(self.default_dtype)
-            v_layer = v_layer.astype(self.default_dtype)
+            if cache is not None:
+                cache_k, cache_v = cache[0], cache[1]
+                # [s + c, b, n, h/n]
+                k_layer = paddle.concat([cache_k, k_layer], axis=0)
+                v_layer = paddle.concat([cache_v, v_layer], axis=0)
 
-        # [b, n, s, h/n]
-        output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]
-        # [s, b * n, h/n]
-        v_layer = v_layer.reshape([v_layer.shape[0], output_shape[0] * output_shape[1], -1])
-        # [b * n, s, s]
-        attention_probs = attention_probs.reshape([output_shape[0] * output_shape[1], output_shape[2], -1])
+            seq_length, batch_size, num_heads, hidden_size = k_layer.shape
 
-        # [b * n, s, h/n]
-        context_layer = paddle.bmm(attention_probs, v_layer.transpose([1, 0, 2]))
-        context_layer = context_layer.reshape(output_shape)
+            cache_kv = None
+            if use_cache:
+                cache_kv = (k_layer, v_layer)
 
-        # [s, b, n, h/n]
-        context_layer = context_layer.transpose([2, 0, 1, 3])
+            attention_scale_coeff = float(layer_id) + 1.0
+            if self.attention_scale:
+                # [s, b, n, h/n]
+                q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
+                q_layer = q_layer.astype(self.default_dtype)
 
-        # [s, b, h]
-        new_context_shape = context_layer.shape[:-2] + [self.num_attention_heads * self.attention_head_size]
-        context_layer = context_layer.reshape(new_context_shape)
+            # [b, n, s, s]
+            output_shape = [q_layer.shape[1], q_layer.shape[2], q_layer.shape[0], k_layer.shape[0]]
 
-        output = self.dense(context_layer)
+            # [s, b * n, h/n]
+            q_layer = q_layer.reshape([output_shape[2], output_shape[0] * output_shape[1], -1])
+            k_layer = k_layer.reshape([output_shape[3], output_shape[0] * output_shape[1], -1])
+
+            # [b * n , s, s] = matmul([b * n, s, h/n],  [b * n, h/n, s])
+            attention_scores = paddle.matmul(q_layer.transpose([1, 0, 2]), k_layer.transpose([1, 2, 0]))
+            # [b, n, s, s]
+            attention_scores = attention_scores.reshape(output_shape)
+
+            if self.scale_mask_softmax:
+                self.scale_mask_softmax.scale = attention_scale_coeff
+                attention_probs = self.scale_mask_softmax(attention_scores, attention_mask)
+            else:
+                attention_scores = attention_scores.astype("float32")
+                attention_scores = attention_scores * attention_scale_coeff
+                attention_scores = attention_scores + attention_mask
+
+                attention_probs = F.softmax(attention_scores, axis=-1)
+                attention_probs = attention_probs.astype(self.default_dtype)
+                v_layer = v_layer.astype(self.default_dtype)
+
+            # [b, n, s, h/n]
+            output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]
+            # [s, b * n, h/n]
+            v_layer = v_layer.reshape([v_layer.shape[0], output_shape[0] * output_shape[1], -1])
+            # [b * n, s, s]
+            attention_probs = attention_probs.reshape([output_shape[0] * output_shape[1], output_shape[2], -1])
+
+            # [b * n, s, h/n]
+            context_layer = paddle.bmm(attention_probs, v_layer.transpose([1, 0, 2]))
+            context_layer = context_layer.reshape(output_shape)
+
+            # [s, b, n, h/n]
+            context_layer = context_layer.transpose([2, 0, 1, 3])
+
+            # [s, b, h]
+            new_context_shape = context_layer.shape[:-2] + [self.num_attention_heads * self.attention_head_size]
+            context_layer = context_layer.reshape(new_context_shape)
+
+            output = self.dense(context_layer)
 
         return output, cache_kv, attention_probs
 
@@ -841,6 +865,10 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
                 "use_cache": True,
                 "attention_mask": attention_mask,
             }
+
+    def reorder_cache(self, cache: paddle.Tensor, beam_idx):
+        cache = map_structure(lambda x: paddle.index_select(x, beam_idx, axis=1), cache)
+        return cache
 
     def update_model_kwargs_for_generation(
         self,

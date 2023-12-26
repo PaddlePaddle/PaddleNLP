@@ -24,7 +24,7 @@ import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.common_ops_import import convert_dtype
 from paddle.distributed.fleet.utils import recompute
-from paddle.fluid import layers
+from paddle.base import layers
 from paddle.incubate.nn import FusedLinear
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from ppfleetx.utils.log import logger
@@ -1077,7 +1077,7 @@ class GPTForGeneration(nn.Layer):
 
         attn_mask = model_kwargs["attention_mask"]
         # make the shape of attention_mask = (-1, -1, -1, -1) in dy2static.
-        model_kwargs["attention_mask"] = paddle.reshape(attn_mask, paddle.shape(attn_mask))
+        paddle.jit.dy2static.utils_helper.set_dynamic_shape(model_kwargs["attention_mask"], [-1, -1, -1, -1])
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
         if hasattr(paddle.framework, "_no_check_dy2st_diff"):
             # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior

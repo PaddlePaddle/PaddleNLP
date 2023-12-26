@@ -66,3 +66,11 @@ class AutoModelTest(unittest.TestCase):
             self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, PADDLE_WEIGHTS_NAME)))
             # check against double appending model_name in cache_dir
             self.assertFalse(os.path.exists(os.path.join(tempdir, model_name, model_name)))
+
+    def test_from_hf_hub(self):
+        model = AutoModel.from_pretrained("PaddleCI/tiny-random-bert", from_hf_hub=True, convert_from_torch=False)
+        self.assertIsInstance(model, BertModel)
+
+    def test_from_aistudio(self):
+        model = AutoModel.from_pretrained("PaddleNLP/tiny-random-bert", from_aistudio=True)
+        self.assertIsInstance(model, BertModel)

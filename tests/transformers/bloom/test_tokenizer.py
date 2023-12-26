@@ -31,6 +31,7 @@ class BloomTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = BloomTokenizer
     from_pretrained_kwargs = {"add_prefix_space": True}
+    test_decode_token = True
     test_seq2seq = False
 
     def setUp(self):

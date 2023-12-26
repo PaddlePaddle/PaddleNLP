@@ -13,13 +13,15 @@
 # limitations under the License.
 
 import os
+import sys
 import numpy as np
 
 import paddle
-import paddle.fluid.core as core
+import paddle.base.core as core
 import paddle.nn as nn
 from paddle.distributed.fleet import auto
 from paddle.profiler import SummaryView
+from paddle.profiler.utils import job_schedule_profiler_range
 
 try:
     from ppfleetx.optims import build_lr_scheduler, build_optimizer
@@ -31,6 +33,18 @@ from ppfleetx.utils.device import synchronize as device_synchronize
 from ppfleetx.utils.log import convert_timestamp_to_data, get_timestamp, logger
 from ppfleetx.utils.version import version_check
 
+def use_new_executor():
+    new_executor_micro_batching = os.environ.get(
+        'FLAGS_new_executor_micro_batching', None
+    )
+    return new_executor_micro_batching in [
+        None,
+        1,
+        '1',
+        True,
+        'True',
+        'true',
+    ]
 
 class AutoEngine(BasicEngine):
     def __init__(self, configs, module=None, mode="train"):
@@ -68,7 +82,10 @@ class AutoEngine(BasicEngine):
 
         # Distributed
         self._pp_degree = configs["Distributed"]["pp_degree"]
-
+        pipeline_cfg = configs.Distributed.get("pipeline", {})
+        self._job_schedule_profiler_start = pipeline_cfg.get("job_schedule_profiler_start", -1)
+        self._job_schedule_profiler_end = pipeline_cfg.get("job_schedule_profiler_end", -1)
+        
         # engine configs
         self._configs = configs["Engine"]
 
@@ -128,6 +145,9 @@ class AutoEngine(BasicEngine):
         self.memory_stats = configs.get("Profiler_auto", {}).get("memory_stats", False)
         self.nvprof_start = configs.get("Profiler_auto", {}).get("nvprof_start", -1)
         self.nvprof_end = configs.get("Profiler_auto", {}).get("nvprof_end", -1)
+        
+        if (self._job_schedule_profiler_start != -1) and use_new_executor():
+            logger.info("Schedule Profiler start at step {} and end at step {}".format(self._job_schedule_profiler_start, self._job_schedule_profiler_end))
 
     def _validate_batch(self, batch):
         if self._pp_degree > 1 or self._accumulate_steps == 1:
@@ -152,18 +172,23 @@ class AutoEngine(BasicEngine):
 
         total_train_batch = self._max_steps if self._run_mode == "step" else len(train_data_loader)
         total_train_step = self._max_steps if self._run_mode == "step" else total_train_batch * self._num_train_epochs
-        total_eval_batch = len(valid_data_loader) if valid_data_loader is not None else 0
+        if use_new_executor():
+            total_eval_batch = len(valid_data_loader) if valid_data_loader is not None else 0
+        else:
+            total_eval_batch = valid_data_loader._steps if valid_data_loader is not None else 0
         valid_data_loader = valid_data_loader if valid_data_loader is not None else None
         eval_finished_step = 0
 
         self._auto_engine.prepare(mode="train")
 
         for step, batch in enumerate(train_data_loader):
+            with job_schedule_profiler_range(step, self._job_schedule_profiler_start, self._auto_engine.enable_job_schedule_profiler) as status:
+                self._auto_engine.enable_job_schedule_profiler = status
+
             if epoch_index == self._load_recovery["epoch"]:
                 if step < self._load_recovery["step"]:
                     continue
 
-            batches = self._validate_batch(batch)
 
             fetch_list = None
             if self._strategy.amp.enable:
@@ -171,18 +196,34 @@ class AutoEngine(BasicEngine):
                 fetch_list = []
 
             final_loss = None
-            for micro_batch in batches:
-                with paddle.profiler.utils._nvprof_range(iter_id=step, start=self.nvprof_start, end=self.nvprof_end):
-                    outs = self._auto_engine.run(micro_batch, fetch_list=fetch_list, mode="train")
-                # pp: some devices don't have loss in outs
-                if "loss" in outs:
-                    if final_loss is None:
-                        final_loss = np.sum(outs["loss"])
-                    else:
-                        final_loss += np.sum(outs["loss"])
+            if use_new_executor():
+                batches = self._validate_batch(batch)
+                for micro_batch in batches:
+                    with paddle.profiler.utils._nvprof_range(iter_id=step, start=self.nvprof_start, end=self.nvprof_end):
+                        outs = self._auto_engine.run(micro_batch, fetch_list=fetch_list, mode="train")
+                    # pp: some devices don't have loss in outs
+                    if "loss" in outs:
+                        if final_loss is None:
+                            final_loss = np.sum(outs["loss"])
+                        else:
+                            final_loss += np.sum(outs["loss"])
 
-            if final_loss is not None and self._accumulate_steps > 1:
-                final_loss /= self._accumulate_steps
+                if final_loss is not None and self._accumulate_steps > 1:
+                    final_loss /= self._accumulate_steps
+            else:
+                if self._pp_degree == 1 and self._accumulate_steps > 1:  # gradient merge
+                    local_steps = self._accumulate_steps
+                else:
+                    local_steps = 1
+                for _ in range(local_steps):
+                    with paddle.profiler.utils._nvprof_range(iter_id=step, start=self.nvprof_start, end=self.nvprof_end):
+                        outs = self._auto_engine.run(batch, fetch_list=fetch_list, mode="train")
+                    # pp: some devices don't have loss in outs
+                    if "loss" in outs:
+                        if final_loss is None:
+                            final_loss = np.sum(outs["loss"])
+                        else:
+                            final_loss += np.sum(outs["loss"])
 
             if final_loss is not None:
                 train_losses.append(final_loss)
@@ -267,27 +308,49 @@ class AutoEngine(BasicEngine):
 
         train_data_loader, valid_data_loader = None, None
         if train_dataset:
-            train_data_loader = self._auto_engine.dataloader(
-                dataset=train_dataset,
-                batch_size=self._global_batch_size,
-                steps_per_epoch=self._max_steps,
-                epochs=self._num_train_epochs,
-                collate_fn=train_dataset.collate_fn,
-                num_workers=1,
-                sample_split=train_dataset.sample_split,
-                mode="train",
-            )
+            if use_new_executor():
+                train_data_loader = self._auto_engine.dataloader(
+                    dataset=train_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=train_dataset.collate_fn,
+                    num_workers=1,
+                    sample_split=train_dataset.sample_split,
+                    mode="train",
+                )
+            else:
+                train_data_loader = self._auto_engine.dataloader_from_generator(
+                    dataset=train_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=train_dataset.collate_fn,
+                    sample_split=train_dataset.sample_split,
+                    mode="train",
+                )
         if valid_dataset and self._eval_freq <= self._max_steps:
-            valid_data_loader = self._auto_engine.dataloader(
-                dataset=valid_dataset,
-                batch_size=self._global_batch_size,
-                steps_per_epoch=self._max_steps,
-                epochs=self._num_train_epochs,
-                collate_fn=valid_dataset.collate_fn,
-                num_workers=1,
-                sample_split=valid_dataset.sample_split,
-                mode="eval",
-            )
+            if use_new_executor():
+                valid_data_loader = self._auto_engine.dataloader(
+                    dataset=valid_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=valid_dataset.collate_fn,
+                    num_workers=1,
+                    sample_split=valid_dataset.sample_split,
+                    mode="eval",
+                )
+            else:
+                valid_data_loader = self._auto_engine.dataloader_from_generator(
+                    dataset=valid_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=valid_dataset.collate_fn,
+                    sample_split=valid_dataset.sample_split,
+                    mode="eval",
+                )
 
         for epoch_index in range(start_epoch, epoch):
             train_epoch_start = get_timestamp()
@@ -320,6 +383,8 @@ class AutoEngine(BasicEngine):
                 convert_timestamp_to_data(get_timestamp() - train_start)
             )
         )
+        if valid_data_loader and not use_new_executor():
+            valid_data_loader._inner_dataloader.reset()
 
         if self.profiler:
             self._profiler_done()
@@ -328,16 +393,28 @@ class AutoEngine(BasicEngine):
 
         valid_data_loader = None
         if valid_dataset:
-            valid_data_loader = self._auto_engine.dataloader(
-                dataset=valid_dataset,
-                batch_size=self._global_batch_size,
-                steps_per_epoch=self._max_steps,
-                epochs=self._num_train_epochs,
-                collate_fn=valid_dataset.collate_fn,
-                num_workers=1,
-                sample_split=valid_dataset.sample_split,
-                mode="eval",
-            )
+            if use_new_executor():
+                valid_data_loader = self._auto_engine.dataloader(
+                    dataset=valid_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=valid_dataset.collate_fn,
+                    num_workers=1,
+                    sample_split=valid_dataset.sample_split,
+                    mode="eval",
+                )
+            else:
+                valid_data_loader = self._auto_engine.dataloader_from_generator(
+                    dataset=valid_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=valid_dataset.collate_fn,
+                    num_workers=1,
+                    sample_split=valid_dataset.sample_split,
+                    mode="eval",
+                )
 
         for epoch_index in range(epoch):
             eval_epoch_start = get_timestamp()
@@ -388,16 +465,28 @@ class AutoEngine(BasicEngine):
 
         test_data_loader = None
         if test_dataset:
-            test_data_loader = self._auto_engine.dataloader(
-                dataset=test_dataset,
-                batch_size=self._global_batch_size,
-                steps_per_epoch=self._max_steps,
-                epochs=self._num_train_epochs,
-                collate_fn=test_dataset.collate_fn,
-                num_workers=1,
-                sample_split=test_dataset.sample_split,
-                mode="predict",
-            )
+            if use_new_executor():
+                test_data_loader = self._auto_engine.dataloader(
+                    dataset=test_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=test_dataset.collate_fn,
+                    num_workers=1,
+                    sample_split=test_dataset.sample_split,
+                    mode="predict",
+                )
+            else:
+                test_data_loader = self._auto_engine.dataloader_from_generator(
+                    dataset=test_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=test_dataset.collate_fn,
+                    num_workers=1,
+                    sample_split=test_dataset.sample_split,
+                    mode="predict",
+                )
 
         test_start = get_timestamp()
         test_losses = []

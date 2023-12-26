@@ -16,7 +16,7 @@ import logging
 
 import paddle
 import paddle.distributed as dist
-from paddle.fluid import core
+from paddle.base import core
 from ppfleetx.utils.log import logger
 
 

@@ -356,6 +356,8 @@ def _transformer_encoder_fwd(
     )
 
 
+_transformer_encoder_fwd.__name__ = "forward"
+_transformer_encoder_layer_fwd.__name__ = "forward"
 # patches of paddle.nn.Transformer to get all hidden_states and attentions
 paddle.nn.TransformerEncoderLayer.forward = _transformer_encoder_layer_fwd
 paddle.nn.TransformerDecoderLayer.forward = _transformer_decoder_layer_fwd

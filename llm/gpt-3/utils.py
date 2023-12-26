@@ -78,8 +78,9 @@ def set_seed(seed):
 
     # NOTE: the commented seeds are set only for precision validation
     # seed += 100 * pp_rank
-    random.seed(seed + 100 * pp_rank)
-    np.random.seed(seed + 100 * pp_rank)
+    random_seed = seed + 100 * pp_rank
+    random.seed(random_seed)
+    np.random.seed(random_seed)
 
     # seed = mp_rank +
     #        pp_rank * (mp_size) +
@@ -110,7 +111,10 @@ def set_seed(seed):
 
     paddle.seed(global_seed)
 
-    logger.info("The global seed is set to {} and local seed is set to {}.".format(global_seed, local_seed))
+    logger.info(
+        "The global seed is set to {}, local seed is set to {} and "
+        "random seed is set to {}.".format(global_seed, local_seed, random_seed)
+    )
 
 
 def create_hcg(strategy, hcg_name="HybridCommunicateGroup"):
@@ -129,10 +133,23 @@ def init_dist_env(
 ):
 
     strategy = fleet.DistributedStrategy()
+
+    def is_segment_parallel_supported():
+        import inspect
+
+        members = [name for (name, date) in inspect.getmembers(fleet.HybridCommunicateGroup)]
+        return "get_sep_parallel_world_size" in members
+
     if tensor_parallel_degree == 1 and sharding_parallel_degree == 1:
-        order = ["pp", "dp", "sharding", "mp"]
+        if is_segment_parallel_supported():
+            order = ["pp", "dp", "sharding", "sep", "mp"]
+        else:
+            order = ["pp", "dp", "sharding", "mp"]
     else:
-        order = ["dp", "pp", "sharding", "mp"]
+        if is_segment_parallel_supported():
+            order = ["dp", "pp", "sharding", "sep", "mp"]
+        else:
+            order = ["dp", "pp", "sharding", "mp"]
 
     strategy.hybrid_configs = {
         "dp_degree": data_parallel_degree,

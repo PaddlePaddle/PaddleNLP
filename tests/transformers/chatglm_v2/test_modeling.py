@@ -15,16 +15,16 @@
 import unittest
 
 import paddle
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import ChatGLMv2Config, ChatGLMv2ForCausalLM, ChatGLMv2Model
 from tests.transformers.test_generation_utils import GenerationTesterMixin
-from tests.transformers.test_modeling_common import (  # GenerationD2STestMixin,
+from tests.transformers.test_modeling_common import (
+    GenerationD2STestMixin,
     ModelTesterMixin,
     ids_tensor,
     random_attention_mask,
 )
-
-# from parameterized import parameterized_class
 
 
 class ChatGLMv2Tester:
@@ -172,13 +172,13 @@ class ChatGLMv2Tester:
         self.parent.assertTrue((result_2d[attn_mask_2d] == result_no_attention_mask[attn_mask_2d]).all())
 
 
-# @parameterized_class(
-#     ("return_dict", "use_labels"),
-#     [
-#         [False, True],
-#         [True, False],
-#     ],
-# )
+@parameterized_class(
+    ("return_dict", "use_labels"),
+    [
+        [False, True],
+        [True, False],
+    ],
+)
 class ChatGLMv2Test(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     base_model_class = ChatGLMv2Model
     return_dict: bool = True
@@ -220,17 +220,9 @@ class ChatGLMv2Test(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_model_attention_mask(*config_and_inputs)
 
-    # chatglm_v2 cannot use beam search temporarily
-    def test_beam_search_generate(self):
-        pass
 
-    # chatglm_v2 cannot use group beam search temporarily
-    def test_group_beam_search_generate(self):
-        pass
-
-
-# class ChatGLMV2GenerationD2STest(GenerationD2STestMixin, unittest.TestCase):
-#     internal_testing_model = "__internal_testing__/tiny-random-chatglm2"
+class ChatGLMV2GenerationD2STest(GenerationD2STestMixin, unittest.TestCase):
+    internal_testing_model = "__internal_testing__/tiny-random-chatglm2"
 
 
 if __name__ == "__main__":

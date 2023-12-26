@@ -25,7 +25,6 @@ from benchmark_utils import (
     compute_metrics,
     compute_metrics_not_do_generation,
 )
-from modeling_pp import LlamaForCausalLMPipe
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
@@ -37,7 +36,11 @@ from paddlenlp.trainer import (
     get_last_checkpoint,
     set_seed,
 )
-from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+from paddlenlp.transformers import (
+    AutoModelForCausalLM,
+    AutoModelForCausalLMPipe,
+    AutoTokenizer,
+)
 from paddlenlp.utils.log import logger
 
 
@@ -172,7 +175,7 @@ def main():
 
     paddle.set_device(training_args.device)
 
-    set_seed(args=training_args)
+    set_seed(seed=training_args.seed)
 
     # Log on each process the small summary:
     logger.warning(
@@ -207,7 +210,7 @@ def main():
     if training_args.pipeline_parallel_degree > 1:
         if model_args.eval_with_do_generation and training_args.do_eval:
             raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
-        model_class = LlamaForCausalLMPipe
+        model_class = AutoModelForCausalLMPipe
 
     # Load the pretrained language model.
     model = model_class.from_pretrained(
@@ -249,15 +252,14 @@ def main():
     if model_args.qat:
         from paddle import nn
         from paddle.quantization import QAT, QuantConfig
-
-        # FakeQuanterChannelWiseAbsMaxObserver not yet merge in Paddle develop
-        from paddle.quantization.quanters import FakeQuanterChannelWiseAbsMaxObserver
         from paddle.quantization.quanters.abs_max import (
             FakeQuanterWithAbsMaxObserverLayer,
         )
-        from paddleslim.quant.quanters import PACTQuanter
+        from paddleslim.quant.quanters import (
+            FakeQuanterChannelWiseAbsMaxObserver,
+            PACTQuanter,
+        )
 
-        # from paddle.quantization.quanters import FakeQuanterWithAbsMaxObserver
         from paddlenlp.peft.lora import LoRALinear
         from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
 

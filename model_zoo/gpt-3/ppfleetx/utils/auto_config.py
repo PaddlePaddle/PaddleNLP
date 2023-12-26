@@ -42,6 +42,15 @@ def process_dist_configs(config):
     mp_degree = configs.setdefault("mp_degree", 1)
     pp_degree = configs.setdefault("pp_degree", 1)
 
+    # disenable sequence parallel is mp_degree < 2.
+    sequence_parallel = config["Model"]["sequence_parallel"]
+    if mp_degree < 2 and sequence_parallel:
+        config["Model"]["sequence_parallel"] = False
+        logger.warning(
+            "sequence_parallel is turn off since mp_degree < 2."
+        )
+
+
     # sharding default
     sharding_config = configs["sharding"]
     sharding_degree = sharding_config.setdefault("sharding_degree", 1)
@@ -70,7 +79,7 @@ def process_global_configs(config):
     # pp_degree = config["Distributed"]["pp_degree"]
     # sharding_degree = config["Distributed"]["sharding"]["sharding_degree"]
 
-    # TODO: support partial_send_recv and sequence_parallel
+    # TODO: support partial_send_recv
     # config["Global"]["enable_partial_send_recv"] = True
     # if config.get("Model", None) is not None and "sequence_parallel" in config["Model"] and pp_degree > 1:
     #     if config["Model"]["sequence_parallel"]:
@@ -141,6 +150,9 @@ def process_engine_configs(config):
     )
     config.Engine["accumulate_steps"] = config.Global.local_batch_size // config.Global.micro_batch_size
 
+def use_pir():
+    is_pir_mode = os.environ.get("FLAGS_enable_pir_in_executor", None)
+    return str(is_pir_mode).lower() not in ('false', 'off', '0', 'none')
 
 def process_strategy(config):
     """
@@ -150,20 +162,24 @@ def process_strategy(config):
     strategy.auto_mode = "semi"
     # strategy.seed = config["Global"]["seed"]
 
-    # amp config
-    amp_cfg = config.Engine.get("mix_precision", {})
-    amp = strategy.amp
-    amp.enable = amp_cfg.get("enable", False)
-    amp.dtype = amp_cfg.get("dtype", "float16")
-    amp.level = amp_cfg.get("level", "o2")
-    amp.init_loss_scaling = amp_cfg.get("scale_loss", 32768)
-    amp.custom_black_list = amp_cfg.get("custom_black_list", [])
-    amp.custom_white_list = amp_cfg.get("custom_white_list", [])
-    amp.use_fp16_guard = amp_cfg.get("use_fp16_guard", False)
-    amp.use_bf16_guard = amp_cfg.get("use_bf16_guard", False)
+    if config.get("FusedPasses", None) is not None:
+        # fused passes config
+        fused_passes_list = []
+        fused_linear = config.FusedPasses.pop("fused_linear", False)
+        fused_adamw = config.FusedPasses.pop("fused_adamw", False)
+        if fused_linear:
+            if use_pir():
+                fused_passes_list.append("fused_gemm_epilogue_pass")
+            else:
+                fused_passes_list.append("fuse_gemm_epilogue")
+        if fused_adamw:
+            fused_passes_list.append("fuse_adamw")
+        fused_passes = strategy.fused_passes
+        fused_passes.enable = len(fused_passes_list) > 0
+        fused_passes.fused_passes_list = fused_passes_list
 
-    # recompute config
     if config.get("Model", None) is not None:
+        # recompute config
         if not config.Model.get("no_recompute_layers", None):
             config.Model["no_recompute_layers"] = []
         else:
@@ -177,8 +193,28 @@ def process_strategy(config):
             config.Model["no_recompute_layers"] = sorted(list(set(config.Model["no_recompute_layers"])))
         recompute = strategy.recompute
         recompute.enable = config.Model.get("use_recompute", False)
+        recompute.sr = config.Model.pop("sr", 0)
+        recompute.refined_ops_patterns = config.Model.pop("refined_ops_patterns", []) # gpt.GPTModelAuto don't need this parameter
         recompute.no_recompute_segments = config.Model.pop("no_recompute_layers", [])
         recompute.enable_tuning = config.get("Tuning", False) and config.Tuning.get("tuning_recompute", False)
+
+    # amp config
+    amp_cfg = config.Engine.get("mix_precision", {})
+    amp = strategy.amp
+    amp.enable = amp_cfg.get("enable", False)
+    amp.dtype = amp_cfg.get("dtype", "float16")
+    amp.level = amp_cfg.get("level", "o2")
+    amp.init_loss_scaling = amp_cfg.get("scale_loss", 32768)
+    amp.custom_black_list = amp_cfg.get("custom_black_list", [])
+    amp.custom_white_list = amp_cfg.get("custom_white_list", [])
+    amp.use_fp16_guard = amp_cfg.get("use_fp16_guard", False)
+    amp.use_bf16_guard = amp_cfg.get("use_bf16_guard", False)
+
+    # mp_optimization config
+    mp_degree = config.Distributed.get("mp_degree", 1)
+    if mp_degree > 1:
+        mp_cfg = config.Distributed.get("mp_optimization", {})
+        strategy.mp_optimization.allreduce_matmul_grad_overlapping = mp_cfg.get("allreduce_matmul_grad_overlapping", False)
 
     # sharding config
     sharding_cfg = config.Distributed.get("sharding", {})
@@ -197,11 +233,16 @@ def process_strategy(config):
     accumulate_steps = config.Engine.get("accumulate_steps", 1)
     if pp_degree > 1 and accumulate_steps > 1:
         # pipeline config
+        pipeline_cfg = config.Distributed.get("pipeline", {})
         pipeline = strategy.pipeline
         pipeline.enable = True
-        pipeline.schedule_mode = config.Distributed.get("schedule_mode", "1F1B")
+        pipeline.enable_send_recv_overlap = pipeline_cfg.get("enable_send_recv_overlap", False)
+        pipeline.schedule_mode = pipeline_cfg.get("schedule_mode", "1F1B")
         pipeline.micro_batch_size = config.Global.micro_batch_size
         pipeline.accumulate_steps = accumulate_steps
+        pipeline.job_schedule_profiler_start = pipeline_cfg.get("job_schedule_profiler_start", -1)
+        pipeline.job_schedule_profiler_stop = pipeline_cfg.get("job_schedule_profiler_stop", -1)
+        
     elif accumulate_steps > 1:
         # gradient merge config
         gradient_merge = strategy.gradient_merge
@@ -225,6 +266,11 @@ def process_strategy(config):
     tuning.profile_end_step = tuning_cfg.get("profile_end_step", 1)
     tuning.run_after_tuning = tuning_cfg.get("run_after_tuning", True)
     tuning.debug = tuning_cfg.get("debug", True)
+
+    # sequence parallel config
+    if config.Model.get("sequence_parallel", False):
+        sp_optimization = strategy.sp_optimization
+        sp_optimization.enable = True
 
     engine_cfg = config["Engine"]
     engine_cfg["strategy"] = strategy

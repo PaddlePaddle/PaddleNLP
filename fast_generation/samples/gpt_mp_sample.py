@@ -96,7 +96,7 @@ def main(args):
     if args.profile:
         MODEL_CLASSES[model_name][0].generate = profile(args.batch_size)(MODEL_CLASSES[model_name][0].generate)
     tokenizer = MODEL_CLASSES[model_name][-1].from_pretrained(model_name)
-    model = MODEL_CLASSES[model_name][0].from_pretrained(model_name, load_state_as_np=True)
+    model = MODEL_CLASSES[model_name][0].from_pretrained(model_name)
     model.eval()
 
     # NOTE: When using prompt, open this and replace the text with what you want.

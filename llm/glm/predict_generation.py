@@ -80,9 +80,7 @@ class Predictor(object):
             args.model_name_or_path,
             tensor_parallel_degree=tensor_parallel_degree,
             tensor_parallel_rank=tensor_parallel_rank,
-            load_state_as_np=True,
             dtype=dtype,
-            low_cpu_mem_usage=True,
         )
         if self.args.lora_path is not None:
             self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)

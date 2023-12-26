@@ -13,9 +13,11 @@
 # limitations under the License.
 
 import os
+import tempfile
 from functools import partial
 from typing import Callable, Optional
 
+import aistudio_sdk
 import numpy as np
 import paddle
 import paddle.nn as nn
@@ -42,6 +44,8 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         pad_attention_mask: Optional[Callable] = None,
     ) -> None:
         super().__init__()
+        if isinstance(model, fleet.meta_parallel.PipelineLayer):
+            raise NotImplementedError("Prefix tuning is not implemented for pipeline parallelism.")
         self.prefix_config = prefix_config
         self.model = model
         self.forward_keys = signature(self.model.forward)
@@ -266,18 +270,18 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         self.prefix_encoder.eval()
 
     def print_trainable_parameters(self) -> None:
-        freeze_numel = 0
         trainable_numel = 0
+        freeze_numel = 0
         for _, weight in self.model.state_dict().items():
             if weight.stop_gradient:
-                freeze_numel += weight.numel().item()
+                freeze_numel += np.prod(weight.shape)
             else:
-                trainable_numel += weight.numel().item()
+                trainable_numel += np.prod(weight.shape)
         for _, weight in self.prefix_encoder.state_dict().items():
             if weight.stop_gradient:
-                freeze_numel += weight.numel().item()
+                freeze_numel += np.prod(weight.shape)
             else:
-                trainable_numel += weight.numel().item()
+                trainable_numel += np.prod(weight.shape)
         logger.info(
             f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel+trainable_numel:.2e}|| Trainable:{trainable_numel / (freeze_numel+trainable_numel):.2%}"
         )
@@ -350,7 +354,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             ]
         )
         # (num_layers, 2, num_heads, prefixlen, head_dim)
-        past_key_values = paddle.transpose(past_key_values, perm=[2, 1, 3, 0, 4]).numpy()
+        past_key_values = paddle.transpose(past_key_values, perm=[2, 1, 3, 0, 4]).cpu().numpy()
 
         if merge_tensor_parallel and self.prefix_config.tensor_parallel_degree > 1:
             trainable_state_dict = self.prefix_encoder.state_dict()
@@ -417,7 +421,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
                 tensor = action(ret) if is_dst else None
                 trainable_state_dict[key] = tensor
             else:
-                trainable_state_dict[key] = tensor.numpy() if is_dst else None
+                trainable_state_dict[key] = tensor.cpu().numpy() if is_dst else None
 
         return trainable_state_dict
 
@@ -447,3 +451,58 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             tensor = prefix_state_dict.pop(name)
             prefix_state_dict[name] = action(tensor)
         return prefix_state_dict
+
+    def save_to_aistudio(
+        self,
+        repo_id,
+        private=True,
+        license="Apache License 2.0",
+        exist_ok=True,
+        subfolder=None,
+        merge_tensor_parallel=False,
+        **kwargs
+    ):
+        """
+        Uploads all elements of this model to a new AiStudio Hub repository.
+        Args:
+            repo_id (str): Repository name for your model/tokenizer in the Hub.
+            token (str): Your token for the Hub.
+            private (bool, optional): Whether the model/tokenizer is set to private. Defaults to True.
+            license (str): The license of your model/tokenizer. Defaults to: "Apache License 2.0".
+            exist_ok (bool, optional): Whether to override existing repository. Defaults to: True.
+            subfolder (str, optional): Push to a subfolder of the repo instead of the root
+            merge_tensor_parallel (bool): Whether to merge the tensor parallel weights. Defaults to False.
+        """
+        res = aistudio_sdk.hub.create_repo(repo_id=repo_id, private=private, license=license, **kwargs)
+        if "error_code" in res:
+            if res["error_code"] == 10003 and exist_ok:
+                logger.info(
+                    f"Repo {repo_id} already exists, it will override files with the same name. To avoid this, please set exist_ok=False"
+                )
+            else:
+                logger.error(
+                    f"Failed to create repo {repo_id}, error_code: {res['error_code']}, error_msg: {res['error_msg']}"
+                )
+        else:
+            logger.info(f"Successfully created repo {repo_id}")
+
+        with tempfile.TemporaryDirectory() as root_dir:
+            if subfolder is not None:
+                save_dir = os.path.join(root_dir, subfolder)
+            else:
+                save_dir = root_dir
+            # save model
+            self.save_pretrained(save_dir, merge_tensor_parallel=merge_tensor_parallel)
+
+            # Upload model and return
+            logger.info(f"Pushing to the {repo_id}. This might take a while")
+            for filename in os.listdir(save_dir):
+                res = aistudio_sdk.hub.upload(
+                    repo_id=repo_id, path_or_fileobj=os.path.join(save_dir, filename), path_in_repo=filename, **kwargs
+                )
+                if "error_code" in res:
+                    logger.error(
+                        f"Failed to upload {filename}, error_code: {res['error_code']}, error_msg: {res['error_msg']}"
+                    )
+                else:
+                    logger.info(f"{filename}: {res['message']}")

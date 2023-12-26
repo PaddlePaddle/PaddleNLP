@@ -8,7 +8,7 @@
     "fp16": true,
     "fp16_opt_level": "O2",
     "dataset_name_or_path": "./data",
-    "output_dir": "./checkpoints/bloom_gptq_ckpts",
+    "output_dir": "./checkpoints/bloom_ptq_ckpts",
     "do_eval": true,
     "eval_with_do_generation": false,
     "do_ptq": true,
@@ -17,6 +17,6 @@
     "smooth_step": 16,
     "smooth_all_linears": true,
     "smooth_piecewise_search": true,
-    "smooth_k_piece": true,
+    "smooth_k_piece": 3,
     "smooth_search_piece": true
   }

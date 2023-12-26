@@ -20,14 +20,11 @@ from collections import OrderedDict
 
 from huggingface_hub import hf_hub_download
 
-from paddlenlp import __version__
-from paddlenlp.utils.downloader import (
-    COMMUNITY_MODEL_PREFIX,
-    get_path_from_url_with_filelock,
-)
-from paddlenlp.utils.import_utils import import_module, is_fast_tokenizer_available
-from paddlenlp.utils.log import logger
-
+from ... import __version__
+from ...utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
+from ...utils.import_utils import import_module, is_fast_tokenizer_available
+from ...utils.log import logger
+from ..aistudio_utils import aistudio_download
 from ..utils import resolve_cache_dir
 
 __all__ = [
@@ -221,7 +218,7 @@ class AutoTokenizer:
             return tokenizer_class
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, from_hf_hub=False, subfolder=None, *model_args, **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         """
         Creates an instance of `AutoTokenizer`. Related resources are loaded by
         specifying name of a built-in pretrained model, or a community-contributed
@@ -235,9 +232,6 @@ class AutoTokenizer:
                 - Name of a community-contributed pretrained model.
                 - Local directory path which contains tokenizer related resources
                   and tokenizer config file ("tokenizer_config.json").
-            from_hf_hub (bool, optional) Whether to load from HuggingFace Hub
-            subfolder (str, optional) An optional value corresponding to a folder inside the repo.
-                Only works when loading from HuggingFace Hub.
             *args (tuple): position arguments for model `__init__`. If provided,
                 use these as position argument values for tokenizer initialization.
             **kwargs (dict): keyword arguments for model `__init__`. If provided,
@@ -270,6 +264,9 @@ class AutoTokenizer:
         # Default not to use fast tokenizer
         use_fast = kwargs.pop("use_fast", False)
         cache_dir = kwargs.get("cache_dir", None)
+        subfolder = kwargs.get("subfolder", "")
+        from_aistudio = kwargs.get("from_aistudio", False)
+        from_hf_hub = kwargs.get("from_hf_hub", False)
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
         if "use_faster" in kwargs:
@@ -280,24 +277,27 @@ class AutoTokenizer:
         for names, tokenizer_class in cls._tokenizer_mapping.items():
             for name in names:
                 all_tokenizer_names.append(name)
-        # From HF Hub
-        if from_hf_hub:
-            config_file = hf_hub_download(
-                repo_id=pretrained_model_name_or_path,
-                filename=cls.tokenizer_config_file,
-                subfolder=subfolder,
-                cache_dir=cache_dir,
-                library_name="PaddleNLP",
-                library_version=__version__,
-            )
+        # From AI Studio or HF Hub
+        if from_aistudio or from_hf_hub:
+            if from_aistudio:
+                config_file = aistudio_download(
+                    repo_id=pretrained_model_name_or_path, filename=cls.tokenizer_config_file
+                )
+            else:
+                config_file = hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=cls.tokenizer_config_file,
+                    subfolder=subfolder,
+                    cache_dir=cache_dir,
+                    library_name="PaddleNLP",
+                    library_version=__version__,
+                )
             if os.path.exists(config_file):
                 tokenizer_class = cls._get_tokenizer_class_from_config(
                     pretrained_model_name_or_path, config_file, use_fast
                 )
                 logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
-                return tokenizer_class.from_pretrained(
-                    pretrained_model_name_or_path, from_hf_hub=from_hf_hub, subfolder=subfolder, *model_args, **kwargs
-                )
+                return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         # From built-in pretrained models
         elif pretrained_model_name_or_path in all_tokenizer_names:
             for names, tokenizer_classes in cls._tokenizer_mapping.items():

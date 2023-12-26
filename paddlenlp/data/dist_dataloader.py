@@ -16,7 +16,6 @@ import numpy as np
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
 _MAX_DATA_DIM = 64
@@ -58,20 +57,18 @@ class DistDataLoader(paddle.io.DataLoader):
 
         if dataset is None:
             dataset = DummyDataset()
-            batch_sampler = DistributedBatchSampler(dataset, 1)
             logger.info("rank has no data, use Dummpy dataset")
 
         super().__init__(dataset=dataset, batch_sampler=batch_sampler, collate_fn=collate_fn, num_workers=num_workers)
 
         self._hcg = fleet.get_hybrid_communicate_group()
 
-        # init pp data comm group
+        # Init pp data comm group.
         if self._hcg.get_pipe_parallel_world_size() > 1:
             self._pp_data_group = self._init_dataloader_comm_group()
         else:
             self._pp_data_group = None
 
-        # tensor parallel message
         self.mp_group = self._hcg.get_model_parallel_group()
         self.mp_rank = self._hcg.get_model_parallel_rank()
         self.mp_src_rank = self._hcg.get_model_parallel_group_src_rank()
@@ -80,7 +77,10 @@ class DistDataLoader(paddle.io.DataLoader):
         self.dp_rank = self._hcg.get_data_parallel_rank()
         sharding_rank = self._hcg.get_sharding_parallel_rank()
         self._need_data = (self.mp_rank == 0) and (self.pp_rank == 0)
-        self._data_keys, self._data_keys_size = None, None
+
+        # When needed other data types, we can modify dtype_list.
+        self.dtype_list = [paddle.int64, paddle.float32, paddle.int32]
+        self._data_keys_list, self._data_keys_size = None, None
 
         if self._need_data:
             self._dataloader = paddle.io.DataLoader(
@@ -138,60 +138,75 @@ class DistDataLoader(paddle.io.DataLoader):
         return self
 
     def __next__(self):
-        data_keys_size = 0
+        data_keys_size = [0 for i in range(len(self.dtype_list))]
         if self._need_data:
-            # {'input_ids': int64, 'labels': int64}
             data = next(self._dataloader_iter)
-            data_keys_size, data_keys = len(data.keys()), list(data.keys())
-            data_list = [data[key] for key in data_keys]
-            # TODO(daisiming): add more type assertion.
-            assert {item.dtype for item in data_list} == {
-                paddle.int64
-            }, f"Distloader requires dtype == `int64`, got:{[item.dtype for item in data_list]}"
+            data_keys = list(data.keys())
 
-        # broadcast data keys size
-        data_keys_size = paddle.to_tensor(data_keys_size)
+            for key in data_keys:
+                if data[key].dtype not in self.dtype_list:
+                    raise ValueError(
+                        f"Dist dataloader requires dtype as `int64`, `float32` or `int32` currently, but got: {data[key].dtype}"
+                    )
+
+            data_list, data_keys_list = [], []
+            for i, dtype in enumerate(self.dtype_list):
+                data_list.append([data[key] for key in data_keys if data[key].dtype == dtype])
+                data_keys_list.append([key for key in data_keys if data[key].dtype == dtype])
+            data_keys_size = [len(keys) for keys in data_keys_list]
+
+        # Broadcast data keys size.
         if self._data_keys_size is None:
-            if self.mp_group is not None and self.pp_rank == 0:
-                paddle.distributed.broadcast(data_keys_size, src=self.mp_src_rank, group=self.mp_group)
-            if self._pp_data_group is not None:
-                paddle.distributed.broadcast(
-                    data_keys_size, src=self._pp_data_group.ranks[0], group=self._pp_data_group
-                )
-            self._data_keys_size = int(data_keys_size.item())
-
-        if not self._need_data:
-            data_keys = [None for i in range(self._data_keys_size)]
-
-        # broadcast data keys name
-        if self._data_keys is None:
-            if self.mp_group is not None and self.pp_rank == 0:
-                paddle.distributed.broadcast_object_list(data_keys, src=self.mp_src_rank, group=self.mp_group)
+            if self.mp_group.nranks > 1 and self.pp_rank == 0:
+                paddle.distributed.broadcast_object_list(data_keys_size, src=self.mp_src_rank, group=self.mp_group)
             if self._pp_data_group is not None:
                 paddle.distributed.broadcast_object_list(
-                    data_keys, src=self._pp_data_group.ranks[0], group=self._pp_data_group
+                    data_keys_size, src=self._pp_data_group.ranks[0], group=self._pp_data_group
                 )
-            self._data_keys = data_keys
+            self._data_keys_size = data_keys_size
 
-        # broadcast data
         if not self._need_data:
-            data_list = [None for i in range(self._data_keys_size)]
-        if self.mp_group is not None and self.pp_rank == 0:
-            data_list = broadcast_data_list(data_list, paddle.int64, self.mp_rank, self.mp_group, self.mp_src_rank)
+            data_keys_list = [[None for i in range(keys_size)] for keys_size in self._data_keys_size]
+
+        # Broadcast data keys name.
+        if self._data_keys_list is None:
+            if self.mp_group.nranks > 1 and self.pp_rank == 0:
+                paddle.distributed.broadcast_object_list(data_keys_list, src=self.mp_src_rank, group=self.mp_group)
+            if self._pp_data_group is not None:
+                paddle.distributed.broadcast_object_list(
+                    data_keys_list, src=self._pp_data_group.ranks[0], group=self._pp_data_group
+                )
+            self._data_keys_list = data_keys_list
+
+        # Broadcast data.
+        if not self._need_data:
+            data_list = [[None for i in range(keys_size)] for keys_size in self._data_keys_size]
+
+        if self.mp_group.nranks > 1 and self.pp_rank == 0:
+            for i, dtype in enumerate(self.dtype_list):
+                if self._data_keys_size[i] > 0:
+                    data_list[i] = broadcast_data_list(
+                        data_list[i], dtype, self.mp_rank, self.mp_group, self.mp_src_rank
+                    )
 
         if self._pp_data_group is not None:
             # Note(daisimng): In last stage of pp, we don't need input_ids.
             # It will be removed in future.
-            data_list = broadcast_data_list(
-                data_list,
-                paddle.int64,
-                self.pp_rank,
-                self._pp_data_group,
-                self._pp_data_group.ranks[0],
-            )
+            for i, dtype in enumerate(self.dtype_list):
+                if self._data_keys_size[i] > 0:
+                    data_list[i] = broadcast_data_list(
+                        data_list[i],
+                        dtype,
+                        self.pp_rank,
+                        self._pp_data_group,
+                        self._pp_data_group.ranks[0],
+                    )
 
-        out = dict([(key, data) for key, data in zip(self._data_keys, data_list)])
-        return out
+        out_data = {}
+        for keys, datas in zip(self._data_keys_list, data_list):
+            out_data.update([(k, d) for k, d in zip(keys, datas)])
+
+        return out_data
 
 
 def broadcast_data_list(data_list, datatype, comm_rank=0, comm_group=None, src_rank=0):

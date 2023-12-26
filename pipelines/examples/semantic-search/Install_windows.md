@@ -80,6 +80,7 @@ python rest_api/application.py 8891
 
 #### 1.4.4 启动 WebUI
 ```bash
+pip install streamlit==1.11.1
 # 配置模型服务地址
 $env:API_ENDPOINT='http://127.0.0.1:8891'
 # 在指定端口 8502 启动 WebUI

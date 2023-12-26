@@ -16,7 +16,7 @@ python chat_paper.py \
 --secret_key \
 --bos_ak \
 --bos_sk \
---json_dir \
+--txt_file \
 --retriever_api_key \
 --retriever_secret_key \
 --es_host \

@@ -73,7 +73,8 @@ Learnt by ERNIE：[mask] [mask] [mask] 是黑龙江的省会，国际 [mask] [ma
 ├── pretraining_introduction.md 中文预训练详细介绍文档
 ├── preprocess
 │   ├── docs                部分数据制作文档，包括CLUECorpusSmall，WuDaoCorpusBase
-│   └── xxx.py              文件处理的python脚本。
+│   ├─ xxx.py              文件处理的python脚本
+│   └──README.md            PaddleNLP 预训练数据流程
 ├── vocab                   全中文字符词表制作教程
 ├── run_gb512_s1m.sh        训练启动shell脚本，batch size 512. max steps 100w
 ├── run_gb512_s1m_static.sh
@@ -116,7 +117,7 @@ ERNIE 中文预训练更详细的介绍文档请可以参见[ERNIE 中文预训�
 <summary><b>CLUECorpusSmall 数据准备</b></summary>
 
 #### 数据准备
-数据下载部分请参考[data_tools](./data_tools)目录，根据文档中`CLUECorpusSmall 数据集处理教程`，下载数据。下载好后:
+数据下载部分请参考[preprocess](./preprocess)目录，根据文档中`CLUECorpusSmall 数据集处理教程`，下载数据。下载好后:
 
 解压文件
 ```shell
@@ -127,15 +128,16 @@ unzip wiki2019zh_corpus.zip    -d  clue_corpus_small_14g/wiki2019zh_corpus
 ```
 将txt文件转换为jsonl格式
 ```
-python data_tools/trans_to_json.py  --input_path ./clue_corpus_small_14g --output_path clue_corpus_small_14g.jsonl
+python preprocess/trans_to_json.py  --input_path ./clue_corpus_small_14g --output_path clue_corpus_small_14g.jsonl
 ```
 现在我们得到了jsonl格式的数据集，下面是针对训练任务的数据集应用，此处以ernie为例。
 ```
-python -u  data_tools/create_pretraining_data.py \
+python -u  preprocess/create_pretraining_data.py \
     --model_name ernie-1.0-base-zh \
     --tokenizer_name ErnieTokenizer \
     --input_path clue_corpus_small_14g.jsonl \
-    --split_sentences\
+    --split_sentences \
+    --data_impl mmap \
     --chinese \
     --cn_whole_word_segment \
     --cn_seg_func jieba \
@@ -145,8 +147,8 @@ python -u  data_tools/create_pretraining_data.py \
 ```
 数据共有文档`15702702`条左右，由于分词比较耗时，大概一小时左右可以完成。在当前目录下产出训练所需数据。
 ```
-clue_corpus_small_14g_20220104_ids.npy
-clue_corpus_small_14g_20220104_idx.npz
+clue_corpus_small_14g_20220104.bin
+clue_corpus_small_14g_20220104.idx
 ```
 
 </details>
@@ -158,7 +160,7 @@ clue_corpus_small_14g_20220104_idx.npz
 
 ####  开始训练
 
-将制作好的数据`clue_corpus_small_14g_20220104_ids.npy,clue_corpus_small_14g_20220104_idx.npz`移动到input_dir中，即可开始训练。
+将制作好的数据`clue_corpus_small_14g_20220104.bin,clue_corpus_small_14g_20220104.idx`移动到input_dir中，即可开始训练。
 这里以8卡GPU训练为例任务脚本为例：
 ```
 python -u  -m paddle.distributed.launch \
@@ -169,6 +171,7 @@ python -u  -m paddle.distributed.launch \
     --model_name_or_path "ernie-1.0-base-zh" \
     --tokenizer_name_or_path "ernie-1.0-base-zh" \
     --input_dir "./data" \
+    --data_impl "mmap" \
     --output_dir "output/ernie-1.0-dp8-gb512" \
     --split 949,50,1 \
     --max_seq_len 512 \
@@ -201,6 +204,7 @@ python -u  -m paddle.distributed.launch \
     --model_name_or_path "ernie-1.0-base-zh" \
     --tokenizer_name_or_path "ernie-1.0-base-zh" \
     --input_dir "./data" \
+    --data_impl "mmap" \
     --output_dir "output/ernie-1.0-dp8-gb512" \
     --split 949,50,1 \
     --max_seq_len 512 \
@@ -228,6 +232,7 @@ python -u  -m paddle.distributed.launch \
 - `tokenizer_name_or_path` 模型词表文件所在的文件夹，或者PaddleNLP内置tokenizer的名字。
 - `continue_training` 默认false，模型从随机初始化，开始训练。如果为True，从已有的预训练权重加载，开始训练。如果为True， 训练初始loss 为2.x 是正常loss，如果未False，随机初始化，初始loss一般为10+。
 - `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
+- `data_impl` 指定输入文件数据制作类型，默认为`mmap`，可指定`mmap`或`lazy`，`mmap`格式在读入数据时会建立内存映射，`lazy`格式在读入数据时直接从文件读取。
 - `output_dir` 指定输出文件。
 - `split` 划分数据集为train、valid、test的比例。整个数据集会按照这个比例划分数据。默认1/1000的数据为test，当样本数太少时，请修改此比例。
 - `max_seq_len` 输入文本序列的长度。

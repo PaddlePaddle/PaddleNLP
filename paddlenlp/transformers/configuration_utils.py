@@ -20,7 +20,6 @@ from __future__ import annotations
 import copy
 import json
 import os
-import os.path as osp
 import re
 import shutil
 import sys
@@ -32,12 +31,9 @@ import paddle
 from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import EntryNotFoundError
 
-from paddlenlp import __version__
-from paddlenlp.transformers.utils import resolve_cache_dir
-from paddlenlp.utils.env import LEGACY_CONFIG_NAME
-from paddlenlp.utils.log import logger
-
-from ..utils import CONFIG_NAME
+from .. import __version__
+from ..quantization.quantization_config import QuantizationConfig
+from ..utils import CONFIG_NAME, LEGACY_CONFIG_NAME
 from ..utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     get_path_from_url_with_filelock,
@@ -45,6 +41,9 @@ from ..utils.downloader import (
     is_url,
     url_file_exists,
 )
+from ..utils.log import logger
+from .aistudio_utils import aistudio_download
+from .utils import resolve_cache_dir
 
 _re_configuration_file = re.compile(r"config\.(.*)\.json")
 
@@ -115,55 +114,6 @@ def custom_object_save(obj, folder, config=None):
     # for needed_file in get_relative_import_files(object_file):
     #     dest_file = Path(folder) / (Path(needed_file).name)
     #     shutil.copy(needed_file, dest_file)
-
-
-def cached_path(
-    url_or_filename,
-    cache_dir=None,
-    force_download=False,
-    local_files_only=False,
-) -> Optional[str]:
-    """
-    Given something that might be a URL (or might be a local path), determine which. If it's a URL, download the file
-    and cache it, and return the path to the cached file. If it's already a local path, make sure the file exists and
-    then return the path
-
-    Args:
-        cache_dir: specify a cache directory to save the file to (overwrite the default cache dir).
-        force_download: if True, re-download the file even if it's already cached in the cache dir.
-        user_agent: Optional string or dict that will be appended to the user-agent on remote requests.
-
-    Return:
-        Local path (string) of file or if networking is off, last version of file cached on disk.
-
-    Raises:
-        In case of non-recoverable file (non-existent or inaccessible url + no cache on disk).
-    """
-    if is_url(url_or_filename):
-        if cache_dir is None:
-            raise NotADirectoryError(
-                "when download from url<%s>, cache_dir is required, but receive None", url_or_filename
-            )
-
-        if force_download:
-            # remove the target file under cache_dir
-            file_path = osp.join(cache_dir, osp.split(url_or_filename)[-1])
-            shutil.rmtree(file_path, ignore_errors=True)
-
-        # URL, so get it from the cache (downloading if necessary)
-        output_path = get_path_from_url_with_filelock(
-            url_or_filename,
-            root_dir=cache_dir,
-        )
-    elif os.path.exists(url_or_filename):
-        # File, and it exists.
-        output_path = url_or_filename
-    else:
-        raise FileNotFoundError(
-            "can't find the file<{%s}> which should be valid url or local file path", url_or_filename
-        )
-
-    return output_path
 
 
 def attribute_map(config: PretrainedConfig, kwargs: Dict[str, Any]) -> Dict[str, Any]:
@@ -503,6 +453,10 @@ class PretrainedConfig:
         self.output_hidden_states = kwargs.pop("output_hidden_states", False)
         self.output_attentions = kwargs.pop("output_attentions", False)
         self.use_cache = kwargs.pop("use_cache", False)
+        if "quantization_config" in kwargs and isinstance(kwargs["quantization_config"], Dict):
+            kwargs["quantization_config"] = QuantizationConfig.from_dict(kwargs["quantization_config"])
+        self.quantization_config = kwargs.pop("quantization_config", QuantizationConfig())
+        self.use_flash_attention = kwargs.pop("use_flash_attention", False)
 
         self.pruned_heads = kwargs.pop("pruned_heads", {})
         self.tie_word_embeddings = kwargs.pop(
@@ -518,6 +472,8 @@ class PretrainedConfig:
         # Parameters for tensor parallel
         self.tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", -1)
         self.tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
+        # Parameters for sep
+        self.sep_parallel_degree = kwargs.pop("sep_parallel_degree", -1)
         # If set to True, this option is used with fleet.meta_parallel.ParallelCrossEntropy
         # to calculate cross-entropy loss for parallel model.
         self.tensor_parallel_output = kwargs.pop("tensor_parallel_output", False)
@@ -677,13 +633,7 @@ class PretrainedConfig:
         logger.info(f"Configuration saved in {output_config_file}")
 
     @classmethod
-    def from_pretrained(
-        cls,
-        pretrained_model_name_or_path: Union[str, os.PathLike],
-        from_hf_hub: bool = False,
-        cache_dir: Optional[str] = None,
-        **kwargs
-    ) -> PretrainedConfig:
+    def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs) -> PretrainedConfig:
         r"""
         Instantiate a [`PretrainedConfig`] (or a derived class) from a pretrained model configuration.
 
@@ -697,20 +647,6 @@ class PretrainedConfig:
                 - a path to a *directory* containing a configuration file saved using the
                   [`~PretrainedConfig.save_pretrained`] method, e.g., `./my_model_directory/`.
                 - a path or url to a saved configuration JSON *file*, e.g., `./my_model_directory/configuration.json`.
-            from_hf_hub (bool, *optional*):
-                load config from huggingface hub: https://huggingface.co/models
-            cache_dir (`str` or `os.PathLike`, *optional*):
-                Path to a directory in which a downloaded pretrained model configuration should be cached if the
-                standard cache should not be used.
-            force_download (`bool`, *optional*, defaults to `False`):
-                Whether or not to force to (re-)download the configuration files and override the cached versions if
-                they exist.
-            return_unused_kwargs (`bool`, *optional*, defaults to `False`):
-                If `False`, then this function returns just the final configuration object.
-
-                If `True`, then this functions returns a `Tuple(config, unused_kwargs)` where *unused_kwargs* is a
-                dictionary consisting of the key/value pairs whose keys are not configuration attributes: i.e., the
-                part of `kwargs` which has not been used to update `config` and is otherwise ignored.
             kwargs (`Dict[str, Any]`, *optional*):
                 The values in kwargs of any keys which are configuration attributes will be used to override the loaded
                 values. Behavior concerning key/value pairs whose keys are *not* configuration attributes is controlled
@@ -745,7 +681,6 @@ class PretrainedConfig:
         assert config.output_attentions == True
         assert unused_kwargs == {"foo": False}
         ```"""
-        kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         return cls.from_dict(config_dict, **kwargs)
@@ -768,13 +703,11 @@ class PretrainedConfig:
         """
         original_kwargs = copy.deepcopy(kwargs)
         cache_dir = kwargs.pop("cache_dir", None)
-        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        from_hf_hub = kwargs.get("from_hf_hub", False)
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
         # Get config dict associated with the base config file
-        config_dict, kwargs = cls._get_config_dict(
-            pretrained_model_name_or_path, cache_dir=cache_dir, from_hf_hub=from_hf_hub, **kwargs
-        )
+        config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, cache_dir=cache_dir, **kwargs)
 
         # That config file may point us toward another config file to use.
         if "configuration_files" in config_dict:
@@ -792,8 +725,8 @@ class PretrainedConfig:
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         cache_dir = kwargs.pop("cache_dir", None)
         from_hf_hub = kwargs.pop("from_hf_hub", False)
+        from_aistudio = kwargs.pop("from_aistudio", False)
         subfolder = kwargs.pop("subfolder", None)
-
         force_download = kwargs.pop("force_download", False)
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
 
@@ -838,6 +771,8 @@ class PretrainedConfig:
             resolved_config_file = resolve_hf_config_path(
                 repo_id=pretrained_model_name_or_path, cache_dir=cache_dir, subfolder=subfolder
             )
+        elif from_aistudio:
+            resolved_config_file = aistudio_download(repo_id=pretrained_model_name_or_path, filename=CONFIG_NAME)
         else:
             community_url = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, CONFIG_NAME])
             if url_file_exists(community_url):
@@ -903,6 +838,11 @@ class PretrainedConfig:
                 )
         to_remove = []
         for key, value in kwargs.items():
+            if key == "quantization_config" and isinstance(value, Dict):
+                for q_key in value:
+                    setattr(config.quantization_config, q_key, value[q_key])
+                to_remove.append(key)
+                continue
             if hasattr(config, key):
                 setattr(config, key, value)
                 if key != "dtype":
@@ -963,6 +903,11 @@ class PretrainedConfig:
 
         # only serialize values that differ from the default config
         for key, value in config_dict.items():
+            if key == "quantization_config":
+                quantization_diff_dict = self.quantization_config.to_diff_dict()
+                if len(quantization_diff_dict) > 0:
+                    serializable_config_dict[key] = quantization_diff_dict
+                continue
             if (
                 key not in default_config_dict
                 or key == "paddlenlp_version"
@@ -985,6 +930,8 @@ class PretrainedConfig:
             output["model_type"] = self.__class__.model_type
         if "_auto_class" in output:
             del output["_auto_class"]
+
+        output["quantization_config"] = self.quantization_config.to_dict()
 
         return output
 

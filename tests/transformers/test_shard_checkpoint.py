@@ -74,7 +74,7 @@ class TestFromPretrained(unittest.TestCase):
     def test_keep_in_fp32_modules(self):
         with tempfile.TemporaryDirectory() as tempdir:
             config = PretrainedConfig()
-            model = FakeModel._from_config(config, dtype="float16")
+            model = FakeModel.from_config(config, dtype="float16")
             model.config = config
             model.save_pretrained(tempdir)
 
@@ -94,7 +94,7 @@ class TestFromPretrained(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             model.save_pretrained(tmp_dir, max_shard_size="200kiB")
-            model_load = BertModel._from_config(config)
+            model_load = BertModel.from_config(config)
             missing_keys, unexpected_keys = load_sharded_checkpoint(model_load, tmp_dir)
 
         self.assertEqual(missing_keys, [])
@@ -115,7 +115,7 @@ class TestFromPretrained(unittest.TestCase):
             str_dst_dtype = str(dst_dtype)[dtype_prefix_len:]
 
             config = AutoConfig.from_pretrained("__internal_testing__/tiny-random-bert")
-            model = BertModel._from_config(config, dtype=str_src_dtype)
+            model = BertModel.from_config(config, dtype=str_src_dtype)
 
             with tempfile.TemporaryDirectory() as tmp_dir:
                 model.save_pretrained(tmp_dir)

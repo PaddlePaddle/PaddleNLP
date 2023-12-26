@@ -11,10 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import os
 from typing import Dict, List, Optional, Union
 
+import numpy as np
 from sentencepiece import SentencePieceProcessor
 
 from .. import PretrainedTokenizer
@@ -261,9 +263,29 @@ class ChatGLMv2Tokenizer(PretrainedTokenizer):
             difference = max_length - len(required_input)
 
             if "attention_mask" in encoded_inputs:
-                encoded_inputs["attention_mask"] = [0] * difference + encoded_inputs["attention_mask"]
+                # 3D/4D attention mask
+                if len(np.shape(encoded_inputs["attention_mask"])) > 2:
+                    encoded_inputs["attention_mask"] = np.pad(
+                        encoded_inputs["attention_mask"],
+                        pad_width=[(0, 0), (difference, 0), (difference, 0)],
+                        mode="constant",
+                        constant_values=0,
+                    )
+                # 2D attention mask
+                else:
+                    encoded_inputs["attention_mask"] = [0] * difference + encoded_inputs["attention_mask"]
             if "position_ids" in encoded_inputs:
                 encoded_inputs["position_ids"] = [0] * difference + encoded_inputs["position_ids"]
             encoded_inputs[self.model_input_names[0]] = [self.pad_token_id] * difference + required_input
 
         return encoded_inputs
+
+    def encode_chat_inputs(self, conversations: List[List[str, str]]):
+        # encode system
+        result = super().encode_chat_inputs(conversations)
+        if "system" in result:
+            result["system"] = self.get_prefix_tokens() + result["system"]
+        else:
+            result["conversations"][0][0] = self.get_prefix_tokens() + result["conversations"][0][0]
+
+        return result

@@ -9,6 +9,8 @@ jinja2
 sphinx
 sphinx_book_theme
 readthedocs-sphinx-search
+sphinx-rtd-theme
+recommonmark
 
 Markdown
 sphinx-copybutton
@@ -16,3 +18,4 @@ sphinx-markdown-tables
 
 # use paddlepaddle == 2.3.* according to: https://github.com/PaddlePaddle/Paddle/issues/48243
 paddlepaddle>=2.4.2
+paddlenlp

@@ -25,6 +25,7 @@ __all__ = [
 LLAMA_PRETRAINED_INIT_CONFIGURATION = {
     # Hypothetical model weights (tiny-random-llama & micro-random-llama) for test only
     "__internal_testing__/micro-random-llama": {
+        "architectures": ["LlamaForCausalLM"],
         "hidden_size": 64,
         "initializer_range": 0.02,
         "intermediate_size": 1000,
@@ -42,6 +43,7 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "use_flash_attention": False,
     },
     "__internal_testing__/tiny-random-llama": {
+        "architectures": ["LlamaForCausalLM"],
         "hidden_size": 768,
         "initializer_range": 0.02,
         "intermediate_size": 11008,
@@ -99,11 +101,8 @@ class LlamaConfig(PretrainedConfig):
             relevant if `config.is_decoder=True`.
         tie_word_embeddings(`bool`, *optional*, defaults to `False`):
             Whether to tie weight embeddings
-        rope_fusion_level(`str`, *optional*, defaults to ``):
-            The level of fusion of rope embedding. Can be chosen from:
-            (1) 'full': fuse sin cos compute and rope embedding
-            (2) 'core': only fuse rope embedding, will compute the sin and cos
-            (3) None: don't fuse any part of the rope embedding
+        use_fused_rope(`bool`, *optional*, defaults to False):
+            Enable rope fusion or not.
         num_key_value_heads (`int`, *optional*):
             This is the number of key_value heads that should be used to implement Grouped Query Attention. If
             `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
@@ -154,18 +153,19 @@ class LlamaConfig(PretrainedConfig):
         pp_recompute_interval=1,
         no_recompute_layers=None,
         fuse_attention_qkv=False,
-        use_flash_attention=False,
         fuse_attention_ffn=False,
+        use_flash_attention=False,
         use_fused_rms_norm=False,
+        use_fused_rope=False,
         tensor_parallel_output=True,
         sequence_parallel=False,
         fuse_sequence_parallel_allreduce=False,
+        virtual_pp_degree=1,
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
         tie_word_embeddings=False,
         alibi=False,
-        rope_fusion_level=None,
         rope_scaling_factor=1.0,
         rope_scaling_type=None,
         **kwargs,
@@ -197,13 +197,14 @@ class LlamaConfig(PretrainedConfig):
         self.tensor_parallel_output = tensor_parallel_output
         self.sequence_parallel = sequence_parallel
         self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
+        self.virtual_pp_degree = virtual_pp_degree
 
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
         self.alibi = alibi
 
-        self.rope_fusion_level = rope_fusion_level
+        self.use_fused_rope = use_fused_rope
         self.rope_scaling_factor = rope_scaling_factor
         self.rope_scaling_type = rope_scaling_type
 

@@ -55,6 +55,8 @@ from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.import_utils import import_module
 from paddlenlp.utils.log import logger
 
+from .aistudio_utils import aistudio_download
+
 HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
 
 
@@ -72,13 +74,13 @@ def convert_ndarray_dtype(np_array: np.ndarray, target_dtype: str) -> np.ndarray
     if source_dtype == "uint16" or target_dtype == "bfloat16":
         tensor = paddle.to_tensor(np_array)
         tensor = paddle.cast(tensor, target_dtype)
-        return tensor.numpy()
+        return tensor.cpu().numpy()
 
         # TODO(wj-Mcat): device_guard will slow the converting
         # with device_guard("cpu"):
         #     tensor = paddle.to_tensor(np_array)
         #     tensor = paddle.cast(tensor, target_dtype)
-        # return tensor.numpy()
+        # return tensor.cpu().numpy()
 
     if target_dtype == "bfloat16":
         target_dtype = "uint16"
@@ -141,7 +143,9 @@ def adapt_stale_fwd_patch(self, name, value):
         # NOTE(guosheng): In dygraph to static, `layer.forward` would be patched
         # by an instance of `StaticFunction`. And use string compare to avoid to
         # import fluid.
-        if type(value).__name__.endswith("StaticFunction"):
+        if type(value).__name__.endswith("StaticFunction") or self.forward.__class__.__name__.endswith(
+            "StaticFunction"
+        ):
             return value
         if hasattr(inspect, "getfullargspec"):
             (
@@ -467,9 +471,10 @@ def cached_file(
     filename: str,
     cache_dir: Optional[Union[str, os.PathLike]] = None,
     subfolder: str = "",
+    from_aistudio: bool = False,
     _raise_exceptions_for_missing_entries: bool = True,
     _raise_exceptions_for_connection_errors: bool = True,
-):
+) -> str:
     """
     Tries to locate a file in a local folder and repo, downloads and cache it if necessary.
     Args:
@@ -517,25 +522,32 @@ def cached_file(
     if isinstance(cache_dir, Path):
         cache_dir = str(cache_dir)
 
-    try:
-        # Load from URL or cache if already cached
-        # import pdb;pdb.set_trace()
-        resolved_file = paddlenlp_hub_download(
-            path_or_repo_id,
-            filename,
-            subfolder=None if len(subfolder) == 0 else subfolder,
-            # revision=revision,
-            cache_dir=cache_dir,
-        )
-    except HTTPError as err:
-        # First we try to see if we have a cached version (not up to date):
-        resolved_file = try_to_load_from_cache(path_or_repo_id, full_filename, cache_dir=cache_dir)
-        if resolved_file is not None and resolved_file != _CACHED_NO_EXIST:
-            return resolved_file
-        if not _raise_exceptions_for_connection_errors:
-            return None
+    if from_aistudio:
+        try:
+            resolved_file = aistudio_download(repo_id=path_or_repo_id, filename=filename)
+        except:
+            resolved_file = None
+    else:
+        try:
+            # Load from URL or cache if already cached
+            resolved_file = paddlenlp_hub_download(
+                path_or_repo_id,
+                filename,
+                subfolder=None if len(subfolder) == 0 else subfolder,
+                # revision=revision,
+                cache_dir=cache_dir,
+            )
+        except HTTPError as err:
+            # First we try to see if we have a cached version (not up to date):
+            resolved_file = try_to_load_from_cache(path_or_repo_id, full_filename, cache_dir=cache_dir)
+            if resolved_file is not None and resolved_file != _CACHED_NO_EXIST:
+                return resolved_file
+            if not _raise_exceptions_for_connection_errors:
+                return None
 
-        raise EnvironmentError(f"There was a specific connection error when trying to load {path_or_repo_id}:\n{err}")
+            raise EnvironmentError(
+                f"There was a specific connection error when trying to load {path_or_repo_id}:\n{err}"
+            )
 
     return resolved_file
 
@@ -584,12 +596,17 @@ def cached_file_for_hf_hub(
         return resolved_file
     except Exception as e:
         print(e)
-        raise EnvironmentError(
-            f"{path_or_repo_id} is not a local folder and is not a valid model identifier "
-            "listed on 'https://huggingface.co/models'\nIf this is a private repository, make sure to "
+        msg = f"""
+            {path_or_repo_id} is not a local folder and is not a valid model identifier "
+            "listed on 'https://huggingface.co/models' If this is a private repository, make sure to "
             "pass a token having permission to this repo with `use_auth_token` or log in with "
-            "`huggingface-cli login` and pass `use_auth_token=True`."
-        )
+            "`huggingface-cli login` and pass `use_auth_token=True`.
+            """
+        if _raise_exceptions_for_missing_entries:
+            raise EnvironmentError(msg)
+        else:
+            logger.info(msg)
+            return None
 
 
 def get_checkpoint_shard_files(
@@ -597,6 +614,7 @@ def get_checkpoint_shard_files(
     index_filename,
     cache_dir=None,
     subfolder="",
+    from_aistudio=False,
 ):
     """
     For a given model:
@@ -620,6 +638,12 @@ def get_checkpoint_shard_files(
     sharded_metadata["all_checkpoint_keys"] = list(index["weight_map"].keys())
     sharded_metadata["weight_map"] = index["weight_map"].copy()
 
+    file_map = {file: set() for file in shard_filenames}
+    for weight, file in index["weight_map"].items():
+        file_map[file].add(weight)
+
+    sharded_metadata["file_map"] = file_map
+
     # First, let's deal with local folder.
     if os.path.isdir(pretrained_model_name_or_path):
         shard_filenames = [os.path.join(pretrained_model_name_or_path, subfolder, f) for f in shard_filenames]
@@ -638,12 +662,15 @@ def get_checkpoint_shard_files(
     show_progress_bar = last_shard is None
     for shard_filename in tqdm.tqdm(shard_filenames, desc="Downloading shards", disable=not show_progress_bar):
         try:
-            cached_filename = paddlenlp_hub_download(
-                pretrained_model_name_or_path,
-                shard_filename,
-                subfolder=None if len(subfolder) == 0 else subfolder,
-                cache_dir=cache_dir,
-            )
+            if from_aistudio:
+                cached_filename = aistudio_download(repo_id=pretrained_model_name_or_path, filename=shard_filename)
+            else:
+                cached_filename = paddlenlp_hub_download(
+                    pretrained_model_name_or_path,
+                    shard_filename,
+                    subfolder=None if len(subfolder) == 0 else subfolder,
+                    cache_dir=cache_dir,
+                )
         # We have already dealt with RepositoryNotFoundError and RevisionNotFoundError when getting the index, so
         # we don't have to catch them here.
         except EntryNotFoundError:

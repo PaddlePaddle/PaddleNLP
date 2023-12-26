@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import glob
+import math
 import os
 import struct
 from typing import Dict, Optional
@@ -28,6 +29,8 @@ from sklearn.metrics import accuracy_score
 from paddlenlp.datasets import InTokensIterableDataset
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
+from paddlenlp.transformers import ChatGLMv2Tokenizer, LlamaForCausalLMPipe
+from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -110,7 +113,7 @@ def get_lora_target_modules(model):
         ]
     elif model.base_model_prefix == "bloom":
         target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
-    elif model.base_model_prefix == "llama":
+    elif model.base_model_prefix == "llama" or isinstance(model, LlamaForCausalLMPipe):
         target_modules = [
             ".*q_proj.*",
             ".*v_proj.*",
@@ -182,7 +185,7 @@ class CausalLMTrainer(Trainer):
         prediction_loss_only: bool,
         ignore_keys=None,
     ):
-        if prediction_loss_only:
+        if prediction_loss_only or self.args.pipeline_parallel_degree > 1:
             return super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
         elif not self.do_generation:
             loss, logits, labels = super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
@@ -200,7 +203,7 @@ class CausalLMTrainer(Trainer):
                 input_ids=inputs["input_ids"],
                 attention_mask=inputs["attention_mask"] if "attention_mask" in inputs else None,
                 position_ids=inputs["position_ids"] if "position_ids" in inputs else None,
-                max_length=self.data_args.tgt_length,
+                max_length=max(self.data_args.max_length - inputs["input_ids"].shape[-1], 1),
                 decode_strategy="sampling",
                 top_k=self.gen_args.top_k,
                 top_p=self.gen_args.top_p,
@@ -292,7 +295,7 @@ class CausalLMTrainer(Trainer):
 
 def get_infer_model_path(input_dir, model_prefix):
     if dist.get_world_size() > 1:
-        local_rank = dist.ParallelEnv().dev_id
+        local_rank = dist.get_rank()
         return os.path.join(input_dir, "rank_{}".format(local_rank), model_prefix)
     else:
         return os.path.join(input_dir, model_prefix)
@@ -351,6 +354,21 @@ def deserialize_from_file(fp):
     return data_arr
 
 
+def get_alibi_slopes(num_heads):
+    closest_power_of_2 = 2 ** math.floor(math.log2(num_heads))
+    base = 2 ** (-(2 ** -(math.log2(closest_power_of_2) - 3)))
+    powers = np.arange(1, 1 + closest_power_of_2)
+    slopes = np.power(base, powers)
+
+    if closest_power_of_2 != num_heads:
+        extra_base = 2 ** (-(2 ** -(math.log2(2 * closest_power_of_2) - 3)))
+        num_remaining_heads = min(closest_power_of_2, num_heads - closest_power_of_2)
+        extra_powers = np.arange(1, 1 + 2 * num_remaining_heads, 2)
+        slopes = np.concatante([slopes, np.power(extra_base, extra_powers)], axis=0)
+
+    return slopes.astype("float32")
+
+
 def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
     """Pad sequences to the max sequence length in batch."""
     max_len = max(map(len, insts))
@@ -366,20 +384,37 @@ def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
         return inst_data.astype("int64").reshape([-1, max_len])
 
 
-def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectures: str, benchmark=False):
+def dybatch_preprocess(
+    tokenizer,
+    texts: list[str],
+    src_length: int,
+    max_length: int,
+    architectures: str,
+    top_p: float,
+    temperature: float,
+    eos_token_id: int | list[list[int]],
+    pre_caches_length: int = 0,
+    benchmark: bool = False,
+):
     """Pre-process generation inputs."""
-    if "chatglm" in architectures:
+    inputs = {}
+    if "chatglmforcausallm" == architectures.lower():
         input_ids = []
         position_ids = []
 
         for text in texts:
-            tokens = tokenizer(text, return_tensors="np", padding=True)
+            tokens = tokenizer(
+                text,
+                return_tensors="np",
+                padding=True,
+                max_length=src_length,
+                # if use chat_template, it will not add special_tokens
+                add_special_tokens=tokenizer.chat_template is None or isinstance(tokenizer, ChatGLMv2Tokenizer),
+            )
             input_ids.append(tokens["input_ids"][0])
             position_ids.append(tokens["position_ids"][0])
 
-        inputs = {}
         pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][0]
-
         inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
         bs = inputs["input_ids"].shape[0]
         max_len = max(map(len, input_ids))
@@ -388,9 +423,8 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
         for i in range(len(position_ids)):
             inst_data_pos.append(np.array([list(inst) + [0] * (max_len - len(inst)) for inst in position_ids[i]]))
         inputs["position_ids"] = paddle.to_tensor(np.array(inst_data_pos))
-    else:
+    elif "gpt" in architectures:
         input_ids = []
-        position_ids = []
         if isinstance(texts, str):
             texts = [texts]
 
@@ -399,20 +433,48 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
                 text,
                 return_tensors="np",
                 padding=False,
+                max_length=src_length,
                 return_attention_mask=False,
                 return_token_type_ids=False,
             )
             input_ids.append(tokens["input_ids"][0])
 
-        inputs = {}
         pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][-1]
         inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
         bs = inputs["input_ids"].shape[0]
         max_len = max(map(len, input_ids))
 
-        position_ids = paddle.zeros(shape=[bs, max_len], dtype="int64")
+        position_ids = paddle.arange(sum(seq_len), dtype="int64")
+        pre_len = seq_len[0]
+        for length in seq_len[1:]:
+            position_ids[pre_len : length + pre_len] = position_ids[pre_len : length + pre_len] - pre_len
+            pre_len += length
+        inputs["position_ids"] = position_ids
+    else:
+        input_ids = []
+        if isinstance(texts, str):
+            texts = [texts]
+
+        for text in texts:
+            tokens = tokenizer(
+                text,
+                return_tensors="np",
+                padding=False,
+                max_length=src_length,
+                return_attention_mask=False,
+                return_token_type_ids=False,
+            )
+            input_ids.append(tokens["input_ids"][0])
+
+        pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][-1]
+        inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
+        bs = inputs["input_ids"].shape[0]
+        max_len = max(map(len, input_ids))
+
+        position_ids = paddle.zeros(shape=[bs, max_length + src_length], dtype="int64")
+
         for i in range(bs):
-            position_ids[i, : seq_len[i]] = paddle.arange(seq_len[i])
+            position_ids[i, pre_caches_length : pre_caches_length + seq_len[i]] = paddle.arange(seq_len[i])
         inputs["position_ids"] = position_ids
 
     tgt_ids = [input[-1:] for input in input_ids]
@@ -424,20 +486,16 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
         0,
     ] * bs
     tgt_pos = np.array(tgt_pos).astype("int64")
-    inputs["eos_token_id"] = (
-        np.array(
-            [
-                tokenizer.eos_token_id,
-            ]
-            * bs
-        )
-        .reshape(-1, 1)
-        .astype("int64")
-    )
+
+    if isinstance(eos_token_id, int):
+        eos_token_id = [eos_token_id]
+
+    inputs["eos_token_id"] = np.array(eos_token_id * bs).reshape(-1, 1).astype("int64")
+
     inputs["top_p"] = (
         np.array(
             [
-                0.0,
+                top_p,
             ]
             * bs
         )
@@ -447,7 +505,7 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
     inputs["temperature"] = (
         np.array(
             [
-                1.0,
+                temperature,
             ]
             * bs
         )
@@ -455,15 +513,18 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
         .astype("float32")
     )
     inputs["seq_len_encoder"] = seq_len.astype("int32").reshape(-1, 1)
-    inputs["seq_len_decoder"] = seq_len.astype("int32").reshape(-1, 1)
+    inputs["seq_len_decoder"] = (seq_len + pre_caches_length).astype("int32").reshape(-1, 1)
     inputs["step_idx"] = np.array(step_idx).astype("int64").reshape(-1, 1)
     inputs["tgt_ids"] = np.array(tgt_ids).astype("int64").reshape(-1, 1)
     inputs["tgt_pos"] = tgt_pos.reshape(-1, 1)
-    inputs["max_length"] = np.array(max_length - seq_len).astype("int64").reshape((-1, 1))
+    inputs["max_length"] = np.array(max_length - pre_caches_length).astype("int64").reshape((-1, 1))
     inputs["min_length"] = (
         np.array(
             [
-                1 if not benchmark else max_length - seq_len, # Note(Zhengzekang): When in benchmark mode, we need to set a fixed decode length. 
+                1
+                if not benchmark
+                else max_length
+                - pre_caches_length,  # Note(Zhengzekang): When in benchmark mode, we need to set a fixed decode length.
             ]
             * bs
         )
@@ -517,7 +578,7 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
 def load_real_time_tokens():
     tokens = []
     files = glob.glob(os.path.join("./real_time_save.*"))
-    for j in range(1, len(files)):
+    for j in range(1, len(files) + 1):
         filename = "./real_time_save.temp_ids_rank_0_step_{}".format(j)
         if not os.path.exists(filename):
             break
@@ -529,3 +590,50 @@ def load_real_time_tokens():
     os.system("rm -f ./real_time_save.temp_ids_rank_*")
     tokens = np.concatenate(tokens, axis=1)
     return tokens
+
+
+def init_chat_template(
+    tokenizer: PretrainedTokenizer, model_name_or_path: str, chat_template_file: Optional[str] = None
+):
+    """init chat template for the given tokenizer.
+
+        If is None, it will not use `chat_template.json`;
+        If is equal with `model_name_or_path`, it will use the default loading;
+        If is directory, it will find the `chat_template.json` under the directory;
+        If is file, it will load it.
+
+    Args:
+        tokenizer (PretrainedTokenizer): the instance of tokenizer
+        model_name_or_path (str): _description_
+        chat_template_file (Optional[str], optional): _description_. Defaults to None.
+    """
+    # 1. use the default chat_template file
+    if chat_template_file is None:
+        return
+
+    if str(chat_template_file).lower() == "none":
+        # delete the chat_template from tokenizer if not use chat_template.
+        # why do this: it will load the `chat_template.json` file by default
+        tokenizer.chat_template = None
+        return
+
+    # it will load the `chat_template.json` file by default, so do nothing
+    if chat_template_file == model_name_or_path:
+        if tokenizer.chat_template is None:
+            logger.warning(f"there is not `chat_template.json` file in the `{model_name_or_path}`")
+        return
+
+    if os.path.isdir(chat_template_file):
+        local_chat_template_file_path = os.path.join(chat_template_file, "chat_template.json")
+        if os.path.exists(local_chat_template_file_path):
+            chat_template_file = local_chat_template_file_path
+        else:
+            logger.warning(f"there is not `chat_template.json` file in the `{model_name_or_path}`")
+            return
+
+    if not os.path.exists(chat_template_file):
+        logger.warning(f"there is not `chat_template.json` file from path<`{model_name_or_path}`>")
+        return
+
+    logger.info(f"loading `chat_template.json` from `{chat_template_file}`")
+    tokenizer.init_chat_template(chat_template_file)

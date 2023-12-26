@@ -40,8 +40,9 @@ PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao �
 - tool_helpers
 - visualdl
 - pybind11
+- lac (可选)
 
-安装命令 `pip install visualdl pybind11 tool_helpers`
+安装命令 `pip install tool_helpers visualdl pybind11 lac`
 
 <a name="数据准备"> </a>
 
@@ -62,7 +63,7 @@ PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao �
 
 **CLUECorpus2020 语料**
 
-CLUECorpus2020 过对Common Crawl的中文部分进行语料清洗得到。开源部分提供了约200G左右的语料文本，详细介绍见[官网](https://github.com/CLUEbenchmark/CLUECorpus2020#%E6%95%B0%E6%8D%AE%E4%B8%8B%E8%BD%BD)，用户可以通过邮件申请下载。
+CLUECorpus2020 是通过Common Crawl中文部分语料清洗得到。开源部分提供了约200G左右的语料文本，详细介绍见[官网](https://github.com/CLUEbenchmark/CLUECorpus2020#%E6%95%B0%E6%8D%AE%E4%B8%8B%E8%BD%BD)，用户可以通过邮件申请下载。
 
 **WuDaoCorpus2.0 Base 语料**
 
@@ -82,9 +83,9 @@ tar -xvf WuDaoCorpus2.0_base_200G_sample.tar.gz
 
 ### 1.2 高精准中文分词
 
-ERNIE 使用知识嵌入的方式进行预训练。文本中的知识，比如 文本的中的人名、地名、成语、短语等都是知识。如何把这知识训练融合到模型中呢？ERNIE给出的方案，是对这些知识短语一起MASK，然后预测，也就是Whole Words MASK。
+ERNIE 使用知识嵌入的方式进行预训练。文本中的知识，比如 文本的中的人名、地名、成语、短语等都是知识。如何把这知识训练融合到模型中呢？ERNIE给出的方案是对这些知识短语一起MASK，然后预测，也就是Whole Words MASK。
 
-在我们数据处理层面，如何尽可能精确的从原始文本中提取知识，直接关系预训练模型的效果。我们对目前PaddleNLP常用的分词方式的有`jieba`，`lac`，`Wordtag`进行分析。`jieba`采用HMM隐马尔可模型，`lac`是LSTM模型，`wordtag`是基于Transformer的模型。
+在我们数据处理层面，如何尽可能精确的从原始文本中提取知识，直接关系预训练模型的效果。我们对目前PaddleNLP常用的分词方式的有`jieba`，`lac`，`seg`进行分析。`jieba`采用HMM隐马尔可模型，`lac`是LSTM模型。
 
 效果、速度对比表格如下，假设CPU使用40线程，GPU使用16卡，处理200G文本：
 
@@ -92,9 +93,9 @@ ERNIE 使用知识嵌入的方式进行预训练。文本中的知识，比如 �
 |-|-|-|-|
 | jieba | 一般 | 607 KB/s |  2.5 h |
 | lac   | 好 | 106 KB/s | 13.9 h
-| wordtag| 最好 | 0.94 KB/s | 159 D (GPU)|
+| wordtag (弃用)| 最好 | 0.94 KB/s | 159 D (GPU)|
 
-综合考虑分词的效果与速度，我们选择百度的LAC作为我们的文本分词工具。
+综合考虑分词的效果与速度，我们选择百度的LAC（seg）作为我们的文本分词工具。
 
 
 本文档以WuDao数据为例，对数据进行分词：
@@ -102,11 +103,11 @@ ERNIE 使用知识嵌入的方式进行预训练。文本中的知识，比如 �
 
 ```shell
 python ./preprocess/words_segmentation.py \
-    --input_path ./WuDaoCorpus2.0_base_200G \
-    --workers 40  \
-    --data_format wudao \
-    --cn_seg_func seg \
-    --output_path ./wudao_lac_cut \
+    --input_path "./WuDaoCorpus2.0_base_200G" \
+    --output_path "./wudao_lac_cut" \
+    --data_format "wudao" \
+    --cn_seg_func "seg" \
+    --workers 48
 ```
 
 注：预训练需要实现 SOP( Sentence Order Predict) 任务，在分词的同时，我们使用 简单规则 进行了文本断句。如果语料只有一句话，建议去除SOP loss，训练时设置 `binary_head=False`。
@@ -114,8 +115,8 @@ python ./preprocess/words_segmentation.py \
 文本转化完成后。我们使用 `./preprocess/trans_to_json.py`重新转换为jsonl格式（分词完毕）。
 ```shell
 python ./preprocess/trans_to_json.py  \
-    --input_path ./wudao_lac_cut \
-    --output_path wudao_corpus_200g_0623.jsonl \
+    --input_path "./wudao_lac_cut" \
+    --output_path "wudao_corpus_200g_sample.jsonl" \
     --workers 40 \
     --no-shuffle
 ```
@@ -142,17 +143,18 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_corpus
 
 使用 Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz CPU测试，40线程，处理速度 8+MB/s，约7个小时左右，即可完成 200GB 文本转化为ID.
 
-```
+```shell
 python -u  ./preprocess/create_pretraining_data.py \
-    --model_name ernie-3.0-base-zh \
-    --tokenizer_name ErnieTokenizer \
-    --input_path wudao_corpus_200g_0623.jsonl \
+    --model_name "ernie-3.0-base-zh" \
+    --tokenizer_name "ErnieTokenizer" \
+    --input_path "wudao_corpus_200g.jsonl" \
+    --output_prefix "wudao_corpus_200g" \
     --split_sentences\
+    --data_impl "mmap" \
     --chinese \
     --cn_splited \
     --cn_whole_word_segment \
-    --output_prefix wudao_200g_0703 \
-    --workers 40 \
+    --workers 48 \
     --log_interval 1000
 ```
 
@@ -161,15 +163,14 @@ python -u  ./preprocess/create_pretraining_data.py \
 
 转化后的数据如下，使用这份数据，即可开始ERNIE预训练：
 ```
--rw-rw-r-- 1 500 501 129G Jul  4 03:39 wudao_200g_0703_ids.npy
--rw-rw-r-- 1 500 501 6.4G Jul  4 03:39 wudao_200g_0703_idx.npz
+wudao_corpus_200g.bin
+wudao_corpus_200g.idx
 ```
 同样，对于 WuDaoCorpus2.0_base_200G_sample.tar.gz 数据，使用`ernie-3.0-bash-zh`的tokenizer，可以得到数据。
 ```
 mkdir data && cd data
-wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-base-zh_ids.npy
-wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-base-zh_idx.npz
-cd -
+wget https://paddlenlp.bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_corpus_200g_sample_ernie-3.0-base-zh.bin
+wget https://paddlenlp.bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_corpus_200g_sample_ernie-3.0-base-zh.idx
 ```
 
 <a name="中文词表制作"> </a>

@@ -493,7 +493,7 @@ def tolist(x):
     if isinstance(x, list):
         return x
     elif hasattr(x, "numpy"):  # Checks for TF tensors without needing the import
-        x = x.numpy()
+        x = x.cpu().numpy()
     return x.tolist()
 
 

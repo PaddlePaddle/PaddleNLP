@@ -151,18 +151,20 @@ def parsing_QA(api_key=None, secret_key=None, query="", maxlen=11200):
         return "我无法解答这个问题"
     else:
         text = ""
+        index = 0
         for key in query_keys:
+            index += 1
             query_text = "请提取" + company + key + "的信息来解答" + query + "这个问题"
             if key in ["主营收入", "公司主营业务"]:
-                text += "从" + key + "角度：\n" + text_retrieval(query_text, key) + "\n"
+                text += str(index) + "." + text_retrieval(query_text, key) + "\n\n"
             elif key != "日行情K线数据":
-                text += "从" + key + "角度：\n" + chat_table(query_text, api_key, secret_key, key) + "\n"
+                text += str(index) + "." + chat_table(query_text, api_key, secret_key, key) + "\n\n"
     ernie_bot = ErnieBot(api_key, secret_key)
     try:
         prompt = "你现在是金融助手，请你根据背景信息回答问题。请你记住，你的回答要基于背景信息，不要胡编乱造。背景信息{information},请回答相关问题{query}"
         information = text[: maxlen - 1 - len(query) - len(prompt)]
         prompt = prompt.format(information=information, query=query)
-        text = ernie_bot.run(prompt)[0]["result"] + "\n" + text
+        text = "以下是我为这个问题提供的相关信息：\n" + text + "\n\n" + ernie_bot.run(prompt)[0]["result"]
         return text
     except:
         return text

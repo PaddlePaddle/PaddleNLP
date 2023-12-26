@@ -33,7 +33,6 @@ from tritonclient.http import InferenceServerClient, InferInput, InferRequestedO
 from pipelines.document_stores import BaseDocumentStore
 from pipelines.nodes.retriever.base import BaseRetriever
 from pipelines.schema import ContentTypes, Document
-from pipelines.utils.common_utils import initialize_device_settings
 
 logger = logging.getLogger(__name__)
 
@@ -155,14 +154,14 @@ def run_main_query(query, url="0.0.0.0:8082", model_name="m3e", model_version="1
     return runner.Run_query(query)
 
 
-def embeddings_multi_doc(data, batch_size=32, num_process=10, url="0.0.0.0:8082"):
+def embeddings_multi_doc(data, batch_size=32, num_process=10, url="0.0.0.0:8082", model_name="m3e", model_version="1"):
     workers = len(data) // batch_size + 1
     offset = [i * batch_size for i in range(workers)]
     if offset[-1] != len(data):
         offset += [len(data)]
     data_index = zip(offset, offset[1:])
     data_list = [data[start:end] for start, end in data_index]
-    func = partial(run_main_doc, url=url)
+    func = partial(run_main_doc, url=url, model_name=model_name, model_version=model_version)
     pool = Pool(processes=min(num_process, multiprocessing.cpu_count()))
     result = pool.map(func, data_list)
     pool.close()  # close the process pool and no longer accept new processes
@@ -211,10 +210,6 @@ class ParallelRetriever(BaseRetriever):
             progress_bar=progress_bar,
         )
 
-        self.devices, _ = initialize_device_settings(use_cuda=use_gpu, multi_gpu=True)
-        if batch_size < len(self.devices):
-            logger.warning("Batch size is less than the number of devices. All gpus will not be utilized.")
-
         self.document_store = document_store
         self.batch_size = batch_size
         self.progress_bar = progress_bar
@@ -223,6 +218,7 @@ class ParallelRetriever(BaseRetriever):
         self.mode = mode
         self.url = url
         self.num_process = num_process
+        self.model_name = kwargs.get("model_name", "m3e")
 
         if document_store is None:
             logger.warning("DensePassageRetriever initialized without a document store. ")
@@ -325,7 +321,11 @@ class ParallelRetriever(BaseRetriever):
     def run_indexing(self, documents: List[dict], **kwargs):
         time1 = time.time()
         documents_list = embeddings_multi_doc(
-            documents, batch_size=self.batch_size, num_process=self.num_process, url=self.url
+            documents,
+            batch_size=self.batch_size,
+            num_process=self.num_process,
+            url=self.url,
+            model_name=self.model_name,
         )
         documents = []
         for i in documents_list:
@@ -337,3 +337,6 @@ class ParallelRetriever(BaseRetriever):
 
     def embed_queries(self, texts: List[str], **kwargs) -> List[np.ndarray]:
         return run_main_query(texts, self.url)
+
+    def embed_documents(self, docs: List[Document], **kwargs):
+        return run_main_query([d.content for d in docs], self.url)

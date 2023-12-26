@@ -28,10 +28,12 @@ __global__ void fusedQKV_transpose_split_kernel(
     const int seq_len,
     const int token_num,
     const int head_num,
+    const int kv_head_num,
     const int size_per_head) {
-  const int32_t offset = batch_size * max_len_this_time * head_num * size_per_head;
+  // const int32_t offset = batch_size * max_len_this_time * head_num * size_per_head;
   const int32_t hidden_size = head_num * size_per_head;
-  const int32_t fused_hidden_size = 3 * hidden_size;
+  const int32_t fused_hidden_size = hidden_size + kv_head_num * size_per_head + kv_head_num * size_per_head;
+
   int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
   using LoadT = AlignedVector<T, VecSize>;
   LoadT src_vec;
@@ -52,9 +54,9 @@ __global__ void fusedQKV_transpose_split_kernel(
 
     // equal to:
     // const int qkv_id  = (linear_index % fused_hidden_size) / hidden_size;
-    const int32_t qkv_id = bias_idx / hidden_size;
-    const int32_t head_id = (linear_index % hidden_size) / size_per_head;
-    const int32_t size_id = linear_index % size_per_head;
+    const int32_t qkv_id = bias_idx < hidden_size ? 0 : (bias_idx -  hidden_size) / ( kv_head_num * size_per_head) + 1;
+    const int32_t head_id = qkv_id == 0 ? bias_idx / size_per_head : (bias_idx -  hidden_size) / size_per_head % kv_head_num;
+    const int32_t size_id = bias_idx % size_per_head;
 
     if (qkv_id == 0) {
       Store<T, VecSize>(
@@ -65,13 +67,13 @@ __global__ void fusedQKV_transpose_split_kernel(
     } else if (qkv_id == 1) {
       Store<T, VecSize>(
           src_vec,
-          &k_buf[target_batch_id * head_num * max_len_this_time * size_per_head +
+          &k_buf[target_batch_id * kv_head_num * max_len_this_time * size_per_head +
                  head_id * max_len_this_time * size_per_head + seq_id * size_per_head +
                  size_id]);
     } else {
       Store<T, VecSize>(
           src_vec,
-          &v_buf[target_batch_id * head_num * max_len_this_time * size_per_head +
+          &v_buf[target_batch_id * kv_head_num * max_len_this_time * size_per_head +
                  head_id * max_len_this_time * size_per_head + seq_id * size_per_head +
                  size_id]);
     }
@@ -94,11 +96,16 @@ std::vector<paddle::Tensor> qkv_transpose_split(const paddle::Tensor& qkv, // [t
     const int token_num = qkv_shape[0];
     const int bsz = seq_lens.shape()[0];
     const int max_seq_len = input_ids.shape()[1]; //max_seq_len_tensor.copy_to(paddle::CPUPlace(), false).data<int>()[0];
+    
+    int64_t fused_hidden_size = qkv.shape()[1];
+    int kv_num_head = (fused_hidden_size - num_head * head_size) / head_size / 2;
+
     auto q_out = paddle::full({bsz, num_head, max_seq_len, head_size}, 0, qkv.dtype(), qkv.place());
-    auto k_out = paddle::full({bsz, num_head, max_seq_len, head_size}, 0, qkv.dtype(), qkv.place());
-    auto v_out = paddle::full({bsz, num_head, max_seq_len, head_size}, 0, qkv.dtype(), qkv.place());
+    auto k_out = paddle::full({bsz, kv_num_head, max_seq_len, head_size}, 0, qkv.dtype(), qkv.place());
+    auto v_out = paddle::full({bsz, kv_num_head, max_seq_len, head_size}, 0, qkv.dtype(), qkv.place());
     constexpr int PackSize = VEC_16B / sizeof(DataType_);
-    const int elem_cnt = token_num * num_head * head_size * 3;
+    const int elem_cnt = qkv_shape[0] * qkv_shape[1];
+
     const int pack_num = elem_cnt / PackSize;
     const int blocksize = 128;
     const int grid_size = (pack_num + blocksize - 1) / blocksize;
@@ -116,6 +123,7 @@ std::vector<paddle::Tensor> qkv_transpose_split(const paddle::Tensor& qkv, // [t
         max_seq_len,
         token_num,
         num_head,
+        kv_num_head,
         head_size);
     return {q_out, k_out, v_out};
 }
@@ -173,7 +181,9 @@ std::vector<std::vector<int64_t>> QKVTransposeSplitInferShape(const std::vector<
                                                               int num_head,
                                                               int head_size) {
     int64_t bsz = seq_lens_shape[0];
-    return {{bsz, num_head, -1, head_size}, {bsz, num_head, -1, head_size}, {bsz, num_head, -1, head_size}};
+    int64_t fused_hidden_size = qkv_shape[1];
+    int kv_num_head = (fused_hidden_size - num_head * head_size) / head_size / 2;
+    return {{bsz, num_head, -1, head_size}, {bsz, kv_num_head, -1, head_size}, {bsz, kv_num_head, -1, head_size}};
 }
 
 std::vector<paddle::DataType> QKVTransposeSplitInferDtype(const paddle::DataType& qkv_dtype,

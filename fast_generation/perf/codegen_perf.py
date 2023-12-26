@@ -37,7 +37,7 @@ def perf_pd(args):
     place = "gpu"
     place = paddle.set_device(place)
     tokenizer = CodeGenTokenizer.from_pretrained(args.model_name_or_path)
-    model = CodeGenForCausalLM.from_pretrained(args.model_name_or_path, load_state_as_np=True)
+    model = CodeGenForCausalLM.from_pretrained(args.model_name_or_path)
     model.eval()
     load_mem = query_by_id(args.gpu_id)
 
