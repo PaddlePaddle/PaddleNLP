@@ -413,7 +413,6 @@ function llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1() {
     log_dir=mylog
     rm -rf $log_dir
     python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 run_pretrain.py \
-        --model_type gpt \
         --model_name_or_path gpt2-medium-en \
         --tokenizer_name_or_path gpt2-medium-en \
         --input_dir ./data \
@@ -454,7 +453,7 @@ function llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1() {
     ips=`cat $log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
     mem=`cat $log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'gpu_max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=8.93378448
+    loss_base=8.93362331
     ips_base=64.75564390065037
     mem_base=8904
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}

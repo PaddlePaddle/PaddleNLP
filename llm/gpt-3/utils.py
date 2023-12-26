@@ -78,8 +78,9 @@ def set_seed(seed):
 
     # NOTE: the commented seeds are set only for precision validation
     # seed += 100 * pp_rank
-    random.seed(seed + 100 * pp_rank)
-    np.random.seed(seed + 100 * pp_rank)
+    random_seed = seed + 100 * pp_rank
+    random.seed(random_seed)
+    np.random.seed(random_seed)
 
     # seed = mp_rank +
     #        pp_rank * (mp_size) +
