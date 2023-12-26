@@ -1,3 +1,6 @@
+
+max_len.txt 
+
 # tmp files
 infer.json
 output.json 
@@ -11,3 +14,4 @@ checkpoints/
 
 # inference_model
 inference*/
+

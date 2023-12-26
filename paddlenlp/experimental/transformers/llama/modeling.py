@@ -12,16 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import annotations
+from typing_extensions import Self
 
 import json
 import os
 
 import numpy as np
+import time
 import paddle
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
-from paddlenlp_ops import fused_get_rotary_embedding, get_padding_offset
+from paddlenlp_ops import (
+    fused_get_rotary_embedding,
+    get_padding_offset,
+    get_padding_offset_v2,
+)
+from paddlenlp.utils.log import logger
+
 
 from paddlenlp.experimental.model_utils import ActScalesLoader, WeightScalesLoader
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
@@ -29,9 +37,13 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
+    FusedBlockMultiTransformer,
+    FusedBlockMultiTransformerWeightOnly,
+    FusedBlockMultiTransformerA8W8,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
+    GenerationBlockInferenceModel,
 )
 from paddlenlp.transformers import LlamaConfig, LlamaPretrainedModel
 from paddlenlp.transformers.llama.modeling import LlamaLMHead
@@ -44,7 +56,7 @@ from paddlenlp.transformers.model_utils import (
     register_base_model,
 )
 
-__all__ = ["LlamaInferenceModel", "LlamaForCausalLMInferenceModel", "LlamaForMiniGPT4InferenceModel"]
+__all__ = ["LlamaInferenceModel", "LlamaForCausalLMInferenceModel", "LlamaForCausalLMBlockInferenceModel", "LlamaForMiniGPT4InferenceModel"]
 
 
 class FusedLlamaRMSNorm(nn.Layer):
@@ -89,6 +101,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
         self.use_weight_only = False
         self.weight_only_quant_bits = config.weight_only_quant_bits
+
 
         if self.quant_type is not None and "weight_only_int" in self.quant_type:
             self.use_weight_only = True
@@ -280,12 +293,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             use_neox_rotary_style=True,
         )
 
-        if self.use_weight_only:
-            self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
-        elif self.quant_type == "a8w8":
-            self.transformer_block = FusedMultiTransformerA8W8(transformer_config)
-        else:
-            self.transformer_block = FusedMultiTransformerBase(transformer_config)
+
+        self.set_transformer_block(transformer_config)
 
         self.norm = FusedLlamaRMSNorm(config)
 
@@ -294,6 +303,14 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
         self.gradient_checkpointing = False
 
+    def set_transformer_block(self, transformer_config):
+        if self.use_weight_only:
+            self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
+        elif self.quant_type == "a8w8":
+            self.transformer_block = FusedMultiTransformerA8W8(transformer_config)
+        else:
+            self.transformer_block = FusedMultiTransformerBase(transformer_config)
+        
     def get_input_embeddings(self):
         return self.embed_tokens
 
@@ -431,6 +448,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.norm.weight.set_value(paddle.to_tensor(state_dict["llama.norm.weight"], dtype=self.norm.weight.dtype))
 
         for idx in range(self.config.num_hidden_layers):
+            logger.info(f"set state for layer {idx}")
             unfused_state_dict = {}
             unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
                 "llama.layers.{}.self_attn.q_proj.weight".format(idx)
@@ -442,6 +460,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 "llama.layers.{}.self_attn.v_proj.weight".format(idx)
             ]
 
+            
             concated_qkv_weight = (
                 np.concatenate(
                     [
@@ -471,8 +490,11 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 qkv_weight_tensor = paddle.to_tensor(concated_qkv_weight)
                 qkv_weight_tensor = paddle.transpose(qkv_weight_tensor, perm=[1, 0])
                 qkv_quanted_weight_tensor, qkv_weight_scale_tensor = weight_quantize(
-                    qkv_weight_tensor, algo=self.quant_type
+                    qkv_weight_tensor.cuda(), algo=self.quant_type
                 )
+                qkv_quanted_weight_tensor=qkv_quanted_weight_tensor.cpu()
+                qkv_weight_scale_tensor=qkv_weight_scale_tensor.cpu()
+                qkv_weight_scale_tensor=qkv_weight_scale_tensor.cast(qkv_weight_tensor.dtype)
                 self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor)
                 self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor)
             elif self.quant_type == "a8w8":
@@ -485,8 +507,11 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             linear_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.weight".format(idx)])
             if self.use_weight_only:
                 linear_quanted_weight_tensor, linear_weight_scale_tensor = weight_quantize(
-                    linear_weight_tensor, algo=self.quant_type
+                    linear_weight_tensor.cuda(), algo=self.quant_type
                 )
+                linear_quanted_weight_tensor = linear_quanted_weight_tensor.cpu()
+                linear_weight_scale_tensor = linear_weight_scale_tensor.cpu()
+                linear_weight_scale_tensor=linear_weight_scale_tensor.cast(linear_weight_tensor.dtype)
                 self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor)
                 self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor)
             elif self.quant_type == "a8w8":
@@ -503,8 +528,11 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
             if self.use_weight_only:
                 ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
-                    ffn1_weight_tensor, algo=self.quant_type
+                    ffn1_weight_tensor.cuda(), algo=self.quant_type
                 )
+                ffn1_quanted_weight_tensor = ffn1_quanted_weight_tensor.cpu()
+                ffn1_weight_scale_tensor = ffn1_weight_scale_tensor.cpu()
+                ffn1_weight_scale_tensor = ffn1_weight_scale_tensor.cast(ffn1_weight_tensor.dtype)
                 self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor)
                 self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor)
             elif self.quant_type == "a8w8":
@@ -517,8 +545,11 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             ffn2_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)])
             if self.use_weight_only:
                 ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(
-                    ffn2_weight_tensor, algo=self.quant_type
+                    ffn2_weight_tensor.cuda(), algo=self.quant_type
                 )
+                ffn2_quanted_weight_tensor = ffn2_quanted_weight_tensor.cpu()
+                ffn2_weight_scale_tensor = ffn2_weight_scale_tensor.cpu()
+                ffn2_weight_scale_tensor = ffn2_weight_scale_tensor.cast(ffn2_weight_tensor.dtype)
                 self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
                 self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
             elif self.quant_type == "a8w8":
@@ -669,6 +700,73 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                                 )
                             )
 
+@register_base_model
+class LlamaBlockInferenceModel(LlamaInferenceModel):
+    def __init__(self, config: LlamaConfig):
+        super().__init__(config)
+        self.max_seq_len = config.max_seq_len
+        self.block_size = config.block_size
+
+    def set_transformer_block(self, transformer_config):
+        if self.use_weight_only:
+            self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
+        elif self.quant_type == "a8w8":
+            self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
+        else:
+            self.transformer_block = FusedBlockMultiTransformer(transformer_config)
+
+    def remove_padding(self, input_ids, seq_lens_this_time):
+        cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
+        token_num = paddle.sum(seq_lens_this_time)
+        ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = get_padding_offset_v2(
+            input_ids, cum_offsets_now, token_num, seq_lens_this_time
+        )
+        return ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        caches=None,
+        pre_caches=None,
+        output_attentions=False,
+        output_hidden_states=None,
+        return_dict=False,
+        **kwargs,
+    ):  
+
+        seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
+        rope_emb = kwargs.get("rope_emb", None)
+        ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
+                input_ids, seq_lens_this_time
+            )
+        kwargs["cu_seqlens_q"] = cu_seqlens_q
+        kwargs["cu_seqlens_k"] = cu_seqlens_k
+        kwargs["padding_offsets"] = padding_offset
+        kwargs["max_input_length"] = self.max_seq_len
+
+        inputs_embeds = self.embed_tokens(ids_remove_padding)
+
+        with dy2st_nocheck_guard_context():
+            hidden_states, _ = self.transformer_block(
+                input_ids=input_ids,
+                src=inputs_embeds,
+                cum_offsets=cum_offsets,
+                attn_mask=attention_mask,
+                caches=caches,
+                pre_caches=pre_caches,
+                rotary_embs=rope_emb,
+                **kwargs,
+            )
+        hidden_states = self.norm(hidden_states)
+
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=hidden_states,
+            past_key_values=None,
+            hidden_states=None,
+            attentions=None,
+        )
 
 class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedModel):
     """
@@ -829,6 +927,193 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         if "lm_head.weight" in state_dict:
             self.lm_head.weight.set_value(state_dict["lm_head.weight"])
         self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
+
+
+class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPretrainedModel):
+    """
+    Dynamic Batching for LLaMA Model with pretraining tasks on top.
+    """
+
+    _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.llama = LlamaBlockInferenceModel(config)
+        self.lm_head = LlamaLMHead(config)
+
+    @classmethod
+    def from_pretrained(
+        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
+    ):
+        # TODO: Support safetensors loading.
+        kwargs["use_safetensors"] = False
+        from paddlenlp.transformers.utils import resolve_cache_dir, is_paddle_support_lazy_init, ContextManagers, is_safetensors_available
+        from paddlenlp.transformers.configuration_utils import PretrainedConfig
+        from paddlenlp.transformers.model_utils import no_init_weights, dtype_guard
+
+        config = kwargs.pop("config", None)
+        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
+        dtype = kwargs.pop("dtype", None)
+        from_aistudio = kwargs.get("from_aistudio", False)
+        subfolder = kwargs.get("subfolder", None)
+        variant = kwargs.pop("variant", None)
+        use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
+        convert_from_torch = kwargs.pop("convert_from_torch", None)
+        cache_dir = kwargs.pop("cache_dir", None)
+
+        model_kwargs = kwargs
+
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+        # if not isinstance(config, PretrainedConfig):
+        #     config_path = config if config is not None else pretrained_model_name_or_path
+        #     config, model_kwargs = cls.config_class.from_pretrained(
+        #         config_path,
+        #         cache_dir=cache_dir,
+        #         return_unused_kwargs=True,
+        #         **kwargs,
+        #     )
+
+        init_contexts = []
+        # if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
+        #     # Instantiate model.
+        #     init_contexts.append(no_init_weights(_enable=True))
+        #     if is_paddle_support_lazy_init():
+        #         init_contexts.append(paddle.LazyGuard())
+        # if dtype:
+        #     init_contexts.append(dtype_guard(dtype))
+
+        init_args = config["init_args"] or ()
+        with ContextManagers(init_contexts):
+            model = cls(config, *init_args, **model_kwargs)
+
+        resolved_archive_file, sharded_metadata, is_sharded = cls._resolve_model_file_path(
+            pretrained_model_name_or_path,
+            cache_dir=cache_dir,
+            subfolder=subfolder,
+            from_hf_hub=from_hf_hub,
+            from_aistudio=from_aistudio,
+            config=config,
+            convert_from_torch=convert_from_torch,
+            use_safetensors=use_safetensors,
+            variant=variant,
+        )
+
+        model.state_dict = paddle.load(resolved_archive_file, return_numpy=True)
+        model.set_state_dict(model.state_dict)
+
+        return model
+
+    @classmethod
+    def get_cache_kvs_shape(
+        cls, config: LlamaConfig, max_batch_size: int = None, max_length: int = None
+    ) -> list[list[int]]:
+        """get cache_kvs tensor for llama model
+
+        Args:
+            max_batch_size (int): the max batch size
+            max_length (int | None, optional): the max_length of cache_kvs. Defaults to None.
+
+        Returns:
+            list[paddle.Tensor]: the list tensor shape for cache
+        """
+        max_block_per_seq = (config.max_seq_len + config.block_size - 1) // config.block_size
+        if max_batch_size == -1:
+            max_block_nums = None
+        else:
+            max_block_nums = max_batch_size * max_block_per_seq
+
+        cache_kvs = []
+        for _ in range(config.num_hidden_layers):
+            cache_kv_shape = [
+                max_block_nums,
+                config.num_attention_heads // max(config.tensor_parallel_degree, 1),
+                config.block_size,
+                config.hidden_size // config.num_attention_heads,
+            ]
+            cache_kvs.append(cache_kv_shape)
+            cache_kvs.append(cache_kv_shape)
+        return cache_kvs
+
+    def prepare_inputs_for_generation(self, **kwargs):
+        # only last token for inputs_ids if cache is defined in kwargs
+        input_ids = kwargs["input_ids"]
+        src_mask = kwargs.get("src_mask", None)
+        block_tables = kwargs.get("block_tables", None)
+
+        pre_caches = kwargs.get("pre_caches", None)
+        caches = kwargs.get("caches", None)
+
+        rope_emb = kwargs["rope_emb"]
+        seq_lens_this_time = kwargs["seq_lens_this_time"]
+        seq_lens_encoder = kwargs["seq_lens_encoder"]
+        seq_lens_decoder = kwargs["seq_lens_decoder"]
+        k_quant_scales = kwargs.get("k_quant_scales", None)
+        v_quant_scales = kwargs.get("v_quant_scales", None)
+        k_dequant_scales = kwargs.get("k_dequant_scales", None)
+        v_dequant_scales = kwargs.get("v_dequant_scales", None)
+        model_inputs = {
+            "input_ids": input_ids,
+            "src_mask": src_mask,
+            "rope_emb": rope_emb,
+            "pre_caches": pre_caches,
+            "caches": caches,
+            "seq_lens_this_time": seq_lens_this_time,
+            "seq_lens_encoder": seq_lens_encoder,
+            "seq_lens_decoder": seq_lens_decoder,
+            "block_tables": block_tables,
+            "k_quant_scales": k_quant_scales,
+            "v_quant_scales": v_quant_scales,
+            "k_dequant_scales": k_dequant_scales,
+            "v_dequant_scales": v_dequant_scales,
+        }
+        return model_inputs
+
+    def forward(
+        self,
+        input_ids,
+        src_mask=None,
+        pre_caches=None,
+        caches=None,
+        seq_lens_this_time=None,
+        seq_lens_encoder=None,
+        seq_lens_decoder=None,
+        rope_emb=None,
+        block_tables=None,
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
+    ):
+        outputs = self.llama(
+            input_ids,
+            src_mask=src_mask,
+            caches=caches,
+            rope_emb=rope_emb,
+            block_tables=block_tables,
+            pre_caches=pre_caches,
+            seq_lens_this_time=seq_lens_this_time,
+            seq_lens_encoder=seq_lens_encoder,
+            seq_lens_decoder=seq_lens_decoder,
+            k_quant_scales=k_quant_scales,
+            v_quant_scales=v_quant_scales,
+            k_dequant_scales=k_dequant_scales,
+            v_dequant_scales=v_dequant_scales,
+        )
+
+        hidden_states = outputs[0]
+        logits = self.lm_head(
+            hidden_states,
+            tensor_parallel_output=False,
+        )
+
+        return logits
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict):
+        if "lm_head.weight" in state_dict:
+            self.lm_head.weight.set_value(state_dict["lm_head.weight"])
+        self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
+
 
 
 class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
