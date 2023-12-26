@@ -24,8 +24,7 @@ import tempfile
 import warnings
 from contextlib import contextmanager
 from functools import partial
-
-# from pathlib import Path
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
 
 import aistudio_sdk
@@ -324,7 +323,7 @@ def load_state_dict(
         # Check format of the archive
         with safe_open(checkpoint_file, framework="np") as f:
             metadata = f.metadata()
-        if metadata.get("format") not in ["pd", "np"]:
+        if metadata.get("format", "np") not in ["pd", "np"]:
             raise OSError(
                 f"The safetensors archive passed at {checkpoint_file} does not contain the valid metadata. Make sure "
                 "you save your model with the `save_pretrained` method."
@@ -355,14 +354,14 @@ def load_state_dict(
 
 
 def resolve_weight_file_from_hf_hub(
-    repo_id: str, cache_dir: str, support_conversion: bool, subfolder=None, use_safetensors=False
+    repo_id: str, cache_dir: str, convert_from_torch: bool, subfolder=None, use_safetensors=False
 ):
     """find the suitable weight file name
 
     Args:
         repo_id (str): repo name of huggingface hub
         cache_dir (str): cache dir for hf
-        support_conversion (bool): whether support converting pytorch weight file to paddle weight file
+        convert_from_torch (bool): whether support converting pytorch weight file to paddle weight file
         subfolder (str, optional) An optional value corresponding to a folder inside the repo.
     """
     is_sharded = False
@@ -373,24 +372,35 @@ def resolve_weight_file_from_hf_hub(
             is_sharded = True
         elif hf_file_exists(repo_id, SAFE_WEIGHTS_NAME, subfolder=subfolder):
             file_name = SAFE_WEIGHTS_NAME
-    else:
-        # RAW WEIGHTS
-        if hf_file_exists(repo_id, PADDLE_WEIGHTS_INDEX_NAME, subfolder=subfolder):
-            file_name = PADDLE_WEIGHTS_INDEX_NAME
-            is_sharded = True
-        elif hf_file_exists(repo_id, PYTORCH_WEIGHTS_INDEX_NAME, subfolder=subfolder):
-            file_name = PYTORCH_WEIGHTS_INDEX_NAME
-            is_sharded = True
-        elif hf_file_exists(repo_id, PADDLE_WEIGHTS_NAME, subfolder=subfolder):
-            file_name = PADDLE_WEIGHTS_NAME
-        elif hf_file_exists(repo_id, PYTORCH_WEIGHTS_NAME, subfolder=subfolder):
-            file_name = PYTORCH_WEIGHTS_NAME
-
         else:
             raise EntryNotFoundError(
-                message=f"can not find the paddle/pytorch weight file from: https://huggingface.co/{repo_id}",
+                message=f"can not find the safetensors weight file from: https://huggingface.co/{repo_id}",
                 response=None,
             )
+    else:
+        if convert_from_torch:
+            # TORCH WEIGHTS
+            if hf_file_exists(repo_id, PYTORCH_WEIGHTS_INDEX_NAME, subfolder=subfolder):
+                file_name = PYTORCH_WEIGHTS_INDEX_NAME
+                is_sharded = True
+            elif hf_file_exists(repo_id, PYTORCH_WEIGHTS_NAME, subfolder=subfolder):
+                file_name = PYTORCH_WEIGHTS_NAME
+            else:
+                raise EntryNotFoundError(
+                    message=f"can not find the pytorch weight file from: https://huggingface.co/{repo_id}",
+                    response=None,
+                )
+        else:
+            if hf_file_exists(repo_id, PADDLE_WEIGHTS_INDEX_NAME, subfolder=subfolder):
+                file_name = PADDLE_WEIGHTS_INDEX_NAME
+                is_sharded = True
+            elif hf_file_exists(repo_id, PADDLE_WEIGHTS_NAME, subfolder=subfolder):
+                file_name = PADDLE_WEIGHTS_NAME
+            else:
+                raise EntryNotFoundError(
+                    message=f"can not find the paddle weight file from: https://huggingface.co/{repo_id}",
+                    response=None,
+                )
 
     file_name_list = [file_name]
     resolved_file = None
@@ -574,10 +584,11 @@ def shard_checkpoint(
     # Otherwise, let's build the index
     weight_map = {}
     shards = {}
+    weights_name_suffix = Path(weights_name).suffix
     for idx, shard in enumerate(sharded_state_dicts):
-        shard_file = weights_name.replace(".pdparams", f"-{idx+1:05d}-of-{len(sharded_state_dicts):05d}.pdparams")
-        shard_file = shard_file.replace(
-            ".safetensors", f"-{idx + 1:05d}-of-{len(sharded_state_dicts):05d}.safetensors"
+        # replace `suffix` -> `-00001-of-00002suffix`
+        shard_file = weights_name.replace(
+            weights_name_suffix, f"-{idx+1:05d}-of-{len(sharded_state_dicts):05d}{weights_name_suffix}"
         )
         shards[shard_file] = shard
         for key in shard.keys():
@@ -1555,7 +1566,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     resolved_archive_file, is_sharded = resolve_weight_file_from_hf_hub(
                         pretrained_model_name_or_path,
                         cache_dir=cache_dir,
-                        support_conversion=convert_from_torch,
+                        convert_from_torch=convert_from_torch,
                         subfolder=subfolder,
                         use_safetensors=use_safetensors,
                     )

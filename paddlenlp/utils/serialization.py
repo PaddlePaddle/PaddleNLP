@@ -25,6 +25,7 @@ from _io import BufferedReader
 from safetensors import safe_open
 
 from paddlenlp.utils.env import PYTORCH_WEIGHTS_NAME, SAFE_WEIGHTS_NAME
+from paddlenlp.utils.import_utils import is_torch_available
 
 MZ_ZIP_LOCAL_DIR_HEADER_SIZE = 30
 
@@ -220,16 +221,27 @@ def load_torch(path: str, **pickle_load_args):
         torch_zip.close()
     elif path.endswith(SAFE_WEIGHTS_NAME) or os.path.split(path)[-1].startswith("model-"):
         # Check format of the archive
-        with safe_open(path, framework="pt") as f:
-            metadata = f.metadata()
-        if metadata.get("format") not in ["pt"]:
-            raise OSError(
-                f"You have open the `convert_from_torch` flag but the safetensors archive passed at {path} does not contain the 'pt' metadata."
-            )
-        state_dict = {}
-        with safe_open(path, framework="pt") as f:
-            for key in f.keys():
-                weight = f.get_tensor(key)
-                state_dict[key] = weight.numpy()
-
+        if is_torch_available():
+            with safe_open(path, framework="pt") as f:
+                metadata = f.metadata()
+            if metadata.get("format", "pt") not in ["pt"]:
+                raise OSError(
+                    f"You have open the `convert_from_torch` flag but the safetensors archive passed at {path} does not contain the 'pt' metadata."
+                )
+            state_dict = {}
+            with safe_open(path, framework="pt") as f:
+                for key in f.keys():
+                    weight = f.get_tensor(key)
+                    state_dict[key] = weight.numpy()
+        else:
+            with safe_open(path, framework="np") as f:
+                metadata = f.metadata()
+            if metadata.get("format", "pt") not in ["pt", "np"]:
+                raise OSError(
+                    f"You have open the `convert_from_torch` flag but the safetensors archive passed at {path} does not contain the 'pt' or 'np' metadata."
+                )
+            state_dict = {}
+            with safe_open(path, framework="np") as f:
+                for key in f.keys():
+                    state_dict[key] = f.get_tensor(key)
     return state_dict
