@@ -18,7 +18,6 @@ import time
 import types
 from types import MethodType
 
-import lr
 import numpy as np
 import paddle
 import paddle.distributed as dist
@@ -43,7 +42,11 @@ from paddle.incubate.distributed.models import moe
 from utils import get_timers, set_timers
 from visualdl import LogWriter
 
-from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
+from paddlenlp.transformers import (
+    CosineAnnealingWithWarmupDecay,
+    GPTChineseTokenizer,
+    GPTTokenizer,
+)
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
@@ -426,7 +429,7 @@ def do_train(args):
     if args.lr_decay_style == "none":
         lr_scheduler = None
     elif args.lr_decay_style == "cosine":
-        lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
+        lr_scheduler = CosineAnnealingWithWarmupDecay(
             max_lr=args.max_lr, min_lr=args.min_lr, warmup_step=warmup_step, decay_step=args.decay_steps
         )
 
