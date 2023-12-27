@@ -35,7 +35,7 @@ from pipelines.nodes.file_converter import BaseConverter, ImageToTextConverter
 logger = logging.getLogger(__name__)
 
 
-def tackle_page(page_list, file_path):
+def extract_pages(page_list, file_path):
     start = page_list[0]
     end = page_list[1]
     page_text = []
@@ -46,11 +46,11 @@ def tackle_page(page_list, file_path):
     return page_text
 
 
-def mul_tackle(pages, file_path, process_num=2):
+def run_process(pages, file_path, process_num=2):
     process_num = min(os.cpu_count(), process_num)
     pool = multiprocessing.Pool(process_num)
-    tackle_page_c = functools.partial(tackle_page, file_path=file_path)
-    result = pool.map_async(tackle_page_c, pages)
+    extract_pages_c = functools.partial(extract_pages, file_path=file_path)
+    result = pool.map_async(extract_pages_c, pages)
     pool.close()
     pool.join()
     return result.get()
@@ -92,7 +92,7 @@ class PDFToTextConverter(BaseConverter):
         **kwargs: Any,
     ) -> List[Dict[str, Any]]:
         """
-        Extract text from a .pdf file using the pdftotext library (https://www.xpdfreader.com/pdftotext-man.html)
+        Extract text from a .pdf file using the pypdf library (https://pybrary.net/pyPdf/)
 
         :param file_path: Path to the .pdf file you want to convert
         :param process_num: Number of processes
@@ -169,14 +169,17 @@ class PDFToTextConverter(BaseConverter):
                        the content stream order.
         ::param process_num: Number of processes
         """
+        if process_num > os.cpu_count():
+            logger.warning("The number of processes cannot exceed the number of cups")
+            process_num = os.cpu_count()
         pdf = pypdf.PdfReader(file_path)
-        all_page = len(pdf.pages)
-        split_len = all_page // process_num
-        page_list = [i for i in range(0, all_page, split_len)]
-        if all_page > page_list[-1]:
-            page_list.append(all_page)
+        page_length = len(pdf.pages)
+        split_len = page_length // process_num
+        page_list = [i for i in range(0, page_length, split_len)]
+        if page_length > page_list[-1]:
+            page_list.append(page_length)
         page_combination = [(start, end) for start, end in zip(page_list, page_list[1:])]
-        page_text = mul_tackle(page_combination, file_path, process_num)
+        page_text = run_process(page_combination, file_path, process_num)
         page_text_all = []
         for item in page_text:
             page_text_all.extend(item)
