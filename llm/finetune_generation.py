@@ -414,6 +414,7 @@ def main():
                 target_modules=target_modules,
                 r=model_args.lora_rank,
                 lora_alpha=2 * model_args.lora_rank,
+                quick_backward=training_args.quick_backward,
                 merge_weights=False,
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 dtype=dtype,

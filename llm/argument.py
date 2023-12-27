@@ -26,6 +26,7 @@ class TrainingArguments(TrainingArguments):
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
     )
+    quick_backward: bool = field(default=False, metadata={"help": "Whether use lora quick backward"})
 
     def __post_init__(self):
         super().__post_init__()

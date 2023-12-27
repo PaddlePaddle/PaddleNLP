@@ -54,6 +54,7 @@ class LoRAConfig:
     merge_weights: bool = field(
         default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
     )
+    quick_backward: bool = field(default=False, metadata={"help": "whether use lora quick backward."})
     trainable_bias: Optional[str] = field(
         default=None, metadata={"help": "Define trainable bias parameters for the Lora model."}
     )
