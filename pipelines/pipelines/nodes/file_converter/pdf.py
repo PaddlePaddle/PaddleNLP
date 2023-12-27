@@ -13,13 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import functools
 import logging
+import multiprocessing
 import os
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import pdfplumber
+import pypdf
 
 try:
     from pdf2image import convert_from_path
@@ -31,6 +33,27 @@ except (ImportError, ModuleNotFoundError) as ie:
 from pipelines.nodes.file_converter import BaseConverter, ImageToTextConverter
 
 logger = logging.getLogger(__name__)
+
+
+def extract_pages(page_list, file_path):
+    start = page_list[0]
+    end = page_list[1]
+    page_text = []
+    pdf = pypdf.PdfReader(file_path)
+    for page in pdf.pages[start:end]:
+        paragraphs = page.extract_text()
+        page_text.append(paragraphs)
+    return page_text
+
+
+def run_process(pages, file_path, process_num=2):
+    process_num = min(os.cpu_count(), process_num)
+    pool = multiprocessing.Pool(process_num)
+    extract_pages_c = functools.partial(extract_pages, file_path=file_path)
+    result = pool.map_async(extract_pages_c, pages)
+    pool.close()
+    pool.join()
+    return result.get()
 
 
 class PDFToTextConverter(BaseConverter):
@@ -61,6 +84,7 @@ class PDFToTextConverter(BaseConverter):
     def convert(
         self,
         file_path: Path,
+        process_num: int = 20,
         meta: Optional[Dict[str, str]] = None,
         remove_numeric_tables: Optional[bool] = None,
         valid_languages: Optional[List[str]] = None,
@@ -68,9 +92,10 @@ class PDFToTextConverter(BaseConverter):
         **kwargs: Any,
     ) -> List[Dict[str, Any]]:
         """
-        Extract text from a .pdf file using the pdftotext library (https://www.xpdfreader.com/pdftotext-man.html)
+        Extract text from a .pdf file using the pypdf library (https://pybrary.net/pyPdf/)
 
         :param file_path: Path to the .pdf file you want to convert
+        :param process_num: Number of processes
         :param meta: Optional dictionary with metadata that shall be attached to all resulting documents.
                      Can be any custom keys and values.
         :param remove_numeric_tables: This option uses heuristics to remove numeric rows from the tables.
@@ -84,8 +109,7 @@ class PDFToTextConverter(BaseConverter):
                                 not one of the valid languages, then it might likely be encoding error resulting
                                 in garbled text.
         """
-
-        pages = self._read_pdf(file_path, layout=False)
+        pages = self._read_pdf(file_path, layout=False, process_num=process_num)
         if remove_numeric_tables is None:
             remove_numeric_tables = self.remove_numeric_tables
         if valid_languages is None:
@@ -136,20 +160,30 @@ class PDFToTextConverter(BaseConverter):
         document = {"content": text, "content_type": "text", "meta": meta}
         return [document]
 
-    def _read_pdf(self, file_path: Path, layout: bool) -> List[str]:
+    def _read_pdf(self, file_path: Path, layout: bool, process_num: int) -> List[str]:
         """
         Extract pages from the pdf file at file_path.
 
         :param file_path: path of the pdf file
         :param layout: whether to retain the original physical layout for a page. If disabled, PDF pages are read in
                        the content stream order.
+        ::param process_num: Number of processes
         """
-        pdf = pdfplumber.open(file_path)
-        page_text = []
-        for page in pdf.pages:
-            paragraphs = page.extract_text()
-            page_text.append(paragraphs)
-        return page_text
+        if process_num > os.cpu_count():
+            logger.warning("The number of processes cannot exceed the number of cups")
+            process_num = os.cpu_count()
+        pdf = pypdf.PdfReader(file_path)
+        page_length = len(pdf.pages)
+        split_len = page_length // process_num
+        page_list = [i for i in range(0, page_length, split_len)]
+        if page_length > page_list[-1]:
+            page_list.append(page_length)
+        page_combination = [(start, end) for start, end in zip(page_list, page_list[1:])]
+        page_text = run_process(page_combination, file_path, process_num)
+        page_text_all = []
+        for item in page_text:
+            page_text_all.extend(item)
+        return page_text_all
 
 
 class PDFToTextOCRConverter(BaseConverter):
