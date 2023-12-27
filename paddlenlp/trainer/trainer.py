@@ -510,10 +510,10 @@ class Trainer:
 
         if self.args.unified_checkpoint:
             if resume_from_checkpoint is not None:
+                use_unified_checkpoint = False
                 if self.is_unified_checkpoint(resume_from_checkpoint):
                     use_unified_checkpoint = True
                 else:
-                    use_unified_checkpoint = False
                     logger.info("Loading origin checkpoint, the next checkpoint will be saved as unified checkpoint")
 
                 if use_unified_checkpoint:
@@ -2289,12 +2289,11 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
-            use_unified_checkpoint = False
             if self.args.unified_checkpoint:
+                use_unified_checkpoint = False
                 if self.is_unified_checkpoint(checkpoint):
                     use_unified_checkpoint = True
                 else:
-                    use_unified_checkpoint = False
                     logger.info("Loading checkpoint, the next checkpoint will be saved as unified checkpoint")
 
             if not use_unified_checkpoint:

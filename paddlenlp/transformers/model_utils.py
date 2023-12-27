@@ -750,6 +750,7 @@ def _convert_state_dict_dtype_and_shape(state_dict, model_to_load):
                     value_pop if value_pop.place == expected_place else value_pop._copy_to(expected_place, False)
                 )
                 state_dict[key] = paddle.cast(value_new_place, value.dtype)._copy_to(value_pop.place, False)
+                del value_new_place
             # unified 0d and 1d tensor
             if is_0d_or_1d(value) and is_0d_or_1d(state_dict[key]):
                 if list(value.shape) != list(state_dict[key].shape):
