@@ -70,8 +70,6 @@ from paddle.distributed.fleet.utils.hybrid_parallel_util import (
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from tqdm.auto import tqdm
 
-from paddlenlp.trainer.trainer_utils import check_memory_usage
-
 from ..data import (
     DataCollator,
     DataCollatorWithPadding,
@@ -641,7 +639,6 @@ class Trainer:
                 f"args.max_steps must be set to a positive value if dataloader does not have a length, was {args.max_steps}"
             )
 
-        print("=" * 20, "memory usage after init_train_model_opt", check_memory_usage("before"))
         # delay_optimizer_creation = (
         #     self.sharding is not None
         #     and ShardingOption.SHARD_OP in self.args.sharding
@@ -677,10 +674,6 @@ class Trainer:
             if delay_optimizer_creation:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
             self._load_optimizer_and_scheduler(resume_from_checkpoint)
-
-        print("=" * 20, "memory usage after init_train_model_opt", check_memory_usage("before"))
-        paddle.device.cuda.empty_cache()
-        print("=" * 20, "memory usage after init_train_model_opt", check_memory_usage("empty"))
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples:,}")
@@ -848,7 +841,6 @@ class Trainer:
                     and availiable_no_sync
                     and args._no_sync_in_gradient_accumulation
                 ) or (args.recompute and availiable_no_sync)
-                print("=" * 20, "memory usage after full_train_step", check_memory_usage("before"))
                 # sharding
                 # stage1. the same as ddp
                 # stage2. manualy collect gradient on dp group
@@ -946,16 +938,11 @@ class Trainer:
                     self.callback_handler.on_optimizer_end(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
                     )
-                    print("=" * 20, "memory usage after full_train_step", check_memory_usage("before"))
-                    paddle.device.cuda.empty_cache()
-                    print("=" * 20, "memory usage after full_train_step", check_memory_usage("empty"))
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
-                    # if self.state.global_step == 2:
-                    #     exit(0)
                     self._print_timer()
                     step_control = 0
                 else:
@@ -1112,7 +1099,6 @@ class Trainer:
             logs: Dict[str, float] = {}
 
             # all_gather + mean() to get average loss over all processes
-            # print(self._nested_gather(tr_loss))
             tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
 
             # reset tr_loss to zero
@@ -1138,7 +1124,6 @@ class Trainer:
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
             self._globalstep_last_start_time = time.time()
-            # print(logs)
 
             self.log(logs, **kwargs)
 
@@ -1509,17 +1494,6 @@ class Trainer:
         warmup = (
             self.args.warmup_steps if self.args.warmup_steps > 0 else int(self.args.warmup_ratio * num_training_steps)
         )
-        print(
-            "=" * 20,
-            "lr setting:",
-            self.args.learning_rate,
-            self.args.lr_scheduler_type,
-            warmup,
-            num_training_steps,
-            self.args.num_cycles,
-            self.args.lr_end,
-            self.args.power,
-        )
 
         if self.lr_scheduler is None:
             self.lr_scheduler = get_scheduler(
@@ -1845,11 +1819,9 @@ class Trainer:
 
         model.train()
         inputs = self._prepare_inputs(inputs)
-        # print("=" * 20, "after _prepare_inputs")
 
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
-        # print("=" * 20, "after compute_loss")
 
         if self.args.gradient_accumulation_steps > 1:
             loss = loss / self.args.gradient_accumulation_steps
@@ -1858,7 +1830,6 @@ class Trainer:
             self.scaler.scale(loss).backward()
         else:
             loss.backward()
-        # print("=" * 20, "after backward")
 
         return loss.detach()
 
@@ -2406,7 +2377,6 @@ class Trainer:
 
             # Prediction step
             loss, logits, labels = self.prediction_step(model, inputs, prediction_loss_only, ignore_keys=ignore_keys)
-            # print(logits, labels)
 
             # Update containers on host
             if loss is not None:

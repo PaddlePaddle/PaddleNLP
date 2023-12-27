@@ -16,14 +16,12 @@ import copy
 import itertools
 import math
 import os
-import sys
 import time
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
-import paddle.distributed as dist
 import paddle.nn as nn
 import paddle.nn.functional as F
 import tqdm
@@ -35,38 +33,28 @@ from rich.table import Table
 
 from paddlenlp.data import DataCollator
 from paddlenlp.generation import GenerationConfig
-from paddlenlp.generation.utils import print
-from paddlenlp.trainer.trainer import (  # DEFAULT_CALLBACKS,; DEFAULT_PROGRESS_CALLBACK,; CallbackHandler,; PrinterCallback,; TrainerMemoryTracker,; get_reporting_integration_callbacks,; get_timers,; set_seed,; set_timers,
-    PADDLE_WEIGHTS_NAME,
+from paddlenlp.trainer.trainer import (
     TRAINER_STATE_NAME,
     DygraphShardingOptimizer,
     EvalLoopOutput,
     EvalPrediction,
     HybridParallelOptimizer,
-    LoRAModel,
     NlpDistributedBatchSampler,
-    PrefixModelForCausalLM,
     ShardingOption,
     Trainer,
     TrainerCallback,
     TrainerControl,
     TrainerState,
     TrainingArguments,
-    TrainOutput,
-    _add_variant,
     _obtain_optimizer_parameters_list,
     distributed_file,
     distributed_isfile,
     fleet,
     fused_allreduce_gradients,
-    has_length,
     is_dp_group_support_in_group_sharded_parallel,
     logger,
     speed_metrics,
 )
-from paddlenlp.trainer.trainer_utils import check_memory_usage
-
-# from paddlenlp.trainer.utils import nested_detach
 from paddlenlp.transformers import BatchEncoding, PretrainedModel, PretrainedTokenizer
 from paddlenlp.transformers.tokenizer_utils_base import (
     PaddingStrategy,
@@ -109,6 +97,9 @@ def gather_log_probabilities(logits: paddle.Tensor, labels: paddle.Tensor) -> pa
 def init_train_model_opt(
     self: Trainer, max_steps: int, resume_from_checkpoint: bool = False, clear_master_weight: bool = False
 ) -> PretrainedModel:
+    # Copy of model/optimizer init and resuming related code in `Trainer.train`.
+    # NOTE: this `_load_from_checkpoint` is indeed to load model states in the
+    # following elif-else branches, though they are apart away in `Trainer.train`.
     if not self.args.should_load_sharding_stage1_model:
         self._load_from_checkpoint(resume_from_checkpoint)
 
@@ -157,57 +148,6 @@ def init_train_model_opt(
         npu_accelerate_plugin(self.optimizer)
 
     return model
-
-
-def init_train_num(self: Trainer, train_dataloader: DataLoader):
-    args = self.args
-
-    total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.dataset_world_size
-    len_dataloader = None
-    if has_length(train_dataloader):
-        len_dataloader = len(train_dataloader)
-        num_update_steps_per_epoch = len(train_dataloader) // args.gradient_accumulation_steps
-        num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
-        num_examples = len(self.train_dataset)
-
-        if args.max_steps > 0:
-            max_steps = args.max_steps
-            num_train_epochs = args.max_steps // num_update_steps_per_epoch + int(
-                args.max_steps % num_update_steps_per_epoch > 0
-            )
-            num_train_samples = args.max_steps * total_train_batch_size
-        else:
-            max_steps = int(num_update_steps_per_epoch * args.num_train_epochs)
-            num_train_epochs = math.ceil(args.num_train_epochs)
-            num_train_samples = int(len(self.train_dataset) * args.num_train_epochs)
-
-        if args.minimum_eval_times is not None and args.minimum_eval_times > 0:
-            if max_steps // args.eval_steps < args.minimum_eval_times:
-                exp_step = max_steps / args.minimum_eval_times
-                exp_step = max(int(exp_step - exp_step % 10), 10)
-                logger.info("Reset eval step by minimum_eval_times to %d" % exp_step)
-                args.eval_steps = exp_step
-    elif args.max_steps > 0:  # Rely on max_steps when dataloader does not have a working size
-        max_steps = args.max_steps
-        # Setting a very large number of epochs so we go as many times as necessary over the iterator.
-        num_train_epochs = sys.maxsize
-        num_update_steps_per_epoch = max_steps
-        num_examples = total_train_batch_size * args.max_steps
-        num_train_samples = args.max_steps * total_train_batch_size
-    else:
-        raise ValueError(
-            f"args.max_steps must be set to a positive value if dataloader does not have a length, was {args.max_steps}"
-        )
-
-    return (
-        total_train_batch_size,
-        len_dataloader,
-        max_steps,
-        num_train_epochs,
-        num_update_steps_per_epoch,
-        num_examples,
-        num_train_samples,
-    )
 
 
 def init_train_state(
@@ -312,91 +252,14 @@ def init_train_log(
             logger.info(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
 
 
-def init_train(
-    self: Trainer,
-    resume_from_checkpoint: Optional[Union[str, bool]] = None,
-    ignore_keys_for_eval: Optional[List[str]] = None,
-):
-    args = self.args
-    self.is_in_train = True
-
-    # memory metrics - must set up as early as possible
-    self._memory_tracker.start()
-
-    # ##### trainging related num setting #####
-    train_dataloader = self.get_train_dataloader()
-    (
-        total_train_batch_size,
-        len_dataloader,
-        max_steps,
-        num_train_epochs,
-        num_update_steps_per_epoch,
-        num_examples,
-        num_train_samples,
-    ) = self.init_train_num(train_dataloader)
-
-    # ##### model and optimizer related setting #####
-    model = self.init_train_model_opt(max_steps, resume_from_checkpoint)
-
-    # ##### traing statistic logging #####
-    self.init_train_log(num_examples, num_train_epochs, total_train_batch_size, max_steps, num_train_samples, model)
-
-    # ##### set training state and resume #####
-    epochs_trained, steps_trained_in_current_epoch, steps_trained_progress_bar = self.init_train_state(
-        resume_from_checkpoint, train_dataloader, max_steps, num_train_epochs, num_update_steps_per_epoch
-    )
-
-    # ##### training track vars #####
-    epoch_iterator = train_dataloader
-    # steps_in_epoch = len(epoch_iterator)
-    steps_in_epoch = (
-        len(epoch_iterator) if len_dataloader is not None else args.max_steps * args.gradient_accumulation_steps
-    )
-    if len_dataloader is not None:
-        if self.args.gradient_accumulation_steps > len(epoch_iterator):
-            logger.warning(
-                f"changing accumulation step from `{self.args.gradient_accumulation_steps}` to `{len(epoch_iterator)}` to avoid, cross epoch accumulate"
-            )
-            self.args.gradient_accumulation_steps = len(epoch_iterator)
-
-    self.callback_handler.model = self.model
-    self.callback_handler.optimizer = self.optimizer
-    self.callback_handler.lr_scheduler = self.lr_scheduler
-    self.callback_handler.train_dataloader = train_dataloader
-
-    self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
-
-    tr_loss = paddle.to_tensor(0.0)
-    self._total_loss_scalar = 0.0
-    self._globalstep_last_logged = self.state.global_step
-
-    # return local vars or move local vars to outter space
-    return {
-        "train_dataloader": train_dataloader,
-        "num_train_samples": num_train_samples,
-        "num_train_epochs": num_train_epochs,
-        "epochs_trained": epochs_trained,
-        "steps_trained_in_current_epoch": steps_trained_in_current_epoch,
-        "steps_trained_progress_bar": steps_trained_progress_bar,
-        "steps_in_epoch": steps_in_epoch,
-        "tr_loss": tr_loss,
-        "model": model,
-    }
-
-
-# def full_training_step(self: Trainer,
-#                        epoch: int,
-#                        step: int,
-#                        steps_in_epoch: int,
-#                        inputs: Dict[str, paddle.Tensor],
-#                        model: PretrainedModel,
-#                        train_dataloader: DataLoader,
-#                        resume_from_checkpoint: bool = False,
-#                        steps_trained_in_current_epoch: int = 0,
-#                        steps_trained_progress_bar=None,
-#                        ignore_keys_for_eval: Optional[List[str]] = None):
 def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs):
-    # maybe should be abstracted in Trainer
+    """
+    Just a copy of single training step complete code in Trainer.train while loop
+    which including forward+backward+step, while wraps the inputs and outputs to
+    make the complicated copied code no need to change. Maybe a better way is to
+    add fine-grained methods including these steps to Trainer which is similar to
+    DeepSpeed engine.
+    """
 
     # TODO(guosheng): step, steps_trained_in_current_epoch and steps_trained_progress_bar
     # should use reference since they would be overwrite.
@@ -476,7 +339,6 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
             tr_loss_step = self.training_step(model, inputs)
     else:
         tr_loss_step = self.training_step(model, inputs)
-    print("=" * 20, "after training_step")
 
     tr_loss += tr_loss_step
 
@@ -494,11 +356,8 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
 
         if self.sharding and ShardingOption.SHARD_OP not in self.args.sharding:
             if self.args.data_parallel_degree > 1 and not is_dp_group_support_in_group_sharded_parallel():
-                print("=" * 20, "before fused_allreduce_gradients")
                 fused_allreduce_gradients(model.parameters(), fleet.get_hybrid_communicate_group())
-                print("=" * 20, "after fused_allreduce_gradients")
                 if ShardingOption.FULL_SHARD in self.args.sharding:
-                    print("=" * 20, "before all_reduce bw_storage")
                     # Why need sync on parm again ?
                     # TODO: fix this.
                     for p in model.parameters():
@@ -506,7 +365,6 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
                             assert p.grad is None, "This case shouldn't happen."
                             p.bw_storage.scale_(1.0 / self.dp_group.nranks)
                             paddle.distributed.all_reduce(p.bw_storage, group=self.dp_group)
-                    print("=" * 20, "after all_reduce bw_storage")
 
         # Case 2: Use recompute and dp / sharding stage1,
         # manualy collect gradient for dp.
@@ -541,7 +399,6 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
                         p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
 
         # Optimizer step
-        print("=" * 20, "on_optimizer_begin")
         self.callback_handler.on_optimizer_begin(
             args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
         )
@@ -557,18 +414,7 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
         elif isinstance(self.optimizer, HybridParallelOptimizer):
             self.optimizer._step(parameters_list)
         else:
-            print(
-                "=" * 20,
-                "before opt step weight: ",
-                self.model.get_decoder().layers[0].mlp.down_proj.weight.fw_storage,
-            )
             self.optimizer.step()
-            print(
-                "=" * 20,
-                "after opt step weight: ",
-                self.model.get_decoder().layers[0].mlp.down_proj.weight.fw_storage,
-                self.model.get_decoder().layers[0].mlp.down_proj.weight.fw_storage.cast("float32").mean(),
-            )
 
         self.timers and self.timers("optimizer-step").stop()
 
@@ -580,13 +426,11 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
         self.callback_handler.on_optimizer_end(
             args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
         )
-        print("=" * 20, "on_optimizer_end")
 
         self.state.global_step += 1
         self.state.epoch = epoch + (step + 1) / steps_in_epoch
         self.control = self.callback_handler.on_step_end(args, self.state, self.control)
         self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
-        print("=" * 20, "after _maybe_log_save_evaluate")
         # if self.state.global_step == 2:
         #     exit(0)
         self._print_timer()
@@ -609,119 +453,7 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
 Trainer.init_train_model_opt = init_train_model_opt
 Trainer.init_train_log = init_train_log
 Trainer.init_train_state = init_train_state
-Trainer.init_train = init_train
 Trainer.full_training_step = full_training_step
-
-
-def train(
-    self: Trainer,
-    resume_from_checkpoint: Optional[Union[str, bool]] = None,
-    ignore_keys_for_eval: Optional[List[str]] = None,
-):
-    args = self.args
-
-    init_train_dict = self.init_train(resume_from_checkpoint, ignore_keys_for_eval)
-    train_dataloader = epoch_iterator = init_train_dict["train_dataloader"]
-    epochs_trained = init_train_dict["epochs_trained"]
-    num_train_epochs = init_train_dict["num_train_epochs"]
-    num_train_samples = init_train_dict["num_train_samples"]
-    tr_loss = init_train_dict["tr_loss"]
-    model = init_train_dict["model"]
-
-    # train_step_kwargs = {
-    #     "resume_from_checkpoint": resume_from_checkpoint,
-    #     "ignore_keys_for_eval": ignore_keys_for_eval,
-    #     "train_dataloader": train_dataloader,
-    #     "steps_in_epoch": steps_in_epoch,
-    #     "steps_trained_in_current_epoch": steps_trained_in_current_epoch,
-    #     "steps_trained_progress_bar": steps_trained_progress_bar,
-    #     "tr_loss": tr_loss,
-    #     "model": model
-    # }
-
-    start_time = time.time()
-    self._globalstep_last_start_time = time.time()
-    self.timers and self.timers("read-data").start()
-
-    for epoch in range(epochs_trained, num_train_epochs):
-        if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
-            train_dataloader.batch_sampler, DistributedBatchSampler
-        ):
-            train_dataloader.batch_sampler.set_epoch(epoch)
-
-        self.step_control = 0  # used in loop control, reset to 0 after every step
-        self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
-
-        for step, inputs in enumerate(epoch_iterator):
-            self.timers and self.timers("read-data").stop()
-            os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
-            self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
-            init_train_dict.update({"epoch": epoch, "step": step})
-            init_train_dict = self.full_training_step(inputs, **init_train_dict)
-            if self.control.should_epoch_stop or self.control.should_training_stop:
-                break
-            self.timers and self.timers("read-data").start()
-        if step < 0:
-            logger.warning(
-                f"There seems to be not a single sample in your epoch_iterator, stopping training at step"
-                f" {self.state.global_step}! This is expected if you're using an IterableDataset and set"
-                f" num_steps ({self.state.max_steps}) higher than the number of available samples."
-            )
-            self.control.should_training_stop = True
-
-        self.control = self.callback_handler.on_epoch_end(args, self.state, self.control)
-        self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
-
-        if self.control.should_training_stop:
-            break
-
-    if args.past_index and hasattr(self, "_past"):
-        # Clean the state at the end of training
-        delattr(self, "_past")
-
-    logger.info("\nTraining completed. \n")
-    if args.load_best_model_at_end and self.state.best_model_checkpoint is not None:
-        if args.local_rank != -1:
-            dist.barrier()
-
-        logger.info(f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric}).")
-        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
-            self._load_best_model_from_peft_checkpoint()
-        else:
-            weight_name = PADDLE_WEIGHTS_NAME
-            best_model_path = os.path.join(
-                self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
-            )
-            if os.path.exists(best_model_path):
-                # We load the model state dict on the CPU to avoid an OOM error.
-                state_dict = paddle.load(best_model_path, return_numpy=True)
-                # If the model is on the GPU, it still works!
-                self._set_state_dict_in_model(state_dict)
-            else:
-                logger.warning(
-                    f"Could not locate the best model at {best_model_path}, if you are running a distributed training "
-                    "on multiple nodes, you should activate `--save_on_each_node`."
-                )
-
-    self._total_loss_scalar += tr_loss.item()
-    train_loss = self._total_loss_scalar / self.state.global_step
-
-    metrics = speed_metrics("train", start_time, num_samples=num_train_samples, num_steps=self.state.max_steps)
-
-    metrics["train_loss"] = train_loss
-
-    self.is_in_train = False
-
-    self._memory_tracker.stop_and_update_metrics(metrics)
-
-    self.log(metrics)
-
-    self.control = self.callback_handler.on_train_end(args, self.state, self.control)
-
-    return TrainOutput(self.state.global_step, train_loss, metrics)
-
-
-# Trainer.train = train
 
 
 class PolicyTrainer(Trainer):
@@ -754,15 +486,6 @@ class PolicyTrainer(Trainer):
             preprocess_logits_for_metrics,
         )
 
-    def _prepare_inputs(self, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> Dict[str, Union[paddle.Tensor, Any]]:
-        """
-        Prepare `inputs` before feeding them to the model, converting them to tensors if they are not already and
-        handling potential state.
-        """
-        # start = inputs.get("start", 0)
-        inputs = super()._prepare_inputs(inputs)
-        return inputs
-
     def actor_loss_fn(
         self,
         log_probs: paddle.Tensor,
@@ -790,7 +513,6 @@ class PolicyTrainer(Trainer):
             labels = inputs.get("labels", None)
             outputs = model(**inputs)
             ptx_loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
-            print("=" * 20, "ptx_loss", ptx_loss)
             ptx_loss = self.ptx_coeff * ptx_loss
             return ptx_loss
 
@@ -820,8 +542,6 @@ class PolicyTrainer(Trainer):
             reward_advantages,
             sequence_mask[:, start:],
         )
-        print("=" * 20, "log_probs", log_probs)
-        print("=" * 20, "actor_loss", actor_loss)
 
         return actor_loss
 
@@ -839,18 +559,6 @@ class PolicyTrainer(Trainer):
         kwargs["policy_step_control"] = kwargs.pop("step_control")
         kwargs[loss_name] = kwargs.pop("tr_loss")
         return kwargs
-
-    def training_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
-        out = super().training_step(model, inputs)
-        print(
-            "=" * 20,
-            "hidden grad",
-            self.model._hidden_states.grad if hasattr(self.model, "_hidden_states") else None,
-            self.model._hidden_states.grad.cast("float32").mean(axis=-1)
-            if hasattr(self.model, "_hidden_states")
-            else None,
-        )
-        return out
 
 
 class ValueTrainer(Trainer):
@@ -891,23 +599,13 @@ class ValueTrainer(Trainer):
         mask: paddle.Tensor,
     ) -> paddle.Tensor:
         """Compute critic loss."""
-        print("=" * 20, "values in critic_loss_fn: ", values)
-        print("=" * 20, "old_values in critic_loss_fn: ", old_values)
-        print("=" * 20, "returns in critic_loss_fn: ", returns)
-        print("=" * 20, "mask in critic_loss_fn: ", mask)
-        # values_clipped = paddle.clip(
-        #     values,
-        #     old_values - self.clip_range_value,
-        #     old_values + self.clip_range_value,
-        # )
+        # TODO(guosheng): use paddle.clip when its min/max can support more than
+        # 0D Tensor
         values_clipped = paddle.minimum(
             paddle.maximum(values, old_values - self.clip_range_value), old_values + self.clip_range_value
         )
         vf_loss1 = paddle.square(values - returns)
         vf_loss2 = paddle.square(values_clipped - returns)
-        print("=" * 20, f"values_clipped in critic_loss_fn {self.clip_range_value}: ", values_clipped)
-        print("=" * 20, "vf_loss1 in critic_loss_fn: ", vf_loss1)
-        print("=" * 20, "vf_loss2 in critic_loss_fn: ", vf_loss2)
         return 0.5 * paddle.sum(paddle.maximum(vf_loss1, vf_loss2) * mask) / mask.sum()
 
     def compute_loss(self, model, inputs, return_outputs=False):
@@ -924,11 +622,9 @@ class ValueTrainer(Trainer):
         use_cache = inputs["use_cache"]
         return_dict = inputs["return_dict"]
 
-        print("=" * 20, "before critic model call")
         outputs = model(
             input_ids=input_ids, attention_mask=attention_mask, use_cache=use_cache, return_dict=return_dict
         )
-        print("=" * 20, "after critic model call")
 
         # We don't use .loss here since the model may return tuples instead of ModelOutput.
         reward_values = outputs["scores"] if isinstance(outputs, dict) else outputs
@@ -944,9 +640,6 @@ class ValueTrainer(Trainer):
             reward_returns,
             sequence_mask[:, start:],
         )
-        print("=" * 20, "after critic_loss_fn")
-        print("=" * 20, "reward_values", reward_values)
-        print("=" * 20, "reward_critic_loss", reward_critic_loss)
 
         return reward_critic_loss
 
@@ -959,18 +652,6 @@ class ValueTrainer(Trainer):
         kwargs["value_step_control"] = kwargs.pop("step_control")
         kwargs["reward_critic_loss"] = kwargs.pop("tr_loss")
         return kwargs
-
-    def training_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
-        out = super().training_step(model, inputs)
-        print(
-            "=" * 20,
-            "value hidden grad",
-            self.model._hidden_states.grad if hasattr(self.model, "_hidden_states") else None,
-            self.model._hidden_states.grad.cast("float32").mean(axis=-1)
-            if hasattr(self.model, "_hidden_states")
-            else None,
-        )
-        return out
 
 
 @contextmanager
@@ -1020,35 +701,10 @@ class PPOTrainer(Trainer):
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor] = None,
     ):
-        # self.args = args
-        # self.is_in_train = False
-
-        # # Seed must be set before instantiating the model when using model
-        # set_seed(args=self.args)
-
-        # if self.args.should_save or self.args.should_save_model_state:
-        #     os.makedirs(self.args.output_dir, exist_ok=True)
-
-        # self._memory_tracker = TrainerMemoryTracker(
-        #     self.args.skip_memory_metrics)
-        # self.compute_metrics = None
-
-        # if not args.skip_profile_timer:
-        #     set_timers()
-        # self.timers = get_timers()
-        # self.state = TrainerState()
-        # self.control = TrainerControl()
-
-        # default_callbacks = DEFAULT_CALLBACKS + get_reporting_integration_callbacks(self.args.report_to)
-        # callbacks = default_callbacks if callbacks is None else default_callbacks + callbacks
-        # self.callback_handler = CallbackHandler(callbacks, None, self.tokenizer, None, None)
-        # self.add_callback(PrinterCallback if self.args.disable_tqdm else DEFAULT_PROGRESS_CALLBACK)
-
         with guard_set_args(args, {"recompute": False, "fp16_opt_level": "O1"}):
             # just used to create trival attrs might be used in the training
             # process of trainer, while changing some args to avoid model usage
             # in __init__ such as recompute and AMP-O2
-            print("=" * 20, "begin super.__init__")
             super().__init__(
                 model,
                 criterion,
@@ -1062,15 +718,13 @@ class PPOTrainer(Trainer):
                 optimizers,
                 preprocess_logits_for_metrics,
             )
-        print("=" * 20, "after super.__init__")
 
         self.train_dataset = train_dataset
         self.ptx_dataset = ptx_dataset
         self.eval_dataset = eval_dataset
-        # self.data_collator = data_collator
 
         (policy_model, reference_model, reward_model, value_model) = model
-        # policy_tokenizer and value_model should be same
+        # policy_tokenizer and value_tokenizer should be same
         (policy_tokenizer, reference_tokenizer, reward_tokenizer, value_tokenizer) = tokenizer
 
         policy_training_args = copy.deepcopy(args)
@@ -1115,12 +769,6 @@ class PPOTrainer(Trainer):
         )
 
         # use trainer for reference_model/reward_model to enable sharding stage-3
-        # self.reference_model = reference_model
-        # self.reference_model.eval()
-        # if False:
-        #     # NOTE: reference_model/reward_model should be guaranteed to be BF16
-        #     # by model provider since they would not be wrapped by Trainer.
-        #     logger.warning()
         self.reference_trainer = Trainer(
             reference_model,
             criterion,
@@ -1134,9 +782,6 @@ class PPOTrainer(Trainer):
             optimizers,
             preprocess_logits_for_metrics,
         )
-
-        # self.reward_model = reward_model
-        # self.reward_model.eval()
         self.reward_trainer = Trainer(
             reward_model,
             criterion,
@@ -1189,12 +834,20 @@ class PPOTrainer(Trainer):
 
     @property
     def reference_model(self):
-        model = self.reference_trainer.model
+        if self.reference_trainer.args.pipeline_parallel_degree > 1:
+            # Only accept wrapped model for pipeline_parallel mode
+            model = self.reference_trainer.model_wrapped
+        else:
+            model = self.reference_trainer.model
         return model
 
     @property
     def reward_model(self):
-        model = self.reward_trainer.model
+        if self.reward_trainer.args.pipeline_parallel_degree > 1:
+            # Only accept wrapped model for pipeline_parallel mode
+            model = self.reward_trainer.model_wrapped
+        else:
+            model = self.reward_trainer.model
         return model
 
     @property
@@ -1216,21 +869,8 @@ class PPOTrainer(Trainer):
             # Only accept wrapped model for pipeline_parallel mode
             model = self.value_trainer.model_wrapped
         else:
-            # model = self.value_trainer.model
             model = self.value_trainer.model
         return model
-
-    # @property
-    # def optimizer(self):
-    #     return self.policy_trainer.optimizer
-
-    # @property
-    # def model(self):
-    #     return self.policy_trainer.model
-
-    # @property
-    # def model_wrapped(self):
-    #     return self.policy_trainer.model_wrapped
 
     def set_train(self, mode: bool = True) -> None:
         """Set training mode for all models."""
@@ -1268,7 +908,7 @@ class PPOTrainer(Trainer):
                     input_ids=inputs["input_ids"],
                     attention_mask=inputs["attention_mask"],
                     generation_config=self.generation_config,
-                    synced_gpus=True,
+                    synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
                 )[0]
                 attention_mask = paddle.logical_and(
                     seq != self.tokenizer.pad_token_id,
@@ -1291,7 +931,6 @@ class PPOTrainer(Trainer):
                 reward_score = self.reward_model(
                     reward_input_ids, attention_mask=reward_attention_mask, return_dict=True
                 ).end_scores.squeeze(axis=-1)
-                print("=" * 20, "predict step end")
 
         # keep the first batch of eval output sequence to print and check
         prompt = self.tokenizer.batch_decode(inputs["input_ids"], skip_special_tokens=True)
@@ -1325,7 +964,6 @@ class PPOTrainer(Trainer):
             dataloader, description, prediction_loss_only, ignore_keys, metric_key_prefix, max_eval_iters
         )
         output.metrics[f"{metric_key_prefix}/reward"] = output.metrics.pop(f"{metric_key_prefix}_loss")
-        print("=" * 20, "evaluation_loop end")
 
         columns = ["Prompt", "Generated", "Reward"]
         rows = list(zip(*self._eval_seq))
@@ -1349,15 +987,27 @@ class PPOTrainer(Trainer):
 
     def _save_checkpoint(self, model, metrics=None):
         # maybe change args.output_dir of policy_trainer/value_trainer directly
-        with guard_set_args(
-            self.policy_trainer.args, {"output_dir": os.path.join(self.policy_trainer.args.output_dir, "policy")}
-        ):
+        with guard_set_args(self.policy_trainer.args, {"output_dir": os.path.join(self.args.output_dir, "policy")}):
             self.policy_trainer._save_checkpoint(model, metrics)
-        with guard_set_args(
-            self.value_trainer.args, {"output_dir": os.path.join(self.value_trainer.args.output_dir, "value")}
-        ):
+        with guard_set_args(self.value_trainer.args, {"output_dir": os.path.join(self.args.output_dir, "value")}):
             self.value_trainer._save_checkpoint(model, metrics)
-        print("=" * 20, "save checkpoint end")
+
+    def _load_from_checkpoint(self, resume_from_checkpoint=None):
+        with guard_set_args(self.policy_trainer.args, {"output_dir": os.path.join(self.args.output_dir, "policy")}):
+            self.policy_trainer._load_from_checkpoint(resume_from_checkpoint)
+        with guard_set_args(self.value_trainer.args, {"output_dir": os.path.join(self.args.output_dir, "value")}):
+            self.value_trainer._load_from_checkpoint(resume_from_checkpoint)
+
+    def _load_optimizer_and_scheduler(self, checkpoint):
+        # NOTE: `Trainer._load_optimizer_and_scheduler` would not seek the latest
+        # state as in `_load_from_checkpoint``, and it just use `resume_from_checkpoint`
+        # as value of `checkpoint` to load.
+        self.policy_trainer._load_optimizer_and_scheduler(
+            checkpoint if checkpoint is None else os.path.join(checkpoint, "policy")
+        )
+        self.value_trainer._load_optimizer_and_scheduler(
+            checkpoint if checkpoint is None else os.path.join(checkpoint, "value")
+        )
 
     def get_epoch_iterator(self):
         # TODO(guosheng): support iter dataset
@@ -1366,27 +1016,18 @@ class PPOTrainer(Trainer):
         num_ptx_replicas = (num_prompt_only_batches + num_ptx_batches - 1) // num_ptx_batches
 
         def gen_epoch_data():
-            # inputs = paddle.load("inputs.pkl")
-            # while True:
-            #     yield inputs
-            # return
-
             for prompt_only_batch, ptx_batch in zip(
                 self.prompt_only_dataloader,
                 itertools.chain.from_iterable([self.ptx_dataloader] * num_ptx_replicas),
             ):
                 # generate batches
                 self.set_eval()
-                print("=" * 20, "memory usage before gen_step", check_memory_usage("before"))
-                print("=" * 20, self.args.local_rank, prompt_only_batch)
                 rl_batches = self.split_rl_micro_batches(prompt_only_batch)
                 if self.use_ptx:
                     ptx_batches = self.split_ptx_micro_batches(ptx_batch)
                 else:
                     ptx_batches = [None for _ in range(len(rl_batches))]
-                print("=" * 20, "memory usage after gen_step", check_memory_usage("before"))
                 paddle.device.cuda.empty_cache()
-                print("=" * 20, "memory usage after gen_step", check_memory_usage("empty"))
 
                 self.set_train()
                 for _ in range(self.args.update_iters):
@@ -1438,10 +1079,12 @@ class PPOTrainer(Trainer):
         resume_from_checkpoint: Optional[Union[str, bool]] = None,
         ignore_keys_for_eval: Optional[List[str]] = None,
     ) -> None:
+        # ##### The following code try to keep same as the Trainer.train #####
         args = self.args
         self.is_in_train = True
 
-        # ##### trainging related num setting #####
+        # ##### trainging data and related num setting #####
+        # TODO(guosheng): remove the binding method get_collator of dataset
         with guard_set_args(
             args, {"per_device_train_batch_size": self.args.per_device_prompt_batch_size}
         ), guard_set_args(
@@ -1476,23 +1119,15 @@ class PPOTrainer(Trainer):
         # policy_trainer/value_trainer only init train with init_train_model_opt,
         # maybe more training setting used in full_training_step should be set here,
         # such as trainer.control and trainer.state
-        policy_model = self.policy_trainer.init_train_model_opt(
-            # max_steps * 2 if self.use_ptx else max_steps, resume_from_checkpoint
-            max_steps,
-            resume_from_checkpoint,
-        )
+        policy_model = self.policy_trainer.init_train_model_opt(max_steps, resume_from_checkpoint)
         value_model = self.value_trainer.init_train_model_opt(max_steps, resume_from_checkpoint)
+        # TODO(guosheng): sharding stage3 should create master weight optionally
+        # instead of creation and clear.
         self.reference_trainer.init_train_model_opt(max_steps, None, clear_master_weight=True)
         self.reference_model.eval()
         self.reward_trainer.init_train_model_opt(max_steps, None, clear_master_weight=True)
         self.reward_model.eval()
-        print("=" * 20, "memory usage", check_memory_usage("before"))
         paddle.device.cuda.empty_cache()
-        print("=" * 20, "memory usage", check_memory_usage("empty"))
-        pd_cpu_seed = paddle.framework.core.default_cpu_generator().get_state().current_seed()
-        print("=" * 20, "pd_cpu_seed:", pd_cpu_seed)
-        # import time
-        # time.sleep(1000)
         # disable inner trainers' callback/state/control
         self.policy_trainer.add_callback(MuteDefaultFlowCallback)
         self.value_trainer.add_callback(MuteDefaultFlowCallback)
@@ -1533,16 +1168,21 @@ class PPOTrainer(Trainer):
         self._total_ptx_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
 
+        # train_step_kwargs is used to provide arguments more than model inputs
+        # for full_training_step which is copied from Trainer.train and needs
+        # these arguments to control training process.
         train_step_kwargs = {
-            "resume_from_checkpoint": None,  # resume_from_checkpoint,
-            "ignore_keys_for_eval": None,
-            "train_dataloader": None,  # train_dataloader,
-            # "num_train_samples": num_train_samples,
-            # "num_train_epochs": num_train_epochs,
+            "ignore_keys_for_eval": None,  # no need
+            # TODO(guosheng): commented args are to resume data, not support yet
+            # "resume_from_checkpoint": resume_from_checkpoint,
+            # "train_dataloader": train_dataloader,
             # "epochs_trained": epochs_trained,
             # "steps_trained_in_current_epoch": steps_trained_in_current_epoch,
             # "steps_trained_progress_bar": steps_trained_progress_bar,
-            "steps_in_epoch": steps_in_epoch,
+            "steps_in_epoch": steps_in_epoch,  # to control training process
+            # the following args are corresponding to tr_loss and model used in
+            # Trainer.train, and they would be used as tr_loss and model in
+            # PolicyTranier and ValueTrainer.
             "actor_loss": actor_loss,
             "reward_critic_loss": reward_critic_loss,
             "ptx_loss": ptx_loss,
@@ -1553,10 +1193,6 @@ class PPOTrainer(Trainer):
         start_time = time.time()
         self._globalstep_last_start_time = start_time  # time.time()
         # self.timers and self.timers("read-data").start()
-        # metrics = self.evaluate(ignore_keys=None)
-        # self._save_checkpoint(None, metrics=metrics)
-        # TODO(guosheng): a dummy generation to max_length firstly seems can
-        # solve memory fragement, but how to do it.
 
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
@@ -1566,8 +1202,6 @@ class PPOTrainer(Trainer):
 
             step_control = 0  # used in loop control, reset to 0 after every step
             train_step_kwargs.update({"policy_step_control": step_control, "value_step_control": step_control})
-            # self.policy_trainer.step_control = 0
-            # self.value_trainer.step_control = 0
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
@@ -1579,34 +1213,13 @@ class PPOTrainer(Trainer):
                 # resume data
                 train_step_kwargs.update({"epoch": epoch, "step": step})
                 rl_batch, ptx_batch = inputs
-                # if self.use_ptx:
-                #     print("=" * 20, "ptx_batch", ptx_batch)
-                #     print("=" * 20, "memory usage before ptx_step", check_memory_usage("before"))
-                #     ptx_info, train_step_kwargs = self.ptx_step(ptx_batch, **train_step_kwargs)
-                #     # del train_step_kwargs, rl_info, ptx_info, rl_batch, ptx_batch, inputs, epoch_iterator
-                #     print(list((k, type(v)) for k, v in locals().items()))
-                #     print("=" * 20, "memory usage after ptx_step", check_memory_usage("before"))
-                #     paddle.device.cuda.empty_cache()
-                #     print("=" * 20, "memory usage after ptx_step", check_memory_usage("empty"))
-                print("=" * 20, "rl_batch", rl_batch)
-                print("=" * 20, "memory usage before rl_step", check_memory_usage("before"))
                 # TODO(guosheng): make rl_step/ptx_step run with autocast_smart_context_manager
                 rl_info, train_step_kwargs = self.rl_step(rl_batch, **train_step_kwargs)
-                print("=" * 20, "memory usage after rl_step", check_memory_usage("before"))
                 paddle.device.cuda.empty_cache()
-                print("=" * 20, "memory usage after rl_step", check_memory_usage("empty"))
                 if self.use_ptx:
-                    print("=" * 20, "ptx_batch", ptx_batch)
-                    print("=" * 20, "memory usage before ptx_step", check_memory_usage("before"))
                     ptx_info, train_step_kwargs = self.ptx_step(ptx_batch, **train_step_kwargs)
                     rl_info.update(ptx_info)
-                    # del train_step_kwargs, rl_info, ptx_info, rl_batch, ptx_batch, inputs, epoch_iterator
-                    # print(list((k, type(v)) for k, v in locals().items()))
-                    print("=" * 20, "memory usage after ptx_step", check_memory_usage("before"))
                     paddle.device.cuda.empty_cache()
-                    print("=" * 20, "memory usage after ptx_step", check_memory_usage("empty"))
-                # paddle.save(inputs, "inputs.pkl")
-                # exit(0)
 
                 self.state.global_step = self.value_trainer.state.global_step
                 self.state.epoch = self.value_trainer.state.epoch
@@ -1616,11 +1229,7 @@ class PPOTrainer(Trainer):
                 else:
                     # on_sub_step_end
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
-                # NOTE: Beaver(deepspeed) log loss without gradient_accumulation_steps scaling
                 self._maybe_log_save_evaluate(rl_info, None, epoch, ignore_keys_for_eval, inputs=inputs)
-                # if self.state.global_step == 2:
-                #     exit(0)
-                # exit(0)
 
             if step < 0:
                 logger.warning(
@@ -1636,8 +1245,7 @@ class PPOTrainer(Trainer):
 
             if self.control.should_training_stop:
                 break
-        # metrics = self.evaluate(ignore_keys=None)
-        # self._save_checkpoint(None, metrics=metrics)
+        # TODO(guosheng): add epilogue of training
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
@@ -1647,15 +1255,14 @@ class PPOTrainer(Trainer):
             for k, v in tr_loss.items():
                 if isinstance(v, paddle.Tensor) and "lr" not in k and "max_generated_length" not in k:
                     v_scalar = self._nested_gather(v).mean().item()
-                    if "train/actor_loss" == k:
-                        v_scalar = v_scalar * 2  # self.policy_trainer.args.gradient_accumulation_steps
+                    if "train/actor_loss" == k and "train/ptx_loss" in tr_loss:
+                        # use_ptx would double the gradient_accumulation_steps
+                        # which causes actor_loss and ptx_loss reduced by half
+                        v_scalar = v_scalar * 2
                     elif "train/ptx_loss" == k:
-                        v_scalar = (
-                            v_scalar * 2 / self.ptx_coeff
-                        )  # self.policy_trainer.args.gradient_accumulation_steps / self.ptx_coeff
-                    # elif "train/reward_critic_loss" == k:
-                    #     v_scalar = v_scalar * self.value_trainer.args.gradient_accumulation_steps
-                    # print("=" * 20, "metric", k, v, self._nested_gather(v), v_scalar)
+                        # similar to actor_loss and should double, additionally
+                        # it should be divided by ptx_coeff for logging
+                        v_scalar = v_scalar * 2 / self.ptx_coeff
                     logs[k] = round(v_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
                     v.subtract_(v)
                     attr_name = "_total_" + k.split("/")[-1] + "_scalar"
@@ -1686,7 +1293,8 @@ class PPOTrainer(Trainer):
 
             self.log(logs, **kwargs)
 
-        with guard_set_args(self.control, {"should_log": False}):  # avoid log again
+        # To trigger evaluation and save but avoid log again
+        with guard_set_args(self.control, {"should_log": False}):
             super()._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval)
 
     def add_kl_divergence_regularization(
@@ -1761,37 +1369,6 @@ class PPOTrainer(Trainer):
                 sequence_mask,
                 start,
             )
-        print("=" * 20, "after reward_advantages")
-        print("=" * 20, "old_rewards", old_rewards)
-        print("=" * 20, "reward_advantages", reward_advantages)
-        print("=" * 20, "reward_returns", reward_returns)
-
-        # value_trainer_inputs = {
-        #     "input_ids": input_ids,
-        #     "attention_mask": attention_mask,
-        #     "old_reward_values": old_reward_values,
-        #     "reward_returns": reward_returns,
-        #     "sequence_mask": sequence_mask,
-        #     "start": start,
-        #     "use_cache": False,
-        #     "return_dict": True
-        # }
-        # # print(value_trainer_inputs)
-        # # reward_critic_loss = self.value_trainer.training_step(
-        # #     value_trainer_inputs)
-        # # reward_critic_loss = self.value_trainer.full_training_step(
-        # #     epoch, step, steps_in_epoch, value_trainer_inputs, model,
-        # #     train_dataloader, resume_from_checkpoint,
-        # #     steps_trained_in_current_epoch, steps_trained_progress_bar,
-        # #     ignore_keys_for_eval)
-        # print("=" * 20, "memory usage before value_trainer.full_training_step", check_memory_usage("before"))
-        # print("=" * 20, "before value_trainer.full_training_step")
-        # kwargs = self.value_trainer.full_training_step(value_trainer_inputs,
-        #                                                **kwargs)
-        # print("=" * 20, "after value_trainer.full_training_step")
-        # print("=" * 20, "memory usage after value_trainer.full_training_step", check_memory_usage("before"))
-        # paddle.device.cuda.empty_cache()
-        # print("=" * 20, "memory usage after value_trainer.full_training_step", check_memory_usage("empty"))
 
         policy_trainer_inputs = {
             "input_ids": input_ids,
@@ -1803,16 +1380,7 @@ class PPOTrainer(Trainer):
             "use_cache": False,
             "return_dict": True,
         }
-        # print(policy_trainer_inputs)
-        # actor_loss = self.policy_trainer.training_step(policy_trainer_inputs)
-        # actor_loss = self.policy_trainer.full_training_step(
-        #     epoch, step, steps_in_epoch, policy_trainer_inputs, model,
-        #     train_dataloader, resume_from_checkpoint,
-        #     steps_trained_in_current_epoch, steps_trained_progress_bar,
-        #     ignore_keys_for_eval)
-        print("=" * 20, "before policy_trainer.full_training_step")
         kwargs = self.policy_trainer.full_training_step(policy_trainer_inputs, **kwargs)
-        print("=" * 20, "after policy_trainer.full_training_step")
 
         value_trainer_inputs = {
             "input_ids": input_ids,
@@ -1824,17 +1392,7 @@ class PPOTrainer(Trainer):
             "use_cache": False,
             "return_dict": True,
         }
-        # print(value_trainer_inputs)
-        # reward_critic_loss = self.value_trainer.training_step(
-        #     value_trainer_inputs)
-        # reward_critic_loss = self.value_trainer.full_training_step(
-        #     epoch, step, steps_in_epoch, value_trainer_inputs, model,
-        #     train_dataloader, resume_from_checkpoint,
-        #     steps_trained_in_current_epoch, steps_trained_progress_bar,
-        #     ignore_keys_for_eval)
-        print("=" * 20, "before value_trainer.full_training_step")
         kwargs = self.value_trainer.full_training_step(value_trainer_inputs, **kwargs)
-        print("=" * 20, "after value_trainer.full_training_step")
 
         with paddle.no_grad():
             kl_divergence = ((old_log_probs - ref_log_probs) * sequence_mask)[:, start:].sum(axis=-1).mean()
@@ -1842,16 +1400,6 @@ class PPOTrainer(Trainer):
             max_generated_length = sequence_mask[:, start:].cast(paddle.float32).sum(axis=-1).max()
 
         rewards = rewards.mean()
-
-        # actor_loss = get_all_reduce_mean(actor_loss)
-        # reward_critic_loss = get_all_reduce_mean(reward_critic_loss)
-        # rewards = get_all_reduce_mean(rewards)
-        # kl_divergence = get_all_reduce_mean(kl_divergence)
-        # mean_generated_length = get_all_reduce_mean(mean_generated_length)
-        # max_generated_length = get_all_reduce_max(max_generated_length)
-
-        # dist.barrier()
-        # return {}, kwargs
 
         return {
             "train/actor_loss": kwargs["actor_loss"],
@@ -1866,13 +1414,7 @@ class PPOTrainer(Trainer):
 
     def ptx_step(self, ptx_batch: Dict[str, paddle.Tensor], **kwargs) -> Dict[str, Any]:
         """Perform a single update step with PTX loss."""
-        # ptx_loss = self.policy_trainer.training_step(ptx_batch)
-        # print(ptx_batch)
         kwargs = self.policy_trainer.full_training_step(ptx_batch, **kwargs)
-
-        # ptx_loss = get_all_reduce_mean(ptx_loss)
-        # return {}, kwargs
-
         return {"train/ptx_loss": kwargs["ptx_loss"]}, kwargs
 
     def split_ptx_micro_batches(
@@ -1915,15 +1457,11 @@ class PPOTrainer(Trainer):
         input_ids = prompt_only_batch["input_ids"]
         # NOTE: generation output of paddlenlp do not contain prompt, we should
         # change sequences here.
-        # print("=" * 20, type(self.policy_trainer.model_wrapped),
-        #       type(self.policy_trainer.model))
-        # sequences = self.policy_trainer.model_wrapped.generate(
-        # sequences = self.actor_model.generate(
-        sequences = self.policy_trainer.model.generate(
+        sequences = self.actor_model.generate(
             input_ids=input_ids,
             attention_mask=prompt_only_batch["attention_mask"],
             generation_config=self.generation_config,
-            synced_gpus=True,
+            synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
         )[0]
         sequences = sequences.reshape([input_ids.shape[0], self.args.num_return_sequences, -1]).transpose([1, 0, 2])
 
@@ -1959,8 +1497,7 @@ class PPOTrainer(Trainer):
             reward_seq = sequence
             reward_attention_mask = attention_mask
 
-        # logits = self.actor_model(
-        logits = self.policy_trainer.model(
+        logits = self.actor_model(
             sequence,
             attention_mask=attention_mask,
             return_dict=True,
@@ -1968,8 +1505,7 @@ class PPOTrainer(Trainer):
         ref_logits = self.reference_model(sequence, attention_mask=attention_mask, return_dict=True).logits
 
         reward_score = self.reward_model(reward_seq, attention_mask=reward_attention_mask, return_dict=True).end_scores
-        # reward_value = self.reward_critic_model(
-        reward_value = self.value_trainer.model(
+        reward_value = self.reward_critic_model(
             sequence,
             attention_mask=attention_mask,
             return_dict=True,

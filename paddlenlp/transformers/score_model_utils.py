@@ -26,7 +26,6 @@ import paddle
 import paddle.distributed as dist
 import paddle.nn as nn
 
-from paddlenlp.generation.utils import print
 from paddlenlp.transformers import PretrainedConfig
 from paddlenlp.transformers.model_outputs import ModelOutput
 
@@ -163,27 +162,7 @@ class ScoreModelMixin:
         return_dict: bool | None = None,
     ) -> ScoreModelOutput:
         """Forward pass of the score model."""
-        print("=" * 20, "score hidden", hidden_state)
-        import inspect
-
-        if self.training and "debug" in inspect.getfullargspec(print).kwonlyargs:
-            self._hidden_states = hidden_state
-            hidden_state.retain_grads()
         scores = self.score_head(hidden_state)  # size = (B, L, D)
-        # print("=" * 20, "after LlamaModelForScore.score_head")
-        print("=" * 20, "scores", scores)
-
-        # if dist.get_rank() == 0:
-        #     # print("=" * 20, "hidden_state", hidden_state.numpy(), hidden_state.shape,
-        #     print("=" * 20, "hidden_state", hidden_state, hidden_state.shape, hidden_state.dtype)
-        #     print("=" * 20, "nonorm_scores", scores, scores.shape, scores.dtype)
-        #     print(
-        #         "=" * 20,
-        #         "head_weight",
-        #         self.score_head.weight,
-        #         self.score_head.weight.shape,
-        #         self.score_head.weight.dtype,
-        #     )
 
         end_score = []
         for i in range(hidden_state.shape[0]):
@@ -192,37 +171,22 @@ class ScoreModelMixin:
         end_score = paddle.stack(end_score, axis=0)  # size = (B, D)
 
         if self.training:
-            # TODO: data parallel + sharding
-            # hcg = fleet.get_hybrid_communicate_group()
-            # group = hcg.get_data_parallel_group()
-            # world_size = hcg.get_data_parallel_world_size()
-            # group = hcg.get_sharding_parallel_group()
-            # world_size = hcg.get_sharding_parallel_world_size()
 
             if dist.is_initialized():
+                # TODO(guosheng): maybe only need nodes in data parallel group
+                # when support hybird dist parallel.
                 gathered_end_score_list = [paddle.zeros_like(end_score) for _ in range(dist.get_world_size())]
-                # print("=" * 20, "before score all_gather")
                 dist.all_gather(gathered_end_score_list, end_score)
-                print("=" * 20, "after score all_gather")
                 gathered_end_score = paddle.concat(gathered_end_score_list, axis=0)
                 self.normalizer.update(gathered_end_score)
-                # output_shape = end_score.shape
-                # output_shape[0] = output_shape[0] * world_size
-                # gathered_end_score = paddle.empty(shape=output_shape,
-                #                                   dtype=end_score.dtype)
-                # group.process_group.all_gather(end_score,
-                #                                gathered_end_score).wait()
-                # self.normalizer.update(gathered_end_score)
             else:
                 self.normalizer.update(end_score)
             self.config.mean = self.normalizer.mean.tolist()
             self.config.var = self.normalizer.var.tolist()
-            print("=" * 20, "after normalizer update")
 
         if self.do_normalize:
             scores = self.normalizer.normalize(scores)
             end_score = self.normalizer.normalize(end_score)
-            print("=" * 20, "after do_normalize")
 
         if not return_dict:
             return scores, end_score
@@ -239,20 +203,6 @@ class ScoreModelMixin:
         self.do_normalize = self.config.do_normalize = mode
 
 
-# Copyright 2023 PKU-Alignment Team. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
 """Normalizer for score models."""
 from typing import Literal
 

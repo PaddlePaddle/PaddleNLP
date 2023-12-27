@@ -158,20 +158,6 @@ class RewardTrainer(Trainer):
                     )
 
             loss = paddle.stack(losses).mean()  # size = ()
-            # print("="*20, "loss:", loss)
-            # print("=" * 20, "higher_end_rewards:", higher_end_rewards)
-            # print("=" * 20, "lower_end_rewards:", lower_end_rewards)
-            # print("=" * 20, better_input_ids, better_input_ids.shape)
-            # print("=" * 20, better_attention_mask, better_attention_mask.shape)
-            # print("=" * 20, worse_input_ids, worse_input_ids.shape)
-            # print("=" * 20, worse_attention_mask, worse_attention_mask.shape)
-            # print("=" * 20, "higher_rewards", higher_rewards, higher_rewards.shape)
-            # print("=" * 20, "lower_rewards", lower_rewards, lower_rewards.shape)
-            # print("=" * 20, "higher_end_rewards", higher_end_rewards, higher_end_rewards.shape)
-            # print("=" * 20, "lower_end_rewards", lower_end_rewards, lower_end_rewards.shape)
-            # print("=" * 20, "losses", losses)
-            # print("=" * 20, "loss", loss, loss.shape)
-            # exit(0)
         elif self.args.loss_type == "sequence-wise":
             loss = -F.log_sigmoid(higher_end_rewards - lower_end_rewards).mean()
 
@@ -190,12 +176,6 @@ class RewardTrainer(Trainer):
             _tr_acc = [paddle.to_tensor(0.0), 0.0, self._nested_gather]
         _tr_acc[0] = _tr_acc[0] + accuracy.detach()
 
-        # return {
-        #     "loss": loss,  # size = ()
-        #     "higher_end_rewards": higher_end_rewards,  # size = (B,)
-        #     "lower_end_rewards": lower_end_rewards,  # size = (B,)
-        #     "accuracy": accuracy,  # size = ()
-        # }
         if return_outputs:
             return loss, {
                 "higher_end_rewards": higher_end_rewards,

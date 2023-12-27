@@ -1346,15 +1346,10 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
                 self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
         with paddle.amp.auto_cast(False):
-            # print("=" * 20, "logits: ", prediction_scores)
-            # print("=" * 20, "labels: ", masked_lm_labels)
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
-            # print("=" * 20, "masked_lm_loss: ", masked_lm_loss)
             # skip ignore_index which loss == 0
             masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
-            # print("=" * 20, "positive masked_lm_loss: ", masked_lm_loss)
             loss = paddle.mean(masked_lm_loss)
-            # print("=" * 20, "loss: ", loss)
 
         return loss
 
@@ -1505,13 +1500,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         )
 
         hidden_states = outputs[0]  # [bs, seq_len, dim]
-        import inspect
-
-        from paddlenlp.generation.utils import print
-
-        if self.training and "debug" in inspect.getfullargspec(print).kwonlyargs:
-            self._hidden_states = hidden_states
-            hidden_states.retain_grads()
 
         # if labels is None，means we need full output, instead of tensor_parallel_output
         # tensor_parallel_output is togather with ParallelCrossEntropy
@@ -1519,15 +1507,11 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         )
 
-        # if hidden_states.shape[1] > 1:
-        #     print("=" * 20, "causalLM hidden", self.lm_head.weight, hidden_states)
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
-        # print("=" * 20, "after lm_head")
 
         loss = None
         if labels is not None:
             loss = self.criterion(logits, labels)
-            # print("=" * 20, "after causalLM loss")
 
         if not return_dict:
             output = (logits,) + outputs[1:]
@@ -1585,30 +1569,6 @@ class LlamaModelForScore(ScoreModelMixin, LlamaPretrainedModel):
         output_hidden_states: bool | None = None,
         return_dict: bool | None = None,
     ) -> tuple[paddle.Tensor, paddle.Tensor] | ScoreModelOutput:
-        """
-        Args:
-
-        Returns:
-
-        Examples:
-
-        ```python
-        >>> from safe_rlhf.models.llama.modeling_llama import LlamaModelForScore
-        >>> from transformers import LlamaTokenizer
-
-        >>> model = LlamaForCausalLM.from_pretrained(PATH_TO_CONVERTED_WEIGHTS)
-        >>> tokenizer = AutoTokenizer.from_pretrained(PATH_TO_CONVERTED_TOKENIZER)
-
-        >>> prompt = "Hey, are you conscious? Can you talk to me?"
-        >>> inputs = tokenizer(prompt, return_tensors="pt")
-
-        # got score
-        >>> outputs = model(**inputs)
-        >>> scores = outputs.scores
-        >>> scores
-        tensor([[[0.0000]]])
-        ```
-        """
         assert attention_mask is not None
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1627,7 +1587,6 @@ class LlamaModelForScore(ScoreModelMixin, LlamaPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        # print("=" * 20, "after LlamaModelForScore.llama")
         hidden_states = outputs[0]  # size = (B, L, E)
         return self.get_score(
             hidden_states,

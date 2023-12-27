@@ -141,26 +141,22 @@ class ModelArgument:
     )
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
 
-    # LoRA related parameters
-    lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
-    lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
-    lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
+    # # LoRA related parameters
+    # lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
+    # lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
+    # lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
 
-    # prefix tuning related parameters
-    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
-    num_prefix_tokens: int = field(default=128, metadata={"help": "Number of prefix tokens"})
+    # # prefix tuning related parameters
+    # prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
+    # num_prefix_tokens: int = field(default=128, metadata={"help": "Number of prefix tokens"})
 
 
 @dataclass
 class DataArgument:
-    dataset_name_or_path: str = field(default=None, metadata={"help": "Name or path for dataset"})
-    task_name: str = field(default=None, metadata={"help": "Additional name to select a more specific task."})
     train_datasets: str = field(default=None, metadata={"help": "Dataset name(s) registered in the raw dataset."})
     eval_datasets: str = field(default=None, metadata={"help": "Dataset name(s) registered in the raw dataset."})
     eval_split_ratio: float = field(default=None, metadata={"help": "Ratio of eval data to train data"})
     ptx_datasets: str = field(default=None, metadata={"help": "Dataset name(s) registered in the raw dataset."})
-    intokens: bool = field(default=False, metadata={"help": "Whether to use InTokens data stream"})
-    src_length: int = field(default=1024, metadata={"help": "The maximum length of source(context) tokens."})
     max_length: int = field(
         default=2048,
         metadata={
@@ -170,13 +166,7 @@ class DataArgument:
     eval_with_do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
     save_generation_output: bool = field(
         default=False,
-        metadata={"help": "Whether to save generated text to file when eval_with_do_generation set to True."},
-    )
-    lazy: bool = field(
-        default=False,
-        metadata={
-            "help": "Weather to return `MapDataset` or an `IterDataset`.True for `IterDataset`. False for `MapDataset`."
-        },
+        metadata={"help": "Whether to save generated text to file when eval"},
     )
 
     @property
@@ -216,13 +206,13 @@ def main():
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
 
-    prop = paddle.device.cuda.get_device_properties()
-    if prop.total_memory > 40 * 1024 * 1024 * 1024:
-        memory_size = 75 * 1024 * 1024 * 1024
-    else:
-        memory_size = 30 * 1024 * 1024 * 1024
-    x = paddle.empty([memory_size], dtype=paddle.uint8)
-    del x
+    # prop = paddle.device.cuda.get_device_properties()
+    # if prop.total_memory > 40 * 1024 * 1024 * 1024:
+    #     memory_size = 75 * 1024 * 1024 * 1024
+    # else:
+    #     memory_size = 30 * 1024 * 1024 * 1024
+    # x = paddle.empty([memory_size], dtype=paddle.uint8)
+    # del x
 
     # Detecting last checkpoint.
     # last_checkpoint = None
@@ -257,7 +247,6 @@ def main():
         # actor model
         model_config = AutoConfig.from_pretrained(
             model_args.actor_model_name_or_path,
-            # "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced/",
             tensor_parallel_output=False,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             tensor_parallel_rank=training_args.tensor_parallel_rank,
@@ -267,18 +256,13 @@ def main():
             model_config.use_flash_attention = model_args.use_flash_attention
         actor_model = LlamaForCausalLM.from_pretrained(
             model_args.actor_model_name_or_path,
-            # "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced/",
             config=model_config,
         )
-        # print("=" * 20, "lm_head.weight after create", actor_model.lm_head.weight)
         # reference model
         actor_reference_model = LlamaForCausalLM.from_pretrained(
             model_args.actor_model_name_or_path,
-            # "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced/",
             config=model_config,
         )
-        # print("=" * 20, actor_reference_model.lm_head.weight)
-        # exit(0)
         actor_tokenizer = AutoTokenizer.from_pretrained(
             model_args.actor_model_name_or_path, model_max_length=data_args.max_length, padding_side="left"
         )
@@ -320,7 +304,6 @@ def main():
     train_ds = PromptOnlyDataset(data_args.parsed_train_datasets, tokenizer=actor_tokenizer)
     if data_args.eval_datasets is None and data_args.eval_split_ratio:
         train_ds, dev_ds = train_ds.split_train_test(split_ratio=data_args.eval_split_ratio)
-        print("=" * 20, "dev_ds: ", dev_ds[0])
     elif data_args.eval_datasets is not None:
         dev_ds = PromptOnlyDataset(data_args.parsed_eval_datasets, tokenizer=actor_tokenizer)
     else:
@@ -331,11 +314,6 @@ def main():
         if data_args.ptx_datasets is not None
         else None
     )
-    # trainer = Trainer(model=actor_model,
-    #                   args=training_args,
-    #                   train_dataset=ptx_ds,
-    #                   tokenizer=actor_tokenizer,
-    #                   data_collator=ptx_ds.get_collator())
 
     trainer = PPOTrainer(
         model=(actor_model, actor_reference_model, reward_model, reward_critic_model),
