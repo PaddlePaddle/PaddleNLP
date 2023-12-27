@@ -148,6 +148,8 @@ class ColumnParallelQuantizationLoRALinear(ColumnParallelQuantizationLinear):
             raise ValueError("Lora rank r should be a positive integer")
         if self.quant_algo == "llm.int8":
             raise NotImplementedError("llm.int8 not yet support lora strategy.")
+        if self.quant_algo in ["fp4", "nf4"]:
+            raise NotImplementedError(f"{self.quant_algo} not yet support tensor parallelism.")
 
         self.r = r
         self.lora_alpha = lora_alpha
@@ -228,6 +230,10 @@ class RowParallelQuantizationLoRALinear(RowParallelQuantizationLinear):
         )
         if not isinstance(r, int) or r <= 0:
             raise ValueError("Lora rank r should be a positive integer")
+        if self.quant_algo == "llm.int8":
+            raise NotImplementedError("llm.int8 not yet support lora strategy.")
+        if self.quant_algo in ["fp4", "nf4"]:
+            raise NotImplementedError(f"{self.quant_algo} not yet support tensor parallelism.")
         self.r = r
         self.lora_alpha = lora_alpha
         # Optional dropout

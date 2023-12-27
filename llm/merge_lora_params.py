@@ -12,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
+import os
 
 import paddle
 
 from paddlenlp.peft import LoRAConfig, LoRAModel
-from paddlenlp.transformers import AutoModelForCausalLM
+from paddlenlp.quantization.quantization_config import QuantizationConfig
+from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM
+from paddlenlp.utils.env import CONFIG_NAME
 
 
 def parse_arguments():
@@ -25,7 +28,9 @@ def parse_arguments():
     parser.add_argument(
         "--lora_path", default=None, required=True, help="The directory of LoRA parameters. Default to None"
     )
-    parser.add_argument("--merge_model_path", default=None, help="The directory of merged parameters. Default to None")
+    parser.add_argument(
+        "--merge_lora_model_path", default=None, help="The directory of merged parameters. Default to None"
+    )
     parser.add_argument("--device", type=str, default="gpu", help="Device")
     return parser.parse_args()
 
@@ -33,13 +38,29 @@ def parse_arguments():
 def merge():
     args = parse_arguments()
     paddle.set_device(args.device)
+
     lora_config = LoRAConfig.from_pretrained(args.lora_path)
-    dtype = lora_config.dtype
     lora_config.merge_weights = True
+    if lora_config.base_model_name_or_path is None:
+        if args.model_name_or_path is not None:
+            raise ValueError("We can not find a valid model_name_or_path.")
+        else:
+            lora_config.base_model_name_or_path = args.model_name_or_path
+
+    if os.path.isfile(os.path.join(args.lora_path, CONFIG_NAME)):
+        config = AutoConfig.from_pretrained(args.lora_path)
+    elif args.model_name_or_path is not None:
+        config = AutoConfig.from_pretrained(args.model_name_or_path)
+    else:
+        raise ValueError(
+            f"We can not find config.json in lora_path: {args.lora_path} or find a valid model_name_or_path."
+        )
+    config.dtype = lora_config.dtype
 
     model = AutoModelForCausalLM.from_pretrained(
-        args.model_name_or_path,
-        dtype=dtype,
+        lora_config.base_model_name_or_path,
+        dtype=config.dtype,
+        low_cpu_mem_usage=True,
     )
     model = LoRAModel.from_pretrained(model=model, lora_path=args.lora_path, lora_config=lora_config)
     model.eval()
@@ -50,6 +71,9 @@ def merge():
     for key in list(model_state_dict):
         if "lora" in key:
             del model_state_dict[key]
+        if "quant" in key:
+            del model_state_dict[key]
+    model.model.config.quantization_config = QuantizationConfig()
     model.model.save_pretrained(args.merge_model_path, state_dict=model_state_dict)
 
 
