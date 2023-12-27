@@ -27,3 +27,4 @@ tritonclient[all]
 typing_extensions==4.5.0
 aistudio_sdk
 markdown
+pypdf
