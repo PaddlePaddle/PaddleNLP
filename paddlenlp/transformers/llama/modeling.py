@@ -329,7 +329,6 @@ def rms_norm_fused(x_in, w, eps):
 
 def xft_weight_only_linear(x, weight_quant, scale, zero_point, bias=None, bits="int8"):
     if in_dynamic_mode():
-        # TODO(jiabin): using addmm for fast forward route
         return _C_ops.xft_weight_only_linear(x, weight_quant, bias, scale, zero_point, bits)
 
     elif in_pir_mode():
@@ -415,8 +414,7 @@ class XFTWeightOnlyLinear(nn.Layer):
 
     def forward(self, input):
         out = xft_weight_only_linear(
-            x=input, weight=self.weight, bias=self.bias, scale=self.scales, zero_point=self.zero_point, bits=self.bits
-        )
+            x=input, weight_quant=self.weight, scale=self.scales, zero_point=self.zero_point, bias=self.bias, bits=self.bits)
         return out
 
     def extra_repr(self):
@@ -860,7 +858,8 @@ class LlamaAttention(nn.Layer):
 
             if CPU_MODE:
                 mix_layer = self.qkv_proj_weight_only(hidden_states)
-                import pdb;pdb.set_trace()
+                mix_layer = paddle.reshape_(mix_layer, target_shape)
+                query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
             else:
                 mix_layer = self.qkv_proj(hidden_states)
                 mix_layer = paddle.reshape_(mix_layer, target_shape)
