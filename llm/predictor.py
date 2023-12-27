@@ -280,7 +280,9 @@ class StaticGraphPredictor(BasePredictor):
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             inference_config.disable_gpu()
-            inference_config.enable_mkldnn()
+            inference_config.disable_mkldnn()
+            # inference_config.enable_new_executor()
+            # inference_config.dis
             inference_config.set_cpu_math_library_num_threads(32)
         # inference_config.disable_glog_info()
 

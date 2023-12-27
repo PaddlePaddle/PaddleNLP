@@ -49,8 +49,8 @@ from .stopping_criteria import (
 )
 from .streamers import BaseStreamer
 
-if is_paddlenlp_ops_available():
-    import paddlenlp_ops
+# if is_paddlenlp_ops_available():
+#     import paddlenlp_ops
 
 __all__ = [
     "GenerationMixin",
@@ -1340,7 +1340,8 @@ class GenerationMixin(object):
             # compute next_tokens
             if use_top_p:
                 logits = logits / temperature
-                if is_paddlenlp_ops_available():
+                # if is_paddlenlp_ops_available():
+                if False:
                     top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
                     _, next_tokens = paddlenlp_ops.top_p_sampling(probs, top_ps_tensor, -1)
                 else:
