@@ -226,10 +226,14 @@ class ShardingIO:
                 if optimizer._param2rank[k] != int(v):
                     return True
         else:
-            # reshard anyway
-            if "pp_overlap" not in sharding_meta:
-                return True
-            pp_overlap = sharding_meta["pp_overlap"]
+            pp_overlap = None
+            if "pp_overlap" in sharding_meta:
+                pp_overlap = sharding_meta["pp_overlap"]
+
+            # backward compatibility
+            if "enable_overlap" in sharding_meta:
+                pp_overlap = sharding_meta["enable_overlap"]
+
             cur_pp_overlap = unwrap_optimizer(self.optimizer, DygraphShardingOptimizerV2).pp_overlap
             return pp_overlap != cur_pp_overlap
 
