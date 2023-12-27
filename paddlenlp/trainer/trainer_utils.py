@@ -76,7 +76,7 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
     # global seed: only mp group is same.
     # local seed: all groups are different
     hcg = None
-    if hasattr(fleet.fleet, "_hcg") and topo is not None:
+    if hasattr(fleet.fleet, "_hcg") and topo is None:
         hcg = fleet.get_hybrid_communicate_group()
 
     if topo is not None and paddle.distributed.get_world_size() > 1:
@@ -99,8 +99,11 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
         mp_rank = hcg.get_model_parallel_rank()
         mp_size = hcg.get_model_parallel_world_size()
 
-        sep_rank = hcg.get_sep_parallel_rank()
-        sep_size = hcg.get_sep_parallel_world_size()
+        if hasattr(hcg, "get_sep_parallel_rank"):
+            sep_rank = hcg.get_sep_parallel_rank()
+            sep_size = hcg.get_sep_parallel_world_size()
+        else:
+            sep_rank, sep_size = 0, 1
 
         pp_rank = hcg.get_stage_id()
         pp_size = hcg.get_pipe_parallel_world_size()

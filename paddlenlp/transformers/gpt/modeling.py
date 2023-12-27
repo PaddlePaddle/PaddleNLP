@@ -48,11 +48,7 @@ from ..sequence_parallel_utils import (
     ScatterOp,
     mark_as_sequence_parallel_parameter,
 )
-from .configuration import (
-    GPT_PRETRAINED_INIT_CONFIGURATION,
-    GPT_PRETRAINED_RESOURCE_FILES_MAP,
-    GPTConfig,
-)
+from .configuration import GPT_PRETRAINED_INIT_CONFIGURATION, GPTConfig
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
@@ -759,7 +755,6 @@ class GPTPretrainedModel(PretrainedModel):
     base_model_prefix = "gpt"
     config_class = GPTConfig
     pretrained_init_configuration = GPT_PRETRAINED_INIT_CONFIGURATION
-    pretrained_resource_files_map = GPT_PRETRAINED_RESOURCE_FILES_MAP
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):
