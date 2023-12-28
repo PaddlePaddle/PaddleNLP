@@ -808,7 +808,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
 
         assert self.weight_only_quant_bits != -1
         self.weight_dtype = "int" + str(self.weight_only_quant_bits)
-
+        self.weight_scale_dtype = self._dtype
         self.qkv_weights_scale = []
         self.linear_weights_scale = []
         self.ffn1_weights_scale = []
@@ -824,28 +824,28 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             qkv_weight_scale = self.create_parameter(
                 shape=[(config.num_heads + 2 * config.kv_num_heads) * self.head_dim],
                 attr=qkv_weight_scale_attr,
-                dtype=paddle.float32,
+                dtype=self.weight_scale_dtype,
                 is_bias=False,
             )
 
             linear_weight_scale = self.create_parameter(
                 shape=[config.embed_dim],
                 attr=linear_weight_scale_attr,
-                dtype=paddle.float32,
+                dtype=self.weight_scale_dtype,
                 is_bias=False,
             )
 
             ffn1_weight_scale = self.create_parameter(
                 shape=[config.dim_feedforward * 2] if config.activation.endswith("glu") else [config.dim_feedforward],
                 attr=ffn1_weight_scale_attr,
-                dtype=paddle.float32,
+                dtype=self.weight_scale_dtype,
                 is_bias=False,
             )
 
             ffn2_weight_scale = self.create_parameter(
                 shape=[config.embed_dim],
                 attr=ffn2_weight_scale_attr,
-                dtype=paddle.float32,
+                dtype=self.weight_scale_dtype,
                 is_bias=False,
             )
 

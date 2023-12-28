@@ -20,14 +20,24 @@ mkdir -p /workspace/case_logs
 export log_path=/workspace/case_logs
 export case_list=()
 
+target_lists_for_gpt=(
+    "model_zoo/gpt-3"
+)
+
+target_lists_for_llama=(
+    "llm/llama/auto_parallel"
+    "paddlenlp/transformers/llama/modeling_auto.py"
+)
+
+target_path_for_ci_scripts="scripts/distribute"
+
 ####################################
-# Insatll paddlepaddle-gpu
 install_paddle(){
     echo -e "\033[31m ---- Install paddlepaddle-gpu  \033"
-    python -m pip install --user ${paddle} --force-reinstall --no-dependencies;
+    python -m pip install --no-cache-dir --user ${paddle} --force-reinstall --no-dependencies;
     python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
 }
-# Install paddlenlp
+
 install_paddlenlp(){
     echo -e "\033[31m ---- Install paddlenlp  \033"
     cd ${nlp_dir}
@@ -53,22 +63,26 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
     dir2=${arr_file_name[1]}
     dir3=${arr_file_name[2]}
     dir4=${arr_file_name[3]}
-    echo "file_name:"${file_name}, "dir1:"${dir1}, "dir2:"${dir2},"dir3:"${dir3},"dir4:"${dir4},".xx:" ${file_name##*.}
+    file_item=$dir1/$dir2/$dir3/$dir4
+    echo "file_name:"${file_name}, "path:"${file_item}
     if [ ! -f ${file_name} ];then # 针对pr删掉文件
         continue
     elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
         continue
-    elif [[ ${dir1} =~ "model_zoo" ]] && [[ ${dir2} =~ "gpt-3" ]];then
-        if [[ ${dir3} =~ "benchmarks" ]];then
-            continue
-        else
-            # model_zoo/gpt-3
-            case_list[${#case_list[*]}]=gpt-3
-        fi
     elif [[ ${dir1} =~ "paddlenlp" ]];then
-        export FLAGS_paddlenlp=1
+	    export FLAGS_paddlenlp=1
     else
-        continue
+        for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
+            if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
+                case_list[${#case_list[*]}]=gpt-3_auto
+                case_list[${#case_list[*]}]=gpt-3_dygraph
+            fi
+        done
+        for ((i=0; i<${#target_lists_for_llama[@]}; i++)); do
+            if [[ ${file_item} == *${target_lists_for_llama[i]}* ]];then
+                case_list[${#case_list[*]}]=llama_auto
+            fi
+        done
     fi
 done
 }
@@ -77,7 +91,7 @@ print_info(){
 if [ $1 -ne 0 ];then
     EXCODE=2
     if [ ! -f ${log_path}/$2 ];then
-        echo -e "\033[31m run CI FAIL \033"
+        echo -e "\033[31m run $2 CI FAIL \033"
     else
         mv ${log_path}/$2 ${log_path}/$2_FAIL.log
         echo -e "\033[31m ${log_path}/$2_FAIL \033"
@@ -85,8 +99,18 @@ if [ $1 -ne 0 ];then
     fi
     exit $EXCODE
 else
-    echo -e "\033[32m run CI SUCCESS \033"
+    echo -e "\033[32m run $3 CI SUCCESS \033"
 fi
+}
+####################################
+function contain_case(){
+    local e
+    for e in "${@:2}";do
+        if [[ "$e" == "$1" ]];then
+            return 1
+        fi
+    done
+    return 0
 }
 ####################################
 get_diff_TO_case # 获取待执行case列表
@@ -94,36 +118,47 @@ case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${case_list[*]}))  # 去重并将结�
 if [[ ${#case_list[*]} -ne 0 ]];then
     echo -e "\033[31m =======CI Check case========= \033"
     echo -e "\033[31m ---- case_list length: ${#case_list[*]}, cases: ${case_list[*]} \033"
+    echo -e "\033[31m ============================= \033"
     set +e
-    echo -e "\033[31m ---- start run case  \033"
+
     # Install paddle
     install_paddle
-    if [[ FLAGS_paddlenlp -eq 1 ]];then
+    if [[ FLAGS_paddlenlp -eq 1 ]] || [[ $(contain_case llama_auto ${case_list[@]}; echo $?) -eq 1 ]];then
         # 安装本地paddlenlp
         install_paddlenlp
     fi
     case_num=1
-    for case in ${case_list[*]};do
-        echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: ${case} \033"
-        if [[ ${case} == "gpt-3" ]];then
-            echo -e "\033[31m ---- running case gpt-3 auto \033"
-            bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh
-            print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'`
-            echo -e "\033[31m ---- running case gpt-3 dynamic \033"
-            bash /workspace/PaddleNLP/scripts/distribute/ci_case_dy.sh
-            print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'`
-            let case_num++
-        else
-            echo -e "\033[31m ---- no ${case} \033"
-            let case_num++
-        fi
-    done
+    export FLAGS_install_deps=0
+    export FLAGS_download_data=""
+    if [[ $(contain_case llama_auto ${case_list[@]}; echo $?) -eq 1 ]];then
+        echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: llama_auto \033"
+        bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh llama_case_list_auto $FLAGS_install_deps $FLAGS_download_data
+        print_info $? `ls -lt ${log_path} | grep llama | head -n 1 | awk '{print $9}'` llama_auto
+        export FLAGS_download_data="llama ""$FLAGS_download_data"
+        let case_num++
+    fi
+    if [[ $(contain_case gpt-3_auto ${case_list[@]}; echo $?) -eq 1 ]];then
+        echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: gpt-3_auto \033"
+        bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh gpt_case_list_auto $FLAGS_install_deps $FLAGS_download_data
+        print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` gpt-3_auto
+        export FLAGS_install_deps=1
+        export FLAGS_download_data="gpt ""$FLAGS_download_data"
+        let case_num++
+    fi
+    if [[ $(contain_case gpt-3_dygraph ${case_list[@]}; echo $?) -eq 1 ]];then
+        echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: gpt-3_dygraph \033"
+        bash /workspace/PaddleNLP/scripts/distribute/ci_case_dy.sh gpt_case_list_dygraph $FLAGS_install_deps $FLAGS_download_data
+        print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` gpt-3_dygraph
+        export FLAGS_install_deps=1
+        export FLAGS_download_data="gpt ""$FLAGS_download_data"
+        let case_num++
+    fi
     echo -e "\033[31m ---- end run case  \033"
     cd ${log_path}
     if [ ! -f *FAIL* ];then
         FF=0
         EXCODE=0
-        echo -e "\033[32m ---- case Success \033"
+        echo -e "\033[32m ---- all case Success \033"
     else
         FF=`ls *FAIL*|wc -l`
         EXCODE=2

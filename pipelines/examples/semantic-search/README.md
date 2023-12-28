@@ -171,6 +171,7 @@ curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' 
 
 ```bash
 pip install streamlit==1.11.1
+pip install markdown
 # 配置模型服务地址
 export API_ENDPOINT=http://127.0.0.1:8891
 # 在指定端口 8502 启动 WebUI

@@ -13,6 +13,7 @@
     "sequence_parallel": 0,   
     "use_flash_attention": true,
     "use_fused_rms_norm": true,
+    "use_fused_rope": true,
     "max_seq_length": 4096,
     "learning_rate": 3e-05,
     "min_learning_rate": 3e-06,

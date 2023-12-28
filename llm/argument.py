@@ -14,23 +14,45 @@
 from dataclasses import dataclass, field
 
 from paddlenlp.trainer import TrainingArguments
+from paddlenlp.trainer.trainer_utils import IntervalStrategy
+from paddlenlp.utils.log import logger
 
 
 @dataclass
 class TrainingArguments(TrainingArguments):
     benchmark: bool = field(default=False, metadata={"help": "Whether runs benchmark"})
+    # NOTE(gongenlei): new add autotuner_benchmark
+    autotuner_benchmark: bool = field(
+        default=False,
+        metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
+    )
+
+    def __post_init__(self):
+        super().__post_init__()
+        # NOTE(gongenlei): new add autotuner_benchmark
+        if self.autotuner_benchmark:
+            self.max_steps = 5
+            self.do_train = True
+            self.do_export = False
+            self.do_predict = False
+            self.do_eval = False
+            self.overwrite_output_dir = True
+            self.load_best_model_at_end = False
+            self.report_to = []
+            self.save_strategy = IntervalStrategy.NO
+            self.evaluation_strategy = IntervalStrategy.NO
 
 
 @dataclass
 class DataArgument:
     dataset_name_or_path: str = field(default=None, metadata={"help": "Name or path for dataset"})
     task_name: str = field(default=None, metadata={"help": "Additional name to select a more specific task."})
-    intokens: bool = field(default=False, metadata={"help": "Whether to use InTokens data stream"})
+    zero_padding: bool = field(default=False, metadata={"help": "Whether to use Zero Padding data stream"})
     src_length: int = field(default=1024, metadata={"help": "The maximum length of source(context) tokens."})
     max_length: int = field(
         default=2048,
         metadata={
-            "help": "The maximum length that model input tokens can have. When intokens is set to True, it's also the maximum length for InTokens data stream"
+            "help": "The maximum length that model input tokens can have. When Zero Padding is set to True, it's also the maximum length for Zero Padding data stream"
         },
     )
     eval_with_do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
@@ -50,6 +72,28 @@ class DataArgument:
             "help": "the path of `chat_template.json` file to handle multi-rounds conversation. If is None, it will not use `chat_template.json`; If is equal with `model_name_or_path`, it will use the default loading; If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
         },
     )
+    # NOTE(gongenlei): deprecated params
+    task_name_or_path: str = field(
+        default=None,
+        metadata={
+            "help": "@deprecated Please use `dataset_name_or_path`. Name or path for dataset, same as `dataset_name_or_path`."
+        },
+    )  # Alias for dataset_name_or_path
+    intokens: bool = field(
+        default=None,
+        metadata={
+            "help": "@deprecated Please use `zero_padding`. Whether to use InTokens data stream, same as `zero_padding`."
+        },
+    )  # Alias for zero_padding
+
+    def __post_init__(self):
+        if self.task_name_or_path is not None:
+            logger.warning("`--task_name_or_path` is deprecated, please use `--dataset_name_or_path`.")
+            self.dataset_name_or_path = self.task_name_or_path
+
+        if self.intokens is not None:
+            logger.warning("`--intokens` is deprecated, please use `--zero_padding`.")
+            self.zero_padding = self.intokens
 
 
 @dataclass
@@ -58,6 +102,25 @@ class ModelArgument:
         default=None, metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
+    weight_quantize_algo: str = field(
+        default=None,
+        metadata={
+            "help": "Model weight quantization algorithm including 'nf4', 'fp4','weight_only_int4', 'weight_only_int8'."
+        },
+    )
+    weight_blocksize: int = field(
+        default=64,
+        metadata={"help": "Block size for weight quantization(Only available for nf4 or fp4 quant_scale.)."},
+    )
+    weight_double_quant: bool = field(
+        default=False, metadata={"help": "Whether apply double quant(Only available for nf4 or fp4 quant_scale.)."}
+    )
+    weight_double_quant_block_size: int = field(
+        default=256,
+        metadata={
+            "help": "Block size for quant_scale of weight quant_scale(Only available for nf4 or fp4 quant_scale.)"
+        },
+    )
 
     # LoRA related parameters
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})

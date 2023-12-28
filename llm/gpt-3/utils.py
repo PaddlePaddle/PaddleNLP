@@ -78,8 +78,9 @@ def set_seed(seed):
 
     # NOTE: the commented seeds are set only for precision validation
     # seed += 100 * pp_rank
-    random.seed(seed + 100 * pp_rank)
-    np.random.seed(seed + 100 * pp_rank)
+    random_seed = seed + 100 * pp_rank
+    random.seed(random_seed)
+    np.random.seed(random_seed)
 
     # seed = mp_rank +
     #        pp_rank * (mp_size) +
@@ -110,7 +111,10 @@ def set_seed(seed):
 
     paddle.seed(global_seed)
 
-    logger.info("The global seed is set to {} and local seed is set to {}.".format(global_seed, local_seed))
+    logger.info(
+        "The global seed is set to {}, local seed is set to {} and "
+        "random seed is set to {}.".format(global_seed, local_seed, random_seed)
+    )
 
 
 def create_hcg(strategy, hcg_name="HybridCommunicateGroup"):

@@ -88,3 +88,15 @@ PYTORCH_WEIGHTS_INDEX_NAME = "pytorch_model.bin.index.json"
 
 SAFE_WEIGHTS_NAME = "model.safetensors"
 SAFE_WEIGHTS_INDEX_NAME = "model.safetensors.index.json"
+
+PADDLE_OPTIMIZER_NAME = "optimizer.pdopt"
+PADDLE_OPTIMIZER_INDEX_NAME = "optimizer.pdopt.index.json"
+
+SAFE_OPTIMIZER_NAME = "optimizer.safetensors"
+SAFE_OPTIMIZER_INDEX_NAME = "optimizer.safetensors.index.json"
+
+PADDLE_MASTER_WEIGHTS_NAME = "master_weights.pdparams"
+PADDLE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.pdparams.index.json"
+
+SAFE_MASTER_WEIGHTS_NAME = "master_weights.safetensors"
+SAFE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.safetensors.index.json"

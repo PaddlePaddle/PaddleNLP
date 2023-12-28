@@ -32,7 +32,8 @@ from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import EntryNotFoundError
 
 from .. import __version__
-from ..utils import CONFIG_NAME, LEGACY_CONFIG_NAME, QuantizationConfig
+from ..quantization.quantization_config import QuantizationConfig
+from ..utils import CONFIG_NAME, LEGACY_CONFIG_NAME
 from ..utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     get_path_from_url_with_filelock,
@@ -471,6 +472,8 @@ class PretrainedConfig:
         # Parameters for tensor parallel
         self.tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", -1)
         self.tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
+        # Parameters for sep
+        self.sep_parallel_degree = kwargs.pop("sep_parallel_degree", -1)
         # If set to True, this option is used with fleet.meta_parallel.ParallelCrossEntropy
         # to calculate cross-entropy loss for parallel model.
         self.tensor_parallel_output = kwargs.pop("tensor_parallel_output", False)
@@ -835,6 +838,11 @@ class PretrainedConfig:
                 )
         to_remove = []
         for key, value in kwargs.items():
+            if key == "quantization_config" and isinstance(value, Dict):
+                for q_key in value:
+                    setattr(config.quantization_config, q_key, value[q_key])
+                to_remove.append(key)
+                continue
             if hasattr(config, key):
                 setattr(config, key, value)
                 if key != "dtype":

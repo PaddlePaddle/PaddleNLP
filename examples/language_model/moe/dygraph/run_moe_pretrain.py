@@ -18,7 +18,6 @@ import time
 import types
 from types import MethodType
 
-import lr
 import numpy as np
 import paddle
 import paddle.distributed as dist
@@ -43,7 +42,11 @@ from paddle.incubate.distributed.models import moe
 from utils import get_timers, set_timers
 from visualdl import LogWriter
 
-from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
+from paddlenlp.transformers import (
+    CosineAnnealingWithWarmupDecay,
+    GPTChineseTokenizer,
+    GPTTokenizer,
+)
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
@@ -426,7 +429,7 @@ def do_train(args):
     if args.lr_decay_style == "none":
         lr_scheduler = None
     elif args.lr_decay_style == "cosine":
-        lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
+        lr_scheduler = CosineAnnealingWithWarmupDecay(
             max_lr=args.max_lr, min_lr=args.min_lr, warmup_step=warmup_step, decay_step=args.decay_steps
         )
 
@@ -626,8 +629,18 @@ def do_train(args):
                         avg_loss -= bal_loss
                     else:
                         bal_loss = -1
+                    max_mem_reserved_msg = ""
+                    max_mem_allocated_msg = ""
+                    if paddle.device.is_compiled_with_cuda():
+                        max_mem_reserved_msg = (
+                            f"max_mem_reserved: {paddle.device.cuda.max_memory_reserved() >> 20} MB,"
+                        )
+                        max_mem_allocated_msg = (
+                            f"max_mem_allocated: {paddle.device.cuda.max_memory_allocated() >> 20} MB"
+                        )
                     logger.info(
-                        "global step %d, epoch: %d, batch: %d, loss: %.9f, bal_loss: %.9f, speed: %.2f step/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
+                        "global step %d, epoch: %d, batch: %d, loss: %.9f, bal_loss: %.9f, speed: %.2f step/s, "
+                        "ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e, %s %s"
                         % (
                             global_step,
                             epoch,
@@ -638,6 +651,8 @@ def do_train(args):
                             speed * default_global_tokens_num,
                             speed * default_global_tokens_num / nranks,
                             learning_rate,
+                            max_mem_reserved_msg,
+                            max_mem_allocated_msg,
                         )
                     )
                     log_writer.add_scalar("loss", float(loss), global_step)

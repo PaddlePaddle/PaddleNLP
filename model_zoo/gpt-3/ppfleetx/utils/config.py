@@ -41,6 +41,7 @@ def process_dist_config(configs):
     mp_degree = config.setdefault("mp_degree", 1)
     pp_degree = config.setdefault("pp_degree", 1)
     config.setdefault("pp_recompute_interval", 1)
+    sep_degree = config.setdefault("sep_degree", 1)
 
     # sharding default
     sharding_config = config["sharding"]
@@ -50,15 +51,15 @@ def process_dist_config(configs):
     reduce_overlap = sharding_config.setdefault("reduce_overlap", False)
     broadcast_overlap = sharding_config.setdefault("broadcast_overlap", False)
 
-    other_degree = mp_degree * pp_degree * sharding_degree
+    other_degree = sep_degree * mp_degree * pp_degree * sharding_degree
 
     assert nranks % other_degree == 0, "unreasonable config of dist_strategy."
     dp_degree = config.setdefault("dp_degree", nranks // other_degree)
     assert nranks % dp_degree == 0, "unreasonable config of dist_strategy."
     assert nranks == dp_degree * other_degree, (
         "Mismatched config using {} cards with dp_degree[{}],"
-        "mp_degree[{}], pp_degree[{}] and sharding_degree[{}]".format(
-            nranks, dp_degree, mp_degree, pp_degree, sharding_degree
+        "sep_degree[{}], mp_degree[{}], pp_degree[{}] and sharding_degree[{}]".format(
+            nranks, dp_degree, sep_degree, mp_degree, pp_degree, sharding_degree
         )
     )
 
