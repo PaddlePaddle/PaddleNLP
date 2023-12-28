@@ -382,8 +382,8 @@ class BloomAttention(nn.Layer):
         if layer_past is not None:
             past_key, past_value = layer_past
             # concatenate along seq_length dimension:
-            #  - key: [batch_size, self.num_heads, head_dim, kv_length]
-            #  - value: [batch_size, self.num_heads, kv_length, head_dim]
+            #  - key: [batch_size, kv_length, self.num_heads, head_dim]
+            #  - value: [batch_size, kv_length, self.num_heads, head_dim]
             key_layer = paddle.concat((past_key, key_layer), axis=1)
             value_layer = paddle.concat((past_value, value_layer), axis=1)
 
@@ -394,12 +394,12 @@ class BloomAttention(nn.Layer):
 
         version = paddle.version.full_version
         version_check = True
-        if version != "0.0.0" and version <= "2.5.2":
+        if self.config.use_flash_attention and version != "0.0.0" and version <= "2.5.2":
             logger.warning(
                 "PaddlePaddle version 2.5.3 or higher is required, please upgrade your PaddlePaddle to 2.5.3 or other higher version."
             )
             version_check = False
-        if self.config.use_flash_attention and version_check:
+        if version_check:
             query_states, key_states, value_states = query_layer, key_layer, value_layer
 
             attention_mask = attention_mask.cast(alibi.dtype) + alibi
@@ -411,6 +411,8 @@ class BloomAttention(nn.Layer):
                 key_states,
                 value_states,
                 attn_mask=attention_mask,
+                dropout_p=self.config.attention_dropout,
+                training=self.training,
                 is_causal=False,
             )
             attn_weights = None
@@ -434,7 +436,6 @@ class BloomAttention(nn.Layer):
             attention_scores = baddbmm(
                 alibi, batch1=query_layer, batch2=key_layer, beta=self.beta, alpha=self.inv_norm_factor
             )
-
             # change view to [batch_size, num_heads, q_length, kv_length]
             # attention_scores = matmul_result.reshape([batch_size, self.num_heads, q_length, kv_length])
 
