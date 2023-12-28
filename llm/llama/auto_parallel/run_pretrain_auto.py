@@ -113,10 +113,29 @@ class PreTrainingArguments(TrainingArguments):
     virtual_pipeline_seg_method: str = field(
         default="LlamaDecoderLayerAuto", metadata={"help": "The seg method of spliting pp layer for virtual pipeline."}
     )
+    # NOTE(gongenlei): new add autotuner_benchmark
+    autotuner_benchmark: bool = field(
+        default=False,
+        metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
+    )
 
     def __post_init__(self):
         super().__post_init__()
         assert self.use_auto_parallel
+
+        # NOTE(gongenlei): new add autotuner_benchmark
+        if self.autotuner_benchmark:
+            self.max_steps = 5
+            self.do_train = True
+            self.do_export = False
+            self.do_predict = False
+            self.do_eval = False
+            self.overwrite_output_dir = True
+            self.load_best_model_at_end = False
+            self.report_to = []
+            # self.save_strategy = IntervalStrategy.NO
+            # self.evaluation_strategy = IntervalStrategy.NO
+
         if self.fused_linear_param_grad_add:
             fused_passes = self.strategy.fused_passes
             fused_passes.enable = True
@@ -300,17 +319,16 @@ def create_pretrained_dataset(
     def print_dataset(data, mode="train"):
         logger.info(f"Sample data for {mode} mode.")
         # input_ids, loss_mask, attention_mask, position_ids, labels = data
-        input_ids = data["text"]
+        input_ids = data["tokens"]
 
         logger.info(tokenizer._decode(input_ids))
 
     from paddlenlp.data import Stack
 
     def _collate_data(data, stack_fn=Stack()):
-        tokens_ = stack_fn([x["text"] for x in data])
 
-        labels = tokens_[:, 1:]
-        tokens = tokens_[:, :-1]
+        labels = stack_fn([x["labels"] for x in data])
+        tokens = stack_fn([x["tokens"] for x in data])
 
         return {
             "input_ids": tokens,

@@ -636,6 +636,10 @@ class LlamaPretrainingCriterionAuto(paddle.nn.Layer):
         self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
     def forward(self, prediction_scores, masked_lm_labels):
+
+        if masked_lm_labels is not None:
+            print("labels.shape :", masked_lm_labels.shape, "    labels.dtype :", masked_lm_labels.dtype)
+
         masked_lm_labels = dist.shard_tensor(masked_lm_labels, get_mesh(-1), [dist.Shard(0), dist.Replicate()])
 
         # Force Replicated to match dy & st
@@ -692,7 +696,7 @@ class LlamaForCausalLMAuto(PretrainedModel):
     ):
         input_ids.stop_gradient = True
 
-        print("input_ids :", input_ids.shape)
+        print("input_ids.shape :", input_ids.shape, "    input_ids.dtype :", input_ids.dtype)
 
         input_ids = dist.shard_tensor(input_ids, get_mesh(), [dist.Shard(0), dist.Replicate()])
 

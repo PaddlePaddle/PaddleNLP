@@ -123,6 +123,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     ShardingOption,
     TrainerMemoryTracker,
     TrainOutput,
+    _exec_mode_guard,
     find_batch_size,
     get_last_checkpoint,
     get_scheduler,
@@ -630,8 +631,6 @@ class Trainer:
 
         train_dataloader = self.get_train_dataloader()
 
-        print("train_dataloader :", train_dataloader)
-
         total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.dataset_world_size
         len_dataloader = None
         if has_length(train_dataloader):
@@ -721,24 +720,7 @@ class Trainer:
         logger.info(f"  Total num train samples = {num_train_samples:,}")
         # per_device_trainable_numel = sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)
         # TODO: Temporary fix since Tensor.numel() not supported in distributed mode
-        per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
-        logger.info(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
-        if self.args.use_hybrid_parallel:
-            # todo fix for pipeline_parallel_degree
-            parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
-            if parts_num > 1:
-                all_reduce_dtype = "int64"
-                if paddle.get_device().split(":")[0] in ["npu", "xpu"]:
-                    # TODO(duanyanhui): fix when NPU all_reduce supports int64
-                    all_reduce_dtype = "float32"
-                trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
-                paddle.distributed.all_reduce(trainable_numel_tensor)
-                trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
-                if self.args.sep_parallel_degree > 0:
-                    trainable_numel = trainable_numel // self.args.sep_parallel_degree
-                # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
-                # so, the trainable numel is a little bigger than real.
-                logger.info(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
+        self._print_trainable_numel()
 
         start_time = time.time()
         self._globalstep_last_start_time = time.time()
@@ -821,7 +803,8 @@ class Trainer:
 
         self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
 
-        tr_loss = paddle.to_tensor(0.0)
+        with _exec_mode_guard("dynamic"):
+            tr_loss = paddle.to_tensor(0.0)
         self._total_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
 
@@ -909,12 +892,20 @@ class Trainer:
                 else:
                     tr_loss_step = self.training_step(model, inputs)
 
-                tr_loss += tr_loss_step
+                with _exec_mode_guard("dynamic"):
+                    tr_loss += tr_loss_step
+
+                disable_accumulation = (
+                    self.args.use_auto_parallel
+                    and self.args.pipeline_parallel_degree > 1
+                    and self.args.run_static_semi_auto
+                )
 
                 if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
                     # last step in epoch but step is always smaller than gradient_accumulation_steps
                     steps_in_epoch <= args.gradient_accumulation_steps
                     and (step + 1) == steps_in_epoch
+                    or disable_accumulation
                 ):
                     self.timers and self.timers("forward-backward").stop()
                     # Maunally collect gradients
@@ -938,23 +929,15 @@ class Trainer:
 
                     self.timers and self.timers("optimizer-step").stop()
 
-                    print("---- after optimizer_step ----")
-
                     self.callback_handler.on_optimizer_end(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
                     )
-
-                    print("---- after callback_handler.on_optimizer_end ----")
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
 
-                    print("---- after callback_handler.on_step_end ----")
-
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
-
-                    print("---- after maybe_log_save_evaluate ----")
 
                     self._print_timer()
                     step_control = 0
@@ -1010,7 +993,7 @@ class Trainer:
                         "on multiple nodes, you should activate `--save_on_each_node`."
                     )
 
-        self._total_loss_scalar += tr_loss.item()
+        self._total_loss_scalar += self._get_item_from_loss(tr_loss)
         train_loss = self._total_loss_scalar / self.state.global_step
 
         metrics = speed_metrics("train", start_time, num_samples=num_train_samples, num_steps=self.state.max_steps)
@@ -1037,6 +1020,27 @@ class Trainer:
         # TODO: fix bugs in paddle/distributed/auto_parallel/api.py#L981 about sample_split of engine._prepare_data_spec
         model, dist_loader = dist.to_static(model, train_dataloader, self.criterion, self.optimizer, strategy=strategy)
         return model, dist_loader
+
+    def _print_trainable_numel(self):
+        per_device_trainable_numel = sum(np.prod(p.shape) for p in self.model.parameters() if not p.stop_gradient)
+        logger.info(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
+
+        if self.args.use_hybrid_parallel:
+            # todo fix for pipeline_parallel_degree
+            parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
+            if parts_num > 1:
+                all_reduce_dtype = "int64"
+                if paddle.get_device().split(":")[0] in ["npu", "xpu"]:
+                    # TODO(duanyanhui): fix when NPU all_reduce supports int64
+                    all_reduce_dtype = "float32"
+                trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
+                paddle.distributed.all_reduce(trainable_numel_tensor)
+                trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
+                if self.args.sep_parallel_degree > 0:
+                    trainable_numel = trainable_numel // self.args.sep_parallel_degree
+                # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
+                # so, the trainable numel is a little bigger than real.
+                logger.info(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
 
     def synchronize_gradients(self, availiable_no_sync, dp_master_grad):
         # Case 1: Use recompute and dp / sharding stage1,
@@ -1187,15 +1191,23 @@ class Trainer:
         if timer_info or paddle_timer_info:
             logger.info(f"[Profile global_step: {self.state.global_step}] {timer_info} {paddle_timer_info}")
 
+    def _get_item_from_loss(self, loss):
+        if isinstance(loss, paddle.Tensor):
+            return loss.item() if loss._is_initialized() else 0.0
+        else:
+            return loss
+
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
 
             logs: Dict[str, float] = {}
 
             # all_gather + mean() to get average loss over all processes
-            tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
+
+            tr_loss_scalar = self._get_item_from_loss(self._nested_gather(tr_loss))
 
             # reset tr_loss to zero
+
             tr_loss.subtract_(tr_loss)
 
             logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
@@ -1302,8 +1314,6 @@ class Trainer:
 
         if self.args.distributed_dataloader:
             logger.info("Training using DistDataLoader.")
-
-        print("data_collator :", self.data_collator)
 
         return _DataLoader(
             train_dataset,
@@ -2637,7 +2647,7 @@ class Trainer:
             metrics = {}
 
         if all_losses is not None:
-            metrics[f"{metric_key_prefix}_loss"] = all_losses.mean().item()
+            metrics[f"{metric_key_prefix}_loss"] = self._get_item_from_loss(all_losses.mean())
 
         # Prefix all keys with metric_key_prefix + '_'
         for key in list(metrics.keys()):
@@ -2826,6 +2836,7 @@ class Trainer:
         Whether or not this process is the local (e.g., on one machine if training in a distributed fashion on several
         machines) main process.
         """
+
         return self.args.local_process_index == 0
 
     def is_world_process_zero(self) -> bool:
