@@ -41,7 +41,6 @@ def extract_pages(page_list, file_path):
     page_text = []
     pdf = pypdf.PdfReader(file_path)
     for index, page in enumerate(pdf.pages[start:end]):
-        paragraphs = page.extract_text()
         try:
             paragraphs = page.extract_text()
             paragraphs = paragraphs.encode("UTF-8", "ignore").decode("UTF-8")
