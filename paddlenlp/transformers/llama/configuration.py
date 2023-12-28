@@ -47,7 +47,7 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "hidden_size": 768,
         "initializer_range": 0.02,
         "intermediate_size": 11008,
-        "max_position_embeddings": 100,
+        "max_position_embeddings": 2048,
         "model_type": "llama",
         "num_attention_heads": 8,
         "num_hidden_layers": 2,
