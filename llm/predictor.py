@@ -29,6 +29,8 @@ from paddle.distributed import fleet
 from utils import (
     dybatch_preprocess,
     get_alibi_slopes,
+    get_default_max_decoding_length,
+    get_default_max_encoding_length,
     get_infer_model_path,
     get_prefix_tuning_params,
     init_chat_template,
@@ -56,8 +58,8 @@ from paddlenlp.utils.log import logger
 class PredictorArgument:
     model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
-    src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
-    max_length: int = field(default=2048, metadata={"help": "the max length for decoding."})
+    src_length: int = field(default=None, metadata={"help": "The max length of source text."})
+    max_length: int = field(default=None, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
     top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
     temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
@@ -885,6 +887,13 @@ def create_predictor(
             predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
         else:
             raise ValueError("the `mode` should be one of [dynamic, static]")
+
+    if predictor.config.src_length is None:
+        predictor.config.src_length = get_default_max_encoding_length(predictor.model_config)
+
+    if predictor.config.max_length is None:
+        predictor.config.max_length = get_default_max_decoding_length(predictor.model_config)
+
     return predictor
 
 

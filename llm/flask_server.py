@@ -17,7 +17,7 @@ import json
 import os
 import socket
 from contextlib import closing
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from time import sleep
 
 import requests
@@ -123,16 +123,26 @@ class PredictorServer:
 
                 # build chat template
                 if self.predictor.tokenizer.chat_template is not None:
-                    history = json.loads(history)
+                    if not history:
+                        history = history or []
+                    # also support history data
+                    elif isinstance(history, str):
+                        history = json.loads(history)
+
                     assert len(history) % 2 == 0
                     chat_query = []
                     for idx in range(0, len(history), 2):
-                        chat_query.append(["", ""])
-                        chat_query[-1][0], chat_query[-1][1] = history[idx]["utterance"], history[idx + 1]["utterance"]
+                        if isinstance(history[idx], str):
+                            chat_query.append([history[idx], history[idx + 1]])
+                        else:
+                            chat_query.append([history[idx]["utterance"], history[idx + 1]["utterance"]])
                     query = [chat_query]
 
                 generation_args = data
                 self.predictor.config.max_length = generation_args["max_length"]
+                if "src_length" in generation_args:
+                    self.predictor.config.src_length = generation_args["src_length"]
+
                 self.predictor.config.top_p = generation_args["top_p"]
                 self.predictor.config.temperature = generation_args["temperature"]
                 self.predictor.config.top_k = generation_args["top_k"]
@@ -160,13 +170,13 @@ class PredictorServer:
         # refer to: https://github.com/pallets/flask/blob/main/src/flask/app.py#L605
         app.run(host="0.0.0.0", port=self.port, threaded=False)
 
-    def start_ui_service(self, args):
+    def start_ui_service(self, args, predictor_args):
         # do not support start ui service in one command
         from multiprocessing import Process
 
         from gradio_ui import main
 
-        p = Process(target=main, args=(args,))
+        p = Process(target=main, args=(args, predictor_args))
         p.daemon = True
         p.start()
 
@@ -194,6 +204,6 @@ if __name__ == "__main__":
     server = PredictorServer(server_args, predictor)
 
     if server.predictor.tensor_parallel_rank == 0:
-        server.start_ui_service(server_args)
+        server.start_ui_service(server_args, asdict(predictor.config))
 
     server.start_flask_server()
