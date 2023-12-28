@@ -18,13 +18,13 @@ import paddle
 
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.quantization.quantization_config import QuantizationConfig
-from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM
+from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.env import CONFIG_NAME
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name_or_path", default=None, required=True, help="The directory of pretrained model.")
+    parser.add_argument("--model_name_or_path", default=None, help="The directory of pretrained model.")
     parser.add_argument(
         "--lora_path", default=None, required=True, help="The directory of LoRA parameters. Default to None"
     )
@@ -59,7 +59,7 @@ def merge():
 
     model = AutoModelForCausalLM.from_pretrained(
         lora_config.base_model_name_or_path,
-        dtype=config.dtype,
+        config,
         low_cpu_mem_usage=True,
     )
     model = LoRAModel.from_pretrained(model=model, lora_path=args.lora_path, lora_config=lora_config)
@@ -75,6 +75,8 @@ def merge():
             del model_state_dict[key]
     model.model.config.quantization_config = QuantizationConfig()
     model.model.save_pretrained(args.merge_model_path, state_dict=model_state_dict)
+    tokenizer = AutoTokenizer.from_pretrained(lora_config.base_model_name_or_path)
+    tokenizer.save_pretrained(args.merge_model_path)
 
 
 if __name__ == "__main__":

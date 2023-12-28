@@ -20,10 +20,9 @@ from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.nn.quant import llm_int8_linear, weight_only_linear
 
 try:
-    from .qlora import qlora_weight_linear, qlora_weight_quantize
+    from .qlora import qlora_weight_linear
 except:
     qlora_weight_linear = None
-    qlora_weight_quantize = None
 
 
 QuantMapping = {
