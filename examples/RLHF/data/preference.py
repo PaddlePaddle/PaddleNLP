@@ -1,3 +1,4 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2023 PKU-Alignment Team. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# ==============================================================================
 """Dataset class for preference training."""
 
 from __future__ import annotations
@@ -62,11 +62,7 @@ class PreferenceDataset(TokenizedDataset):
 
         better_input_ids = self.tokenize(prompt + better_answer + self.tokenizer.eos_token)
         worse_input_ids = self.tokenize(prompt + worse_answer + self.tokenizer.eos_token)
-        # import paddle.distributed as dist
 
-        # if dist.get_rank() == 0:
-        #     print("=" * 20, index, prompt, better_answer)
-        #     print("=" * 20, index, prompt, worse_answer)
         if (
             better_input_ids.shape == worse_input_ids.shape
             and np.all(np.equal(better_input_ids, worse_input_ids)).item()

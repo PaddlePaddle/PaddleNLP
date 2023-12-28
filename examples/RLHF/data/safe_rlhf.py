@@ -1,3 +1,4 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2023 PKU-Alignment Team. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# ==============================================================================
 """Safe-RLHF preference datasets."""
 
 from __future__ import annotations
@@ -58,7 +58,6 @@ class SafeRLHFTrainDataset(SafeRLHFDataset):
     ALIASES: tuple[str, ...] = ("PKU-Alignment/PKU-SafeRLHF/train",)
     PATH: str = "PKU-Alignment/PKU-SafeRLHF"
     SPLIT: str = "train"
-    # SPLIT: str = "30k_train"  # dataset has been updated
 
 
 class SafeRLHFTestDataset(SafeRLHFDataset):
@@ -66,7 +65,6 @@ class SafeRLHFTestDataset(SafeRLHFDataset):
     ALIASES: tuple[str, ...] = ("PKU-Alignment/PKU-SafeRLHF/test",)
     PATH: str = "PKU-Alignment/PKU-SafeRLHF"
     SPLIT: str = "test"
-    # SPLIT: str = "30k_test"
 
 
 class SafeRLHF10KTrainDataset(SafeRLHFDataset):

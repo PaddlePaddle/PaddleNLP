@@ -1,3 +1,4 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2023 PKU-Alignment Team. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,70 +12,56 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# ==============================================================================
-"""Auto-models for score models."""
+"""Utilities for score models."""
 
 from __future__ import annotations
 
+import importlib
+import io
+import json
 from abc import abstractmethod
-
-# from collections import OrderedDict
+from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 import paddle
 import paddle.distributed as dist
 import paddle.nn as nn
 
 from paddlenlp.transformers import PretrainedConfig
+from paddlenlp.transformers.auto.modeling import (
+    _BaseAutoModelClass,
+    get_init_configurations,
+    get_name_mapping,
+    is_standard_config,
+)
 from paddlenlp.transformers.model_outputs import ModelOutput
 
-# from paddle.distributed import fleet
 
+class AutoModelForScore(_BaseAutoModelClass):
+    CONFIGURATION_MODEL_MAPPING = get_init_configurations()
+    _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
+    _name_mapping: OrderedDict[str, Any] = get_name_mapping("ForScore")
+    _score_module_name: str = "models.score_model"
 
-# from paddlenlp.transformers.sequence_parallel_utils import AllGatherOp, all_gather
+    @classmethod
+    def _get_model_class_from_config(cls, pretrained_model_name_or_path, config_file_path):
+        with io.open(config_file_path, encoding="utf-8") as f:
+            config = json.load(f)
 
-# from transformers.models.auto.auto_factory import (
-#     _BaseAutoModelClass,
-#     _LazyAutoMapping,
-#     auto_class_update,
-#     getattribute_from_module,
-# )
-# from transformers.models.auto.configuration_auto import (
-#     CONFIG_MAPPING_NAMES,
-#     model_type_to_module_name,
-# )
+        # Get class name corresponds to this configuration
+        if is_standard_config(config):
+            architectures = config["architectures"]
+            init_class = architectures.pop() if len(architectures) > 0 else None
+        else:
+            init_class = config.pop("init_class", None)
+        import_class = importlib.import_module(cls._score_module_name)
+        model_class = getattr(import_class, init_class)
+        return model_class
 
-# class _LazyAutoMappingInSafeRLHF(_LazyAutoMapping):
-#     def _load_attr_from_module(self, model_type: str, attr: str) -> Any:
-#         module_name = model_type_to_module_name(model_type)
-#         if module_name not in self._modules:
-#             self._modules[module_name] = importlib.import_module(
-#                 f'.{module_name}',
-#                 'safe_rlhf.models.score_model',
-#             )
-#         return getattribute_from_module(self._modules[module_name], attr)
-
-# MODEL_FOR_SCROE_MAPPING_NAMES: OrderedDict[str, str] = OrderedDict(
-#     [
-#         # Score model mapping
-#         ('llama', 'LlamaModelForScore'),
-#         ('bloom', 'BloomModelForScore'),
-#         ('open_llama', 'OpenLlamaForScore'),
-#         ('opt', 'OPTForScore'),
-#         ('gpt_neo', 'GPTNeoForScore'),
-#         ('gptj', 'GPTJForScore'),
-#         ('gpt2', 'GPT2ForScore'),
-#         ('gpt_neox', 'GPTNeoXForScore'),
-#     ], )
-# MODEL_FOR_SCORE_MAPPING: OrderedDict[str, Any] = _LazyAutoMappingInSafeRLHF(
-#     CONFIG_MAPPING_NAMES,
-#     MODEL_FOR_SCROE_MAPPING_NAMES,
-# )
-
-# @functools.partial(auto_class_update, head_doc='score model')
-# class AutoModelForScore(_BaseAutoModelClass):
-#     _model_mapping: OrderedDict[str, Any] = MODEL_FOR_SCORE_MAPPING
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
+        return cls._from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
 
 @dataclass
@@ -202,9 +189,6 @@ class ScoreModelMixin:
 
         self.do_normalize = self.config.do_normalize = mode
 
-
-"""Normalizer for score models."""
-from typing import Literal
 
 NormalizeFunction = Literal["affine", "scale", "translate", "identity"]
 NormalizerType = Literal["RunningMeanStd", "ExponentialMovingAverage"]

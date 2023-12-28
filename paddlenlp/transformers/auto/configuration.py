@@ -106,6 +106,17 @@ class AutoConfig(PretrainedConfig):
         model_name = architectures[0]
         model_class = import_module(f"paddlenlp.transformers.{model_name}")
 
+        # To make AutoConfig support loading config with custom model_class
+        # which is not in paddlenlp.transformers. Using "model_type" to load
+        # here actually conforms to what PretrainedConfig doc describes.
+        if model_class is None and "model_type" in config:
+            model_type = config["model_type"]
+            # MAPPING_NAMES is a dict with item like ('llama', [LlamaConfig, PretrainedConfig])
+            for config_class in cls.MAPPING_NAMES[model_type]:
+                if config_class is not PretrainedConfig:
+                    model_config_class = config_class
+                    return model_config_class
+
         assert inspect.isclass(model_class) and issubclass(
             model_class, PretrainedModel
         ), f"<{model_class}> should be a PretarinedModel class, but <{type(model_class)}>"

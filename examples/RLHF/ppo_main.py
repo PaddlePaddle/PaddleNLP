@@ -19,6 +19,7 @@ from typing import Any, Dict, Tuple
 
 import paddle
 from data import PromptOnlyDataset, SupervisedDataset, parse_dataset
+from models import AutoModelForScore
 from ppo_trainer import PPOTrainer
 
 from paddlenlp.trainer import (  # , get_last_checkpoint
@@ -29,7 +30,6 @@ from paddlenlp.transformers import (
     AutoConfig,
     AutoTokenizer,
     LlamaForCausalLM,
-    LlamaModelForScore,
     LlamaTokenizer,
 )
 from paddlenlp.utils.log import logger
@@ -277,7 +277,7 @@ def main():
         )
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
-        reward_model = LlamaModelForScore.from_pretrained(
+        reward_model = AutoModelForScore.from_pretrained(
             model_args.reward_model_name_or_path,
             config=model_config,
             score_type="reward",
@@ -289,7 +289,7 @@ def main():
         # critic model
         if model_args.reward_critic_model_name_or_path is None:
             model_args.reward_critic_model_name_or_path = model_args.reward_model_name_or_path
-        reward_critic_model = LlamaModelForScore.from_pretrained(
+        reward_critic_model = AutoModelForScore.from_pretrained(
             model_args.reward_critic_model_name_or_path, config=model_config, score_type="critic", do_normalize=False
         )
         reward_critic_tokenizer = AutoTokenizer.from_pretrained(
