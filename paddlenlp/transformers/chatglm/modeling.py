@@ -262,7 +262,7 @@ class ChatGLMAttention(nn.Layer):
                 "PaddlePaddle version 2.5.3 or higher is required, please upgrade your PaddlePaddle to 2.5.3 or other higher version."
             )
             version_check = False
-        if version_check:
+        if self.config.use_flash_attention and version_check:
             # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
             # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
             # [s, b, n, h/n] = > [batch_size, seq_len, num_heads, head_dim]

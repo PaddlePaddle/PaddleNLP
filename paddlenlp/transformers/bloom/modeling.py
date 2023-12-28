@@ -399,7 +399,7 @@ class BloomAttention(nn.Layer):
                 "PaddlePaddle version 2.5.3 or higher is required, please upgrade your PaddlePaddle to 2.5.3 or other higher version."
             )
             version_check = False
-        if version_check:
+        if self.config.use_flash_attention and version_check:
             query_states, key_states, value_states = query_layer, key_layer, value_layer
 
             attention_mask = attention_mask.cast(alibi.dtype) + alibi
