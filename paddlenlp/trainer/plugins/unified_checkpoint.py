@@ -116,7 +116,7 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
         raise ValueError("Unified checkpoint only supports PretrainedModel")
 
     if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
-        if is_need_master_weight(args, optimizer):
+        if is_need_master_weight(optimizer, is_fp16_or_bp16=(args.fp16 or args.bf16)):
             logger.info(
                 f"With {UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value}, skip the model checkpoint save."
                 "The master weight will be loaded as model weights for next resumption."
@@ -237,9 +237,6 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
                 None, model.config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
             )
 
-        # confirm parameter cast is executed on the same device as model
-        # TODO: cast(FP32 -> FP16) has diff on different devices, need to fix it
-        state_dict = nested_copy_place(state_dict, place=paddle.framework._current_expected_place())
         error_msgs += _load_state_dict_into_model(model, state_dict, "")
 
         # force memory release
@@ -1388,7 +1385,6 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
             tensor = state_dict[key]
             if key in tp_actions:
                 ret = distributed_gather(tensor, dst=j, group=tp_group, offload=False)
-                dist.barrier(group=tp_group)
                 action = tp_actions.pop(key)
                 tensor = action(ret) if is_dst else None
             else:
@@ -1429,7 +1425,6 @@ def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys)
                     )  # Need broadcast when loaded
                 else:
                     ret = distributed_gather(tensor, dst=j, group=tp_group, offload=False)
-                    dist.barrier(group=tp_group)
                     action = tp_actions[model_key]
                     tensor = action(ret) if is_dst else None
             else:
@@ -1631,13 +1626,17 @@ def select_model_weight_index(args, model, resume_from_checkpoint, safe_serializ
 
 
 def update_master_weight_status(args, optimizer, has_master_weight, safe_serialization):
-    if is_need_master_weight(args, optimizer):
+    if is_need_master_weight(optimizer, is_fp16_or_bp16=(args.fp16 or args.bf16)):
         if not has_master_weight:
             if UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value in args.unified_checkpoint_config:
                 index_filename_master_weights = (
                     PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
                 )
                 has_master_weight = True
+                logger.warning(
+                    "The unified checkpoint does not contain master weight, "
+                    "the model weight will be loaded as master weight."
+                )
             else:
                 raise ValueError(
                     "Can't find a valid unified master weight checkpoint,"
@@ -1656,28 +1655,19 @@ def update_master_weight_status(args, optimizer, has_master_weight, safe_seriali
     return has_master_weight, index_filename_master_weights
 
 
-def is_need_master_weight(args, optimizer):
-    """
-    https://github.com/PaddlePaddle/Paddle/blob/4a9991fb6744443333638b65fb7e225fb2b00a13/python/paddle/amp/auto_cast.py#L485
-    """
+def unwrap_optimizer(optimizer):
+    while hasattr(optimizer, "_inner_opt") or hasattr(optimizer, "_optim"):
+        if hasattr(optimizer, "_inner_opt"):
+            optimizer = optimizer._inner_opt
+        if hasattr(optimizer, "_optim"):
+            optimizer = optimizer._optim
 
-    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
-        DygraphShardingOptimizer,
-        DygraphShardingOptimizerV2,
-    )
-    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
-        HybridParallelOptimizer,
-    )
-    from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_optimizer_stage2 import (
-        GroupShardedOptimizerStage2,
-    )
+    return optimizer
 
-    if isinstance(optimizer, (DygraphShardingOptimizer, DygraphShardingOptimizerV2, HybridParallelOptimizer)):
-        optimizer = optimizer._inner_opt
-    elif isinstance(optimizer, GroupShardedOptimizerStage2):
-        optimizer = optimizer._optim
 
+def is_need_master_weight(optimizer, is_fp16_or_bp16):
+    optimizer = unwrap_optimizer(optimizer)
     if hasattr(optimizer, "_multi_precision"):
-        return optimizer._multi_precision and (args.bf16 or args.fp16)
+        return optimizer._multi_precision and is_fp16_or_bp16
     else:
         return False

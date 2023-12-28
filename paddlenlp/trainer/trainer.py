@@ -88,9 +88,12 @@ from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
     LORA_WEIGHTS_NAME,
+    PADDLE_MASTER_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
     PREFIX_WEIGHTS_NAME,
+    SAFE_MASTER_WEIGHTS_INDEX_NAME,
+    SAFE_WEIGHTS_INDEX_NAME,
 )
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
@@ -507,9 +510,10 @@ class Trainer:
 
         if self.args.unified_checkpoint:
             if resume_from_checkpoint is not None:
-                use_unified_checkpoint = True
-                if self.check_origin_checkpoint(resume_from_checkpoint):
-                    use_unified_checkpoint = False
+                use_unified_checkpoint = False
+                if self.is_unified_checkpoint(resume_from_checkpoint):
+                    use_unified_checkpoint = True
+                else:
                     logger.info("Loading origin checkpoint, the next checkpoint will be saved as unified checkpoint")
 
                 if use_unified_checkpoint:
@@ -2285,11 +2289,11 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
-            use_unified_checkpoint = False
             if self.args.unified_checkpoint:
-                use_unified_checkpoint = True
-                if self.check_origin_checkpoint(checkpoint):
-                    use_unified_checkpoint = False
+                use_unified_checkpoint = False
+                if self.is_unified_checkpoint(checkpoint):
+                    use_unified_checkpoint = True
+                else:
                     logger.info("Loading checkpoint, the next checkpoint will be saved as unified checkpoint")
 
             if not use_unified_checkpoint:
@@ -2940,20 +2944,22 @@ class Trainer:
 
         logger.info("")
 
-    def check_origin_checkpoint(self, resume_from_checkpoint):
-        is_origin_checkpoint_type = False
-
-        weight_name = PADDLE_WEIGHTS_NAME
-        weight_index_name = PADDLE_WEIGHTS_INDEX_NAME
-        weights_file = os.path.join(
-            resume_from_checkpoint,
-            _add_variant(weight_name, self.args.weight_name_suffix),
+    def is_unified_checkpoint(self, resume_from_checkpoint, safe_serialization=True):
+        is_unified_checkpoint_type = False
+        weights_index_name = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+        master_weights_index_name = (
+            PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
         )
         weights_index_file = os.path.join(
             resume_from_checkpoint,
-            _add_variant(weight_index_name, self.args.weight_name_suffix),
+            weights_index_name,
         )
-        if distributed_isfile(weights_file) or distributed_isfile(weights_index_file):
-            is_origin_checkpoint_type = True
+        master_weights_index_file = os.path.join(
+            resume_from_checkpoint,
+            master_weights_index_name,
+        )
 
-        return is_origin_checkpoint_type
+        if distributed_isfile(weights_index_file) or distributed_isfile(master_weights_index_file):
+            is_unified_checkpoint_type = True
+
+        return is_unified_checkpoint_type
