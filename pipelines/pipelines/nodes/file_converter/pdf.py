@@ -175,6 +175,8 @@ class PDFToTextConverter(BaseConverter):
         pdf = pypdf.PdfReader(file_path)
         page_length = len(pdf.pages)
         split_len = page_length // process_num
+        if split_len == 0:
+            split_len = page_length
         page_list = [i for i in range(0, page_length, split_len)]
         if page_length > page_list[-1]:
             page_list.append(page_length)
