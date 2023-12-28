@@ -13,6 +13,10 @@
 # limitations under the License.
 
 import os
+
+os.environ[
+    "no_proxy"
+] = "baidu.com,127.0.0.1,0.0.0.0,localhost,bcebos.com,pip.baidu-int.com,mirrors.baidubce.com,repo.baidubce.com,repo.bcm.baidubce.com,pypi.tuna.tsinghua.edu.cn,aistudio.baidu.com"
 import tempfile
 import unittest
 
