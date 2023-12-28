@@ -400,6 +400,11 @@ class PretrainedConfig:
 
             This attribute is currently not being used during model loading time, but this may change in the future
             versions. But we can already start preparing for the future by saving the dtype with save_pretrained.
+        fp16_opt_level(`str`, *optional*):
+            The `level` of the amp level.
+
+            This attribute is currently not being used during model loading time, but this may change in the future
+            versions. But we can already start preparing for the future by saving the dtype with save_pretrained.
     """
     model_type: str = ""
     is_composition: bool = False
@@ -540,6 +545,8 @@ class PretrainedConfig:
         self.pad_token_id = kwargs.pop("pad_token_id", None)
         self.eos_token_id = kwargs.pop("eos_token_id", None)
         self.sep_token_id = kwargs.pop("sep_token_id", None)
+
+        self.fp16_opt_level = kwargs.pop("fp16_opt_level", None)
 
         self.decoder_start_token_id = kwargs.pop("decoder_start_token_id", None)
 
