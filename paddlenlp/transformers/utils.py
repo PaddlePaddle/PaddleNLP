@@ -398,12 +398,17 @@ def paddlenlp_hub_download(
     *,
     subfolder: Optional[str] = None,
     cache_dir: Union[str, Path, None] = None,
-    local_dir: Union[str, Path, None] = None,
+    pretrained_model_name_or_path: str = None,
 ) -> str:
     if subfolder is None:
         subfolder = ""
+    if pretrained_model_name_or_path is not None and is_url(repo_id):
+        cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
+    else:
+        cache_dir = os.path.join(cache_dir, repo_id, subfolder)
+
     # check in cache_dir
-    weight_file_path = os.path.join(cache_dir, repo_id, subfolder, filename)
+    weight_file_path = os.path.join(cache_dir, filename)
 
     if os.path.exists(weight_file_path):
         logger.info(f"Already cached {weight_file_path}")
@@ -447,9 +452,7 @@ def paddlenlp_hub_download(
     # check wether the target file exist in the comunity bos server
     if url_file_exists(community_model_file_path):
         logger.info(f"Downloading {community_model_file_path}")
-        weight_file_path = get_path_from_url_with_filelock(
-            community_model_file_path, os.path.join(cache_dir, repo_id, subfolder)
-        )
+        weight_file_path = get_path_from_url_with_filelock(community_model_file_path, cache_dir)
         # # check the downloaded weight file and registered weight file name
         download_check(community_model_file_path, "paddlenlp_hub_download")
         return weight_file_path
@@ -469,6 +472,7 @@ def cached_file(
     from_aistudio: bool = False,
     _raise_exceptions_for_missing_entries: bool = True,
     _raise_exceptions_for_connection_errors: bool = True,
+    pretrained_model_name_or_path=None,
 ) -> str:
     """
     Tries to locate a file in a local folder and repo, downloads and cache it if necessary.
@@ -523,8 +527,8 @@ def cached_file(
         except:
             resolved_file = None
     else:
-        if cache_dir is None:
-            cache_dir = os.path.join(MODEL_HOME, ".cache")
+        # if cache_dir is None:
+        #     cache_dir = os.path.join(MODEL_HOME, ".cache")
         try:
             # Load from URL or cache if already cached
             resolved_file = paddlenlp_hub_download(
@@ -533,6 +537,7 @@ def cached_file(
                 subfolder=None if len(subfolder) == 0 else subfolder,
                 # revision=revision,
                 cache_dir=cache_dir,
+                pretrained_model_name_or_path=pretrained_model_name_or_path,
             )
         except HTTPError as err:
             # First we try to see if we have a cached version (not up to date):

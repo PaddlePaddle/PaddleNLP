@@ -1556,7 +1556,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         f" {pretrained_model_name_or_path}."
                     )
             # pretrained_model_name_or_path is file
-            elif os.path.isfile(os.path.join(subfolder, pretrained_model_name_or_path)):
+            elif os.path.isfile(pretrained_model_name_or_path):
                 archive_file = pretrained_model_name_or_path
                 is_local = True
             elif is_remote_url(pretrained_model_name_or_path):
@@ -1585,14 +1585,16 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                             pretrained_model_name_or_path
                         ]
                         resolved_archive_file = cached_file(
-                            resource_file_url, _add_variant(PADDLE_WEIGHTS_NAME, variant), **cached_file_kwargs
+                            resource_file_url,
+                            _add_variant(PADDLE_WEIGHTS_NAME, variant),
+                            pretrained_model_name_or_path=pretrained_model_name_or_path,
+                            **cached_file_kwargs,
                         )
 
                     if resolved_archive_file is None:
                         resolved_archive_file = cached_file(
                             pretrained_model_name_or_path, filename, **cached_file_kwargs
                         )
-
                     else:
                         # xxx.pdparams in pretrained_resource_files_map renamed model_state.pdparams
                         filename = _add_variant(PADDLE_WEIGHTS_NAME, variant)
