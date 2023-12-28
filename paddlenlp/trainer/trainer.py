@@ -917,6 +917,9 @@ class Trainer:
                     steps_in_epoch <= args.gradient_accumulation_steps
                     and (step + 1) == steps_in_epoch
                 ):
+                    if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
+                        tr_loss /= self.args.gradient_accumulation_steps
+
                     self.timers and self.timers("forward-backward").stop()
                     # Maunally collect gradients
                     # Case 1: Use recompute and dp
@@ -938,7 +941,6 @@ class Trainer:
                     pipeline_parallel_config = (
                         set(args.pipeline_parallel_config.split(" ")) if args.pipeline_parallel_degree > 1 else set()
                     )
-                    enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
                     enable_release_grads = "enable_release_grads" in pipeline_parallel_config
 
@@ -957,7 +959,7 @@ class Trainer:
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
 
-                    if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
+                    if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss():
                         for p in model._layers.parameters():
                             with paddle.no_grad():
                                 if hasattr(p, "main_grad") and p.main_grad is not None:
@@ -1901,6 +1903,15 @@ class Trainer:
 
         return (loss, outputs) if return_outputs else loss
 
+    def _enable_delay_scale_loss(self):
+        key = "enable_delay_scale_loss"
+        if self.args.pipeline_parallel_degree > 1:
+            return key in self.args.pipeline_parallel_config.split(" ")
+        elif self.args.tensor_parallel_degree > 1:
+            return key in self.args.tensor_parallel_config.split(" ")
+        else:
+            return False
+
     def training_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         """
         Perform a training step on a batch of inputs.
@@ -1928,7 +1939,7 @@ class Trainer:
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
 
-        if self.args.gradient_accumulation_steps > 1:
+        if self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = loss / self.args.gradient_accumulation_steps
 
         if self.do_grad_scaling:
