@@ -103,13 +103,13 @@ def apply_shift(quant_args, trainer, ptq_dataloader, ptq_model_config):
         sample_function=shift_sampler,
         shift_all_linears=quant_args.shift_all_linears,
     )
-
-    trainer.ptq_loop(
-        ptq_dataloader,
-        description="Shift",
-        max_eval_iters=quant_args.shift_step,
-    )
-    shift.update_weight()
+    with paddle.no_grad():
+        trainer.ptq_loop(
+            ptq_dataloader,
+            description="Shift",
+            max_eval_iters=quant_args.shift_step,
+        )
+        shift.update_weight()
     del shift, shift_sampler
     logger.info("***** Shift done *****")
 
@@ -150,13 +150,14 @@ def apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config):
         search_function=search_func,
         smooth_method="awq" if quant_args.do_awq else "smoothquant",
     )
-    trainer.ptq_loop(
-        ptq_dataloader,
-        description="Smooth",
-        max_eval_iters=quant_args.smooth_step,
-    )
+    with paddle.no_grad():
+        trainer.ptq_loop(
+            ptq_dataloader,
+            description="Smooth",
+            max_eval_iters=quant_args.smooth_step,
+        )
 
-    smooth.update_weight()
+        smooth.update_weight()
     del smooth, smooth_sampler, search_func
     logger.info("***** Smooth done *****")
 
@@ -175,13 +176,13 @@ def apply_autoclip(quant_args, trainer, ptq_dataloader):
         n_grid=20,
         max_shrink=0.5,
     )
-
-    trainer.ptq_loop(
-        ptq_dataloader,
-        description="AutoClip",
-        max_eval_iters=quant_args.autoclip_step,
-    )
-    auto_clip.auto_clip()
+    with paddle.no_grad():
+        trainer.ptq_loop(
+            ptq_dataloader,
+            description="AutoClip",
+            max_eval_iters=quant_args.autoclip_step,
+        )
+        auto_clip.auto_clip()
     del sampler, auto_clip
     logger.info("***** AutoClip done *****")
 
@@ -260,12 +261,13 @@ def apply_gptq(quant_args, trainer, ptq_dataloader):
             parent_layer, sub_name = find_parent_layer_and_sub_name(model, cur_name)
             cur_quant_layer = GPTQ(cur_layer)
             setattr(parent_layer, sub_name, cur_quant_layer)
-            trainer.ptq_loop(
-                ptq_dataloader,
-                description="GPTQ",
-                max_eval_iters=quant_args.gptq_step,
-            )
-            cur_quant_layer.fasterquant(percdamp=0.1, groupsize=-1, actorder=True)
+            with paddle.no_grad():
+                trainer.ptq_loop(
+                    ptq_dataloader,
+                    description="GPTQ",
+                    max_eval_iters=quant_args.gptq_step,
+                )
+                cur_quant_layer.fasterquant(percdamp=0.1, groupsize=-1, actorder=True)
             del cur_quant_layer
             setattr(parent_layer, sub_name, cur_layer)
     logger.info("***** GPTQ done *****")
