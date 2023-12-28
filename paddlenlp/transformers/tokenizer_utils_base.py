@@ -1530,7 +1530,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     resolved_vocab_files[file_id] = path
 
                 else:
-                    logger.info("Downloading %s and saved to %s" % (file_path, cache_dir))
+                    logger.info(
+                        "Downloading %s and saved to %s"
+                        % (file_path, os.path.join(cache_dir, pretrained_model_name_or_path, subfolder))
+                    )
                     try:
                         if not url_file_exists(file_path):
                             # skip warning for chat-template config file
