@@ -57,10 +57,8 @@ class QuickBackward(PyLayer):
         #    num += 1
         # print(num)
         # print("=====================quick forward============================")
-        try:
-            ctx.save_for_backward(input, weight, bias, lora_A, lora_B)
-        except:
-            ctx.save_for_backward(input, weight, lora_A, lora_B)
+        ctx.save_for_backward(input, weight, lora_A, lora_B)
+
         result = F.linear(x=input, weight=weight, bias=bias, name=name)
         result += (lora_dropout(input) @ lora_A @ lora_B) * scaling
         return result
@@ -68,33 +66,20 @@ class QuickBackward(PyLayer):
     @staticmethod
     def backward(ctx, grad_output):
         # print("=====================quick backward============================")
-        try:
-            input, weight, bias, lora_A, lora_B = ctx.saved_tensor()
-        except:
-            input, weight, lora_A, lora_B = ctx.saved_tensor()
+        input, weight, lora_A, lora_B = ctx.saved_tensor()
+
         # [seq, h] @ [h, h]
         if input.stop_gradient is False:
             input_grad = grad_output @ (weight + lora_A @ lora_B).T
         else:
             input_grad = None
-        # [h, bz * seq] @ [bz * seq , h]
-        # weight_grad = input.reshape([-1, input.shape[-1]]).T @ grad_output.reshape([-1, grad_output.shape[-1]])
-        # [bz*seq, h] -> [h]
-        # bias_grad = grad_output.reshape([-1, grad_output.shape[-1]]).sum(axis=0)
-        # [bz*seq, i].T @ [bz*seq, o] @ [o, r]
-        lora_A_grad = input.reshape([-1, input.shape[-1]]).T @ (
-            grad_output.reshape([-1, grad_output.shape[-1]]) @ lora_B.T
-        )
+        input_fused = input.reshape([-1, input.shape[-1]])
+        grad_output_fused = grad_output.reshape([-1, grad_output.shape[-1]])
+        lora_A_grad = input_fused.T @ (grad_output_fused @ lora_B.T)
         # [r, i] @ [i, bz*seq] @ [bz*seq, h]
-        lora_B_grad = (lora_A.T @ input.reshape([-1, input.shape[-1]]).T) @ grad_output.reshape(
-            [-1, grad_output.shape[-1]]
-        )
+        lora_B_grad = (lora_A.T @ input_fused.T) @ grad_output_fused
 
-        # print("++" * 20)
-        # print(input, weight, lora_A, lora_B)
-        # print(input_grad, lora_A_grad, lora_B_grad)
-        # print("++" * 20)
-        return input_grad, lora_A_grad, lora_B_grad, None
+        return input_grad, lora_A_grad, lora_B_grad
 
 
 class LoRALinear(nn.Linear):
