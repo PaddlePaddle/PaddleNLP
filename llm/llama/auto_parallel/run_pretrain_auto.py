@@ -29,7 +29,7 @@ import paddle.distributed as dist
 from paddlenlp.ops import Topology
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.trainer.auto_trainer import SemiAutoTrainer
-from paddlenlp.trainer.trainer_utils import _get_distributed_seeds
+from paddlenlp.trainer.trainer_utils import IntervalStrategy, _get_distributed_seeds
 from paddlenlp.transformers import (
     AutoConfig,
     AutoTokenizer,
@@ -133,8 +133,8 @@ class PreTrainingArguments(TrainingArguments):
             self.overwrite_output_dir = True
             self.load_best_model_at_end = False
             self.report_to = []
-            # self.save_strategy = IntervalStrategy.NO
-            # self.evaluation_strategy = IntervalStrategy.NO
+            self.save_strategy = IntervalStrategy.NO
+            self.evaluation_strategy = IntervalStrategy.NO
 
         if self.fused_linear_param_grad_add:
             fused_passes = self.strategy.fused_passes

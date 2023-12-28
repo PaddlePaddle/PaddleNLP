@@ -358,18 +358,15 @@ class GPTDataset(paddle.io.Dataset):
         doc_index_l = self.sample_idx[idx + 1][0]
         offset_f = self.sample_idx[idx][1]
         offset_l = self.sample_idx[idx + 1][1]
-
         # If we are within the same document, just extract the chunk.
         doc_ids = []
         if doc_index_f == doc_index_l:
-
             doc_ids.append(self.doc_idx[doc_index_f])
 
             sample = self.indexed_dataset.get(
                 self.doc_idx[doc_index_f], offset=offset_f, length=offset_l - offset_f + 1
             )
         else:
-
             # Otherwise, get the rest of the initial document.
             doc_ids.append(self.doc_idx[doc_index_f])
             sample_list = [self.indexed_dataset.get(self.doc_idx[doc_index_f], offset=offset_f)]
@@ -380,7 +377,6 @@ class GPTDataset(paddle.io.Dataset):
             # And finally add the relevant portion of last document.
             doc_ids.append(self.doc_idx[doc_index_l])
             sample_list.append(self.indexed_dataset.get(self.doc_idx[doc_index_l], length=offset_l + 1))
-
             sample = np.concatenate(sample_list)
         # print(sample)
         if self.return_doc_ids:  # for retro preprocessing
