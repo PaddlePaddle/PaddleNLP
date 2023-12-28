@@ -282,7 +282,9 @@ def convert_files_to_dicts_splitter(
         pdf_splitter = SpacyTextSplitter(
             separator=separator, chunk_size=chunk_size, chunk_overlap=chunk_overlap, filters=filters
         )
-
+    pdf_splitter = CharacterTextSplitter(
+        separator=separator, chunk_size=chunk_size, chunk_overlap=chunk_overlap, filters=filters
+    )
     text_splitter = CharacterTextSplitter(
         separator=separator, chunk_size=chunk_size, chunk_overlap=chunk_overlap, filters=filters
     )
