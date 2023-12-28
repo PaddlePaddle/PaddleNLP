@@ -245,6 +245,7 @@ class DygraphPredictor(BasePredictor):
         if self.model is None:
             self.model = AutoModelForCausalLM.from_pretrained(
                 config.model_name_or_path,
+                use_flash_attention=config.use_flash_attention,
                 dtype=dtype,
                 tensor_parallel_degree=self.tensor_parallel_degree,
                 tensor_parallel_rank=self.tensor_parallel_rank,
@@ -691,7 +692,6 @@ def create_predictor(
 ):
     tokenizer = AutoTokenizer.from_pretrained(
         predictor_args.model_name_or_path,
-        use_flash_attention=predictor_args.use_flash_attention,
     )
     # init chat_template for tokenizer
     init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
@@ -734,6 +734,7 @@ def create_predictor(
                 model = AutoModelForCausalLM.from_pretrained(
                     predictor_args.model_name_or_path,
                     dtype=predictor_args.dtype,
+                    use_flash_attention=predictor_args.use_flash_attention,
                     tensor_parallel_degree=tensor_parallel_degree,
                     tensor_parallel_rank=tensor_parallel_rank,
                 )
