@@ -942,7 +942,6 @@ class BloomModel(BloomPreTrainedModel):
             attention_mask = paddle.ones([batch_size, seq_length_with_past], dtype="bool")
         elif attention_mask.dtype != paddle.bool:
             attention_mask = paddle.cast(attention_mask, "bool")
-
         if len(attention_mask.shape) > 2:
             _attention_mask = paddle.ones([batch_size, seq_length_with_past], dtype="bool")
             alibi = build_alibi_tensor(_attention_mask, self.config.n_head, dtype=hidden_states.dtype)
