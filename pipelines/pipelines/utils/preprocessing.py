@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 import copy
 
 
-def document_rough_classification(document_list, max_token=4000):
+def document_rough_split(document_list, max_token=4500):
     document_index_rough = []
     for item in document_list:
         if len(item["content"]) < max_token or "\n" in item:
@@ -219,7 +219,7 @@ def convert_files_to_dicts_splitter(
     chunk_size: int = 300,
     chunk_overlap: int = 0,
     language: str = "chinese",
-    process_num: int = 20,
+    process_num: int = 10,
 ) -> List[dict]:
     """
     Convert all files(.txt, .pdf, .docx) in the sub-directories of the given path to Python dicts that can be written to a
@@ -318,7 +318,7 @@ def convert_files_to_dicts_splitter(
                 encoding=encoding,
                 language=language,
             )
-            list_documents = document_rough_classification(list_documents)
+            list_documents = document_rough_split(list_documents)
             document_number = len(list_documents)
             split_len = document_number // process_num
             if split_len == 0:

@@ -44,10 +44,9 @@ def extract_pages(page_list, file_path):
         try:
             paragraphs = page.extract_text()
             paragraphs = paragraphs.encode("UTF-8", "ignore").decode("UTF-8")
-            list(paragraphs)
             page_text.append(paragraphs)
         except Exception as e:
-            logger.warning("文件的%d页无法正确解析%s" % (index + start + 1, str(e)))
+            logger.warning("Page %d of the file cannot be parsed correctly %s" % (index + start + 1, str(e)))
     return page_text
 
 
@@ -119,8 +118,6 @@ class PDFToTextConverter(BaseConverter):
         for page in pages:
             document = {"content": page, "content_type": "text", "meta": meta}
             documents.append(document)
-            # print(page)
-            # print('---------------')
         return documents
 
     def _read_pdf(self, file_path: Path, process_num: int) -> List[str]:
