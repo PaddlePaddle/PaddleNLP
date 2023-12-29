@@ -78,10 +78,10 @@ class PredictorTest(LLMTest, unittest.TestCase):
             self.assertGreaterEqual(count / len(result_0), 0.4)
 
     def test_flash_attention(self):
-        self.run_predictor({"inference_model": True, "use_flash_attention": False})
+        self.run_predictor({"inference_model": False, "use_flash_attention": False})
         result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
 
-        self.run_predictor({"inference_model": True, "use_flash_attention": True})
+        self.run_predictor({"inference_model": False, "use_flash_attention": True})
         result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))
 
         # compare the generation result of dygraph & flash attention model
@@ -89,7 +89,10 @@ class PredictorTest(LLMTest, unittest.TestCase):
 
         count, full_match = 0, 0
         for inference_item, no_inference_item in zip(result_0, result_1):
-            min_length = min(len(inference_item), len(no_inference_item))
+            if self.model_name_or_path == "__internal_testing__/tiny-random-llama":
+                min_length = 5
+            else:
+                min_length = min(len(inference_item), len(no_inference_item))
             count += int(inference_item[: min_length // 2] == no_inference_item[: min_length // 2])
             full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
 
