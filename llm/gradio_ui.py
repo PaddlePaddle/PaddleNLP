@@ -188,14 +188,6 @@ def launch(args, default_params: dict = {}):
                     label="Repetition Penalty",
                     info="该参数越大，生成结果重复的概率越低。设置 1 则不开启。",
                 )
-                max_length = gr.Slider(
-                    minimum=1,
-                    maximum=default_params["max_length"],
-                    value=50,
-                    step=1,
-                    label="Max Length",
-                    info="生成结果的最大长度。",
-                )
                 default_src_length = default_params["src_length"]
                 src_length = gr.Slider(
                     minimum=1,
@@ -204,6 +196,14 @@ def launch(args, default_params: dict = {}):
                     step=1,
                     label="Max Src Length",
                     info="最大输入长度。",
+                )
+                max_length = gr.Slider(
+                    minimum=1,
+                    maximum=default_params["max_length"],
+                    value=50,
+                    step=1,
+                    label="Max Length",
+                    info="生成结果的最大长度。",
                 )
             with gr.Column(scale=4):
                 state = gr.State({})

@@ -32,6 +32,7 @@ from utils import (
     get_default_max_decoding_length,
     get_default_max_encoding_length,
     get_infer_model_path,
+    get_model_max_position_embeddings,
     get_prefix_tuning_params,
     init_chat_template,
     load_real_time_tokens,
@@ -893,6 +894,15 @@ def create_predictor(
 
     if predictor.config.max_length is None:
         predictor.config.max_length = get_default_max_decoding_length(predictor.model_config)
+
+    max_position_embeddings = get_model_max_position_embeddings(predictor.model_config)
+    if max_position_embeddings is not None:
+        if predictor.config.src_length + predictor.config.max_length > max_position_embeddings:
+            raise ValueError(
+                f"The sum of src_length<{predictor.config.src_length}> and "
+                f"max_length<{predictor.config.max_length}> should be smaller than or equal to "
+                f"the maximum position embedding size<{max_position_embeddings}>"
+            )
 
     return predictor
 

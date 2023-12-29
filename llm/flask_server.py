@@ -124,7 +124,7 @@ class PredictorServer:
                 # build chat template
                 if self.predictor.tokenizer.chat_template is not None:
                     if not history:
-                        history = history or []
+                        history = []
                     # also support history data
                     elif isinstance(history, str):
                         history = json.loads(history)
@@ -134,9 +134,17 @@ class PredictorServer:
                     for idx in range(0, len(history), 2):
                         if isinstance(history[idx], str):
                             chat_query.append([history[idx], history[idx + 1]])
-                        else:
+                        elif isinstance(history[idx], dict):
                             chat_query.append([history[idx]["utterance"], history[idx + 1]["utterance"]])
-                    query = [chat_query]
+                        else:
+                            raise ValueError(
+                                "history data should be list[str] or list[dict], eg: ['sentence-1', 'sentece-2', ...], or "
+                                "[{'utterance': 'sentence-1'}, {'utterance': 'sentence-2'}, ...]"
+                            )
+
+                    # the input of predictor should be batched.
+                    # batched query: [ [[user, bot], [user, bot], ..., [user]]  ]
+                    query = [chat_query + [[query]]]
 
                 generation_args = data
                 self.predictor.config.max_length = generation_args["max_length"]
