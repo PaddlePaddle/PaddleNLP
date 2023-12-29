@@ -72,6 +72,30 @@ class PredictorTest(LLMTest, unittest.TestCase):
         # self.assertGreaterEqual(full_match / len(result_0), 0.25)
         # self.assertGreaterEqual(count / len(result_0), 0.4)
 
+    def test_flash_attention(self):
+        self.run_predictor({"inference_model": False, "use_flash_attention": False})
+        result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
+
+        self.run_predictor({"inference_model": False, "use_flash_attention": True})
+        result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))
+
+        # compare the generation result of dygraph & flash attention model
+        assert len(result_0) == len(result_1)
+
+        count, full_match = 0, 0
+        for inference_item, no_inference_item in zip(result_0, result_1):
+            if self.model_name_or_path == "__internal_testing__/tiny-random-llama":
+                min_length = 5
+            else:
+                min_length = min(len(inference_item), len(no_inference_item))
+            count += int(inference_item[: min_length // 2] == no_inference_item[: min_length // 2])
+            full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
+
+        if self.model_name_or_path == "__internal_testing__/tiny-random-llama":
+            self.assertGreaterEqual(count / len(result_0), 0.2)
+        else:
+            self.assertEqual(full_match / len(result_0), 1.0)
+
     def test_wint8(self):
         self.run_predictor({"inference_model": True, "quant_type": "weight_only_int8"})
         result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))

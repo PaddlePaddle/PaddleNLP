@@ -75,6 +75,10 @@ class PredictorArgument:
             "help": "the decoding strategy of generation, which should be one of ['sampling', 'greedy_search', 'beam_search']. Default to sampling"
         },
     )
+    use_flash_attention: bool = field(
+        default=False,
+        metadata={"help": "Whether to use flash attention"},
+    )
 
     mode: str = field(
         default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
@@ -249,6 +253,7 @@ class DygraphPredictor(BasePredictor):
         if self.model is None:
             self.model = AutoModelForCausalLM.from_pretrained(
                 config.model_name_or_path,
+                use_flash_attention=config.use_flash_attention,
                 dtype=dtype,
                 tensor_parallel_degree=self.tensor_parallel_degree,
                 tensor_parallel_rank=self.tensor_parallel_rank,
@@ -717,7 +722,9 @@ def create_predictor(
     tensor_parallel_degree: int = 1,
     tensor_parallel_rank: int = 0,
 ):
-    tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(
+        predictor_args.model_name_or_path,
+    )
     # init chat_template for tokenizer
     init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
 
@@ -759,6 +766,7 @@ def create_predictor(
                 model = AutoModelForCausalLM.from_pretrained(
                     predictor_args.model_name_or_path,
                     dtype=predictor_args.dtype,
+                    use_flash_attention=predictor_args.use_flash_attention,
                     tensor_parallel_degree=tensor_parallel_degree,
                     tensor_parallel_rank=tensor_parallel_rank,
                 )
