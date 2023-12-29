@@ -80,7 +80,7 @@ def launch(args, default_params: dict = {}):
         context = state.setdefault("context", [])
 
         if not utterance:
-            gr.Warning("invalid inputs111")
+            gr.Warning("invalid inputs")
             # gr.Warning("请输入有效问题")
             shown_context = get_shown_context(context)
             return None, shown_context, context, state
@@ -99,6 +99,11 @@ def launch(args, default_params: dict = {}):
         res = requests.post(f"http://0.0.0.0:{args.flask_port}/api/chat", json=data, stream=True)
         for line in res.iter_lines():
             result = json.loads(line)
+            if result["error_code"] != 0:
+                gr.Warning(result["error_msg"])
+                shown_context = get_shown_context(context)
+                return None, shown_context, context, state
+
             bot_response = result["result"]["response"]
 
             # replace \n with br: https://github.com/gradio-app/gradio/issues/4344

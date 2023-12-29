@@ -68,6 +68,7 @@ class PredictorServer:
             self.args.flask_port + port_interval * predictor.tensor_parallel_rank,
             self.args.flask_port + port_interval * (predictor.tensor_parallel_rank + 1),
         )
+        self.total_max_length = predictor.config.src_length + predictor.config.max_length
 
         if self.predictor.tensor_parallel_rank == 0:
             # fetch port info
@@ -150,6 +151,16 @@ class PredictorServer:
                 self.predictor.config.max_length = generation_args["max_length"]
                 if "src_length" in generation_args:
                     self.predictor.config.src_length = generation_args["src_length"]
+
+                if self.predictor.config.src_length + self.predictor.config.max_length > self.total_max_length:
+                    output = {
+                        "error_code": 1,
+                        "error_msg": f"The sum of src_length<{self.predictor.config.src_length}> and "
+                        f"max_length<{self.predictor.config.max_length}> should be smaller than or equal to "
+                        f"the maximum position embedding size<{self.total_max_length}>",
+                    }
+                    yield json.dumps(output, ensure_ascii=False) + "\n"
+                    return
 
                 self.predictor.config.top_p = generation_args["top_p"]
                 self.predictor.config.temperature = generation_args["temperature"]
