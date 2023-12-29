@@ -818,9 +818,7 @@ class FusedMultiTransformerBase(Layer):
 
         residual_input = src
         for i in range(self.num_layers):
-            # print(i)
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
-            # print("qkv_out", qkv_out)
             out_linear_out = self.compute_attn(
                 time_step,
                 qkv_out,
@@ -836,17 +834,12 @@ class FusedMultiTransformerBase(Layer):
                 i,
                 **kwargs,
             )
-            # print("out_linear_out", out_linear_out)
-            # exit(0)
             # all_reduce
             if self.nranks > 1:
                 dist.all_reduce(out_linear_out)
 
-            # print("out_linear_out", out_linear_out)
-
             # ffn layernorm
             tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
-            # print("ln_out", tmp_out)
 
             # ffn1 matmul
             ffn1_out = self.compute_ffn1(tmp_out, i)
@@ -854,12 +847,10 @@ class FusedMultiTransformerBase(Layer):
 
             # ffn2 matmul
             ffn2_out = self.compute_ffn2(ffn1_out, i)
-            # print("ffn2_out", ffn2_out)
+
             # all_reduce
             if self.nranks > 1:
                 dist.all_reduce(ffn2_out)
-            # print("ffn2_out", ffn2_out)
-            # exit(0)
 
             # norm + residual_add_bias
             tmp_out, residual_input = self.compute_bias_residual_layernorm(

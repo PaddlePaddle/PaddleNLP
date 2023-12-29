@@ -27,10 +27,10 @@ export FLAGS_cache_inference_while_scope=1
 python predictor.py \
     --model_name_or_path ./llama7b-inference_model_fp16 \
     --dtype float16 \
-    --src_length ${total_len} \
-    --max_length ${dec_len} \
+    --src_length 300 \
+    --max_length 100 \
     --output_file "infer.json" \
     --mode "static" \
-    --batch_size 128 \
+    --batch_size 1 \
     --benchmark \
     --inference_model 

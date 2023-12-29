@@ -764,7 +764,6 @@ class DygraphBlockInferencePredictor(BasePredictor):
                 )
                 for _ in range(2 * self.num_layers)
             ]
-            print("pre_cache_length: ", self.pre_cache_length)
             for i in range(self.num_layers):
                 self.pre_caches[2 * i][:, :, :, :] = paddle.to_tensor(pre_cache_npy[i][0], dtype=self.dtype).unsqueeze(
                     0
@@ -830,14 +829,10 @@ class DygraphBlockInferencePredictor(BasePredictor):
             shape=[config.batch_size, 1], fill_value=config.max_length, dtype="int64"
         )
         self.inputs["stop_nums"] = paddle.full(shape=[1], fill_value=config.batch_size, dtype="int64")
-        tmp_position_ids = paddle.arange(self.total_max_length).reshape((1, -1))
-        self.inputs["rope_emb"] = self._get_rotary_position_embedding(tmp_position_ids, self.head_dim)
-        self.inputs["eos_token_id"] = paddle.to_tensor(
-            [
-                self.tokenizer.eos_token_id,
-            ],
-            "int64",
+        self.inputs["rope_emb"] = self._get_rotary_position_embedding(
+            paddle.arange(self.total_max_length).reshape((1, -1)), self.head_dim
         )
+        self.inputs["eos_token_id"] = get_eos_token_id(self.tokenizer, self.generation_config)
         # need update
         self.inputs["block_tables"] = paddle.full(
             shape=[config.batch_size, pre_max_block_num], fill_value=-1, dtype="int32"
@@ -920,8 +915,6 @@ class DygraphBlockInferencePredictor(BasePredictor):
             tokens = self.tokenizer(text, return_tensors="np", padding=False, max_length=self.config.src_length)
             input_ids = tokens["input_ids"][0]
             length = len(input_ids)
-            print("input_ids: ", input_ids)
-            print("length: ", length)
             self.inputs["input_ids"][i : i + 1, :length] = input_ids
             self.inputs["penalty_score"][i : i + 1] = self.config.repetition_penalty
             self.inputs["frequency_score"][i : i + 1] = 0.0
@@ -1043,14 +1036,10 @@ class StaticBlockInferencePredictor(BasePredictor):
         self.inputs["presence_score"] = paddle.full(shape=[config.batch_size, 1], fill_value=0.0, dtype="float32")
 
         self.inputs["stop_nums"] = paddle.full(shape=[1], fill_value=config.batch_size, dtype="int64")
-        tmp_position_ids = paddle.arange(self.total_max_length).reshape((1, -1))
-        self.inputs["rope_emb"] = self._get_rotary_position_embedding(tmp_position_ids, self.head_dim)
-        self.inputs["eos_token_id"] = paddle.to_tensor(
-            [
-                self.tokenizer.eos_token_id,
-            ],
-            "int64",
+        self.inputs["rope_emb"] = self._get_rotary_position_embedding(
+            paddle.arange(self.total_max_length).reshape((1, -1)), self.head_dim
         )
+        self.inputs["eos_token_id"] = get_eos_token_id(self.tokenizer, self.generation_config)
         # need update
         self.inputs["block_tables"] = paddle.full(
             shape=[config.batch_size, pre_max_block_num], fill_value=-1, dtype="int32"
@@ -1139,7 +1128,7 @@ class StaticBlockInferencePredictor(BasePredictor):
         # config.disable_glog_info()
         # config.enable_memory_optim()
 
-        if self.tensor_parallel_degree >= 1:
+        if self.tensor_parallel_degree > 1:
             trainer_endpoints = fleet.worker_endpoints()
             current_endpoint = trainer_endpoints[self.tensor_parallel_rank]
 
@@ -1155,7 +1144,7 @@ class StaticBlockInferencePredictor(BasePredictor):
 
     def _share_data(self):
         """
-        分享不拷贝数据
+        Share external data for inference predictor.
         """
         for name in self.input_names:
             if "pre_key_" in name or "pre_value_" in name:
@@ -1200,13 +1189,11 @@ class StaticBlockInferencePredictor(BasePredictor):
 
     def _preprocess(self, source):
         for i, text in enumerate(source):
-            # print("text: ", text)
             tokens = self.tokenizer(
                 text, return_tensors="np", padding=False, max_length=(self.config.src_length - self.config.max_length)
             )
             input_ids = tokens["input_ids"][0]
             length = len(input_ids)
-            # print("input_ids: ", input_ids)
             print("length: ", length)
             self.inputs["input_ids"][i : i + 1, :length] = input_ids
             self.inputs["penalty_score"][i : i + 1] = self.config.repetition_penalty

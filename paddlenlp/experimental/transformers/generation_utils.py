@@ -435,7 +435,6 @@ class GenerationBlockInferenceModel(GenerationMixin):
         else:
             precache_kv_spec = None
         use_cachekv_int8 = config.get("use_cachekv_int8", "None")
-        print("use_cachekv_int8", use_cachekv_int8)
 
         if use_cachekv_int8 == "static" or use_cachekv_int8 == "dynamic":
             cachekv_dtype = "uint8"

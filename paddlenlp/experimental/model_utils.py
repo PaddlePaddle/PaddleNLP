@@ -407,8 +407,6 @@ class CacheScaleLoader:
         self.key_map = key_map_dict
         self.scale = {}
         for scale_type, key_template in self.key_map.items():
-            print("scale_type: ", scale_type)
-            print("key_template: ", key_template)
             if "cache_k" in scale_type:
                 scale_type_out = "cache_k_out_scale"
             else:
