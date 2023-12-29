@@ -486,14 +486,12 @@ class LlamaAttentionAuto(nn.Layer):
             attn_output = paddle.transpose(attn_output, [1, 0, 2])
             mesh = get_mesh(self.ipp)
             if "dp" in mesh.dim_names:
-                print("check : dp in "* 8)
                 attn_output = dist.reshard(
                     attn_output,
                     get_mesh(self.ipp),
                     [dist.Shard(1), dist.Shard(0)],
                 )
             else:
-                print("check : dp not in "* 8)
                 attn_output = dist.reshard(
                     attn_output,
                     get_mesh(self.ipp),
@@ -608,17 +606,14 @@ class LlamaDecoderLayerAuto(nn.Layer):
         
         # enter tp region
         if self.config.sequence_parallel:
-            print("FFN: sp enable if" * 8)
             mesh = get_mesh(self.ipp)
             if "dp" in mesh.dim_names:
-                print("FFN: sp enable dp" * 8)
                 hidden_states = dist.reshard(
                     hidden_states,
                     get_mesh(self.ipp),
                     [dist.Shard(1), dist.Replicate()],
                 )
             else:
-                print("FFN: sp enable not dp" * 8)
                 hidden_states = dist.reshard(
                     hidden_states,
                     get_mesh(self.ipp),
