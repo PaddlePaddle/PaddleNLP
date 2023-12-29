@@ -17,7 +17,7 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-task_name="llama_auto_dp2sharding2mp2pp2_vpp2"
+task_name="llama_auto_dp2sharding2mp2pp2_vpp2_sp"
 # rm -rf output/$task_name/  # ckpt is saved in 'output/''
 rm -rf "output/$task_name""_log"
 
@@ -47,7 +47,7 @@ python -u -m paddle.distributed.launch \
     --pipeline_parallel_degree 2 \
     --virtual_pp_degree 2 \
     --pipeline_schedule_mode "VPP" \
-    --sharding_parallel_degree 2 \
+    --sharding_parallel_degree 1 \
     --sharding "stage2" \
     --learning_rate 0.0001 \
     --min_learning_rate 0.00001 \
@@ -68,6 +68,7 @@ python -u -m paddle.distributed.launch \
     --do_eval \
     --device "gpu" \
     --data_impl "mmap" \
-    --parallel_mode "auto"
+    --parallel_mode "auto" \
+    # --sequence_parallel true \
 
     # --resume_from_checkpoint "output/llama_auto_serial/checkpoint-2" \
