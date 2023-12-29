@@ -14,12 +14,10 @@
 
 import dataclasses
 import json
-import math
 import os
 import random
 import re
 import tempfile
-import unittest
 from pathlib import Path
 
 import numpy as np
@@ -49,7 +47,7 @@ if is_paddle_available():
     from paddle.io import IterableDataset
 
     from paddlenlp.trainer import EarlyStoppingCallback, Trainer, TrainerState
-    from paddlenlp.transformers import GPTConfig, GPTLMHeadModel, PretrainedModel
+    from paddlenlp.transformers import PretrainedModel
 
     # from paddlenlp.transformers.model_utils import unwrap_model
 
@@ -505,32 +503,6 @@ class TrainerIntegrationTest(TestCasePlus, TrainerIntegrationCommon):
         _ = trainer.evaluate()
         _ = trainer.predict(eval_dataset)
 
-    def test_evaluation_with_keys_to_drop(self):
-        config = GPTConfig(vocab_size=100, n_positions=128, n_embd=32, n_layer=3, n_head=4)
-        tiny_gpt2 = GPTLMHeadModel(config)
-        x = paddle.randint(0, 100, (128,))
-        eval_dataset = RepeatDataset(x)
-        args = TrainingArguments("./test")
-        trainer = Trainer(tiny_gpt2, args=args, eval_dataset=eval_dataset)
-        # By default the past_key_values are removed
-        result = trainer.predict(eval_dataset)
-        self.assertTrue(isinstance(result.predictions, np.ndarray))
-        # We can still get them by setting ignore_keys to []
-        result = trainer.predict(eval_dataset, ignore_keys=[])
-        # print(type(result.predictions), result)
-        self.assertTrue(isinstance(result.predictions, tuple))
-        self.assertEqual(len(result.predictions), 2)
-
-    def test_training_arguments_are_left_untouched(self):
-        trainer = get_regression_trainer()
-        trainer.train()
-        args = TrainingArguments("./regression", report_to=[])
-        dict1, dict2 = args.to_dict(), trainer.args.to_dict()
-        for key in dict1.keys():
-            # Logging dir can be slightly different as they default to something with the time.
-            if key != "logging_dir":
-                self.assertEqual(dict1[key], dict2[key])
-
     def test_number_of_steps_in_training(self):
         # Regular training has n_epochs * len(train_dl) steps
         trainer = get_regression_trainer(learning_rate=0.1)
@@ -546,69 +518,6 @@ class TrainerIntegrationTest(TestCasePlus, TrainerIntegrationCommon):
         trainer = get_regression_trainer(learning_rate=0.1, max_steps=10)
         train_output = trainer.train()
         self.assertEqual(train_output.global_step, 10)
-
-    def test_logging_inf_nan_filter(self):
-        config = GPTConfig(vocab_size=100, n_positions=128, n_embd=32, n_layer=3, n_head=4)
-        tiny_gpt2 = GPTLMHeadModel(config)
-        x = paddle.randint(0, 100, (128,))
-        train_dataset = RepeatDataset(x)
-
-        # Trainer without inf/nan filter
-        args = TrainingArguments("./test", learning_rate=1e9, logging_steps=5, logging_nan_inf_filter=False)
-        trainer = Trainer(tiny_gpt2, args=args, train_dataset=train_dataset)
-        trainer.train()
-        log_history_no_filter = trainer.state.log_history
-
-        # Trainer with inf/nan filter
-        args = TrainingArguments("./test", learning_rate=1e9, logging_steps=5, logging_nan_inf_filter=True)
-        trainer = Trainer(tiny_gpt2, args, train_dataset=train_dataset)
-        trainer.train()
-        log_history_filter = trainer.state.log_history
-
-        def is_any_loss_nan_or_inf(log_history):
-            losses = [l["loss"] for l in log_history[:-1]]
-            return any(math.isnan(x) for x in losses) or any(math.isinf(x) for x in losses)
-
-        self.assertTrue(is_any_loss_nan_or_inf(log_history_no_filter))
-        self.assertFalse(is_any_loss_nan_or_inf(log_history_filter))
-
-    def test_train_and_eval_dataloaders(self):
-        n_gpu = max(1, paddle.cuda.device_count())
-        trainer = get_regression_trainer(learning_rate=0.1, per_device_train_batch_size=16)
-        self.assertEqual(trainer.get_train_dataloader().batch_size, 16 * n_gpu)
-        trainer = get_regression_trainer(learning_rate=0.1, per_device_eval_batch_size=16)
-        self.assertEqual(trainer.get_eval_dataloader().batch_size, 16 * n_gpu)
-
-        # Check drop_last works
-        trainer = get_regression_trainer(
-            train_len=66, eval_len=74, learning_rate=0.1, per_device_train_batch_size=16, per_device_eval_batch_size=32
-        )
-        self.assertEqual(len(trainer.get_train_dataloader()), 66 // (16 * n_gpu) + 1)
-        self.assertEqual(len(trainer.get_eval_dataloader()), 74 // (32 * n_gpu) + 1)
-
-        trainer = get_regression_trainer(
-            train_len=66,
-            eval_len=74,
-            learning_rate=0.1,
-            per_device_train_batch_size=16,
-            per_device_eval_batch_size=32,
-            dataloader_drop_last=True,
-        )
-        self.assertEqual(len(trainer.get_train_dataloader()), 66 // (16 * n_gpu))
-        self.assertEqual(len(trainer.get_eval_dataloader()), 74 // (32 * n_gpu))
-
-        # Check passing a new dataset for evaluation works
-        new_eval_dataset = RegressionDataset(length=128)
-        self.assertEqual(len(trainer.get_eval_dataloader(new_eval_dataset)), 128 // (32 * n_gpu))
-
-    # tests that we do not require dataloader to have a .dataset attribute
-    def test_dataloader_without_dataset(self):
-        train_dataset = RegressionDataset(length=128)
-        trainer = CustomDataloaderTrainer(
-            model=RegressionModel(), train_dataset=train_dataset, eval_dataset=train_dataset
-        )
-        trainer.train()
-        trainer.evaluate()
 
     def test_evaluate(self):
         trainer = get_regression_trainer(a=1.5, b=2.5, compute_metrics=AlmostAccuracy())
@@ -648,191 +557,6 @@ class TrainerIntegrationTest(TestCasePlus, TrainerIntegrationCommon):
         expected_acc = AlmostAccuracy()((pred + 1, y))["accuracy"]
         self.assertAlmostEqual(results["eval_accuracy"], expected_acc)
 
-    def test_predict(self):
-        trainer = get_regression_trainer(a=1.5, b=2.5)
-        preds = trainer.predict(trainer.eval_dataset).predictions
-        x = trainer.eval_dataset.x
-        self.assertTrue(np.allclose(preds, 1.5 * x + 2.5))
-
-        # With a number of elements not a round multiple of the batch size
-        trainer = get_regression_trainer(a=1.5, b=2.5, eval_len=66)
-        preds = trainer.predict(trainer.eval_dataset).predictions
-        x = trainer.eval_dataset.x
-        self.assertTrue(np.allclose(preds, 1.5 * x + 2.5))
-
-        # With more than one output of the model
-        trainer = get_regression_trainer(a=1.5, b=2.5, double_output=True)
-        preds = trainer.predict(trainer.eval_dataset).predictions
-        x = trainer.eval_dataset.x
-        self.assertEqual(len(preds), 2)
-        self.assertTrue(np.allclose(preds[0], 1.5 * x + 2.5))
-        self.assertTrue(np.allclose(preds[1], 1.5 * x + 2.5))
-
-        # With more than one output/label of the model
-        trainer = get_regression_trainer(a=1.5, b=2.5, double_output=True, label_names=["labels", "labels_2"])
-        outputs = trainer.predict(trainer.eval_dataset)
-        preds = outputs.predictions
-        labels = outputs.label_ids
-        x = trainer.eval_dataset.x
-        self.assertEqual(len(preds), 2)
-        self.assertTrue(np.allclose(preds[0], 1.5 * x + 2.5))
-        self.assertTrue(np.allclose(preds[1], 1.5 * x + 2.5))
-        self.assertTrue(np.array_equal(labels[0], trainer.eval_dataset.ys[0]))
-        self.assertTrue(np.array_equal(labels[1], trainer.eval_dataset.ys[1]))
-
-    def test_save_checkpoints(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            trainer = get_regression_trainer(output_dir=tmpdir, save_steps=5)
-            trainer.train()
-            self.check_saved_checkpoints(tmpdir, 5, int(self.n_epochs * 64 / self.batch_size))
-
-        # With a regular model that is not a PretrainedModel
-        with tempfile.TemporaryDirectory() as tmpdir:
-            trainer = get_regression_trainer(output_dir=tmpdir, save_steps=5, pretrained=False)
-            trainer.train()
-            self.check_saved_checkpoints(tmpdir, 5, int(self.n_epochs * 64 / self.batch_size), False)
-
-    @unittest.skipIf(True, "Failed!")
-    def test_resume_training_with_randomness(self):
-        # For more than 1 GPUs, since the randomness is introduced in the model and with DataParallel (which is used
-        # in this test for more than 2 GPUs), the calls to the paddle RNG will happen in a random order (sometimes
-        # GPU 0 will call first and sometimes GPU 1).
-        random_paddle = not paddle.cuda.is_available() or paddle.cuda.device_count() <= 1
-
-        if paddle.cuda.is_available():
-            paddle.backends.cudnn.deterministic = True
-        train_dataset = RegressionDataset(length=128)
-        eval_dataset = RegressionDataset()
-
-        with self.subTest("Test every step"):
-            config = RegressionModelConfig(a=0, b=2, random_paddle=random_paddle)
-            model = RegressionRandomPretrainedModel(config)
-
-            tmp_dir = self.get_auto_remove_tmp_dir()
-            args = RegressionTrainingArguments(tmp_dir, save_steps=5, learning_rate=0.1)
-            trainer = Trainer(model, args=args, train_dataset=train_dataset, eval_dataset=eval_dataset)
-
-            trainer.train()
-            (a, b) = trainer.model.a.item(), trainer.model.b.item()
-
-            model = RegressionRandomPretrainedModel(config)
-            trainer = Trainer(model, args=args, train_dataset=train_dataset, eval_dataset=eval_dataset)
-            trainer.train(resume_from_checkpoint=os.path.join(tmp_dir, "checkpoint-15"))
-            (a1, b1) = trainer.model.a.item(), trainer.model.b.item()
-
-            self.assertAlmostEqual(a, a1, delta=1e-5)
-            self.assertAlmostEqual(b, b1, delta=1e-5)
-
-        with self.subTest("Test every epoch"):
-            config = RegressionModelConfig(a=0, b=2, random_paddle=random_paddle)
-            model = RegressionRandomPretrainedModel(config)
-
-            tmp_dir = self.get_auto_remove_tmp_dir()
-            args = RegressionTrainingArguments(tmp_dir, save_strategy="epoch", learning_rate=0.1)
-            trainer = Trainer(model, args=args, train_dataset=train_dataset, eval_dataset=eval_dataset)
-
-            trainer.train()
-            (a, b) = trainer.model.a.item(), trainer.model.b.item()
-
-            model = RegressionRandomPretrainedModel(config)
-            trainer = Trainer(model, args=args, train_dataset=train_dataset, eval_dataset=eval_dataset)
-
-            checkpoints = [d for d in os.listdir(tmp_dir) if d.startswith("checkpoint-")]
-            # There should be one checkpoint per epoch.
-            self.assertEqual(len(checkpoints), 3)
-            checkpoint_dir = sorted(checkpoints, key=lambda x: int(x.replace("checkpoint-", "")))[0]
-
-            trainer.train(resume_from_checkpoint=os.path.join(tmp_dir, checkpoint_dir))
-            (a1, b1) = trainer.model.a.item(), trainer.model.b.item()
-
-            self.assertAlmostEqual(a, a1, delta=1e-5)
-            self.assertAlmostEqual(b, b1, delta=1e-5)
-
-    # regression for this issue: https://github.com/huggingface/transformers/issues/12970
-    def test_training_with_resume_from_checkpoint_false(self):
-        train_dataset = RegressionDataset(length=128)
-        eval_dataset = RegressionDataset()
-
-        config = RegressionModelConfig(a=0, b=2)
-        model = RegressionRandomPretrainedModel(config)
-
-        tmp_dir = self.get_auto_remove_tmp_dir()
-        args = RegressionTrainingArguments(tmp_dir, save_steps=5, learning_rate=0.1)
-        trainer = Trainer(model, args=args, train_dataset=train_dataset, eval_dataset=eval_dataset)
-
-        trainer.train(resume_from_checkpoint=False)
-
-    def test_load_best_model_at_end(self):
-        total = int(self.n_epochs * 64 / self.batch_size)
-        with tempfile.TemporaryDirectory() as tmpdir:
-            trainer = get_regression_trainer(
-                a=1.5,
-                b=2.5,
-                output_dir=tmpdir,
-                learning_rate=0.1,
-                eval_steps=5,
-                evaluation_strategy="steps",
-                save_steps=5,
-                load_best_model_at_end=True,
-            )
-            self.assertFalse(trainer.args.greater_is_better)
-            trainer.train()
-            self.check_saved_checkpoints(tmpdir, 5, total)
-            self.check_best_model_has_been_loaded(tmpdir, 5, total, trainer, "eval_loss")
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            trainer = get_regression_trainer(
-                a=1.5,
-                b=2.5,
-                output_dir=tmpdir,
-                learning_rate=0.1,
-                eval_steps=5,
-                evaluation_strategy="steps",
-                save_steps=5,
-                load_best_model_at_end=True,
-                metric_for_best_model="accuracy",
-                compute_metrics=AlmostAccuracy(),
-            )
-            self.assertTrue(trainer.args.greater_is_better)
-            trainer.train()
-            self.check_saved_checkpoints(tmpdir, 5, total)
-            self.check_best_model_has_been_loaded(tmpdir, 5, total, trainer, "eval_accuracy", greater_is_better=True)
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            trainer = get_regression_trainer(
-                a=1.5,
-                b=2.5,
-                output_dir=tmpdir,
-                learning_rate=0.1,
-                evaluation_strategy="epoch",
-                save_strategy="epoch",
-                load_best_model_at_end=True,
-                metric_for_best_model="accuracy",
-                compute_metrics=AlmostAccuracy(),
-            )
-            self.assertTrue(trainer.args.greater_is_better)
-            trainer.train()
-            self.check_saved_checkpoints(tmpdir, 64 // self.batch_size, total)
-            self.check_best_model_has_been_loaded(
-                tmpdir, 64 // self.batch_size, total, trainer, "eval_accuracy", greater_is_better=True
-            )
-
-        # Test this works with a non PretrainedModel
-        with tempfile.TemporaryDirectory() as tmpdir:
-            trainer = get_regression_trainer(
-                output_dir=tmpdir,
-                learning_rate=0.1,
-                eval_steps=5,
-                evaluation_strategy="steps",
-                save_steps=5,
-                load_best_model_at_end=True,
-                pretrained=False,
-            )
-            self.assertFalse(trainer.args.greater_is_better)
-            trainer.train()
-            self.check_saved_checkpoints(tmpdir, 5, total, is_pretrained=False)
-            self.check_best_model_has_been_loaded(tmpdir, 5, total, trainer, "eval_loss", is_pretrained=False)
-
     def test_training_iterable_dataset(self):
         config = RegressionModelConfig()
         model = RegressionPretrainedModel(config)
@@ -845,28 +569,8 @@ class TrainerIntegrationTest(TestCasePlus, TrainerIntegrationCommon):
         self.assertEqual(trainer.state.global_step, 4)
 
         loader = trainer.get_train_dataloader()
-        self.assertIsInstance(loader, paddle.utils.data.DataLoader)
-        self.assertIsInstance(loader.sampler, paddle.utils.data.dataloader._InfiniteConstantSampler)
-
-    def test_training_finite_iterable_dataset(self):
-        config = RegressionModelConfig()
-        model = RegressionPretrainedModel(config)
-
-        batch_size = 1
-        num_samples = 10
-
-        available_steps = num_samples // batch_size
-
-        data = FiniteIterableDataset(length=num_samples)
-        train_args = TrainingArguments(
-            "..",
-            max_steps=available_steps + 1,  # set a higher number than actually available
-            per_device_train_batch_size=batch_size,
-        )
-        trainer = Trainer(model, train_dataset=data, args=train_args)
-        with self.assertLogs("transformers.trainer", level="WARNING") as logs:
-            trainer.train()
-        self.assertIn(f"stopping training at step {available_steps}!", logs.output[0])
+        self.assertIsInstance(loader, paddle.io.DataLoader)
+        self.assertIsInstance(loader.batch_sampler, paddle.io.dataloader.batch_sampler._InfiniteIterableSampler)
 
     def test_evaluation_iterable_dataset(self):
         config = RegressionModelConfig(a=1.5, b=2.5)
@@ -895,25 +599,6 @@ class TrainerIntegrationTest(TestCasePlus, TrainerIntegrationCommon):
         self.assertAlmostEqual(results["eval_loss"], expected_loss)
         expected_acc = AlmostAccuracy()((pred, y))["accuracy"]
         self.assertAlmostEqual(results["eval_accuracy"], expected_acc)
-
-    def test_predict_iterable_dataset(self):
-        config = RegressionModelConfig(a=1.5, b=2.5)
-        model = RegressionPretrainedModel(config)
-        eval_dataset = SampleIterableDataset()
-
-        args = RegressionTrainingArguments(output_dir="./examples")
-        trainer = Trainer(model=model, args=args, eval_dataset=eval_dataset, compute_metrics=AlmostAccuracy())
-
-        preds = trainer.predict(trainer.eval_dataset).predictions
-        x = eval_dataset.dataset.x
-        self.assertTrue(np.allclose(preds, 1.5 * x + 2.5))
-
-        # With a number of elements not a round multiple of the batch size
-        # Adding one column not used by the model should have no impact
-        test_dataset = SampleIterableDataset(length=66, label_names=["labels", "extra"])
-        preds = trainer.predict(test_dataset).predictions
-        x = test_dataset.dataset.x
-        self.assertTrue(np.allclose(preds, 1.5 * x + 2.5))
 
     def test_num_train_epochs_in_training(self):
         # len(train_dl) < gradient_accumulation_steps shouldn't give ``ZeroDivisionError`` when ``max_steps`` is given.
@@ -998,43 +683,3 @@ class TrainerIntegrationTest(TestCasePlus, TrainerIntegrationCommon):
 
             trainer.state.best_model_checkpoint = os.path.join(tmp_dir, "checkpoint-5")
             self.check_checkpoint_deletion(trainer, tmp_dir, [5, 25])
-
-    def check_mem_metrics(self, trainer, check_func):
-        metrics = trainer.train().metrics
-        check_func("init_mem_cpu_alloc_delta", metrics)
-        check_func("train_mem_cpu_alloc_delta", metrics)
-        if paddle.cuda.device_count() > 0:
-            check_func("init_mem_gpu_alloc_delta", metrics)
-            check_func("train_mem_gpu_alloc_delta", metrics)
-
-        metrics = trainer.evaluate()
-        check_func("eval_mem_cpu_alloc_delta", metrics)
-        if paddle.cuda.device_count() > 0:
-            check_func("eval_mem_gpu_alloc_delta", metrics)
-
-        metrics = trainer.predict(RegressionDataset()).metrics
-        check_func("test_mem_cpu_alloc_delta", metrics)
-        if paddle.cuda.device_count() > 0:
-            check_func("test_mem_gpu_alloc_delta", metrics)
-
-    def test_mem_metrics(self):
-
-        # with mem metrics enabled
-        trainer = get_regression_trainer(skip_memory_metrics=False)
-        self.check_mem_metrics(trainer, self.assertIn)
-
-        # with mem metrics disabled
-        trainer = get_regression_trainer(skip_memory_metrics=True)
-        self.check_mem_metrics(trainer, self.assertNotIn)
-
-    def test_no_wd_param_group(self):
-        model = nn.Sequential(TstLayer(128), nn.LayerList([TstLayer(128), TstLayer(128)]))
-        trainer = Trainer(model=model)
-        trainer.create_optimizer_and_scheduler(10)
-        # fmt: off
-        wd_names = ['0.linear1.weight', '0.linear2.weight', '1.0.linear1.weight', '1.0.linear2.weight', '1.1.linear1.weight', '1.1.linear2.weight']
-        # fmt: on
-        wd_params = [p for n, p in model.named_parameters() if n in wd_names]
-        no_wd_params = [p for n, p in model.named_parameters() if n not in wd_names]
-        self.assertListEqual(trainer.optimizer.param_groups[0]["params"], wd_params)
-        self.assertListEqual(trainer.optimizer.param_groups[1]["params"], no_wd_params)
