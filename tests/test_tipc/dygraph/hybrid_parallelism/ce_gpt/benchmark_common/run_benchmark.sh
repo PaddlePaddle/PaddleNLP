@@ -93,14 +93,13 @@ function _train(){
     fi
 
     if [ "False" = ${use_pipeline_parallel} ]; then
-        pp_config_disable_partial_send_recv = ""
+        pp_config_disable_partial_send_recv=""
     else
-        pp_config_disable_partial_send_recv = "--pipeline_parallel_config \"disable_partial_send_recv\""
+        pp_config_disable_partial_send_recv="--pipeline_parallel_config disable_partial_send_recv"
     fi
 
     model_config="gpt2-medium-en"
-    train_cmd="--model_type gpt \
-                --model_name_or_path ${model_config} \
+    train_cmd="--model_name_or_path ${model_config} \
                 --tokenizer_name_or_path ${model_config} \
                 --input_dir ./data\
                 --output_dir output\

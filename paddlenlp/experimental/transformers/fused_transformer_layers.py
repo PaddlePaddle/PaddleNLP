@@ -24,7 +24,7 @@ from paddle.incubate.nn.functional import (
 )
 from paddle.nn import Layer
 from paddle.nn.initializer import Constant
-from paddle.nn.quant import weight_only_linear, weight_quantize
+from paddle.nn.quant import weight_only_linear
 
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
@@ -910,11 +910,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
 
         assert self.weight_only_quant_bits != -1
         self.weight_dtype = "int" + str(self.weight_only_quant_bits)
-        # test for weight only quant scale
-        _, quant_weight_dtype_test_scale_tensor = weight_quantize(
-            paddle.ones(shape=[64, 64], dtype="float16"), algo="weight_only_int" + str(self.weight_only_quant_bits)
-        )
-        self.weight_scale_dtype = quant_weight_dtype_test_scale_tensor.dtype
+        self.weight_scale_dtype = self._dtype
         self.qkv_weights_scale = []
         self.linear_weights_scale = []
         self.ffn1_weights_scale = []

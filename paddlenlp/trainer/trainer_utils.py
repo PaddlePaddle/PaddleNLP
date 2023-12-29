@@ -41,6 +41,7 @@ from paddle.optimizer.lr import LambdaDecay
 
 from paddlenlp.ops import Topology
 
+from ..trainer.argparser import strtobool
 from ..transformers.tokenizer_utils_base import BatchEncoding
 from ..utils.import_utils import is_paddle_cuda_available, is_psutil_available
 from ..utils.log import logger
@@ -75,7 +76,7 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
     # global seed: only mp group is same.
     # local seed: all groups are different
     hcg = None
-    if hasattr(fleet.fleet, "_hcg") and topo is not None:
+    if hasattr(fleet.fleet, "_hcg") and topo is None:
         hcg = fleet.get_hybrid_communicate_group()
 
     if topo is not None and paddle.distributed.get_world_size() > 1:
@@ -98,8 +99,11 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
         mp_rank = hcg.get_model_parallel_rank()
         mp_size = hcg.get_model_parallel_world_size()
 
-        sep_rank = hcg.get_sep_parallel_rank()
-        sep_size = hcg.get_sep_parallel_world_size()
+        if hasattr(hcg, "get_sep_parallel_rank"):
+            sep_rank = hcg.get_sep_parallel_rank()
+            sep_size = hcg.get_sep_parallel_world_size()
+        else:
+            sep_rank, sep_size = 0, 1
 
         pp_rank = hcg.get_stage_id()
         pp_size = hcg.get_pipe_parallel_world_size()
@@ -217,7 +221,16 @@ def get_last_checkpoint(folder):
     ]
     if len(checkpoints) == 0:
         return
-    return os.path.join(folder, max(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0])))
+
+    if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
+        for i in sorted(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0]), reverse=True):
+            current_path = os.path.join(folder, i)
+            # make sure the checkpoint is valid
+            if os.path.exists(os.path.join(current_path, ".checkpoint_done")):
+                return current_path
+        return
+    else:
+        return os.path.join(folder, max(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0])))
 
 
 class IntervalStrategy(ExplicitEnum):
@@ -811,6 +824,10 @@ class TrainerMemoryTracker:
         # deal with nested calls of eval during train - simply ignore those
         if self.cur_stage is not None and self.cur_stage != stage:
             return
+
+        if hasattr(self, "gpu_mem_used_peak"):
+            metrics["gpu_mem_max_memory_allocated"] = self.gpu_mem_used_peak
+            metrics["gpu_mem_max_memory_reserved"] = self.paddle.device.cuda.max_memory_reserved()
 
         # since we don't have a way to return init metrics, we push them into the first of train/val/predict
         stages = [stage]
