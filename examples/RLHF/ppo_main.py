@@ -22,14 +22,11 @@ from data import PromptOnlyDataset, SupervisedDataset, parse_dataset
 from models import AutoModelForScore
 from ppo_trainer import PPOTrainer
 
-from paddlenlp.trainer import (  # , get_last_checkpoint
-    PdArgumentParser,
-    TrainingArguments,
-)
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import (
     AutoConfig,
+    AutoModelForCausalLM,
     AutoTokenizer,
-    LlamaForCausalLM,
     LlamaTokenizer,
 )
 from paddlenlp.utils.log import logger
@@ -206,29 +203,6 @@ def main():
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
 
-    # prop = paddle.device.cuda.get_device_properties()
-    # if prop.total_memory > 40 * 1024 * 1024 * 1024:
-    #     memory_size = 75 * 1024 * 1024 * 1024
-    # else:
-    #     memory_size = 30 * 1024 * 1024 * 1024
-    # x = paddle.empty([memory_size], dtype=paddle.uint8)
-    # del x
-
-    # Detecting last checkpoint.
-    # last_checkpoint = None
-    # if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
-    #     last_checkpoint = get_last_checkpoint(training_args.output_dir)
-    #     if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 1:
-    #         raise ValueError(
-    #             f"Output directory ({training_args.output_dir}) already exists and is not empty. "
-    #             "Use --overwrite_output_dir to overcome."
-    #         )
-    #     if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
-    #         logger.info(
-    #             f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
-    #             "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
-    #         )
-
     # Load model
     if training_args.fp16_opt_level == "O2":
         if training_args.fp16:
@@ -254,12 +228,12 @@ def main():
         )
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
-        actor_model = LlamaForCausalLM.from_pretrained(
+        actor_model = AutoModelForCausalLM.from_pretrained(
             model_args.actor_model_name_or_path,
             config=model_config,
         )
         # reference model
-        actor_reference_model = LlamaForCausalLM.from_pretrained(
+        actor_reference_model = AutoModelForCausalLM.from_pretrained(
             model_args.actor_model_name_or_path,
             config=model_config,
         )
@@ -296,10 +270,8 @@ def main():
             model_args.reward_critic_model_name_or_path, model_max_length=data_args.max_length, padding_side="left"
         )
     for tokenizer in [actor_tokenizer, reward_tokenizer, reward_critic_tokenizer]:
-        if isinstance(tokenizer, LlamaTokenizer):
-            # tokenizer.pad_token_id = tokenizer.eos_token_id
-            # to be consistent with PKU-Alignment/alpaca-7b-reproduced
-            tokenizer.pad_token_id = 32000  # tokenizer.eos_token_id
+        if isinstance(tokenizer, LlamaTokenizer) and tokenizer.pad_token_id is None:
+            tokenizer.pad_token_id = tokenizer.eos_token_id
 
     train_ds = PromptOnlyDataset(data_args.parsed_train_datasets, tokenizer=actor_tokenizer)
     if data_args.eval_datasets is None and data_args.eval_split_ratio:

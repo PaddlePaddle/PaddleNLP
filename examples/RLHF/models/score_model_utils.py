@@ -30,6 +30,7 @@ import paddle.nn as nn
 
 from paddlenlp.transformers import PretrainedConfig
 from paddlenlp.transformers.auto.modeling import (
+    MAPPING_NAMES,
     _BaseAutoModelClass,
     get_init_configurations,
     get_name_mapping,
@@ -41,7 +42,10 @@ from paddlenlp.transformers.model_outputs import ModelOutput
 class AutoModelForScore(_BaseAutoModelClass):
     CONFIGURATION_MODEL_MAPPING = get_init_configurations()
     _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
-    _name_mapping: OrderedDict[str, Any] = get_name_mapping("ForScore")
+    # "ForScore" might be more consistent with other tasks, while this suffix is
+    # consistent with Beaver now.
+    _task_suffix = "ModelForScore"
+    _name_mapping: OrderedDict[str, Any] = get_name_mapping(_task_suffix)
     _score_module_name: str = "models.score_model"
 
     @classmethod
@@ -55,7 +59,25 @@ class AutoModelForScore(_BaseAutoModelClass):
             init_class = architectures.pop() if len(architectures) > 0 else None
         else:
             init_class = config.pop("init_class", None)
-        import_class = importlib.import_module(cls._score_module_name)
+
+        # Get class name corresponds to this task, since we might init Score
+        # model with CausalLM model.
+        init_class = init_class[:-5] if init_class is not None and init_class.endswith("Model") else init_class
+        model_name = None
+        if init_class:
+            for model_flag, name in MAPPING_NAMES.items():
+                if model_flag in init_class:
+                    model_name = model_flag + "Model"
+                    break
+        if model_name is None:
+            raise AttributeError(
+                f"Unable to parse 'architectures' or 'init_class' from {config_file_path}. Also unable to infer model class from 'pretrained_model_name_or_path'"
+            )
+        init_class = cls._name_mapping[model_name + "_Import_Class"]
+        # module_name = cls._name_mapping[init_class]
+        module_name = cls._score_module_name
+
+        import_class = importlib.import_module(module_name)
         model_class = getattr(import_class, init_class)
         return model_class
 

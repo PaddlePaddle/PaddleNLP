@@ -201,21 +201,6 @@ def total_processes_number(local_rank):
     return 1
 
 
-def check_memory_usage(msg=""):
-    import paddle
-
-    max_memory_allocated_size = paddle.device.cuda.max_memory_allocated() / (1024 * 1024 * 1024)
-    max_memory_reserved_size = paddle.device.cuda.max_memory_reserved() / (1024 * 1024 * 1024)
-    memory_allocated_size = paddle.device.cuda.memory_allocated() / (1024 * 1024 * 1024)
-    memory_reserved_size = paddle.device.cuda.memory_reserved() / (1024 * 1024 * 1024)
-    return {
-        f"{msg}_max_memory_allocated_size": max_memory_allocated_size,
-        f"{msg}_max_memory_reserved_size": max_memory_reserved_size,
-        f"{msg}_memory_allocated_size": memory_allocated_size,
-        f"{msg}_memory_reserved_size": memory_reserved_size,
-    }
-
-
 def speed_metrics(split, start_time, num_samples=None, num_steps=None):
     """
     Measure and return speed performance metrics.
@@ -237,7 +222,6 @@ def speed_metrics(split, start_time, num_samples=None, num_steps=None):
     if num_steps is not None:
         steps_per_second = num_steps / runtime
         result[f"{split}_steps_per_second"] = steps_per_second
-    result.update(check_memory_usage(split))
     return result
 
 

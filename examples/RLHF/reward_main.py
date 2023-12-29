@@ -25,21 +25,19 @@ except ImportError:
     from typing_extensions import Literal
 
 from data import PreferenceDataset, parse_dataset
+from models import AutoModelForScore
 from reward_trainer import RewardTrainer
 
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
-from paddlenlp.transformers import (
-    AutoConfig,
-    AutoTokenizer,
-    LlamaModelForScore,
-    LlamaTokenizer,
-)
+from paddlenlp.transformers import AutoConfig, AutoTokenizer, LlamaTokenizer
 from paddlenlp.utils.log import logger
 
 # launch would unset http_proxy
 # export https_proxy=http://172.19.57.45:3128
-os.environ["http_proxy"] = "http://172.19.57.45:3128"
-os.environ["https_proxy"] = "http://172.19.57.45:3128"
+# os.environ["http_proxy"] = "http://172.19.57.45:3128"
+# os.environ["https_proxy"] = "http://172.19.57.45:3128"
+os.environ["http_proxy"] = "http://10.162.37.16:8128"
+os.environ["https_proxy"] = "http://10.162.37.16:8128"
 
 
 @dataclass
@@ -189,7 +187,7 @@ def main():
         )
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
-        model = LlamaModelForScore.from_pretrained(
+        model = AutoModelForScore.from_pretrained(
             model_args.model_name_or_path, config=model_config, **model_args.extra_model_kwargs
         )
     tokenizer = AutoTokenizer.from_pretrained(

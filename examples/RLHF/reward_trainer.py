@@ -18,6 +18,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from models import ScoreModelOutput
 from paddle.io import Dataset
 
 import paddlenlp.trainer.trainer as trainer
@@ -30,7 +31,6 @@ from paddlenlp.trainer import (
 )
 from paddlenlp.trainer.utils import nested_detach
 from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
-from paddlenlp.transformers.score_model_utils import ScoreModelOutput
 
 _tr_acc = None
 
@@ -170,7 +170,8 @@ class RewardTrainer(Trainer):
 
         accuracy = (higher_end_rewards > lower_end_rewards).cast("float32").mean()  # size = ()
 
-        # hack for accuracy track in training
+        # TODO(guosheng): use a formal way to replace this hack for accuracy track
+        # in training
         global _tr_acc
         if _tr_acc is None:
             _tr_acc = [paddle.to_tensor(0.0), 0.0, self._nested_gather]
