@@ -17,6 +17,7 @@ import gc
 import json
 import os
 
+import numpy as np
 import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
@@ -45,6 +46,7 @@ from paddlenlp.utils.env import (
     PADDLE_OPTIMIZER_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
+    PAST_KEY_VALUES_FILE_NAME,
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
     SAFE_MASTER_WEIGHTS_NAME,
     SAFE_OPTIMIZER_INDEX_NAME,
@@ -115,6 +117,24 @@ def save_unified_checkpoint(args, model, output_dir, safe_serialization=False):
         safe_save_file(state_dict, os.path.join(save_directory, shard_file), metadata={"format": "np"})
     else:
         paddle.save(state_dict, os.path.join(save_directory, shard_file))
+
+    # Save prefix model past_key_values
+    if isinstance(model_to_save, PrefixModelForCausalLM):
+        local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+        if local_rank == 0:
+            past_key_value = model_to_save.prefix_encoder(model_to_save.prefix_tokens.unsqueeze(0).expand([1, -1]))
+            past_key_value = past_key_value.reshape(
+                [
+                    model_to_save.prefix_config.num_prefix_tokens,
+                    2,
+                    model_to_save.prefix_config.num_hidden_layers,
+                    model_to_save.num_heads,
+                    model_to_save.head_dim,
+                ]
+            )
+            past_key_value = paddle.transponse(past_key_value, perm=[2, 1, 3, 0, 4]).cpu().numpy()
+            model_to_save.prefix_config.save_pretrained(save_directory)
+            np.save(os.path.join(save_directory, PAST_KEY_VALUES_FILE_NAME), past_key_value)
 
     # Attach architecture to the config
     config_to_save.architectures = [model_to_save.__class__.__name__]
