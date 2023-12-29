@@ -33,6 +33,12 @@ def send_request(query, history=None):
     text = ""
     for line in res.iter_lines():
         result = json.loads(line)
+
+        if result["error_code"] != 0:
+            text = "error-response"
+            break
+
+        result = json.loads(line)
         bot_response = result["result"]["response"]
 
         if bot_response["utterance"].endswith("[END]"):
