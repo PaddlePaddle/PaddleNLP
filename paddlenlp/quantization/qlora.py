@@ -19,15 +19,14 @@ from paddleslim_ops import dequant_blockwise, quant_blockwise
 
 def qlora_weight_quantize(
     weight,
-    quant_type="nf4",
+    quant_algo="nf4",
     double_quant=False,
     block_size=64,
     double_quant_block_size=256,
     linear_name=None,
     return_dict=True,
 ):
-    quant_weight, quant_scale = quant_blockwise(weight, None, blocksize=block_size, quant_type=quant_type)
-    quant_weight = quant_weight.reshape([weight.shape[1] // 2, weight.shape[0]])
+    quant_weight, quant_scale = quant_blockwise(weight, None, blocksize=block_size, quant_type=quant_algo)
     if double_quant:
         quant_sacle_offset = quant_scale.mean()
         quant_scale -= quant_sacle_offset
@@ -55,7 +54,7 @@ def qlora_weight_quantize(
 
 
 def qlora_weight_dequantize(
-    quant_weight, quant_type, state, double_quant=False, block_size=64, double_quant_block_size=256
+    quant_weight, quant_algo, state, double_quant=False, block_size=64, double_quant_block_size=256
 ):
     if double_quant:
         qquant_scale, double_quant_scale, quant_sacle_offset = state
@@ -65,39 +64,43 @@ def qlora_weight_dequantize(
         quant_scale += quant_sacle_offset
     else:
         quant_scale = state
-
-    out = dequant_blockwise(quant_weight, None, quant_scale, blocksize=block_size, quant_type=quant_type)
+    out = dequant_blockwise(quant_weight, None, quant_scale, blocksize=block_size, quant_type=quant_algo)
     return out
 
 
 def qlora_weight_quantize_dequantize(
-    weight, quant_type="nf4", double_quant=False, block_size=64, double_quant_block_size=256
+    weight, quant_algo="nf4", double_quant=False, block_size=64, double_quant_block_size=256
 ):
-
+    dtype = weight.dtype
     quant_weight, state = qlora_weight_quantize(
         weight=weight,
-        quant_type=quant_type,
+        quant_algo=quant_algo,
         double_quant=double_quant,
         block_size=block_size,
         double_quant_block_size=double_quant_block_size,
+        return_dict=False,
     )
-    quant_dequant_weight = qlora_weight_dequantize(
-        quant_weight=quant_weight,
-        quant_type=quant_type,
-        state=state,
-        double_quant=double_quant,
-        block_size=block_size,
-        double_quant_block_size=double_quant_block_size,
-    ).reshape(weight.shape)
+    quant_dequant_weight = (
+        qlora_weight_dequantize(
+            quant_weight=quant_weight,
+            quant_algo=quant_algo,
+            state=state,
+            double_quant=double_quant,
+            block_size=block_size,
+            double_quant_block_size=double_quant_block_size,
+        )
+        .reshape(weight.shape)
+        .cast(dtype)
+    )
     return quant_dequant_weight
 
 
 def qlora_weight_linear(
     x,
     quant_weight,
-    quant_algo,
     dtype,
     state,
+    quant_algo="nf4",
     double_quant=False,
     block_size=64,
     double_quant_block_size=256,

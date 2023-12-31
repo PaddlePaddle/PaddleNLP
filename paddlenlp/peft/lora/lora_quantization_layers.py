@@ -80,6 +80,8 @@ class QuantizationLoRALinear(QuantizationLinear):
             raise ValueError("Lora rank r should be a positive integer")
         if self.quant_algo == "llm.int8":
             raise NotImplementedError("llm.int8 not yet support lora strategy.")
+        self.in_features = in_features
+        self.out_features = out_features
         self.r = r
         self.lora_alpha = lora_alpha
         # Mark the weight as unmerged
@@ -104,21 +106,20 @@ class QuantizationLoRALinear(QuantizationLinear):
             is_bias=False,
             default_initializer=nn.initializer.Constant(value=0.0),
         )
-        if self.merge_weights:
-            self.weight = self.create_parameter(
-                shape=[in_features, out_features],
-                dtype=self._dtype,
-                is_bias=False,
-            )
-            self.init_weight()
+        self.weight = None
         self.scaling = self.lora_alpha / self.r
 
     def init_weight(self):
+        self.weight = self.create_parameter(
+            shape=[self.in_features, self.out_features],
+            dtype=self._dtype,
+            is_bias=False,
+        )
         if self.quant_algo in ["fp4", "nf4"]:
             qdq_weight = (
                 qlora_weight_dequantize(
                     quant_weight=self.quant_weight,
-                    quant_type=self.quant_algo,
+                    quant_algo=self.quant_algo,
                     state=(self.qquant_scale, self.double_quant_scale, self.quant_scale_offset)
                     if self.double_quant
                     else self.quant_scale,
@@ -126,8 +127,8 @@ class QuantizationLoRALinear(QuantizationLinear):
                     block_size=self.block_size,
                     double_quant_block_size=self.double_quant_block_size,
                 )
-                .reshape(self.weight.shape)
                 .cast(self._dtype)
+                .reshape(self.weight.shape)
             )
         elif self.quant_algo in ["weight_only_int8"]:
             qdq_weight = weight_dequantize(self.quant_weight, self.quant_scale, self.quant_algo, self._dtype)
@@ -146,6 +147,8 @@ class QuantizationLoRALinear(QuantizationLinear):
     def eval(self):
         super().eval()
         if self.merge_weights and not self.merged:
+            if self.weight is None:
+                self.init_weight()
             # Merge the weights and mark it
             new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
@@ -153,6 +156,8 @@ class QuantizationLoRALinear(QuantizationLinear):
 
     def forward(self, x: paddle.Tensor):
         if self.merge_weights:
+            if self.weight is None:
+                self.init_weight()
             result = paddle.nn.functional.linear(x, self.weight, self.bias)
         else:
             result = super().forward(x)

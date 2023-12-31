@@ -250,7 +250,7 @@ class LoRAModel(nn.Layer):
         ), f"Saving directory ({save_directory}) should be a directory, not a file"
         os.makedirs(save_directory, exist_ok=True)
 
-        lora_config_to_save = copy.deepcopy(self.lora_config)
+        lora_config_to_save = LoRAConfig(**self.lora_config.to_dict())
 
         if merge_tensor_parallel and lora_config_to_save.tensor_parallel_degree > 1:
             trainable_state_dict = self.get_trainable_state_dict()

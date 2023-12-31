@@ -12,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
+import copy
 import os
 
 import paddle
+from paddle.nn.quant import weight_dequantize, weight_quantize
 
 from paddlenlp.peft import LoRAConfig, LoRAModel
+from paddlenlp.quantization.qlora import qlora_weight_quantize_dequantize
 from paddlenlp.quantization.quantization_config import QuantizationConfig
 from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+from paddlenlp.transformers.utils import device_guard
 from paddlenlp.utils.env import CONFIG_NAME
 
 
@@ -29,10 +33,39 @@ def parse_arguments():
         "--lora_path", default=None, required=True, help="The directory of LoRA parameters. Default to None"
     )
     parser.add_argument(
-        "--merge_lora_model_path", default=None, help="The directory of merged parameters. Default to None"
+        "--merge_lora_model_path",
+        default=None,
+        required=True,
+        help="The directory of merged parameters. Default to None",
     )
     parser.add_argument("--device", type=str, default="gpu", help="Device")
+    parser.add_argument(
+        "--low_gpu_mem", type=bool, default=True, help="Whether to use low gpu memory. Default to False"
+    )
     return parser.parse_args()
+
+
+def weight_process(name, quant_config, lora_config, state_dict):
+    weight = state_dict.pop(name + ".weight").cuda()
+    if quant_config.weight_quantize_algo is None:
+        pass
+    elif quant_config.weight_quantize_algo in ["nf4", "fp4"]:
+        weight = qlora_weight_quantize_dequantize(
+            weight,
+            quant_algo=quant_config.weight_quantize_algo,
+            double_quant=quant_config.weight_double_quant,
+            block_size=quant_config.weight_blocksize,
+            double_quant_block_size=quant_config.weight_double_quant_block_size,
+        )
+    elif quant_config.weight_quantize_algo in ["weight_only_int8"]:
+        out, scale = weight_quantize(weight, algo=quant_config.weight_quantize_algo)
+        weight = weight_dequantize(out, scale)
+    else:
+        raise ValueError(f"quant_config.weight_quantize_algo {quant_config.weight_quantize_algo} is not supported.")
+    lora_A = state_dict.pop(name + ".lora_A").cuda()
+    lora_B = state_dict.pop(name + ".lora_B").cuda()
+    scaling = lora_config.lora_alpha / lora_config.r
+    state_dict[name + ".weight"] = (weight + lora_A @ lora_B * scaling).cpu()
 
 
 def merge():
@@ -40,7 +73,6 @@ def merge():
     paddle.set_device(args.device)
 
     lora_config = LoRAConfig.from_pretrained(args.lora_path)
-    lora_config.merge_weights = True
     if lora_config.base_model_name_or_path is None:
         if args.model_name_or_path is not None:
             raise ValueError("We can not find a valid model_name_or_path.")
@@ -56,27 +88,48 @@ def merge():
             f"We can not find config.json in lora_path: {args.lora_path} or find a valid model_name_or_path."
         )
     config.dtype = lora_config.dtype
+    if lora_config.dtype == "bfloat16" and args.device == "cpu":
+        raise ValueError("We can not apply bfloat16 lora merge on cpu.")
 
-    model = AutoModelForCausalLM.from_pretrained(
-        lora_config.base_model_name_or_path,
-        config,
-        low_cpu_mem_usage=True,
-    )
-    model = LoRAModel.from_pretrained(model=model, lora_path=args.lora_path, lora_config=lora_config)
-    model.eval()
-    if args.merge_model_path is None:
-        args.merge_model_path = args.lora_path
+    if args.low_gpu_mem and args.device == "gpu":
+        quant_config = copy.deepcopy(config.quantization_config)
+        config.quantization_config = QuantizationConfig()
+        lora_config.merge_weights = False
+        with device_guard():
+            model = AutoModelForCausalLM.from_pretrained(
+                lora_config.base_model_name_or_path,
+                config=config,
+                low_cpu_mem_usage=True,
+            )
+            model = LoRAModel.from_pretrained(model=model, lora_path=args.lora_path, lora_config=lora_config)
+        model.eval()
+        model_state_dict = model.model.state_dict()
+        lora_name_list = []
+        for key in model_state_dict.keys():
+            if "lora_A" in key:
+                lora_name_list.append(key[:-7])
+        for name in lora_name_list:
+            weight_process(name, quant_config, lora_config, model_state_dict)
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            lora_config.base_model_name_or_path,
+            config=config,
+            low_cpu_mem_usage=True,
+        )
+        lora_config.merge_weights = True
+        model = LoRAModel.from_pretrained(model=model, lora_path=args.lora_path, lora_config=lora_config)
+        model.eval()
+        model_state_dict = model.model.state_dict()
+        for key in list(model_state_dict):
+            if "lora" in key:
+                del model_state_dict[key]
+            if "quant" in key:
+                del model_state_dict[key]
+        model.model.config.quantization_config = QuantizationConfig()
+    model.model.save_pretrained(args.merge_lora_model_path, state_dict=model_state_dict)
 
-    model_state_dict = model.model.state_dict()
-    for key in list(model_state_dict):
-        if "lora" in key:
-            del model_state_dict[key]
-        if "quant" in key:
-            del model_state_dict[key]
-    model.model.config.quantization_config = QuantizationConfig()
-    model.model.save_pretrained(args.merge_model_path, state_dict=model_state_dict)
     tokenizer = AutoTokenizer.from_pretrained(lora_config.base_model_name_or_path)
-    tokenizer.save_pretrained(args.merge_model_path)
+    tokenizer.save_pretrained(args.merge_lora_model_path)
 
 
 if __name__ == "__main__":

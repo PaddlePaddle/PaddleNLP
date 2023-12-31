@@ -791,7 +791,7 @@ def _load_state_dict_into_meta_model(
             if (
                 keep_in_fp32_modules is not None
                 and any(module_to_keep_in_fp32 in param_name for module_to_keep_in_fp32 in keep_in_fp32_modules)
-                and dtype == paddle.float16
+                and (dtype == paddle.float16 or dtype == paddle.bfloat16)
             ):
                 param = param.astype(dtype=paddle.float32)
             else:
@@ -2075,7 +2075,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     replace_with_quantization_linear,
                 )
             except ImportError:
-                raise ImportError("You need to install paddlepaddle >= 2.5.2")
+                raise ImportError("You need to install paddlepaddle >= 2.6.0")
 
             if dtype != "float16" and dtype != "bfloat16":
                 dtype = "float16"

@@ -162,7 +162,6 @@ def main():
         else:
             # NOTE(gongenlei): new add autotuner_benchmark
             model = AutoModelForCausalLM.from_config(model_config, dtype=dtype)
-
     if training_args.do_train and model_args.neftune:
         # Inspired by https://github.com/neelsjain/NEFTune
         if hasattr(model, "get_input_embeddings"):
