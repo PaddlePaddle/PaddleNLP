@@ -40,7 +40,7 @@ def parse_arguments():
     )
     parser.add_argument("--device", type=str, default="gpu", help="Device")
     parser.add_argument(
-        "--low_gpu_mem", type=bool, default=True, help="Whether to use low gpu memory. Default to False"
+        "--low_gpu_mem", type=bool, default=False, help="Whether to use low gpu memory. Default to False"
     )
     return parser.parse_args()
 

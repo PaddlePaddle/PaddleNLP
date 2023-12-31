@@ -217,15 +217,14 @@ python merge_tp_and_pp_params.py \
 python merge_lora_params.py \
     --lora_path ./checkpoints/llama_lora_ckpts \
     --merge_lora_model_path ./checkpoints/llama_lora_merge \
-    --device "gpu"
+    --device "gpu" \
+    --low_gpu_mem True
 ```
-**Note:**
-低比特LoRA模型参数合并的时候会将模型反量化为float16或bfloat16类型，因此需要使用GPU进行参数合并。
 
-需要使用CPU进行参数合并，因为低比特LoRA模型参数是float16类型。
 <summary>&emsp; 脚本参数介绍</summary><div>
 
 - `lora_path`: LoRA参数和配置路径，对LoRA参数进行初始化，默认为None。
 - `merge_model_path`: 必须，合并参数后保存路径，默认为None。
 - `device`: 运行环境，默认为gpu。
+- `low_gpu_mem`:降低合参时候所需显存，默认为False。如果合参时显存不足，建议开启
 </div>
