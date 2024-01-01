@@ -19,7 +19,7 @@ from paddle import nn
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.nn.quant import weight_only_linear
 
-from ...utils.quantization import (
+from ...quantization.quantization_linear import (
     ColumnParallelQuantizationLinear,
     QuantizationLinear,
     RowParallelQuantizationLinear,
@@ -44,12 +44,35 @@ class QuantizationLoRALinear(QuantizationLinear):
         weight_attr=None,
         scale_attr=None,
         bias_attr=None,
+        block_size=64,
+        double_quant_block_size=256,
+        double_quant=False,
+        qquant_scale_attr=None,
+        double_quant_scale_attr=None,
+        quant_sacle_offset_attr=None,
+        quant_scale_attr=None,
+        llm_int8_threshold=6.0,
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
     ):
         QuantizationLinear.__init__(
-            self, in_features, out_features, quant_algo, dtype, weight_attr, scale_attr, bias_attr
+            self,
+            in_features,
+            out_features,
+            quant_algo,
+            dtype,
+            weight_attr,
+            scale_attr,
+            bias_attr,
+            block_size,
+            double_quant_block_size,
+            double_quant,
+            qquant_scale_attr,
+            double_quant_scale_attr,
+            quant_sacle_offset_attr,
+            quant_scale_attr,
+            llm_int8_threshold,
         )
         if not isinstance(r, int) or r <= 0:
             raise ValueError("Lora rank r should be a positive integer")

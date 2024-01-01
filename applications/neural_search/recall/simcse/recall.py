@@ -77,7 +77,7 @@ if __name__ == "__main__":
 
     id2corpus = gen_id2corpus(args.corpus_file)
 
-    # conver_example function's input must be dict
+    # convert_example function's input must be dict
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     corpus_ds = MapDataset(corpus_list)
 

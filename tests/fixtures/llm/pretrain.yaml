@@ -20,11 +20,11 @@ pretrain:
     continue_training: 1
   default:
     llama:
-      model_type: llama
       model_name_or_path: __internal_testing__/tiny-random-llama
-    chatglm:
-      model_type: chatglm
-      model_name_or_path: __internal_testing__/tiny-fused-chatglm
+    qwen:
+      model_name_or_path: __internal_testing__/tiny-fused-qwen
+    gpt:
+      model_name_or_path: __internal_testing__/gpt 
 
 inference-predict:
   default:

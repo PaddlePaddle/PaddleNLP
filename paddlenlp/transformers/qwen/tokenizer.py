@@ -30,6 +30,9 @@ from ..tokenizer_utils_base import (
     PaddingStrategy,
 )
 
+__all__ = ["QWenTokenizer"]
+
+
 VOCAB_FILES_NAMES = {"vocab_file": "qwen.tiktoken"}
 
 PAT_STR = r"""(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+"""
@@ -60,7 +63,7 @@ def _load_tiktoken_bpe(tiktoken_bpe_file: str) -> Dict[bytes, int]:
 class QWenTokenizer(PretrainedTokenizer):
     """QWen tokenizer."""
 
-    model_input_names = ["input_ids", "attention_mask"]
+    model_input_names = ["input_ids", "attention_mask", "position_ids"]
     resource_files_names = VOCAB_FILES_NAMES
 
     def __init__(

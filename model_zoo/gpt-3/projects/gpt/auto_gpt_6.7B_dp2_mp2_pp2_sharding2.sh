@@ -18,6 +18,10 @@ log_dir=log_dp2mp2pp2
 rm -rf $log_dir
 export FLAGS_new_executor_micro_batching=True
 
+# control deterministic if needed
+# export FLAGS_cudnn_deterministic=true
+# export FLAGS_cudnn_deterministic=true
+
 python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3,4,5,6,7" \
     ./tools/auto.py \
     -c ./ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_6.7B_dp2_mp2_pp2_sharding2.yaml \

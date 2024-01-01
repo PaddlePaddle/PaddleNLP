@@ -379,75 +379,105 @@ class BloomAttention(nn.Layer):
 
         batch_size, q_length, _, _ = query_layer.shape
 
-        query_layer = query_layer.transpose([0, 2, 1, 3])
-        key_layer = key_layer.transpose([0, 2, 3, 1])
-        value_layer = value_layer.transpose([0, 2, 1, 3])
         if layer_past is not None:
             past_key, past_value = layer_past
             # concatenate along seq_length dimension:
-            #  - key: [batch_size, self.num_heads, head_dim, kv_length]
-            #  - value: [batch_size, self.num_heads, kv_length, head_dim]
-            key_layer = paddle.concat((past_key, key_layer), axis=3)
-            value_layer = paddle.concat((past_value, value_layer), axis=2)
+            #  - key: [batch_size, kv_length, self.num_heads, head_dim]
+            #  - value: [batch_size, kv_length, self.num_heads, head_dim]
+            key_layer = paddle.concat((past_key, key_layer), axis=1)
+            value_layer = paddle.concat((past_value, value_layer), axis=1)
 
         if use_cache is True:
             present = (key_layer, value_layer)
         else:
             present = None
 
-        _, _, _, kv_length = key_layer.shape
+        version = paddle.version.full_version
+        version_check = True
+        if self.config.use_flash_attention and version != "0.0.0" and version <= "2.5.2":
+            logger.warning(
+                "PaddlePaddle version 2.5.3 or higher is required, please upgrade your PaddlePaddle to 2.5.3 or other higher version."
+            )
+            version_check = False
+        if self.config.use_flash_attention and version_check:
+            query_states, key_states, value_states = query_layer, key_layer, value_layer
 
-        query_layer = query_layer.reshape([batch_size * self.num_heads, q_length, self.head_dim])
-        key_layer = key_layer.reshape([batch_size * self.num_heads, self.head_dim, kv_length])
-        value_layer = value_layer.reshape([batch_size * self.num_heads, kv_length, self.head_dim])
+            attention_mask = attention_mask.cast(alibi.dtype) + alibi
+            attention_mask = attention_mask.reshape(
+                [query_states.shape[0], -1, attention_mask.shape[-2], attention_mask.shape[-1]]
+            )
+            attn_output = F.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=attention_mask,
+                dropout_p=self.config.attention_dropout,
+                training=self.training,
+                is_causal=False,
+            )
+            attn_weights = None
+            # [batch_size, seq_len, num_heads, head_dim] = > [batch_size, seq_len, hidden_size]
+            attn_output = attn_output.reshape([attn_output.shape[0], attn_output.shape[1], -1])
+            output_tensor = self.dense(attn_output)
 
-        # [batch_size * num_heads, q_length, kv_length]
-        # alibi:[batch_size * num_heads, q_length, kv_length]
-        # we use `Tensor.baddbmm` instead of `paddle.baddbmm` as the latter isn't supported by TorchScript v1.11
-        attention_scores = baddbmm(
-            alibi, batch1=query_layer, batch2=key_layer, beta=self.beta, alpha=self.inv_norm_factor
-        )
-
-        # change view to [batch_size, num_heads, q_length, kv_length]
-        # attention_scores = matmul_result.reshape([batch_size, self.num_heads, q_length, kv_length])
-
-        # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
-        input_dtype = query_layer.dtype
-        # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
-        if input_dtype != paddle.float32:
-            attention_scores = paddle.cast(attention_scores, paddle.float32)
-            attn_weights = attention_scores + attention_mask
-            attention_probs = paddle.cast(F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype)
         else:
-            attn_weights = attention_scores + attention_mask
-            attention_probs = F.softmax(attn_weights, axis=-1)
+            query_layer = query_layer.transpose([0, 2, 1, 3])
+            key_layer = key_layer.transpose([0, 2, 3, 1])
+            value_layer = value_layer.transpose([0, 2, 1, 3])
+            _, _, _, kv_length = key_layer.shape
 
-        # [batch_size, num_heads, q_length, kv_length]
-        attention_probs = self.attention_dropout(attention_probs)
+            query_layer = query_layer.reshape([batch_size * self.num_heads, q_length, self.head_dim])
+            key_layer = key_layer.reshape([batch_size * self.num_heads, self.head_dim, kv_length])
+            value_layer = value_layer.reshape([batch_size * self.num_heads, kv_length, self.head_dim])
 
-        if head_mask is not None:
-            attention_probs = attention_probs * head_mask
+            # [batch_size * num_heads, q_length, kv_length]
+            # alibi:[batch_size * num_heads, q_length, kv_length]
+            # we use `Tensor.baddbmm` instead of `paddle.baddbmm` as the latter isn't supported by TorchScript v1.11
+            attention_scores = baddbmm(
+                alibi, batch1=query_layer, batch2=key_layer, beta=self.beta, alpha=self.inv_norm_factor
+            )
+            # change view to [batch_size, num_heads, q_length, kv_length]
+            # attention_scores = matmul_result.reshape([batch_size, self.num_heads, q_length, kv_length])
 
-        # change view [batch_size x num_heads, q_length, kv_length]
-        attention_probs_reshaped = attention_probs.reshape([batch_size * self.num_heads, q_length, kv_length])
-
-        # matmul: [batch_size * num_heads, q_length, head_dim]
-        context_layer = paddle.matmul(attention_probs_reshaped, value_layer)
-
-        # change view [batch_size, num_heads, q_length, head_dim]
-        context_layer = self._merge_heads(context_layer)
-
-        # aggregate results across tp ranks. See here: https://github.com/pypaddle/pypaddle/issues/76232
-        if self.pretraining_tp > 1 and self.slow_but_exact:
-            slices = self.hidden_size / self.pretraining_tp
-            output_tensor = paddle.zeros_like(context_layer)
-            for i in range(self.pretraining_tp):
-                output_tensor = output_tensor + F.linear(
-                    context_layer[:, :, int(i * slices) : int((i + 1) * slices)],
-                    self.dense.weight[:, int(i * slices) : int((i + 1) * slices)],
+            # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
+            input_dtype = query_layer.dtype
+            # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
+            if input_dtype != paddle.float32:
+                attention_scores = paddle.cast(attention_scores, paddle.float32)
+                attn_weights = attention_scores + attention_mask
+                attention_probs = paddle.cast(
+                    F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype
                 )
-        else:
-            output_tensor = self.dense(context_layer)
+            else:
+                attn_weights = attention_scores + attention_mask
+                attention_probs = F.softmax(attn_weights, axis=-1)
+
+            # [batch_size, num_heads, q_length, kv_length]
+            attention_probs = self.attention_dropout(attention_probs)
+
+            if head_mask is not None:
+                attention_probs = attention_probs * head_mask
+
+            # change view [batch_size x num_heads, q_length, kv_length]
+            attention_probs_reshaped = attention_probs.reshape([batch_size * self.num_heads, q_length, kv_length])
+
+            # matmul: [batch_size * num_heads, q_length, head_dim]
+            context_layer = paddle.matmul(attention_probs_reshaped, value_layer)
+
+            # change view [batch_size, num_heads, q_length, head_dim]
+            context_layer = self._merge_heads(context_layer)
+
+            # aggregate results across tp ranks. See here: https://github.com/pypaddle/pypaddle/issues/76232
+            if self.pretraining_tp > 1 and self.slow_but_exact:
+                slices = self.hidden_size / self.pretraining_tp
+                output_tensor = paddle.zeros_like(context_layer)
+                for i in range(self.pretraining_tp):
+                    output_tensor = output_tensor + F.linear(
+                        context_layer[:, :, int(i * slices) : int((i + 1) * slices)],
+                        self.dense.weight[:, int(i * slices) : int((i + 1) * slices)],
+                    )
+            else:
+                output_tensor = self.dense(context_layer)
 
         output_tensor = dropout_add(output_tensor, residual, self.hidden_dropout, self.training)
 
@@ -905,14 +935,13 @@ class BloomModel(BloomPreTrainedModel):
         seq_length_with_past = seq_length
         past_key_values_length = 0
         if past_key_values[0] is not None:
-            past_key_values_length = past_key_values[0][0].shape[3]
+            past_key_values_length = past_key_values[0][0].shape[1]
             seq_length_with_past = seq_length_with_past + past_key_values_length
 
         if attention_mask is None:
             attention_mask = paddle.ones([batch_size, seq_length_with_past], dtype="bool")
         elif attention_mask.dtype != paddle.bool:
             attention_mask = paddle.cast(attention_mask, "bool")
-
         if len(attention_mask.shape) > 2:
             _attention_mask = paddle.ones([batch_size, seq_length_with_past], dtype="bool")
             alibi = build_alibi_tensor(_attention_mask, self.config.n_head, dtype=hidden_states.dtype)

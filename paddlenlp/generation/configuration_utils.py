@@ -179,6 +179,7 @@ class GenerationConfig:
         # Generation parameters exclusive to encoder-decoder models
         self.use_fast = kwargs.pop("use_fast", False)
         self.use_fp16_decoding = kwargs.pop("use_fp16_decoding", False)
+        self.fast_ptq_sampling = kwargs.pop("fast_ptq_sampling", False)
         self.decoder_start_token_id = kwargs.pop("decoder_start_token_id", None)
         self._from_model_config = kwargs.pop("_from_model_config", False)
         self.paddlenlp_version = kwargs.pop("paddlenlp_version", __version__)

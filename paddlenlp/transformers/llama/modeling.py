@@ -24,7 +24,9 @@ import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
 from paddle import Tensor, nn
+from paddle.autograd import PyLayer
 from paddle.distributed import fleet
+from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 
 try:
@@ -46,6 +48,7 @@ from paddlenlp.transformers.model_outputs import (
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 from paddlenlp.utils.log import logger
 
+from ..segment_parallel_utils import ReshardLayer
 from ..sequence_parallel_utils import (
     ColumnSequenceParallelLinear,
     GatherOp,
@@ -182,26 +185,53 @@ def scaled_dot_product_attention(
     output_attentions,
     alibi=None,
     sequence_parallel=False,
-    is_causal=True,
+    reshard_layer=None,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention:
-        # Flash Attention now ignore attention mask
-        # Current Flash Attention doesn't support attn maskt
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
-        if alibi is not None:
-            raise ValueError("Flash Attention does not support ALiBi yet")
 
-        attn_output, attn_weights = flash_attention(
-            query_states,
-            key_states,
-            value_states,
-            causal=is_causal and query_states.shape[1] != 1,
-            return_softmax=output_attentions,
-        )
+        version = paddle.version.full_version
+        if version != "0.0.0" and version <= "2.5.2":
+            if alibi is not None:
+                raise ValueError("Flash Attention doesn't support alibi")
+            attn_output, attn_weights = flash_attention(
+                query_states,
+                key_states,
+                value_states,
+                causal=True,
+                return_softmax=output_attentions,
+            )
+        else:
+            if alibi is not None:
+                alibi = alibi.reshape([bsz, num_heads, 1, -1])
+                attention_mask = attention_mask.cast(alibi.dtype) + alibi
+            attn_output = F.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=attention_mask,
+                is_causal=attention_mask is None,
+            )
+            attn_weights = None
+
+        if reshard_layer is not None:
+            # attn_output shape: [bs, seqlen, num_head/sep, head_dim]
+            attn_output = reshard_layer(
+                attn_output,
+                split_axis=1,
+                concat_axis=2,
+            )
+            # attn_output shape: [bs, seqlen/sep, num_head, head_dim]
+            assert (
+                config.sep_parallel_degree > 1 and q_len % config.sep_parallel_degree == 0
+            ), f"q_len:{q_len}, config.sep_parallel_degree:{config.sep_parallel_degree}"
+            q_len = q_len // config.sep_parallel_degree
+            num_heads = num_heads * config.sep_parallel_degree
+
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
@@ -227,12 +257,15 @@ def scaled_dot_product_attention(
                 f" {attn_weights.shape}"
             )
 
+        # In sep mode, the attenion mask should be created in the runtime.
+        if reshard_layer is not None:
+            attention_mask = None
+
         # NOTE: we only call get_triangle_upper_mask under PP setup
         # FIXME ZHUI when we use pipeline parallel, the attention_mask can be None
         # we just make it triangle_upper_mask
         if attention_mask is None:
             attention_mask = get_triangle_upper_mask(attn_weights)
-
         attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
         if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
             raise ValueError(
@@ -248,6 +281,16 @@ def scaled_dot_product_attention(
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
+
+        if reshard_layer is not None:
+            attn_output = reshard_layer(
+                attn_output,
+                split_axis=1,
+                concat_axis=2,
+            )
+            q_len = q_len // config.sep_parallel_degree
+            num_heads = num_heads * config.sep_parallel_degree
+
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
@@ -258,6 +301,13 @@ def scaled_dot_product_attention(
 def masked_fill(x, mask, value):
     y = paddle.full(x.shape, value, x.dtype)
     return paddle.where(mask, y, x)
+
+
+def is_casual_mask(attention_mask):
+    """
+    Upper triangular of attention_mask equals to attention_mask is casual
+    """
+    return (paddle.triu(attention_mask) == attention_mask).all().item()
 
 
 def _make_causal_mask(input_ids_shape, past_key_values_length):
@@ -365,9 +415,11 @@ class LlamaRotaryEmbedding(nn.Layer):
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
+        cos = self.cos_cached[:, :, :seq_len, ...]
+        sin = self.sin_cached[:, :, :seq_len, ...]
         return (
-            self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
-            self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
+            cos.cast(x.dtype) if cos.dtype != x.dtype else cos,
+            sin.cast(x.dtype) if sin.dtype != x.dtype else sin,
         )
 
 
@@ -427,15 +479,14 @@ class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
         # x: [bs, num_attention_heads, seq_len, head_size]
         if seq_len > self.max_position_embeddings:
             scale_cos, scale_sin = self._scale_cos_sin(seq_len=seq_len)
-            return (
-                scale_cos[:, :, :seq_len, ...].cast(x.dtype),
-                scale_sin[:, :, :seq_len, ...].cast(x.dtype),
-            )
         else:
-            return (
-                self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
-                self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
-            )
+            scale_cos, scale_sin = self.cos_cached, self.sin_cached
+        cos = scale_cos[:, :seq_len, :, ...]
+        sin = scale_sin[:, :seq_len, :, ...]
+        return (
+            cos.cast(x.dtype) if cos.dtype != x.dtype else cos,
+            sin.cast(x.dtype) if sin.dtype != x.dtype else sin,
+        )
 
 
 def rotate_half(x):
@@ -668,6 +719,12 @@ class LlamaAttention(nn.Layer):
         if config.rope:
             self._init_rope()
 
+        self.reshard_layer = None
+        if config.sep_parallel_degree > 1:
+            assert self.num_key_value_heads % config.sep_parallel_degree == 0
+            assert self.num_heads % config.sep_parallel_degree == 0
+            self.reshard_layer = ReshardLayer()
+
         self.config = config
 
     def _init_rope(self):
@@ -711,25 +768,79 @@ class LlamaAttention(nn.Layer):
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
 
         if self.fuse_attention_qkv:
-            if self.sequence_parallel:
-                target_shape = [-1, self.seq_length, self.num_heads, 3 * self.head_dim]
-            else:
-                target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
-
             mix_layer = self.qkv_proj(hidden_states)
-            mix_layer = paddle.reshape_(mix_layer, target_shape)
+            if self.reshard_layer is not None:
+                if self.sequence_parallel:
+                    assert self.seq_length % self.config.sep_parallel_degree == 0
+                    mix_layer = paddle.reshape_(
+                        mix_layer,
+                        [-1, self.seq_length // self.config.sep_parallel_degree, 3 * self.num_heads * self.head_dim],
+                    )
+                # [bs, seq_len / sep, num_head, head_dim] -> [bs, seq_len, num_head / sep, head_dim]
+                mix_layer = self.reshard_layer(
+                    mix_layer,
+                    split_axis=2,
+                    concat_axis=1,
+                )
+                mix_layer = paddle.reshape_(
+                    mix_layer, [0, self.seq_length, -1, 3 * self.head_dim]
+                )  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
+            else:
+                if self.sequence_parallel:
+                    target_shape = [-1, self.seq_length, self.num_heads, 3 * self.head_dim]
+                else:
+                    target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
+                mix_layer = paddle.reshape_(mix_layer, target_shape)
             query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
         else:
-            if self.sequence_parallel:
-                target_query_shape = [-1, self.seq_length, self.num_heads, self.head_dim]
-                target_key_value_shape = [-1, self.seq_length, self.num_key_value_heads, self.head_dim]
+            query_states = self.q_proj(hidden_states)
+            key_states = self.k_proj(hidden_states)
+            value_states = self.v_proj(hidden_states)
+            if self.reshard_layer is not None:
+                if self.sequence_parallel:
+                    assert self.seq_length % self.config.sep_parallel_degree == 0
+                    query_states = paddle.reshape(
+                        query_states,
+                        [-1, self.seq_length // self.config.sep_parallel_degree, self.num_heads * self.head_dim],
+                    )
+                    key_states = paddle.reshape(
+                        key_states,
+                        [-1, self.seq_length // self.config.sep_parallel_degree, self.num_heads * self.head_dim],
+                    )
+                    value_states = paddle.reshape(
+                        value_states,
+                        [-1, self.seq_length // self.config.sep_parallel_degree, self.num_heads * self.head_dim],
+                    )
+                query_states = self.reshard_layer(
+                    query_states,
+                    split_axis=2,
+                    concat_axis=1,
+                )
+                key_states = self.reshard_layer(
+                    key_states,
+                    split_axis=2,
+                    concat_axis=1,
+                )
+                value_states = self.reshard_layer(
+                    value_states,
+                    split_axis=2,
+                    concat_axis=1,
+                )
+                query_states = paddle.reshape(
+                    query_states, [0, self.seq_length, -1, self.head_dim]
+                )  # [bs, seq_len, num_head/k, head_dim], k is sep degree
+                key_states = paddle.reshape(key_states, [0, self.seq_length, -1, self.head_dim])
+                value_states = paddle.reshape(value_states, [0, self.seq_length, -1, self.head_dim])
             else:
-                target_query_shape = [0, 0, self.num_heads, self.head_dim]
-                target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
-
-            query_states = self.q_proj(hidden_states).reshape(shape=target_query_shape)
-            key_states = self.k_proj(hidden_states).reshape(shape=target_key_value_shape)
-            value_states = self.v_proj(hidden_states).reshape(shape=target_key_value_shape)
+                if self.sequence_parallel:
+                    target_query_shape = [-1, self.seq_length, self.num_heads, self.head_dim]
+                    target_key_value_shape = [-1, self.seq_length, self.num_key_value_heads, self.head_dim]
+                else:
+                    target_query_shape = [0, 0, self.num_heads, self.head_dim]
+                    target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
+                query_states = query_states.reshape(shape=target_query_shape)
+                key_states = key_states.reshape(shape=target_key_value_shape)
+                value_states = value_states.reshape(shape=target_key_value_shape)
 
         kv_seq_len = key_states.shape[-3]
 
@@ -737,6 +848,9 @@ class LlamaAttention(nn.Layer):
             kv_seq_len += past_key_value[0].shape[-3]
 
         if self.config.rope:
+            if self.reshard_layer is not None:
+                batch_size, seq_length, _, _ = query_states.shape
+                position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
@@ -787,6 +901,7 @@ class LlamaAttention(nn.Layer):
                 output_attentions,
                 alibi,
                 self.sequence_parallel,
+                reshard_layer=self.reshard_layer,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
@@ -799,6 +914,7 @@ class LlamaAttention(nn.Layer):
                 output_attentions,
                 alibi,
                 self.sequence_parallel,
+                reshard_layer=self.reshard_layer,
             )
         if output_attentions:
             attn_output, attn_weights = outputs
@@ -1029,6 +1145,8 @@ class LlamaPretrainedModel(PretrainedModel):
 
     def _init_weights(self, layer):
         """Initialization hook"""
+        if self.config.tensor_parallel_degree > 1:
+            rng_tracker = get_rng_state_tracker().rng_state
         if isinstance(
             layer,
             (
@@ -1045,15 +1163,27 @@ class LlamaPretrainedModel(PretrainedModel):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
-                layer.weight.set_value(
-                    paddle.tensor.normal(
-                        mean=0.0,
-                        std=self.config.initializer_range
-                        if hasattr(self.config, "initializer_range")
-                        else self.llama.config.initializer_range,
-                        shape=layer.weight.shape,
+                if layer.weight.is_distributed:
+                    with rng_tracker():
+                        layer.weight.set_value(
+                            paddle.tensor.normal(
+                                mean=0.0,
+                                std=self.config.initializer_range
+                                if hasattr(self.config, "initializer_range")
+                                else self.llama.config.initializer_range,
+                                shape=layer.weight.shape,
+                            )
+                        )
+                else:
+                    layer.weight.set_value(
+                        paddle.tensor.normal(
+                            mean=0.0,
+                            std=self.config.initializer_range
+                            if hasattr(self.config, "initializer_range")
+                            else self.llama.config.initializer_range,
+                            shape=layer.weight.shape,
+                        )
                     )
-                )
         # Layer.apply is DFS https://github.com/PaddlePaddle/Paddle/blob/a6f5021fcc58b21f4414bae6bf4731ef6971582c/python/paddle/nn/layer/layers.py#L527-L530
         # sublayer is init first
         # scale RowParallelLinear weight
@@ -1223,7 +1353,6 @@ class LlamaModel(LlamaPretrainedModel):
         if attention_mask is None:
             # [bs, seq_len]
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
-
         if self.config.alibi:
             alibi = build_alibi_tensor(attention_mask, self.config.num_attention_heads, dtype=inputs_embeds.dtype)
             if self.config.tensor_parallel_degree > 1:
@@ -1246,6 +1375,10 @@ class LlamaModel(LlamaPretrainedModel):
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
+        if self.config.use_flash_attention:
+            is_casual = is_casual_mask(attention_mask)
+            if is_casual and alibi is None:
+                attention_mask = None
         hidden_states = inputs_embeds
 
         # decoder layers
@@ -1346,11 +1479,36 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
 
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
+
+            if self.config.sep_parallel_degree > 1:
+                _hcg = fleet.get_hybrid_communicate_group()
+                masked_lm_loss = ConcatSePMaskedLoss.apply(masked_lm_loss, axis=1, group=_hcg.get_sep_parallel_group())
             # skip ignore_index which loss == 0
             masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
             loss = paddle.mean(masked_lm_loss)
 
         return loss
+
+
+class ConcatSePMaskedLoss(PyLayer):
+    @staticmethod
+    def forward(ctx, inp, axis, group):
+        inputs = []
+        paddle.distributed.all_gather(inputs, inp, group=group)
+        with paddle.no_grad():
+            cat = paddle.concat(inputs, axis=axis)
+        ctx.args_axis = axis
+        ctx.args_group = group
+        return cat
+
+    @staticmethod
+    def backward(ctx, grad):
+        axis = ctx.args_axis
+        group = ctx.args_group
+        with paddle.no_grad():
+            grads = paddle.split(grad, paddle.distributed.get_world_size(group), axis=axis)
+        grad = grads[paddle.distributed.get_rank(group)]
+        return grad
 
 
 class LlamaLMHead(nn.Layer):
@@ -1374,7 +1532,11 @@ class LlamaLMHead(nn.Layer):
     def forward(self, hidden_states, tensor_parallel_output=None):
         if self.config.sequence_parallel:
             hidden_states = GatherOp.apply(hidden_states)
-            hidden_states = paddle.reshape_(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
+            seq_length = self.config.seq_length
+            if self.config.sep_parallel_degree > 1:
+                assert seq_length % self.config.sep_parallel_degree == 0
+                seq_length = seq_length // self.config.sep_parallel_degree
+            hidden_states = paddle.reshape_(hidden_states, [-1, seq_length, self.config.hidden_size])
 
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
@@ -1485,7 +1647,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
         outputs = self.llama(
             input_ids,  # [bs, seq_len]
             position_ids=position_ids,

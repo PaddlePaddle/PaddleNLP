@@ -29,7 +29,8 @@ from sklearn.metrics import accuracy_score
 from paddlenlp.datasets import InTokensIterableDataset
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
-from paddlenlp.transformers import LlamaForCausalLMPipe
+from paddlenlp.transformers import ChatGLMv2Tokenizer, LlamaForCausalLMPipe
+from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -391,17 +392,25 @@ def dybatch_preprocess(
     architectures: str,
     top_p: float,
     temperature: float,
+    eos_token_id: int | list[list[int]],
     pre_caches_length: int = 0,
     benchmark: bool = False,
 ):
     """Pre-process generation inputs."""
     inputs = {}
-    if "chatglm" in architectures:
+    if "chatglmforcausallm" == architectures.lower():
         input_ids = []
         position_ids = []
 
         for text in texts:
-            tokens = tokenizer(text, return_tensors="np", padding=True, max_length=src_length)
+            tokens = tokenizer(
+                text,
+                return_tensors="np",
+                padding=True,
+                max_length=src_length,
+                # if use chat_template, it will not add special_tokens
+                add_special_tokens=tokenizer.chat_template is None or isinstance(tokenizer, ChatGLMv2Tokenizer),
+            )
             input_ids.append(tokens["input_ids"][0])
             position_ids.append(tokens["position_ids"][0])
 
@@ -477,16 +486,12 @@ def dybatch_preprocess(
         0,
     ] * bs
     tgt_pos = np.array(tgt_pos).astype("int64")
-    inputs["eos_token_id"] = (
-        np.array(
-            [
-                tokenizer.eos_token_id,
-            ]
-            * bs
-        )
-        .reshape(-1, 1)
-        .astype("int64")
-    )
+
+    if isinstance(eos_token_id, int):
+        eos_token_id = [eos_token_id]
+
+    inputs["eos_token_id"] = np.array(eos_token_id * bs).reshape(-1, 1).astype("int64")
+
     inputs["top_p"] = (
         np.array(
             [
@@ -585,3 +590,50 @@ def load_real_time_tokens():
     os.system("rm -f ./real_time_save.temp_ids_rank_*")
     tokens = np.concatenate(tokens, axis=1)
     return tokens
+
+
+def init_chat_template(
+    tokenizer: PretrainedTokenizer, model_name_or_path: str, chat_template_file: Optional[str] = None
+):
+    """init chat template for the given tokenizer.
+
+        If is None, it will not use `chat_template.json`;
+        If is equal with `model_name_or_path`, it will use the default loading;
+        If is directory, it will find the `chat_template.json` under the directory;
+        If is file, it will load it.
+
+    Args:
+        tokenizer (PretrainedTokenizer): the instance of tokenizer
+        model_name_or_path (str): _description_
+        chat_template_file (Optional[str], optional): _description_. Defaults to None.
+    """
+    # 1. use the default chat_template file
+    if chat_template_file is None:
+        return
+
+    if str(chat_template_file).lower() == "none":
+        # delete the chat_template from tokenizer if not use chat_template.
+        # why do this: it will load the `chat_template.json` file by default
+        tokenizer.chat_template = None
+        return
+
+    # it will load the `chat_template.json` file by default, so do nothing
+    if chat_template_file == model_name_or_path:
+        if tokenizer.chat_template is None:
+            logger.warning(f"there is not `chat_template.json` file in the `{model_name_or_path}`")
+        return
+
+    if os.path.isdir(chat_template_file):
+        local_chat_template_file_path = os.path.join(chat_template_file, "chat_template.json")
+        if os.path.exists(local_chat_template_file_path):
+            chat_template_file = local_chat_template_file_path
+        else:
+            logger.warning(f"there is not `chat_template.json` file in the `{model_name_or_path}`")
+            return
+
+    if not os.path.exists(chat_template_file):
+        logger.warning(f"there is not `chat_template.json` file from path<`{model_name_or_path}`>")
+        return
+
+    logger.info(f"loading `chat_template.json` from `{chat_template_file}`")
+    tokenizer.init_chat_template(chat_template_file)

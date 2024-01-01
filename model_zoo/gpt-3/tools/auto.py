@@ -51,7 +51,7 @@ if __name__ == "__main__":
             "step_each_epoch": len(train_data),
         }
     )
-
+    dist.auto_parallel.parallel_manual_seed(cfg.Global.seed)
     engine = AutoEngine(configs=cfg, module=module)
 
     if cfg.Engine.save_load.ckpt_dir is not None:
