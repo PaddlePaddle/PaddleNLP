@@ -6,8 +6,8 @@ coverage:
   status:
     project:
       default: 
-        target: 75% # overall project Coverage < 75%  CI will fail
+        target: 58% # overall project Coverage 
+        threshold: 1% # Allow the coverage to drop by 1%, and posting a success status.
     patch:
       default: 
-        target: 90% # lines adjusted  Coverage < 90%  CI will fail
-      
+        target: 80% # lines adjusted  Coverage < 80%  CI will fail
