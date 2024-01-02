@@ -826,8 +826,8 @@ class TrainerMemoryTracker:
             return
 
         if hasattr(self, "gpu_mem_used_peak"):
-            metrics["gpu_mem_max_memory_allocated"] = self.gpu_mem_used_peak >> 20
-            metrics["gpu_mem_max_memory_reserved"] = self.paddle.device.cuda.max_memory_reserved() >> 20
+            metrics["gpu_mem_max_memory_allocated"] = self.gpu_mem_used_peak
+            metrics["gpu_mem_max_memory_reserved"] = self.paddle.device.cuda.max_memory_reserved()
 
         # since we don't have a way to return init metrics, we push them into the first of train/val/predict
         stages = [stage]
