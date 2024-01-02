@@ -17,8 +17,12 @@ import paddle.nn as nn
 from paddle.distributed.fleet.base import topology as tp
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
-from paddle.nn.quant import llm_int8_linear, weight_only_linear
 
+try:
+    from paddle.nn.quant import llm_int8_linear, weight_only_linear
+except:
+    llm_int8_linear = None
+    weight_only_linear = None
 try:
     from .qlora import qlora_weight_linear
 except:

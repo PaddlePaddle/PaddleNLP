@@ -77,7 +77,11 @@ from ..data import (
     default_data_collator,
 )
 from ..peft import LoRAModel, PrefixModelForCausalLM
-from ..quantization.quantization_linear import QuantizationLinear
+
+try:
+    from ..quantization.quantization_linear import QuantizationLinear
+except:
+    QuantizationLinear = None
 from ..transformers.model_utils import (
     PretrainedModel,
     _add_variant,
