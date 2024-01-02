@@ -59,13 +59,15 @@ def main():
     # Arguments
     parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
     json_indices = [index for index, string in enumerate(sys.argv) if string.endswith(".json")]
-    if(len(json_indices)>=2):
+    if len(json_indices) >= 2:
         raise ValueError("Only support one file in json format at most, please check the command line parameters.")
-    elif(len(json_indices)==0):
+    elif len(json_indices) == 0:
         gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     else:
         json_file_idx = json_indices[0]
-        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines(json_file_idx)
+        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines(
+            json_file_idx
+        )
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")

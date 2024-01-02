@@ -18,8 +18,8 @@
 
 import dataclasses
 import json
-import sys
 import os
+import sys
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, ArgumentTypeError
 from copy import copy
 from enum import Enum
@@ -247,32 +247,40 @@ class PdArgumentParser(ArgumentParser):
             obj = dtype(**inputs)
             outputs.append(obj)
         return (*outputs,)
+
     def parse_json_file_and_cmd_lines(self, json_file_idx: int) -> Tuple[DataClass, ...]:
         """
-        This method extends the functionality of `parse_json_file` by adding the ability to handle command line arguments
-        in addition to loading a JSON file. 
-        Parameters:
-        json_file_idx (int): The index of the JSON file argument in the command line arguments array. This index is used
-        to identify the JSON file path from the command line arguments.
+        Extend the functionality of `parse_json_file` to handle command line arguments in addition to loading a JSON
+        file.
+
+        This method combines data from a JSON file and command line arguments to populate instances of dataclasses.
+        The JSON file is identified using its index in the command line arguments array.
+
+        Args:
+            json_file_idx :
+                The index of the JSON file argument within the command line arguments array.
+                This index is used to locate and extract the JSON file path from the command line arguments.
+
         Returns:
-        Tuple[DataClass, ...]: A tuple of dataclass instances, populated with the combined data from the JSON file and 
-        the command line arguments.
+            Tuple consisting of:
+
+                - the dataclass instances in the same order as they were passed to the initializer.abspath
         """
-        json_file =os.path.abspath(sys.argv[json_file_idx])
+        json_file = os.path.abspath(sys.argv[json_file_idx])
         json_args = json.loads(Path(json_file).read_text())
         del sys.argv[json_file_idx]
-        output_dir_arg = next((arg for arg in sys.argv if arg == '--output' or arg.startswith('--output=')), None)
+        output_dir_arg = next((arg for arg in sys.argv if arg == "--output" or arg.startswith("--output=")), None)
         if output_dir_arg is None:
-            if 'output_dir' in json_args.keys():
-                sys.argv.extend(['--output_dir', json_args['output_dir']])
+            if "output_dir" in json_args.keys():
+                sys.argv.extend(["--output_dir", json_args["output_dir"]])
             else:
                 raise ValueError("The following arguments are required: --output_dir")
         cmd_args = vars(self.parse_args())
         merged_args = {}
         for key in json_args.keys() | cmd_args.keys():
-            if any(arg == f'--{key}' or arg.startswith(f'--{key}=') for arg in sys.argv):
+            if any(arg == f"--{key}" or arg.startswith(f"--{key}=") for arg in sys.argv):
                 merged_args[key] = cmd_args.get(key)
-            elif(json_args.get(key)):
+            elif json_args.get(key):
                 merged_args[key] = json_args.get(key)
         outputs = []
         for dtype in self.dataclass_types:
@@ -281,6 +289,7 @@ class PdArgumentParser(ArgumentParser):
             obj = dtype(**inputs)
             outputs.append(obj)
         return (*outputs,)
+
     def parse_dict(self, args: dict) -> Tuple[DataClass, ...]:
         """
         Alternative helper method that does not use `argparse` at all, instead uses a dict and populating the dataclass

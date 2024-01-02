@@ -373,9 +373,9 @@ class PretrainingTrainer(Trainer):
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
     json_indices = [index for index, string in enumerate(sys.argv) if string.endswith(".json")]
-    if(len(json_indices)>=2):
+    if len(json_indices) >= 2:
         raise ValueError("Only support one file in json format at most, please check the command line parameters.")
-    elif(len(json_indices)==0):
+    elif len(json_indices) == 0:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     else:
         json_file_idx = json_indices[0]
