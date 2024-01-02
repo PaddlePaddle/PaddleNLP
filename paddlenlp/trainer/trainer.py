@@ -1611,15 +1611,13 @@ class Trainer:
         # Mixed precision training
         if training and self.do_grad_scaling:  # self.args.fp16_opt_level=="O2":
             # model, self.optimizer
-            if self.amp_dtype == "bfloat16":
-                # fix for paddlepaddle < 2.4.1, not support for bf16
-                decorated = paddle.amp.decorate(
-                    models=model, optimizers=self.optimizer, level=self.args.fp16_opt_level, dtype=self.amp_dtype
-                )
-            else:
-                decorated = paddle.amp.decorate(
-                    models=model, optimizers=self.optimizer, level=self.args.fp16_opt_level
-                )
+            decorated = paddle.amp.decorate(
+                models=model,
+                optimizers=self.optimizer,
+                level=self.args.fp16_opt_level,
+                dtype=self.amp_dtype,
+                excluded_layers=QuantizationLinear,
+            )
 
             if self.optimizer is None:
                 model = decorated

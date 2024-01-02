@@ -109,7 +109,7 @@ class QuantizationLoRALinear(QuantizationLinear):
         self.weight = None
         self.scaling = self.lora_alpha / self.r
 
-    def init_weight(self):
+    def init_float_weight(self):
         self.weight = self.create_parameter(
             shape=[self.in_features, self.out_features],
             dtype=self._dtype,
@@ -148,7 +148,7 @@ class QuantizationLoRALinear(QuantizationLinear):
         super().eval()
         if self.merge_weights and not self.merged:
             if self.weight is None:
-                self.init_weight()
+                self.init_float_weight()
             # Merge the weights and mark it
             new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
@@ -157,7 +157,7 @@ class QuantizationLoRALinear(QuantizationLinear):
     def forward(self, x: paddle.Tensor):
         if self.merge_weights:
             if self.weight is None:
-                self.init_weight()
+                self.init_float_weight()
             result = paddle.nn.functional.linear(x, self.weight, self.bias)
         else:
             result = super().forward(x)
