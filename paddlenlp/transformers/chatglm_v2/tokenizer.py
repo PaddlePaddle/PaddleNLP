@@ -311,9 +311,9 @@ class ChatGLMv2Tokenizer(PretrainedTokenizer):
 
         return encoded_inputs
 
-    def encode_chat_inputs(self, conversations: List[List[str, str]]):
+    def encode_chat_inputs(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}):
         # encode system
-        result = super().encode_chat_inputs(conversations)
+        result = super().encode_chat_inputs(conversations, context_data=context_data)
         if "system" in result:
             result["system"] = self.get_prefix_tokens() + result["system"]
         else:

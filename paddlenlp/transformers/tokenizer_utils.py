@@ -649,13 +649,14 @@ class ChatTemplateMixin:
         tokenizer_kwargs["add_special_tokens"] = False
         return self(query, **tokenizer_kwargs)
 
-    def encode_chat_inputs(self, conversations: List[List[str, str]]):
+    def encode_chat_inputs(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}):
         """Encodes conversation to pairs of token ids.
         Turn 0: bos + system + sep + user     bot + eos
         Turn t: sep + bot + query             bot + eos
 
         Args:
             conversation (List[List[str, str]]): the conversation of data
+            context_data (Dict[str, Any]): the context data of conversation
 
         Returns:
             List[list[int], list[int]]: the pair of input_ids and target_ids
@@ -663,7 +664,8 @@ class ChatTemplateMixin:
         # encode system
         result = {}
         if self.chat_template.system:
-            result["system"] = self.encode(self.chat_template.system, add_special_tokens=False)["input_ids"]
+            system = self.chat_template.render_system(context_data)
+            result["system"] = self.encode(system, add_special_tokens=False)["input_ids"]
 
         # encode conversation
         conversation_ids = []
