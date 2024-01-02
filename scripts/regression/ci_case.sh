@@ -234,116 +234,7 @@ time (python -u ./run_pretrain.py \
     --device gpu >${log_path}/electra_pretrain) >>${log_path}/electra_pretrain 2>&1
 print_info $? electra_pretrain
 }
-fast_gpt(){
-# FT
-cd ${nlp_dir}/
-export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-wget -q https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-TagBuild-Infer-Linux-Gpu-Cuda120-Cudnn89-Trt86-Mkl-Avx-Gcc122/latest/paddle_inference.tgz
-tar -zxf paddle_inference.tgz
-cd ${nlp_dir}/paddlenlp/ops
-#python
-mkdir build_gpt_so
-cd build_gpt_so/
-cmake ..  -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=${C_COMPILER_PATH} -DCMAKE_CXX_COMPILER=${CXX_COMPILER_PATH} \
--DPADDLE_LIB=${nlp_dir}/paddle_inference/ -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/gpt.cc \
--DPY_CMD=python -DWITH_GPT=ON -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
-make -j >${log_path}/GPT_python_FT >>${log_path}/gpt_python_FT 2>&1
-print_info $? gpt_python_FT
-cd ../
-#c++
-mkdir build_gpt_cc
-cd build_gpt_cc/
-cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=${C_COMPILER_PATH} -DCMAKE_CXX_COMPILER=${CXX_COMPILER_PATH} \
--DPADDLE_LIB=${nlp_dir}/paddle_inference/ -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/gpt.cc \
--DWITH_GPT=ON -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
-make -j >${log_path}/GPT_C_FT >>${log_path}/gpt_C_FT 2>&1
-print_info $? gpt_C_FT
-#depoly python
-cd ${nlp_dir}/model_zoo/gpt/fast_gpt/
-python infer.py \
-    --model_name_or_path gpt2-medium-en \
-    --batch_size 1 \
-    --topk 4 \
-    --topp 0.0 \
-    --max_length 32 \
-    --start_token "<|endoftext|>" \
-    --end_token "<|endoftext|>" \
-    --temperature 1.0  >${log_path}/gpt_deploy_P_FT >>${log_path}/gpt_deploy_P_FT 2>&1
-print_info $? gpt_deploy_P_FT
-#depoly C++
-python export_model.py \
-    --model_name_or_path gpt2-medium-en \
-    --decoding_lib ${nlp_dir}/paddlenlp/ops/build_gpt_so/lib/libdecoding_op.so \
-    --topk 4 \
-    --topp 0.0 \
-    --max_out_len 32 \
-    --temperature 1.0 \
-    --inference_model_dir ./infer_model/
-mv infer_model/ ${nlp_dir}/paddlenlp/ops/build_gpt_cc/bin/
-cd ${nlp_dir}/paddlenlp/ops/build_gpt_cc/bin/
-./gpt -batch_size 1 -gpu_id 0 -model_dir ./infer_model -vocab_file ./infer_model/vocab.txt -start_token "<|endoftext|>" -end_token "<|endoftext|>"  >${log_path}/gpt_deploy_C_FT >>${log_path}/gpt_deploy_C_FT 2>&1
-print_info $? gpt_deploy_C_FT
-}
-# 8 gpt
-gpt(){
-cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
-sed -i "s/python3/python/g" Makefile
-sed -i "s/python-config/python3.7m-config/g" Makefile
-#pretrain
-cd ${nlp_dir}/model_zoo/gpt/
-mkdir data
-cd ./data
-wget -q https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
-wget -q https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
-cd ../
 
-time (python run_pretrain_trainer.py \
-    --model_type "gpt" \
-    --model_name_or_path "gpt2-en" \
-    --tokenizer_name_or_path "gpt2-en" \
-    --input_dir "${nlp_dir}/model_zoo/gpt/data" \
-    --output_dir "output" \
-    --split 949,50,1 \
-    --max_seq_length 1024 \
-    --per_device_train_batch_size 8 \
-    --per_device_eval_batch_size 8 \
-    --fp16  \
-    --fp16_opt_level "O2"  \
-    --learning_rate 0.0001 \
-    --min_learning_rate 0.00001 \
-    --max_steps 10 \
-    --save_steps 5 \
-    --weight_decay 0.01 \
-    --warmup_ratio 0.01 \
-    --max_grad_norm 1.0 \
-    --logging_steps 1 \
-    --dataloader_num_workers 1 \
-    --eval_steps 5 \
-    --report_to "visualdl" \
-    --disable_tqdm true \
-    --do_train \
-    --do_eval \
-    --device "gpu" >${log_path}/gpt_pretrain) >>${log_path}/gpt_pretrain 2>&1
-print_info $? gpt_pretrain
-time (python export_model.py --model_type=gpt \
-    --model_path "gpt2-medium-en" \
-    --output_path ${nlp_dir}/model_zoo/gpt/infer_model/model >${log_path}/gpt_export) >>${log_path}/gpt_export 2>&1
-print_info $? gpt_export
-time (python deploy/python/inference.py \
-    --model_type "gpt" \
-    --model_path ${nlp_dir}/model_zoo/gpt/infer_model/model >${log_path}/gpt_p_depoly) >>${log_path}/gpt_p_depoly 2>&1
-print_info $? gpt_p_depoly
-
-# echo 'run gpt test with pytest'
-# cd ${nlp_dir}
-# python -m pytest ./tests/model_zoo/test_gpt.py >${log_path}/gpt >>${log_path}/gpt 2>&1
-# print_info $? gpt
-
-fast_gpt
-cd ${nlp_dir}/fast_generation/samples
-python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
-print_info $? fast_generation_gpt
-}
 # 9 ernie
 ernie(){
 #data process
@@ -1208,5 +1099,17 @@ ernie_doc(){
 
 ernie_health(){
     ernie-health
+}
+
+segment_parallel_utils(){
+cd ${nlp_dir}
+echo "test segment_parallel_utils, cudaid1:${cudaid1}, cudaid2:${cudaid2}"
+if [[ ${cudaid1} != ${cudaid2} ]]; then
+    time (python -m paddle.distributed.launch tests/transformers/test_segment_parallel_utils.py >${log_path}/segment_parallel_utils) >>${log_path}/segment_parallel_utils 2>&1
+    print_info $? segment_parallel_utils
+else
+    echo "only one gpu:${cudaid1} is set, skip test"
+fi
+
 }
 $1

@@ -117,16 +117,29 @@ def main():
             raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
         from paddlenlp.transformers import AutoModelForCausalLMPipe
 
-        model = AutoModelForCausalLMPipe.from_pretrained(
-            model_args.model_name_or_path,
-            tensor_parallel_output=False,
-            tensor_parallel_degree=training_args.tensor_parallel_degree,
-            tensor_parallel_rank=training_args.tensor_parallel_rank,
-            use_flash_attention=model_args.use_flash_attention,
-            dtype=dtype,
-            from_aistudio=model_args.from_aistudio,
-            quantization_config=quantization_config,
-        )
+        if not training_args.autotuner_benchmark:
+            model = AutoModelForCausalLMPipe.from_pretrained(
+                model_args.model_name_or_path,
+                tensor_parallel_output=False,
+                tensor_parallel_degree=training_args.tensor_parallel_degree,
+                tensor_parallel_rank=training_args.tensor_parallel_rank,
+                use_flash_attention=model_args.use_flash_attention,
+                dtype=dtype,
+                from_aistudio=model_args.from_aistudio,
+                quantization_config=quantization_config,
+            )
+        else:
+            # NOTE(gongenlei): new add autotuner_benchmark
+            model_config = AutoConfig.from_pretrained(
+                model_args.model_name_or_path,
+                tensor_parallel_output=False,
+                tensor_parallel_degree=training_args.tensor_parallel_degree,
+                tensor_parallel_rank=training_args.tensor_parallel_rank,
+                dtype=dtype,
+                from_aistudio=model_args.from_aistudio,
+                quantization_config=quantization_config,
+            )
+            model = AutoModelForCausalLMPipe.from_config(model_config, dtype=dtype)
     else:
         model_config = AutoConfig.from_pretrained(
             model_args.model_name_or_path,
@@ -139,11 +152,16 @@ def main():
         )
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
-        model = AutoModelForCausalLM.from_pretrained(
-            model_args.model_name_or_path,
-            config=model_config,
-            from_aistudio=model_args.from_aistudio,
-        )
+
+        if not training_args.autotuner_benchmark:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_args.model_name_or_path,
+                config=model_config,
+                from_aistudio=model_args.from_aistudio,
+            )
+        else:
+            # NOTE(gongenlei): new add autotuner_benchmark
+            model = AutoModelForCausalLM.from_config(model_config, dtype=dtype)
     if training_args.do_train and model_args.neftune:
         # Inspired by https://github.com/neelsjain/NEFTune
         if hasattr(model, "get_input_embeddings"):
@@ -304,24 +322,26 @@ def main():
     else:
         trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
 
-    if data_args.intokens:
+    if data_args.zero_padding:
         if (
             model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2", "qwen"]
             and training_args.pipeline_parallel_degree < 1
         ):
             raise NotImplementedError(
-                "InTokens data stream is only implemented for LLaMA, Bloom, ChatGLM and QWen so far."
+                "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM and QWen so far."
             )
     train_ds = (
-        train_ds.map(partial(trans_func, is_test=False, intokens=data_args.intokens)) if train_ds is not None else None
+        train_ds.map(partial(trans_func, is_test=False, intokens=data_args.zero_padding))
+        if train_ds is not None
+        else None
     )
     ptq_ds = (
-        ptq_ds.map(partial(trans_func, is_test=False, intokens=data_args.intokens)) if ptq_ds is not None else None
+        ptq_ds.map(partial(trans_func, is_test=False, intokens=data_args.zero_padding)) if ptq_ds is not None else None
     )
-    eval_intokens = data_args.intokens
-    if data_args.intokens and data_args.eval_with_do_generation:
+    eval_intokens = data_args.zero_padding
+    if data_args.zero_padding and data_args.eval_with_do_generation:
         logger.warning(
-            "`intokens` conflicts with `eval_with_do_generation`. Setting intokens to False for the eval_dataset."
+            "`zero_padding` conflicts with `eval_with_do_generation`. Setting zero_padding to False for the eval_dataset."
         )
         eval_intokens = False
     dev_ds = (
@@ -329,12 +349,12 @@ def main():
         if dev_ds is not None
         else None
     )
-    if data_args.intokens:
+    if data_args.zero_padding:
         if data_args.lazy:
             intoken_dataset = InTokensIterableDataset
         else:
             intoken_dataset = InTokensMapDataset
-        logger.info("Creating InTokens Data Stream. This may take a few minutes.")
+        logger.info("Creating Zero Padding Data Stream. This may take a few minutes.")
         train_ds = (
             intoken_dataset(
                 train_ds,
@@ -396,6 +416,8 @@ def main():
                 merge_weights=False,
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 dtype=dtype,
+                do_qat=quant_args.do_qat,
+                base_model_name_or_path=model_args.model_name_or_path,
             )
             model = LoRAModel(model, lora_config)
         else:
@@ -434,8 +456,14 @@ def main():
         }
 
     # Create trainer
-    max_length = data_args.max_length if training_args.pipeline_parallel_degree > 1 else None
-    padding = "max_length" if training_args.pipeline_parallel_degree > 1 else True
+    max_length = (
+        data_args.max_length
+        if training_args.pipeline_parallel_degree > 1 or training_args.autotuner_benchmark
+        else None
+    )  # NOTE(gongenlei): new add autotuner_benchmark
+    padding = (
+        "max_length" if training_args.pipeline_parallel_degree > 1 or training_args.autotuner_benchmark else True
+    )  # NOTE(gongenlei): new add autotuner_benchmark
     if training_args.pipeline_parallel_degree > 1:
         metrics = None
     elif data_args.eval_with_do_generation:
@@ -505,10 +533,11 @@ def main():
                     **kwargs,
                 )
 
-            trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
-            trainer.log_metrics("train", train_result.metrics)
-            trainer.save_metrics("train", train_result.metrics)
-            trainer.save_state()
+            if not training_args.autotuner_benchmark:
+                trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
+                trainer.log_metrics("train", train_result.metrics)
+                trainer.save_metrics("train", train_result.metrics)
+                trainer.save_state()
 
     # QAT
     if quant_args.do_qat:
@@ -527,7 +556,13 @@ def main():
             raise NotImplementedError(
                 "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
             )
-        from quant import apply_ptq, apply_shift, apply_smooth, get_ptq_model_config
+        from quant import (
+            apply_autoclip,
+            apply_ptq,
+            apply_shift,
+            apply_smooth,
+            get_ptq_model_config,
+        )
 
         trainer.model.eval()
         trainer.model.config.quantization_config.quant_type = quant_args.quant_type
@@ -545,6 +580,9 @@ def main():
 
         if quant_args.smooth:
             apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config)
+
+        if quant_args.auto_clip:
+            apply_autoclip(quant_args, trainer, ptq_dataloader)
 
         apply_ptq(quant_args, trainer, ptq_dataloader)
         trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)

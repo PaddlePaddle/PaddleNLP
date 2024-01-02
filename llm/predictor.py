@@ -75,6 +75,10 @@ class PredictorArgument:
             "help": "the decoding strategy of generation, which should be one of ['sampling', 'greedy_search', 'beam_search']. Default to sampling"
         },
     )
+    use_flash_attention: bool = field(
+        default=False,
+        metadata={"help": "Whether to use flash attention"},
+    )
 
     mode: str = field(
         default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
@@ -241,6 +245,7 @@ class DygraphPredictor(BasePredictor):
         if self.model is None:
             self.model = AutoModelForCausalLM.from_pretrained(
                 config.model_name_or_path,
+                use_flash_attention=config.use_flash_attention,
                 dtype=dtype,
                 tensor_parallel_degree=self.tensor_parallel_degree,
                 tensor_parallel_rank=self.tensor_parallel_rank,
@@ -375,13 +380,11 @@ class InferencePredictorMixin:
                 dtype=self.dtype,
             )
 
-        self.tgt_generation_mask = paddle.zeros(
+        self.tgt_generation_mask = paddle.ones(
             shape=[config.batch_size, 1, 1, config.total_max_length],
             dtype=self.dtype,
         )
-        self.arange_tensor_encoder = paddle.zeros(
-            shape=(config.batch_size, 1, config.total_max_length), dtype=self.dtype
-        )
+        self.arange_tensor_encoder = paddle.arange(config.total_max_length, dtype=self.dtype)
 
         if config.export_precache:
             if config.prefix_path:
@@ -427,7 +430,7 @@ class InferencePredictorMixin:
 
     def _preprocess(self, source):
         self.attention_mask[:] = 0
-        self.tgt_generation_mask[:] = 0
+        self.tgt_generation_mask[:] = 1
         pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
 
         if self.tokenizer.chat_template is not None:
@@ -468,15 +471,6 @@ class InferencePredictorMixin:
                         [prefix_attention_mask, post_attention_mask], axis=2
                     )
 
-                if self.config.prefix_path is None:
-                    self.tgt_generation_mask[i, 0, 0, pre_caches_length : length + pre_caches_length] = paddle.ones(
-                        shape=[1, length], dtype=self.config.dtype
-                    )
-                else:
-                    self.tgt_generation_mask[i, 0, 0, : length + pre_caches_length] = paddle.ones(
-                        shape=[1, length + pre_caches_length], dtype=self.config.dtype
-                    )
-
             inputs["tgt_pos"] = self.tgt_pos
         elif "bloom" in self.architectures:
             for i in range(inputs["input_ids"].shape[0]):
@@ -496,20 +490,13 @@ class InferencePredictorMixin:
                     self.attention_mask[i, :, :length, : length + pre_caches_length] = paddle.concat(
                         [prefix_attention_mask, post_attention_mask], axis=2
                     )
-                self.arange_tensor_encoder[i, :, : length + pre_caches_length] = paddle.arange(
-                    length + pre_caches_length
-                ).astype(self.config.dtype)
 
-                self.tgt_generation_mask[i, :, 0, : length + pre_caches_length] = paddle.ones(
-                    shape=[1, length + pre_caches_length], dtype=self.config.dtype
-                )
             inputs["tgt_pos"] = inputs["tgt_pos"] + pre_caches_length
             # alibi encoder
             alibi_slopes = get_alibi_slopes(self.model_config.n_head)
             inputs["position_ids"] = paddle.to_tensor(alibi_slopes, dtype="float32")
 
-            alibi = alibi_slopes[..., None] * self.arange_tensor_encoder
-            alibi = alibi[:, :, None, :]
+            alibi = alibi_slopes[None, :, None, None] * self.arange_tensor_encoder
 
             if self.model_config.tensor_parallel_degree > 1:
                 block_size = self.model_config.n_head // self.model_config.tensor_parallel_degree
@@ -534,6 +521,9 @@ class InferencePredictorMixin:
                     self.config.total_max_length,
                 ]
             )
+            # only generate valid encoder attention mask, other place set 0.
+            alibi_encoder[i, :, length:, length:] = 0
+
             alibi_decoder = alibi.expand(
                 [
                     self.config.batch_size,
@@ -570,15 +560,6 @@ class InferencePredictorMixin:
                     ).unsqueeze_(axis=0)
                     self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
                         [prefix_attention_mask, post_attention_mask], axis=2
-                    )
-
-                if self.config.prefix_path is None:
-                    self.tgt_generation_mask[i, 0, 0, pre_caches_length : length + pre_caches_length] = paddle.ones(
-                        shape=[1, length], dtype="float16"
-                    )
-                else:
-                    self.tgt_generation_mask[i, 0, 0, : length + pre_caches_length] = paddle.ones(
-                        shape=[1, length + pre_caches_length], dtype=self.config.dtype
                     )
 
         inputs["pre_ids"] = self.pre_ids
@@ -679,7 +660,7 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
         model: PretrainedModel = None,
         tokenizer: PretrainedTokenizer = None,
     ):
-        self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size)
+        self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size, config.total_max_length)
         BasePredictor.__init__(self, config, tokenizer)
         InferencePredictorMixin.__init__(self, config, tokenizer)
         self.model = model
@@ -709,7 +690,9 @@ def create_predictor(
     tensor_parallel_degree: int = 1,
     tensor_parallel_rank: int = 0,
 ):
-    tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(
+        predictor_args.model_name_or_path,
+    )
     # init chat_template for tokenizer
     init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
 
@@ -751,6 +734,7 @@ def create_predictor(
                 model = AutoModelForCausalLM.from_pretrained(
                     predictor_args.model_name_or_path,
                     dtype=predictor_args.dtype,
+                    use_flash_attention=predictor_args.use_flash_attention,
                     tensor_parallel_degree=tensor_parallel_degree,
                     tensor_parallel_rank=tensor_parallel_rank,
                 )

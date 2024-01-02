@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import math
 import os
 import re
@@ -40,13 +41,14 @@ from .lora_config import LoRAConfig
 from .lora_layers import (
     ColumnParallelLoRALinear,
     ColumnParallelLoRAMergedLinear,
+    LoRAConv2D,
     LoRALinear,
     LoRAMergedLinear,
     RowParallelLoRALinear,
 )
 
 try:
-    from ...utils.quantization import (
+    from ...quantization.quantization_linear import (
         ColumnParallelQuantizationLinear,
         QuantizationLinear,
         RowParallelQuantizationLinear,
@@ -70,6 +72,7 @@ class LoRAModel(nn.Layer):
     restore_layer_map: Dict[nn.Layer, nn.Layer] = {
         LoRALinear: nn.Linear,
         LoRAMergedLinear: nn.Linear,
+        LoRAConv2D: nn.Conv2D,
         # ColumnParallelLoRALinear: ColumnParallelLinear,
         # ColumnParallelLoRAMergedLinear: ColumnParallelLinear,
         # RowParallelLoRALinear: RowParallelLinear,
@@ -216,19 +219,24 @@ class LoRAModel(nn.Layer):
                 lora_name_action_mappings[v] = name_action_mappings[k]
 
         for name, action in lora_name_action_mappings.items():
-            tensor = lora_state_dict.pop(name)
-            lora_state_dict[name] = action(tensor)
+            if name in lora_state_dict:
+                tensor = lora_state_dict.pop(name)
+                lora_state_dict[name] = action(tensor)
+            else:
+                logger.warning(f"{name} not found in lora_state_dict!")
         return lora_state_dict
 
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
+        save_model_config = kwargs.get("save_model_config", True)
+
         if self.is_pipelinemodel:
             self.model._single_to_pp_mapping = None
-        if self.quantized and merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
+        if self.quantized and merge_tensor_parallel and self.lora_config.tensor_parallel_degre > 1:
             merge_tensor_parallel = False
             logger.warning(
                 "Quantized strategy does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
             )
-        if self.is_pipelinemodel and merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
+        if self.is_pipelinemodel and merge_tensor_parallel and self.lora_config.tensor_parallel_degre > 1:
             merge_tensor_parallel = False
             logger.warning(
                 "Pipeline parallism does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
@@ -242,7 +250,9 @@ class LoRAModel(nn.Layer):
         ), f"Saving directory ({save_directory}) should be a directory, not a file"
         os.makedirs(save_directory, exist_ok=True)
 
-        if merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
+        lora_config_to_save = LoRAConfig(**self.lora_config.to_dict())
+
+        if merge_tensor_parallel and lora_config_to_save.tensor_parallel_degree > 1:
             trainable_state_dict = self.get_trainable_state_dict()
             trainable_state_dict = self._merge_trainable_tensor_parallel(trainable_state_dict)
             if not is_main_process:
@@ -250,10 +260,10 @@ class LoRAModel(nn.Layer):
                 return
             if variant is not None and "tp" in variant:
                 variant = "_".join([x for x in variant.split("_") if "tp" not in x])
-            self.lora_config.tensor_parallel_degree = -1
+            lora_config_to_save.tensor_parallel_degree = -1
         else:
             trainable_state_dict = self.get_trainable_state_dict()
-            if self.model.config.tensor_parallel_degree > 1:
+            if lora_config_to_save.tensor_parallel_degree > 1:
                 if variant is None:
                     variant = weight_name_suffix()
 
@@ -264,8 +274,12 @@ class LoRAModel(nn.Layer):
 
         # save lora config
         if is_main_process:
-            self.lora_config.save_pretrained(save_directory)
-        self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
+            lora_config_to_save.save_pretrained(save_directory)
+            if save_model_config:
+                model_config_to_save = copy.deepcopy(self.model.config)
+                if merge_tensor_parallel:
+                    model_config_to_save.tensor_parallel_degree = -1
+                model_config_to_save.save_pretrained(save_directory)
 
     def _find_and_replace_module(self, model, module_name, lora_config, enable_lora):
         parent_module = model
@@ -284,6 +298,23 @@ class LoRAModel(nn.Layer):
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
                     bias_attr=False if module.bias is None else None,
+                )
+            if isinstance(module, nn.Conv2D):
+                lora_module = LoRAConv2D(
+                    in_channels=module._in_channels,
+                    out_channels=module._out_channels,
+                    kernel_size=module._kernel_size,
+                    stride=module._stride,
+                    padding=module._padding,
+                    dilation=module._dilation,
+                    groups=module._groups,
+                    padding_mode=module._padding_mode,
+                    data_format=module._data_format,
+                    r=lora_config.r,
+                    lora_alpha=lora_config.lora_alpha,
+                    lora_dropout=lora_config.lora_dropout,
+                    merge_weights=lora_config.merge_weights,
+                    bias_attr=module._bias_attr,
                 )
             elif isinstance(module, ColumnParallelLinear):
                 # recover the original output_features
@@ -307,9 +338,10 @@ class LoRAModel(nn.Layer):
                 self.add_lora_split_mapping(module_name + ".lora_B", is_column=True)
 
                 # for lora qat
-                self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=True)
-                self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
-                self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
+                if self.lora_config.do_qat:
+                    self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=True)
+                    self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
+                    self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
             elif isinstance(module, RowParallelLinear):
                 # recover the original output_features
                 lora_module = RowParallelLoRALinear(
@@ -326,9 +358,10 @@ class LoRAModel(nn.Layer):
                 self.add_lora_split_mapping(module_name + ".lora_A", is_column=False)
 
                 # for lora qat
-                self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=False)
-                self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
-                self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
+                if self.lora_config.do_qat:
+                    self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=False)
+                    self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
+                    self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
             elif QuantizationLinear is not None and isinstance(module, QuantizationLinear):
                 lora_module = QuantizationLoRALinear(
                     in_features=module.in_features,
@@ -342,6 +375,7 @@ class LoRAModel(nn.Layer):
                     r=lora_config.r,
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
+                    merge_weights=lora_config.merge_weights,
                 )
                 self.quantized = True
             elif ColumnParallelQuantizationLinear is not None and isinstance(module, ColumnParallelQuantizationLinear):
@@ -463,6 +497,7 @@ class LoRAModel(nn.Layer):
         for _, layer in self.model.named_sublayers():
             if (
                 isinstance(layer, LoRALinear)
+                or isinstance(layer, LoRAConv2D)
                 or isinstance(layer, ColumnParallelLoRALinear)
                 or isinstance(layer, RowParallelLoRALinear)
                 or isinstance(layer, LoRAMergedLinear)
@@ -552,6 +587,7 @@ class LoRAModel(nn.Layer):
                 self._find_and_restore_module(layer_name)
             elif (
                 isinstance(layer, ColumnParallelLoRALinear)
+                or isinstance(layer, LoRAConv2D)
                 or isinstance(layer, ColumnParallelLoRAMergedLinear)
                 or isinstance(layer, RowParallelLoRALinear)
                 or (QuantizationLoRALinear is not None and isinstance(layer, QuantizationLoRALinear))

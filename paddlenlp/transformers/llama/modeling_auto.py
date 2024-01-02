@@ -477,9 +477,7 @@ class LlamaAttentionAuto(nn.Layer):
 
 
 class LlamaDecoderLayerAuto(nn.Layer):
-    def __init__(
-        self, config, layerwise_recompute: bool = False, ipp: Optional[int] = None, ichunk: Optional[int] = None
-    ):
+    def __init__(self, config, layerwise_recompute: bool = False, ipp: Optional[int] = None):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size
@@ -493,7 +491,6 @@ class LlamaDecoderLayerAuto(nn.Layer):
         self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
         self.ipp = ipp
-        self.ichunk = ichunk
 
     def forward(
         self,
@@ -710,18 +707,11 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         virtual_pp_degree = getattr(self.config, "virtual_pp_degree", 1)
         assert config.num_hidden_layers % (pp_degree * virtual_pp_degree) == 0
 
-        num_layer_per_chunk = math.ceil(config.num_hidden_layers / pp_degree / virtual_pp_degree)
-        total_virtual_chunks = config.num_hidden_layers // virtual_pp_degree
-        self.layer_to_ipp = [(i // num_layer_per_chunk) % pp_degree for i in range(config.num_hidden_layers)]
-        self.layer_to_ichunk = [
-            (i // total_virtual_chunks) % virtual_pp_degree for i in range(config.num_hidden_layers)
-        ]
-
+        num_layer_per_stage = math.ceil(config.num_hidden_layers / pp_degree)
+        self.layer_to_ipp = [i // num_layer_per_stage for i in range(config.num_hidden_layers)]
         self.layers = nn.LayerList(
             [
-                LlamaDecoderLayerAuto(
-                    config, i not in self.no_recompute_layers, self.layer_to_ipp[i], self.layer_to_ichunk[i]
-                )
+                LlamaDecoderLayerAuto(config, i not in self.no_recompute_layers, self.layer_to_ipp[i])
                 for i in range(config.num_hidden_layers)
             ]
         )
@@ -783,7 +773,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         # NOTE(zhaoyingli): temprorary method to guarantee the later ops are placed all ranks until meeting new annotaion.
-        full = fleet.auto.shard_op(paddle.full, get_mesh(), chunk_id=0)
+        full = fleet.auto.shard_op(paddle.full, get_mesh())
         full(shape=[1], fill_value=0)
 
         # retrieve input_ids and inputs_embeds
@@ -807,11 +797,11 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
         if inputs_embeds is None:
             fleet.auto.shard_tensor(self.embed_tokens.weight, *get_dist_attr(["mp", None], 0))
-            embed_tokens = fleet.auto.shard_op(self.embed_tokens, get_mesh(0), chunk_id=0)
+            embed_tokens = fleet.auto.shard_op(self.embed_tokens, get_mesh(0))
             inputs_embeds = embed_tokens(input_ids)
 
         # NOTE(zhaoyingli): temprorary method to guarantee the later ops are placed all ranks until meeting new annotaion.
-        full = fleet.auto.shard_op(paddle.full, get_mesh(), chunk_id=0)
+        full = fleet.auto.shard_op(paddle.full, get_mesh())
         full(shape=[1], fill_value=0)
 
         # embed positions
@@ -831,12 +821,14 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             # 1. infer spmd does not support [seq_len] --> [batch, seq_len] in data_parallel
             fleet.auto.shard_tensor(position_ids, get_mesh(), [None, None])
 
-        attention_mask = self._prepare_decoder_attention_mask(
-            attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
-        )  # [bs, 1, seq_len, seq_len]
         if self.config.use_flash_attention:
             # attention_mask in flash_attn is always None for pretrain
             attention_mask = None
+        else:
+            attention_mask = self._prepare_decoder_attention_mask(
+                attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
+            )  # [bs, 1, seq_len, seq_len]
+
         hidden_states = inputs_embeds
 
         # decoder layers
@@ -846,9 +838,8 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
         for idx, (decoder_layer) in enumerate(self.layers):
             ipp = decoder_layer.ipp
-            ichunk = decoder_layer.ichunk
             fleet.auto.shard_tensor(hidden_states, *get_dist_attr(["dp", None, None], ipp))
-            decoder_layer = fleet.auto.shard_op(decoder_layer, get_mesh(ipp), chunk_id=ichunk)
+            decoder_layer = fleet.auto.shard_op(decoder_layer, get_mesh(ipp))
 
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
@@ -892,14 +883,22 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
 
-        return fleet.auto.shard_op(self._post_output, get_mesh(-1), chunk_id=self.layer_to_ichunk[-1])(
-            hidden_states,
-            output_hidden_states,
-            next_decoder_cache,
-            all_self_attns,
-            all_hidden_states,
-            use_cache,
-            return_dict,
+        hidden_states = self.norm(hidden_states)
+
+        # add hidden states from the last decoder layer
+        if output_hidden_states:
+            all_hidden_states += (hidden_states,)
+
+        next_cache = next_decoder_cache if use_cache else None
+
+        if not return_dict:
+            return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None)
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=hidden_states,
+            past_key_values=next_cache,
+            hidden_states=all_hidden_states,
+            attentions=all_self_attns,
+            cross_attentions=None,
         )
 
     def _post_output(
@@ -1115,15 +1114,13 @@ class LlamaForCausalLMAuto(LlamaPretrainedModelAuto):
             self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         )
 
-        lm_head = fleet.auto.shard_op(self.lm_head, get_mesh(-1), chunk_id=self.llama.layer_to_ichunk[-1])
-        logits = lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+        logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
 
         loss = None
         if labels is not None:
             labels.stop_gradient = True
             fleet.auto.shard_tensor(labels, *get_dist_attr(["dp", None], -1))
-            criterion = fleet.auto.shard_op(self.criterion, get_mesh(-1), chunk_id=self.llama.layer_to_ichunk[-1])
-            loss = criterion(logits, labels)
+            loss = self.criterion(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]
