@@ -3,11 +3,13 @@
 ## 1.算法介绍
 
 大模型量化将16位、32位浮点数的模型参数或激活量化为4位或8位整数能够有效降低模型存储空间和计算资源需求，同时加速推理速度。工具链量化算法包含：
-- **PTQ**。PaddleSlim 团队自研的自适应Shift-SmoothQuant量化算法，在[SmoothQuant](https://arxiv.org/abs/2211.10438)和[Outlier Suppression+](https://arxiv.org/abs/2304.09145)基础上
+- **PTQ**。PaddleSlim 团队自研的自适应PiecewiseSearchSmooth(PSS)量化算法，在[SmoothQuant](https://arxiv.org/abs/2211.10438)和[Outlier Suppression+](https://arxiv.org/abs/2304.09145)基础上
 新增PieceWiseSearch参数搜索算法并将算法扩展至**所有线性层**，对模型权重和激活分布进行调整，减少后续A8W8 PTQ量化损失。
 
 
 - **GPTQ**。[GPTQ](https://arxiv.org/abs/2210.17323)是业界主流的权重量化算法，可以将大模型权重进行4位整数无损量化，提高模型推理速度。
+
+- **AWQ**。[GPTQ](https://arxiv.org/abs/2306.00978)是业界主流的权重量化算法，可以将大模型权重进行4位整数无损量化，提高模型推理速度。
 
 <div align="center">
     <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/fe8f941b-4b35-48ca-814f-96533d7e24ce">
@@ -65,12 +67,19 @@ python  finetune_generation.py ./llama/ptq_argument.json
 python  finetune_generation.py ./llama/gptq_argument.json
 ```
 
-### 2.5 量化参数介绍
+### 2.5 AWQ 量化
+
+```
+python  finetune_generation.py ./llama/awq_argument.json
+```
+
+### 2.6 量化参数介绍
 
 <summary>&emsp; 量化参数（QuantArgument）</summary><div>
 
 - `quant_type`: PTQ,QAT量化类型，默认为A8W8。支持A8W8,WINT4，WINT8：A8W8指对激活（输入）进行INT8量化，对模型权重进行INT8量化；WINT4指仅对模型权重进行INT4量化，后续使用WeightOnly进行推理；WINT8指仅对模型权重进行INT8量化，后续使用WeightOnly进行推理。
 - `do_ptq`: 是否进行PTQ量化，默认为False。
+- `weight_quant_method`: 权重量化方式，现可选groupwise或者abs_max_channel_wise。
 - `ptq_step`: PTQ量化步数，也即模型前向次数，默认为32。
 - `shift`: 是否在PTQ量化前进行[Shift策略](https://arxiv.org/abs/2304.09145)，默认为False。使用Shift策略需要设`do_ptq`为True。
 - `shift_all_linear`: 是否对模型中所有Linear层应用Shift，如果为True，将会对非LayerNorm-Linear组合的Linear进行Shift，并且添加两个op，默认为False
@@ -85,6 +94,11 @@ python  finetune_generation.py ./llama/gptq_argument.json
 - `smooth_search_piece`: 使用分段搜索功能时，是否搜索分段数量，默认为False。设为True时，`smooth_k_piece`建议设为6，搜索分段数量耗时较长，如需加速Smooth过程建议关闭。
 - `do_gptq`: 是否进行GPTQ量化，GPTQ对模型进行WINT4量化，相比于普通PTQ量化精度更高，量化时间较长。默认为False。
 - `gptq_step`: GPTQ量化步数，也即模型前向次数，默认为8。
+- `do_awq`: 是否进行AWQ量化，AWQ对模型进行WINT4量化，相比于普通PTQ量化精度更高。默认为False。
+- `auto_clip`: AWQ时是否进行自动搜索截断值并对模型权重进行截断操作，截断操作有利于量化模型精度，但搜索速度较慢。默认为False。
+- `autoclip_step`: AutoClip步数，也即模型前向次数，采样时默认concat每轮数据用来搜索截断值，默认为8。
+
+
 </div>
 
 

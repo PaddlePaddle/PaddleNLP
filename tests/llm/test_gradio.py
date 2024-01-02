@@ -39,11 +39,11 @@ def is_port_in_use(port):
 class UITest(unittest.TestCase):
     def setUp(self):
         # start web ui
-        self.base_port = self.avaliable_free_port()
-        self.port = self.avaliable_free_port([self.base_port])
+        self.flask_port = self.avaliable_free_port()
+        self.port = self.avaliable_free_port([self.flask_port])
         self.model_path = "__internal_testing__/tiny-random-llama"
-        command = 'cd llm && python flask_server.py --model_name_or_path {model_path} --port {port} --base_port {base_port} --src_length 1024 --dtype "float16"'.format(
-            base_port=self.base_port, port=self.port, model_path=self.model_path
+        command = 'cd llm && python flask_server.py --model_name_or_path {model_path} --port {port} --flask_port {flask_port} --src_length 1024 --dtype "float16"'.format(
+            flask_port=self.flask_port, port=self.port, model_path=self.model_path
         )
         self.ui_process = subprocess.Popen(command, shell=True, stdout=sys.stdout, stderr=sys.stderr)
         self.tokenizer = LlamaTokenizer.from_pretrained(self.model_path)
@@ -66,7 +66,7 @@ class UITest(unittest.TestCase):
 
     def wait_until_server_is_ready(self):
         while True:
-            if is_port_in_use(self.base_port) and is_port_in_use(self.port):
+            if is_port_in_use(self.flask_port) and is_port_in_use(self.port):
                 break
 
             print("waiting for server ...")
@@ -84,7 +84,7 @@ class UITest(unittest.TestCase):
         self.wait_until_server_is_ready()
 
         def get_response(data):
-            res = requests.post(f"http://localhost:{self.base_port}/api/chat", json=data, stream=True)
+            res = requests.post(f"http://localhost:{self.flask_port}/api/chat", json=data, stream=True)
             result_ = ""
             for line in res.iter_lines():
                 print(line)
