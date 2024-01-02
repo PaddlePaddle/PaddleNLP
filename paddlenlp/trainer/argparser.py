@@ -269,7 +269,9 @@ class PdArgumentParser(ArgumentParser):
         json_file = os.path.abspath(sys.argv[json_file_idx])
         json_args = json.loads(Path(json_file).read_text())
         del sys.argv[json_file_idx]
-        output_dir_arg = next((arg for arg in sys.argv if arg == "--output" or arg.startswith("--output=")), None)
+        output_dir_arg = next(
+            (arg for arg in sys.argv if arg == "--output_dir" or arg.startswith("--output_dir=")), None
+        )
         if output_dir_arg is None:
             if "output_dir" in json_args.keys():
                 sys.argv.extend(["--output_dir", json_args["output_dir"]])
