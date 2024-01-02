@@ -88,8 +88,10 @@ def merge():
             f"We can not find config.json in lora_path: {args.lora_path} or find a valid model_name_or_path."
         )
     config.dtype = lora_config.dtype
-    if lora_config.dtype == "bfloat16" and args.device == "cpu":
-        raise ValueError("We can not apply bfloat16 lora merge on cpu.")
+    if (
+        lora_config.dtype == "bfloat16" or config.quantization_config.weight_quantize_algo in ["nf4", "fp4"]
+    ) and args.device == "cpu":
+        raise ValueError("We can not apply bfloat16 or nf4/fp4 lora merge on cpu.")
 
     if args.low_gpu_mem and args.device == "gpu":
         quant_config = copy.deepcopy(config.quantization_config)
