@@ -16,10 +16,19 @@ import copy
 import os
 
 import paddle
-from paddle.nn.quant import weight_dequantize, weight_quantize
 
 from paddlenlp.peft import LoRAConfig, LoRAModel
-from paddlenlp.quantization.qlora import qlora_weight_quantize_dequantize
+
+try:
+    from paddle.nn.quant import weight_dequantize, weight_quantize
+except:
+    weight_dequantize = None
+    weight_quantize = None
+try:
+    from paddlenlp.quantization.qlora import qlora_weight_quantize_dequantize
+except:
+    qlora_weight_quantize_dequantize = None
+
 from paddlenlp.quantization.quantization_config import QuantizationConfig
 from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.transformers.utils import device_guard
