@@ -35,7 +35,6 @@ from paddlenlp.data import DataCollator
 from paddlenlp.generation import GenerationConfig
 from paddlenlp.trainer.trainer import (
     TRAINER_STATE_NAME,
-    DygraphShardingOptimizer,
     EvalLoopOutput,
     EvalPrediction,
     HybridParallelOptimizer,
@@ -49,11 +48,11 @@ from paddlenlp.trainer.trainer import (
     _obtain_optimizer_parameters_list,
     distributed_file,
     distributed_isfile,
-    fleet,
     fused_allreduce_gradients,
-    is_dp_group_support_in_group_sharded_parallel,
     logger,
+    reshard_util,
     speed_metrics,
+    split_inputs_sequence_dim,
 )
 from paddlenlp.transformers import BatchEncoding, PretrainedModel, PretrainedTokenizer
 from paddlenlp.transformers.tokenizer_utils_base import (
@@ -280,12 +279,11 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
 
     args = self.args
 
-    # self.timers and self.timers("read-data").stop()
-    # os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
-    # self.callback_handler.on_load_data_end(args,
-    #                                        self.state,
-    #                                        self.control,
-    #                                        inputs=inputs)
+    if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
+        inputs = split_inputs_sequence_dim(inputs)
+    self.timers and self.timers("read-data").stop()
+    os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
+    self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
 
     # Skip past any already trained steps if resuming training
     # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
@@ -307,7 +305,11 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
         if steps_trained_in_current_epoch == 0:
             self._load_rng_state(resume_from_checkpoint)
         # continue
-        return
+        final_local_vars = locals()
+        for k in kwargs.keys():
+            if k in final_local_vars:
+                kwargs[k] = final_local_vars[k]
+        return kwargs
     elif steps_trained_progress_bar is not None:
         steps_trained_progress_bar.close()
         steps_trained_progress_bar = None
@@ -333,6 +335,11 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
     # sharding
     # stage1. the same as ddp
     # stage2. manualy collect gradient on dp group
+
+    dp_master_grad = self.args.world_size > 1 and self.args.amp_master_grad and not self.args.use_hybrid_parallel
+    if dp_master_grad:
+        is_no_sync = True
+
     if is_no_sync:
         # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
         with model.no_sync():
@@ -347,49 +354,49 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
         steps_in_epoch <= args.gradient_accumulation_steps
         and (step + 1) == steps_in_epoch
     ):
+        if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
+            tr_loss /= self.args.gradient_accumulation_steps
+
         self.timers and self.timers("forward-backward").stop()
-        # Maunally collect gradients when group_sharded_parallel can't accept dp_group
-        # Case 1: Use sharding stage 2/3 with dp
-        # Case 2: Use recompute and dp
+        # Maunally collect gradients
+        # Case 1: Use recompute and dp
+        # Case 2: Hack dp with master_grad
+        # Case 3: Pipeline or sharding overlap
         # local_rank != -1 don't means dp in networks.
         self.timers and self.timers("all-reduce").start()
 
-        if self.sharding and ShardingOption.SHARD_OP not in self.args.sharding:
-            if self.args.data_parallel_degree > 1 and not is_dp_group_support_in_group_sharded_parallel():
-                fused_allreduce_gradients(model.parameters(), fleet.get_hybrid_communicate_group())
-                if ShardingOption.FULL_SHARD in self.args.sharding:
-                    # Why need sync on parm again ?
-                    # TODO: fix this.
-                    for p in model.parameters():
-                        if hasattr(p, "bw_storage"):
-                            assert p.grad is None, "This case shouldn't happen."
-                            p.bw_storage.scale_(1.0 / self.dp_group.nranks)
-                            paddle.distributed.all_reduce(p.bw_storage, group=self.dp_group)
-
-        # Case 2: Use recompute and dp / sharding stage1,
+        # Case 1: Use recompute and dp / sharding stage1,
         # manualy collect gradient for dp.
-        elif args.recompute and availiable_no_sync:
+        if args.recompute and availiable_no_sync:
             fused_allreduce_gradients(list(model.parameters()), None)
 
-        pipeline_parallel_config = set(args.pipeline_parallel_config.split(" "))
-        enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
-        enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
+        # Case 2: hack dp with master_grad
+        if dp_master_grad and not (args.recompute and availiable_no_sync):
+            fused_allreduce_gradients(list(model.parameters()), None)
 
+        # Pipeline parallel mode,  handle gradient reduce here to overlap
+        pipeline_parallel_config = (
+            set(args.pipeline_parallel_config.split(" ")) if args.pipeline_parallel_degree > 1 else set()
+        )
+        enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
+        enable_release_grads = "enable_release_grads" in pipeline_parallel_config
+
+        # Case 3: Pipeline parallel mode, overlap with dp
         if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
             parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
 
             if not enable_dp_comm_overlap:
                 if self.optimizer._sharding_enable:
-                    assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
+                    assert reshard_util.is_sharding_opt(self.optimizer)
                     self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
-                if self.optimizer._dp_enable:
+                if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
                     fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
+
         self.timers and self.timers("all-reduce").stop()
         self.timers and self.timers("optimizer-step").start()
 
-        # pipeline parallel mode,  handle gradient merge here
-        if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
+        if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss():
             for p in model._layers.parameters():
                 with paddle.no_grad():
                     if hasattr(p, "main_grad") and p.main_grad is not None:
@@ -404,13 +411,17 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
         )
         optimizer_was_run = True
         if self.do_grad_scaling:
-            scale_before = self.scaler._scale.cpu().numpy()
+            scale_before = paddle.assign(self.scaler._scale)
             self.scaler.step(self.optimizer)
             self.scaler.update()
-            scale_after = self.scaler._scale.cpu().numpy()
+            scale_after = self.scaler._scale
             optimizer_was_run = not self.scaler._cache_founf_inf
             if not optimizer_was_run:
-                logger.warning(f"optimizer not run, scale_before: {scale_before[0]}, scale_after: {scale_after[0]}")
+                scale_before_value = scale_before.cpu().numpy()
+                scale_after_value = scale_after.cpu().numpy()
+                logger.warning(
+                    f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
+                )
         elif isinstance(self.optimizer, HybridParallelOptimizer):
             self.optimizer._step(parameters_list)
         else:
@@ -421,8 +432,14 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
         if optimizer_was_run:
             self.lr_scheduler.step()
 
-        # self.optimizer.clear_grad(set_to_zero=False)
-        self.optimizer.clear_grad()
+        if enable_release_grads and args.pipeline_parallel_degree > 1:
+            self.optimizer.clear_grad(set_to_zero=False)
+            for _, buffers in model._chunk_2_comm_buffers.items():
+                for buffer in buffers:
+                    buffer._clear_grad_storage()
+        else:
+            self.optimizer.clear_grad()
+
         self.callback_handler.on_optimizer_end(
             args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
         )
@@ -431,17 +448,20 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
         self.state.epoch = epoch + (step + 1) / steps_in_epoch
         self.control = self.callback_handler.on_step_end(args, self.state, self.control)
         self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
-        # if self.state.global_step == 2:
-        #     exit(0)
         self._print_timer()
         step_control = 0
     else:
         self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
         step_control += 1
 
-    # if self.control.should_epoch_stop or self.control.should_training_stop:
-    #     break
-    # self.timers and self.timers("read-data").start()
+    if self.control.should_epoch_stop or self.control.should_training_stop:
+        # break
+        final_local_vars = locals()
+        for k in kwargs.keys():
+            if k in final_local_vars:
+                kwargs[k] = final_local_vars[k]
+        return kwargs
+    self.timers and self.timers("read-data").start()
 
     final_local_vars = locals()
     for k in kwargs.keys():
