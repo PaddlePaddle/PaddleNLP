@@ -80,7 +80,7 @@ class AutoImageProcessor:
         # class name corresponds to this configuration
         init_class = init_kwargs.pop("init_class", None)
         if init_class is None:
-            init_class = init_kwargs.pop("image_processor_type", None)
+            init_class = init_kwargs.pop("image_processor_type", init_kwargs.pop("feature_extractor_type", None))
 
         if init_class:
             # replace old name to new name
