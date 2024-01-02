@@ -26,7 +26,6 @@ import paddle.nn.functional as F
 from paddle import nn
 from paddle.distributed import fleet
 
-
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
 except ImportError:
@@ -380,7 +379,6 @@ class LlamaAttentionAuto(nn.Layer):
                     [dist.Replicate()],
                 )
 
-
         if self.fuse_attention_qkv:
             target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
             fleet.auto.shard_tensor(self.qkv_proj.weight, *get_dist_attr([None, "mp"], self.ipp))
@@ -480,7 +478,7 @@ class LlamaAttentionAuto(nn.Layer):
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
         fleet.auto.shard_tensor(self.o_proj.weight, *get_dist_attr(["mp", None], self.ipp))
         attn_output = self.o_proj(attn_output)
-        
+
         # enter sp region
         if self.config.sequence_parallel:
             attn_output = paddle.transpose(attn_output, [1, 0, 2])
@@ -603,7 +601,7 @@ class LlamaDecoderLayerAuto(nn.Layer):
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        
+
         # enter tp region
         if self.config.sequence_parallel:
             mesh = get_mesh(self.ipp)
@@ -1215,7 +1213,6 @@ class LlamaForCausalLMAuto(LlamaPretrainedModelAuto):
                     [dist.Replicate()],
                 )
             hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
-
 
         # if labels is None，means we need full output, instead of tensor_parallel_output
         # tensor_parallel_output is togather with ParallelCrossEntropy
