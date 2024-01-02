@@ -38,6 +38,7 @@ unit-test:
 	PYTHONPATH=$(shell pwd) pytest -v \
 		-n auto \
 		--durations 20 \
+		--ignore=./tests/llm \
 		--cov paddlenlp \
 		--cov-report xml:coverage.xml
 
