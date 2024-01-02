@@ -66,9 +66,10 @@ python finetune_generation.py ... --chat_template ./qwen_14b_chat_template.json
 
 > 需要开发者手动调整 `chat_template.json` 实现动态调整 system prompt。
 
-```json
+```diff
 {
-    "system": "{{system | 'You are a helpful assistant.'}}",
+-    "system": "You are a helpful assistant.",
++    "system": "{{system | 'You are a helpful assistant.'}}",
     "conversation": ["\n<|im_start|>user\n{{user}}<|im_end|>\n<|im_start|>assistant\n", "{{bot}}<|im_end|>"],
     "query": "\n<|im_start|>user\n{{query}}<|im_end|>\n<|im_start|>assistant\n",
 }
