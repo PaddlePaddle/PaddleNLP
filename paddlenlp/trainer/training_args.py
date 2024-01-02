@@ -1146,7 +1146,7 @@ class TrainingArguments:
                 warnings.warn("`offload` is not supported NOW!")
 
             strategy = fleet.auto.Strategy()
-            if self.pipeline_parallel_degree > 1:
+            if self.pipeline_parallel_degree > 1 and self.gradient_accumulation_steps > 1:
                 pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
                 for x in pipeline_parallel_config:
                     if len(x) > 0:
