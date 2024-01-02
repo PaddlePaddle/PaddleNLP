@@ -157,7 +157,7 @@ class PredictorServer:
                         "error_code": 1,
                         "error_msg": f"The sum of src_length<{self.predictor.config.src_length}> and "
                         f"max_length<{self.predictor.config.max_length}> should be smaller than or equal to "
-                        f"the maximum position embedding size<{self.total_max_length}>",
+                        f"the max-total-length<{self.total_max_length}>",
                     }
                     yield json.dumps(output, ensure_ascii=False) + "\n"
                     return
