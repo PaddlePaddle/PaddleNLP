@@ -789,32 +789,43 @@ class PPOTrainer(Trainer):
         )
 
         # use trainer for reference_model/reward_model to enable sharding stage-3
-        self.reference_trainer = Trainer(
-            reference_model,
-            criterion,
-            args,
-            data_collator,
-            train_dataset,
-            eval_dataset,
-            reference_tokenizer,
-            compute_metrics,
-            callbacks,
-            optimizers,
-            preprocess_logits_for_metrics,
-        )
-        self.reward_trainer = Trainer(
-            reward_model,
-            criterion,
-            args,
-            data_collator,
-            train_dataset,
-            eval_dataset,
-            reward_tokenizer,
-            compute_metrics,
-            callbacks,
-            optimizers,
-            preprocess_logits_for_metrics,
-        )
+        # maybe we should allow models to use  different dist strategies later
+        if ShardingOption.FULL_SHARD in args.sharding:
+            self.reference_trainer = Trainer(
+                reference_model,
+                criterion,
+                args,
+                data_collator,
+                train_dataset,
+                eval_dataset,
+                reference_tokenizer,
+                compute_metrics,
+                callbacks,
+                optimizers,
+                preprocess_logits_for_metrics,
+            )
+            self.reward_trainer = Trainer(
+                reward_model,
+                criterion,
+                args,
+                data_collator,
+                train_dataset,
+                eval_dataset,
+                reward_tokenizer,
+                compute_metrics,
+                callbacks,
+                optimizers,
+                preprocess_logits_for_metrics,
+            )
+            # TODO(guosheng): sharding stage3 should create master weight optionally
+            # instead of creation and clear.
+            self.reference_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
+            self.reward_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
+        else:
+            self._reference_model = reference_model
+            self._reward_model = reward_model
+        self.reference_model.eval()
+        self.reward_model.eval()
 
         self.reward_tokenizer = reward_tokenizer
         self.tokenizer = policy_tokenizer
@@ -849,11 +860,16 @@ class PPOTrainer(Trainer):
             "DummyPPOModel", (object,), {"eval": lambda _: self.set_eval(), "train": lambda _: self.set_train()}
         )
         self.model = self.model_wrapped = self.DummyPPOModel()
-        self.optimizer = self.policy_trainer.optimizer
-        self.scaler = self.reference_trainer.scaler = self.reward_trainer.scaler = None
+        # self.optimizer = self.policy_trainer.optimizer
+        # self.scaler = self.reference_trainer.scaler = self.reward_trainer.scaler = None
 
     @property
     def reference_model(self):
+        # use model without Trainer
+        model = getattr(self, "_reference_model", None)
+        if model is not None:
+            return model
+        # use model with Trainer
         if self.reference_trainer.args.pipeline_parallel_degree > 1:
             # Only accept wrapped model for pipeline_parallel mode
             model = self.reference_trainer.model_wrapped
@@ -863,6 +879,11 @@ class PPOTrainer(Trainer):
 
     @property
     def reward_model(self):
+        # use model without Trainer
+        model = getattr(self, "_reward_model", None)
+        if model is not None:
+            return model
+        # use model with Trainer
         if self.reward_trainer.args.pipeline_parallel_degree > 1:
             # Only accept wrapped model for pipeline_parallel mode
             model = self.reward_trainer.model_wrapped
@@ -1141,12 +1162,6 @@ class PPOTrainer(Trainer):
         # such as trainer.control and trainer.state
         policy_model = self.policy_trainer.init_train_model_opt(max_steps, resume_from_checkpoint)
         value_model = self.value_trainer.init_train_model_opt(max_steps, resume_from_checkpoint)
-        # TODO(guosheng): sharding stage3 should create master weight optionally
-        # instead of creation and clear.
-        self.reference_trainer.init_train_model_opt(max_steps, None, clear_master_weight=True)
-        self.reference_model.eval()
-        self.reward_trainer.init_train_model_opt(max_steps, None, clear_master_weight=True)
-        self.reward_model.eval()
         paddle.device.cuda.empty_cache()
         # disable inner trainers' callback/state/control
         self.policy_trainer.add_callback(MuteDefaultFlowCallback)
