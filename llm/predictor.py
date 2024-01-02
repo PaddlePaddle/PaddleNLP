@@ -889,20 +889,37 @@ def create_predictor(
         else:
             raise ValueError("the `mode` should be one of [dynamic, static]")
 
-    if predictor.config.src_length is None:
-        predictor.config.src_length = get_default_max_encoding_length(predictor.model_config)
-
-    if predictor.config.max_length is None:
-        predictor.config.max_length = get_default_max_decoding_length(predictor.model_config)
-
     max_position_embeddings = get_model_max_position_embeddings(predictor.model_config)
-    if max_position_embeddings is not None:
-        if predictor.config.src_length + predictor.config.max_length > max_position_embeddings:
-            raise ValueError(
-                f"The sum of src_length<{predictor.config.src_length}> and "
-                f"max_length<{predictor.config.max_length}> should be smaller than or equal to "
-                f"the maximum position embedding size<{max_position_embeddings}>"
-            )
+    if max_position_embeddings is None:
+        max_position_embeddings = 2048
+        logger.warning("Can not retrieval `max_position_embeddings` from config.json, use default value 2048")
+
+    if predictor.config.src_length is None:
+        if predictor.config.max_length is None:
+            predictor.config.src_length = get_default_max_encoding_length(predictor.model_config)
+            predictor.config.max_length = get_default_max_decoding_length(predictor.model_config)
+        else:
+            predictor.config.src_length = max_position_embeddings - predictor.config.max_length
+            if predictor.config.src_length <= 0:
+                raise ValueError(
+                    f"--max_length<{predictor.config.max_length}> param should be smaller "
+                    f"than max_position_embeddings<{max_position_embeddings}>"
+                )
+    else:
+        if predictor.config.max_length is None:
+            predictor.config.max_length = max_position_embeddings - predictor.config.src_length
+            if predictor.config.max_length <= 0:
+                raise ValueError(
+                    f"--src_length<{predictor.config.src_length}> param should be smaller "
+                    f"than max_position_embeddings<{max_position_embeddings}>"
+                )
+        else:
+            if predictor.config.src_length + predictor.config.max_length > max_position_embeddings:
+                raise ValueError(
+                    f"The sum of src_length<{predictor.config.src_length}> and "
+                    f"max_length<{predictor.config.max_length}> should be smaller than or equal to "
+                    f"the maximum position embedding size<{max_position_embeddings}>"
+                )
 
     return predictor
 

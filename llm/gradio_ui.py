@@ -30,6 +30,28 @@ def setup_args():
     return args
 
 
+def create_src_slider(value, maximum):
+    return gr.Slider(
+        minimum=1,
+        maximum=maximum,
+        value=value,
+        step=1,
+        label="Max Src Length",
+        info="最大输入长度。",
+    )
+
+
+def create_max_slider(value, maximum):
+    return gr.Slider(
+        minimum=1,
+        maximum=maximum,
+        value=value,
+        step=1,
+        label="Max Decoding Length",
+        info="生成结果的最大长度。",
+    )
+
+
 def launch(args, default_params: dict = {}):
     """Launch characters dialogue demo."""
 
@@ -194,22 +216,25 @@ def launch(args, default_params: dict = {}):
                     info="该参数越大，生成结果重复的概率越低。设置 1 则不开启。",
                 )
                 default_src_length = default_params["src_length"]
-                src_length = gr.Slider(
-                    minimum=1,
-                    maximum=default_src_length,
-                    value=default_src_length,
-                    step=1,
-                    label="Max Src Length",
-                    info="最大输入长度。",
-                )
-                max_length = gr.Slider(
-                    minimum=1,
-                    maximum=default_params["max_length"],
-                    value=50,
-                    step=1,
-                    label="Max Length",
-                    info="生成结果的最大长度。",
-                )
+                total_length = default_params["src_length"] + default_params["max_length"]
+                src_length = create_src_slider(default_src_length, total_length)
+                max_length = create_max_slider(50, total_length)
+
+                def src_length_change_event(src_length_value, max_length_value):
+                    return create_max_slider(
+                        min(total_length - src_length_value, max_length_value),
+                        total_length - src_length_value,
+                    )
+
+                def max_length_change_event(src_length_value, max_length_value):
+                    return create_src_slider(
+                        min(total_length - max_length_value, src_length_value),
+                        total_length - max_length_value,
+                    )
+
+                src_length.change(src_length_change_event, inputs=[src_length, max_length], outputs=max_length)
+                max_length.change(max_length_change_event, inputs=[src_length, max_length], outputs=src_length)
+
             with gr.Column(scale=4):
                 state = gr.State({})
                 context_chatbot = gr.Chatbot(label="Context")

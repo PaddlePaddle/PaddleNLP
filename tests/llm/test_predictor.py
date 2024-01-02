@@ -17,6 +17,7 @@ import os
 import unittest
 
 import paddle
+import pytest
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import (  # ChatGLMForCausalLM,
@@ -32,7 +33,7 @@ from paddlenlp.utils.downloader import (
     url_file_exists,
 )
 
-from .testing_utils import LLMTest
+from .testing_utils import LLMTest, argv_context_guard, load_test_config
 
 
 @parameterized_class(
@@ -145,3 +146,38 @@ class PredictorPrecacheTest(LLMTest, unittest.TestCase):
 
         self.assertGreaterEqual(full_match / len(result_0), 0.6)
         self.assertGreaterEqual(count / len(result_0), 0.8)
+
+
+class PredictorBaseTest(LLMTest, unittest.TestCase):
+    def load_test_config(self):
+        config = load_test_config("./tests/fixtures/llm/predictor.yaml", "inference-predict")
+        config["model_name_or_path"] = "__internal_testing__/micro-random-llama"
+
+        return config
+
+    def test_create_predictor_with_unexpected_length(self):
+        from predictor import predict
+
+        config = self.load_test_config()
+        config.pop("src_length", None)
+        config.pop("max_length", None)
+
+        with pytest.raises(ValueError, match="--src_length<2048> param should be smaller "):
+            config["src_length"] = 2048
+
+            with argv_context_guard(config):
+                predict()
+
+        with pytest.raises(ValueError, match="--max_length<2048> param should be smaller "):
+            config.pop("src_length", None)
+            config["max_length"] = 2048
+
+            with argv_context_guard(config):
+                predict()
+
+        with pytest.raises(ValueError, match="The sum of src_length<1025> and"):
+            config["max_length"] = 1024
+            config["src_length"] = 1025
+
+            with argv_context_guard(config):
+                predict()
