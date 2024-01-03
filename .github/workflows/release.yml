@@ -35,7 +35,7 @@ jobs:
       - name: Check Branch
         id: check-branch
         run: |
-          if [[ ${{ github.ref }} =~ ^refs/heads/(develop)$ ]]; then
+          if [[ ${{ github.ref }} =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               echo "match=true" >> $GITHUB_OUTPUT
           fi  # See: https://stackoverflow.com/a/58869470/1123955
 
