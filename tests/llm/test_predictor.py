@@ -72,10 +72,6 @@ class PredictorTest(LLMTest, unittest.TestCase):
             count += int(inference_item[: min_length // 2] == no_inference_item[: min_length // 2])
             full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
 
-            print(f"-------------------- OUTPUT COMPARE --------------------")
-            print(f"inference_item: {inference_item}")
-            print(f"no_inference_item: {no_inference_item}")
-
         self.assertGreaterEqual(full_match / len(result_0), 0.25)
 
         if self.model_name_or_path == "__internal_testing__/tiny-fused-chatglm":
