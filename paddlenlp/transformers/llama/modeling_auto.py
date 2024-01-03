@@ -775,8 +775,8 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         virtual_pp_degree = getattr(self.config, "virtual_pp_degree", 1)
         assert config.num_hidden_layers % (pp_degree * virtual_pp_degree) == 0
 
-        num_layer_per_chunk = math.ceil(config.num_hidden_layers / pp_degree / virtual_pp_degree)
-        self.layer_to_ipp = [(i // num_layer_per_chunk) % pp_degree for i in range(config.num_hidden_layers)]
+        num_layer_per_stage = math.ceil(config.num_hidden_layers / pp_degree)
+        self.layer_to_ipp = [i // num_layer_per_stage for i in range(config.num_hidden_layers)]
         self.layers = nn.LayerList(
             [
                 LlamaDecoderLayerAuto(config, i not in self.no_recompute_layers, self.layer_to_ipp[i])

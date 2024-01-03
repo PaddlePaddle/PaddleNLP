@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 import os
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 from sentencepiece import SentencePieceProcessor
@@ -280,9 +280,9 @@ class ChatGLMv2Tokenizer(PretrainedTokenizer):
 
         return encoded_inputs
 
-    def encode_chat_inputs(self, conversations: List[List[str, str]]):
+    def encode_chat_inputs(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}):
         # encode system
-        result = super().encode_chat_inputs(conversations)
+        result = super().encode_chat_inputs(conversations, context_data=context_data)
         if "system" in result:
             result["system"] = self.get_prefix_tokens() + result["system"]
         else:
