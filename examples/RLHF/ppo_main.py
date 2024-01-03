@@ -22,7 +22,7 @@ from data import PromptOnlyDataset, SupervisedDataset, parse_dataset
 from models import AutoModelForScore
 from ppo_trainer import PPOTrainer
 
-from paddlenlp.trainer import PdArgumentParser, TrainingArguments
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -123,6 +123,10 @@ class TrainingArguments(TrainingArguments):
         default=16,
         metadata={"help": "Batch size (per device) for the training dataloader."},
     )
+    # save_generation_output: bool = field(
+    #     default=False,
+    #     metadata={"help": "Whether to save generated text to file when eval"},
+    # )
 
 
 @dataclass
@@ -159,11 +163,6 @@ class DataArgument:
         metadata={
             "help": "The maximum length that model input tokens can have. When intokens is set to True, it's also the maximum length for InTokens data stream"
         },
-    )
-    eval_with_do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
-    save_generation_output: bool = field(
-        default=False,
-        metadata={"help": "Whether to save generated text to file when eval"},
     )
 
     @property
@@ -202,6 +201,21 @@ def main():
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: {training_args.world_size}, "
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
+
+    # Detecting last checkpoint.
+    last_checkpoint = None
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
+        last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 1:
+            raise ValueError(
+                f"Output directory ({training_args.output_dir}) already exists and is not empty. "
+                "Use --overwrite_output_dir to overcome."
+            )
+        if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
+            logger.info(
+                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+            )
 
     # Load model
     if training_args.fp16_opt_level == "O2":
@@ -296,7 +310,12 @@ def main():
         tokenizer=(actor_tokenizer, actor_tokenizer, reward_tokenizer, reward_critic_tokenizer),
         data_collator=train_ds.get_collator(),
     )
-    trainer.train()
+    checkpoint = None
+    if training_args.resume_from_checkpoint is not None:
+        checkpoint = training_args.resume_from_checkpoint
+    elif last_checkpoint is not None:
+        checkpoint = last_checkpoint
+    trainer.train(resume_from_checkpoint=checkpoint)
 
 
 if __name__ == "__main__":

@@ -67,6 +67,20 @@ class SafeRLHFTestDataset(SafeRLHFDataset):
     SPLIT: str = "test"
 
 
+class SafeRLHF30KTrainDataset(SafeRLHFDataset):
+    NAME: str = "PKU-SafeRLHF-30K/train"
+    ALIASES: tuple[str, ...] = ("PKU-Alignment/PKU-SafeRLHF-30K/train",)
+    PATH: str = "PKU-Alignment/PKU-SafeRLHF-30K"
+    SPLIT: str = "train"
+
+
+class SafeRLHF30KTestDataset(SafeRLHFDataset):
+    NAME: str = "PKU-SafeRLHF-30K/test"
+    ALIASES: tuple[str, ...] = ("PKU-Alignment/PKU-SafeRLHF-30K/test",)
+    PATH: str = "PKU-Alignment/PKU-SafeRLHF-30K"
+    SPLIT: str = "test"
+
+
 class SafeRLHF10KTrainDataset(SafeRLHFDataset):
     NAME: str = "PKU-SafeRLHF-10K/train"
     ALIASES: tuple[str, ...] = ("PKU-Alignment/PKU-SafeRLHF-10K/train",)

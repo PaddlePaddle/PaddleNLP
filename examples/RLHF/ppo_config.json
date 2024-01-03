@@ -4,7 +4,7 @@
     "ptx_datasets": "alpaca",
     "actor_model_name_or_path": "/root/paddlejob/workspace/guosheng/alpaca-7b-reproduced/",
     "reward_model_name_or_path": "/root/paddlejob/workspace/guosheng/beaver-7b-v1.0-reward-saved/",
-    "output_dir": "/root/paddlejob/workspace/guosheng/checkpoints/llama_ppo_ckpts-fixclip-detemb-gradclip-8gpu",
+    "output_dir": "/root/paddlejob/workspace/guosheng/checkpoints/llama_ppo_ckpts-fixclip-detemb-gradclip-test1",
     "max_length": 512,
     "temperature": 1.0,
     "num_return_sequences":1,
@@ -30,12 +30,11 @@
     "clip_range_score": 50.0,
     "clip_range_value": 5.0,
     "ptx_coeff": 16.0,
-
     "per_device_eval_batch_size": 16,
     "logging_steps": 1,
     "evaluation_strategy": "steps",
     "eval_steps": 100,
-    "save_strategy": "epoch",
+    "save_strategy": "steps",
     "save_steps": 100000,
     "bf16": true,
     "fp16_opt_level": "O2",
@@ -45,7 +44,8 @@
     "save_total_limit": 1,
     "sharding_parallel_degree": 4,
     "sharding": "stage3",
-    "max_grad_norm": 1.0,
+    "comment-PKU_Beaver-max_grad_norm": 1.0,
+    "max_grad_norm": 1.0, 
     "adam_beta1": 0.9,
     "adam_beta2": 0.95
 }

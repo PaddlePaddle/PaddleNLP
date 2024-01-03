@@ -1033,22 +1033,43 @@ class PPOTrainer(Trainer):
         with guard_set_args(self.value_trainer.args, {"output_dir": os.path.join(self.args.output_dir, "value")}):
             self.value_trainer._save_checkpoint(model, metrics)
 
-    def _load_from_checkpoint(self, resume_from_checkpoint=None):
-        with guard_set_args(self.policy_trainer.args, {"output_dir": os.path.join(self.args.output_dir, "policy")}):
-            self.policy_trainer._load_from_checkpoint(resume_from_checkpoint)
-        with guard_set_args(self.value_trainer.args, {"output_dir": os.path.join(self.args.output_dir, "value")}):
-            self.value_trainer._load_from_checkpoint(resume_from_checkpoint)
+    # def _load_from_checkpoint(self, resume_from_checkpoint=None):
+    #     with guard_set_args(self.policy_trainer.args, {"output_dir": os.path.join(self.args.output_dir, "policy")}):
+    #         self.policy_trainer._load_from_checkpoint(resume_from_checkpoint)
+    #     with guard_set_args(self.value_trainer.args, {"output_dir": os.path.join(self.args.output_dir, "value")}):
+    #         self.value_trainer._load_from_checkpoint(resume_from_checkpoint)
 
-    def _load_optimizer_and_scheduler(self, checkpoint):
-        # NOTE: `Trainer._load_optimizer_and_scheduler` would not seek the latest
-        # state as in `_load_from_checkpoint``, and it just use `resume_from_checkpoint`
-        # as value of `checkpoint` to load.
-        self.policy_trainer._load_optimizer_and_scheduler(
-            checkpoint if checkpoint is None else os.path.join(checkpoint, "policy")
-        )
-        self.value_trainer._load_optimizer_and_scheduler(
-            checkpoint if checkpoint is None else os.path.join(checkpoint, "value")
-        )
+    # def _load_optimizer_and_scheduler(self, checkpoint):
+    #     # NOTE: `Trainer._load_optimizer_and_scheduler` would not seek the latest
+    #     # state as in `_load_from_checkpoint``, and it just use `resume_from_checkpoint`
+    #     # as value of `checkpoint` to load.
+    #     self.policy_trainer._load_optimizer_and_scheduler(
+    #         checkpoint if checkpoint is None else os.path.join(checkpoint, "policy")
+    #     )
+    #     self.value_trainer._load_optimizer_and_scheduler(
+    #         checkpoint if checkpoint is None else os.path.join(checkpoint, "value")
+    #     )
+
+    def init_train_model_opt(
+        self: Trainer, max_steps: int, resume_from_checkpoint: bool = False, clear_master_weight: bool = False
+    ) -> PretrainedModel:
+        # resume should be triggered here
+        # maybe change args.output_dir of policy_trainer/value_trainer directly
+        with guard_set_args(self.policy_trainer.args, {"output_dir": os.path.join(self.args.output_dir, "policy")}):
+            policy_model = self.policy_trainer.init_train_model_opt(
+                max_steps,
+                os.path.join(resume_from_checkpoint, "policy")
+                if isinstance(resume_from_checkpoint, str)
+                else resume_from_checkpoint,
+            )
+        with guard_set_args(self.value_trainer.args, {"output_dir": os.path.join(self.args.output_dir, "value")}):
+            value_model = self.value_trainer.init_train_model_opt(
+                max_steps,
+                os.path.join(resume_from_checkpoint, "value")
+                if isinstance(resume_from_checkpoint, str)
+                else resume_from_checkpoint,
+            )
+        return policy_model, value_model
 
     def get_epoch_iterator(self):
         # TODO(guosheng): support iter dataset
@@ -1160,8 +1181,9 @@ class PPOTrainer(Trainer):
         # policy_trainer/value_trainer only init train with init_train_model_opt,
         # maybe more training setting used in full_training_step should be set here,
         # such as trainer.control and trainer.state
-        policy_model = self.policy_trainer.init_train_model_opt(max_steps, resume_from_checkpoint)
-        value_model = self.value_trainer.init_train_model_opt(max_steps, resume_from_checkpoint)
+        # policy_model = self.policy_trainer.init_train_model_opt(max_steps, resume_from_checkpoint)
+        # value_model = self.value_trainer.init_train_model_opt(max_steps, resume_from_checkpoint)
+        policy_model, value_model = self.init_train_model_opt(max_steps, resume_from_checkpoint)
         paddle.device.cuda.empty_cache()
         # disable inner trainers' callback/state/control
         self.policy_trainer.add_callback(MuteDefaultFlowCallback)
@@ -1391,6 +1413,7 @@ class PPOTrainer(Trainer):
         sequence_mask = attention_mask[:, 1:]
 
         with paddle.no_grad():
+            # maybe these two can also be put into rollout
             old_rewards = self.add_kl_divergence_regularization(
                 prompt,
                 old_log_probs,

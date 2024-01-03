@@ -43,7 +43,7 @@ os.environ["https_proxy"] = "http://10.162.37.16:8128"
 @dataclass
 class TrainingArguments(TrainingArguments):
     loss_type: Literal["token-wise", "sequence-wise"] = field(
-        default="token-wise",
+        default="sequence-wise",
         metadata={
             "help": "Calculate ranking loss with all token-wise reward outputs in the sequence or the "
             "sequence-wise reward output only (the reward of the last token in each sequence)."
@@ -75,15 +75,6 @@ class ModelArgument:
     )
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
 
-    # LoRA related parameters
-    lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
-    lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
-    lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
-
-    # prefix tuning related parameters
-    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
-    num_prefix_tokens: int = field(default=128, metadata={"help": "Number of prefix tokens"})
-
     @property
     def extra_model_kwargs(self):
         """Extra keyword arguments for initializing the model."""
@@ -101,13 +92,9 @@ class DataArgument:
     task_name: str = field(default=None, metadata={"help": "Additional name to select a more specific task."})
     train_datasets: str = field(default=None, metadata={"help": "Dataset name(s) registered in the raw dataset."})
     eval_datasets: str = field(default=None, metadata={"help": "Dataset name(s) registered in the raw dataset."})
-    intokens: bool = field(default=False, metadata={"help": "Whether to use InTokens data stream"})
-    src_length: int = field(default=1024, metadata={"help": "The maximum length of source(context) tokens."})
     max_length: int = field(
         default=2048,
-        metadata={
-            "help": "The maximum length that model input tokens can have. When intokens is set to True, it's also the maximum length for InTokens data stream"
-        },
+        metadata={"help": "The maximum length that model input tokens can ."},
     )
     eval_with_do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
     save_generation_output: bool = field(
@@ -193,10 +180,10 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.model_name_or_path, model_max_length=data_args.max_length, padding_side="right"
     )
-    if isinstance(tokenizer, LlamaTokenizer):
+    if isinstance(tokenizer, LlamaTokenizer) and tokenizer.pad_token_id is None:
         # tokenizer.pad_token_id = tokenizer.eos_token_id
         # to be consistent with PKU-Alignment/alpaca-7b-reproduced
-        tokenizer.pad_token_id = 32000  # tokenizer.eos_token_id
+        tokenizer.pad_token_id = tokenizer.eos_token_id
 
     train_ds = PreferenceDataset(data_args.parsed_train_datasets, tokenizer=tokenizer)
 
