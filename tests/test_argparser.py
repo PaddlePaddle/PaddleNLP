@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import json
 import os
 import sys
@@ -43,7 +42,7 @@ def create_json_from_dict(data_dict, file_path):
 
 
 class ArgparserTest(unittest.TestCase):
-    script_name = "run_pretrain.py"
+    script_name = "test_argparser.py"
     args_dict = {
         "max_steps": 3000,
         "amp_master_grad": False,
@@ -115,7 +114,6 @@ class ArgparserTest(unittest.TestCase):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmpfile:
             json.dump(ArgparserTest.args_dict, tmpfile)
             tmpfile_path = tmpfile.name
-
         # 构造命令行参数，包含与 JSON 文件中的参数冲突的值
         cmd_line_args = [
             ArgparserTest.script_name,
@@ -127,17 +125,13 @@ class ArgparserTest(unittest.TestCase):
             "--log_on_each_node",
             "False",
         ]
-
         # 测试解析
         with patch("sys.argv", cmd_line_args):
             model_args = vars(parse_args()[0])
-
         self.assertEqual(model_args.get("min_learning_rate"), 2e-5)
         self.assertEqual(model_args.get("max_steps"), 3000)
         self.assertEqual(model_args.get("log_on_each_node"), False)
-
         for key, value in ArgparserTest.args_dict.items():
             if key not in ["min_learning_rate", "max_steps", "log_on_each_node"]:
                 self.assertEqual(model_args.get(key), value)
-
         os.remove(tmpfile_path)
