@@ -18,6 +18,7 @@
 
 import dataclasses
 import json
+import os
 import sys
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, ArgumentTypeError
 from copy import copy
@@ -243,6 +244,50 @@ class PdArgumentParser(ArgumentParser):
         for dtype in self.dataclass_types:
             keys = {f.name for f in dataclasses.fields(dtype) if f.init}
             inputs = {k: v for k, v in data.items() if k in keys}
+            obj = dtype(**inputs)
+            outputs.append(obj)
+        return (*outputs,)
+
+    def parse_json_file_and_cmd_lines(self, json_file_idx: int) -> Tuple[DataClass, ...]:
+        """
+        Extend the functionality of `parse_json_file` to handle command line arguments in addition to loading a JSON
+        file.
+
+        This method combines data from a JSON file and command line arguments to populate instances of dataclasses.
+        The JSON file is identified using its index in the command line arguments array.
+
+        Args:
+            json_file_idx :
+                The index of the JSON file argument within the command line arguments array.
+                This index is used to locate and extract the JSON file path from the command line arguments.
+
+        Returns:
+            Tuple consisting of:
+
+                - the dataclass instances in the same order as they were passed to the initializer.abspath
+        """
+        json_file = os.path.abspath(sys.argv[json_file_idx])
+        json_args = json.loads(Path(json_file).read_text())
+        del sys.argv[json_file_idx]
+        output_dir_arg = next(
+            (arg for arg in sys.argv if arg == "--output_dir" or arg.startswith("--output_dir=")), None
+        )
+        if output_dir_arg is None:
+            if "output_dir" in json_args.keys():
+                sys.argv.extend(["--output_dir", json_args["output_dir"]])
+            else:
+                raise ValueError("The following arguments are required: --output_dir")
+        cmd_args = vars(self.parse_args())
+        merged_args = {}
+        for key in json_args.keys() | cmd_args.keys():
+            if any(arg == f"--{key}" or arg.startswith(f"--{key}=") for arg in sys.argv):
+                merged_args[key] = cmd_args.get(key)
+            elif json_args.get(key):
+                merged_args[key] = json_args.get(key)
+        outputs = []
+        for dtype in self.dataclass_types:
+            keys = {f.name for f in dataclasses.fields(dtype) if f.init}
+            inputs = {k: v for k, v in merged_args.items() if k in keys}
             obj = dtype(**inputs)
             outputs.append(obj)
         return (*outputs,)
