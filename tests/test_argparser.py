@@ -53,7 +53,6 @@ class ArgparserTest(unittest.TestCase):
         "enable_linear_fused_grad_add": False,
         "eval_steps": 3216,
         "flatten_param_grads": False,
-        "force_reshard_pp": False,
         "fp16": 1,
         "log_on_each_node": True,
         "logging_dir": "./checkpoints/llama2_pretrain_ckpts/runs/Dec27_04-28-35_instance-047hzlt0-4",
