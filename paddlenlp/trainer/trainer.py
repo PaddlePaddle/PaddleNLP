@@ -194,7 +194,9 @@ def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol
         if k == "master_weights":
             g_cpu_optimizer_state_dict[k] = {}
             for kk, vv in v.items():
+                tensor_name = vv.name
                 g_cpu_optimizer_state_dict[k][kk] = vv.pin_memory()
+                g_cpu_optimizer_state_dict[k][kk].name = tensor_name
         elif k == "LR_Scheduler":
             g_cpu_optimizer_state_dict[k] = copy.deepcopy(v)
         else:
