@@ -119,7 +119,12 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
     elif isinstance(model, PrefixModelForCausalLM) or isinstance(model, LoRAModel):
         model_to_save = model
     else:
-        raise ValueError("Unified checkpoint only supports PretrainedModel")
+        raise ValueError("Unified checkpoint only supports PretrainedModel, LoRAModel and PrefixModelForCausalLM!")
+
+    # Under non distributed environment.
+    if paddle.distributed.get_world_size() <= 1:
+        save_single_card_checkpoint(args, model_to_save, output_dir)
+        return
 
     if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
         if is_need_master_weight(optimizer, is_fp16_or_bp16=(args.fp16 or args.bf16)):
@@ -148,19 +153,7 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
     if isinstance(model_to_save, PrefixModelForCausalLM):
         local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
         if local_rank == 0:
-            past_key_value = model_to_save.prefix_encoder(model_to_save.prefix_tokens.unsqueeze(0).expand([1, -1]))
-            past_key_value = past_key_value.reshape(
-                [
-                    model_to_save.prefix_config.num_prefix_tokens,
-                    2,
-                    model_to_save.prefix_config.num_hidden_layers,
-                    model_to_save.num_heads,
-                    model_to_save.head_dim,
-                ]
-            )
-            past_key_value = paddle.transpose(past_key_value, perm=[2, 1, 3, 0, 4]).cpu().numpy()
-            model_to_save.prefix_config.save_pretrained(save_directory)
-            np.save(os.path.join(save_directory, PAST_KEY_VALUES_FILE_NAME), past_key_value)
+            save_prefix_past_key_value(model_to_save, save_directory)
 
     # Attach architecture to the config
     config_to_save.architectures = [model_to_save.__class__.__name__]
@@ -212,7 +205,7 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
 
     loaded_keys = sharded_metadata["all_checkpoint_keys"]
 
-    model_state_dict = model.state_dict()
+    model_state_dict = get_expected_state_dict(model)
     expected_keys = set(list(model_state_dict.keys()))
     missing_keys = expected_keys - set(loaded_keys)
 
@@ -292,13 +285,7 @@ def unified_checkpoint_into_shards(
     """
     assert hasattr(model_to_save, "config")
 
-    if isinstance(model_to_save, PretrainedModel):
-        state_dict = model_to_save.state_dict()
-    elif isinstance(model_to_save, LoRAModel):
-        state_dict = model_to_save.get_trainable_state_dict()
-    elif isinstance(model_to_save, PrefixModelForCausalLM):
-        state_dict = model_to_save.prefix_encoder.state_dict()
-
+    state_dict = get_expected_state_dict(model_to_save)
     all_filter_keys = filter_params(model_to_save, state_dict)
 
     dtype = get_parameter_dtype(model_to_save)
@@ -344,6 +331,10 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
         safe_serialization (bool, optional): Whether to use safetensors. Defaults to False.
 
     """
+    if paddle.distributed.get_world_size() <= 1:
+        save_single_card_optimizer(args, model, optimizer, output_dir)
+        return
+
     # Split into naive optimizer params and master weights.
     results = unified_optimizer_into_shards(args, model, optimizer, safe_serialization=safe_serialization)
     master_weight_state_dict = None
@@ -543,7 +534,8 @@ def unified_optimizer_into_shards(
 
     # get optimizer param mappings
     static2struct_name_mappings = {}
-    for k, v in model.state_dict().items():
+    state_dict = get_expected_state_dict(model)
+    for k, v in state_dict.items():
         static2struct_name_mappings[v.name] = k
 
     # rename optimizer param
@@ -665,7 +657,8 @@ def check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serializa
         pp_group = hcg.get_pipe_parallel_group()
 
         need_files = set()
-        for key in model.state_dict().keys():
+        state_dict = get_expected_state_dict(model)
+        for key in state_dict.keys():
             filename = index["weight_map"][key]
             need_files.add(filename)
         diff_filelist = list(need_files.difference(set(existed_files)))
@@ -754,7 +747,8 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
         local_resume = True
         if args.data_parallel_rank == 0:
             need_files = set()
-            for key in model.state_dict().keys():
+            state_dict = get_expected_state_dict(model)
+            for key in state_dict.keys():
                 if sharding_group.nranks > 1:
                     static_name = struct2static_name_mappings.get(key, None)
                     param_rank = param2rank.get(static_name, None)
@@ -805,6 +799,115 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
     return local_resume & local_resume_rw
 
 
+def save_single_card_checkpoint(args, model_to_save, output_dir):
+    """Save checkpoint for non-distributed environment."""
+
+    state_dict = get_expected_state_dict(model_to_save)
+    # get index json
+    index_weight_file = {}
+    total_size = 0
+    for key, weight in state_dict.items():
+        index_weight_file[key] = "model-00001-of-00001.safetensors"
+        total_size += weight.numel().item() * dtype_byte_size(weight.dtype)
+    sharded_index_json = {}
+    sharded_index_json["meta_data"] = {"total_size": total_size}
+    sharded_index_json["weight_map"] = index_weight_file
+    path = os.path.join(output_dir, SAFE_WEIGHTS_INDEX_NAME)
+    with open(path, "w") as f:
+        json.dump(sharded_index_json, f, indent=4)
+
+    # save checkpoint
+    file_save_async_or_sync(
+        state_dict, os.path.join(output_dir, "model-00001-of-00001.safetensors"), safe_serialization=True
+    )
+
+    if isinstance(model_to_save, PrefixModelForCausalLM):
+        save_prefix_past_key_value(model_to_save, output_dir)
+
+
+def save_single_card_optimizer(args, model, optimizer, output_dir):
+    """ "Save optimizer for non-distributed environment."""
+    # Split into optimizer params and master weights.
+    optim_state_dict = nested_copy(optimizer.state_dict())
+    master_weights = None
+    if "master_weights" in optim_state_dict.keys():
+        master_weights = optim_state_dict.pop("master_weights")
+    if "LR_Scheduler" in optim_state_dict.keys():
+        optim_state_dict.pop("LR_Scheduler")
+
+    static2struct_name_mappings = {}
+    for k, v in model.state_dict().items():
+        static2struct_name_mappings[v.name] = k
+
+    # rename optimizer param
+    for key in list(optim_state_dict.keys()):
+        static_name, type_name = generate_base_static_name(key)
+        new_name = static2struct_name_mappings[static_name] + "/" + type_name
+        optim_state_dict[new_name] = optim_state_dict.pop(key)
+    if master_weights is not None:
+        for key in list(master_weights.keys()):
+            master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
+
+    # save index json
+    index_optimizer_file, index_master_weight_file = {}, {}
+    total_optim_size, total_master_weight_size = 0, 0
+    for key, weight in optim_state_dict.items():
+        index_optimizer_file[key] = "optimizer-00001-of-00001.safetensors"
+        total_optim_size += weight.numel().item() * dtype_byte_size(weight.dtype)
+    if master_weights is not None:
+        for key, weight in master_weights.items():
+            index_master_weight_file[key] = "master_weights-00001-of-00001.safetensors"
+            total_master_weight_size += weight.numel().item() * dtype_byte_size(weight.dtype)
+    path = os.path.join(output_dir, SAFE_OPTIMIZER_INDEX_NAME)
+    master_path = os.path.join(output_dir, SAFE_MASTER_WEIGHTS_INDEX_NAME)
+    with open(path, "w") as f:
+        json.dump({"meta_data": {"total_size": total_optim_size}, "weight_map": index_optimizer_file}, f, indent=4)
+    if master_weights is not None:
+        with open(master_path, "w") as f:
+            json.dump(
+                {"meta_data": {"total_size": total_master_weight_size}, "weight_map": index_master_weight_file},
+                f,
+                indent=4,
+            )
+
+    # save optimizer state dict
+    file_save_async_or_sync(
+        optim_state_dict, os.path.join(output_dir, "optimizer-00001-of-00001.safetensors"), safe_serialization=True
+    )
+    if master_weights is not None:
+        file_save_async_or_sync(
+            master_weights,
+            os.path.join(output_dir, "master_weights-00001-of-00001.safetensors"),
+            safe_serialization=True,
+        )
+
+
+def save_prefix_past_key_value(model_to_save, save_directory):
+    past_key_value = model_to_save.prefix_encoder(model_to_save.prefix_tokens.unsqueeze(0).expand([1, -1]))
+    past_key_value = past_key_value.reshape(
+        [
+            model_to_save.prefix_config.num_prefix_tokens,
+            2,
+            model_to_save.prefix_config.num_hidden_layers,
+            model_to_save.num_heads,
+            model_to_save.head_dim,
+        ]
+    )
+    past_key_value = paddle.transpose(past_key_value, perm=[2, 1, 3, 0, 4]).cpu().numpy()
+    model_to_save.prefix_config.save_pretrained(save_directory)
+    np.save(os.path.join(save_directory, PAST_KEY_VALUES_FILE_NAME), past_key_value)
+
+
+def get_expected_state_dict(model_to_save):
+    if isinstance(model_to_save, PretrainedModel):
+        state_dict = model_to_save.state_dict()
+    elif isinstance(model_to_save, LoRAModel):
+        state_dict = model_to_save.get_trainable_state_dict()
+    elif isinstance(model_to_save, PrefixModelForCausalLM):
+        state_dict = model_to_save.prefix_encoder.state_dict()
+    return state_dict
+
+
 def create_dispatch_table(args, model, file_keyname_mappings, file_machine_mappings, resume_from_checkpoint):
     """Create dispatch table for dynamically loading state dict.
 
@@ -820,7 +923,8 @@ def create_dispatch_table(args, model, file_keyname_mappings, file_machine_mappi
     dispatch_list = []
     recv_table = {}
     if args.dataset_rank == 0:
-        for (k, v) in model.state_dict().items():
+        state_dict = get_expected_state_dict(model)
+        for (k, v) in state_dict.items():
             if hasattr(v, "is_distributed") and v.is_distributed:
                 recv_table[k] = [(dist.get_rank(), tp_rank)]
             else:
@@ -933,7 +1037,7 @@ def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_chec
     # Distribute the checkpoint tensor dynamically, using the `send_table` and `recv_table` we create before.
     state_dict = distributed_send_recv(
         config_revise,
-        model.state_dict(),
+        get_expected_state_dict(model),
         tp_actions,
         send_table,
         recv_table,

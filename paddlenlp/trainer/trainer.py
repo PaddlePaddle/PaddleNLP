@@ -2062,7 +2062,16 @@ class Trainer:
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
                 logger.info("Saving optimizer files.")
-                paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+                if self.args.unified_checkpoint:
+                    save_unified_optimizer(
+                        self.args,
+                        self.model,
+                        self.optimizer,
+                        output_dir,
+                        safe_serialization=True,
+                    )
+                else:
+                    paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
             # FIXME: maybe only save one copy
             paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
@@ -2300,8 +2309,8 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
+            use_unified_checkpoint = False
             if self.args.unified_checkpoint:
-                use_unified_checkpoint = False
                 if self.is_unified_checkpoint(checkpoint):
                     use_unified_checkpoint = True
                 else:
