@@ -2304,8 +2304,8 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
+            use_unified_checkpoint = False
             if self.args.unified_checkpoint:
-                use_unified_checkpoint = False
                 if self.is_unified_checkpoint(checkpoint):
                     use_unified_checkpoint = True
                 else:
