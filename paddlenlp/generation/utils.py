@@ -1209,17 +1209,19 @@ class GenerationMixin(object):
             if top_p is not None and top_p < 1.0:
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
 
-            # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
-            if probs.dtype == paddle.bfloat16 and top_k == 1:
-                probs = probs.astype("float32")
-                next_tokens = paddle.unsqueeze(paddle.argmax(probs, axis=-1), -1)
-            else:
-                # next_tokens = paddle.multinomial(probs)
-                probs = probs.cpu()
-                from paddlenlp.transformers.utils import device_guard
+            # multinomial already support fp16 and bf16 currently, fix issue: https://github.com/PaddlePaddle/Paddle/issues/51852
+            next_tokens = paddle.multinomial(probs)
+            # # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
+            # if probs.dtype == paddle.bfloat16 and top_k == 1:
+            #     probs = probs.astype("float32")
+            #     next_tokens = paddle.unsqueeze(paddle.argmax(probs, axis=-1), -1)
+            # else:
+            #     # next_tokens = paddle.multinomial(probs)
+            #     probs = probs.cpu()
+            #     from paddlenlp.transformers.utils import device_guard
 
-                with device_guard("cpu"):
-                    next_tokens = paddle.multinomial(probs)
+            #     with device_guard("cpu"):
+            #         next_tokens = paddle.multinomial(probs)
 
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
