@@ -159,12 +159,13 @@ class AutoConfig(PretrainedConfig):
             config = AutoConfig.from_pretrained("bert-base-uncased")
             config.save_pretrained('./bert-base-uncased')
         """
-        subfolder = kwargs.get("subfolder", None)
-        from_aistudio = kwargs.get("from_aistudio", False)
-        from_hf_hub = kwargs.get("from_hf_hub", False)
-        cache_dir = resolve_cache_dir(
-            pretrained_model_name_or_path, from_hf_hub=from_hf_hub, cache_dir=kwargs.pop("cache_dir", None)
-        )
+        subfolder = kwargs.get("subfolder", "")
+        if subfolder is None:
+            subfolder = ""
+        from_aistudio = kwargs.pop("from_aistudio", False)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        cache_dir = kwargs.pop("cache_dir", None)
+        cache_dir = resolve_cache_dir(from_hf_hub=from_hf_hub, from_aistudio=from_aistudio, cache_dir=cache_dir)
 
         if not cls.name2class:
             cls.name2class = {}
@@ -182,10 +183,10 @@ class AutoConfig(PretrainedConfig):
 
         # From local dir path
         elif os.path.isdir(pretrained_model_name_or_path):
-            config_file = os.path.join(pretrained_model_name_or_path, cls.config_file)
+            config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.config_file)
             if not os.path.exists(config_file):
                 # try to load legacy config file
-                legacy_config_file = os.path.join(pretrained_model_name_or_path, cls.legacy_config_file)
+                legacy_config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.legacy_config_file)
                 if not os.path.exists(legacy_config_file):
                     raise ValueError(
                         f"config file<{cls.config_file}> or legacy config file<{cls.legacy_config_file}> not found"
@@ -203,6 +204,8 @@ class AutoConfig(PretrainedConfig):
             file = aistudio_download(
                 repo_id=pretrained_model_name_or_path,
                 filename=cls.config_file,
+                subfolder=subfolder,
+                cache_dir=cache_dir,
             )
             return cls.from_pretrained(os.path.dirname(file))
         elif from_hf_hub:
@@ -219,15 +222,16 @@ class AutoConfig(PretrainedConfig):
 
         # Assuming from community-contributed pretrained models
         else:
-            # support subfolder
-            if subfolder is not None:
-                pretrained_model_name_or_path = os.path.join(pretrained_model_name_or_path, subfolder)
+            url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.config_file]
+            legacy_url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.legacy_config_file]
+            cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
+            if subfolder != "":
+                url_list.insert(2, subfolder)
+                legacy_url_list.insert(2, subfolder)
+            community_config_path = "/".join(url_list)
+            legacy_community_config_path = "/".join(legacy_url_list)
 
-            community_config_path = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.config_file])
             if not url_file_exists(community_config_path):
-                legacy_community_config_path = "/".join(
-                    [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.legacy_config_file]
-                )
                 if not url_file_exists(legacy_community_config_path):
                     raise RuntimeError(
                         f"Can't load Config for '{pretrained_model_name_or_path}'.\n"

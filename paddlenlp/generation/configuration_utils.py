@@ -27,6 +27,7 @@ from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.utils import resolve_cache_dir
 from paddlenlp.utils.log import logger
 
+from ..transformers.aistudio_utils import aistudio_download
 from ..utils import GENERATION_CONFIG_NAME
 from ..utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
@@ -336,6 +337,7 @@ class GenerationConfig:
         cls,
         pretrained_model_name_or_path: Union[str, os.PathLike],
         from_hf_hub: bool = False,
+        from_aistudio: bool = False,
         config_file_name: Optional[Union[str, os.PathLike]] = None,
         cache_dir: Optional[Union[str, os.PathLike]] = None,
         force_download: bool = False,
@@ -404,12 +406,11 @@ class GenerationConfig:
         ```"""
         config_file_name = config_file_name if config_file_name is not None else GENERATION_CONFIG_NAME
 
-        subfolder = kwargs.pop("subfolder", None)
+        subfolder = kwargs.pop("subfolder", "")
+        if subfolder is None:
+            subfolder = ""
 
-        config_path = os.path.join(pretrained_model_name_or_path, config_file_name)
-        config_path = str(config_path)
-
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
 
         # 1. get the configuration file from local file, eg: /cache/path/model_config.json
         if os.path.isfile(pretrained_model_name_or_path):
@@ -418,24 +419,37 @@ class GenerationConfig:
         # 2. get the configuration file from url, eg: https://ip/path/to/model_config.json
         elif is_url(pretrained_model_name_or_path):
             resolved_config_file = get_path_from_url_with_filelock(
-                pretrained_model_name_or_path, cache_dir, check_exist=not force_download
+                pretrained_model_name_or_path,
+                cache_dir=os.path.join(cache_dir, pretrained_model_name_or_path, subfolder),
+                check_exist=not force_download,
             )
         # 3. get the configuration file from local dir with default name, eg: /local/path
         elif os.path.isdir(pretrained_model_name_or_path):
-            configuration_file = os.path.join(pretrained_model_name_or_path, GENERATION_CONFIG_NAME)
+            configuration_file = os.path.join(pretrained_model_name_or_path, subfolder, config_file_name)
             if os.path.exists(configuration_file):
                 resolved_config_file = configuration_file
             else:
                 # try to detect old-school config file
                 raise FileNotFoundError("please make sure there is `generation_config.json` under the dir")
-
-        # 4. get the configuration file from HF hub
+        # 4. get the configuration file from aistudio
+        elif from_aistudio:
+            resolved_config_file = aistudio_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=config_file_name,
+                cache_dir=cache_dir,
+                subfolder=subfolder,
+            )
+        # 5. get the configuration file from HF hub
         elif from_hf_hub:
             resolved_config_file = resolve_hf_generation_config_path(
                 repo_id=pretrained_model_name_or_path, cache_dir=cache_dir, subfolder=subfolder
             )
         else:
-            community_url = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, GENERATION_CONFIG_NAME])
+            url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, config_file_name]
+            cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
+            if subfolder != "":
+                url_list.insert(2, subfolder)
+            community_url = "/".join(url_list)
             if url_file_exists(community_url):
                 resolved_config_file = get_path_from_url_with_filelock(
                     community_url, cache_dir, check_exist=not force_download

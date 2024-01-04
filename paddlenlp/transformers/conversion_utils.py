@@ -1030,7 +1030,6 @@ class ConversionMixin:
         """
         # FIXME(wj-Mcat): add compatibility with downstream models
         name_mappings = cls._get_name_mappings(config)
-
         if weight_file.endswith(".index.json"):
             if ".safetensors." in weight_file:
                 files = [file for file in os.listdir(os.path.dirname(weight_file)) if file.startswith("model-")]

@@ -278,43 +278,27 @@ class _BaseAutoModelClass:
         cache_dir = kwargs.get("cache_dir", None)
         from_aistudio = kwargs.get("from_aistudio", False)
         from_hf_hub = kwargs.get("from_hf_hub", False)
-        subfolder = kwargs.get("subfolder", None)
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
-
+        subfolder = kwargs.get("subfolder", "")
+        if subfolder is None:
+            subfolder = ""
+        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
+        kwargs["cache_dir"] = cache_dir
+        kwargs["subfolder"] = subfolder
         all_model_names = []
         for pretrained_model_names, model_name in cls._pretrained_model_dict.items():
             for name in pretrained_model_names:
                 all_model_names.append(name)
-        if from_aistudio:
-            config_file = aistudio_download(repo_id=pretrained_model_name_or_path, filename=cls.model_config_file)
+        # From local dir path
+        if os.path.isdir(pretrained_model_name_or_path):
+            config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.model_config_file)
+            legacy_config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.legacy_model_config_file)
             if os.path.exists(config_file):
                 model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, config_file)
                 logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
                 return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-            else:
-                logger.warning(f"{config_file}  is not a valid path to a model config file")
-        elif from_hf_hub:
-            if hf_file_exists(repo_id=pretrained_model_name_or_path, filename=cls.model_config_file):
-                config_file = hf_hub_download(
-                    repo_id=pretrained_model_name_or_path,
-                    filename=cls.model_config_file,
-                    subfolder=subfolder,
-                    cache_dir=cache_dir,
-                    library_name="PaddleNLP",
-                    library_version=__version__,
-                )
-            elif hf_file_exists(repo_id=pretrained_model_name_or_path, filename=cls.legacy_model_config_file):
+            elif os.path.exists(legacy_config_file):
                 logger.info("Standard config do not exist, loading from legacy config")
-                config_file = hf_hub_download(
-                    repo_id=pretrained_model_name_or_path,
-                    filename=cls.legacy_model_config_file,
-                    subfolder=subfolder,
-                    cache_dir=cache_dir,
-                    library_name="PaddleNLP",
-                    library_version=__version__,
-                )
-            if os.path.exists(config_file):
-                model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, config_file)
+                model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, legacy_config_file)
                 logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
                 return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
             else:
@@ -350,29 +334,59 @@ class _BaseAutoModelClass:
                                 )
                         logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
                         return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-        # From local dir path
-        elif os.path.isdir(pretrained_model_name_or_path):
-            config_file = os.path.join(pretrained_model_name_or_path, cls.model_config_file)
-            legacy_config_file = os.path.join(pretrained_model_name_or_path, cls.legacy_model_config_file)
+        # Assuming from community-contributed pretrained models
+        elif from_aistudio:
+            config_file = aistudio_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=cls.model_config_file,
+                subfolder=subfolder,
+                cache_dir=cache_dir,
+            )
             if os.path.exists(config_file):
                 model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, config_file)
                 logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
                 return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-            elif os.path.exists(legacy_config_file):
+            else:
+                logger.warning(f"{config_file}  is not a valid path to a model config file")
+        elif from_hf_hub:
+            if hf_file_exists(
+                repo_id=pretrained_model_name_or_path, filename=cls.model_config_file, subfolder=subfolder
+            ):
+                config_file = hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=cls.model_config_file,
+                    subfolder=subfolder,
+                    cache_dir=cache_dir,
+                    library_name="PaddleNLP",
+                    library_version=__version__,
+                )
+            elif hf_file_exists(
+                repo_id=pretrained_model_name_or_path, filename=cls.legacy_model_config_file, subfolder=subfolder
+            ):
                 logger.info("Standard config do not exist, loading from legacy config")
-                model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, legacy_config_file)
+                config_file = hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=cls.legacy_model_config_file,
+                    subfolder=subfolder,
+                    cache_dir=cache_dir,
+                    library_name="PaddleNLP",
+                    library_version=__version__,
+                )
+            if os.path.exists(config_file):
+                model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, config_file)
                 logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
                 return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
             else:
                 logger.warning(f"{config_file}  is not a valid path to a model config file")
-        # Assuming from community-contributed pretrained models
         else:
-            standard_community_url = "/".join(
-                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
-            )
-            legacy_community_url = "/".join(
-                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.legacy_model_config_file]
-            )
+            standard_url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
+            legacy_url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.legacy_model_config_file]
+            cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
+            if subfolder != "":
+                standard_url_list.insert(2, subfolder)
+                legacy_url_list.insert(2, subfolder)
+            standard_community_url = "/".join(standard_url_list)
+            legacy_community_url = "/".join(legacy_url_list)
             try:
                 if url_file_exists(standard_community_url):
                     resolved_vocab_file = get_path_from_url_with_filelock(standard_community_url, cache_dir)
