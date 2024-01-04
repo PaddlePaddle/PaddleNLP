@@ -105,7 +105,7 @@ def get_args():
     group.add_argument("--workers", type=int, default=1, help="Number of worker processes to launch")
     group.add_argument("--max_doc_num", type=int, default=sys.maxsize, help="Number of worker processes to launch")
     group.add_argument(
-        "--max_repeated_len", type=int, default=20, help="The maximum length of the repeated characters to keep"
+        "--max_repeated_len", type=int, default=100, help="The maximum length of the repeated characters to keep"
     )
 
     args = parser.parse_args()
@@ -281,7 +281,7 @@ class Converter(object):
 
         Converter.process = process
 
-    def remove_repeated_chars(text, max_repeated_len=20):
+    def remove_repeated_chars(text, max_repeated_len=100):
         """
         Removes repeated characters from the given text, where the length of
         the repeated characters is greater than or equal to the specified length.
