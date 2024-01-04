@@ -42,7 +42,10 @@ from huggingface_hub import (
 )
 from huggingface_hub.utils import EntryNotFoundError
 from paddle import Tensor
-from paddle.distributed.fleet.meta_parallel.parallel_layers import SharedLayerDesc
+from paddle.distributed.fleet.meta_parallel.parallel_layers import (
+    PipelineLayer,
+    SharedLayerDesc,
+)
 from paddle.nn import Embedding, Layer
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
@@ -934,6 +937,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             and self.__class__.init_weights is PretrainedModel.init_weights
         ):
             self.init_weights()
+
+        # Note:
+        # 1. PipelineLayer will create parameters for each layer and
+        # call `_synchronize_shared_weights()` to synchronize the shared parameters.
+        # 2. When setting the model `state_dict`, `_synchronize_shared_weights` will be called to
+        # synchronize the shared parameters.
+        # However, `self._init_weights` will re-initialize the parameters without
+        # synchronizing the shared parameters. If the following step does not load a checkpoint,
+        # the shared parameters will be different.
+
+        if isinstance(self, PipelineLayer):
+            self._synchronize_shared_weights()
 
     def _init_weights(self, layer):
         """
