@@ -55,7 +55,6 @@ class PrefixTuningTest(LLMTest, unittest.TestCase):
 
         prefix_tuning_config["dataset_name_or_path"] = self.data_dir
         prefix_tuning_config["output_dir"] = self.output_dir
-
         with argv_context_guard(prefix_tuning_config):
             from finetune_generation import main
 

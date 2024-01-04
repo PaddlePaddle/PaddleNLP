@@ -14,7 +14,7 @@
     "use_flash_attention": true,
     "use_fused_rms_norm": true,
     "use_fused_rope": true,
-    "max_seq_length": 4096,
+    "max_seq_length": 2048,
     "learning_rate": 3e-05,
     "min_learning_rate": 3e-06,
     "warmup_steps": 30,
