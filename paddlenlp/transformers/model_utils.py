@@ -939,12 +939,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             self.init_weights()
 
         # Note:
-        # 1. PipelineLayer will create parameters for each layers and
-        # call _synchronize_shared_weights() to synchronize the shared parameters.
-        # 2. When set model state_dict, the _synchronize_shared_weights will be called to
+        # 1. PipelineLayer will create parameters for each layer and
+        # call `_synchronize_shared_weights()` to synchronize the shared parameters.
+        # 2. When setting the model `state_dict`, `_synchronize_shared_weights` will be called to
         # synchronize the shared parameters.
-        # However, self._init_weights will re-initialize the parameters and
-        # without synchronize the shared parameters. If the following step will not load checkpoint,
+        # However, `self._init_weights` will re-initialize the parameters without
+        # synchronizing the shared parameters. If the following step does not load a checkpoint,
         # the shared parameters will be different.
 
         if isinstance(self, PipelineLayer):
