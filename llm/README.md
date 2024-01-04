@@ -378,8 +378,11 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" flask_server.py \
 - `flask_port`: Flask服务端口号，默认8010。
 - 其他参数请参见动态图推理中参数。
 
+此外，如果想通过API脚本的方式跑推理，可参考：`./request_flask_server.py` 文件。
+
 </div></details>
 
+<<<<<<< HEAD
 ## 6. 量化
 
 量化算法可以将模型权重和激活转为更低比特数值类型表示，能够有效减少显存占用和计算开销。下面我们提供GPTQ和PaddleSlim自研的PTQ策略，分别实现WINT4和W8A8量化。更多技术细节详见[量化策略详细教程](https://github.com/PaddlePaddle/PaddleSlim/blob/develop/docs/zh_cn/tutorials/quant/advanced_quantization.md)
@@ -465,6 +468,12 @@ python  finetune_generation.py ./llama/gptq_argument.json
 ### 7.2 转化 Pytorch 权重
 
 PaddleNLP 提供了可自动将 Pytorch 相关的权重转化为 Paddle 权重的接口，代码如下：
+=======
+
+
+### 6. PyTorch模型权重转换
+PaddleNLP 提供了可自动将 PyTorch 相关的权重转化为 Paddle 权重的接口，代码如下：
+>>>>>>> 04dc6251f ([New Features] support dynamic src_length (#7740))
 
 ```python
 from paddlenlp.transformers import AutoModelForCausalLM

@@ -39,11 +39,19 @@ def is_port_in_use(port):
 class UITest(unittest.TestCase):
     def setUp(self):
         # start web ui
+<<<<<<< HEAD
         self.base_port = self.avaliable_free_port()
         self.port = self.avaliable_free_port([self.base_port])
         self.model_path = "__internal_testing__/tiny-random-llama"
         command = 'cd llm && python flask_server.py --model_name_or_path {model_path} --port {port} --base_port {base_port} --src_length 1024 --dtype "float16"'.format(
             base_port=self.base_port, port=self.port, model_path=self.model_path
+=======
+        self.flask_port = self.avaliable_free_port()
+        self.port = self.avaliable_free_port([self.flask_port])
+        self.model_path = "__internal_testing__/micro-random-llama"
+        command = 'cd llm && python flask_server.py --model_name_or_path {model_path} --port {port} --flask_port {flask_port} --src_length 1024 --dtype "float16"'.format(
+            flask_port=self.flask_port, port=self.port, model_path=self.model_path
+>>>>>>> 04dc6251f ([New Features] support dynamic src_length (#7740))
         )
         self.ui_process = subprocess.Popen(command, shell=True, stdout=sys.stdout, stderr=sys.stderr)
         self.tokenizer = LlamaTokenizer.from_pretrained(self.model_path)
