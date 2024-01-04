@@ -551,6 +551,84 @@ class TestUnifiedCheckpointOnN1C8CheckpointCompatible(TestUnifiedCheckpointBase)
         self.run_n1c8("run_pretrain.py", **train_args)
 
 
+class TestPaddleCheckpointOnN1C8Reset(TestUnifiedCheckpointBase):
+    def setUp(self):
+        super().setUp()
+
+        self.need_allclose = True
+        self.rtol = 1e-7
+
+    def runfrist(self, train_args):
+        train_args["unified_checkpoint"] = 0
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+    def rerun(self, train_args):
+        train_args["unified_checkpoint"] = 0
+        self.run_n1c8("run_pretrain.py", **train_args)
+
+
+class TestPaddleCheckpointOnN1C2Reset(TestMultipleGpus):
+    def setUp(self):
+        self.configs = get_pretrain_arguments(pretrain_arguments)
+        os.environ.update(environment_variables)
+
+        self.need_allclose = True
+        self.rtol = 1e-7
+
+    def runfrist(self, train_args):
+        train_args["unified_checkpoint"] = 0
+        self.run_n1c2("run_pretrain.py", **train_args)
+
+    def rerun(self, train_args):
+        train_args["unified_checkpoint"] = 0
+        self.run_n1c2("run_pretrain.py", **train_args)
+
+    def testTP2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["TP2"]
+
+        self.runfrist(train_args)
+        self.rerun(train_args)
+
+        if self.need_allclose:
+            res = check_acc()
+            assert len(res) == 2
+            np.testing.assert_allclose(res[0], res[1], self.rtol)
+
+
+class TestUnifiedCheckpointOnN1C2Reset(TestMultipleGpus):
+    def setUp(self):
+        self.configs = get_pretrain_arguments(pretrain_arguments)
+        os.environ.update(environment_variables)
+
+        self.need_allclose = True
+        self.rtol = 1e-7
+
+    def runfrist(self, train_args):
+        train_args["unified_checkpoint"] = 1
+        self.run_n1c2("run_pretrain.py", **train_args)
+
+    def rerun(self, train_args):
+        train_args["unified_checkpoint"] = 1
+        self.run_n1c2("run_pretrain.py", **train_args)
+
+    def testTP2(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        train_args = self.configs["TP2"]
+
+        self.runfrist(train_args)
+        self.rerun(train_args)
+
+        if self.need_allclose:
+            res = check_acc()
+            assert len(res) == 2
+            np.testing.assert_allclose(res[0], res[1], self.rtol)
+
+
 class TestUnifiedCheckpointOnN1C8AsyncSaveToDisk(TestUnifiedCheckpointBase):
     def setUp(self):
         super().setUp()

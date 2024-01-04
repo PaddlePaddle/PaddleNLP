@@ -187,6 +187,11 @@ class TestMultipleGpus(unittest.TestCase):
         self.selected_gpus = get_gpus("0,1,2,3,4,5,6,7")
         self.run_n_gpu(*args, **kwargs)
 
+    def run_n1c2(self, *args, **kwargs):
+        self.selected_gpus = get_gpus("0,1")
+        self.num_nodes = 1
+        self.run_n_gpu(*args, **kwargs)
+
     def run_n1c8(self, *args, **kwargs):
         self.selected_gpus = get_gpus("0,1,2,3,4,5,6,7")
         self.num_nodes = 1
