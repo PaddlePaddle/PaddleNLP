@@ -99,8 +99,7 @@ function _train(){
     fi
 
     model_config="gpt2-medium-en"
-    train_cmd="--model_type gpt \
-                --model_name_or_path ${model_config} \
+    train_cmd="--model_name_or_path ${model_config} \
                 --tokenizer_name_or_path ${model_config} \
                 --input_dir ./data\
                 --output_dir output\
@@ -131,7 +130,6 @@ function _train(){
                 --max_steps ${max_iter}\
                 --save_steps 5000\
                 --device gpu\
-                --skip_memory_metrics 0 \
                 --warmup_ratio 0.01\
                 --scale_loss 32768\
                 --per_device_train_batch_size ${micro_batch_size}\

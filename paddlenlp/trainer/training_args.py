@@ -235,6 +235,7 @@ class TrainingArguments:
               enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance.
               enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.
               enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true. It can accelerate model parallel further.
+              enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.
         pipeline_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it.
             following config is support:
@@ -243,6 +244,7 @@ class TrainingArguments:
               enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
               enable_dp_comm_overlap, fuse data parallel gradient communication.
               enable_sharding_comm_overlap, fuse sharding stage 1 parallel gradient communication.
+              enable_release_grads, reduce peak memory usage by releasing gradients after each iteration. The creation of gradients will be postponed until backward propagation of the next iteration.
         sharding_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
             following config is support:
@@ -573,7 +575,8 @@ class TrainingArguments:
                 "following config is support:\n"
                 "enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance. \n"
                 "enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.\n"
-                "enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true.  It can accelerate model parallel further."
+                "enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true.  It can accelerate model parallel further.\n"
+                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.\n"
             )
         },
     )
@@ -726,12 +729,24 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Enable training under @to_static."},
     )
-
+    unified_checkpoint_config: Optional[str] = field(
+        default="",
+        metadata={
+            "help": (
+                "Configs to unify hybrid parallel checkpoint.\n"
+                "Following options are supports:\n"
+                "- skip_save_model_weight: do not save model weights when the masters weight exist\n"
+                "- master_weight_compatible: 1. if the master weights exist, only load when needed\n"
+                "                            2. if master weights does not exist, convert model weights to master weights when needed\n"
+                "- async_save: enable asynchronous saving checkpoints to disk\n"
+                "- enable_all_options: enable all optimization configurations\n"
+            )
+        },
+    )
     ignore_load_lr_and_optim: Optional[bool] = field(
         default=False,
         metadata={"help": "whether to ignore load optimizer and scheduler."},
     )
-
     force_reshard_pp: Optional[bool] = field(
         default=False,
         metadata={"help": "reshard pp even if pp degree in the model and pp degree in script match"},
@@ -934,6 +949,7 @@ class TrainingArguments:
                                 "enable_dp_comm_overlap",
                                 "enable_sharding_comm_overlap",
                                 "enable_timer",
+                                "enable_release_grads",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -954,6 +970,7 @@ class TrainingArguments:
                         "sharding_comm_overlap": "enable_sharding_comm_overlap" in pipeline_parallel_config
                         and self.sharding_parallel_degree > 1,
                         "enable_timer": "enable_timer" in pipeline_parallel_config,
+                        "release_gradients": "enable_release_grads" in pipeline_parallel_config,
                     }
                     if dygraph_pp_configs["dp_comm_overlap"]:
                         raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
@@ -985,6 +1002,7 @@ class TrainingArguments:
                                 "enable_mp_async_allreduce",
                                 "enable_mp_skip_c_identity",
                                 "enable_mp_fused_linear_param_grad_add",
+                                "enable_delay_scale_loss",
                             ]:
                                 raise ValueError(
                                     f"Found unknown tensor parallell config {x}, "
@@ -1135,7 +1153,8 @@ class TrainingArguments:
                 warnings.warn("`offload` is not supported NOW!")
 
             strategy = fleet.auto.Strategy()
-            if self.pipeline_parallel_degree > 1:
+            # navie-pp: pipeline_parallel_degree > 1 and gradient_accumulation_steps == 1
+            if self.pipeline_parallel_degree > 1 and self.gradient_accumulation_steps > 1:
                 pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
                 for x in pipeline_parallel_config:
                     if len(x) > 0:
@@ -1276,11 +1295,26 @@ class TrainingArguments:
                     else:
                         paddle.distributed.init_parallel_env()
 
-        # if self.unified_checkpoint and not self.use_hybrid_parallel:
-        #     logger.warning(
-        #         "The unified_checkpoint only avaliable for hybrid_parallel. Set unified_checkpoint to False for not using hybrid_parallel."
-        #     )
-        #     self.unified_checkpoint = False
+        if self.unified_checkpoint:
+            unified_checkpoint_config = set(self.unified_checkpoint_config.split(" "))
+            for x in unified_checkpoint_config:
+                if len(x) > 0:
+                    if x not in [
+                        "skip_save_model_weight",
+                        "master_weight_compatible",
+                        "async_save",
+                        "enable_all_options",
+                    ]:
+                        raise ValueError(
+                            f"Found unknown unified_checkpoint config {x}, accpet config is skip_save_model_weight, "
+                            + "master_weight_compatible, async_save, enable_all_options."
+                        )
+            if "enable_all_options" in unified_checkpoint_config:
+                self.unified_checkpoint_config = [
+                    "skip_save_model_weight",
+                    "master_weight_compatible",
+                    "async_save",
+                ]
 
         if self.report_to is None:
             logger.info(

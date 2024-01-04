@@ -136,12 +136,13 @@ def convert_to_quantize_state_dict_without_check(state_dict, quantization_linear
         if weight_name in state_dict:
             target_weight = state_dict.pop(weight_name).cast(dtype).cuda()
             qlora_state_dict = qlora_weight_quantize(
-                target_weight,
-                quantization_config.weight_quantize_algo,
+                weight=target_weight,
+                quant_algo=quantization_config.weight_quantize_algo,
                 double_quant=quantization_config.weight_double_quant,
                 block_size=quantization_config.weight_blocksize,
                 double_quant_block_size=quantization_config.weight_double_quant_block_size,
                 linear_name=name,
+                return_dict=True,
             )
             state_dict.update(qlora_state_dict)
             del target_weight
