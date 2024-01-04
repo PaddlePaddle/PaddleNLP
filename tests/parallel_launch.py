@@ -30,6 +30,8 @@ from paddle.distributed.utils.launch_utils import (
     watch_local_trainers,
 )
 
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
+
 logger = logging.getLogger("root")
 
 
@@ -251,6 +253,14 @@ class TestMultipleGpus(unittest.TestCase):
                 time.sleep(0.5)
         finally:
             terminate_local_procs(procs)
+
+    def prepare_inputs_data(self, input_dir, files):
+        os.makedirs(input_dir, exist_ok=True)
+        for file in files:
+            file_name = file.split("/")[-1]
+            file_path = os.path.join(input_dir, file_name)
+            if not os.path.exists(file_path):
+                get_path_from_url_with_filelock(file, root_dir=input_dir)
 
 
 class TestMultipleWithGloo(unittest.TestCase):
