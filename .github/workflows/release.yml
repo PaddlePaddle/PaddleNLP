@@ -42,8 +42,8 @@ jobs:
       - name: Is A Publish Branch
         if: steps.check-branch.outputs.match == 'true' && steps.should-deploy.outputs.should_deploy == 'true'
         env:
-          TWINE_USERNAME: paddle-dev
-          TWINE_PASSWORD: ${{ secrets.paddlenlp }}
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.paddlenlp_pypi }}
           PACKAGE: ${{ inputs.package }}
           PADDLENLP_STABLE_VERSION: "true"
         run: |
