@@ -1293,6 +1293,9 @@ class Trainer:
         )
 
     def _get_eval_sampler(self, eval_dataset: Dataset):
+        if eval_dataset is None or not has_length(eval_dataset):
+            return None
+
         if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
                 eval_dataset,
