@@ -422,7 +422,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
     )
     has_master_weights = True if sharded_metadata["master_weights"] else False
 
-    model_state_dict = model.state_dict()
+    model_state_dict = get_expected_state_dict(model)
     model_keys = list(model_state_dict.keys())
     struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}  # get optimizer param mappings
 
@@ -969,7 +969,8 @@ def create_optimizer_dispatch_table(
     dispatch_list = []
     recv_table = {}
     if args.data_parallel_rank == 0:
-        for (k, v) in model.state_dict().items():
+        state_dict = get_expected_state_dict(model)
+        for (k, v) in state_dict.items():
             if sharding_group.nranks > 1:
                 static_name = struct2static_name_mappings[k]
                 param_rank = param2rank.get(static_name, None)
@@ -1088,8 +1089,8 @@ def load_unified_optimizer_dynamically(args, model, optimizer, resume_from_check
     for key in index["weight_map"].keys():
         _, typename = key.split("/")
         typename_set.add(typename)
-    struct2static_name_mappings = {k: v.name for k, v in model.state_dict().items()}
-    static2struct_name_mappings = {v.name: k for k, v in model.state_dict().items()}
+    struct2static_name_mappings = {k: v.name for k, v in get_expected_state_dict(model).items()}
+    static2struct_name_mappings = {v.name: k for k, v in get_expected_state_dict(model).items()}
     # Get send_table and recv_table. The send table indicates which workers are responsible for sending tensors, and the recv table indicates which workers should receive the tensors.
     send_table, recv_table = create_optimizer_dispatch_table(
         args,
@@ -1614,7 +1615,7 @@ def get_expected_keys(sharded_metadata, model, optimizer):
     if in_sharding_parallel_model:
         params2rank = optimizer._param2rank
 
-    struct2static_name_mappings = {k: v.name for k, v in model.state_dict().items()}
+    struct2static_name_mappings = {k: v.name for k, v in get_expected_state_dict(model).items()}
 
     expected_keys = []
     for key in list(sharded_metadata["all_optimizer_keys"]):
