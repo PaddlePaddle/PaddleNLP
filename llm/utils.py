@@ -29,7 +29,11 @@ from sklearn.metrics import accuracy_score
 from paddlenlp.datasets import InTokensIterableDataset
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
-from paddlenlp.transformers import ChatGLMv2Tokenizer, LlamaForCausalLMPipe
+from paddlenlp.transformers import (
+    ChatGLMv2Tokenizer,
+    LlamaForCausalLMPipe,
+    PretrainedConfig,
+)
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
@@ -637,3 +641,49 @@ def init_chat_template(
 
     logger.info(f"loading `chat_template.json` from `{chat_template_file}`")
     tokenizer.init_chat_template(chat_template_file)
+
+
+def get_model_max_position_embeddings(config: PretrainedConfig) -> Optional[int]:
+    names = [
+        "max_position_embeddings",  # most of models
+        "max_sequence_length",  # GLM model
+        "seq_length",  # llama model
+    ]
+    for name in names:
+        max_length = config.get(name, None)
+        if max_length is not None:
+            return max_length
+    return None
+
+
+def get_default_max_decoding_length(config: PretrainedConfig, default: int = 1024) -> int:
+    """get the default max decoding length from config.
+
+    Args:
+        config (PretrainedConfig): the instance of PretrainedConfig
+        default (int): the default value of max decoding length
+
+    Returns:
+        int: the default max_length of decoding length
+    """
+    max_position_embeddings = get_model_max_position_embeddings(config)
+    if max_position_embeddings is None:
+        return default
+    return max_position_embeddings // 4
+
+
+def get_default_max_encoding_length(config: PretrainedConfig, default: int = 1024) -> int:
+    """get the default max encoding length from config.
+
+    Args:
+        config (PretrainedConfig): the instance of PretrainedConfig
+        default (int): the default value of max encoding length
+
+    Returns:
+        int: the default max_length of encoding length
+    """
+
+    max_position_embeddings = get_model_max_position_embeddings(config)
+    if max_position_embeddings is None:
+        return default
+    return max_position_embeddings // 4 * 3
