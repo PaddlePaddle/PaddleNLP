@@ -702,9 +702,6 @@ class TrainingArguments:
     skip_memory_metrics: bool = field(
         default=True, metadata={"help": "Whether or not to skip adding of memory profiler reports to metrics."}
     )
-    keep_optimizer_state_static_keys: bool = field(
-        default=True, metadata={"help": "Whether or not to save the optimizer state as paddle statice keys."}
-    )
 
     flatten_param_grads: Optional[bool] = field(
         default=False,

@@ -25,13 +25,27 @@ from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
+import paddle
+import paddle.io as io
+import paddle.nn as nn
 
-from paddlenlp.trainer import IntervalStrategy, TrainingArguments
+from paddlenlp.trainer import (
+    EarlyStoppingCallback,
+    IntervalStrategy,
+    Trainer,
+    TrainerState,
+    TrainingArguments,
+)
 from paddlenlp.trainer.trainer_utils import PREFIX_CHECKPOINT_DIR
-
-# from paddlenlp.trainer.training_args import OptimizerNames
-from paddlenlp.transformers import PretrainedConfig
-from paddlenlp.transformers.testing_utils import (
+from paddlenlp.transformers import (
+    GPTConfig,
+    GPTLMHeadModel,
+    PretrainedConfig,
+    PretrainedModel,
+)
+from paddlenlp.utils.env import PADDLE_WEIGHTS_INDEX_NAME, PADDLE_WEIGHTS_NAME
+from paddlenlp.utils.import_utils import is_paddle_available
+from tests.testing_utils import (
     TestCasePlus,
     get_gpu_count,
     get_tests_dir,
@@ -43,22 +57,8 @@ from paddlenlp.transformers.testing_utils import (
     require_paddle_up_to_2_gpus,
     require_sentencepiece,
 )
-from paddlenlp.utils.import_utils import is_paddle_available
 
-# from paddlenlp.transformers.utils import WEIGHTS_INDEX_NAME, WEIGHTS_NAME
-
-WEIGHTS_NAME = "model_state.pdparams"
-WEIGHTS_INDEX_NAME = "model_state.pdparams.index.json"
-
-if is_paddle_available():
-    import paddle
-    from paddle import nn
-    from paddle.io import IterableDataset
-
-    from paddlenlp.trainer import EarlyStoppingCallback, Trainer, TrainerState
-    from paddlenlp.transformers import GPTConfig, GPTLMHeadModel, PretrainedModel
-
-    # from paddlenlp.transformers.model_utils import unwrap_model
+# from paddlenlp.transformers.model_utils import unwrap_model
 
 
 PATH_SAMPLE_TEXT = f"{get_tests_dir()}/fixtures/sample_text.txt"
@@ -143,7 +143,7 @@ class RegressionModelConfig(PretrainedConfig):
 
 if is_paddle_available():
 
-    class SampleIterableDataset(IterableDataset):
+    class SampleIterableDataset(io.IterableDataset):
         def __init__(self, a=2, b=3, length=64, seed=42, label_names=None):
             self.dataset = RegressionDataset(a=a, b=b, length=length, seed=seed, label_names=label_names)
 
@@ -309,7 +309,7 @@ if is_paddle_available():
 
 class TrainerIntegrationCommon:
     def check_saved_checkpoints(self, output_dir, freq, total, is_pretrained=True):
-        file_list = [WEIGHTS_NAME, "training_args.bin", "optimizer.pt", "scheduler.pt", "trainer_state.json"]
+        file_list = [PADDLE_WEIGHTS_NAME, "training_args.bin", "optimizer.pt", "scheduler.pt", "trainer_state.json"]
         if is_pretrained:
             file_list.append("config.json")
         for step in range(freq, total, freq):
@@ -333,7 +333,7 @@ class TrainerIntegrationCommon:
             best_model.to(trainer.args.device)
         else:
             best_model = RegressionModel()
-            state_dict = paddle.load(os.path.join(checkpoint, WEIGHTS_NAME))
+            state_dict = paddle.load(os.path.join(checkpoint, PADDLE_WEIGHTS_NAME))
             best_model.load_state_dict(state_dict)
             best_model.to(trainer.args.device)
         self.assertTrue(paddle.allclose(best_model.a, trainer.model.a))
@@ -359,16 +359,16 @@ class TrainerIntegrationCommon:
 
     def convert_to_sharded_checkpoint(self, folder):
         # Converts a checkpoint of a regression model to a sharded checkpoint.
-        state_dict = paddle.load(os.path.join(folder, WEIGHTS_NAME))
-        os.remove(os.path.join(folder, WEIGHTS_NAME))
+        state_dict = paddle.load(os.path.join(folder, PADDLE_WEIGHTS_NAME))
+        os.remove(os.path.join(folder, PADDLE_WEIGHTS_NAME))
         keys = list(state_dict.keys())
 
         shard_files = [
-            WEIGHTS_NAME.replace(".bin", f"-{idx+1:05d}-of-{len(keys):05d}.bin") for idx in range(len(keys))
+            PADDLE_WEIGHTS_NAME.replace(".bin", f"-{idx+1:05d}-of-{len(keys):05d}.bin") for idx in range(len(keys))
         ]
         index = {"metadata": {}, "weight_map": {key: shard_files[i] for i, key in enumerate(keys)}}
 
-        save_index_file = os.path.join(folder, WEIGHTS_INDEX_NAME)
+        save_index_file = os.path.join(folder, PADDLE_WEIGHTS_INDEX_NAME)
         with open(save_index_file, "w", encoding="utf-8") as f:
             content = json.dumps(index, indent=2, sort_keys=True) + "\n"
             f.write(content)
