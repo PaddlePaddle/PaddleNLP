@@ -25,8 +25,9 @@ from typing import List, Optional
 import numpy as np
 import paddle
 import paddle.distributed.fleet.base.topology as tp
+import paddle.incubate.multiprocessing as mp
 from paddle.distributed import fleet
-from paddlenlp_ops import reset_stop_value
+from paddlenlp_ops import get_output, reset_stop_value
 from utils import (
     dybatch_preprocess,
     get_alibi_slopes,
@@ -113,11 +114,9 @@ class PredictorArgument:
     )
     block_attn: bool = field(default=False, metadata={"help": "whether use block attention"})
     block_size: int = field(default=64, metadata={"help": "the block size for cache_kvs."})
-    use_cachekv_int8: str = field(
-        default="None",
-        metadata={
-            "help": "If use_cachekv_int8 set as `dynamic`, dynamic cache kv quantization will be applied; if set as `static`, static cache kv will be applied"
-        },
+    cachekv_int8: bool = field(
+        default=False,
+        metadata={"help": "If cachekv_int8 set as `True`, cache kv would be quantized to int8 dynamically. "},
     )
 
     chat_template: str = field(
@@ -134,6 +133,10 @@ class PredictorArgument:
     @property
     def total_max_length(self):
         return self.src_length + self.max_length
+
+    @property
+    def use_cachekv_int8(self):
+        return "dynamic" if self.cachekv_int8 else "None"
 
 
 @dataclass
@@ -816,13 +819,18 @@ class DygraphBlockInferencePredictor(BasePredictor):
         self.inputs["rope_emb"] = self._get_rotary_position_embedding(
             paddle.arange(self.total_max_length).reshape((1, -1)), self.head_dim
         )
-        self.inputs["eos_token_id"] = get_eos_token_id(self.tokenizer, self.generation_config)
+        eos_token_id = get_eos_token_id(self.tokenizer, self.generation_config)
+        if isinstance(eos_token_id, int):
+            eos_token_id = [eos_token_id]
+        self.inputs["eos_token_id"] = paddle.to_tensor(
+            np.array(eos_token_id * config.batch_size).reshape(-1, 1).astype("int64")
+        )
         # need update
         self.inputs["block_tables"] = paddle.full(
             shape=[config.batch_size, pre_max_block_num], fill_value=-1, dtype="int32"
         )
         self.inputs["input_ids"] = paddle.full(
-            shape=[config.batch_size, config.src_length], fill_value=-1, dtype="int64"
+            shape=[config.batch_size, self.total_max_length], fill_value=-1, dtype="int64"
         )
         self.inputs["top_p"] = paddle.full(shape=[config.batch_size, 1], fill_value=config.top_p, dtype="float32")
         self.inputs["temperature"] = paddle.full(shape=[config.batch_size, 1], fill_value=1.0, dtype="float32")
@@ -1029,7 +1037,7 @@ class StaticBlockInferencePredictor(BasePredictor):
             shape=[config.batch_size, pre_max_block_num], fill_value=-1, dtype="int32"
         )
         self.inputs["input_ids"] = paddle.full(
-            shape=[config.batch_size, config.src_length], fill_value=-1, dtype="int64"
+            shape=[config.batch_size, config.total_max_length], fill_value=-1, dtype="int64"
         )
         self.inputs["top_p"] = paddle.full(shape=[config.batch_size, 1], fill_value=config.top_p, dtype="float32")
         self.inputs["temperature"] = paddle.full(shape=[config.batch_size, 1], fill_value=1.0, dtype="float32")
@@ -1173,9 +1181,7 @@ class StaticBlockInferencePredictor(BasePredictor):
 
     def _preprocess(self, source):
         for i, text in enumerate(source):
-            tokens = self.tokenizer(
-                text, return_tensors="np", padding=False, max_length=(self.config.src_length - self.config.max_length)
-            )
+            tokens = self.tokenizer(text, return_tensors="np", padding=False, max_length=(self.config.src_length))
             input_ids = tokens["input_ids"][0]
             length = len(input_ids)
             print("length: ", length)
@@ -1345,7 +1351,7 @@ def create_predictor(
                         LlamaForMiniGPT4InferenceModel as LlamaInferenceModel,
                     )
                 elif predictor_args.block_attn:
-                    config.max_seq_len = predictor_args.src_length
+                    config.max_seq_len = predictor_args.total_max_length
                     config.block_size = predictor_args.block_size
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMBlockInferenceModel as LlamaInferenceModel,
@@ -1443,7 +1449,7 @@ def create_predictor(
             if "llama" in config.architectures[0].lower():
                 if predictor_args.block_attn:
                     config.block_size = predictor_args.block_size
-                    config.max_seq_len = predictor_args.src_length
+                    config.max_seq_len = predictor_args.total_max_length
                     config.use_dynamic_cachekv_quant = predictor_args.use_cachekv_int8 == "dynamic"
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMBlockInferenceModel as LlamaInferenceModel,
@@ -1508,6 +1514,37 @@ def create_predictor(
     return predictor
 
 
+def read_res(predictor_args: PredictorArgument, tensor_queue: mp.Queue, result_queue: mp.Queue):
+    tokenizer = AutoTokenizer.from_pretrained(
+        predictor_args.model_name_or_path,
+    )
+
+    paddle.device.set_device("cpu")
+    outputs = []
+    output_tensor = tensor_queue.get(timeout=1)
+
+    logger.info("Start read result message")
+    logger.info(f"Current path is {os.getcwd()}")
+    while True:
+        get_output(output_tensor, 0, True)
+        print(output_tensor)
+        if output_tensor[0, 0] == -2:  # read none
+            continue
+        bsz = output_tensor[1, 0].numpy()
+        output_numpy = output_tensor[2 : bsz + 2].numpy()
+        output_numpy[output_numpy == -1] = 2
+        outputs.append(output_numpy)
+        if output_tensor[0, 0] == -1:
+            break
+    output = np.concatenate(outputs, axis=1).tolist()
+
+    for i, seq in enumerate(output):
+        seq = tokenizer.decode(seq)
+        result_queue.put([i, seq])
+        print(i, seq)
+    logger.info("Finish read result message")
+
+
 def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
@@ -1544,9 +1581,29 @@ def predict():
 
     with open(model_args.output_file, "w", encoding="utf-8") as f:
         for bs, batch_source_text in enumerate(batch_source_texts):
-            outputs = predictor.predict(batch_source_text)
+            if predictor_args.block_attn:
+                result_queue = mp.Queue()
+                tensor_queue = mp.Queue()
 
-            if predictor.tensor_parallel_rank > 0 or predictor_args.block_attn:
+                # Note(@RochardWooSJTU): MAX_BSZ must be the same as definition in get_output / save_output
+                MAX_BSZ = 512
+                output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64")
+                output_tensor = output_tensor.cpu()
+                tensor_queue.put(output_tensor)
+
+                read_res_process = mp.Process(target=read_res, args=[predictor_args, tensor_queue, result_queue])
+                read_res_process.start()
+
+            logger.info("Start predict")
+            outputs = predictor.predict(batch_source_text)
+            logger.info("End predict")
+
+            if predictor_args.block_attn and not result_queue.empty():
+                outputs = []
+                while len(outputs) < predictor_args.batch_size:
+                    outputs.appends(result_queue.get(timeout=1)[-1])
+
+            if predictor.tensor_parallel_rank > 0:
                 continue
             for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
                 print("***********Source**********")
@@ -1565,10 +1622,7 @@ def predict():
 def benchmark(predictor, predictor_args, model_args):
     # Just construct a simple benchmark input. We pad input to the src_length.
     test_texts = "who are you"
-    benchmark_texts = [
-        test_texts + "<pad>" * (predictor_args.src_length - predictor_args.max_length)
-        for _ in range(predictor_args.batch_size)
-    ]
+    benchmark_texts = [test_texts + "<pad>" * (predictor_args.src_length) for _ in range(predictor_args.batch_size)]
 
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")

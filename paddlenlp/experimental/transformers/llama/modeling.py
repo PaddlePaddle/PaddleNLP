@@ -1134,7 +1134,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         if not config.single_card_ptq:
             resolved_archive_file = pretrained_model_name_or_path
         else:
-            resolved_archive_file, sharded_metadata, is_sharded = cls._resolve_model_file_path(
+            resolved_archive_file = cls._resolve_model_file_path(
                 pretrained_model_name_or_path,
                 cache_dir=cache_dir,
                 subfolder=subfolder,
@@ -1144,7 +1144,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
                 convert_from_torch=convert_from_torch,
                 use_safetensors=use_safetensors,
                 variant=variant,
-            )
+            )[0]
         logger.info(f"Load model form {resolved_archive_file}")
 
         if config.tensor_parallel_degree > 1 and config.single_card_ptq:
