@@ -1527,7 +1527,6 @@ def read_res(predictor_args: PredictorArgument, tensor_queue: mp.Queue, result_q
     logger.info(f"Current path is {os.getcwd()}")
     while True:
         get_output(output_tensor, 0, True)
-        print(output_tensor)
         if output_tensor[0, 0] == -2:  # read none
             continue
         bsz = output_tensor[1, 0].numpy()
@@ -1541,7 +1540,6 @@ def read_res(predictor_args: PredictorArgument, tensor_queue: mp.Queue, result_q
     for i, seq in enumerate(output):
         seq = tokenizer.decode(seq)
         result_queue.put([i, seq])
-        print(i, seq)
     logger.info("Finish read result message")
 
 
@@ -1598,10 +1596,10 @@ def predict():
             outputs = predictor.predict(batch_source_text)
             logger.info("End predict")
 
-            if predictor_args.block_attn and not result_queue.empty():
+            if predictor_args.block_attn:
                 outputs = []
                 while len(outputs) < predictor_args.batch_size:
-                    outputs.appends(result_queue.get(timeout=1)[-1])
+                    outputs.append(result_queue.get(timeout=1)[-1])
 
             if predictor.tensor_parallel_rank > 0:
                 continue

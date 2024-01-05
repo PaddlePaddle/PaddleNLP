@@ -34,7 +34,6 @@ void SaveOutMmsg(const paddle::Tensor& x,
     int64_t *x_data = x_cpu.data<int64_t>();
     static struct msgdata msg_sed;
     static key_t key = ftok("./", 1);
-    printf(" save key is %d\n", key);
     static int msgid = msgget(key, IPC_CREAT | 0666);
 
     msg_sed.mtype = 1;

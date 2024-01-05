@@ -35,8 +35,6 @@ void GetOutput(const paddle::Tensor& x,
 
   static key_t key = ftok("./", 1);
 
-  printf(" get key is %d\n", key);
-
   static int msgid = msgget(key, IPC_CREAT | 0666);
 
   int64_t *out_data = const_cast<int64_t*>(x.data<int64_t>());
