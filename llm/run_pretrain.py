@@ -524,13 +524,10 @@ def main():
     if training_args.recompute:
         model.recompute_enable()
     if model_args.use_vocab_extend:
-        if model_args.new_tokenizer_name_or_path is not None:
-            new_tokenizer_name_or_path = model_args.new_tokenizer_name_or_path
-            new_tokenizer = AutoTokenizer.from_pretrained(new_tokenizer_name_or_path)
-        else:
-            raise ValueError("new_tokenizer_name_or_path must be specified.")
-        model.resize_token_embeddings(len(new_tokenizer))
-        tokenizer = new_tokenizer
+        # new_tokenizer_name_or_path = model_args.new_tokenizer_name_or_path
+        # new_tokenizer = AutoTokenizer.from_pretrained(new_tokenizer_name_or_path)
+        # model.resize_token_embeddings(len(new_tokenizer))
+        # tokenizer = new_tokenizer
         logger.info("Init new lora model")
         modules_to_save = model_args.modules_to_save
         if modules_to_save is not None:
@@ -549,13 +546,11 @@ def main():
             merge_weights=False,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,
+            trainable_modules=modules_to_save,
+            # modules_to_save = modules_to_save,
         )
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()
-        model.print_trainable_parameters()
-        for name, weight in model.state_dict().items():
-            if any(key in name for key in modules_to_save):
-                weight.stop_gradient = False
         model.print_trainable_parameters()
 
     # Create the learning_rate sheduler and optimizer
@@ -602,6 +597,7 @@ def main():
         * data_args.max_seq_length
     )
 
+    model.save_pretrained("/root/paddlejob/workspace/zhengxiong/model_param")
     trainer = PretrainingTrainer(
         model=model,
         args=training_args,

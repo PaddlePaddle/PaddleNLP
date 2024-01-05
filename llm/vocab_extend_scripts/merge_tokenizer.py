@@ -43,6 +43,7 @@ def parse_arguments():
         "--chinese_sp_vocab_file", default=None, required=True, help="The directory of new *.vocab file."
     )
     parser.add_argument("--output_dir", default=None, required=True, help="The directory of the output.")
+    parser.add_argument("--need_to_use_8_gpus_tp", default=False, required=True, help="The directory of the output.")
     return parser.parse_args()
 
 
@@ -79,7 +80,7 @@ def main():
             origin_spm.pieces.append(new_p)
     print(f"New model pieces: {len(origin_spm.pieces)}")
     # 判断词表大小是否被8整除
-    if (len(origin_spm.pieces) % 8) != 0:
+    if args.need_to_use_8_gpus_tp and (len(origin_spm.pieces) % 8) != 0:
         print(
             "The size of the new model is not divisible by 8 and it needs to be tailored.Please wait for a few more hours."
         )
