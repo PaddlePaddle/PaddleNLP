@@ -2342,7 +2342,6 @@ class Trainer:
         if opt_state_dict is not None:
             # Load in optimizer and scheduler states
             self.optimizer.set_state_dict(opt_state_dict)
-
         else:
             raise ValueError(f"optimizer-state-dict not found, opt: {os.path.join(checkpoint, optimizer_name)}.")
 

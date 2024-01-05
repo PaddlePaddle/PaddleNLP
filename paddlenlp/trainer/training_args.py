@@ -702,7 +702,6 @@ class TrainingArguments:
     skip_memory_metrics: bool = field(
         default=True, metadata={"help": "Whether or not to skip adding of memory profiler reports to metrics."}
     )
-
     flatten_param_grads: Optional[bool] = field(
         default=False,
         metadata={"help": "Whether use flatten_param_grads method in optimizer, only used on NPU devices."},
