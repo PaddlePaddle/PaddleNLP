@@ -2499,16 +2499,6 @@ class Trainer:
         opt_state_dict = self._load_optimizer_state(checkpoint)
 
         if opt_state_dict and os.path.isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
-            # Note(GuoxiaWang): The checkpoint is not saved by ClipGradByAdaptiveNorm during training.
-            # To avoid errors, add a temporary empty dict to the checkpoint.
-            if (
-                hasattr(self.args, "adaptive_norm_clip")
-                and self.args.adaptive_norm_clip
-                and "LR_Scheduler" in opt_state_dict
-                and "adaptive_norm" not in opt_state_dict["LR_Scheduler"]
-            ):
-                opt_state_dict["LR_Scheduler"]["adaptive_norm"] = {}
-
             # Load in optimizer and scheduler states
             if self.args.ignore_load_lr_and_optim:
                 init_opt_state_dict = self.optimizer.state_dict()
@@ -2517,35 +2507,9 @@ class Trainer:
             else:
                 self.optimizer.set_state_dict(opt_state_dict)
 
-            # Note(GuoxiaWang): Hold correct adaptive_norm state dict
-            if (
-                hasattr(self.args, "adaptive_norm_clip")
-                and self.args.adaptive_norm_clip
-                and hasattr(self.optimizer._learning_rate, "adaptive_norm")
-            ):
-                adaptive_norm = self.optimizer._learning_rate.adaptive_norm
-
             sched_state_dict = paddle.load(os.path.join(checkpoint, SCHEDULER_NAME))
-            # Note(GuoxiaWang): The checkpoint is not saved by ClipGradByAdaptiveNorm during training.
-            # To avoid errors, add a temporary empty dict to the checkpoint.
-            if (
-                hasattr(self.args, "adaptive_norm_clip")
-                and self.args.adaptive_norm_clip
-                and "adaptive_norm" not in sched_state_dict
-            ):
-                sched_state_dict["adaptive_norm"] = {}
-
             if not self.args.ignore_load_lr_and_optim:
                 self.lr_scheduler.set_state_dict(sched_state_dict)
-
-            # Note(GuoxiaWang): Because the state dict of lr_scheduler has been set to the state on the global rank 0 at this time
-            # so, it need restore correctly adaptive_norm state dict
-            if (
-                hasattr(self.args, "adaptive_norm_clip")
-                and self.args.adaptive_norm_clip
-                and hasattr(self.optimizer._learning_rate, "adaptive_norm")
-            ):
-                self.optimizer._learning_rate.adaptive_norm = adaptive_norm
 
             if self.do_grad_scaling and os.path.isfile(os.path.join(checkpoint, SCALER_NAME)):
                 self.scaler.load_state_dict(paddle.load(os.path.join(checkpoint, SCALER_NAME), return_numpy=True))
