@@ -1,7 +1,7 @@
 {
-    "model_name_or_path": "/root/paddlejob/workspace/zhengxiong/pr_test/new_vocab_model",
-    "dataset_name_or_path": "/root/paddlejob/workspace/zhengxiong/data/CLUECorpusSmall/sft_data/sft-dataset/wps/train_eval_data",
-    "output_dir": "/root/paddlejob/workspace/zhengxiong/pr_test/model_output/",
+    "model_name_or_path": "./new_vocab_model",
+    "dataset_name_or_path": "./sft_data/train_eval_data",
+    "output_dir": "./model_output/",
     "per_device_train_batch_size": 2,
     "gradient_accumulation_steps": 64,
     "per_device_eval_batch_size": 8,

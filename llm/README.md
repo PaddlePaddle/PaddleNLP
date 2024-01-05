@@ -87,11 +87,13 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py
 # Qwen 模型预训练
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./qwen/pretrain_argument_stage2.json
 ```
+
 ##### 1.1词表扩充预训练
 词表扩充预训练是自然语言处理（NLP）中的一个重要概念，旨在通过增加模型词汇库的大小和多样性来提高语言模型的理解和生成能力。这个过程通常涉及到识别和添加新的词汇到模型的词表中，使其能够处理更广泛的文本数据。预训练阶段是在模型处理特定任务之前进行的，有助于模型更好地适应不同的语言特征和术语。
 下图为词表扩充预训练后，经过SFT效果展示：
 ![avatar](./vocab_extend_scripts/vocab_extend_results.png)
 更多技术细节和词表扩充预训练使用详见[词表扩充预训练](./vocab_extend_scripts/VOCAB_EXTEND.md)
+
 注意：
 1. 建议使用paddle develop版本训练，需要安装`pip install tool_helpers visualdl==2.5.3`等相关缺失whl包
 2. `use_flash_attention` 需要在A100机器开启，建议使用cuda11.8环境。

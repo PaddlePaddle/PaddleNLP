@@ -597,7 +597,6 @@ def main():
         * data_args.max_seq_length
     )
 
-    model.save_pretrained("/root/paddlejob/workspace/zhengxiong/model_param")
     trainer = PretrainingTrainer(
         model=model,
         args=training_args,
@@ -617,6 +616,7 @@ def main():
     # Training
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
+
         # NOTE(gongenlei): new add
         if not training_args.autotuner_benchmark:
             metrics = train_result.metrics
