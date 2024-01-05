@@ -166,7 +166,6 @@ def main():
         else:
             # NOTE(gongenlei): new add autotuner_benchmark
             model = AutoModelForCausalLM.from_config(model_config, dtype=dtype)
-
     if training_args.do_train and model_args.neftune:
         # Inspired by https://github.com/neelsjain/NEFTune
         if hasattr(model, "get_input_embeddings"):
@@ -422,6 +421,7 @@ def main():
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 dtype=dtype,
                 do_qat=quant_args.do_qat,
+                base_model_name_or_path=model_args.model_name_or_path,
             )
             model = LoRAModel(model, lora_config)
         else:

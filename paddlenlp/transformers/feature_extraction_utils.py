@@ -27,6 +27,7 @@ from huggingface_hub import hf_hub_download
 from .. import __version__
 from ..utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
 from ..utils.log import logger
+from .aistudio_utils import aistudio_download
 from .tokenizer_utils_base import TensorType
 from .utils import resolve_cache_dir
 
@@ -133,6 +134,8 @@ class FeatureExtractionMixin(object):
     This is a feature extraction mixin used to provide saving/loading functionality for sequential and image feature
     extractors.
     """
+
+    pretrained_init_configuration = {}
 
     pretrained_feature_extractor_file = []
     _auto_class = None
@@ -245,20 +248,29 @@ class FeatureExtractionMixin(object):
         """
         cache_dir = kwargs.pop("cache_dir", None)
         from_hf_hub = kwargs.pop("from_hf_hub", False)
-        subfolder = kwargs.pop("subfolder", None)
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+        from_aistudio = kwargs.pop("from_aistudio", False)
+        subfolder = kwargs.pop("subfolder", "")
+        if subfolder is None:
+            subfolder = ""
+        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
+
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         is_local = os.path.isdir(pretrained_model_name_or_path)
         if os.path.isdir(pretrained_model_name_or_path):
-            if subfolder is None:
-                resolved_feature_extractor_file = os.path.join(pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME)
-            else:
-                resolved_feature_extractor_file = os.path.join(
-                    pretrained_model_name_or_path, subfolder, FEATURE_EXTRACTOR_NAME
-                )
+            resolved_feature_extractor_file = os.path.join(
+                pretrained_model_name_or_path, subfolder, FEATURE_EXTRACTOR_NAME
+            )
         elif os.path.isfile(pretrained_model_name_or_path):
             resolved_feature_extractor_file = pretrained_model_name_or_path
             is_local = True
+        elif from_aistudio:
+            feature_extractor_file = FEATURE_EXTRACTOR_NAME
+            resolved_feature_extractor_file = aistudio_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=feature_extractor_file,
+                cache_dir=cache_dir,
+                subfolder=subfolder,
+            )
         elif from_hf_hub:
             feature_extractor_file = FEATURE_EXTRACTOR_NAME
             resolved_feature_extractor_file = hf_hub_download(
@@ -275,16 +287,11 @@ class FeatureExtractionMixin(object):
                 feature_extractor_file = cls.pretrained_feature_extractor_file[pretrained_model_name_or_path]
             else:
                 # Assuming from community-contributed pretrained models
-                if subfolder is None:
-                    feature_extractor_file = "/".join(
-                        [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME]
-                    )
-                else:
-                    feature_extractor_file = "/".join(
-                        [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, subfolder, FEATURE_EXTRACTOR_NAME]
-                    )
-                    # update cache_dir
-                    cache_dir = os.path.join(cache_dir, subfolder)
+                url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME]
+                cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
+                if subfolder != "":
+                    url_list.insert(2, subfolder)
+                feature_extractor_file = "/".join(url_list)
             try:
                 resolved_feature_extractor_file = get_path_from_url_with_filelock(feature_extractor_file, cache_dir)
             except EnvironmentError:

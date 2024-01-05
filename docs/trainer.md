@@ -1,3 +1,4 @@
+trainer.md
 # PaddleNLP Trainer API
 
 PaddleNLP提供了Trainer训练API，针对训练过程的通用训练配置做了封装，比如：
@@ -660,6 +661,29 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         是否从断点重启恢复训练，(可选，默认为 None)
                         The path to a folder with a valid checkpoint for your
                         model. (default: None)
+
+  --unified_checkpoint
+                       是否使用unified_checkpoint，开启后训练的checkpoint将存储为新格式。
+                       可以支持跨分布式策略重启、动态扩缩容重启。(可选，默认为False)
+                       Whether to use unified_checkpoint, enable it to store training checkpoint in a new format.
+                       Supporting restart with different distribution strategies and devices，(optional, defaults to False)
+
+  --unified_checkpoint_config
+                       与Unified Checkpoint相关的一些优化配置项，以str形式传入配置。
+                       支持如下选项:
+                           skip_save_model_weight: 当master_weights存在时，跳过保存模型权重。
+                           master_weight_compatible: 1. 仅当optimizer需要master_weights时，才进行加载;
+                                                     2. 如果checkpoint中不存在master_weights，则将model weight作为master_weights进行加载。
+                           async_save: 在保存Checkpoint至磁盘时做异步保存，不影响训练过程，提高训练效率。
+                           enable_all_options: 上述参数全部开启。
+
+                       Some additional config of Unified checkpoint, we provide some options to config.
+                       Following config is support:
+                           skip_save_model_weight, no need to save model weights when the master_weights exist.
+                           master_weight_compatible, 1. if the master_weights exist, only load when needed.
+                                                     2. if master_weights does not exist, convert model weights to master_weights when needed.
+                           async_save, enable asynchronous saving checkpoints to disk.
+                           enable_all_options, enable all unified checkpoint optimization configs.
 
   --skip_memory_metrics
                        是否跳过内存profiler检测。（可选，默认为True，跳过）
