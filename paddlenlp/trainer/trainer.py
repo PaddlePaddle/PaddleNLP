@@ -889,15 +889,13 @@ class Trainer:
                     self.args.tensor_parallel_degree > 1 or self.args.pipeline_parallel_degree > 1
                 ):
                     forbidden_no_sync = True
-                if self.args.use_moe:
-                    forbidden_no_sync = True
                 availiable_no_sync = dp_enabled and not forbidden_no_sync
 
                 is_no_sync = (
                     ((step + 1) % args.gradient_accumulation_steps != 0)
                     and availiable_no_sync
                     and args._no_sync_in_gradient_accumulation
-                ) or (args.recompute and availiable_no_sync)
+                ) or ((args.recompute or args.use_moe) and availiable_no_sync)
                 # sharding
                 # stage1. the same as ddp
                 # stage2. manualy collect gradient on dp group
