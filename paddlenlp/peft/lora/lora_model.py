@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import math
 import os
 import re
@@ -226,14 +227,16 @@ class LoRAModel(nn.Layer):
         return lora_state_dict
 
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
+        save_model_config = kwargs.get("save_model_config", True)
+
         if self.is_pipelinemodel:
             self.model._single_to_pp_mapping = None
-        if self.quantized and merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
+        if self.quantized and merge_tensor_parallel and self.lora_config.tensor_parallel_degre > 1:
             merge_tensor_parallel = False
             logger.warning(
                 "Quantized strategy does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
             )
-        if self.is_pipelinemodel and merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
+        if self.is_pipelinemodel and merge_tensor_parallel and self.lora_config.tensor_parallel_degre > 1:
             merge_tensor_parallel = False
             logger.warning(
                 "Pipeline parallism does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
@@ -247,7 +250,9 @@ class LoRAModel(nn.Layer):
         ), f"Saving directory ({save_directory}) should be a directory, not a file"
         os.makedirs(save_directory, exist_ok=True)
 
-        if merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
+        lora_config_to_save = LoRAConfig(**self.lora_config.to_dict())
+
+        if merge_tensor_parallel and lora_config_to_save.tensor_parallel_degree > 1:
             trainable_state_dict = self.get_trainable_state_dict()
             trainable_state_dict = self._merge_trainable_tensor_parallel(trainable_state_dict)
             if not is_main_process:
@@ -255,10 +260,10 @@ class LoRAModel(nn.Layer):
                 return
             if variant is not None and "tp" in variant:
                 variant = "_".join([x for x in variant.split("_") if "tp" not in x])
-            self.lora_config.tensor_parallel_degree = -1
+            lora_config_to_save.tensor_parallel_degree = -1
         else:
             trainable_state_dict = self.get_trainable_state_dict()
-            if self.model.config.tensor_parallel_degree > 1:
+            if lora_config_to_save.tensor_parallel_degree > 1:
                 if variant is None:
                     variant = weight_name_suffix()
 
@@ -269,8 +274,12 @@ class LoRAModel(nn.Layer):
 
         # save lora config
         if is_main_process:
-            self.lora_config.save_pretrained(save_directory)
-        self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
+            lora_config_to_save.save_pretrained(save_directory)
+            if save_model_config:
+                model_config_to_save = copy.deepcopy(self.model.config)
+                if merge_tensor_parallel:
+                    model_config_to_save.tensor_parallel_degree = -1
+                model_config_to_save.save_pretrained(save_directory)
 
     def _find_and_replace_module(self, model, module_name, lora_config, enable_lora):
         parent_module = model
@@ -366,6 +375,7 @@ class LoRAModel(nn.Layer):
                     r=lora_config.r,
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
+                    merge_weights=lora_config.merge_weights,
                 )
                 self.quantized = True
             elif ColumnParallelQuantizationLinear is not None and isinstance(module, ColumnParallelQuantizationLinear):

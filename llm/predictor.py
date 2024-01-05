@@ -29,7 +29,10 @@ from paddle.distributed import fleet
 from utils import (
     dybatch_preprocess,
     get_alibi_slopes,
+    get_default_max_decoding_length,
+    get_default_max_encoding_length,
     get_infer_model_path,
+    get_model_max_position_embeddings,
     get_prefix_tuning_params,
     init_chat_template,
     load_real_time_tokens,
@@ -56,8 +59,8 @@ from paddlenlp.utils.log import logger
 class PredictorArgument:
     model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
-    src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
-    max_length: int = field(default=2048, metadata={"help": "the max length for decoding."})
+    src_length: int = field(default=None, metadata={"help": "The max length of source text."})
+    max_length: int = field(default=None, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
     top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
     temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
@@ -74,6 +77,10 @@ class PredictorArgument:
         metadata={
             "help": "the decoding strategy of generation, which should be one of ['sampling', 'greedy_search', 'beam_search']. Default to sampling"
         },
+    )
+    use_flash_attention: bool = field(
+        default=False,
+        metadata={"help": "Whether to use flash attention"},
     )
 
     mode: str = field(
@@ -241,6 +248,7 @@ class DygraphPredictor(BasePredictor):
         if self.model is None:
             self.model = AutoModelForCausalLM.from_pretrained(
                 config.model_name_or_path,
+                use_flash_attention=config.use_flash_attention,
                 dtype=dtype,
                 tensor_parallel_degree=self.tensor_parallel_degree,
                 tensor_parallel_rank=self.tensor_parallel_rank,
@@ -375,13 +383,11 @@ class InferencePredictorMixin:
                 dtype=self.dtype,
             )
 
-        self.tgt_generation_mask = paddle.zeros(
+        self.tgt_generation_mask = paddle.ones(
             shape=[config.batch_size, 1, 1, config.total_max_length],
             dtype=self.dtype,
         )
-        self.arange_tensor_encoder = paddle.zeros(
-            shape=(config.batch_size, 1, config.total_max_length), dtype=self.dtype
-        )
+        self.arange_tensor_encoder = paddle.arange(config.total_max_length, dtype=self.dtype)
 
         if config.export_precache:
             if config.prefix_path:
@@ -427,7 +433,7 @@ class InferencePredictorMixin:
 
     def _preprocess(self, source):
         self.attention_mask[:] = 0
-        self.tgt_generation_mask[:] = 0
+        self.tgt_generation_mask[:] = 1
         pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
 
         if self.tokenizer.chat_template is not None:
@@ -468,15 +474,6 @@ class InferencePredictorMixin:
                         [prefix_attention_mask, post_attention_mask], axis=2
                     )
 
-                if self.config.prefix_path is None:
-                    self.tgt_generation_mask[i, 0, 0, pre_caches_length : length + pre_caches_length] = paddle.ones(
-                        shape=[1, length], dtype=self.config.dtype
-                    )
-                else:
-                    self.tgt_generation_mask[i, 0, 0, : length + pre_caches_length] = paddle.ones(
-                        shape=[1, length + pre_caches_length], dtype=self.config.dtype
-                    )
-
             inputs["tgt_pos"] = self.tgt_pos
         elif "bloom" in self.architectures:
             for i in range(inputs["input_ids"].shape[0]):
@@ -496,20 +493,13 @@ class InferencePredictorMixin:
                     self.attention_mask[i, :, :length, : length + pre_caches_length] = paddle.concat(
                         [prefix_attention_mask, post_attention_mask], axis=2
                     )
-                self.arange_tensor_encoder[i, :, : length + pre_caches_length] = paddle.arange(
-                    length + pre_caches_length
-                ).astype(self.config.dtype)
 
-                self.tgt_generation_mask[i, :, 0, : length + pre_caches_length] = paddle.ones(
-                    shape=[1, length + pre_caches_length], dtype=self.config.dtype
-                )
             inputs["tgt_pos"] = inputs["tgt_pos"] + pre_caches_length
             # alibi encoder
             alibi_slopes = get_alibi_slopes(self.model_config.n_head)
             inputs["position_ids"] = paddle.to_tensor(alibi_slopes, dtype="float32")
 
-            alibi = alibi_slopes[..., None] * self.arange_tensor_encoder
-            alibi = alibi[:, :, None, :]
+            alibi = alibi_slopes[None, :, None, None] * self.arange_tensor_encoder
 
             if self.model_config.tensor_parallel_degree > 1:
                 block_size = self.model_config.n_head // self.model_config.tensor_parallel_degree
@@ -534,6 +524,9 @@ class InferencePredictorMixin:
                     self.config.total_max_length,
                 ]
             )
+            # only generate valid encoder attention mask, other place set 0.
+            alibi_encoder[i, :, length:, length:] = 0
+
             alibi_decoder = alibi.expand(
                 [
                     self.config.batch_size,
@@ -570,15 +563,6 @@ class InferencePredictorMixin:
                     ).unsqueeze_(axis=0)
                     self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
                         [prefix_attention_mask, post_attention_mask], axis=2
-                    )
-
-                if self.config.prefix_path is None:
-                    self.tgt_generation_mask[i, 0, 0, pre_caches_length : length + pre_caches_length] = paddle.ones(
-                        shape=[1, length], dtype="float16"
-                    )
-                else:
-                    self.tgt_generation_mask[i, 0, 0, : length + pre_caches_length] = paddle.ones(
-                        shape=[1, length + pre_caches_length], dtype=self.config.dtype
                     )
 
         inputs["pre_ids"] = self.pre_ids
@@ -709,13 +693,49 @@ def create_predictor(
     tensor_parallel_degree: int = 1,
     tensor_parallel_rank: int = 0,
 ):
-    tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(
+        predictor_args.model_name_or_path,
+    )
     # init chat_template for tokenizer
     init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
 
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer) and not tokenizer.pad_token:
         tokenizer.pad_token = tokenizer.unk_token
+
+    config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
+
+    max_position_embeddings = get_model_max_position_embeddings(config)
+    if max_position_embeddings is None:
+        max_position_embeddings = 2048
+        logger.warning("Can not retrieval `max_position_embeddings` from config.json, use default value 2048")
+
+    if predictor_args.src_length is None:
+        if predictor_args.max_length is None:
+            predictor_args.src_length = get_default_max_encoding_length(config)
+            predictor_args.max_length = get_default_max_decoding_length(config)
+        else:
+            predictor_args.src_length = max_position_embeddings - predictor_args.max_length
+            if predictor_args.src_length <= 0:
+                raise ValueError(
+                    f"--max_length<{predictor_args.max_length}> param should be smaller "
+                    f"than max_position_embeddings<{max_position_embeddings}>"
+                )
+    else:
+        if predictor_args.max_length is None:
+            predictor_args.max_length = max_position_embeddings - predictor_args.src_length
+            if predictor_args.max_length <= 0:
+                raise ValueError(
+                    f"--src_length<{predictor_args.src_length}> param should be smaller "
+                    f"than max_position_embeddings<{max_position_embeddings}>"
+                )
+        else:
+            if predictor_args.src_length + predictor_args.max_length > max_position_embeddings:
+                raise ValueError(
+                    f"The sum of src_length<{predictor_args.src_length}> and "
+                    f"max_length<{predictor_args.max_length}> should be smaller than or equal to "
+                    f"the maximum position embedding size<{max_position_embeddings}>"
+                )
 
     # update config parameter for inference predictor
     if predictor_args.decode_strategy == "greedy_search":
@@ -751,6 +771,7 @@ def create_predictor(
                 model = AutoModelForCausalLM.from_pretrained(
                     predictor_args.model_name_or_path,
                     dtype=predictor_args.dtype,
+                    use_flash_attention=predictor_args.use_flash_attention,
                     tensor_parallel_degree=tensor_parallel_degree,
                     tensor_parallel_rank=tensor_parallel_rank,
                 )
@@ -909,6 +930,7 @@ def create_predictor(
             predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
         else:
             raise ValueError("the `mode` should be one of [dynamic, static]")
+
     return predictor
 
 

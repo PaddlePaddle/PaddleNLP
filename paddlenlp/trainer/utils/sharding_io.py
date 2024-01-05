@@ -226,10 +226,11 @@ class ShardingIO:
                 if optimizer._param2rank[k] != int(v):
                     return True
         else:
-            # reshard anyway
-            if "pp_overlap" not in sharding_meta:
-                return True
-            pp_overlap = sharding_meta["pp_overlap"]
+            pp_overlap = None
+            # backward compatibility
+            if "enable_overlap" in sharding_meta:
+                pp_overlap = sharding_meta["enable_overlap"]
+
             cur_pp_overlap = unwrap_optimizer(self.optimizer, DygraphShardingOptimizerV2).pp_overlap
             return pp_overlap != cur_pp_overlap
 
@@ -543,7 +544,7 @@ class ShardingIO:
         sharding_meta["param2rank"] = param2rank
         sharding_meta["structure_name_mapping"] = structure_name_mapping
         sharding_meta["sharding_strategy"] = sharding_strategy
-        sharding_meta["pp_overlap"] = pp_overlap
+        sharding_meta["enable_overlap"] = pp_overlap
         suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
         sharding_metas[suffix] = sharding_meta
         sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_model_parallel_group())

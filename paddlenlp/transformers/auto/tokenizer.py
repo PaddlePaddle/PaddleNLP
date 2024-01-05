@@ -265,9 +265,11 @@ class AutoTokenizer:
         use_fast = kwargs.pop("use_fast", False)
         cache_dir = kwargs.get("cache_dir", None)
         subfolder = kwargs.get("subfolder", "")
+        if subfolder is None:
+            subfolder = ""
         from_aistudio = kwargs.get("from_aistudio", False)
         from_hf_hub = kwargs.get("from_hf_hub", False)
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
 
         if "use_faster" in kwargs:
             use_fast = kwargs.pop("use_faster", False)
@@ -277,27 +279,17 @@ class AutoTokenizer:
         for names, tokenizer_class in cls._tokenizer_mapping.items():
             for name in names:
                 all_tokenizer_names.append(name)
-        # From AI Studio or HF Hub
-        if from_aistudio or from_hf_hub:
-            if from_aistudio:
-                config_file = aistudio_download(
-                    repo_id=pretrained_model_name_or_path, filename=cls.tokenizer_config_file
-                )
-            else:
-                config_file = hf_hub_download(
-                    repo_id=pretrained_model_name_or_path,
-                    filename=cls.tokenizer_config_file,
-                    subfolder=subfolder,
-                    cache_dir=cache_dir,
-                    library_name="PaddleNLP",
-                    library_version=__version__,
-                )
+        # From local dir path
+        if os.path.isdir(pretrained_model_name_or_path):
+            config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.tokenizer_config_file)
             if os.path.exists(config_file):
                 tokenizer_class = cls._get_tokenizer_class_from_config(
                     pretrained_model_name_or_path, config_file, use_fast
                 )
                 logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
                 return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+            else:
+                raise FileNotFoundError(f"{config_file} is not found under '{pretrained_model_name_or_path}'")
         # From built-in pretrained models
         elif pretrained_model_name_or_path in all_tokenizer_names:
             for names, tokenizer_classes in cls._tokenizer_mapping.items():
@@ -334,22 +326,37 @@ class AutoTokenizer:
                         return actual_tokenizer_class.from_pretrained(
                             pretrained_model_name_or_path, *model_args, **kwargs
                         )
-        # From local dir path
-        elif os.path.isdir(pretrained_model_name_or_path):
-            config_file = os.path.join(pretrained_model_name_or_path, cls.tokenizer_config_file)
+        # From AI Studio or HF Hub
+        elif from_aistudio or from_hf_hub:
+            if from_aistudio:
+                config_file = aistudio_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=cls.tokenizer_config_file,
+                    cache_dir=cache_dir,
+                    subfolder=subfolder,
+                )
+            else:
+                config_file = hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=cls.tokenizer_config_file,
+                    subfolder=subfolder,
+                    cache_dir=cache_dir,
+                    library_name="PaddleNLP",
+                    library_version=__version__,
+                )
             if os.path.exists(config_file):
                 tokenizer_class = cls._get_tokenizer_class_from_config(
                     pretrained_model_name_or_path, config_file, use_fast
                 )
                 logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
                 return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-            else:
-                raise FileNotFoundError(f"{config_file} is not found under '{pretrained_model_name_or_path}'")
         # Assuming from community-contributed pretrained models
         else:
-            community_config_path = "/".join(
-                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
-            )
+            url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
+            cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
+            if subfolder != "":
+                url_list.insert(2, subfolder)
+            community_config_path = "/".join(url_list)
             try:
                 resolved_vocab_file = get_path_from_url_with_filelock(community_config_path, cache_dir)
             except RuntimeError as err:

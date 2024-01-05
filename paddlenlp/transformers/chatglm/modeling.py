@@ -245,9 +245,19 @@ class ChatGLMAttention(nn.Layer):
         q_layer, k_layer, v_layer = paddle.split(mixed_layer, 3, axis=-1)
         # [s, b, n, h/n]
         q_layer, k_layer = self._core_attention(q_layer, k_layer, position_ids, rotary_embeds)
+
+        if cache is not None:
+            cache_k, cache_v = cache[0], cache[1]
+            # [s + c, b, n, h/n]
+            k_layer = paddle.concat([cache_k, k_layer], axis=0)
+            v_layer = paddle.concat([cache_v, v_layer], axis=0)
+
+        cache_kv = None
+        if use_cache:
+            cache_kv = (k_layer, v_layer)
         version = paddle.version.full_version
         version_check = True
-        if version != "0.0.0" and version <= "2.5.2":
+        if self.config.use_flash_attention and version != "0.0.0" and version <= "2.5.2":
             logger.warning(
                 "PaddlePaddle version 2.5.3 or higher is required, please upgrade your PaddlePaddle to 2.5.3 or other higher version."
             )
@@ -255,15 +265,6 @@ class ChatGLMAttention(nn.Layer):
         if self.config.use_flash_attention and version_check:
             # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
             # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
-            if cache is not None:
-                cache_k, cache_v = cache[0], cache[1]
-                # [s + c, b, n, h/n]
-                k_layer = paddle.concat([cache_k, k_layer], axis=0)
-                v_layer = paddle.concat([cache_v, v_layer], axis=0)
-            cache_kv = None
-            if use_cache:
-                cache_kv = (k_layer, v_layer)
-
             # [s, b, n, h/n] = > [batch_size, seq_len, num_heads, head_dim]
             q_layer = paddle.transpose(q_layer, [1, 0, 2, 3])
             k_layer = paddle.transpose(k_layer, [1, 0, 2, 3])
@@ -286,17 +287,8 @@ class ChatGLMAttention(nn.Layer):
 
             output, attention_probs = attn_output, attn_weights
         else:
-            if cache is not None:
-                cache_k, cache_v = cache[0], cache[1]
-                # [s + c, b, n, h/n]
-                k_layer = paddle.concat([cache_k, k_layer], axis=0)
-                v_layer = paddle.concat([cache_v, v_layer], axis=0)
 
             seq_length, batch_size, num_heads, hidden_size = k_layer.shape
-
-            cache_kv = None
-            if use_cache:
-                cache_kv = (k_layer, v_layer)
 
             attention_scale_coeff = float(layer_id) + 1.0
             if self.attention_scale:

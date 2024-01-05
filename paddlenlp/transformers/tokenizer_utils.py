@@ -647,13 +647,14 @@ class ChatTemplateMixin:
         tokenizer_kwargs["add_special_tokens"] = False
         return self(query, **tokenizer_kwargs)
 
-    def encode_chat_inputs(self, conversations: List[List[str, str]]):
+    def encode_chat_inputs(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}):
         """Encodes conversation to pairs of token ids.
         Turn 0: bos + system + sep + user     bot + eos
         Turn t: sep + bot + query             bot + eos
 
         Args:
             conversation (List[List[str, str]]): the conversation of data
+            context_data (Dict[str, Any]): the context data of conversation
 
         Returns:
             List[list[int], list[int]]: the pair of input_ids and target_ids
@@ -661,12 +662,15 @@ class ChatTemplateMixin:
         # encode system
         result = {}
         if self.chat_template.system:
-            result["system"] = self.encode(self.chat_template.system, add_special_tokens=False)["input_ids"]
+            system = self.chat_template.render_system(context_data)
+            result["system"] = self.encode(system, add_special_tokens=False)["input_ids"]
 
         # encode conversation
         conversation_ids = []
         for index, conversation in enumerate(conversations):
-            user_input, bot_output = self.chat_template.render_conversation(conversation, index=index)
+            user_input, bot_output = self.chat_template.render_conversation(
+                conversation, index=index, context_data=context_data
+            )
             user_ids = self.encode(user_input, add_special_tokens=False)["input_ids"]
             bot_ids = self.encode(bot_output, add_special_tokens=False)["input_ids"]
             conversation_ids.append([user_ids, bot_ids])
@@ -676,16 +680,23 @@ class ChatTemplateMixin:
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
-        cache_dir = kwargs.get("cache_dir", None)
-        from_hf_hub = kwargs.get("from_hf_hub", None)
+        cache_dir = kwargs.pop("cache_dir", None)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        from_aistudio = kwargs.pop("from_aistudio", False)
+        subfolder = kwargs.pop("subfolder", "")
+        if subfolder is None:
+            subfolder = ""
 
-        tokenizer = super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
+        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
+        kwargs["subfolder"] = subfolder
+        kwargs["cache_dir"] = cache_dir
+        kwargs["from_hf_hub"] = from_hf_hub
+        kwargs["from_aistudio"] = from_aistudio
+        kwargs["return_tokenizer_file_dir"] = True
+        tokenizer, tokenizer_config_file_dir = super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
 
         # load chat-template
-        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
-
-        chat_template_file = os.path.join(cache_dir, CHAT_TEMPLATE_CONFIG_NAME)
+        chat_template_file = os.path.join(tokenizer_config_file_dir, CHAT_TEMPLATE_CONFIG_NAME)
         if not os.path.exists(chat_template_file):
             return tokenizer
 
