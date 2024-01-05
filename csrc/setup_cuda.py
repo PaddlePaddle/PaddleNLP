@@ -47,8 +47,18 @@ def get_gencode_flags():
             "arch=compute_70,code=sm_70",
         ]
 
+def set_custom_flags():
+    custom_flags = []
+    # set CUDA_ENABLE_BF16
+    prop = paddle.device.cuda.get_device_properties()
+    cc = prop.major * 10 + prop.minor
+    if cc >= 80:
+        custom_flags.append("-DCUDA_ENABLE_BF16")
+    
+    return custom_flags
 
 gencode_flags = get_gencode_flags()
+custom_flags = set_custom_flags()
 
 setup(
     name="paddlenlp_ops",
@@ -69,7 +79,7 @@ setup(
             "./generation/dequant_int8.cu",
         ],
         extra_compile_args={
-            "cxx": ["-O3"],
+            "cxx": ["-O3"] + custom_flags,
             "nvcc": [
                 "-O3",
                 "-U__CUDA_NO_HALF_OPERATORS__",
@@ -79,7 +89,8 @@ setup(
                 "-U__CUDA_NO_BFLOAT162_OPERATORS__",
                 "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
             ]
-            + gencode_flags,
+            + gencode_flags
+            + custom_flags,
         },
     ),
 )
