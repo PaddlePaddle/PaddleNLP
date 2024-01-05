@@ -130,7 +130,6 @@ function _train(){
                 --max_steps ${max_iter}\
                 --save_steps 5000\
                 --device gpu\
-                --skip_memory_metrics 0 \
                 --warmup_ratio 0.01\
                 --scale_loss 32768\
                 --per_device_train_batch_size ${micro_batch_size}\
