@@ -360,7 +360,7 @@ class QWenForCausalLMInferenceModel(GenerationInferenceModel, QWenPretrainedMode
         cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
     ):
         # TODO: Support safetensors loading.
-        kwargs["use_safetensors"] = True
+        kwargs["use_safetensors"] = False
         return super().from_pretrained(pretrained_model_name_or_path, from_hf_hub, subfolder, *args, **kwargs)
 
     @classmethod
