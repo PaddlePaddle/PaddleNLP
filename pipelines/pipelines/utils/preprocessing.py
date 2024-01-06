@@ -59,7 +59,7 @@ def document_rough_split(document_list, max_token=4500):
     return document_index_rough
 
 
-def split_document(document_index, all_document, split_text, split_paragraphs: bool, clean_func, path, split_answers):
+def split_document(document_index, all_document, splitter, split_paragraphs: bool, clean_func, path, split_answers):
     start = document_index[0]
     end = document_index[1]
     documents = []
@@ -68,7 +68,7 @@ def split_document(document_index, all_document, split_text, split_paragraphs: b
         if clean_func:
             text = clean_func(text)
         if split_paragraphs is True:
-            text_splits = split_text.split_text(text)
+            text_splits = splitter.split_text(text)
             for txt in text_splits:
                 if not txt.strip():  # skip empty paragraphs
                     continue
@@ -95,7 +95,7 @@ def split_document(document_index, all_document, split_text, split_paragraphs: b
 def run_process(
     document_combination_index,
     list_documents,
-    split_text,
+    splitter,
     process_num,
     split_paragraphs,
     clean_func,
@@ -107,7 +107,7 @@ def run_process(
     split_document_c = functools.partial(
         split_document,
         all_document=list_documents,
-        split_text=split_text,
+        splitter=splitter,
         split_paragraphs=split_paragraphs,
         clean_func=clean_func,
         path=path,
@@ -168,8 +168,6 @@ def convert_files_to_dicts(
     documents = []
     for suffix, paths in suffix2paths.items():
         for path in paths:
-            if encoding is None and suffix == ".pdf":
-                encoding = "Latin1"
             logger.info("Converting {}".format(path))
             list_documents = suffix2converter[suffix].convert(
                 file_path=path,
@@ -280,7 +278,11 @@ def convert_files_to_dicts_splitter(
             pipeline="en_core_web_sm",
         )
         pdf_splitter = SpacyTextSplitter(
-            separator=separator, chunk_size=chunk_size, chunk_overlap=chunk_overlap, filters=filters
+            separator=separator,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            filters=filters,
+            pipeline="en_core_web_sm",
         )
     text_splitter = CharacterTextSplitter(
         separator=separator, chunk_size=chunk_size, chunk_overlap=chunk_overlap, filters=filters
@@ -309,8 +311,6 @@ def convert_files_to_dicts_splitter(
             suffix2splitter[file_suffix] = markdown_splitter
     for suffix, paths in suffix2paths.items():
         for path in paths:
-            if encoding is None and suffix == ".pdf":
-                encoding = "Latin1"
             logger.info("Converting {}".format(path))
             list_documents = suffix2converter[suffix].convert(
                 file_path=path,
@@ -330,7 +330,7 @@ def convert_files_to_dicts_splitter(
             document_mul = run_process(
                 document_combination_index=document_combination_index,
                 list_documents=list_documents,
-                split_text=suffix2splitter[suffix],
+                splitter=suffix2splitter[suffix],
                 process_num=process_num,
                 split_paragraphs=split_paragraphs,
                 clean_func=clean_func,
