@@ -84,7 +84,7 @@ def merge():
 
     lora_config = LoRAConfig.from_pretrained(args.lora_path)
     if lora_config.base_model_name_or_path is None:
-        if args.model_name_or_path is not None:
+        if args.model_name_or_path is None:
             raise ValueError("We can not find a valid model_name_or_path.")
         else:
             lora_config.base_model_name_or_path = args.model_name_or_path
