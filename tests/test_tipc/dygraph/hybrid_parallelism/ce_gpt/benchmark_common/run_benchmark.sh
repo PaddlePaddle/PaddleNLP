@@ -156,6 +156,11 @@ function _train(){
             run_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
+    MP2-SP2-SD2-Stage1-mbs8-acc2) echo "run run_mode: ${run_mode}"
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3 ${PADDLE_RANK_OPTION}\
+            run_pretrain.py ${train_cmd}"
+        workerlog_id=0
+        ;;
     *) echo "choose run_mode "; exit 1;
     esac
     cd ../llm/gpt-3

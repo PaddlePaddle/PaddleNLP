@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-model_item=gpt-345m_seqlen1024_pretrain
+model_item=CE_gpt-345m_seqlen1024_pretrain
 dp_degree=1
 mp_degree=2
 pp_degree=2
