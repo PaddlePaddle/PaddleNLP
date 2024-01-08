@@ -30,6 +30,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
 import aistudio_sdk
 import numpy as np
 import paddle
+import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn as nn
 import six
 from huggingface_hub import (
