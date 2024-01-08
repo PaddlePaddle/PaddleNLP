@@ -247,7 +247,11 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" flask_server.py \
 - `flask_port`: Flask服务端口号，默认8010。
 - 其他参数请参见[推理文档](./docs/inference.md)中推理参数配置。
 
+此外，如果想通过API脚本的方式跑推理，可参考：`./request_flask_server.py` 文件。
+
 </div></details>
+
+
 
 ### 6. PyTorch模型权重转换
 PaddleNLP 提供了可自动将 PyTorch 相关的权重转化为 Paddle 权重的接口，代码如下：

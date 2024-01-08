@@ -29,25 +29,23 @@ from ..aistudio_utils import aistudio_download
 from ..utils import resolve_cache_dir
 
 __all__ = [
-    "AutoProcessor",
+    "AutoImageProcessor",
 ]
 
-PROCESSOR_MAPPING_NAMES = OrderedDict(
+IMAGE_PROCESSOR_MAPPING_NAMES = OrderedDict(
     [
-        ("ChineseCLIPProcessor", "chineseclip"),
-        ("CLIPProcessor", "clip"),
-        ("ErnieViLProcessor", "ernie_vil"),
-        ("CLIPSegProcessor", "clipseg"),
-        ("SpeechT5Processor", "speecht5"),
-        ("ClapProcessor", "clap"),
+        ("ChineseCLIPImageProcessor", "chineseclip"),
+        ("CLIPImageProcessor", "clip"),
+        ("ErnieViLImageProcessor", "ernie_vil"),
+        ("ViTImageProcessor", "clipseg"),
     ]
 )
 
 
 def get_configurations():
     MAPPING_NAMES = OrderedDict()
-    for key, class_name in PROCESSOR_MAPPING_NAMES.items():
-        import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.processing")
+    for key, class_name in IMAGE_PROCESSOR_MAPPING_NAMES.items():
+        import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.image_processing")
         processor_name = getattr(import_class, key)
         name = tuple(processor_name.pretrained_init_configuration.keys())
         if MAPPING_NAMES.get(name, None) is None:
@@ -56,18 +54,18 @@ def get_configurations():
     return MAPPING_NAMES
 
 
-class AutoProcessor:
+class AutoImageProcessor:
     """
     AutoClass can help you automatically retrieve the relevant model given the provided
     pretrained weights/vocabulary.
-    Autoprocessor is a generic processor class that will be instantiated as one of the
-    base processor classes when created with the Autoprocessor.from_pretrained() classmethod.
+    AutoImageProcessor is a generic processor class that will be instantiated as one of the
+    base processor classes when created with the AutoImageProcessor.from_pretrained() classmethod.
     """
 
     MAPPING_NAMES = get_configurations()
     _processor_mapping = MAPPING_NAMES
-    _name_mapping = PROCESSOR_MAPPING_NAMES
-    processor_config_file = "preprocessor_config.json"
+    _name_mapping = IMAGE_PROCESSOR_MAPPING_NAMES
+    image_processor_config_file = "preprocessor_config.json"
 
     def __init__(self, *args, **kwargs):
         raise EnvironmentError(
@@ -76,28 +74,20 @@ class AutoProcessor:
         )
 
     @classmethod
-    def _get_processor_class_from_config(cls, pretrained_model_name_or_path, config_file_path):
+    def _get_image_processor_class_from_config(cls, pretrained_model_name_or_path, config_file_path):
         with io.open(config_file_path, encoding="utf-8") as f:
             init_kwargs = json.load(f)
         # class name corresponds to this configuration
         init_class = init_kwargs.pop("init_class", None)
         if init_class is None:
-            init_class = init_kwargs.pop("processor_class", None)
-            if init_class is None:
-                init_class = init_kwargs.pop("image_processor_type", None)
-                # replace old name to new name
-                if init_class is not None and init_class.endswith("ImageProcessor"):
-                    init_class = init_class.replace("ImageProcessor", "Processor")
-            if init_class is None:
-                init_class = init_kwargs.pop("feature_extractor_type", None)
-                # replace old name to new name
-                if init_class is not None and init_class.endswith("FeatureExtractor"):
-                    init_class = init_class.replace("FeatureExtractor", "Processor")
+            init_class = init_kwargs.pop("image_processor_type", init_kwargs.pop("feature_extractor_type", None))
 
         if init_class:
+            # replace old name to new name
+            init_class = init_class.replace("FeatureExtractor", "ImageProcessor")
             try:
                 class_name = cls._name_mapping[init_class]
-                import_class = import_module(f"paddlenlp.transformers.{class_name}.processing")
+                import_class = import_module(f"paddlenlp.transformers.{class_name}.image_processing")
                 processor_class = getattr(import_class, init_class)
                 return processor_class
             except Exception:
@@ -110,7 +100,7 @@ class AutoProcessor:
                 if pattern in pretrained_model_name_or_path.lower():
                     init_class = key
                     class_name = cls._name_mapping[init_class]
-                    import_class = import_module(f"paddlenlp.transformers.{class_name}.processor")
+                    import_class = import_module(f"paddlenlp.transformers.{class_name}.image_processing")
                     processor_class = getattr(import_class, init_class)
                     break
             return processor_class
@@ -118,7 +108,7 @@ class AutoProcessor:
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         """
-        Creates an instance of `Autoprocessor`. Related resources are loaded by
+        Creates an instance of `AutoImageProcessor`. Related resources are loaded by
         specifying name of a built-in pretrained model, or a community-contributed
         pretrained model, or a local file directory path.
 
@@ -142,8 +132,8 @@ class AutoProcessor:
 
         Example:
             .. code-block::
-            from paddlenlp.transformers import AutoProcessor
-            processor = AutoProcessor.from_pretrained("openai/clip-vit-base-patch32")
+            from paddlenlp.transformers import AutoImageProcessor
+            processor = AutoImageProcessor.from_pretrained("openai/clip-vit-base-patch32")
             processor.save_pretrained('clip_processor')
         """
         cache_dir = kwargs.get("cache_dir", None)
@@ -163,9 +153,11 @@ class AutoProcessor:
 
         # From local dir path
         if os.path.isdir(pretrained_model_name_or_path):
-            config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.processor_config_file)
+            config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.image_processor_config_file)
             if os.path.exists(config_file):
-                processor_class = cls._get_processor_class_from_config(pretrained_model_name_or_path, config_file)
+                processor_class = cls._get_image_processor_class_from_config(
+                    pretrained_model_name_or_path, config_file
+                )
                 logger.info("We are using %s to load '%s'." % (processor_class, pretrained_model_name_or_path))
                 return processor_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         # From built-in pretrained models
@@ -180,27 +172,26 @@ class AutoProcessor:
                         return actual_processor_class.from_pretrained(
                             pretrained_model_name_or_path, *model_args, **kwargs
                         )
-
         # From AI Studio or HF Hub
         elif from_aistudio or from_hf_hub:
             if from_aistudio:
                 config_file = aistudio_download(
                     repo_id=pretrained_model_name_or_path,
-                    filename=cls.processor_config_file,
+                    filename=cls.image_processor_config_file,
                     cache_dir=cache_dir,
                     subfolder=subfolder,
                 )
             else:
                 config_file = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
-                    filename=cls.processor_config_file,
+                    filename=cls.image_processor_config_file,
                     subfolder=subfolder,
                     cache_dir=cache_dir,
                     library_name="PaddleNLP",
                     library_version=__version__,
                 )
             if os.path.exists(config_file):
-                processor_class = cls._get_processor_class_from_config(
+                processor_class = cls._get_image_processor_class_from_config(
                     pretrained_model_name_or_path,
                     config_file,
                 )
@@ -208,7 +199,7 @@ class AutoProcessor:
                 return processor_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         # Assuming from community-contributed pretrained models
         else:
-            url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.processor_config_file]
+            url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.image_processor_config_file]
             cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
             if subfolder != "":
                 url_list.insert(2, subfolder)
@@ -227,7 +218,7 @@ class AutoProcessor:
                 )
 
             if os.path.exists(resolved_vocab_file):
-                processor_class = cls._get_processor_class_from_config(
+                processor_class = cls._get_image_processor_class_from_config(
                     pretrained_model_name_or_path, resolved_vocab_file
                 )
                 logger.info("We are using %s to load '%s'." % (processor_class, pretrained_model_name_or_path))

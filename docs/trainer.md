@@ -663,8 +663,10 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         model. (default: None)
 
   --unified_checkpoint
-                       是否统一混合并行训练的Checkpoint，(可选，默认为False)
-                       Whether to unify hybrid parallel checkpoint. (default: False)
+                       是否使用unified_checkpoint，开启后训练的checkpoint将存储为新格式。
+                       可以支持跨分布式策略重启、动态扩缩容重启。(可选，默认为False)
+                       Whether to use unified_checkpoint, enable it to store training checkpoint in a new format.
+                       Supporting restart with different distribution strategies and devices，(optional, defaults to False)
 
   --unified_checkpoint_config
                        与Unified Checkpoint相关的一些优化配置项，以str形式传入配置。
