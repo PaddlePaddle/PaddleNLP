@@ -18,24 +18,15 @@ import unittest
 
 import paddle
 
+from paddlenlp.generation import GenerationConfig
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from tests.transformers.test_modeling_common import ids_tensor
 
 
 class ShardingStage3Tester(unittest.TestCase):
-    def get_inputs(self, model):
-        input_ids = ids_tensor([1, 5], vocab_size=model.config.vocab_size, dtype="int64")
-        attention_mask = paddle.ones_like(input_ids, dtype="bool")
-        return {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "decode_strategy": "greedy_search",
-            "max_length": 10 + paddle.distributed.get_rank(),
-            "synced_gpus": True,
-        }
-
-    def test_synced_gpus(self):
+    @classmethod
+    def setUpClass(cls):
         tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-llama")
         model = AutoModelForCausalLM.from_pretrained("__internal_testing__/tiny-random-llama")
         model.config.eos_token_id = -1
@@ -54,16 +45,45 @@ class ShardingStage3Tester(unittest.TestCase):
             trainer = Trainer(model, args=args, tokenizer=tokenizer)
             trainer.create_optimizer_and_scheduler(num_training_steps=10)
             trainer._wrap_model(trainer.model_wrapped)
-            model = trainer.model
-            model.eval()
-            with paddle.no_grad():
-                input_kwargs = self.get_inputs(model)
-                # to ensure not hang
-                model.generate(**input_kwargs)
+        cls.model = trainer.model
+        cls.model.eval()
+        input_ids = ids_tensor([1, 5], vocab_size=model.config.vocab_size, dtype="int64")
+        attention_mask = paddle.ones_like(input_ids, dtype="bool")
+        cls.input_kwargs = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "synced_gpus": True,
+        }
+        cls.generation_config = GenerationConfig(max_length=10 + paddle.distributed.get_rank(), trunc_input=False)
+
+    def test_synced_gpus_greedy(self):
+        with paddle.no_grad():
+            self.generation_config.decode_strategy = "greedy_search"
+            self.model.generate(**self.input_kwargs, generation_config=self.generation_config)
+
+    def test_synced_gpus_sample(self):
+        with paddle.no_grad():
+            self.generation_config.decode_strategy = "sampling"
+            self.generation_config.top_k = 8
+            self.model.generate(**self.input_kwargs, generation_config=self.generation_config)
+
+    def test_synced_gpus_beam_search(self):
+        with paddle.no_grad():
+            self.generation_config.decode_strategy = "beam_search"
+            self.generation_config.num_beams = 4
+            self.model.generate(**self.input_kwargs, generation_config=self.generation_config)
+
+    def test_synced_gpus_group_beam_search(self):
+        with paddle.no_grad():
+            self.generation_config.decode_strategy = "beam_search"
+            self.generation_config.num_beams = 4
+            self.generation_config.num_beam_groups = 2
+            self.model.generate(**self.input_kwargs, generation_config=self.generation_config)
 
 
 if __name__ == "__main__":
-    ShardingStage3Tester().test_synced_gpus()
+    # ShardingStage3Tester().test_synced_gpus_sample()
+    unittest.main()
 
 # CUDA_VISIBLE_DEVICES=2 PYTHONPATH=./ pytest -s -v tests/test_synced_gpus.py
 # PYTHONPATH=/ssd2/zhonghui03/Datasets/PaddleNLP:$PYTHONPATH  PYTHONPATH=$PYTHONPATH:./ python   -m paddle.distributed.launch --gpus 0,1,2,3  tests/test_pipeline_parallel.py

@@ -39,6 +39,7 @@ from paddlenlp.utils.log import logger
 # os.environ["https_proxy"] = "http://172.19.57.45:3128"
 os.environ["http_proxy"] = "http://10.162.37.16:8128"
 os.environ["https_proxy"] = "http://10.162.37.16:8128"
+os.environ["no_proxy"] = "localhost,bj.bcebos.com,su.bcebos.com,paddlepaddledeps.bj.bcebos.com,pslib.bj.bcebos.com"
 
 
 @dataclass
