@@ -35,6 +35,7 @@ from huggingface_hub.utils import EntryNotFoundError
 from .. import __version__
 from ..utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
 from ..utils.log import logger
+from .aistudio_utils import aistudio_download
 from .feature_extraction_utils import BatchFeature as BaseBatchFeature
 from .utils import resolve_cache_dir
 
@@ -62,6 +63,7 @@ class ImageProcessingMixin(object):
     extractors.
     """
 
+    pretrained_init_configuration = {}
     _auto_class = None
 
     def __init__(self, **kwargs):
@@ -317,21 +319,29 @@ class ImageProcessingMixin(object):
         """
         cache_dir = kwargs.pop("cache_dir", None)
         from_hf_hub = kwargs.pop("from_hf_hub", False)
-        subfolder = kwargs.pop("subfolder", None)
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+        from_aistudio = kwargs.pop("from_aistudio", False)
+        subfolder = kwargs.pop("subfolder", "")
+        if subfolder is None:
+            subfolder = ""
+        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         is_local = os.path.isdir(pretrained_model_name_or_path)
         if os.path.isdir(pretrained_model_name_or_path):
-            if subfolder is None:
-                resolved_image_processor_file = os.path.join(pretrained_model_name_or_path, IMAGE_PROCESSOR_NAME)
-            else:
-                resolved_image_processor_file = os.path.join(
-                    pretrained_model_name_or_path, subfolder, IMAGE_PROCESSOR_NAME
-                )
+            resolved_image_processor_file = os.path.join(
+                pretrained_model_name_or_path, subfolder, IMAGE_PROCESSOR_NAME
+            )
         elif os.path.isfile(pretrained_model_name_or_path):
             resolved_image_processor_file = pretrained_model_name_or_path
             is_local = True
+        elif from_aistudio:
+            image_processor_file = IMAGE_PROCESSOR_NAME
+            resolved_image_processor_file = aistudio_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=image_processor_file,
+                cache_dir=cache_dir,
+                subfolder=subfolder,
+            )
         elif from_hf_hub:
             image_processor_file = IMAGE_PROCESSOR_NAME
             resolved_image_processor_file = hf_hub_download(
@@ -344,16 +354,11 @@ class ImageProcessingMixin(object):
             )
         else:
             # Assuming from community-contributed pretrained models
-            if subfolder is None:
-                image_processor_file = "/".join(
-                    [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, IMAGE_PROCESSOR_NAME]
-                )
-            else:
-                image_processor_file = "/".join(
-                    [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, subfolder, IMAGE_PROCESSOR_NAME]
-                )
-                # update cache_dir
-                cache_dir = os.path.join(cache_dir, subfolder)
+            url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, IMAGE_PROCESSOR_NAME]
+            cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
+            if subfolder != "":
+                url_list.insert(2, subfolder)
+            image_processor_file = "/".join(url_list)
             try:
                 # Load from local folder or from cache or download from model Hub and cache
                 resolved_image_processor_file = get_path_from_url_with_filelock(image_processor_file, cache_dir)

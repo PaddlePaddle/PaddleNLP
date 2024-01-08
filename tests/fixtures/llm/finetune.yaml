@@ -17,6 +17,7 @@ finetune:
     fp16_opt_level: "O2"
     do_train: true
     do_eval: true
+    use_flash_attention: true
     disable_tqdm: true
     load_best_model_at_end: true
     eval_with_do_generation: false
@@ -31,7 +32,7 @@ finetune:
     chatglm:
       model_name_or_path: __internal_testing__/tiny-fused-chatglm
     chatglm2:
-      model_name_or_path: __internal_testing__/tiny-random-chatglm2
+      model_name_or_path: __internal_testing__/tiny-fused-chatglm2
     bloom:
       model_name_or_path: __internal_testing__/tiny-fused-bloom
     qwen:

@@ -25,7 +25,7 @@ import re
 import unicodedata
 from collections import OrderedDict
 from dataclasses import asdict, dataclass
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy
 import numpy as np
@@ -524,41 +524,52 @@ class ChatTemplate:
         jinja_env.globals["raise_exception"] = raise_exception
         return jinja_env.from_string(chat_template)
 
-    def render_conversation(self, conversation_data: list[str] | dict[str, str], index: int = 0) -> str:
+    def render_conversation(
+        self, conversation_data: list[str] | dict[str, str], index: int = 0, context_data: Dict[str, Any] = {}
+    ) -> list[str]:
         """
         Args:
-            conversation_data (list[str]): _description_
+            conversation_data (list[str]): the conversation data which must be two parts
+            index (int): the index of current conversation
 
         Returns:
-            _type_: _description_
+            list[str]: the rendered conversation data
         """
         if self.conversation is None:
             raise ValueError(
                 "The template for multi-turns is invalid, please check `conversation` filed in your chat-template."
             )
 
-        if isinstance(conversation_data, list):
+        if isinstance(conversation_data, (list, tuple)):
             assert (
                 len(conversation_data) == 2
             ), "Each round/turn of conversation must be two participants, eg: [user-query, bot-query]"
 
             conversation_data = {"user": conversation_data[0], "bot": conversation_data[1], "index": index}
+        conversation_data.update(context_data)
 
         one_turn_conversation = []
         for conversation in self.conversation:
             template = self._compile_jinja_template(conversation)
             result = template.render(conversation_data)
             one_turn_conversation.append(result)
-        return "".join(one_turn_conversation)
+        return one_turn_conversation
 
-    def render_query(self, query: str, index: int = 0):
+    def render_query(self, query: str, index: int = 0, context_data: Dict[str, Union[int, str]] = {}):
         if self.query is None:
             return query
 
         template = self._compile_jinja_template(self.query)
-        return template.render(query=query, index=index)
+        return template.render(query=query, index=index, **context_data)
 
-    def __call__(self, conversations: list[list[str]] | str):
+    def render_system(self, context_data: Dict[str, Union[int, str]] = {}) -> str:
+        if self.system is None:
+            return ""
+
+        template = self._compile_jinja_template(self.system)
+        return template.render(**context_data)
+
+    def __call__(self, conversations: list[list[str]] | str, context_data: Dict[str, Union[int, str]] = {}) -> str:
         """render the conversations by chat-template
 
         Args:
@@ -571,16 +582,22 @@ class ChatTemplate:
             conversations = [[conversations]]
 
         # [1 ... n-1] conversation
-        final_query = self.system or ""
+        final_query = self.render_system(context_data=context_data)
+        context_data["length"] = len(conversations)
         for index, conversation in enumerate(conversations[:-1]):
-            final_query += self.render_conversation(conversation, index=index)
+            final_query += "".join(self.render_conversation(conversation, index=index, context_data=context_data))
 
         if not isinstance(conversations[-1], list) and not len(conversations[-1]) != 1:
             raise ValueError(
                 "The length of last conversation must be one, eg: [[user-query, bot-answer], [user-query, bot-answer], ..., [user-query]]"
             )
 
-        final_query += self.render_query(conversations[-1][0], index=len(conversations) - 1)
+        if len(conversations[-1]) > 1:
+            logger.warning(
+                f"The last conversation is not a single-round, chat-template will skip the conversation: {conversations[-1][1:]}"
+            )
+
+        final_query += self.render_query(conversations[-1][0], index=len(conversations) - 1, context_data=context_data)
         return final_query
 
     @classmethod
@@ -598,46 +615,88 @@ class ChatTemplateMixin:
     chat_template: Optional[ChatTemplate] = None
 
     def apply_chat_template(
-        self, conversation: List[List[str, str]] | str, tokenize: bool = True, **tokenizer_kwargs
+        self,
+        conversation: List[List[str, str]] | str,
+        tokenize: bool = True,
+        context_data: Dict[str, Any] = {},
+        **tokenizer_kwargs
     ) -> str | dict[str, numpy.ndarray | paddle.Tensor]:
+        """apply chat_template rules to conversation which should not be batched data
+
+        Args:
+            conversation (List[List[str, str]] | str): the conversation messages between user and bot
+            context_data (Dict[str, Any]): the context data for chat_template.json
+            tokenize (bool, optional): whether do tokenization. Defaults to True.
+
+        Returns:
+            str | dict[str, numpy.ndarray | paddle.Tensor]: return the result of applied data
+        """
         if isinstance(conversation, str):
             conversation = [[conversation]]
+        elif isinstance(conversation, list) and isinstance(conversation[0], str):
+            raise ValueError(
+                "apply_chat_template do not support appling batch conversations, "
+                "so you should apply the conversation one by one."
+            )
 
-        query = self.chat_template(conversation)
+        query = self.chat_template(conversation, context_data=context_data)
         if not tokenize:
             return query
 
+        # chat_template should not add special tokens
+        tokenizer_kwargs["add_special_tokens"] = False
         return self(query, **tokenizer_kwargs)
 
-    def encode_chat_inputs(self, conversation: List[List[str, str]]):
+    def encode_chat_inputs(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}):
         """Encodes conversation to pairs of token ids.
         Turn 0: bos + system + sep + user     bot + eos
         Turn t: sep + bot + query             bot + eos
 
         Args:
             conversation (List[List[str, str]]): the conversation of data
+            context_data (Dict[str, Any]): the context data of conversation
 
         Returns:
             List[list[int], list[int]]: the pair of input_ids and target_ids
         """
-        # TODO(wj-Mcat): complete in next pr
-        pass
-        # encode_ids = []
-        # for index, (user, bot) in enumerate(conversation):
-        #     pass
+        # encode system
+        result = {}
+        if self.chat_template.system:
+            system = self.chat_template.render_system(context_data)
+            result["system"] = self.encode(system, add_special_tokens=False)["input_ids"]
+
+        # encode conversation
+        conversation_ids = []
+        for index, conversation in enumerate(conversations):
+            user_input, bot_output = self.chat_template.render_conversation(
+                conversation, index=index, context_data=context_data
+            )
+            user_ids = self.encode(user_input, add_special_tokens=False)["input_ids"]
+            bot_ids = self.encode(bot_output, add_special_tokens=False)["input_ids"]
+            conversation_ids.append([user_ids, bot_ids])
+
+        result["conversations"] = conversation_ids
+        return result
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
-        cache_dir = kwargs.get("cache_dir", None)
-        from_hf_hub = kwargs.get("from_hf_hub", None)
+        cache_dir = kwargs.pop("cache_dir", None)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        from_aistudio = kwargs.pop("from_aistudio", False)
+        subfolder = kwargs.pop("subfolder", "")
+        if subfolder is None:
+            subfolder = ""
 
-        tokenizer = super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
+        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
+        kwargs["subfolder"] = subfolder
+        kwargs["cache_dir"] = cache_dir
+        kwargs["from_hf_hub"] = from_hf_hub
+        kwargs["from_aistudio"] = from_aistudio
+        kwargs["return_tokenizer_file_dir"] = True
+        tokenizer, tokenizer_config_file_dir = super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
 
         # load chat-template
-        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
-
-        chat_template_file = os.path.join(cache_dir, CHAT_TEMPLATE_CONFIG_NAME)
+        chat_template_file = os.path.join(tokenizer_config_file_dir, CHAT_TEMPLATE_CONFIG_NAME)
         if not os.path.exists(chat_template_file):
             return tokenizer
 
@@ -1664,7 +1723,8 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             # from byte fallback tokenization.
             # If it's in the middle, it's probably a real invalid id generated
             # by the model
-            new_text = new_text[len(prefix_text) :]
+            prefix_index = new_text.index(prefix_text)
+            new_text = new_text[prefix_index + len(prefix_text) :]
             return new_text, read_offset, len(all_input_ids)
         else:
             return "", prefix_offset, read_offset

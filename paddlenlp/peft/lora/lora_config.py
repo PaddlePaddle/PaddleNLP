@@ -71,6 +71,10 @@ class LoRAConfig:
             "help": "The model multi head dimension.Only for LoRAMergedLinear and ColumnParallelLoRAMergedLinear."
         },
     )
+    do_qat: bool = field(default=False, metadata={"help": "Whether the lora model would do quant-aware training"})
+    base_model_name_or_path: Optional[str] = field(
+        default=None, metadata={"help": "The name of the base model to use."}
+    )
 
     @property
     def __dict__(self):

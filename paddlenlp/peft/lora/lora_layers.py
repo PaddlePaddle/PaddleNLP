@@ -85,7 +85,7 @@ class LoRALinear(nn.Linear):
             self.weight.set_value(new_weight)
             self.merged = True
 
-    def forward(self, input: paddle.Tensor):
+    def forward(self, input: paddle.Tensor, *args, **kwargs):
         result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
         if not self.merged:
             result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
@@ -635,3 +635,136 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
     def extra_repr(self):
         name = f", name={self.name}" if self.name else ""
         return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}{name}"
+
+
+class LoRAConv2D(nn.Conv2D):
+    # LoRA implemented in a dense layer
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        r: int = 0,
+        lora_alpha: int = 1,
+        lora_dropout: float = 0.0,
+        merge_weights: bool = True,
+        **kwargs
+    ):
+        nn.Conv2D.__init__(self, in_channels, out_channels, kernel_size, **kwargs)
+        if not isinstance(r, int) or r <= 0:
+            raise ValueError("Lora rank r should be a positive integer")
+        self.r = r
+        self.lora_alpha = lora_alpha
+        # Optional dropout
+        if lora_dropout > 0.0:
+            self.lora_dropout = nn.Dropout(p=lora_dropout)
+        else:
+            self.lora_dropout = lambda x: x
+        # Mark the weight as unmerged
+        self.merged = False
+        self.merge_weights = merge_weights
+
+        # Actual trainable parameters
+        lora_A = nn.Conv2D(
+            in_channels,
+            r,
+            kernel_size=self._kernel_size,
+            stride=self._stride,
+            padding=self._padding,
+            weight_attr=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu"),
+            bias_attr=False,
+        )
+        self.lora_A = lora_A.weight
+        self.lora_A_forward = lambda x: nn.Conv2D.__call__(lora_A, x)
+        lora_B = nn.Conv2D(
+            r,
+            out_channels,
+            kernel_size=(1, 1),
+            stride=(1, 1),
+            weight_attr=nn.initializer.Constant(value=0.0),
+            bias_attr=False,
+        )
+        self.lora_B_forward = lambda x: nn.Conv2D.__call__(lora_B, x)
+        self.lora_B = lora_B.weight
+        self.scaling = lora_alpha / r
+
+        # Freezing the pre-trained weight matrix
+        self.weight.stop_gradient = True
+        if self.bias is not None:
+            self.bias.stop_gradient = True
+
+    def train(self):
+        super().train()
+        if self.merge_weights and self.merged:
+            weight_A = self.lora_A.cast(dtype=self.weight.dtype)
+            weight_B = self.lora_B.cast(dtype=self.weight.dtype)
+            if self.weight.shape[2:4] == [1, 1]:
+                # conv2d 1x1
+                delta_weight = (weight_B.squeeze(3).squeeze(2) @ weight_A.squeeze(3).squeeze(2)).unsqueeze(
+                    2
+                ).unsqueeze(3) * self.scaling
+            else:
+                # conv2d 3x3
+                delta_weight = (
+                    F.conv2d(
+                        weight_A.transpose([1, 0, 2, 3]),
+                        weight_B,
+                    ).transpose([1, 0, 2, 3])
+                    * self.scaling
+                )
+            # Make sure that the weights are not merged
+            new_weight = self.weight - delta_weight
+            self.weight.set_value(new_weight)
+            self.merged = False
+
+    def eval(self):
+        super().eval()
+        if self.merge_weights and not self.merged:
+            weight_A = self.lora_A.cast(dtype=self.weight.dtype)
+            weight_B = self.lora_B.cast(dtype=self.weight.dtype)
+            if self.weight.shape[2:4] == [1, 1]:
+                # conv2d 1x1
+                delta_weight = (weight_B.squeeze(3).squeeze(2) @ weight_A.squeeze(3).squeeze(2)).unsqueeze(
+                    2
+                ).unsqueeze(3) * self.scaling
+            else:
+                # conv2d 3x3
+                delta_weight = (
+                    F.conv2d(
+                        weight_A.transpose([1, 0, 2, 3]),
+                        weight_B,
+                    ).transpose([1, 0, 2, 3])
+                    * self.scaling
+                )
+            # Merge the weights and mark it
+            new_weight = self.weight + delta_weight
+            self.weight.set_value(new_weight)
+            self.merged = True
+
+    def forward(self, input: paddle.Tensor, *args, **kwargs):
+        previous_dtype = input.dtype
+        result = super().forward(input)
+        if not self.merged:
+            result += (
+                self.lora_B_forward(self.lora_A_forward(self.lora_dropout(input.cast(dtype=self.lora_A.dtype))))
+                * self.scaling
+            )
+        result = result.cast(dtype=previous_dtype)
+        return result
+
+    def extra_repr(self):
+        main_str = "{_in_channels}, {_out_channels}, kernel_size={_kernel_size}"
+        if self._stride != [1] * len(self._stride):
+            main_str += ", stride={_stride}"
+        if self._padding != 0:
+            main_str += ", padding={_padding}"
+        if self._padding_mode != "zeros":
+            main_str += ", padding_mode={_padding_mode}"
+        if self.output_padding != 0:
+            main_str += ", output_padding={output_padding}"
+        if self._dilation != [1] * len(self._dilation):
+            main_str += ", dilation={_dilation}"
+        if self._groups != 1:
+            main_str += ", groups={_groups}"
+        main_str += ", data_format={_data_format}, rank={r}, alpha={lora_alpha}"
+        return main_str.format(**self.__dict__)

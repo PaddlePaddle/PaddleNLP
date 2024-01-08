@@ -24,8 +24,7 @@ import tempfile
 import warnings
 from contextlib import contextmanager
 from functools import partial
-
-# from pathlib import Path
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
 
 import aistudio_sdk
@@ -42,18 +41,20 @@ from huggingface_hub import (
 )
 from huggingface_hub.utils import EntryNotFoundError
 from paddle import Tensor
+from paddle.distributed.fleet.meta_parallel.parallel_layers import SharedLayerDesc
 from paddle.nn import Embedding, Layer
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddle.utils.download import is_url as is_remote_url
 from tqdm.auto import tqdm
 
-from paddlenlp.utils.downloader import get_path_from_url_with_filelock, hf_file_exists
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from paddlenlp.utils.env import (
     CONFIG_NAME,
     LEGACY_CONFIG_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
+    PYTORCH_WEIGHTS_INDEX_NAME,
     PYTORCH_WEIGHTS_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
@@ -323,14 +324,17 @@ def load_state_dict(
         # Check format of the archive
         with safe_open(checkpoint_file, framework="np") as f:
             metadata = f.metadata()
-        if metadata.get("format") not in ["pd", "np"]:
+        if metadata is None:
+            metadata = {"format", "np"}
+
+        if metadata.get("format", "np") not in ["pd", "np"]:
             raise OSError(
                 f"The safetensors archive passed at {checkpoint_file} does not contain the valid metadata. Make sure "
                 "you save your model with the `save_pretrained` method."
             )
-        if metadata["format"] == "pd":
+        if metadata.get("format", "np") == "pd":
             raise ValueError("Currently unsupport paddle weights file, use numpy instead.")
-        if metadata["format"] == "np":
+        if metadata.get("format", "np") == "np":
             state_dict = {}
             with safe_open(checkpoint_file, framework="np") as f:
                 for key in f.keys():
@@ -353,45 +357,40 @@ def load_state_dict(
     return state_dict
 
 
-def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conversion: bool, subfolder=None):
+def resolve_weight_file_from_hf_hub(
+    repo_id: str, cache_dir: str, convert_from_torch: bool, subfolder=None, use_safetensors=False
+):
     """find the suitable weight file name
 
     Args:
         repo_id (str): repo name of huggingface hub
         cache_dir (str): cache dir for hf
-        support_conversion (bool): whether support converting pytorch weight file to paddle weight file
+        convert_from_torch (bool): whether support converting pytorch weight file to paddle weight file
         subfolder (str, optional) An optional value corresponding to a folder inside the repo.
     """
-    is_local = os.path.isdir(repo_id)
-    if not is_local:
-        if hf_file_exists(repo_id, PADDLE_WEIGHTS_NAME, subfolder=subfolder):
-            file_name = PADDLE_WEIGHTS_NAME
-            assert (
-                support_conversion is False
-            ), "Please call set convert_from_torch for paddle weights on huggingface hub, eg. Model.from_pretrained(model_name, from_hf_hub=True, convert_from_torch=False)"
-        elif hf_file_exists(repo_id, PYTORCH_WEIGHTS_NAME, subfolder=subfolder):
-            if not support_conversion:
-                raise EntryNotFoundError(
-                    f"can not download `{PADDLE_WEIGHTS_NAME} from https://huggingface.co/{repo_id}` "
-                    "and current model doesn't support conversion from pytorch weight file to paddle weight file"
-                )
-            file_name = PYTORCH_WEIGHTS_NAME
-        else:
-            raise EntryNotFoundError(
-                message=f"can not find the paddle/pytorch weight file from: https://huggingface.co/{repo_id}",
-                response=None,
-            )
-    else:
-        # for local file, we use support_conversion to select paddle or torch weight.
-        file_name = PYTORCH_WEIGHTS_NAME if support_conversion else PADDLE_WEIGHTS_NAME
+    is_sharded = False
 
-    file_name_list = [SAFE_WEIGHTS_NAME] + [file_name]
+    if use_safetensors:
+        file_name_list = [
+            SAFE_WEIGHTS_INDEX_NAME,
+            SAFE_WEIGHTS_NAME,
+        ]
+    else:
+        file_name_list = [
+            PYTORCH_WEIGHTS_INDEX_NAME,
+            PADDLE_WEIGHTS_INDEX_NAME,
+            PYTORCH_WEIGHTS_NAME,
+            PADDLE_WEIGHTS_NAME,
+            SAFE_WEIGHTS_NAME,  # (NOTE,lxl): 兼容极端情况
+        ]
     resolved_file = None
     for fn in file_name_list:
         resolved_file = cached_file_for_hf_hub(
             repo_id, fn, cache_dir, subfolder, _raise_exceptions_for_missing_entries=False
         )
         if resolved_file is not None:
+            if resolved_file.endswith(".json"):
+                is_sharded = True
             break
 
     if resolved_file is None:
@@ -401,7 +400,7 @@ def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conver
             f"'https://huggingface.co/{repo_id}' for available files."
         )
 
-    return resolved_file
+    return resolved_file, is_sharded
 
 
 def register_base_model(cls):
@@ -567,10 +566,11 @@ def shard_checkpoint(
     # Otherwise, let's build the index
     weight_map = {}
     shards = {}
+    weights_name_suffix = Path(weights_name).suffix
     for idx, shard in enumerate(sharded_state_dicts):
-        shard_file = weights_name.replace(".pdparams", f"-{idx+1:05d}-of-{len(sharded_state_dicts):05d}.pdparams")
-        shard_file = shard_file.replace(
-            ".safetensors", f"-{idx + 1:05d}-of-{len(sharded_state_dicts):05d}.safetensors"
+        # replace `suffix` -> `-00001-of-00002suffix`
+        shard_file = weights_name.replace(
+            weights_name_suffix, f"-{idx+1:05d}-of-{len(sharded_state_dicts):05d}{weights_name_suffix}"
         )
         shards[shard_file] = shard
         for key in shard.keys():
@@ -733,15 +733,22 @@ def _convert_state_dict_dtype_and_shape(state_dict, model_to_load):
     def is_0d_or_1d(tensor):
         return len(tensor.shape) == 0 or list(tensor.shape) == [1]
 
+    expected_place = paddle.framework._current_expected_place()
     for key, value in model_to_load.state_dict().items():
         if key in state_dict:
             if isinstance(state_dict[key], np.ndarray):
                 raise ValueError(
                     "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, plase convert numpy.ndarray to paddle.Tensor"
                 )
+            # confirm parameter cast is executed on the same device as model
+            # TODO: cast(FP32 -> FP16) has diff on different devices, need to fix it
             if state_dict[key].is_floating_point() and state_dict[key].dtype != value.dtype:
-                state_dict[key] = paddle.cast(state_dict.pop(key), value.dtype)
-
+                value_pop = state_dict.pop(key)
+                value_new_place = (
+                    value_pop if value_pop.place == expected_place else value_pop._copy_to(expected_place, False)
+                )
+                state_dict[key] = paddle.cast(value_new_place, value.dtype)._copy_to(value_pop.place, False)
+                del value_new_place
             # unified 0d and 1d tensor
             if is_0d_or_1d(value) and is_0d_or_1d(state_dict[key]):
                 if list(value.shape) != list(state_dict[key].shape):
@@ -789,7 +796,7 @@ def _load_state_dict_into_meta_model(
             if (
                 keep_in_fp32_modules is not None
                 and any(module_to_keep_in_fp32 in param_name for module_to_keep_in_fp32 in keep_in_fp32_modules)
-                and dtype == paddle.float16
+                and (dtype == paddle.float16 or dtype == paddle.bfloat16)
             ):
                 param = param.astype(dtype=paddle.float32)
             else:
@@ -1409,13 +1416,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         from_hf_hub: bool = False,
         from_aistudio: bool = False,
         cache_dir: str | None = None,
-        subfolder: Optional[str] = None,
+        subfolder: Optional[str] = "",
         config: PretrainedConfig = None,
         convert_from_torch: bool = False,
         use_safetensors: bool | None = None,
         variant=None,
     ) -> str:
-
         """resolve model target file path from `` and `cache_dir`
 
         1. when it is file path:
@@ -1442,13 +1448,27 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # -1. when it's from HF
         if from_hf_hub or convert_from_torch:
-            resolved_archive_file = resolve_weight_file_from_hf_hub(
+            resolved_archive_file, is_sharded = resolve_weight_file_from_hf_hub(
                 pretrained_model_name_or_path,
                 cache_dir=cache_dir,
-                support_conversion=convert_from_torch,
+                convert_from_torch=convert_from_torch,
                 subfolder=subfolder,
+                use_safetensors=use_safetensors,
             )
-            return resolved_archive_file, sharded_metadata, is_sharded
+            # We'll need to download and cache each checkpoint shard if the checkpoint is sharded.
+            resolved_sharded_files = None
+            if is_sharded:
+                # resolved_archive_file becomes a list of files that point to the different checkpoint shards in this case.
+                resolved_sharded_files, sharded_metadata = get_checkpoint_shard_files(
+                    pretrained_model_name_or_path,
+                    resolved_archive_file,
+                    from_aistudio=from_aistudio,
+                    from_hf_hub=from_hf_hub,
+                    cache_dir=cache_dir,
+                    subfolder=subfolder,
+                )
+
+            return resolved_archive_file, resolved_sharded_files, sharded_metadata, is_sharded
 
         if pretrained_model_name_or_path is not None:
             # the following code use a lot of os.path.join, hence setting subfolder to empty str if None
@@ -1546,13 +1566,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         f" {pretrained_model_name_or_path}."
                     )
             # pretrained_model_name_or_path is file
-            elif os.path.isfile(os.path.join(subfolder, pretrained_model_name_or_path)):
+            elif os.path.isfile(pretrained_model_name_or_path):
                 archive_file = pretrained_model_name_or_path
                 is_local = True
             elif is_remote_url(pretrained_model_name_or_path):
                 filename = pretrained_model_name_or_path
                 resolved_archive_file = get_path_from_url_with_filelock(pretrained_model_name_or_path)
             else:
+
                 # set correct filename
                 if use_safetensors is not False:
                     filename = _add_variant(SAFE_WEIGHTS_NAME, variant)
@@ -1574,14 +1595,16 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                             pretrained_model_name_or_path
                         ]
                         resolved_archive_file = cached_file(
-                            resource_file_url, _add_variant(PADDLE_WEIGHTS_NAME, variant), **cached_file_kwargs
+                            resource_file_url,
+                            _add_variant(PADDLE_WEIGHTS_NAME, variant),
+                            pretrained_model_name_or_path=pretrained_model_name_or_path,
+                            **cached_file_kwargs,
                         )
 
                     if resolved_archive_file is None:
                         resolved_archive_file = cached_file(
                             pretrained_model_name_or_path, filename, **cached_file_kwargs
                         )
-
                     else:
                         # xxx.pdparams in pretrained_resource_files_map renamed model_state.pdparams
                         filename = _add_variant(PADDLE_WEIGHTS_NAME, variant)
@@ -1636,22 +1659,24 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 logger.info(f"Loading weights file {archive_file}")
                 resolved_archive_file = archive_file
             else:
-                logger.info(f"Loading weights file {filename} from cache at {resolved_archive_file}")
+                logger.info(f"Loading weights file from cache at {resolved_archive_file}")
         else:
             resolved_archive_file = None
 
         # We'll need to download and cache each checkpoint shard if the checkpoint is sharded.
+        resolved_sharded_files = None
         if is_sharded:
             # resolved_archive_file becomes a list of files that point to the different checkpoint shards in this case.
-            resolved_archive_file, sharded_metadata = get_checkpoint_shard_files(
+            resolved_sharded_files, sharded_metadata = get_checkpoint_shard_files(
                 pretrained_model_name_or_path,
                 resolved_archive_file,
                 from_aistudio=from_aistudio,
+                from_hf_hub=from_hf_hub,
                 cache_dir=cache_dir,
                 subfolder=subfolder,
             )
 
-        return resolved_archive_file, sharded_metadata, is_sharded
+        return resolved_archive_file, resolved_sharded_files, sharded_metadata, is_sharded
 
     @classmethod
     def _load_pretrained_model(
@@ -1659,7 +1684,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         model: PretrainedModel,
         state_dict: Dict[str, Tensor],
         loaded_keys: List[str],
-        resolved_archive_file,
+        resolved_archive_file: Union[str, List],
         pretrained_model_name_or_path,
         config=None,
         ignore_mismatched_sizes=False,
@@ -1717,7 +1742,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # Weight quantization if not yet quantized & update loaded_keys
         if config.quantization_config.is_weight_quantize():
             try:
-                from ..utils.quantization import (
+                from ..quantization.quantization_utils import (
                     convert_to_quantize_state_dict,
                     update_loaded_state_dict_keys,
                 )
@@ -1727,12 +1752,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 state_dict = convert_to_quantize_state_dict(
                     state_dict,
                     quantization_linear_list,
-                    config.quantization_config.weight_quantize_algo,
+                    config.quantization_config,
                     dtype,
                 )
                 loaded_keys = [k for k in state_dict.keys()]
             else:
-                loaded_keys = update_loaded_state_dict_keys(loaded_keys, quantization_linear_list)
+                loaded_keys = update_loaded_state_dict_keys(
+                    loaded_keys, quantization_linear_list, config.quantization_config
+                )
             if keep_in_fp32_modules is None:
                 keep_in_fp32_modules = ["quant_scale"]
             else:
@@ -1868,7 +1895,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     state_dict = convert_to_quantize_state_dict(
                         state_dict,
                         quantization_linear_list,
-                        config.quantization_config.weight_quantize_algo,
+                        config.quantization_config,
                         dtype,
                     )
 
@@ -2021,9 +2048,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         force_download = kwargs.get("force_download", False)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", False)
         dtype = kwargs.pop("dtype", None)
-        from_hf_hub = kwargs.get("from_hf_hub", False)
-        from_aistudio = kwargs.get("from_aistudio", False)
-        subfolder = kwargs.get("subfolder", None)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        from_aistudio = kwargs.pop("from_aistudio", False)
+        subfolder = kwargs.pop("subfolder", None)
+        if subfolder is None:
+            subfolder = ""
         variant = kwargs.pop("variant", None)
         use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
 
@@ -2046,20 +2075,25 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if convert_from_torch is None:
             convert_from_torch = False
 
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
         # 1. get the PretrainedConfig to init model
         if not isinstance(config, PretrainedConfig):
             config_path = config if config is not None else pretrained_model_name_or_path
             config, model_kwargs = cls.config_class.from_pretrained(
                 config_path,
                 cache_dir=cache_dir,
+                from_hf_hub=from_hf_hub,
+                from_aistudio=from_aistudio,
+                subfolder=subfolder,
                 return_unused_kwargs=True,
                 **kwargs,
             )
         if "from_aistudio" in model_kwargs:
             model_kwargs.pop("from_aistudio")
-        if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
-            config.save_pretrained(cache_dir)
+
+        if not from_hf_hub and not from_aistudio:
+            if not os.path.exists(os.path.join(cache_dir, pretrained_model_name_or_path, subfolder, CONFIG_NAME)):
+                config.save_pretrained(os.path.join(cache_dir, pretrained_model_name_or_path, subfolder))
 
         # refine options for config
         convert_from_torch = cls.support_conversion(config) and convert_from_torch
@@ -2068,9 +2102,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         if config.quantization_config.is_weight_quantize():
             try:
-                from ..utils.quantization import replace_with_quantization_linear
+                from ..quantization.quantization_utils import (
+                    replace_with_quantization_linear,
+                )
             except ImportError:
-                raise ImportError("You need to install paddlepaddle >= 2.5.2")
+                raise ImportError("You need to install paddlepaddle >= 2.6.0")
 
             if dtype != "float16" and dtype != "bfloat16":
                 dtype = "float16"
@@ -2101,7 +2137,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         use_keep_in_fp32_modules = False
 
         # resolve model_weight file
-        resolved_archive_file, sharded_metadata, is_sharded = cls._resolve_model_file_path(
+        resolved_archive_file, resolved_sharded_files, sharded_metadata, is_sharded = cls._resolve_model_file_path(
             pretrained_model_name_or_path,
             cache_dir=cache_dir,
             subfolder=subfolder,
@@ -2113,34 +2149,40 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             variant=variant,
         )
 
-        # load pt weights early so that we know which dtype to init the model under
-        if not is_sharded and state_dict is None:
-            # Time to load the checkpoint
-            if convert_from_torch:
-                if resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME) or resolved_archive_file.endswith(
-                    SAFE_WEIGHTS_NAME
-                ):
-                    # try to get the name-mapping info
-                    logger.info(
-                        f"Starting to convert pytorch weight file<{resolved_archive_file}> to "
-                        f"paddle weight file<{os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)}> ..."
-                    )
-                    state_dict = cls.convert(resolved_archive_file, config, cache_dir)
-                else:
-                    raise ValueError(f"Unexpected file: {resolved_archive_file} for weight conversion.")
+        if convert_from_torch and state_dict is None:
+            if (
+                resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME)
+                or resolved_archive_file.endswith(PYTORCH_WEIGHTS_INDEX_NAME)
+                or resolved_archive_file.endswith(SAFE_WEIGHTS_NAME)
+                or resolved_archive_file.endswith(SAFE_WEIGHTS_INDEX_NAME)
+            ):
+                # try to get the name-mapping info
+                logger.info(
+                    f"Starting to convert pytorch weight file<{resolved_archive_file}> to "
+                    f"paddle weight file<{os.path.join(cache_dir, pretrained_model_name_or_path, subfolder, PADDLE_WEIGHTS_NAME)}> ..."
+                )
+                state_dict = cls.convert(
+                    resolved_archive_file,
+                    config,
+                    cache_dir=os.path.join(cache_dir, pretrained_model_name_or_path, subfolder),
+                )
             else:
-                # 4. loading non-sharded ckpt from the state dict
-                if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
-                    state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
-                elif config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model.safetensors"):
-                    with safe_open(resolved_archive_file, framework="np", device="cpu") as f:
-                        loaded_keys = f.keys()
-                    tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
-                    state_dict = load_state_dict(resolved_archive_file, tp_actions)
-                else:
-                    state_dict = load_state_dict(resolved_archive_file)
+                raise ValueError(f"Unexpected file: {resolved_archive_file} for weight conversion.")
+            # load pt weights early so that we know which dtype to init the model under
 
-                logger.info("Loaded weights file from disk, setting weights to model.")
+        if not is_sharded and state_dict is None:
+            # 4. loading non-sharded ckpt from the state dict
+            if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
+                state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
+            elif config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model.safetensors"):
+                with safe_open(resolved_archive_file, framework="np", device="cpu") as f:
+                    loaded_keys = f.keys()
+                tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
+                state_dict = load_state_dict(resolved_archive_file, tp_actions)
+            else:
+                state_dict = load_state_dict(resolved_archive_file)
+
+            logger.info("Loaded weights file from disk, setting weights to model.")
 
         # Check if `_keep_in_fp32_modules` is not None
         use_keep_in_fp32_modules = (cls._keep_in_fp32_modules is not None) and dtype == "float16"
@@ -2159,7 +2201,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 if not isinstance(state_dict[k], paddle.Tensor):
                     with device_guard():
                         state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
-
         # 3. init the model
         init_args = config["init_args"] or ()
         with ContextManagers(init_contexts):
@@ -2176,7 +2217,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             with ContextManagers(quantization_init_contexts):
                 quantization_linear_list = replace_with_quantization_linear(
                     model=model,
-                    quant_algo=config.quantization_config.weight_quantize_algo,
+                    quantization_config=config.quantization_config,
                     llm_int8_threshold=config.quantization_config.llm_int8_threshold,
                 )
 
@@ -2184,7 +2225,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             model=model,
             state_dict=state_dict,
             loaded_keys=loaded_state_dict_keys,
-            resolved_archive_file=resolved_archive_file,
+            resolved_archive_file=resolved_sharded_files if is_sharded else resolved_archive_file,
             pretrained_model_name_or_path=pretrained_model_name_or_path,
             config=config,
             ignore_mismatched_sizes=ignore_mismatched_sizes,
@@ -2201,6 +2242,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     pretrained_model_name_or_path,
                     cache_dir=cache_dir,
                     force_download=force_download,
+                    from_hf_hub=from_hf_hub,
+                    from_aistudio=from_aistudio,
                     subfolder=subfolder,
                     **kwargs,
                 )
@@ -2392,7 +2435,7 @@ class PipelinePretrainedModel(PretrainedModel):
     def get_sequential_layers(self):
         return [x["layer"] for x in self._sequential_layers]
 
-    def get_sequential_name_prefixs(self):
+    def get_sequential_name_prefixes(self):
         return {str(index): x["name_prefix"] for index, x in enumerate(self._sequential_layers)}
 
     def _set_pipeline_name_mapping(self, mappings=None):
@@ -2413,43 +2456,35 @@ class PipelinePretrainedModel(PretrainedModel):
             # else it will be like 0.xxx
             use_virtual_pp_degree = first_key[0].isdigit() and first_key[1].isdigit()
 
-            prefixs = self.get_sequential_name_prefixs()
+            prefixes = self.get_sequential_name_prefixes()
             for k in state_dict_keys:
                 name_splited = k.split(".")
                 if use_virtual_pp_degree:
                     if name_splited[0].isdigit():
                         if name_splited[1].isdigit():
                             idx = str(int(name_splited[0]) + int(name_splited[1]))
-                            single_name = [prefixs[idx]]
+                            single_name = [prefixes[idx]]
                             single_name.extend(name_splited[2:])
                         else:
-                            single_name = [prefixs[str(len(prefixs) - 1)]]
+                            single_name = [prefixes[str(len(prefixes) - 1)]]
                             single_name.extend(name_splited[2:])
                             logger.warning(
                                 f"Please check! we treat this key as last layer, get {k}, set origin name as {'.'.join(single_name)}"
                             )
                     elif name_splited[0] == "shared_layers":
-                        # TODO: it treat shared_layers as first layer
-                        single_name = [prefixs["0"]]
+                        single_name = [self.get_shardlayer_prefix(name_splited)]
                         single_name.extend(name_splited[2:])
-                        logger.warning(
-                            f"Please check! we treat shared_layers as first layer, get {k}, set origin name as {'.'.join(single_name)}"
-                        )
                     else:
                         raise ValueError(f"Unexpected key: {k} for pp layer.")
                 else:
                     idx = name_splited[0]
                     # for normal pp layer
                     if idx.isdigit():
-                        single_name = [prefixs[idx]]
+                        single_name = [prefixes[idx]]
                         single_name.extend(name_splited[1:])
                     elif idx == "shared_layers":
-                        # TODO: it treat shared_layers as first layer
-                        single_name = [prefixs["0"]]
+                        single_name = [self.get_shardlayer_prefix(name_splited)]
                         single_name.extend(name_splited[2:])
-                        logger.warning(
-                            f"Please check! we treat shared_layers as first layer, get {k}, set origin name as {'.'.join(single_name)}"
-                        )
                     else:
                         raise ValueError(f"Unexpected key: {k} for pp layer.")
 
@@ -2460,6 +2495,34 @@ class PipelinePretrainedModel(PretrainedModel):
             self._pp_to_single_mapping = pp_to_single_mapping
 
         return self._single_to_pp_mapping
+
+    def get_shardlayer_prefix(self, name_splited):
+        """_summary_
+            This function retrieves the prefix of a shared layer. The process involves:
+            1. Identifying all key names of shared layers, like 'shared_weight01', 'shared_weight02', etc.
+            2. For instance, given name_splited = ['shared_layers', 'shared_weight01', 'weight'],
+                the 'shared_layer_key' would be name_splited[1], which is 'shared_weight01'.
+            3. By traversing through all layers, the function checks if the specified
+                shared_layer is present in the current stage. If found, it returns the corresponding prefix.
+
+            Note: For retrieving all SharedLayer instances in Paddle, you can refer to the following Paddle code.
+            https://github.com/PaddlePaddle/Paddle/blob/2cf724d055679a1a0e48766dfb1708b920273078/python/paddle/distributed/fleet/meta_parallel/parallel_layers/pp_layers.py#L460-L513
+        Args:
+            name_splited (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        shared_layer_names = {s.layer_name for s in self._layers_desc if isinstance(s, SharedLayerDesc)}
+        assert name_splited[1] in shared_layer_names, f"The shared layer name {name_splited[1]} must be in prefixes!"
+        shared_layer_key = name_splited[1]
+        for idx, layer in enumerate(self._layers_desc):
+            if isinstance(layer, SharedLayerDesc) and layer.layer_name == shared_layer_key:
+                if self.get_stage_from_index(idx) == self._stage_id:
+                    return self.get_sequential_name_prefixes()[str(idx)]
+
+        # the prefix must be in the current stage, else raise error
+        raise ValueError(f"The shared layer {shared_layer_key} must be in the current stage!")
 
     def state_dict(self, *args, **kwargs):
         state_dict = super().state_dict(*args, **kwargs)

@@ -19,7 +19,7 @@ import paddle
 import paddle.distributed.fleet as fleet
 from paddle.distributed.fleet.meta_parallel.pipeline_parallel import PipelineParallel
 
-from paddlenlp.transformers import LlamaForCausalLM, LlamaForCausalLMPipe
+from paddlenlp.transformers import AutoModelForCausalLM, AutoModelForCausalLMPipe
 
 
 class TestLlama(unittest.TestCase):
@@ -48,16 +48,14 @@ class TestLlama(unittest.TestCase):
         hcg = fleet.get_hybrid_communicate_group()
 
         if pp_degree > 1:
-            model_class = LlamaForCausalLMPipe
+            model_class = AutoModelForCausalLMPipe
         else:
-            model_class = LlamaForCausalLM
+            model_class = AutoModelForCausalLM
 
         model_name_or_path = "./llama-7b-2l"
         # model_name_or_path = "__internal_testing__/tiny-random-llama"
-        # hidden_size = 4096
         model = model_class.from_pretrained(
             model_name_or_path,
-            num_attention_heads=32,
             tensor_parallel_degree=tp_degree,
             tensor_parallel_rank=hcg.get_model_parallel_rank(),
             tensor_parallel_output=False,
@@ -66,29 +64,14 @@ class TestLlama(unittest.TestCase):
 
         model.eval()
 
-        # for k, v in model.state_dict().items():
-        #     print(k, v.shape, v.dtype, v.abs().sum().item())
-        #     if k == "lm_head.weight":
-        #         print(v)
-
-        # input_ids = paddle.to_tensor([[x for x in range(100, 110)]], dtype="int64")
-        # labels = paddle.to_tensor([[x for x in range(101, 111)]], dtype="int64")
+        input_ids = paddle.to_tensor([[x for x in range(100, 110)]], dtype="int64")
+        labels = paddle.to_tensor([[x for x in range(101, 111)]], dtype="int64")
         attention_mask = None
-        input_ids = paddle.load("/ssd2/zhonghui03/Datasets/PaddleNLP/examples/language_model/llama/input_ids")
-        labels = paddle.load("/ssd2/zhonghui03/Datasets/PaddleNLP/examples/language_model/llama/labels")
-        attention_mask = paddle.load(
-            "/ssd2/zhonghui03/Datasets/PaddleNLP/examples/language_model/llama/attention_mask"
-        )
-
-        # labels[labels < 0] = 1
 
         if pp_degree > 1:
             pp_model = PipelineParallel(layers=model, hcg=hcg, strategy=strategy)
             ret = pp_model.eval_batch(data=[input_ids, labels], compute_loss=True)
         else:
-            # pp_model = PipelineParallel(layers=model, hcg=hcg, strategy=strategy)
-            # pp_model.data = [input_ids, labels]
-            # ret = pp_model._forward_step(None)
             ret = model(input_ids=input_ids, labels=labels, attention_mask=attention_mask)
             ret = ret[0]
 
@@ -96,9 +79,8 @@ class TestLlama(unittest.TestCase):
         print(f"ret mp{tp_degree} pp", ret.item())
         ret_mp_pp = ret.item()
 
-        single_model = LlamaForCausalLM.from_pretrained(
+        single_model = AutoModelForCausalLM.from_pretrained(
             model_name_or_path,
-            num_attention_heads=32,
             tensor_parallel_output=False,
         )
         single_model.eval()

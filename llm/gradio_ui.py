@@ -30,7 +30,29 @@ def setup_args():
     return args
 
 
-def launch(args):
+def create_src_slider(value, maximum):
+    return gr.Slider(
+        minimum=1,
+        maximum=maximum,
+        value=value,
+        step=1,
+        label="Max Src Length",
+        info="最大输入长度。",
+    )
+
+
+def create_max_slider(value, maximum):
+    return gr.Slider(
+        minimum=1,
+        maximum=maximum,
+        value=value,
+        step=1,
+        label="Max Decoding Length",
+        info="生成结果的最大长度。",
+    )
+
+
+def launch(args, default_params: dict = {}):
     """Launch characters dialogue demo."""
 
     def rollback(state):
@@ -42,7 +64,7 @@ def launch(args):
         shown_context = get_shown_context(context)
         return utterance, shown_context, context, state
 
-    def regen(state, top_k, top_p, temperature, repetition_penalty, max_length):
+    def regen(state, top_k, top_p, temperature, repetition_penalty, max_length, src_length):
         """Regenerate response."""
         context = state.setdefault("context", [])
         if len(context) < 2:
@@ -74,29 +96,36 @@ def launch(args):
         shown_context = get_shown_context(context)
         return utterance, shown_context, context, state
 
-    def infer(utterance, state, top_k, top_p, temperature, repetition_penalty, max_length):
+    def infer(utterance, state, top_k, top_p, temperature, repetition_penalty, max_length, src_length):
         """Model inference."""
         utterance = utterance.strip().replace("<br>", "\n")
         context = state.setdefault("context", [])
 
         if not utterance:
-            gr.Warning("invalid inputs111")
+            gr.Warning("invalid inputs")
             # gr.Warning("请输入有效问题")
             shown_context = get_shown_context(context)
             return None, shown_context, context, state
 
         data = {
             "context": utterance,
+            "history": json.dumps(context),
             "top_k": top_k,
             "top_p": top_p,
             "temperature": temperature,
             "repetition_penalty": repetition_penalty,
             "max_length": max_length,
+            "src_length": src_length,
             "min_length": 1,
         }
         res = requests.post(f"http://0.0.0.0:{args.flask_port}/api/chat", json=data, stream=True)
         for line in res.iter_lines():
             result = json.loads(line)
+            if result["error_code"] != 0:
+                gr.Warning(result["error_msg"])
+                shown_context = get_shown_context(context)
+                return None, shown_context, context, state
+
             bot_response = result["result"]["response"]
 
             # replace \n with br: https://github.com/gradio-app/gradio/issues/4344
@@ -151,19 +180,29 @@ def launch(args):
         return shown_context
 
     with gr.Blocks(title="LLM", theme=gr.themes.Soft()) as block:
-        gr.Markdown(f"# {args.title}")
+        gr.Markdown(f"# {args.title} <font style='color: red !important' size=2>{args.sub_title}</font>")
         with gr.Row():
             with gr.Column(scale=1):
                 top_k = gr.Slider(
-                    minimum=1, maximum=100, value=50, step=1, label="Top-k", info="该参数越大，模型生成结果更加随机，反之生成结果更加确定。"
+                    minimum=0,
+                    maximum=default_params.get("top_k", 20),
+                    value=0,
+                    step=1,
+                    label="Top-k",
+                    info="该参数越大，模型生成结果更加随机，反之生成结果更加确定。",
                 )
                 top_p = gr.Slider(
-                    minimum=0, maximum=1, value=0.7, step=0.05, label="Top-p", info="该参数越大，模型生成结果更加随机，反之生成结果更加确定。"
+                    minimum=0,
+                    maximum=1,
+                    value=default_params.get("top_p", 0.7),
+                    step=0.05,
+                    label="Top-p",
+                    info="该参数越大，模型生成结果更加随机，反之生成结果更加确定。",
                 )
                 temperature = gr.Slider(
                     minimum=0.05,
                     maximum=1.5,
-                    value=0.95,
+                    value=default_params.get("temperature", 0.95),
                     step=0.05,
                     label="Temperature",
                     info="该参数越小，模型生成结果更加随机，反之生成结果更加确定。",
@@ -171,14 +210,31 @@ def launch(args):
                 repetition_penalty = gr.Slider(
                     minimum=0.1,
                     maximum=10,
-                    value=1.0,
+                    value=default_params.get("repetition_penalty", 1.2),
                     step=0.05,
                     label="Repetition Penalty",
                     info="该参数越大，生成结果重复的概率越低。设置 1 则不开启。",
                 )
-                max_length = gr.Slider(
-                    minimum=1, maximum=1024, value=50, step=1, label="Max Length", info="生成结果的最大长度。"
-                )
+                default_src_length = default_params["src_length"]
+                total_length = default_params["src_length"] + default_params["max_length"]
+                src_length = create_src_slider(default_src_length, total_length)
+                max_length = create_max_slider(50, total_length)
+
+                def src_length_change_event(src_length_value, max_length_value):
+                    return create_max_slider(
+                        min(total_length - src_length_value, max_length_value),
+                        total_length - src_length_value,
+                    )
+
+                def max_length_change_event(src_length_value, max_length_value):
+                    return create_src_slider(
+                        min(total_length - max_length_value, src_length_value),
+                        total_length - max_length_value,
+                    )
+
+                src_length.change(src_length_change_event, inputs=[src_length, max_length], outputs=max_length)
+                max_length.change(max_length_change_event, inputs=[src_length, max_length], outputs=src_length)
+
             with gr.Column(scale=4):
                 state = gr.State({})
                 context_chatbot = gr.Chatbot(label="Context")
@@ -191,9 +247,15 @@ def launch(args):
                 with gr.Row():
                     raw_context_json = gr.JSON(label="Raw Context")
 
-            utt_text.submit(begin, inputs=[utt_text, state], outputs=[utt_text, context_chatbot, raw_context_json, state], queue=False, api_name="chat").then(
+            utt_text.submit(
+                begin,
+                inputs=[utt_text, state],
+                outputs=[utt_text, context_chatbot, raw_context_json, state],
+                queue=False,
+                api_name="chat",
+            ).then(
                 infer,
-                inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_length],
+                inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_length, src_length],
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
             )
 
@@ -212,27 +274,33 @@ def launch(args):
             )
             regen_btn.click(
                 regen,
-                inputs=[state, top_k, top_p, temperature, repetition_penalty, max_length],
+                inputs=[state, top_k, top_p, temperature, repetition_penalty, max_length, src_length],
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
                 queue=False,
                 api_name="chat",
             ).then(
                 infer,
-                inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_length],
+                inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_length, src_length],
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
             )
 
-            send_btn.click(begin, inputs=[utt_text, state], outputs=[utt_text, context_chatbot, raw_context_json, state], queue=False, api_name="chat").then(
+            send_btn.click(
+                begin,
+                inputs=[utt_text, state],
+                outputs=[utt_text, context_chatbot, raw_context_json, state],
+                queue=False,
+                api_name="chat",
+            ).then(
                 infer,
-                inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_length],
+                inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_length, src_length],
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
             )
 
     block.queue().launch(server_name="0.0.0.0", server_port=args.port, debug=True)
 
 
-def main(args):
-    launch(args)
+def main(args, default_params: dict = {}):
+    launch(args, default_params)
 
 
 if __name__ == "__main__":
