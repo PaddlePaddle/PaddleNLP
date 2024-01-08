@@ -18,11 +18,11 @@ mp_degree=2
 pp_degree=1
 bs_item=32
 fp_item=bf16
-run_mode=MP2-PP2-SD2-Stage1-mbs8-acc2
+run_mode=MP2-SP2-SD2-Stage1-mbs8-acc2
 device_num=N1C8
 max_iter=50000
-sharding=stage2
-sharding_degree=1
+sharding=stage1
+sharding_degree=2
 
 virtual_pp_degree=1
 use_recompute=True

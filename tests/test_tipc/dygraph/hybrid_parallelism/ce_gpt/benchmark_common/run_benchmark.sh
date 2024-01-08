@@ -151,7 +151,7 @@ function _train(){
             run_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
-    DP8-mbs2-acc2|SD8-stage1-mbs2-acc2|SD8-stage2-mbs2-acc2|SD8-stage3-mbs2-acc2|MP2-SD4-stage1-mbs4-acc2|MP2-SP2-PP2-DP2-mbs8-acc2|MP8-mbs16-acc2) echo "run run_mode: ${run_mode}"
+    DP8-mbs2-acc2|SD8-stage1-mbs2-acc2|SD8-stage2-mbs2-acc2|SD8-stage3-mbs2-acc2|MP2-SD4-stage1-mbs4-acc2|MP2-SP2-PP2-DP2-mbs8-acc2|MP8-mbs16-acc2|MP2-PP2-DP2-mbs8-acc2|MP2-PP2-SD2-Stage1-mbs8-acc2|MP2-SP2-PP2-SD2-Stage1-mbs8-acc2|MP2-SP2-SD2-Stage1-mbs8-acc2) echo "run run_mode: ${run_mode}"
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
             run_pretrain.py ${train_cmd}"
         workerlog_id=0
