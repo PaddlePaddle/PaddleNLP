@@ -169,44 +169,32 @@ python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_
 python predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --dtype float16 --block_attn
 
 # CacheKV 动态量化推理命令参考
-python predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --dtype float16 --block_attn --cachekv_int8
+python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn --cachekv_int8
 ```
-**Note**：
-1. LoRA 模型在推理之前是需要合并参数，详细可见：[合并 LoRA 参数](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/merge_lora_params.py)。
-2. PrefixTuning推理需要传入相应的pre_cache，需要额外设置`export_precache`为`true`，并且传入对应的PrefixTuning参数保存路径`prefix_path`。
-3. 使用Weight Only Int8 推理需要额外传入 `quant_type`。
 
-#### 2.3.2 静态图推理
+#### 2.4.2 静态图推理
 **step1：动转静**
 ```shell
 # 动转静命令参考
-python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16
-
-# PrefixTuning动转静命令参考
-python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --export_precache true
+python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --block_attn
 
 # Weight Only Int8 动转静命令参考
-python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --quant_type weight_only_int8
+python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --quant_type weight_only_int8 --block_attn
 
 # PTQ-A8W8动转静命令参考
-python export_model.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --output_path ./inference --dtype float16
+python export_model.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --output_path ./inference --dtype float16 --block_attn
+
+# CacheKV 动态量化动转静命令参考
+python export_model.py  --model_name_or_path meta-llama/Llama-2-7b-chat--inference_model --output_path ./inference --dtype float16 --block_attn --cachekv_int8
 ```
-**Note**：
-1. LoRA 模型在推理之前是需要合并参数，详细可见：[合并 LoRA 参数](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/merge_lora_params.py)。
-2. PrefixTuning推理需要传入相应的pre_cache，需要额外设置`export_precache`为`true`。
-3. 使用Weight Only Int8 推理需要额外传入 `quant_type`。
-4. A8W8推理传入的 `model_name_or_path` 为PTQ校准产出的量化模型。
 
 **step2：静态图推理**
 ```shell
 # 静态图推理命令参考
-python predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static"
-
-# PrefixTuning静态图推理命令参考
-python predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static" --export_precache true --prefix_path ./checkpoints/llama_prefix_ckpts
+python predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --block_attn
 
 # Weight Only Int8 静态图推理命令参考
-python predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static" --quant_type weight_only_int8
+python predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --quant_type weight_only_int8 --block_attn
 
 # PTQ-A8W8静态图推理命令参考
 # 以下环境变量用于开启int8矩阵乘的算法选择以获得更快的推理速度，打开之后第一次执行会执行算法选择从而导致速度较慢。
@@ -214,13 +202,14 @@ export FLAGS_use_autotune=1
 export FLAGS_cublaslt_exhaustive_search_times=10
 export FLAGS_cache_inference_while_scope=1
 
-python predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static"
+python predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --block_attn
+
+# CacheKV 动态量化8静态图推理命令参考
+python predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --cachekv_int8 --block_attn
 ```
 **Note**：
-1. LoRA 模型在推理之前是需要合并参数，详细可见：[合并 LoRA 参数](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/merge_lora_params.py)。
-2. PrefixTuning推理需要传入相应的pre_cache，需要额外设置`export_precache`为`true`，并且传入对应的PrefixTuning参数保存路径`prefix_path`。
-3. 使用Weight Only Int8 推理需要额外传入 `quant_type`。
-4. A8W8推理传入的 `model_name_or_path` 为PTQ校准产出的量化模型。
+1. 使用Weight Only Int8 推理需要额外传入 `quant_type`。
+2. A8W8推理传入的 `model_name_or_path` 为PTQ校准产出的量化模型。
 
 
 ## 3. 推理参数介绍

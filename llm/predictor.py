@@ -1031,7 +1031,12 @@ class StaticBlockInferencePredictor(BasePredictor):
         self.inputs["rope_emb"] = self._get_rotary_position_embedding(
             paddle.arange(self.total_max_length).reshape((1, -1)), self.head_dim
         )
-        self.inputs["eos_token_id"] = get_eos_token_id(self.tokenizer, self.generation_config)
+        eos_token_id = get_eos_token_id(self.tokenizer, self.generation_config)
+        if isinstance(eos_token_id, int):
+            eos_token_id = [eos_token_id]
+        self.inputs["eos_token_id"] = paddle.to_tensor(
+            np.array(eos_token_id * config.batch_size).reshape(-1, 1).astype("int64")
+        )
         # need update
         self.inputs["block_tables"] = paddle.full(
             shape=[config.batch_size, pre_max_block_num], fill_value=-1, dtype="int32"
