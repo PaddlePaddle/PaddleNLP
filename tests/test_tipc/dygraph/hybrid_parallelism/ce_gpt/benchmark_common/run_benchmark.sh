@@ -151,7 +151,7 @@ function _train(){
             run_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
-    DP8-mbs2-acc2|SD8-stage1-mbs2-acc2|SD8-stage2-mbs2-acc2|SD8-stage3-mbs2-acc2|MP2-SD4-stage1-mbs4-acc2|MP2-SP2-PP2-DP2-mbs8-acc2|MP8-mbs16-acc2|MP2-PP2-DP2-mbs8-acc2|MP2-PP2-SD2-Stage1-mbs8-acc2|MP2-SP2-PP2-SD2-Stage1-mbs8-acc2|MP2-SP2-SD2-Stage1-mbs8-acc2) echo "run run_mode: ${run_mode}"
+    DP8-mbs2-acc2|SD8-stage1-mbs2-acc2|SD8-stage2-mbs2-acc2|SD8-stage3-mbs2-acc2|MP2-SD4-stage1-mbs4-acc2|MP2-SP2-PP2-DP2-mbs8-acc2|MP8-mbs16-acc2|MP2-PP2-DP2-mbs8-acc2|MP2-PP2-SD2-Stage1-mbs8-acc2|MP2-SP2-PP2-SD2-Stage1-mbs8-acc2) echo "run run_mode: ${run_mode}"
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
             run_pretrain.py ${train_cmd}"
         workerlog_id=0
@@ -189,8 +189,8 @@ export FLAGS_cudnn_deterministic=1
 export FLAGS_embedding_deterministic=1
 
 export PYTHONPATH="../../../PaddleNLP/"
-# source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
+source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@
-_train       # 如果只产出训练log,不解析,可取消注释
-# _run     # 该函数在run_model.sh中,执行时会调用_train; 如果不联调只产出训练log可以注掉本行,提交时需打开
+# _train       # 如果只产出训练log,不解析,可取消注释
+_run     # 该函数在run_model.sh中,执行时会调用_train; 如果不联调只产出训练log可以注掉本行,提交时需打开
 

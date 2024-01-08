@@ -25,11 +25,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# python -m pip install -r ../requirements.txt
-# python -m pip install regex
-# # get data
-# cd ../llm/gpt-3
-# rm -rf data
-# mkdir data
-# wget -O data/gpt2-en-mmap.bin https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/openwebtext2/gpt/mmap/gpt2-en-mmap.bin
-# wget -O data/gpt2-en-mmap.idx https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/openwebtext2/gpt/mmap/gpt2-en-mmap.idx
+python -m pip install -r ../requirements.txt
+python -m pip install regex
+# get data
+cd ../llm/gpt-3
+rm -rf data
+mkdir data
+wget -O data/gpt2-en-mmap.bin https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/openwebtext2/gpt/mmap/gpt2-en-mmap.bin
+wget -O data/gpt2-en-mmap.idx https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/openwebtext2/gpt/mmap/gpt2-en-mmap.idx
