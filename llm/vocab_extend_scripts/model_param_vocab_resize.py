@@ -21,14 +21,14 @@ from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name_or_path", default="", required=False, help="The directory of pretrained model.")
+    parser.add_argument("--model_name_or_path", default="", required=True, help="The directory of pretrained model.")
     parser.add_argument(
-        "--new_tokenizer_name_or_path", default="", required=False, help="The directory of new_tokenizer"
+        "--new_tokenizer_name_or_path", default="", required=True, help="The directory of new_tokenizer"
     )
     parser.add_argument(
-        "--vocab_extend_model_path", default="", required=False, help="path tot save vocab_extend_model"
+        "--vocab_extend_model_path", default="", required=True, help="path tot save vocab_extend_model"
     )
-    parser.add_argument("--device", type=str, default="gpu:1", help="Device")
+    parser.add_argument("--device", type=str, default="gpu", help="Device")
     return parser.parse_args()
 
 

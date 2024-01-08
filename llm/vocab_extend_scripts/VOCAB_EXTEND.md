@@ -3,7 +3,7 @@
 词表扩充预训练是自然语言处理（NLP）中的一个重要概念，旨在通过增加模型词汇库的大小和多样性来提高语言模型的理解和生成能力。这个过程通常涉及到识别和添加新的词汇到模型的词表中，使其能够处理更广泛的文本数据。预训练阶段是在模型处理特定任务之前进行的，有助于模型更好地适应不同的语言特征和术语。
 
 ## 1.结果展示
-词表扩充预训练后，经过sft效果对比表（{<font color=Blue>数字一</font>}/{<font color=Red>数字二</font>}/{<font color=Green>数字三</font>}，分别对应{<font color=Blue>扩充前facebook/llama-7b</font>}/{<font color=Red>扩充后facebook/llama-7b</font>}/{<font color=Green>扩充前的Qwen/qwen-7b</font>}）：
+词表扩充预训练后，经过sft效果对比表（{<font color=Blue>数字一</font>}/{<font color=Red>数字二</font>}/{<font color=Green>数字三</font>}，分别对应{<font color=Blue>扩充前facebook/llama-7b</font>}/{<font color=Red>扩充后facebook/llama-7b</font>}/{<font color=Green>扩充前的Qwen/qwen-7b</font>}）：在WPS、HCG、GSG上词表扩充后效果显著，在BELLE上效果持平
 
 
 | Dataset | Rouge-1 | Rouge-2 | Rouge-L | BLEU-4 |
