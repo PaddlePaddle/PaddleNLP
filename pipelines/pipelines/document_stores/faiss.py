@@ -588,7 +588,6 @@ class FAISSDocumentStore(SQLDocumentStore):
 
         if filters:
             logger.warning("Query filters are not implemented for the FAISSDocumentStore.")
-
         index = index or self.index
         if not self.faiss_indexes.get(index):
             raise Exception(f"Index named '{index}' does not exists. Use 'update_embeddings()' to create an index.")
@@ -603,6 +602,9 @@ class FAISSDocumentStore(SQLDocumentStore):
         score_matrix, vector_id_matrix = self.faiss_indexes[index].search(query_emb, top_k)
         vector_ids_for_query = [str(vector_id) + "_" + index for vector_id in vector_id_matrix[0] if vector_id != -1]
         documents = self.get_documents_by_vector_ids(vector_ids_for_query, index=index)
+        if documents == []:
+            vector_ids_for_query = [str(vector_id) for vector_id in vector_id_matrix[0] if vector_id != -1]
+            documents = self.get_documents_by_vector_ids(vector_ids_for_query, index=index)
 
         # assign query score to each document
         scores_for_vector_ids: Dict[str, float] = {
