@@ -215,13 +215,16 @@ python merge_tp_and_pp_params.py \
 为了后续的**压缩**和**静态图推理**方便，我们提供LoRA参数合并脚本，可以将LoRA参数合并到主干模型并保存相应的权重。
 ```
 python merge_lora_params.py \
-    --model_name_or_path meta-llama/Llama-2-7b-chat \
-    --lora_path ./checkpoints/llama_lora_ckpts
+    --lora_path ./checkpoints/llama_lora_ckpts \
+    --merge_lora_model_path ./checkpoints/llama_lora_merge \
+    --device "gpu" \
+    --low_gpu_mem True
 ```
+
 <summary>&emsp; 脚本参数介绍</summary><div>
 
-- `model_name_or_path`: 必须，预训练模型名称或者本地的模型路径，用于热启模型和分词器，默认为None。
 - `lora_path`: LoRA参数和配置路径，对LoRA参数进行初始化，默认为None。
 - `merge_model_path`: 必须，合并参数后保存路径，默认为None。
 - `device`: 运行环境，默认为gpu。
+- `low_gpu_mem`:降低合参时候所需显存，默认为False。如果合参时显存不足，建议开启
 </div>

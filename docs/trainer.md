@@ -1,3 +1,4 @@
+trainer.md
 # PaddleNLP Trainer API
 
 PaddleNLP提供了Trainer训练API，针对训练过程的通用训练配置做了封装，比如：
@@ -662,16 +663,19 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         model. (default: None)
 
   --unified_checkpoint
-                       是否统一混合并行训练的Checkpoint，(可选，默认为False)
-                       Whether to unify hybrid parallel checkpoint. (default: False)
+                       是否使用unified_checkpoint，开启后训练的checkpoint将存储为新格式。
+                       可以支持跨分布式策略重启、动态扩缩容重启。(可选，默认为False)
+                       Whether to use unified_checkpoint, enable it to store training checkpoint in a new format.
+                       Supporting restart with different distribution strategies and devices，(optional, defaults to False)
 
   --unified_checkpoint_config
-                       与Unified Checkpoint相关的一些优化配置项，以str形式传入配置.
+                       与Unified Checkpoint相关的一些优化配置项，以str形式传入配置。
                        支持如下选项:
-                           skip_save_model_weight: 当master_weights存在时,是否要保存模型权重.
-                           master_weight_compatible: 1. 仅当optimizer需要master_weights时,才进行加载; 2. 如果checkpoint中不存在master_weights,则将model weight作为master_weights进行加载.
-                           async_save: 在保存Checkpoint至磁盘时做异步保存,不影响训练过程,提高训练效率.
-                           enable_all_options: 上述参数全部开启.
+                           skip_save_model_weight: 当master_weights存在时，跳过保存模型权重。
+                           master_weight_compatible: 1. 仅当optimizer需要master_weights时，才进行加载;
+                                                     2. 如果checkpoint中不存在master_weights，则将model weight作为master_weights进行加载。
+                           async_save: 在保存Checkpoint至磁盘时做异步保存，不影响训练过程，提高训练效率。
+                           enable_all_options: 上述参数全部开启。
 
                        Some additional config of Unified checkpoint, we provide some options to config.
                        Following config is support:
