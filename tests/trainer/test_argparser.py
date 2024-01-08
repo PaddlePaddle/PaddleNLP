@@ -24,14 +24,12 @@ from paddlenlp.trainer.argparser import PdArgumentParser
 
 def parse_args():
     parser = PdArgumentParser((PreTrainingArguments,))
-    json_indices = [index for index, string in enumerate(sys.argv) if string.endswith(".json")]
-    if len(json_indices) >= 2:
-        raise ValueError("Only support one file in json format at most, please check the command line parameters.")
-    elif len(json_indices) == 0:
-        model_args = parser.parse_args_into_dataclasses()
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        model_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    elif len(sys.argv) > 2 and sys.argv[1].endswith(".json"):
+        model_args = parser.parse_json_file_and_cmd_lines(json_file=os.path.abspath(sys.argv[1]))
     else:
-        json_file_idx = json_indices[0]
-        model_args = parser.parse_json_file_and_cmd_lines(json_file_idx)
+        model_args = parser.parse_args_into_dataclasses()
     return model_args
 
 
@@ -66,11 +64,6 @@ class ArgparserTest(unittest.TestCase):
         "num_train_epochs": 3.0,
         "output_dir": "./checkpoints/llama2_pretrain_ckpts",
     }
-
-    def test_parse_args_with_multiple_json_files(self):
-        with self.assertRaises(ValueError):
-            with patch("sys.argv", [ArgparserTest.script_name, "config1.json", "config2.json"]):
-                parse_args()
 
     def test_parse_cmd_lines(self):
         cmd_line_args = [ArgparserTest.script_name]

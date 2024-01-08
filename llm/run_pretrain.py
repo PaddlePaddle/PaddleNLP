@@ -372,14 +372,14 @@ class PretrainingTrainer(Trainer):
 
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
-    json_indices = [index for index, string in enumerate(sys.argv) if string.endswith(".json")]
-    if len(json_indices) >= 2:
-        raise ValueError("Only support one file in json format at most, please check the command line parameters.")
-    elif len(json_indices) == 0:
-        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    elif len(sys.argv) > 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines(
+            json_file=os.path.abspath(sys.argv[1])
+        )
     else:
-        json_file_idx = json_indices[0]
-        model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines(json_file_idx)
+        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     if training_args.enable_linear_fused_grad_add:
         from fused_layers import mock_layers

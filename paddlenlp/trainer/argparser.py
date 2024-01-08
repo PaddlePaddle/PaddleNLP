@@ -18,7 +18,6 @@
 
 import dataclasses
 import json
-import os
 import sys
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, ArgumentTypeError
 from copy import copy
@@ -248,27 +247,29 @@ class PdArgumentParser(ArgumentParser):
             outputs.append(obj)
         return (*outputs,)
 
-    def parse_json_file_and_cmd_lines(self, json_file_idx: int) -> Tuple[DataClass, ...]:
+    def parse_json_file_and_cmd_lines(self, json_file: str) -> Tuple[DataClass, ...]:
         """
         Extend the functionality of `parse_json_file` to handle command line arguments in addition to loading a JSON
         file.
 
+        When there is a conflict between the command line arguments and the JSON file configuration,
+        the command line arguments will take precedence.
+
         This method combines data from a JSON file and command line arguments to populate instances of dataclasses.
-        The JSON file is identified using its index in the command line arguments array.
 
         Args:
-            json_file_idx :
-                The index of the JSON file argument within the command line arguments array.
-                This index is used to locate and extract the JSON file path from the command line arguments.
+            json_file :
+                The path to the JSON formatted file should be at index position 1 in the command line
+                arguments array (sys.argv[1]).
+                Any JSON file path at other positions will be considered invalid.
 
         Returns:
             Tuple consisting of:
 
                 - the dataclass instances in the same order as they were passed to the initializer.abspath
         """
-        json_file = os.path.abspath(sys.argv[json_file_idx])
         json_args = json.loads(Path(json_file).read_text())
-        del sys.argv[json_file_idx]
+        del sys.argv[1]
         output_dir_arg = next(
             (arg for arg in sys.argv if arg == "--output_dir" or arg.startswith("--output_dir=")), None
         )
