@@ -37,11 +37,12 @@ function _set_params(){
     sharding_degree=${12:-"1"}
     num_workers=0                  # (可选)
     base_batch_size=$global_batch_size
-    virtual_pp_degree=${13:-"2"}  # (可选) virtualpp数据并行度
+    seed=${13:-"1234"}                 # (可选)
     use_recompute=${14:-"True"}    # (可选)是否打开recompute
     eval_freq=${15:-"25"}         # (可选)模型评估间隔
     use_pipeline_parallel=${16:-"False"}  # (可选)是否开启pipeline_parallel_config
     sequence_parallel=${17:-"False"}  # (可选)是否开启sequence_parallel
+    virtual_pp_degree=${18:-"2"}  # (可选) virtualpp数据并行度
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
