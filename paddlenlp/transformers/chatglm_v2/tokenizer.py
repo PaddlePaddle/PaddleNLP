@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
@@ -36,16 +37,30 @@ class SPTokenizer:
         self.pad_id: int = self.sp_model.unk_id()
         assert self.sp_model.vocab_size() == self.sp_model.get_piece_size()
 
-        special_tokens = ["[MASK]", "[gMASK]", "[sMASK]", "sop", "eop"]
+        role_special_tokens = ["<|system|>", "<|user|>", "<|assistant|>", "<|observation|>"]
+        special_tokens = ["[MASK]", "[gMASK]", "[sMASK]", "sop", "eop"] + role_special_tokens
         self.special_tokens = {}
         self.index_special_tokens = {}
         for token in special_tokens:
             self.special_tokens[token] = self.n_words
             self.index_special_tokens[self.n_words] = token
             self.n_words += 1
+        self.role_special_token_expression = "|".join([re.escape(token) for token in role_special_tokens])
 
-    def tokenize(self, s: str):
-        return self.sp_model.EncodeAsPieces(s)
+    def tokenize(self, s: str, encode_special_tokens=False):
+        if encode_special_tokens:
+            last_index = 0
+            t = []
+            for match in re.finditer(self.role_special_token_expression, s):
+                if last_index < match.start():
+                    t.extend(self.sp_model.EncodeAsPieces(s[last_index : match.start()]))
+                t.append(s[match.start() : match.end()])
+                last_index = match.end()
+            if last_index < len(s):
+                t.extend(self.sp_model.EncodeAsPieces(s[last_index:]))
+            return t
+        else:
+            return self.sp_model.EncodeAsPieces(s)
 
     def encode(self, s: str, bos: bool = False, eos: bool = False) -> List[int]:
         assert type(s) is str
@@ -85,7 +100,7 @@ class ChatGLMv2Tokenizer(PretrainedTokenizer):
         }
     }
 
-    def __init__(self, vocab_file, padding_side="left", **kwargs):
+    def __init__(self, vocab_file, padding_side="left", encode_special_tokens=False, **kwargs):
         super().__init__(padding_side=padding_side, **kwargs)
         self.name = "ChatGLMv2Tokenizer"
 
@@ -94,8 +109,10 @@ class ChatGLMv2Tokenizer(PretrainedTokenizer):
         self.special_tokens = {
             "<bos>": self.tokenizer.bos_id,
             "<eos>": self.tokenizer.eos_id,
+            "<unk>": self.tokenizer.pad_id,
             "<pad>": self.tokenizer.pad_id,
         }
+        self.encode_special_tokens = encode_special_tokens
 
     def get_command(self, token):
         if token in self.special_tokens:
@@ -130,7 +147,7 @@ class ChatGLMv2Tokenizer(PretrainedTokenizer):
         return vocab
 
     def _tokenize(self, text, **kwargs):
-        return self.tokenizer.tokenize(text)
+        return self.tokenizer.tokenize(text, encode_special_tokens=self.encode_special_tokens)
 
     def _convert_token_to_id(self, token):
         """Converts a token (str) in an id using the vocab."""
