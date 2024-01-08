@@ -129,7 +129,7 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
     os.makedirs(save_directory, exist_ok=True)
 
     # save model weights
-    if skip_save_model_weight:
+    if not skip_save_model_weight:
         state_dict, shard_file, sharded_index = unified_checkpoint_into_shards(
             args, model_to_save, safe_serialization=safe_serialization
         )
@@ -1660,6 +1660,10 @@ def update_master_weight_status(args, optimizer, has_master_weight, safe_seriali
             index_filename_master_weights = (
                 PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
             )
+            if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
+                index_filename_master_weights = (
+                    PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+                )
     else:
         has_master_weight = False
         index_filename_master_weights = None
