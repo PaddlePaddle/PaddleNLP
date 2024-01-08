@@ -650,6 +650,26 @@ class TestUnifiedCheckpointOnN1C2Reset(TestMultipleGpus):
         self.rtol = 1e-7
 
         self.run_pretrain_file = "llm/llama/run_pretrain.py"
+        self.filelists = [
+            "config.json",
+            "master_weights-00001-of-00002.safetensors",
+            "master_weights-00002-of-00002.safetensors",
+            "master_weights.safetensors.index.json",
+            "model-00001-of-00002.safetensors",
+            "model-00002-of-00002.safetensors",
+            "model.safetensors.index.json",
+            "optimizer-00001-of-00002.safetensors",
+            "optimizer-00002-of-00002.safetensors",
+            "optimizer.safetensors.index.json",
+            "rng_state_2.pth",
+            "scaler.pdparams",
+            "scheduler.pdparams",
+            "sentencepiece.bpe.model",
+            "special_tokens_map.json",
+            "tokenizer_config.json",
+            "trainer_state.json",
+            "training_args.bin",
+        ]
 
     def runfrist(self, train_args):
         train_args["unified_checkpoint"] = 1
@@ -667,6 +687,43 @@ class TestUnifiedCheckpointOnN1C2Reset(TestMultipleGpus):
         train_args = self.configs["TP2"]
 
         self.runfrist(train_args)
+        self.rerun(train_args)
+
+        if self.need_allclose:
+            res = check_acc()
+            assert len(res) == 2
+            np.testing.assert_allclose(res[0], res[1], self.rtol)
+
+    @require_paddle_at_least_2_gpu
+    def testFileLists(self):
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+
+        save_steps = pretrain_arguments["save_steps"]
+        base_ckpt_path = os.path.join(pretrain_arguments["output_dir"], "checkpoint-%d" % save_steps)
+
+        train_args = self.configs["TP2"]
+        self.runfrist(train_args)
+        assert sorted(self.filelists) == sorted(os.listdir(base_ckpt_path))
+        self.rerun(train_args)
+
+        if self.need_allclose:
+            res = check_acc()
+            assert len(res) == 2
+            np.testing.assert_allclose(res[0], res[1], self.rtol)
+
+        # Test skip_save_model_weight
+        remove_logs()
+        remove_ckpt(pretrain_arguments["output_dir"])
+        train_args["unified_checkpoint_config"] = "skip_save_model_weight"
+        self.runfrist(train_args)
+        unsave_filelists = [
+            "master_weights-00001-of-00002.safetensors",
+            "master_weights-00002-of-00002.safetensors",
+            "master_weights.safetensors.index.json",
+        ]
+        cur_filelists = [file for file in self.filelists if file not in unsave_filelists]
+        assert sorted(cur_filelists) == sorted(os.listdir(base_ckpt_path))
         self.rerun(train_args)
 
         if self.need_allclose:
