@@ -1334,7 +1334,24 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # Tie the weights between the input embeddings and the output embeddings if needed.
         self.tie_weights()
+        if self.get_output_embeddings() is not None and not self.config.tie_word_embeddings:
+            old_lm_head = self.get_output_embeddings()
+            import copy
 
+            # logger.info(f"old_lm_head type is {old_lm_head.__name__}")
+            new_lm_head = copy.deepcopy(old_lm_head)
+            with paddle.no_grad():
+                paddle.set_default_dtype("float16")
+                new_lm_head_weight = paddle.create_parameter(
+                    shape=[old_lm_head.weight.shape[0], new_num_tokens],
+                    dtype=paddle.get_default_dtype(),
+                )
+                num_to_copy = min(new_num_tokens, old_lm_head.weight.shape[1])
+                new_lm_head_weight[:, :num_to_copy] = old_lm_head.weight[:, :num_to_copy]
+                paddle.set_default_dtype("float32")
+            new_lm_head.weight = new_lm_head_weight
+            self.set_output_embeddings(new_lm_head)
+            # self.lm_head.weight = new_lm_head_weight
         return new_embeddings
 
     def _update_init_config(self, init_config: dict, key: str, value: Any):
@@ -1379,20 +1396,27 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if old_num_tokens == new_num_tokens:
             return old_embeddings
 
-        if not isinstance(old_embeddings, nn.Embedding):
+        if not isinstance(old_embeddings, nn.Embedding) and not isinstance(old_embeddings, mpu.VocabParallelEmbedding):
             raise TypeError(
                 f"Old embeddings are of type {type(old_embeddings)}, which is not an instance of {nn.Embedding}. You"
                 " should either use a different resize function or make sure that old_embeddings are an instance of"
-                f" {nn.Embedding}."
+                f" {nn.Embedding} or {mpu.VocabParallelEmbedding}."
             )
-
+        logger.info(f"self.config.tensor_parallel_degree: {self.config.tensor_parallel_degree}")
         # Build new embeddings
-        new_embeddings = nn.Embedding(
-            new_num_tokens,
-            old_embedding_dim,
-            padding_idx=old_embeddings._padding_idx,
-            sparse=old_embeddings._sparse,
-        )
+        if self.config.tensor_parallel_degree > 1:
+            new_embeddings = mpu.VocabParallelEmbedding(
+                new_num_tokens,
+                old_embedding_dim,
+                weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierNormal()),
+            )
+        else:
+            new_embeddings = nn.Embedding(
+                new_num_tokens,
+                old_embedding_dim,
+                padding_idx=old_embeddings._padding_idx,
+                sparse=old_embeddings._sparse,
+            )
 
         # make sure that new_embeddings's dtype is same as the old embeddings' dtype
         if new_embeddings.weight.dtype != old_embeddings.weight.dtype:

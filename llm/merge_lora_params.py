@@ -41,6 +41,7 @@ def parse_arguments():
     parser.add_argument(
         "--lora_path", default=None, required=True, help="The directory of LoRA parameters. Default to None"
     )
+    parser.add_argument("--use_vocab_extend", default=False, help="Whether to use vocab_extend")
     parser.add_argument(
         "--merge_lora_model_path",
         default=None,
@@ -137,6 +138,30 @@ def merge():
             if "quant" in key:
                 del model_state_dict[key]
         model.model.config.quantization_config = QuantizationConfig()
+    if args.use_vocab_extend:
+        LORA_FILE_NAME = "lora_model_state.pdparams"
+        vocab_extend_state_dict = paddle.load(os.path.join(args.lora_path, LORA_FILE_NAME))
+        for key, value in vocab_extend_state_dict.items():
+            if "embed_tokens" in key:
+                model.resize_token_embeddings(vocab_extend_state_dict[key].shape[0])
+                with paddle.no_grad():
+                    paddle.set_default_dtype("float16")
+                    new_embed_tokens = paddle.nn.Embedding(
+                        vocab_extend_state_dict[key].shape[0], vocab_extend_state_dict[key].shape[1]
+                    )
+                    new_embed_tokens.weight[:, :] = value[:, :]
+                    paddle.set_default_dtype("float32")
+                model.set_input_embeddings(new_embed_tokens)
+            if "lm_head" in key:
+                with paddle.no_grad():
+                    paddle.set_default_dtype("float16")
+                    new_lm_head_weight = paddle.create_parameter(
+                        shape=[vocab_extend_state_dict[key].shape[0], vocab_extend_state_dict[key].shape[1]],
+                        dtype=paddle.get_default_dtype(),
+                    )
+                    new_lm_head_weight[:, :] = value[:, :]
+                    paddle.set_default_dtype("float32")
+                model.lm_head.weight = new_lm_head_weight
     model.model.save_pretrained(args.merge_lora_model_path, state_dict=model_state_dict)
 
     tokenizer = AutoTokenizer.from_pretrained(lora_config.base_model_name_or_path)
