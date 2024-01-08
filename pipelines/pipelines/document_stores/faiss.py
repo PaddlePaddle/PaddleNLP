@@ -308,8 +308,6 @@ class FAISSDocumentStore(SQLDocumentStore):
                         if add_vectors:
                             meta["vector_id"] = str(vector_id) + "_" + index
                             vector_id += 1
-                        meta["vector_id"] = str(vector_id) + "_" + index
-                        vector_id += 1
                         docs_to_write_in_sql.append(doc)
                     super(FAISSDocumentStore, self).write_documents(
                         docs_to_write_in_sql,
