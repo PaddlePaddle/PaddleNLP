@@ -37,12 +37,12 @@ function _set_params(){
     sharding_degree=${12:-"1"}
     num_workers=0                  # (可选)
     base_batch_size=$global_batch_size
-    seed=${13:-"1234"}                 # (可选)
+    virtual_pp_degree=${13:-"2"}  # (可选) virtualpp数据并行度
     use_recompute=${14:-"True"}    # (可选)是否打开recompute
     eval_freq=${15:-"25"}         # (可选)模型评估间隔
     use_pipeline_parallel=${16:-"False"}  # (可选)是否开启pipeline_parallel_config
     sequence_parallel=${17:-"False"}  # (可选)是否开启sequence_parallel
-    virtual_pp_degree=${18:-"2"}  # (可选) virtualpp数据并行度
+    seed=${18:-"1234"}                 # (可选) 设置训练seed
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -112,7 +112,7 @@ function _train(){
                 --sequence_parallel ${sequence_parallel} \
                 --split 949,50,1 \
                 --max_seq_length 1024 \
-                --seed 1234 \
+                --seed ${seed} \
                 --fuse_attention_qkv True \
                 --use_flash_attention True \
                 --bf16 ${bf16} \
@@ -131,7 +131,6 @@ function _train(){
                 --max_steps ${max_iter}\
                 --save_steps 5000\
                 --device gpu\
-                --skip_memory_metrics 0 \
                 --warmup_ratio 0.01\
                 --scale_loss 32768\
                 --per_device_train_batch_size ${micro_batch_size}\
@@ -187,6 +186,6 @@ export FLAGS_embedding_deterministic=1
 export PYTHONPATH="../../../PaddleNLP/"
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@
-#_train       # 如果只产出训练log,不解析,可取消注释
-_run     # 该函数在run_model.sh中,执行时会调用_train; 如果不联调只产出训练log可以注掉本行,提交时需打开
+_train       # 如果只产出训练log,不解析,可取消注释
+#_run     # 该函数在run_model.sh中,执行时会调用_train; 如果不联调只产出训练log可以注掉本行,提交时需打开
 

@@ -55,7 +55,6 @@ setup(
     ext_modules=CUDAExtension(
         sources=[
             "./generation/save_with_output.cc",
-            "./generation/set_mask_value.cu",
             "./generation/set_value_by_flags.cu",
             "./generation/token_penalty_multi_scores.cu",
             "./generation/stop_generation_multi_ends.cu",
@@ -66,7 +65,6 @@ setup(
             "./generation/transpose_removing_padding.cu",
             "./generation/write_cache_kv.cu",
             "./generation/encode_rotary_qk.cu",
-            "./generation/set_alibi_mask_value.cu",
             "./generation/quant_int8.cu",
             "./generation/dequant_int8.cu",
         ],

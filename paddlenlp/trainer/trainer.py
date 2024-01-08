@@ -77,6 +77,11 @@ from ..data import (
     default_data_collator,
 )
 from ..peft import LoRAModel, PrefixModelForCausalLM
+
+try:
+    from ..quantization.quantization_linear import QuantizationLinear
+except:
+    QuantizationLinear = None
 from ..transformers.model_utils import (
     PretrainedModel,
     _add_variant,
@@ -88,9 +93,12 @@ from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
     LORA_WEIGHTS_NAME,
+    PADDLE_MASTER_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
     PREFIX_WEIGHTS_NAME,
+    SAFE_MASTER_WEIGHTS_INDEX_NAME,
+    SAFE_WEIGHTS_INDEX_NAME,
 )
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
@@ -352,11 +360,12 @@ class Trainer:
             self.amp_dtype = "float16" if args.fp16 else "bfloat16"
             # fix for load saved fp16 or bf16 ckpt, decorate model first.
             if self.args.fp16_opt_level == "O2":
-                if self.amp_dtype == "bfloat16":
-                    # fix for paddlepaddle < 2.4.1, not support for bf16
-                    paddle.amp.decorate(models=model, level=self.args.fp16_opt_level, dtype=self.amp_dtype)
-                else:
-                    paddle.amp.decorate(models=model, level=self.args.fp16_opt_level)
+                paddle.amp.decorate(
+                    models=model,
+                    level=self.args.fp16_opt_level,
+                    dtype=self.amp_dtype,
+                    excluded_layers=QuantizationLinear,
+                )
             # for pipeline mode and pure tensor parallel
             if self.args.pipeline_parallel_degree > 1 or (
                 self.args.tensor_parallel_degree > 1 and self.sharding is None
@@ -507,9 +516,10 @@ class Trainer:
 
         if self.args.unified_checkpoint:
             if resume_from_checkpoint is not None:
-                use_unified_checkpoint = True
-                if self.check_origin_checkpoint(resume_from_checkpoint):
-                    use_unified_checkpoint = False
+                use_unified_checkpoint = False
+                if self.is_unified_checkpoint(resume_from_checkpoint):
+                    use_unified_checkpoint = True
+                else:
                     logger.info("Loading origin checkpoint, the next checkpoint will be saved as unified checkpoint")
 
                 if use_unified_checkpoint:
@@ -913,6 +923,9 @@ class Trainer:
                     steps_in_epoch <= args.gradient_accumulation_steps
                     and (step + 1) == steps_in_epoch
                 ):
+                    if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
+                        tr_loss /= self.args.gradient_accumulation_steps
+
                     self.timers and self.timers("forward-backward").stop()
                     # Maunally collect gradients
                     # Case 1: Use recompute and dp
@@ -934,7 +947,6 @@ class Trainer:
                     pipeline_parallel_config = (
                         set(args.pipeline_parallel_config.split(" ")) if args.pipeline_parallel_degree > 1 else set()
                     )
-                    enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
                     enable_release_grads = "enable_release_grads" in pipeline_parallel_config
 
@@ -953,7 +965,7 @@ class Trainer:
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
 
-                    if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
+                    if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss():
                         for p in model._layers.parameters():
                             with paddle.no_grad():
                                 if hasattr(p, "main_grad") and p.main_grad is not None:
@@ -1281,6 +1293,9 @@ class Trainer:
         )
 
     def _get_eval_sampler(self, eval_dataset: Dataset):
+        if eval_dataset is None or not has_length(eval_dataset):
+            return None
+
         if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
                 eval_dataset,
@@ -1622,15 +1637,13 @@ class Trainer:
         # Mixed precision training
         if training and self.do_grad_scaling:  # self.args.fp16_opt_level=="O2":
             # model, self.optimizer
-            if self.amp_dtype == "bfloat16":
-                # fix for paddlepaddle < 2.4.1, not support for bf16
-                decorated = paddle.amp.decorate(
-                    models=model, optimizers=self.optimizer, level=self.args.fp16_opt_level, dtype=self.amp_dtype
-                )
-            else:
-                decorated = paddle.amp.decorate(
-                    models=model, optimizers=self.optimizer, level=self.args.fp16_opt_level
-                )
+            decorated = paddle.amp.decorate(
+                models=model,
+                optimizers=self.optimizer,
+                level=self.args.fp16_opt_level,
+                dtype=self.amp_dtype,
+                excluded_layers=QuantizationLinear,
+            )
 
             if self.optimizer is None:
                 model = decorated
@@ -1897,6 +1910,15 @@ class Trainer:
 
         return (loss, outputs) if return_outputs else loss
 
+    def _enable_delay_scale_loss(self):
+        key = "enable_delay_scale_loss"
+        if self.args.pipeline_parallel_degree > 1:
+            return key in self.args.pipeline_parallel_config.split(" ")
+        elif self.args.tensor_parallel_degree > 1:
+            return key in self.args.tensor_parallel_config.split(" ")
+        else:
+            return False
+
     def training_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         """
         Perform a training step on a batch of inputs.
@@ -1924,7 +1946,7 @@ class Trainer:
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
 
-        if self.args.gradient_accumulation_steps > 1:
+        if self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = loss / self.args.gradient_accumulation_steps
 
         if self.do_grad_scaling:
@@ -2287,9 +2309,9 @@ class Trainer:
         else:
             use_unified_checkpoint = False
             if self.args.unified_checkpoint:
-                use_unified_checkpoint = True
-                if self.check_origin_checkpoint(checkpoint):
-                    use_unified_checkpoint = False
+                if self.is_unified_checkpoint(checkpoint):
+                    use_unified_checkpoint = True
+                else:
                     logger.info("Loading checkpoint, the next checkpoint will be saved as unified checkpoint")
 
             if not use_unified_checkpoint:
@@ -2940,20 +2962,22 @@ class Trainer:
 
         logger.info("")
 
-    def check_origin_checkpoint(self, resume_from_checkpoint):
-        is_origin_checkpoint_type = False
-
-        weight_name = PADDLE_WEIGHTS_NAME
-        weight_index_name = PADDLE_WEIGHTS_INDEX_NAME
-        weights_file = os.path.join(
-            resume_from_checkpoint,
-            _add_variant(weight_name, self.args.weight_name_suffix),
+    def is_unified_checkpoint(self, resume_from_checkpoint, safe_serialization=True):
+        is_unified_checkpoint_type = False
+        weights_index_name = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+        master_weights_index_name = (
+            PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
         )
         weights_index_file = os.path.join(
             resume_from_checkpoint,
-            _add_variant(weight_index_name, self.args.weight_name_suffix),
+            weights_index_name,
         )
-        if distributed_isfile(weights_file) or distributed_isfile(weights_index_file):
-            is_origin_checkpoint_type = True
+        master_weights_index_file = os.path.join(
+            resume_from_checkpoint,
+            master_weights_index_name,
+        )
 
-        return is_origin_checkpoint_type
+        if distributed_isfile(weights_index_file) or distributed_isfile(master_weights_index_file):
+            is_unified_checkpoint_type = True
+
+        return is_unified_checkpoint_type
