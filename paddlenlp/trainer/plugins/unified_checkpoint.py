@@ -352,16 +352,17 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
         )
 
     if sharded_optim_index is not None:
-        if not safe_serialization:
-            path = os.path.join(output_dir, PADDLE_OPTIMIZER_INDEX_NAME)
-            master_path = os.path.join(output_dir, PADDLE_MASTER_WEIGHTS_INDEX_NAME)
-        else:
-            path = os.path.join(output_dir, SAFE_OPTIMIZER_INDEX_NAME)
-            master_path = os.path.join(output_dir, SAFE_MASTER_WEIGHTS_INDEX_NAME)
-
+        optimizer_index_name = SAFE_OPTIMIZER_INDEX_NAME if safe_serialization else PADDLE_OPTIMIZER_INDEX_NAME
+        path = os.path.join(output_dir, optimizer_index_name)
         with open(path, "w") as f:
             json.dump(sharded_optim_index, f, indent=4)
 
+        master_weights_name = (
+            SAFE_MASTER_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_MASTER_WEIGHTS_INDEX_NAME
+        )
+        if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
+            master_weights_name = SAFE_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_WEIGHTS_INDEX_NAME
+        master_path = os.path.join(output_dir, master_weights_name)
         if master_weight_state_dict is not None:
             with open(master_path, "w") as f:
                 json.dump(sharded_master_weight_index, f, indent=4)
@@ -570,6 +571,8 @@ def unified_optimizer_into_shards(
     total_optim_size, total_master_weight_size = 0, 0
     optimizer_name = SAFE_OPTIMIZER_NAME if safe_serialization else PADDLE_OPTIMIZER_NAME
     master_weights_name = SAFE_MASTER_WEIGHTS_NAME if safe_serialization else PADDLE_MASTER_WEIGHTS_NAME
+    if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
+        master_weights_name = SAFE_WEIGHTS_NAME if safe_serialization else PADDLE_WEIGHTS_NAME
     shard_optimizer_file = get_sharded_file_name(args, optimizer_name, is_optimizer=True)
     shard_master_weight_file = get_sharded_file_name(args, master_weights_name, is_optimizer=True)
 
