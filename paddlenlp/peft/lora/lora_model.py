@@ -195,8 +195,7 @@ class LoRAModel(nn.Layer):
             if key in trainable_name_action_mappings:
                 ret = distributed_gather(tensor, group=mp_group, offload=True)
                 action = trainable_name_action_mappings[key]
-                is_collumn = self.lora_split_mapping[key]
-                if "_scale" in key and not is_collumn and is_dst:
+                if key in self.lora_split_mapping and not self.lora_split_mapping[key] and "_scale" in key and is_dst:
                     ret = paddle.to_tensor(ret)
                     tensor = paddle.max(ret, axis=0)
                 else:
