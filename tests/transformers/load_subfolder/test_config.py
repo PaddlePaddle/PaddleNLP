@@ -15,9 +15,11 @@ import unittest
 
 from paddlenlp.transformers import AutoConfig, BertConfig, CLIPConfig, T5Config
 from paddlenlp.utils.log import logger
+from tests.testing_utils import slow
 
 
 class ConfigLoadTester(unittest.TestCase):
+    @slow
     def test_bert_config_load(self):
         logger.info("Download Bert Config from PaddleNLP BOS")
         bert_config = BertConfig.from_pretrained("bert-base-uncased", from_hf_hub=False)
@@ -43,6 +45,7 @@ class ConfigLoadTester(unittest.TestCase):
         bert_config = BertConfig.from_pretrained("aistudio/bert-base-uncased", from_aistudio=True)
         bert_config = AutoConfig.from_pretrained("aistudio/bert-base-uncased", from_aistudio=True)
 
+    @slow
     def test_clip_config_load(self):
         logger.info("Download CLIP Config from PaddleNLP BOS")
         clip_config = CLIPConfig.from_pretrained("openai/clip-vit-base-patch32", from_hf_hub=False)
@@ -68,6 +71,7 @@ class ConfigLoadTester(unittest.TestCase):
         clip_config = CLIPConfig.from_pretrained("aistudio/clip-vit-base-patch32", from_aistudio=True)
         clip_config = AutoConfig.from_pretrained("aistudio/clip-vit-base-patch32", from_aistudio=True)
 
+    @slow
     def test_t5_config_load(self):
         logger.info("Download T5 Config from PaddleNLP BOS")
         t5_config = T5Config.from_pretrained("t5-small", from_hf_hub=False)
