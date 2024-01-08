@@ -391,7 +391,7 @@ class FAISSDocumentStore(SQLDocumentStore):
 
                 vector_id_map = {}
                 for doc in document_batch:
-                    vector_id_map[str(doc.id)] = str(vector_id)
+                    vector_id_map[str(doc.id)] = str(vector_id) + "_" + index
                     vector_id += 1
                 self.update_vector_ids(vector_id_map, index=index)
                 progress_bar.set_description_str("Documents Processed")
@@ -443,7 +443,6 @@ class FAISSDocumentStore(SQLDocumentStore):
         )
         if return_embedding is None:
             return_embedding = self.return_embedding
-
         for doc in documents:
             if return_embedding:
                 if doc.meta and doc.meta.get("vector_id") is not None:
@@ -588,7 +587,6 @@ class FAISSDocumentStore(SQLDocumentStore):
 
         if filters:
             logger.warning("Query filters are not implemented for the FAISSDocumentStore.")
-
         index = index or self.index
         if not self.faiss_indexes.get(index):
             raise Exception(f"Index named '{index}' does not exists. Use 'update_embeddings()' to create an index.")
@@ -599,11 +597,9 @@ class FAISSDocumentStore(SQLDocumentStore):
         query_emb = query_emb.reshape(1, -1).astype(np.float32)
         if self.similarity == "cosine":
             self.normalize_embedding(query_emb)
-
         score_matrix, vector_id_matrix = self.faiss_indexes[index].search(query_emb, top_k)
         vector_ids_for_query = [str(vector_id) + "_" + index for vector_id in vector_id_matrix[0] if vector_id != -1]
         documents = self.get_documents_by_vector_ids(vector_ids_for_query, index=index)
-
         # assign query score to each document
         scores_for_vector_ids: Dict[str, float] = {
             str(v_id): s for v_id, s in zip(vector_id_matrix[0], score_matrix[0])
