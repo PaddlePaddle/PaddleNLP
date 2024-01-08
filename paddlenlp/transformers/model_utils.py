@@ -2193,6 +2193,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     quantization_config=config.quantization_config,
                     llm_int8_threshold=config.quantization_config.llm_int8_threshold,
                 )
+                quantization_linear_list = []
+                for key in model.state_dict().keys():
+                    if "quant_weight" in key:
+                        quantization_linear_list.append(key[:-13])
 
         model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
             model=model,
