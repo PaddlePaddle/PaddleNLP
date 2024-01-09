@@ -22,9 +22,11 @@ from paddlenlp.transformers import (
     T5Tokenizer,
 )
 from paddlenlp.utils.log import logger
+from tests.testing_utils import slow
 
 
 class TokenizerLoadTester(unittest.TestCase):
+    @slow
     def test_bert_load(self):
         logger.info("Download model from PaddleNLP BOS")
         bert_tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", from_hf_hub=False)
@@ -57,6 +59,7 @@ class TokenizerLoadTester(unittest.TestCase):
             "aistudio/paddlenlp-test-model", subfolder="bert-base-uncased", from_aistudio=True
         )
 
+    @slow
     def test_clip_load(self):
         logger.info("Download model from PaddleNLP BOS")
         clip_tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32", from_hf_hub=False)
@@ -89,6 +92,7 @@ class TokenizerLoadTester(unittest.TestCase):
             "aistudio/paddlenlp-test-model", subfolder="clip-vit-base-patch32", from_aistudio=True
         )
 
+    @slow
     def test_t5_load(self):
         logger.info("Download model from PaddleNLP BOS")
         t5_tokenizer = T5Tokenizer.from_pretrained("t5-small", from_hf_hub=False)
