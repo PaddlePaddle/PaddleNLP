@@ -1293,6 +1293,9 @@ class Trainer:
         )
 
     def _get_eval_sampler(self, eval_dataset: Dataset):
+        if eval_dataset is None or not has_length(eval_dataset):
+            return None
+
         if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
                 eval_dataset,
@@ -2304,8 +2307,8 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
+            use_unified_checkpoint = False
             if self.args.unified_checkpoint:
-                use_unified_checkpoint = False
                 if self.is_unified_checkpoint(checkpoint):
                     use_unified_checkpoint = True
                 else:

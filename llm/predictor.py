@@ -29,7 +29,10 @@ from paddle.distributed import fleet
 from utils import (
     dybatch_preprocess,
     get_alibi_slopes,
+    get_default_max_decoding_length,
+    get_default_max_encoding_length,
     get_infer_model_path,
+    get_model_max_position_embeddings,
     get_prefix_tuning_params,
     init_chat_template,
     load_real_time_tokens,
@@ -56,8 +59,8 @@ from paddlenlp.utils.log import logger
 class PredictorArgument:
     model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
-    src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
-    max_length: int = field(default=2048, metadata={"help": "the max length for decoding."})
+    src_length: int = field(default=None, metadata={"help": "The max length of source text."})
+    max_length: int = field(default=None, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
     top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
     temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
@@ -700,6 +703,40 @@ def create_predictor(
     if isinstance(tokenizer, LlamaTokenizer) and not tokenizer.pad_token:
         tokenizer.pad_token = tokenizer.unk_token
 
+    config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
+
+    max_position_embeddings = get_model_max_position_embeddings(config)
+    if max_position_embeddings is None:
+        max_position_embeddings = 2048
+        logger.warning("Can not retrieval `max_position_embeddings` from config.json, use default value 2048")
+
+    if predictor_args.src_length is None:
+        if predictor_args.max_length is None:
+            predictor_args.src_length = get_default_max_encoding_length(config)
+            predictor_args.max_length = get_default_max_decoding_length(config)
+        else:
+            predictor_args.src_length = max_position_embeddings - predictor_args.max_length
+            if predictor_args.src_length <= 0:
+                raise ValueError(
+                    f"--max_length<{predictor_args.max_length}> param should be smaller "
+                    f"than max_position_embeddings<{max_position_embeddings}>"
+                )
+    else:
+        if predictor_args.max_length is None:
+            predictor_args.max_length = max_position_embeddings - predictor_args.src_length
+            if predictor_args.max_length <= 0:
+                raise ValueError(
+                    f"--src_length<{predictor_args.src_length}> param should be smaller "
+                    f"than max_position_embeddings<{max_position_embeddings}>"
+                )
+        else:
+            if predictor_args.src_length + predictor_args.max_length > max_position_embeddings:
+                raise ValueError(
+                    f"The sum of src_length<{predictor_args.src_length}> and "
+                    f"max_length<{predictor_args.max_length}> should be smaller than or equal to "
+                    f"the maximum position embedding size<{max_position_embeddings}>"
+                )
+
     # update config parameter for inference predictor
     if predictor_args.decode_strategy == "greedy_search":
         predictor_args.top_p = 0.0
@@ -843,8 +880,19 @@ def create_predictor(
                     dtype=predictor_args.dtype,
                 )
                 model.eval()
+            elif "qwen" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    QWenForCausalLMInferenceModel,
+                )
+
+                model = QWenForCausalLMInferenceModel.from_pretrained(
+                    predictor_args.model_name_or_path,
+                    config=config,
+                    dtype=predictor_args.dtype,
+                )
+                model.eval()
             else:
-                raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt]")
+                raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt, qwen]")
             predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
         elif predictor_args.mode == "static":
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
@@ -888,11 +936,20 @@ def create_predictor(
                 cache_kvs_shape = GPTForCausalLMInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
+            elif "qwen" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    QWenForCausalLMInferenceModel,
+                )
+
+                cache_kvs_shape = QWenForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
+                )
             else:
-                raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt]")
+                raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt, qwen]")
             predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
         else:
             raise ValueError("the `mode` should be one of [dynamic, static]")
+
     return predictor
 
 

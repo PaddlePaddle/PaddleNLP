@@ -38,7 +38,6 @@ from ..utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     get_path_from_url_with_filelock,
     hf_file_exists,
-    is_url,
     url_file_exists,
 )
 from ..utils.log import logger
@@ -704,14 +703,21 @@ class PretrainedConfig:
         original_kwargs = copy.deepcopy(kwargs)
         cache_dir = kwargs.pop("cache_dir", None)
         from_hf_hub = kwargs.get("from_hf_hub", False)
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+        from_aistudio = kwargs.get("from_aistudio", False)
+        subfolder = kwargs.get("subfolder", "")
+        if subfolder is None:
+            subfolder = ""
+
+        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
+        kwargs["cache_dir"] = cache_dir
+        kwargs["subfolder"] = subfolder
 
         # Get config dict associated with the base config file
-        config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, cache_dir=cache_dir, **kwargs)
+        config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         # That config file may point us toward another config file to use.
         if "configuration_files" in config_dict:
-            original_kwargs["cache_dir"] = cache_dir
+            original_kwargs["cache_dir"] = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
             configuration_file = get_configuration_file(config_dict["configuration_files"])
             config_dict, kwargs = cls._get_config_dict(
                 pretrained_model_name_or_path, _configuration_file=configuration_file, **original_kwargs
@@ -726,7 +732,9 @@ class PretrainedConfig:
         cache_dir = kwargs.pop("cache_dir", None)
         from_hf_hub = kwargs.pop("from_hf_hub", False)
         from_aistudio = kwargs.pop("from_aistudio", False)
-        subfolder = kwargs.pop("subfolder", None)
+        subfolder = kwargs.pop("subfolder", "")
+        if subfolder is None:
+            subfolder = ""
         force_download = kwargs.pop("force_download", False)
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
 
@@ -743,21 +751,15 @@ class PretrainedConfig:
         # 1. get the configuration file from local file, eg: /cache/path/model_config.json
         if os.path.isfile(pretrained_model_name_or_path):
             resolved_config_file = pretrained_model_name_or_path
-
-        # 2. get the configuration file from url, eg: https://ip/path/to/model_config.json
-        elif is_url(pretrained_model_name_or_path):
-            resolved_config_file = get_path_from_url_with_filelock(
-                pretrained_model_name_or_path, cache_dir, check_exist=not force_download
-            )
-        # 3. get the configuration file from local dir with default name, eg: /local/path
+        # 2. get the configuration file from local dir with default name, eg: /local/path
         elif os.path.isdir(pretrained_model_name_or_path):
             configuration_file = kwargs.pop("_configuration_file", CONFIG_NAME)
-            configuration_file = os.path.join(pretrained_model_name_or_path, configuration_file)
+            configuration_file = os.path.join(pretrained_model_name_or_path, subfolder, configuration_file)
             if os.path.exists(configuration_file):
                 resolved_config_file = configuration_file
             else:
                 # try to detect old-school config file
-                configuration_file = os.path.join(pretrained_model_name_or_path, LEGACY_CONFIG_NAME)
+                configuration_file = os.path.join(pretrained_model_name_or_path, subfolder, LEGACY_CONFIG_NAME)
                 if os.path.exists(configuration_file):
                     resolved_config_file = configuration_file
                 else:
@@ -765,24 +767,43 @@ class PretrainedConfig:
                         "please make sure there is `model_config.json` under the dir, or you can pass the `_configuration_file` "
                         "param into `from_pretarined` method to specific the configuration file name"
                     )  # 4. load it as the community resource file
-
-        # 4. get the configuration file from HF hub
+        # 3. get the configuration file from aistudio
+        elif from_aistudio:
+            resolved_config_file = aistudio_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=CONFIG_NAME,
+                subfolder=subfolder,
+                cache_dir=cache_dir,
+            )
+        # 4. get the configuration file from HF HUB
         elif from_hf_hub:
             resolved_config_file = resolve_hf_config_path(
                 repo_id=pretrained_model_name_or_path, cache_dir=cache_dir, subfolder=subfolder
             )
-        elif from_aistudio:
-            resolved_config_file = aistudio_download(repo_id=pretrained_model_name_or_path, filename=CONFIG_NAME)
         else:
-            community_url = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, CONFIG_NAME])
-            if url_file_exists(community_url):
-                return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
+            url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, CONFIG_NAME]
+            legacy_url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, LEGACY_CONFIG_NAME]
+            cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
+            if subfolder != "":
+                url_list.insert(2, subfolder)
+                legacy_url_list.insert(2, subfolder)
+            community_url = "/".join(url_list)
+            legacy_community_url = "/".join(legacy_url_list)
 
-            community_url = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, LEGACY_CONFIG_NAME])
             if url_file_exists(community_url):
-                return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
-
-            raise FileNotFoundError(f"configuration file<{CONFIG_NAME}> or <{LEGACY_CONFIG_NAME}> not found")
+                resolved_config_file = get_path_from_url_with_filelock(
+                    community_url,
+                    cache_dir,
+                    check_exist=not force_download,
+                )
+            elif url_file_exists(legacy_community_url):
+                resolved_config_file = get_path_from_url_with_filelock(
+                    legacy_community_url,
+                    cache_dir,
+                    check_exist=not force_download,
+                )
+            else:
+                raise FileNotFoundError(f"configuration file<{CONFIG_NAME}> or <{LEGACY_CONFIG_NAME}> not found")
 
         try:
             logger.info(f"Loading configuration file {resolved_config_file}")
