@@ -19,12 +19,14 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 import paddle
+from utils import get_lora_target_modules
 
 from paddlenlp.data.causal_dataset import (
     build_train_valid_test_datasets,
     check_data_split,
     print_rank_0,
 )
+from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import (
     PdArgumentParser,
     Trainer,
@@ -46,8 +48,6 @@ from paddlenlp.transformers import (
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
-from utils import get_lora_target_modules
-from paddlenlp.peft import LoRAConfig, LoRAModel
 
 def add_start_docstrings(*docstr):
     def docstring_decorator(fn):
@@ -206,18 +206,18 @@ class ModelArguments:
         default=False,
         metadata={"help": "recompute_use_reentrant"},
     )
-    
+
     # vocab_extend
     use_vocab_extend: Optional[bool] = field(
         default=False,
-        metadata={"help": "Enable rope fusion or not."},
+        metadata={"help": "whether to use vocab extend strategy."},
     )
     lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
     lora_alpha: int = field(default=8, metadata={"help": "lora_alpha"})
     lora_trainable: str = field(default=None, metadata={"help": "lora_trainable."})
     modules_to_save: str = field(default=None, metadata={"help": "modules_to_save."})
     lora_dropout: float = field(
-        default=None,
+        default=0.0,
         metadata={"help": "lora dropout."},
     )
 
@@ -541,7 +541,6 @@ def main():
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,
             trainable_modules=modules_to_save,
-            # modules_to_save = modules_to_save,
         )
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()

@@ -14,7 +14,7 @@
 |BELLE|<font color=Blue>0.4584</font>/<font color=Red>**0.4454**</font>/<font color=Green>0.4738</font>|<font color=Blue>0.2659</font>/<font color=Red>**0.2486**</font>/<font color=Green>0.2666</font>|<font color=Blue>0.4702</font>/<font color=Red>**0.4746**</font>/<font color=Green>0.2785</font>|<font color=Blue>0.2400</font>/<font color=Red>**0.2203**</font>/<font color=Green>0.1768</font>|
 
 结果柱状图：
-![avatar](./vocab_extend_results.png)
+![avatar](https://github.com/WAI-clear/save-img/blob/main/vocab_extend_results.png)
 
 ## 2.快速开始
 ```shell
