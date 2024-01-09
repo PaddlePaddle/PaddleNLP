@@ -17,9 +17,11 @@ import unittest
 
 from paddlenlp.transformers import AutoProcessor, CLIPProcessor
 from paddlenlp.utils.log import logger
+from tests.testing_utils import slow
 
 
 class ProcessorLoadTester(unittest.TestCase):
+    @slow
     def test_clip_load(self):
         logger.info("Download model from PaddleNLP BOS")
         clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32", from_hf_hub=False)
