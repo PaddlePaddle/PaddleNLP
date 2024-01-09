@@ -280,6 +280,8 @@ from .rw.modeling import *
 from .rw.configuration import *
 from .rw.tokenizer import *
 from .qwen import *
+from .mixtral.modeling import *
+from .mixtral.configuration import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available
