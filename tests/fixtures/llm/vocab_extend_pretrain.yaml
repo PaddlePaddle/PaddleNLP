@@ -21,9 +21,9 @@ vocab_extend_pretrain:
     use_vocab_extend: true
     lora_rank: 8
     lora_alpha: 32
-    lora_trainable:"q_proj,v_proj,k_proj,o_proj,gate_proj,down_proj,up_proj"
-    modules_to_save:".*embed_tokens.*,.*lm_head.*"
-    lora_dropout:0.05
+    lora_trainable: "q_proj,v_proj,k_proj,o_proj,gate_proj,down_proj,up_proj"
+    modules_to_save: ".*embed_tokens.*,.*lm_head.*"
+    lora_dropout: 0.05
   default:
     llama:
       model_name_or_path: __internal_testing__/tiny-random-llama
