@@ -31,17 +31,17 @@ python train_tokenizer_model.py --pretrain_files_dir '/path/to/pretrain_files' -
 # 将训练的新的词表和原始词表进行合并
 python merge_tokenizer.py --origin_tokenizer_dir '/path/to/origin_tokenizer/' --chinese_sp_model_file '/path/to/new/tokenizer/' --pretrain_files_dir '/path/to/pretrain_files' --chinese_sp_vocab_file '/path/to/new/*.vocab' --output_dir '/merged/result/output'
 
-#修改待扩充的模型词表参数并保存
+# 修改待扩充的模型词表参数并保存
 python ./vocab_extend_scripts/model_param_vocab_resize.py
 
 # 词表扩充预训练
 cd ..
 python -u -m paddle.distributed.launch --gpus "0,1,2,3" run_pretrain.py ./vocab_extend_scripts/vocab_extend_json_file/pretrain_argument_vocab_extend.json
 
-#训练结果参数和主干模型合并
+# 训练结果参数和主干模型合并
 python merge_lora_params.py --model_name_or_path  "" --lora_path "" --merge_lora_model_path "" --use_vocab_extend True
 
-#SFT
+# SFT
 python -u  -m paddle.distributed.launch --gpus "0,1" finetune_generation.py ./vocab_extend_scripts/vocab_extend_json_file/sft_argument_vocab_extend.json
 ```
 **Note**: 为了支持TP(Tensor Parallel)分布式策略，需要使用model_param_vocab_resize.py先保存词表扩充后的模型参数，再进行训练
