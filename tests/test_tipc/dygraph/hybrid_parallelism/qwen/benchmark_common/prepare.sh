@@ -14,6 +14,8 @@
 
 python -m pip install -r ../requirements.txt
 
+python -m pip install tiktoken
+
 # install fused_ln custom ops
 cd ../model_zoo/gpt-3/external_ops/
 python setup.py install
