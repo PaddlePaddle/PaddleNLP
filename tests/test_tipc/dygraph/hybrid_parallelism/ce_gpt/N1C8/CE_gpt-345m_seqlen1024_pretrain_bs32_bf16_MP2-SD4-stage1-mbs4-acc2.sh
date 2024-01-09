@@ -18,6 +18,11 @@ mp_degree=2
 pp_degree=1
 sharding_degree=4
 sharding=stage1
+virtual_pp_degree=1
+use_recompute=True
+eval_freq=25
+use_pipeline_parallel=False
+sequence_parallel=False
 bs_item=32
 fp_item=bf16
 run_mode=MP2-SD4-stage1-mbs4-acc2
@@ -26,8 +31,10 @@ max_iter=50000
 
 model=gpt
 micro_bs=4
+acc=2
+seed=3589
 
 bash ./test_tipc/dygraph/hybrid_parallelism/ce_gpt/benchmark_common/prepare.sh
 # run
 bash ./test_tipc/dygraph/hybrid_parallelism/ce_gpt/benchmark_common/run_benchmark.sh ${model_item} ${fp_item} ${dp_degree} ${mp_degree} ${pp_degree} ${micro_bs} ${bs_item} ${run_mode} ${device_num} \
-${max_iter} ${sharding} ${sharding_degree} 2>&1;
+${max_iter} ${sharding} ${sharding_degree} ${virtual_pp_degree} ${use_recompute} ${eval_freq} ${use_pipeline_parallel} ${sequence_parallel} ${acc} ${seed} 2>&1;

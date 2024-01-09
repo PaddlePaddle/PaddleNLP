@@ -43,6 +43,7 @@ function _set_params(){
     use_pipeline_parallel=${16:-"False"}  # (可选)是否开启pipeline_parallel_config
     sequence_parallel=${17:-"False"}  # (可选)是否开启sequence_parallel
     acc=${18:-"2"} 
+    seed=${19:-"1234"}
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -113,7 +114,7 @@ function _train(){
                 --sequence_parallel ${sequence_parallel} \
                 --split 949,50,1 \
                 --max_seq_length 1024 \
-                --seed 1234 \
+                --seed ${seed} \
                 --fuse_attention_qkv True \
                 --use_flash_attention True \
                 --bf16 ${bf16} \
