@@ -54,4 +54,5 @@ python -u  -m paddle.distributed.launch --gpus "0,1" finetune_generation.py ./vo
 - `pretrain_files_dir`:预训练的数据路径，该参数的目的是为了需要将词表设置为8的倍数方便进行TP(Tensor Parallel)策略需要
 - `chinese_sp_vocab_file`:新训练的词表路径下的vocab后缀的文件
 - `output_dir`: 合并后的词表文件路径
-- `./vocab_extend_scripts/vocab_extend_json_file/pretrain_argument_vocab_extend.json`: 预训练json参数配置文件基于llm/llama/下的json文件修改
+- `./vocab_extend_scripts/vocab_extend_json_file/pretrain_argument_vocab_extend.json`: 预训练参数json配置文件基于llm/llama/下的json文件修改
+- `./vocab_extend_scripts/vocab_extend_json_file/sft_argument_vocab_extend.json`: SFT参数json配置文件基于llm/llama/下的json文件修改
