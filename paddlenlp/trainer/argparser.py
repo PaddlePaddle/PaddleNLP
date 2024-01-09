@@ -19,6 +19,7 @@
 import dataclasses
 import json
 import sys
+import warnings
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, ArgumentTypeError
 from copy import copy
 from enum import Enum
@@ -273,7 +274,7 @@ class PdArgumentParser(ArgumentParser):
             raise FileNotFoundError(f"The argument file {json_file} does not exist.")
         # In case of conflict, command line arguments take precedence
         args = json_args + sys.argv[2:]
-        namespace, _ = self.parse_known_args(args=args)
+        namespace, remaining_args = self.parse_known_args(args=args)
         outputs = []
         for dtype in self.dataclass_types:
             keys = {f.name for f in dataclasses.fields(dtype) if f.init}
@@ -282,6 +283,9 @@ class PdArgumentParser(ArgumentParser):
                 delattr(namespace, k)
             obj = dtype(**inputs)
             outputs.append(obj)
+        if remaining_args:
+            warnings.warn(f"Some specified arguments are not used by the PdArgumentParser: {remaining_args}")
+
         return (*outputs,)
 
     def parse_dict(self, args: dict) -> Tuple[DataClass, ...]:
