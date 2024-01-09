@@ -185,7 +185,7 @@ python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inferen
 python export_model.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --output_path ./inference --dtype float16 --block_attn
 
 # CacheKV 动态量化动转静命令参考
-python export_model.py  --model_name_or_path meta-llama/Llama-2-7b-chat--inference_model --output_path ./inference --dtype float16 --block_attn --cachekv_int8
+python export_model.py  --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --block_attn --cachekv_int8
 ```
 
 **step2：静态图推理**
@@ -230,3 +230,6 @@ python predictor.py  --model_name_or_path ./inference --inference_model --dtype 
 - `model_type`: 初始化不同类型模型，gpt-3: GPTForCausalLM; ernie-3.5-se: Ernie35ForCausalLM; 默认为 None。
 - `mode`: 使用动态图或者静态图推理，值为：[dynamic, static]，默认为 dynamic。
 - `inference_model`: 是否使用Inference Model 推理，默认值为 False。
+- `block_attn`: 是否使用Block Attention 推理， 默认值为False。
+- `block_size`: 如果使用Block Attention 推理，指定一个Block可以存储的token数量，默认值为64。
+- `cachekv_int8`: 是否使用cachekv int8量化用于节省显存，默认值为False。
