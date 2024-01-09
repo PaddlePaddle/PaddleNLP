@@ -45,7 +45,7 @@ python merge_lora_params.py --model_name_or_path  "" --lora_path "" --merge_lora
 **Note**: 为了实现TP(Tensor Parallel)分布式策略，需要使用model_param_vocab_resize.py先保存词表扩充后的模型参数，再进行训练
 
 ## 3.参数介绍
-- `pretrain_files_dir`：
+- `pretrain_files_dir`：用于预训练的语料数据目录
 - `model_prefix、model_type、vocab_size`: 新的tokenzer model 名字的前缀：关于sentencePiece的使用参考https://github.com/google/sentencepiece
 - `origin_tokenizer_dir`: 扩充前的词表路径
 - `chinese_sp_model_file`:新训练的词表路径
