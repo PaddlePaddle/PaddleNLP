@@ -143,7 +143,8 @@ def merge():
         vocab_extend_state_dict = paddle.load(os.path.join(args.lora_path, LORA_FILE_NAME))
         for key, value in vocab_extend_state_dict.items():
             if "embed_tokens" in key:
-                model.resize_token_embeddings(vocab_extend_state_dict[key].shape[0])
+                model.base_model.config["vocab_size"] = vocab_extend_state_dict[key].shape[0]
+                model.vocab_size = vocab_extend_state_dict[key].shape[0]
                 with paddle.no_grad():
                     new_token_embeddings = paddle.nn.Embedding(
                         vocab_extend_state_dict[key].shape[0], vocab_extend_state_dict[key].shape[1]
