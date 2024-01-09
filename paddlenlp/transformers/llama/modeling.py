@@ -1113,6 +1113,9 @@ class LlamaPretrainedModel(PretrainedModel):
                 "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
             }
 
+            if not config.vocab_size % config.tensor_parallel_degree == 0:
+                base_actions.pop("lm_head.weight")
+                base_actions.pop("embed_tokens.weight")
             # Column Linear
             if config.fuse_attention_qkv:
                 base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
@@ -1214,7 +1217,7 @@ class LlamaModel(LlamaPretrainedModel):
 
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
-        if config.tensor_parallel_degree > 1:
+        if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
             self.embed_tokens = mpu.VocabParallelEmbedding(
                 self.vocab_size,
                 self.hidden_size,
@@ -1515,7 +1518,7 @@ class LlamaLMHead(nn.Layer):
     def __init__(self, config: LlamaConfig):
         super(LlamaLMHead, self).__init__()
         self.config = config
-        if config.tensor_parallel_degree > 1:
+        if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
             vocab_size = config.vocab_size // config.tensor_parallel_degree
         else:
             vocab_size = config.vocab_size

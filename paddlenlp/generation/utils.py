@@ -1222,9 +1222,19 @@ class GenerationMixin(object):
 
             #     with device_guard("cpu"):
             #         next_tokens = paddle.multinomial(probs)
+            #     next_tokens = next_tokens.cuda()
 
             if self.config.tensor_parallel_degree > 1:
-                paddle.distributed.broadcast(next_tokens, 0)
+                # Maybe no need to broadcast if seed is set correclty.
+                from paddle.distributed import fleet
+
+                try:
+                    hcg = fleet.get_hybrid_communicate_group()
+                    group = hcg.get_model_parallel_group()
+                    src = group.get_model_parallel_group_src_rank()
+                except:
+                    group, src = None, 0
+                paddle.distributed.broadcast(next_tokens, src=src, group=group)
 
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 

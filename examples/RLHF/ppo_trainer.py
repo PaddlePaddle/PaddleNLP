@@ -542,18 +542,20 @@ class PolicyTrainer(Trainer):
         reward_advantages = inputs["reward_advantages"]
         sequence_mask = inputs["sequence_mask"]
         start = inputs["start"]
-        use_cache = inputs["use_cache"]
-        return_dict = inputs["return_dict"]
-
+        # NOTE: TensorParallel model requires non-Tensor inputs to be lists, thus
+        # do not use these inputs currently.
+        # use_cache = inputs["use_cache"]
+        # return_dict = inputs["return_dict"]
         outputs = model(
-            input_ids=input_ids, attention_mask=attention_mask, use_cache=use_cache, return_dict=return_dict
+            input_ids=input_ids,
+            attention_mask=attention_mask,  # use_cache=use_cache, return_dict=return_dict
         )
 
         logits = outputs["logits"] if isinstance(outputs, dict) else outputs
         if isinstance(outputs, dict):
             logits = outputs["logits"]
         elif isinstance(outputs, tuple):
-            logits = outputs[1]
+            logits = outputs[0]
 
         log_probs = gather_log_probabilities(logits[:, :-1], input_ids[:, 1:])
         actor_loss = self.actor_loss_fn(
@@ -639,11 +641,13 @@ class ValueTrainer(Trainer):
         reward_returns = inputs["reward_returns"]
         sequence_mask = inputs["sequence_mask"]
         start = inputs["start"]
-        use_cache = inputs["use_cache"]
-        return_dict = inputs["return_dict"]
-
+        # NOTE: TensorParallel model requires non-Tensor inputs to be lists, thus
+        # do not use these inputs currently.
+        # use_cache = inputs["use_cache"]
+        # return_dict = inputs["return_dict"]
         outputs = model(
-            input_ids=input_ids, attention_mask=attention_mask, use_cache=use_cache, return_dict=return_dict
+            input_ids=input_ids,
+            attention_mask=attention_mask,  # use_cache=use_cache, return_dict=return_dict
         )
 
         # We don't use .loss here since the model may return tuples instead of ModelOutput.
@@ -1230,7 +1234,7 @@ class PPOTrainer(Trainer):
         # these arguments to control training process.
         train_step_kwargs = {
             "ignore_keys_for_eval": None,  # no need
-            # TODO(guosheng): commented args are to resume data, not support yet
+            # TODO(guosheng): commented args mean to resume data, not support yet
             # "resume_from_checkpoint": resume_from_checkpoint,
             # "train_dataloader": train_dataloader,
             # "epochs_trained": epochs_trained,
