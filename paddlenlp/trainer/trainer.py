@@ -876,37 +876,15 @@ class Trainer:
                 if step % args.gradient_accumulation_steps == 0:
                     self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
                     self.timers and self.timers("forward-backward").start()
-                dp_enabled = (
-                    self.args.data_parallel_degree > 1 if self.args.use_hybrid_parallel else args.local_rank != -1
-                )
-                forbidden_no_sync = False
-                # stage2 and stage3 should not no_sync, because the is no DDP wrapper and no_sync API
-                # hybrid_parallel (tp or pp or sharding stage 1) should not no_sync
-                if self.args.use_hybrid_parallel:
-                    forbidden_no_sync = True
-                # hybrid_parallel (tp or pp) should not no_sync
-                if self.args.use_hybrid_parallel and (
-                    self.args.tensor_parallel_degree > 1 or self.args.pipeline_parallel_degree > 1
-                ):
-                    forbidden_no_sync = True
-                if self.args.use_moe:
-                    forbidden_no_sync = True
-                availiable_no_sync = dp_enabled and not forbidden_no_sync
 
+                availiable_no_sync = hasattr(model, "no_sync")
                 is_no_sync = (
-                    ((step + 1) % args.gradient_accumulation_steps != 0)
-                    and availiable_no_sync
-                    and args._no_sync_in_gradient_accumulation
-                ) or (args.recompute and availiable_no_sync)
-                # sharding
-                # stage1. the same as ddp
-                # stage2. manualy collect gradient on dp group
+                    (((step + 1) % args.gradient_accumulation_steps != 0) and args._no_sync_in_gradient_accumulation)
+                    or args.recompute
+                    or args.use_moe
+                )
 
-                hack_dp_master_grad = self.args.amp_master_grad and not self.args.use_hybrid_parallel
-                if hack_dp_master_grad:
-                    is_no_sync = False
-
-                if is_no_sync:
+                if is_no_sync and availiable_no_sync:
                     # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
                     with model.no_sync():
                         tr_loss_step, outputs = self.training_step(model, inputs)
@@ -950,13 +928,10 @@ class Trainer:
                                         paddle.distributed.all_reduce(p.bw_storage, group=self.dp_group)
 
                     # Case 2: Use recompute and dp / sharding stage1,
-                    # manualy collect gradient for dp.
-                    elif args.recompute and availiable_no_sync:
-                        assert not self.args.use_moe, "moe must `no_sync`"
-                        fused_allreduce_gradients_no_sync(list(model.parameters()), None)
-
                     # Case 2.1: # 纯dp + moe 才在这里手动执行 梯度聚合。
-                    elif args.use_moe and not args.use_hybrid_parallel:
+                    # manualy collect gradient for dp.
+                    elif (args.recompute or args.use_moe) and availiable_no_sync:
+                        # assert not self.args.use_moe, "moe must `no_sync`"
                         fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
                     pipeline_parallel_config = (
@@ -988,6 +963,7 @@ class Trainer:
                     self.timers and self.timers("optimizer-step").start()
 
                     # Case 3: hack dp with master_grad
+                    hack_dp_master_grad = self.args.amp_master_grad and not self.args.use_hybrid_parallel
                     if hack_dp_master_grad and not (args.recompute and availiable_no_sync):
                         fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
