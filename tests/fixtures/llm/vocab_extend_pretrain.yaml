@@ -18,7 +18,7 @@ vocab_extend_pretrain:
     use_flash_attention: 0
     use_fused_rms_norm: 0
     continue_training: 1
-    use_vocab_extend:true
+    use_vocab_extend: true
     lora_rank: 8
     lora_alpha: 32
     lora_trainable:"q_proj,v_proj,k_proj,o_proj,gate_proj,down_proj,up_proj"
