@@ -1304,8 +1304,19 @@ def create_predictor(
                     dtype=predictor_args.dtype,
                 )
                 model.eval()
+            elif "qwen" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    QWenForCausalLMInferenceModel,
+                )
+
+                model = QWenForCausalLMInferenceModel.from_pretrained(
+                    predictor_args.model_name_or_path,
+                    config=config,
+                    dtype=predictor_args.dtype,
+                )
+                model.eval()
             else:
-                raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt]")
+                raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt, qwen]")
             if predictor_args.block_attn:
                 predictor = DygraphBlockInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
             else:
@@ -1369,8 +1380,16 @@ def create_predictor(
                 cache_kvs_shape = GPTForCausalLMInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
+            elif "qwen" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    QWenForCausalLMInferenceModel,
+                )
+
+                cache_kvs_shape = QWenForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
+                )
             else:
-                raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt]")
+                raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt, qwen]")
             if predictor_args.block_attn:
                 predictor = StaticBlockInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
             else:
