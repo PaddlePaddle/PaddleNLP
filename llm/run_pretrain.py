@@ -245,8 +245,8 @@ def create_pretrained_dataset(
         tokens = tokens_[:, :-1]
 
         return {
-            "input_ids": tokens,
-            "labels": labels,
+            "input_ids": paddle.to_tensor(tokens),
+            "labels": paddle.to_tensor(labels),
         }
 
     if need_data:
