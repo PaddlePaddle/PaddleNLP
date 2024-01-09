@@ -247,7 +247,7 @@ class PdArgumentParser(ArgumentParser):
             outputs.append(obj)
         return (*outputs,)
 
-    def parse_json_file_and_cmd_lines(self, json_file: str) -> Tuple[DataClass, ...]:
+    def parse_json_file_and_cmd_lines(self) -> Tuple[DataClass, ...]:
         """
         Extend the functionality of `parse_json_file` to handle command line arguments in addition to loading a JSON
         file.
@@ -255,40 +255,31 @@ class PdArgumentParser(ArgumentParser):
         When there is a conflict between the command line arguments and the JSON file configuration,
         the command line arguments will take precedence.
 
-        This method combines data from a JSON file and command line arguments to populate instances of dataclasses.
-
-        Args:
-            json_file :
-                The path to the JSON formatted file should be at index position 1 in the command line
-                arguments array (sys.argv[1]).
-                Any JSON file path at other positions will be considered invalid.
-
         Returns:
             Tuple consisting of:
 
                 - the dataclass instances in the same order as they were passed to the initializer.abspath
         """
-        json_args = json.loads(Path(json_file).read_text())
-        del sys.argv[1]
-        output_dir_arg = next(
-            (arg for arg in sys.argv if arg == "--output_dir" or arg.startswith("--output_dir=")), None
-        )
-        if output_dir_arg is None:
-            if "output_dir" in json_args.keys():
-                sys.argv.extend(["--output_dir", json_args["output_dir"]])
-            else:
-                raise ValueError("The following arguments are required: --output_dir")
-        cmd_args = vars(self.parse_args())
-        merged_args = {}
-        for key in json_args.keys() | cmd_args.keys():
-            if any(arg == f"--{key}" or arg.startswith(f"--{key}=") for arg in sys.argv):
-                merged_args[key] = cmd_args.get(key)
-            elif json_args.get(key):
-                merged_args[key] = json_args.get(key)
+        if not sys.argv[1].endswith(".json"):
+            raise ValueError(f"The first argument should be a JSON file, but it is {sys.argv[1]}")
+        json_file = Path(sys.argv[1])
+        if json_file.exists():
+            with open(json_file, "r") as file:
+                data = json.load(file)
+            json_args = []
+            for key, value in data.items():
+                json_args.extend([f"--{key}", str(value)])
+        else:
+            raise FileNotFoundError(f"The argument file {json_file} does not exist.")
+        # In case of conflict, command line arguments take precedence
+        args = json_args + sys.argv[2:]
+        namespace, _ = self.parse_known_args(args=args)
         outputs = []
         for dtype in self.dataclass_types:
             keys = {f.name for f in dataclasses.fields(dtype) if f.init}
-            inputs = {k: v for k, v in merged_args.items() if k in keys}
+            inputs = {k: v for k, v in vars(namespace).items() if k in keys}
+            for k in keys:
+                delattr(namespace, k)
             obj = dtype(**inputs)
             outputs.append(obj)
         return (*outputs,)

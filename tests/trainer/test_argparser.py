@@ -24,10 +24,10 @@ from paddlenlp.trainer.argparser import PdArgumentParser
 
 def parse_args():
     parser = PdArgumentParser((PreTrainingArguments,))
-    # Support format as "args.json --args1 value1 --args2 value2.”
+    # Support format as "args.json --arg1 value1 --arg2 value2.”
     # In case of conflict, command line arguments take precedence.
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
-        model_args = parser.parse_json_file_and_cmd_lines(json_file=os.path.abspath(sys.argv[1]))
+        model_args = parser.parse_json_file_and_cmd_lines()
     else:
         model_args = parser.parse_args_into_dataclasses()
     return model_args
