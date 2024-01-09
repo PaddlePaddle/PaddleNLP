@@ -216,7 +216,6 @@ class SQLDocumentStore(BaseDocumentStore):
     ):
         """Fetch documents by specifying a list of text vector id strings"""
         index = index or self.index
-
         documents = []
         for i in range(0, len(vector_ids), batch_size):
             query = self.session.query(DocumentORM).filter(
@@ -224,7 +223,6 @@ class SQLDocumentStore(BaseDocumentStore):
             )
             for row in query.all():
                 documents.append(self._convert_sql_row_to_document(row))
-
         sorted_documents = sorted(documents, key=lambda doc: vector_ids.index(doc.meta["vector_id"]))
         return sorted_documents
 
@@ -405,7 +403,6 @@ class SQLDocumentStore(BaseDocumentStore):
             document_objects = [Document.from_dict(d) if isinstance(d, dict) else d for d in documents]
         else:
             document_objects = documents
-
         document_objects = self._handle_duplicate_documents(
             documents=document_objects, index=index, duplicate_documents=duplicate_documents
         )
