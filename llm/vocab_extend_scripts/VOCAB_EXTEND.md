@@ -21,10 +21,9 @@
 # 环境下载
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
 # pip install ./PaddleNLP 使用develop版本
-cd PaddleNLP/llm
-# 到达运行目录
 
-cd vocab_extend_scripts/
+# 到达运行目录
+cd PaddleNLP/llm/vocab_extend_scripts/
 
 # 训练新的Tokenizer
 python train_tokenizer_model.py --pretrain_files_dir '/path/to/pretrain_files' --model_prefix 'the_name_of_the_tokenizer_model_prefix' --model_type 'the_model_type_used_for_training_tokenizer_model' --vocab_size 'a_number'
@@ -40,15 +39,19 @@ cd ..
 python -u -m paddle.distributed.launch --gpus "0,1,2,3" run_pretrain.py ./vocab_extend_scripts/vocab_extend_json_file/pretrain_argument_vocab_extend.json
 
 #训练结果参数和主干模型合并
-python merge_lora_params.py --model_name_or_path  "" --lora_path "" --merge_lora_model_path "" --use_vocab_extend true
+python merge_lora_params.py --model_name_or_path  "" --lora_path "" --merge_lora_model_path "" --use_vocab_extend True
+
+#SFT
+python -u  -m paddle.distributed.launch --gpus "0,1" finetune_generation.py ./vocab_extend_scripts/vocab_extend_json_file/sft_argument_vocab_extend.json
 ```
-**Note**: 为了实现TP(Tensor Parallel)分布式策略，需要使用model_param_vocab_resize.py先保存词表扩充后的模型参数，再进行训练
+**Note**: 为了支持TP(Tensor Parallel)分布式策略，需要使用model_param_vocab_resize.py先保存词表扩充后的模型参数，再进行训练
 
 ## 3.参数介绍
 - `pretrain_files_dir`：用于预训练的语料数据目录
-- `model_prefix、model_type、vocab_size`: 新的tokenzer model 名字的前缀：关于sentencePiece的使用参考https://github.com/google/sentencepiece
+- `model_prefix、model_type、vocab_size`: 新的tokenzer model 名字的前缀：https://github.com/google/sentencepiece/blob/master/doc/options.md
 - `origin_tokenizer_dir`: 扩充前的词表路径
 - `chinese_sp_model_file`:新训练的词表路径
 - `pretrain_files_dir`:预训练的数据路径，该参数的目的是为了需要将词表设置为8的倍数方便进行TP(Tensor Parallel)策略需要
 - `chinese_sp_vocab_file`:新训练的词表路径下的vocab后缀的文件
-- `output_dir` 合并后的词表文件路径
+- `output_dir`: 合并后的词表文件路径
+- `./vocab_extend_scripts/vocab_extend_json_file/pretrain_argument_vocab_extend.json`: 预训练json参数配置文件基于llm/llama/下的json文件修改
