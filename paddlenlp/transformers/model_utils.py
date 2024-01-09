@@ -30,7 +30,6 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
 import aistudio_sdk
 import numpy as np
 import paddle
-import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn as nn
 import six
 from huggingface_hub import (
@@ -1396,27 +1395,19 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if old_num_tokens == new_num_tokens:
             return old_embeddings
 
-        if not isinstance(old_embeddings, nn.Embedding) and not isinstance(old_embeddings, mpu.VocabParallelEmbedding):
+        if not isinstance(old_embeddings, nn.Embedding):
             raise TypeError(
                 f"Old embeddings are of type {type(old_embeddings)}, which is not an instance of {nn.Embedding}. You"
                 " should either use a different resize function or make sure that old_embeddings are an instance of"
-                f" {nn.Embedding} or {mpu.VocabParallelEmbedding}."
+                f" {nn.Embedding}."
             )
-        logger.info(f"self.config.tensor_parallel_degree: {self.config.tensor_parallel_degree}")
         # Build new embeddings
-        if self.config.tensor_parallel_degree > 1:
-            new_embeddings = mpu.VocabParallelEmbedding(
-                new_num_tokens,
-                old_embedding_dim,
-                weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.XavierNormal()),
-            )
-        else:
-            new_embeddings = nn.Embedding(
-                new_num_tokens,
-                old_embedding_dim,
-                padding_idx=old_embeddings._padding_idx,
-                sparse=old_embeddings._sparse,
-            )
+        new_embeddings = nn.Embedding(
+            new_num_tokens,
+            old_embedding_dim,
+            padding_idx=old_embeddings._padding_idx,
+            sparse=old_embeddings._sparse,
+        )
 
         # make sure that new_embeddings's dtype is same as the old embeddings' dtype
         if new_embeddings.weight.dtype != old_embeddings.weight.dtype:
