@@ -145,22 +145,20 @@ def merge():
             if "embed_tokens" in key:
                 model.resize_token_embeddings(vocab_extend_state_dict[key].shape[0])
                 with paddle.no_grad():
-                    paddle.set_default_dtype("float16")
-                    new_embed_tokens = paddle.nn.Embedding(
+                    new_token_embeddings = paddle.nn.Embedding(
                         vocab_extend_state_dict[key].shape[0], vocab_extend_state_dict[key].shape[1]
                     )
-                    new_embed_tokens.weight[:, :] = value[:, :]
-                    paddle.set_default_dtype("float32")
-                model.set_input_embeddings(new_embed_tokens)
+                    if new_token_embeddings.weight.dtype != model.get_input_embeddings().weight.dtype:
+                        new_token_embeddings.to(dtype=model.get_input_embeddings().weight.dtype)
+                    new_token_embeddings.weight[:, :] = value[:, :]
+                model.set_input_embeddings(new_token_embeddings)
             if "lm_head" in key:
                 with paddle.no_grad():
-                    paddle.set_default_dtype("float16")
                     new_lm_head_weight = paddle.create_parameter(
                         shape=[vocab_extend_state_dict[key].shape[0], vocab_extend_state_dict[key].shape[1]],
-                        dtype=paddle.get_default_dtype(),
+                        dtype=model.lm_head.weight.dtype,
                     )
                     new_lm_head_weight[:, :] = value[:, :]
-                    paddle.set_default_dtype("float32")
                 model.lm_head.weight = new_lm_head_weight
     model.model.save_pretrained(args.merge_lora_model_path, state_dict=model_state_dict)
 

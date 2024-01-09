@@ -1342,14 +1342,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # logger.info(f"old_lm_head type is {old_lm_head.__name__}")
             new_lm_head = copy.deepcopy(old_lm_head)
             with paddle.no_grad():
-                paddle.set_default_dtype("float16")
                 new_lm_head_weight = paddle.create_parameter(
                     shape=[old_lm_head.weight.shape[0], new_num_tokens],
-                    dtype=paddle.get_default_dtype(),
+                    dtype=old_lm_head.weight.dtype,
                 )
+                logger.info(f"old_lm_head.weight.dtype is {old_lm_head.weight.dtype}")
                 num_to_copy = min(new_num_tokens, old_lm_head.weight.shape[1])
                 new_lm_head_weight[:, :num_to_copy] = old_lm_head.weight[:, :num_to_copy]
-                paddle.set_default_dtype("float32")
             new_lm_head.weight = new_lm_head_weight
             self.set_output_embeddings(new_lm_head)
             # self.lm_head.weight = new_lm_head_weight
