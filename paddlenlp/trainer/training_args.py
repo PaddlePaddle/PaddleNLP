@@ -1310,6 +1310,8 @@ class TrainingArguments:
                     "master_weight_compatible",
                     "async_save",
                 ]
+            else:
+                self.unified_checkpoint_config = self.unified_checkpoint_config.split(" ")
 
         if self.report_to is None:
             logger.info(

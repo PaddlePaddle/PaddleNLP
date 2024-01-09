@@ -2030,7 +2030,7 @@ class Trainer:
             unified_checkpoint_config_backup = self.args.unified_checkpoint_config
             # backup and remove unified_checkpoint_config for not trine stage
             if not self.is_in_train:
-                self.args.unified_checkpoint_config = ""
+                self.args.unified_checkpoint_config = []
 
             self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
 
