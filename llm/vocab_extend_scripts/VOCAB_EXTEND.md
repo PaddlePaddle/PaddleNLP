@@ -48,7 +48,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1" finetune_generation.py ./vo
 
 ## 3.参数介绍
 - `pretrain_files_dir`：用于预训练的语料数据目录
-- `model_prefix、model_type、vocab_size`: 新的tokenzer model 名字的前缀：https://github.com/google/sentencepiece/blob/master/doc/options.md
+- `model_prefix、model_type、vocab_size`: 新的tokenzer model 名字的前缀：关于sentencePiece的具体参数配置参考https://github.com/google/sentencepiece/blob/master/doc/options.md
 - `origin_tokenizer_dir`: 扩充前的词表路径
 - `chinese_sp_model_file`:新训练的词表路径
 - `pretrain_files_dir`:预训练的数据路径，该参数的目的是为了需要将词表设置为8的倍数方便进行TP(Tensor Parallel)策略需要
