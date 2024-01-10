@@ -43,6 +43,7 @@ from .testing_utils import LLMTest, argv_context_guard, load_test_config
         ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
         ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
         ["__internal_testing__/tiny-fused-chatglm2", ChatGLMv2ForCausalLM],
+        ["__internal_testing__/tiny-fused-qwen", QwenForCausalLM],
     ],
 )
 class PredictorTest(LLMTest, unittest.TestCase):
