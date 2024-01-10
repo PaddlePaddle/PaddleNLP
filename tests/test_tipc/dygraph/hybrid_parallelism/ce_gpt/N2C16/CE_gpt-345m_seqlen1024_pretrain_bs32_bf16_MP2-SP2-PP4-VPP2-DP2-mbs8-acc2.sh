@@ -18,7 +18,7 @@ mp_degree=2
 pp_degree=4
 bs_item=32
 fp_item=bf16
-run_mode=MP2-PP4-VPP2-DP2-mbs2-acc8
+run_mode=MP2-SP2-PP4-VPP2-DP2-mbs8-acc2
 device_num=N2C16
 max_iter=50000
 sharding=False
@@ -31,9 +31,9 @@ use_pipeline_parallel=True
 sequence_parallel=True
 
 model=gpt
-micro_bs=2
+micro_bs=8
+acc=2
 seed=1234
-acc=8
 
 bash ./test_tipc/dygraph/hybrid_parallelism/ce_gpt/benchmark_common/prepare.sh
 # run
