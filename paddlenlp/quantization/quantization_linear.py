@@ -83,7 +83,7 @@ class QuantizationLinear(nn.Layer):
             self.quant_scale = self.create_parameter(
                 shape=[out_features],
                 attr=scale_attr,
-                dtype="float32",
+                dtype=self._dtype,
                 is_bias=False,
             )
         if self.quant_algo in ["fp4", "nf4"]:
@@ -231,7 +231,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
         self.quant_scale = self.create_parameter(
             shape=[self.output_size_per_partition],
             attr=scale_attr,
-            dtype="float32",
+            dtype=self._dtype,
             is_bias=False,
         )
         self.quant_scale.is_distributed = True if self.is_mp else False
@@ -345,7 +345,7 @@ class RowParallelQuantizationLinear(nn.Layer):
         self.quant_scale = self.create_parameter(
             shape=[out_features],
             attr=scale_attr,
-            dtype="float32",
+            dtype=self._dtype,
             is_bias=False,
         )
         self.quant_scale.is_distributed = True if self.is_mp else False
