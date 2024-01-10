@@ -32,7 +32,7 @@ sequence_parallel=True
 model=gpt
 micro_bs=8
 acc=2
-seed=3589
+seed=1234
 
 bash ./test_tipc/dygraph/hybrid_parallelism/ce_gpt/benchmark_common/prepare.sh
 # run
