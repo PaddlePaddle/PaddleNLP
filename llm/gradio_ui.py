@@ -119,7 +119,7 @@ def launch(args, default_params: dict = {}):
             "min_length": 1,
         }
         res = requests.post(f"http://0.0.0.0:{args.flask_port}/api/chat", json=data, stream=True)
-        for line in res.iter_lines():
+        for index, line in enumerate(res.iter_lines()):
             result = json.loads(line)
             if result["error_code"] != 0:
                 gr.Warning(result["error_msg"])
@@ -133,6 +133,10 @@ def launch(args, default_params: dict = {}):
 
             if bot_response["utterance"].endswith("[END]"):
                 bot_response["utterance"] = bot_response["utterance"][:-5]
+
+            # the first character of gradio can not be "<br>" or "<br/>"
+            if bot_response["utterance"] in ["<br>", "<br/>"] and index == 0:
+                continue
 
             context[-1]["utterance"] += bot_response["utterance"]
             shown_context = get_shown_context(context)
