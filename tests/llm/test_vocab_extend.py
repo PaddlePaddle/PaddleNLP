@@ -33,7 +33,7 @@ from .testing_utils import LLMTest
         ["llama"],
     ],
 )
-class PretrainTest(LLMTest, unittest.TestCase):
+class VocabExtendPretrainTest(LLMTest, unittest.TestCase):
     config_path: str = "./tests/fixtures/llm/vocab_extend_pretrain.yaml"
     model_dir: str = None
 
@@ -84,7 +84,7 @@ class PretrainTest(LLMTest, unittest.TestCase):
             from merge_lora_params import merge
 
             merge()
-        # Now, only work for llama, not gpt or qwen
+        # Now, only work for llama
         if self.model_dir == "llama":
             self.run_predictor({"inference_model": True})
 
