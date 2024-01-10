@@ -27,7 +27,7 @@ import paddle
 import paddle.distributed.fleet.base.topology as tp
 import paddle.incubate.multiprocessing as mp
 from paddle.distributed import fleet
-from paddlenlp_ops import get_output, reset_stop_value
+from paddlenlp_ops import reset_stop_value
 from utils import (
     dybatch_preprocess,
     get_alibi_slopes,
@@ -38,6 +38,7 @@ from utils import (
     get_prefix_tuning_params,
     init_chat_template,
     load_real_time_tokens,
+    read_res,
 )
 
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
@@ -55,6 +56,9 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.utils.import_utils import import_module, is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
+
+# Note(@RochardWooSJTU): MAX_BSZ must be the same as definition in get_output / save_output
+MAX_BSZ = 512
 
 
 @dataclass
@@ -707,6 +711,8 @@ class BlockInferencePredictorMixin:
         self.num_attention_heads = self.cache_kvs_shape[0][-3]
         self.head_dim = self.cache_kvs_shape[0][-1]
         self.max_block_nums = self.cache_kvs_shape[0][0]
+        self.batch_size = config.batch_size
+        self.model_name_or_path = config.model_name_or_path
 
         self.architectures = self.model_config.architectures[0].lower()
 
@@ -934,6 +940,17 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor
     @paddle.no_grad()
     def predict(self, input_texts: str | list[str]):
         self._preprocess(input_texts)
+
+        result_queue = mp.Queue()
+        tensor_queue = mp.Queue()
+
+        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64")
+        output_tensor = output_tensor.cpu()
+        tensor_queue.put(output_tensor)
+
+        read_res_process = mp.Process(target=read_res, args=[self.model_name_or_path, tensor_queue, result_queue])
+        read_res_process.start()
+
         while self.inputs["not_need_stop"]:
             self._infer(self.inputs)
         # reset free_list
@@ -941,7 +958,11 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor
             self.free_list.extend(self.used_list[i])
             self.used_list[i] = []
         reset_stop_value(self.inputs["not_need_stop"])
-        return
+
+        outputs = []
+        while len(outputs) < self.batch_size:
+            outputs.append(result_queue.get(timeout=1)[-1])
+        return outputs
 
 
 class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor):
@@ -1054,6 +1075,16 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
         self.seq_lens_handle.share_external_data(seq_lens_this_time)
         logger.info(f"preprocess spend {time.time()  -  s_time}")
 
+        result_queue = mp.Queue()
+        tensor_queue = mp.Queue()
+
+        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64")
+        output_tensor = output_tensor.cpu()
+        tensor_queue.put(output_tensor)
+
+        read_res_process = mp.Process(target=read_res, args=[self.model_name_or_path, tensor_queue, result_queue])
+        read_res_process.start()
+
         s_time = time.time()
         while self.inputs["not_need_stop"]:
             self.predictor.run()
@@ -1064,7 +1095,11 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
             self.free_list.extend(self.used_list[i])
             self.used_list[i] = []
         reset_stop_value(self.inputs["not_need_stop"])
-        return
+
+        outputs = []
+        while len(outputs) < self.batch_size:
+            outputs.append(result_queue.get(timeout=1)[-1])
+        return outputs
 
     def _preprocess(self, source):
         BlockInferencePredictorMixin._preprocess(self, source)
@@ -1400,35 +1435,6 @@ def create_predictor(
     return predictor
 
 
-def read_res(predictor_args: PredictorArgument, tensor_queue: mp.Queue, result_queue: mp.Queue):
-    tokenizer = AutoTokenizer.from_pretrained(
-        predictor_args.model_name_or_path,
-    )
-
-    paddle.device.set_device("cpu")
-    outputs = []
-    output_tensor = tensor_queue.get(timeout=1)
-
-    logger.info("Start read result message")
-    logger.info(f"Current path is {os.getcwd()}")
-    while True:
-        get_output(output_tensor, 0, True)
-        if output_tensor[0, 0] == -2:  # read none
-            continue
-        bsz = output_tensor[1, 0].numpy()
-        output_numpy = output_tensor[2 : bsz + 2].numpy()
-        output_numpy[output_numpy == -1] = 2
-        outputs.append(output_numpy)
-        if output_tensor[0, 0] == -1:
-            break
-    output = np.concatenate(outputs, axis=1).tolist()
-    seqs = tokenizer.batch_decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-    for i, seq in enumerate(seqs):
-        result_queue.put([i, seq])
-
-    logger.info("Finish read result message")
-
-
 def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
@@ -1465,27 +1471,9 @@ def predict():
 
     with open(model_args.output_file, "w", encoding="utf-8") as f:
         for bs, batch_source_text in enumerate(batch_source_texts):
-            if predictor_args.block_attn:
-                result_queue = mp.Queue()
-                tensor_queue = mp.Queue()
-
-                # Note(@RochardWooSJTU): MAX_BSZ must be the same as definition in get_output / save_output
-                MAX_BSZ = 512
-                output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64")
-                output_tensor = output_tensor.cpu()
-                tensor_queue.put(output_tensor)
-
-                read_res_process = mp.Process(target=read_res, args=[predictor_args, tensor_queue, result_queue])
-                read_res_process.start()
-
             logger.info("Start predict")
             outputs = predictor.predict(batch_source_text)
             logger.info("End predict")
-
-            if predictor_args.block_attn:
-                outputs = []
-                while len(outputs) < predictor_args.batch_size:
-                    outputs.append(result_queue.get(timeout=1)[-1])
 
             if predictor.tensor_parallel_rank > 0:
                 continue
