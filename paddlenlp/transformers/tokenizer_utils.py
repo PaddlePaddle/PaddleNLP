@@ -668,6 +668,10 @@ class ChatTemplateMixin:
         # encode conversation
         conversation_ids = []
         for index, conversation in enumerate(conversations):
+            # give more control to chat_template
+            context_data["is_first"] = index == 0
+            context_data["is_last"] = index == len(conversations) - 1
+
             user_input, bot_output = self.chat_template.render_conversation(
                 conversation, index=index, context_data=context_data
             )

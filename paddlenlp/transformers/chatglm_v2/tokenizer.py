@@ -37,21 +37,34 @@ class SPTokenizer:
         self.pad_id: int = self.sp_model.unk_id()
         assert self.sp_model.vocab_size() == self.sp_model.get_piece_size()
 
-        role_special_tokens = ["<|system|>", "<|user|>", "<|assistant|>", "<|observation|>"]
-        special_tokens = ["[MASK]", "[gMASK]", "[sMASK]", "sop", "eop"] + role_special_tokens
+        special_tokens = [
+            "[MASK]",
+            "[gMASK]",
+            "[sMASK]",
+            "sop",
+            "eop",
+            "<|system|>",
+            "<|user|>",
+            "<|assistant|>",
+            "<|observation|>",
+        ]
+
         self.special_tokens = {}
         self.index_special_tokens = {}
         for token in special_tokens:
             self.special_tokens[token] = self.n_words
             self.index_special_tokens[self.n_words] = token
             self.n_words += 1
-        self.role_special_token_expression = "|".join([re.escape(token) for token in role_special_tokens])
+
+        # add eos/pad/unk token to special_token_expression
+        all_special_tokens = list(self.special_tokens.keys()) + ["</s>", "<unk>"]
+        self.special_token_expression = "|".join([re.escape(token) for token in all_special_tokens])
 
     def tokenize(self, s: str, encode_special_tokens=False):
         if encode_special_tokens:
             last_index = 0
             t = []
-            for match in re.finditer(self.role_special_token_expression, s):
+            for match in re.finditer(self.special_token_expression, s):
                 if last_index < match.start():
                     t.extend(self.sp_model.EncodeAsPieces(s[last_index : match.start()]))
                 t.append(s[match.start() : match.end()])
@@ -100,7 +113,8 @@ class ChatGLMv2Tokenizer(PretrainedTokenizer):
         }
     }
 
-    def __init__(self, vocab_file, padding_side="left", encode_special_tokens=False, **kwargs):
+    # always encode special tokens, eg: </s>, [gMASK], [MASK] ...
+    def __init__(self, vocab_file, padding_side="left", encode_special_tokens=True, **kwargs):
         super().__init__(padding_side=padding_side, **kwargs)
         self.name = "ChatGLMv2Tokenizer"
 
