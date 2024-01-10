@@ -58,10 +58,10 @@ def read_local_dataset(path):
 def main():
     # Arguments
     parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
-    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file(
-            json_file=os.path.abspath(sys.argv[1])
-        )
+    # Support format as "args.json --arg1 value1 --arg2 value2.”
+    # In case of conflict, command line arguments take precedence.
+    if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
+        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
         gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
