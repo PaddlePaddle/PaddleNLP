@@ -1187,6 +1187,7 @@ def create_predictor(
 
     tensor_parallel_rank, tensor_parallel_degree = init_dist_env()
     if not predictor_args.inference_model:
+        tokenizer.padding_side = "left"
         if predictor_args.mode == "dynamic":
             if model_args.model_type == "gpt-3":
                 sys.path.append("./gpt-3")
