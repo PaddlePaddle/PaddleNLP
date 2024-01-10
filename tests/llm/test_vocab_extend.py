@@ -31,8 +31,6 @@ from .testing_utils import LLMTest
     ["model_dir"],
     [
         ["llama"],
-        ["qwen"],
-        ["gpt"],
     ],
 )
 class PretrainTest(LLMTest, unittest.TestCase):
@@ -49,7 +47,7 @@ class PretrainTest(LLMTest, unittest.TestCase):
         LLMTest.tearDown(self)
         shutil.rmtree(self.dataset_dir)
 
-    def test_pretrain(self):
+    def test_vocab_textend_pretrain(self):
 
         pretrain_flag = False
         for key, value in sys.modules.items():
@@ -75,6 +73,17 @@ class PretrainTest(LLMTest, unittest.TestCase):
 
             main()
 
+        # merge weights
+        merge_lora_weights_config = {
+            "lora_path": pretrain_config["output_dir"],
+            "merge_lora_model_path": pretrain_config["output_dir"],
+            "use_vocab_extend": pretrain_config["use_vocab_extend"],
+            "model_name_or_path": pretrain_config["model_name_or_path"],
+        }
+        with argv_context_guard(merge_lora_weights_config):
+            from merge_lora_params import merge
+
+            merge()
         # Now, only work for llama, not gpt or qwen
         if self.model_dir == "llama":
             self.run_predictor({"inference_model": True})

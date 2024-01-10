@@ -32,7 +32,7 @@ def parse_arguments():
     return parser.parse_args()
 
 
-if __name__ == "__main__":
+def main():
     args = parse_arguments()
     paddle.set_device(args.device)
     model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path, dtype="float16")
@@ -62,3 +62,7 @@ if __name__ == "__main__":
     print(model.get_input_embeddings().weight.shape)
     new_tokenizer.save_pretrained(args.vocab_extend_model_path)
     model.save_pretrained(args.vocab_extend_model_path)
+
+
+if __name__ == "__main__":
+    main()
