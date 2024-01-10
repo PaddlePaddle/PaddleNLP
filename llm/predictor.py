@@ -981,7 +981,10 @@ def predict():
                 source_texts.append(example["src"])
                 target_texts.append(example["tgt"])
     else:
-        source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
+        source_texts = [
+            "user:请判断下面的问题是否需要执行动作并获得额外信息才能回答，如果是则生成你的思考和动作序列。\n开车去北京\n\nassistant:\n``` 上文出现过的POI \n{}\n```\n``` 上文出现过的路线 \n{}\n```\n"
+        ]
+
         target_texts = ["", ""]
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
