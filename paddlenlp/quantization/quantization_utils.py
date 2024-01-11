@@ -109,9 +109,12 @@ def convert_to_quantize_state_dict_with_check(state_dict, quantization_linear_li
                 raise ValueError(
                     f"{quant_weight_name} should be {paddle.int8} in state_dict but received dtype {state_dict[quant_weight_name].dtype}."
                 )
-            if state_dict[quant_scale_name].dtype != paddle.float32:
+            if (
+                state_dict[quant_scale_name].dtype != paddle.float16
+                and state_dict[quant_scale_name].dtype != paddle.bfloat16
+            ):
                 raise ValueError(
-                    f"{quant_scale_name} should be {paddle.float32} in state_dict but received dtype {state_dict[quant_scale_name].dtype}."
+                    f"{quant_scale_name} should be {paddle.float16} or {paddle.bfloat16} in state_dict but received dtype {state_dict[quant_scale_name].dtype}."
                 )
         elif weight_name in state_dict:
             target_weight = state_dict.pop(weight_name).cast(dtype)
