@@ -173,12 +173,14 @@ class PredictorServer:
                 streamer = self.predict(query)
                 if self.predictor.tensor_parallel_rank == 0:
                     for new_text in streamer:
+                        if not new_text:
+                            continue
+
                         output = {
                             "error_code": 0,
                             "error_msg": "Success",
                             "result": {"response": {"role": "bot", "utterance": new_text}},
                         }
-                        logger.info(f"Response: {json.dumps(output, indent=2, ensure_ascii=False)}")
                         yield json.dumps(output, ensure_ascii=False) + "\n"
                 else:
                     return "done"

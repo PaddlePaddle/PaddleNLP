@@ -22,14 +22,17 @@ from typing import Dict, Optional
 import numpy as np
 import paddle
 import paddle.distributed as dist
+import paddle.incubate.multiprocessing as mp
 from paddle.distributed import fleet
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
+from paddlenlp_ops import get_output
 from sklearn.metrics import accuracy_score
 
 from paddlenlp.datasets import InTokensIterableDataset
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
 from paddlenlp.transformers import (
+    AutoTokenizer,
     ChatGLMv2Tokenizer,
     LlamaForCausalLMPipe,
     PretrainedConfig,
@@ -687,3 +690,32 @@ def get_default_max_encoding_length(config: PretrainedConfig, default: int = 102
     if max_position_embeddings is None:
         return default
     return max_position_embeddings // 4 * 3
+
+
+def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue):
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_name_or_path,
+    )
+
+    paddle.device.set_device("cpu")
+    outputs = []
+    output_tensor = tensor_queue.get(timeout=1)
+
+    logger.info("Start read result message")
+    logger.info(f"Current path is {os.getcwd()}")
+    while True:
+        get_output(output_tensor, 0, True)
+        if output_tensor[0, 0] == -2:  # read none
+            continue
+        bsz = output_tensor[1, 0].numpy()
+        output_numpy = output_tensor[2 : bsz + 2].numpy()
+        output_numpy[output_numpy == -1] = 2
+        outputs.append(output_numpy)
+        if output_tensor[0, 0] == -1:
+            break
+    output = np.concatenate(outputs, axis=1).tolist()
+    seqs = tokenizer.batch_decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+    for i, seq in enumerate(seqs):
+        result_queue.put([i, seq])
+
+    logger.info("Finish read result message")
