@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import copy
 import math
 import os
 import sys
@@ -261,12 +262,12 @@ def create_pretrained_dataset(
     def _collate_data(data, stack_fn=Stack()):
         tokens_ = stack_fn([x["text"] for x in data])
 
-        labels = tokens_[:, 1:]
+        labels = copy.deepcopy(tokens_)[:, 1:]
         tokens = tokens_[:, :-1]
 
         return {
-            "input_ids": paddle.to_tensor(tokens),
-            "labels": paddle.to_tensor(labels),
+            "input_ids": tokens,
+            "labels": labels,
         }
 
     if need_data:
