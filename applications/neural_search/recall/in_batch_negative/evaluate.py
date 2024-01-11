@@ -65,7 +65,7 @@ if __name__ == "__main__":
     text2similar = {}
     with open(args.similar_text_pair, "r", encoding="utf-8") as f:
         for line in f:
-            text, similar_text = line.rstrip().split("\t$$$")
+            text, similar_text = line.rstrip().split("\t")
             text2similar[text] = similar_text
 
     rs = []
@@ -77,7 +77,7 @@ if __name__ == "__main__":
                 rs.append(relevance_labels)
                 relevance_labels = []
 
-            text, recalled_text, cosine_sim = line.rstrip().split("\t$$$")
+            text, recalled_text, cosine_sim = line.rstrip().split("\t")
             if text2similar[text] == recalled_text:
                 relevance_labels.append(1)
             else:
