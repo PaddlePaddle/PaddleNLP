@@ -45,15 +45,10 @@ class SemiAutoTrainer(Trainer):
         return model
 
     def _wrap_for_static(self, model, train_dataloader):
-        strategy = None
-        if self.args.gradient_accumulation_steps > 1:
-            strategy = dist.Strategy()
-            strategy.pipeline.accumulate_steps = self.args.gradient_accumulation_steps
-
         # TODO: convert fleet.auto.Strategy to dist.Strategy
         # TODO: fix bugs in paddle/distributed/auto_parallel/api.py#L981 about sample_split of engine._prepare_data_spec
         model, dist_loader = dist.to_static(
-            model, train_dataloader, self.criterion, self.optimizer, input_spec=self.input_spec, strategy=strategy
+            model, train_dataloader, self.criterion, self.optimizer, input_spec=self.input_spec, strategy=self.args.strategy
         )
         return model, dist_loader
 
@@ -132,15 +127,18 @@ class SemiAutoTrainer(Trainer):
             else:
                 loss.backward()
         else:
-
             input_ids, labels = tuple(inputs.values())
             loss = model(input_ids, labels)
 
-        if self.args.pipeline_parallel_degree > 1 and self.args.run_static_semi_auto:
-            self._pp_data_buffer = {}
+            if self.args.pipeline_parallel_degree > 1:
+                self._pp_data_buffer = {}
+            elif self.args.gradient_accumulation_steps > 1:
+                loss = loss / self.args.gradient_accumulation_steps
 
         if isinstance(loss, paddle.Tensor):
             return loss.detach()
+        elif isinstance(loss, np.ndarray):
+            return np.sum(loss)
         elif loss is None:
             return float(0.0)
         else:

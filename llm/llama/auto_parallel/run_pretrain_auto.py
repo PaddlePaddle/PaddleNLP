@@ -600,17 +600,18 @@ def main():
         training_args.per_device_train_batch_size * training_args.data_parallel_degree
     )
     total_train_batch_size = total_train_batch_size_per_acc_step * training_args.gradient_accumulation_steps
+    batch_size = (
+        total_train_batch_size
+        if training_args.pipeline_parallel_degree > 1 and training_args.run_static_semi_auto
+        else total_train_batch_size_per_acc_step
+    )
 
     input_spec = [
         [
-            paddle.static.InputSpec(
-                shape=[total_train_batch_size, data_args.max_seq_length], dtype="int64", name="input_ids"
-            ),
+            paddle.static.InputSpec(shape=[batch_size, data_args.max_seq_length], dtype="int64", name="input_ids"),
         ],
         [
-            paddle.static.InputSpec(
-                shape=[total_train_batch_size, data_args.max_seq_length], dtype="int64", name="labels"
-            ),
+            paddle.static.InputSpec(shape=[batch_size, data_args.max_seq_length], dtype="int64", name="labels"),
         ],
     ]
 
