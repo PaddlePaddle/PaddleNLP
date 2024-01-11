@@ -72,6 +72,7 @@ if __name__ == "__main__":
                 relevance_labels.append(1)
             else:
                 relevance_labels.append(0)
+        rs.append(relevance_labels)
 
     recall_N = []
     recall_num = [1, 5, 10, 20, 50]
