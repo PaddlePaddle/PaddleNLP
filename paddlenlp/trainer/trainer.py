@@ -1213,11 +1213,9 @@ class Trainer:
             logs: Dict[str, float] = {}
 
             # all_gather + mean() to get average loss over all processes
-
             tr_loss_scalar = self._get_item_from_loss(self._nested_gather(tr_loss))
 
             # reset tr_loss to zero
-
             tr_loss.subtract_(tr_loss)
 
             logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
@@ -2265,7 +2263,6 @@ class Trainer:
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
         # peft model
         if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
-            print("---- 1 ----")
             self.model.save_pretrained(
                 output_dir,
                 variant=self.args.weight_name_suffix,
@@ -2273,7 +2270,6 @@ class Trainer:
                 is_main_process=self.args.should_save,
                 max_shard_size="1024GB",
             )
-            print("---- 2 ----")
         # TODO: @ZHUI unifiy unwrap_model(self.model) and self.model
         elif not isinstance(self.model, PretrainedModel):
             if isinstance(unwrap_model(self.model), PretrainedModel):
@@ -2283,7 +2279,6 @@ class Trainer:
                         unwrap_model(self.model), merge_tensor_parallel=merge_tensor_parallel
                     )
 
-                    print("---- 3 ----")
                     unwrap_model(self.model).save_pretrained(
                         output_dir,
                         state_dict=state_dict,
@@ -2293,9 +2288,7 @@ class Trainer:
                         is_main_process=self.args.should_save,
                         max_shard_size="1024GB",
                     )
-                    print("---- 4 ----")
                 else:
-                    print("---- 5 ----")
                     unwrap_model(self.model).save_pretrained(
                         output_dir,
                         merge_tensor_parallel=merge_tensor_parallel,
@@ -2303,7 +2296,6 @@ class Trainer:
                         is_main_process=self.args.should_save,
                         max_shard_size="1024GB",
                     )
-                    print("---- 6 ----")
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
                 if merge_tensor_parallel:
@@ -2311,17 +2303,10 @@ class Trainer:
                 if state_dict is None:
                     state_dict = self.model.state_dict()
 
-                print("---- 7 ----")
-
-                print(
-                    "path :", os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix))
-                )
-
                 self._save_ckpt_func(
                     state_dict,
                     os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix)),
                 )
-                print("---- 8 ----")
         else:
             if isinstance(self.model, PretrainedModel) and self.args.should_save_sharding_stage1_model:
                 config_to_save = None
@@ -2881,7 +2866,6 @@ class Trainer:
         Whether or not this process is the local (e.g., on one machine if training in a distributed fashion on several
         machines) main process.
         """
-
         return self.args.local_process_index == 0
 
     def is_world_process_zero(self) -> bool:
