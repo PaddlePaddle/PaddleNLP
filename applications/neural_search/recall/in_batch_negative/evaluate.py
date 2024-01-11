@@ -86,11 +86,11 @@ if __name__ == "__main__":
         rs.append(relevance_labels)
 
     recall_N = []
-    recall_num = [1, 3, 5, 10, 50]
+    recall_num = [1, 5, 10, 20, 50]
     for topN in recall_num:
         R = round(100 * recall(rs, N=topN), 3)
         recall_N.append(str(R))
-    result = open("./result.tsv", "a")
+    result = open("result.tsv", "a")
     res = []
     timestamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
     res.append(timestamp)
