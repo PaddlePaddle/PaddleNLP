@@ -27,6 +27,8 @@ from .trainer_utils import _exec_mode_guard, has_length
 
 class SemiAutoTrainer(Trainer):
     def __init__(self, *args, **kwargs):
+
+        self.input_spec = kwargs.pop("input_spec", None)
         super().__init__(*args, **kwargs)
         assert self.args.use_auto_parallel
 
@@ -41,6 +43,22 @@ class SemiAutoTrainer(Trainer):
         self.optimizer = dist.shard_optimizer(self.optimizer) if not self.args.run_static_semi_auto else self.optimizer
 
         return model
+
+    def _wrap_for_static(self, model, train_dataloader):
+        strategy = None
+        if self.args.gradient_accumulation_steps > 1:
+            strategy = dist.Strategy()
+            strategy.pipeline.accumulate_steps = self.args.gradient_accumulation_steps
+
+        # TODO: convert fleet.auto.Strategy to dist.Strategy
+        # TODO: fix bugs in paddle/distributed/auto_parallel/api.py#L981 about sample_split of engine._prepare_data_spec
+        model, dist_loader = dist.to_static(
+            model, train_dataloader, self.criterion, self.optimizer, input_spec=self.input_spec, strategy=strategy
+        )
+        return model, dist_loader
+
+    def _wrap_for_amp_training(self):
+        pass
 
     def _print_trainable_numel(self):
         if not self.args.run_static_semi_auto:
@@ -114,6 +132,7 @@ class SemiAutoTrainer(Trainer):
             else:
                 loss.backward()
         else:
+
             input_ids, labels = tuple(inputs.values())
             loss = model(input_ids, labels)
 
@@ -140,9 +159,13 @@ class SemiAutoTrainer(Trainer):
         with _exec_mode_guard("dynamic"):
             super()._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, **kwargs)
 
-    def is_local_process_zero(self) -> bool:
-        """
-        Whether or not this process is the local (e.g., on one machine if training in a distributed fashion on several
-        machines) main process.
-        """
-        return True
+    # def is_local_process_zero(self) -> bool:
+    #     """
+    #     Whether or not this process is the local (e.g., on one machine if training in a distributed fashion on several
+    #     machines) main process.
+    #     """
+    #     return True
+
+    def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
+        del self.args.global_mesh
+        super()._save(output_dir, state_dict, merge_tensor_parallel)

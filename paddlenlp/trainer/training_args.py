@@ -238,6 +238,7 @@ class TrainingArguments:
               enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance.
               enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.
               enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true. It can accelerate model parallel further.
+              enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.
         pipeline_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it.
             following config is support:
@@ -577,7 +578,8 @@ class TrainingArguments:
                 "following config is support:\n"
                 "enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance. \n"
                 "enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.\n"
-                "enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true.  It can accelerate model parallel further."
+                "enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true.  It can accelerate model parallel further.\n"
+                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.\n"
             )
         },
     )
@@ -1001,6 +1003,7 @@ class TrainingArguments:
                                 "enable_mp_async_allreduce",
                                 "enable_mp_skip_c_identity",
                                 "enable_mp_fused_linear_param_grad_add",
+                                "enable_delay_scale_loss",
                             ]:
                                 raise ValueError(
                                     f"Found unknown tensor parallell config {x}, "
@@ -1151,7 +1154,8 @@ class TrainingArguments:
                 warnings.warn("`offload` is not supported NOW!")
 
             strategy = fleet.auto.Strategy()
-            if self.pipeline_parallel_degree > 1:
+            # navie-pp: pipeline_parallel_degree > 1 and gradient_accumulation_steps == 1
+            if self.pipeline_parallel_degree > 1 and self.gradient_accumulation_steps > 1:
                 pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
                 for x in pipeline_parallel_config:
                     if len(x) > 0:
@@ -1580,7 +1584,9 @@ class TrainingArguments:
             work for data parallel, tensor parallel
             not work for sharding
         """
-        if self.save_on_each_node:
+        if self.use_auto_parallel:
+            return False
+        elif self.save_on_each_node:
             return self.local_process_index == 0
         else:
             return self.process_index == 0
@@ -1596,7 +1602,9 @@ class TrainingArguments:
             work for data parallel, tensor parallel
             not work for sharding
         """
-        if self.save_on_each_node:
+        if self.use_auto_parallel:
+            return False
+        elif self.save_on_each_node:
             return self.local_process_index == 0
         else:
             if self.should_save_sharding_stage1_model:

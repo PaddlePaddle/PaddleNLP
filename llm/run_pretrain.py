@@ -265,8 +265,8 @@ def create_pretrained_dataset(
         tokens = tokens_[:, :-1]
 
         return {
-            "input_ids": tokens,
-            "labels": labels,
+            "input_ids": paddle.to_tensor(tokens),
+            "labels": paddle.to_tensor(labels),
         }
 
     if need_data:
@@ -372,8 +372,10 @@ class PretrainingTrainer(Trainer):
 
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
-    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    # Support format as "args.json --arg1 value1 --arg2 value2.”
+    # In case of conflict, command line arguments take precedence.
+    if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 

@@ -319,7 +319,7 @@ def create_pretrained_dataset(
     def print_dataset(data, mode="train"):
         logger.info(f"Sample data for {mode} mode.")
         # input_ids, loss_mask, attention_mask, position_ids, labels = data
-        input_ids = data["tokens"]
+        input_ids = data["text"]
 
         logger.info(tokenizer._decode(input_ids))
 
@@ -327,8 +327,13 @@ def create_pretrained_dataset(
 
     def _collate_data(data, stack_fn=Stack()):
 
-        labels = stack_fn([x["labels"] for x in data])
-        tokens = stack_fn([x["tokens"] for x in data])
+        # labels = stack_fn([x["labels"] for x in data])
+        # tokens = stack_fn([x["tokens"] for x in data])
+
+        tokens_ = stack_fn([x["text"] for x in data])
+
+        labels = tokens_[:, 1:]
+        tokens = tokens_[:, :-1]
 
         return {
             "input_ids": tokens,
@@ -542,8 +547,14 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
-    model = model_class.from_config(config, dtype=dtype)
+    with paddle.LazyGuard():
+        model = model_class.from_config(config, dtype=dtype)
+
     criterion = LlamaPretrainingCriterionAuto(config)
+
+    for param in model.parameters():
+        assert not param._is_initialized()
+        param.initialize()
 
     if training_args.recompute:
 
@@ -585,6 +596,24 @@ def main():
         need_data=training_args.should_load_dataset,
     )
 
+    total_train_batch_size_per_acc_step = (
+        training_args.per_device_train_batch_size * training_args.data_parallel_degree
+    )
+    total_train_batch_size = total_train_batch_size_per_acc_step * training_args.gradient_accumulation_steps
+
+    input_spec = [
+        [
+            paddle.static.InputSpec(
+                shape=[total_train_batch_size, data_args.max_seq_length], dtype="int64", name="input_ids"
+            ),
+        ],
+        [
+            paddle.static.InputSpec(
+                shape=[total_train_batch_size, data_args.max_seq_length], dtype="int64", name="labels"
+            ),
+        ],
+    ]
+
     trainer = PretrainingTrainer(
         model=model,
         criterion=criterion,
@@ -594,6 +623,7 @@ def main():
         eval_dataset=eval_dataset if training_args.do_eval else None,
         optimizers=(None, lr_scheduler),
         tokenizer=tokenizer,
+        input_spec=input_spec,
     )
 
     checkpoint = None

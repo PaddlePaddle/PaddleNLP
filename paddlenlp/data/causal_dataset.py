@@ -382,7 +382,8 @@ class GPTDataset(paddle.io.Dataset):
         if self.return_doc_ids:  # for retro preprocessing
             return {"text": np.array(sample, dtype=np.int64), "doc_ids": np.array(doc_ids, dtype=np.int64)}
         else:
-            return {"tokens": np.array(sample[:-1], dtype=np.int64), "labels": np.array(sample[1:], dtype=np.int64)}
+            return {"text": np.array(sample, dtype=np.int64)}
+            # return {"tokens": np.array(sample[:-1], dtype=np.int64), "labels": np.array(sample[1:], dtype=np.int64)}
 
 
 def _build_index_mappings(

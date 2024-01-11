@@ -77,6 +77,11 @@ from ..data import (
     default_data_collator,
 )
 from ..peft import LoRAModel, PrefixModelForCausalLM
+
+try:
+    from ..quantization.quantization_linear import QuantizationLinear
+except:
+    QuantizationLinear = None
 from ..transformers.model_utils import (
     PretrainedModel,
     _add_variant,
@@ -341,6 +346,9 @@ class Trainer:
         )
         self.add_callback(PrinterCallback if self.args.disable_tqdm else DEFAULT_PROGRESS_CALLBACK)
 
+        self._save_ckpt_func = dist.save_state_dict if self.args.use_auto_parallel else paddle.save
+        self._load_ckpt_func = dist.load_state_dict if self.args.use_auto_parallel else paddle.load
+
         if args.max_steps > 0:
             logger.info("max_steps is given, it will override any value given in num_train_epochs")
 
@@ -355,45 +363,8 @@ class Trainer:
             self.enable_autocast_context_manager = True
             self.do_grad_scaling = True if args.fp16 else False
             self.amp_dtype = "float16" if args.fp16 else "bfloat16"
-            # fix for load saved fp16 or bf16 ckpt, decorate model first.
-            if self.args.fp16_opt_level == "O2":
-                if self.amp_dtype == "bfloat16":
-                    # fix for paddlepaddle < 2.4.1, not support for bf16
-                    paddle.amp.decorate(models=model, level=self.args.fp16_opt_level, dtype=self.amp_dtype)
-                else:
-                    paddle.amp.decorate(models=model, level=self.args.fp16_opt_level)
-            # for pipeline mode and pure tensor parallel
-            if self.args.pipeline_parallel_degree > 1 or (
-                self.args.tensor_parallel_degree > 1 and self.sharding is None
-            ):
-                self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
-                if self.args.amp_master_grad:
-                    mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
-                self.scaler = fleet.distributed_scaler(self.scaler)
-            elif self.sharding is not None:
-                self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
-                if self.amp_dtype == "float16" or self.amp_dtype == "bfloat16":
-                    if ShardingOption.SHARD_OP in self.args.sharding:
-                        self.scaler = fleet.distributed_scaler(self.scaler)
-                        if self.args.amp_master_grad:
-                            mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
-                    else:
-                        # scaler for stage2 and stage3
-                        from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
-                            GroupShardedScaler,
-                        )
-
-                        if self.args.amp_master_grad:
-                            mix_precision_utils.MixPrecisionScaler(self.scaler)  # return value has no use
-
-                        self.scaler = GroupShardedScaler(self.scaler)
-                else:
-                    self.do_grad_scaling = False
-                    self.use_cuda_amp = False
-                    self.amp_dtype = None
-
-            else:
-                self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
+            self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
+            self._wrap_for_amp_training()
 
         if args.recompute:
 
@@ -451,6 +422,41 @@ class Trainer:
                first case, will remove the first member of that class found in the list of callbacks.
         """
         self.callback_handler.remove_callback(callback)
+
+    def _wrap_for_amp_training(self):
+        # fix for load saved fp16 or bf16 ckpt, decorate model first.
+        if self.args.fp16_opt_level == "O2":
+            paddle.amp.decorate(
+                models=self.model,
+                level=self.args.fp16_opt_level,
+                dtype=self.amp_dtype,
+                excluded_layers=QuantizationLinear,
+            )
+        # for pipeline mode and pure tensor parallel
+        if self.args.pipeline_parallel_degree > 1 or (self.args.tensor_parallel_degree > 1 and self.sharding is None):
+            if self.args.amp_master_grad:
+                mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
+            self.scaler = fleet.distributed_scaler(self.scaler)
+        elif self.sharding is not None:
+            if self.amp_dtype == "float16" or self.amp_dtype == "bfloat16":
+                if ShardingOption.SHARD_OP in self.args.sharding:
+                    self.scaler = fleet.distributed_scaler(self.scaler)
+                    if self.args.amp_master_grad:
+                        mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
+                else:
+                    # scaler for stage2 and stage3
+                    from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
+                        GroupShardedScaler,
+                    )
+
+                    if self.args.amp_master_grad:
+                        mix_precision_utils.MixPrecisionScaler(self.scaler)  # return value has no use
+
+                    self.scaler = GroupShardedScaler(self.scaler)
+            else:
+                self.do_grad_scaling = False
+                self.use_cuda_amp = False
+                self.amp_dtype = None
 
     def _load_from_peft_checkpoint(self, resume_from_checkpoint=None):
         """load state_dict from checkpoint, Only for PEFT Model.
@@ -916,6 +922,9 @@ class Trainer:
                     and (step + 1) == steps_in_epoch
                     or disable_accumulation
                 ):
+                    if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
+                        tr_loss /= self.args.gradient_accumulation_steps
+
                     self.timers and self.timers("forward-backward").stop()
                     # Maunally collect gradients
                     # Case 1: Use recompute and dp
@@ -1020,15 +1029,7 @@ class Trainer:
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
     def _wrap_for_static(self, model, train_dataloader):
-        strategy = None
-        if self.args.gradient_accumulation_steps > 1:
-            strategy = dist.Strategy()
-            strategy.pipeline.accumulate_steps = self.args.gradient_accumulation_steps
-
-        # TODO: convert fleet.auto.Strategy to dist.Strategy
-        # TODO: fix bugs in paddle/distributed/auto_parallel/api.py#L981 about sample_split of engine._prepare_data_spec
-        model, dist_loader = dist.to_static(model, train_dataloader, self.criterion, self.optimizer, strategy=strategy)
-        return model, dist_loader
+        pass
 
     def _print_trainable_numel(self):
         per_device_trainable_numel = sum(np.prod(p.shape) for p in self.model.parameters() if not p.stop_gradient)
@@ -1080,7 +1081,7 @@ class Trainer:
                     fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
 
     def optimizer_step(self):
-        if self.args.pipeline_parallel_degree > 1 and "enable_delay_scale_loss" in self.args.pipeline_parallel_config:
+        if self.args.pipeline_parallel_degree > 1 and self._enable_delay_scale_loss():
             for p in self.model._layers.parameters():
                 with paddle.no_grad():
                     if hasattr(p, "main_grad") and p.main_grad is not None:
@@ -1332,6 +1333,9 @@ class Trainer:
         )
 
     def _get_eval_sampler(self, eval_dataset: Dataset):
+        if eval_dataset is None or not has_length(eval_dataset):
+            return None
+
         if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
                 eval_dataset,
@@ -1673,15 +1677,13 @@ class Trainer:
         # Mixed precision training
         if training and self.do_grad_scaling:  # self.args.fp16_opt_level=="O2":
             # model, self.optimizer
-            if self.amp_dtype == "bfloat16":
-                # fix for paddlepaddle < 2.4.1, not support for bf16
-                decorated = paddle.amp.decorate(
-                    models=model, optimizers=self.optimizer, level=self.args.fp16_opt_level, dtype=self.amp_dtype
-                )
-            else:
-                decorated = paddle.amp.decorate(
-                    models=model, optimizers=self.optimizer, level=self.args.fp16_opt_level
-                )
+            decorated = paddle.amp.decorate(
+                models=model,
+                optimizers=self.optimizer,
+                level=self.args.fp16_opt_level,
+                dtype=self.amp_dtype,
+                excluded_layers=QuantizationLinear,
+            )
 
             if self.optimizer is None:
                 model = decorated
@@ -1948,6 +1950,15 @@ class Trainer:
 
         return (loss, outputs) if return_outputs else loss
 
+    def _enable_delay_scale_loss(self):
+        key = "enable_delay_scale_loss"
+        if self.args.pipeline_parallel_degree > 1:
+            return key in self.args.pipeline_parallel_config.split(" ")
+        elif self.args.tensor_parallel_degree > 1:
+            return key in self.args.tensor_parallel_config.split(" ")
+        else:
+            return False
+
     def training_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         """
         Perform a training step on a batch of inputs.
@@ -1975,7 +1986,7 @@ class Trainer:
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
 
-        if self.args.gradient_accumulation_steps > 1:
+        if self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = loss / self.args.gradient_accumulation_steps
 
         if self.do_grad_scaling:
@@ -2090,7 +2101,7 @@ class Trainer:
                         safe_serialization=True,
                     )
                 else:
-                    paddle.save(
+                    self._save_ckpt_func(
                         self.optimizer.state_dict(),
                         os.path.join(output_dir, optimizer_name),
                     )
@@ -2098,7 +2109,7 @@ class Trainer:
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
                 logger.info("Saving optimizer files.")
-                paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+                self._save_ckpt_func(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
             # FIXME: maybe only save one copy
             paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
@@ -2254,6 +2265,7 @@ class Trainer:
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
         # peft model
         if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+            print("---- 1 ----")
             self.model.save_pretrained(
                 output_dir,
                 variant=self.args.weight_name_suffix,
@@ -2261,6 +2273,7 @@ class Trainer:
                 is_main_process=self.args.should_save,
                 max_shard_size="1024GB",
             )
+            print("---- 2 ----")
         # TODO: @ZHUI unifiy unwrap_model(self.model) and self.model
         elif not isinstance(self.model, PretrainedModel):
             if isinstance(unwrap_model(self.model), PretrainedModel):
@@ -2269,6 +2282,8 @@ class Trainer:
                     state_dict, config_to_save, weight_name_suffix = self.sharding_io.manipulate_state_dict_and_config(
                         unwrap_model(self.model), merge_tensor_parallel=merge_tensor_parallel
                     )
+
+                    print("---- 3 ----")
                     unwrap_model(self.model).save_pretrained(
                         output_dir,
                         state_dict=state_dict,
@@ -2278,7 +2293,9 @@ class Trainer:
                         is_main_process=self.args.should_save,
                         max_shard_size="1024GB",
                     )
+                    print("---- 4 ----")
                 else:
+                    print("---- 5 ----")
                     unwrap_model(self.model).save_pretrained(
                         output_dir,
                         merge_tensor_parallel=merge_tensor_parallel,
@@ -2286,16 +2303,25 @@ class Trainer:
                         is_main_process=self.args.should_save,
                         max_shard_size="1024GB",
                     )
+                    print("---- 6 ----")
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
                 if merge_tensor_parallel:
                     logger.warning("Trainer.model is not a `PretrainedModel`, not suppor for merge_tensor_parallel.")
                 if state_dict is None:
                     state_dict = self.model.state_dict()
-                paddle.save(
+
+                print("---- 7 ----")
+
+                print(
+                    "path :", os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix))
+                )
+
+                self._save_ckpt_func(
                     state_dict,
                     os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix)),
                 )
+                print("---- 8 ----")
         else:
             if isinstance(self.model, PretrainedModel) and self.args.should_save_sharding_stage1_model:
                 config_to_save = None
@@ -2336,8 +2362,8 @@ class Trainer:
                 checkpoint, OPTIMIZER_NAME, self.model_wrapped
             )
         else:
+            use_unified_checkpoint = False
             if self.args.unified_checkpoint:
-                use_unified_checkpoint = False
                 if self.is_unified_checkpoint(checkpoint):
                     use_unified_checkpoint = True
                 else:

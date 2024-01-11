@@ -111,7 +111,6 @@ function _train(){
             --lora ${lora} \
             --prefix_tuning ${prefix_tuning} \
             --benchmark 1 \
-            --skip_memory_metrics 0 \
             --intokens 1 \
             --device gpu"
 
