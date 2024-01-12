@@ -189,7 +189,7 @@ def launch(args, default_params: dict = {}):
             with gr.Column(scale=1):
                 top_k = gr.Slider(
                     minimum=0,
-                    maximum=default_params.get("top_k", 20),
+                    maximum=100,
                     value=0,
                     step=1,
                     label="Top-k",
@@ -222,7 +222,7 @@ def launch(args, default_params: dict = {}):
                 default_src_length = default_params["src_length"]
                 total_length = default_params["src_length"] + default_params["max_length"]
                 src_length = create_src_slider(default_src_length, total_length)
-                max_length = create_max_slider(50, total_length)
+                max_length = create_max_slider(min(total_length - default_src_length, 50), total_length)
 
                 def src_length_change_event(src_length_value, max_length_value):
                     return create_max_slider(
