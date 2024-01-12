@@ -182,10 +182,18 @@ def get_eos_token_id(
     Returns:
         int | List[int]: eos_token_id to stop the generation
     """
-    if generation_config is None or generation_config.eos_token_id is None:
-        return tokenizer.eos_token_id
+    eos_token_ids = []
+    if tokenizer.eos_token_id is not None:
+        eos_token_ids.append(tokenizer.eos_token_id)
 
-    return generation_config.eos_token_id
+    if generation_config is not None and generation_config.eos_token_id is not None:
+        if isinstance(generation_config.eos_token_id, int):
+            eos_token_ids.append(generation_config.eos_token_id)
+        else:
+            eos_token_ids.extend(generation_config.eos_token_id)
+
+    eos_token_ids_dict = {str(item): item for item in eos_token_ids}
+    return list(eos_token_ids_dict.values())
 
 
 class BasePredictor:
@@ -1460,8 +1468,18 @@ def predict():
         with open(model_args.data_file, "r", encoding="utf-8") as f:
             for line in f:
                 example = json.loads(line)
-                source_texts.append(example["src"])
-                target_texts.append(example["tgt"])
+                if isinstance(example["src"], str) or predictor.tokenizer.chat_template is None:
+                    if isinstance(example["src"], str):
+                        source_texts.append(example["src"])
+                        target_texts.append(example["tgt"])
+                    else:
+                        # load multi-rounds dataset
+                        source_texts.append(example["src"][0])
+                        target_texts.append(example["tgt"][0])
+                else:
+                    source_texts.append(list(zip(example["src"], example["tgt"])))
+                    target_texts.append("")
+
     else:
         source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
         target_texts = ["", ""]
