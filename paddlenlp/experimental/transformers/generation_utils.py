@@ -354,7 +354,7 @@ class GenerationInferenceModel(GenerationMixin):
                 "real_time_save.temp_ids",
                 self.config.tensor_parallel_rank,
             )
-            print("next_tokens", next_tokens)
+
             return next_tokens, model_kwargs
 
         # encoder
