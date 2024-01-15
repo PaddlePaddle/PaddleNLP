@@ -716,7 +716,6 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
             if key.startswith(start_prefix):
                 state_dict[key.replace(start_prefix, "")] = state_dict.pop(key)
 
-    error_msgs = []
     expected_place = paddle.framework._current_expected_place()
     for key, value in model_to_load.state_dict().items():
         if key in state_dict:
@@ -741,12 +740,9 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
             value.set_value(value_state_dict)
             # del value_state_dict
 
-        else:
-            error_msgs.append(f"{key} is not found in the provided dict.")
-
     del state_dict
 
-    return error_msgs
+    return []
 
 
 def _convert_state_dict_dtype_and_shape(state_dict, model_to_load):
