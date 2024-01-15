@@ -160,18 +160,18 @@ def scaled_dot_product_attention(
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
-        if attention_cnt == 0:
-            print(f"q_{attention_cnt} shape: {query_states.shape} md5sum: {query_states._md5sum()}")
+        # if attention_cnt == 0:
+        #     print(f"q_{attention_cnt} shape: {query_states.shape} md5sum: {query_states._md5sum()}")
 
         # matmul and devide by sqrt(head_dim)
         attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
 
-        if attention_cnt == 0:
-            print(f"attn_weights_{attention_cnt} shape: {attn_weights.shape} local_shape: {attn_weights._local_shape} md5sum: {attn_weights._md5sum()}")
+        # if attention_cnt == 0:
+        #     print(f"attn_weights_{attention_cnt} shape: {attn_weights.shape} local_shape: {attn_weights._local_shape} md5sum: {attn_weights._md5sum()}")
 
         # then add alibi bias
         if alibi is not None:
-            print("with alibi")
+            # print("with alibi")
             alibi = alibi.reshape([bsz, num_heads, 1, -1])
             attn_weights = attn_weights + alibi
 
@@ -195,8 +195,8 @@ def scaled_dot_product_attention(
 
         attn_weights = attn_weights + attention_mask
 
-        if attention_cnt == 0:
-            print(f"attn_weights_after_add_{attention_cnt} shape: {attn_weights.shape} local_shape: {attn_weights._local_shape} md5sum: {attn_weights._md5sum()}")
+        # if attention_cnt == 0:
+        #     print(f"attn_weights_after_add_{attention_cnt} shape: {attn_weights.shape} local_shape: {attn_weights._local_shape} md5sum: {attn_weights._md5sum()}")
 
         if not paddle.in_dynamic_mode():
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32")#.astype(query_states.dtype)
@@ -205,13 +205,13 @@ def scaled_dot_product_attention(
             #     attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32")#.astype(query_states.dtype)
 
-        if attention_cnt == 0:
-            print(f"attn_weights_after_soft_{attention_cnt} shape: {attn_weights.shape} local_shape: {attn_weights._local_shape} md5: {attn_weights._md5sum()}")
+        # if attention_cnt == 0:
+        #     print(f"attn_weights_after_soft_{attention_cnt} shape: {attn_weights.shape} local_shape: {attn_weights._local_shape} md5: {attn_weights._md5sum()}")
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
         attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
-        print(f"attn_output_{attention_cnt} shape: {attn_output.shape} md5sum: {attn_output._md5sum()}")
+        # print(f"attn_output_{attention_cnt} shape: {attn_output.shape} md5sum: {attn_output._md5sum()}")
         attention_cnt = attention_cnt+1
         return (attn_output, attn_weights) if output_attentions else attn_output
 
@@ -246,9 +246,9 @@ class LlamaRMSNormAuto(nn.Layer):
             hidden_states = paddle.cast(hidden_states, self.weight.dtype)
 
         global norm_cnt
-        print(f"layernorm_before_scale_{norm_cnt} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()}")    
+        # print(f"layernorm_before_scale_{norm_cnt} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()}")    
         hidden_states = hidden_states * self.weight
-        print(f"layernorm_after_scale_{norm_cnt} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()}")    
+        # print(f"layernorm_after_scale_{norm_cnt} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()}")    
         norm_cnt = norm_cnt + 1    
         return hidden_states 
 
@@ -570,9 +570,9 @@ class LlamaDecoderLayerAuto(nn.Layer):
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
 
-        if self.idx == 0:
-            print(f"decoder input: {residual.dist_attr}")
-            print(f"input_layernorm_{self.idx} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()}, dist_attr: {hidden_states.dist_attr}")
+        # if self.idx == 0:
+        #     print(f"decoder input: {residual.dist_attr}")
+        #     print(f"input_layernorm_{self.idx} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()}, dist_attr: {hidden_states.dist_attr}")
 
         # Self Attention
         has_gradient = not hidden_states.stop_gradient
@@ -616,20 +616,20 @@ class LlamaDecoderLayerAuto(nn.Layer):
 
         hidden_states = residual + hidden_states
 
-        if self.idx == 0:
-            print(f"att_{self.idx} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()} dist_attr: {hidden_states.dist_attr}")
+        # if self.idx == 0:
+        #     print(f"att_{self.idx} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()} dist_attr: {hidden_states.dist_attr}")
 
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        if self.idx == 0:
-            print(f"post_attention_layernorm_{self.idx} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()} dist_attr: {hidden_states.dist_attr}")
+        # if self.idx == 0:
+        #     print(f"post_attention_layernorm_{self.idx} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()} dist_attr: {hidden_states.dist_attr}")
 
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
 
-        if self.idx == 0:
-            print(f"mlp_{self.idx} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()} dist_attr: {hidden_states.dist_attr}")
+        # if self.idx == 0:
+        #     print(f"mlp_{self.idx} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()} dist_attr: {hidden_states.dist_attr}")
         
         outputs = (hidden_states,)
 
@@ -864,7 +864,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         **kwargs,
     ):
         #print(f"inputs_ids shape: {input_ids.shape} sum: {input_ids.sum().numpy()}")
-        print(f"inputs_ids: {input_ids.dist_attr}")
+        # print(f"inputs_ids: {input_ids.dist_attr}")
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -897,9 +897,9 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
             m = get_mesh()
-            print(m.mesh, m.dim_names)
+            # print(m.mesh, m.dim_names)
             inputs_embeds = dist.reshard(inputs_embeds, get_mesh(), [dist.Shard(0), dist.Replicate()])
-        print(f"inputs_embeds : {inputs_embeds.dist_attr}")
+        # print(f"inputs_embeds : {inputs_embeds.dist_attr}")
 
         # embed positions
         if attention_mask is None:
@@ -939,7 +939,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
             has_gradient = not hidden_states.stop_gradient
             if pre_ipp != decoder_layer.ipp and decoder_layer.ipp != None:
-                print(f"hidden_states reshard {pre_ipp} {decoder_layer.ipp}")
+                # print(f"hidden_states reshard {pre_ipp} {decoder_layer.ipp}")
                 hidden_states = dist.reshard(hidden_states, get_mesh(decoder_layer.ipp), [dist.Replicate(), dist.Replicate()])
             #fleet.auto.shard_tensor(hidden_states, *get_dist_attr(["dp", None, None], decoder_layer.ipp))
 
@@ -984,7 +984,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
-            print(f"hidden_states {idx}. shape: {hidden_states.shape} md5sum : {hidden_states._md5sum()}")  
+            # print(f"hidden_states {idx}. shape: {hidden_states.shape} md5sum : {hidden_states._md5sum()}")  
         hidden_states = self.norm(hidden_states)
 
         # add hidden states from the last decoder layer
@@ -1037,11 +1037,11 @@ class LlamaPretrainingCriterionAuto(paddle.nn.Layer):
         # skip ignore_index which loss == 0
         # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
         # TODO: solve the issue of conditional block
-        print(f"masked_lm_loss_{loss_cnt} shape: {masked_lm_loss.shape} md5sum: {masked_lm_loss._md5sum()}")
+        # print(f"masked_lm_loss_{loss_cnt} shape: {masked_lm_loss.shape} md5sum: {masked_lm_loss._md5sum()}")
         masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
         loss = paddle.mean(masked_lm_loss)
-        if loss_cnt ==0:
-            print(f"loss_{loss_cnt} shape: {loss.shape} md5sum: {loss._md5sum()}")
+        # if loss_cnt ==0:
+        #     print(f"loss_{loss_cnt} shape: {loss.shape} md5sum: {loss._md5sum()}")
             #masked_lm_loss
         loss_cnt = loss_cnt + 1        
         return loss
@@ -1080,9 +1080,13 @@ class LlamaForCausalLMAuto(LlamaPretrainedModelAuto):
         #    self.lm_head = LlamaLMHeadAuto(config)
         #    self.criterion = LlamaPretrainingCriterionAuto(config)
 
+        print("============== Before LLaMa Init Model: memory_reserved: {} GB".format(paddle.device.cuda.memory_reserved() / (2 ** 30)))
+        print("============== Before LLaMa Init Model: max_memory_reserved: {} GB".format(paddle.device.cuda.max_memory_reserved() / (2 ** 30)))
         self.llama = LlamaModelAuto(config)
         self.lm_head = LlamaLMHeadAuto(config)
         self.criterion = LlamaPretrainingCriterionAuto(config)
+        print("============== After LLaMa Init Model: memory_reserved: {} GB".format(paddle.device.cuda.memory_reserved() / (2 ** 30)))
+        print("============== After LLaMa Init Model: max_memory_reserved: {} GB".format(paddle.device.cuda.max_memory_reserved() / (2 ** 30)))
 
     def get_input_embeddings(self):
         return self.llama.embed_tokens
@@ -1170,6 +1174,8 @@ class LlamaForCausalLMAuto(LlamaPretrainedModelAuto):
         output_hidden_states=None,
         return_dict=None,
     ):
+        print("============== Before LLaMa Model Forward: memory_reserved: {} GB".format(paddle.device.cuda.memory_reserved() / (2 ** 30)))
+        print("============== Before LLaMa Model Forward: max_memory_reserved: {} GB".format(paddle.device.cuda.max_memory_reserved() / (2 ** 30)))
         input_ids.stop_gradient = True
 
         m = get_mesh(0)
@@ -1202,9 +1208,9 @@ class LlamaForCausalLMAuto(LlamaPretrainedModelAuto):
         tensor_parallel_output = (
             self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         )
-        print(f"llamaout shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()}")
+        # print(f"llamaout shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()}")
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
-        print(f"logits shape: {logits.shape} md5sum: {logits._md5sum()}")
+        # print(f"logits shape: {logits.shape} md5sum: {logits._md5sum()}")
 
         loss = None
         if labels is not None:
@@ -1215,12 +1221,17 @@ class LlamaForCausalLMAuto(LlamaPretrainedModelAuto):
 
         if not return_dict:
             output = (logits,) + outputs[1:]
+            print("============== After LLaMa Model Forward: memory_reserved: {} GB".format(paddle.device.cuda.memory_reserved() / (2 ** 30)))
+            print("============== After LLaMa Model Forward: max_memory_reserved: {} GB".format(paddle.device.cuda.max_memory_reserved() / (2 ** 30)))
             return (loss,) + output if loss is not None else output
 
-        return CausalLMOutputWithCrossAttentions(
+        result = CausalLMOutputWithCrossAttentions(
             loss=loss,
             logits=logits,
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+        print("============== After LLaMa Model Forward: memory_reserved: {} GB".format(paddle.device.cuda.memory_reserved() / (2 ** 30)))
+        print("============== After LLaMa Model Forward: max_memory_reserved: {} GB".format(paddle.device.cuda.max_memory_reserved() / (2 ** 30)))
+        return result

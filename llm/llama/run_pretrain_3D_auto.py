@@ -18,6 +18,7 @@ import os
 import random
 import sys
 import types
+import time
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -31,6 +32,7 @@ from paddle.distributed import fleet
 from paddle.io import DataLoader, DistributedBatchSampler
 
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
+from paddlenlp.trainer.trainer_utils import speed_metrics
 from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
@@ -204,10 +206,25 @@ class AutoClipGradByGlobalNorm(paddle.nn.ClipGradByGlobalNorm):
         super().__init__(clip_norm)
         pp_group = None
         if "pp" in fleet.auto.get_mesh().dim_names:
-            global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("dp").mesh
+            if "dp" in fleet.auto.get_mesh().dim_names:
+                global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("dp").mesh
+            elif "mp" in fleet.auto.get_mesh().dim_names:
+                global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("mp").mesh
+            else:
+                global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("pp").mesh
+                ranks = global_mesh[:]
+                group = dist.new_group(ranks)
+                if dist.get_rank() in ranks:
+                    pp_group = group
+                self.pp_group = pp_group
+                return
+
             mesh_shape = global_mesh.shape
             for id in range(mesh_shape[0]):
-                dp0_mesh = global_mesh[id]
+                if len(mesh_shape) > 2:
+                    dp0_mesh = global_mesh[id]
+                else:
+                    dp0_mesh = global_mesh
                 for i in range(dp0_mesh.shape[-1]):
                     ranks = dp0_mesh[:, i]
                     print("pp ranks: ", ranks)
@@ -224,7 +241,7 @@ class AutoClipGradByGlobalNorm(paddle.nn.ClipGradByGlobalNorm):
         sum_square_list_fp16 = []
         sum_square_list_fp32 = []
         for p, g in params_grads:
-            if g is None:
+            if g is None or not g._is_initialized():
                 continue
             if getattr(p, "need_clip", True) is False:
                 continue
@@ -249,6 +266,9 @@ class AutoClipGradByGlobalNorm(paddle.nn.ClipGradByGlobalNorm):
             return params_grads
 
         def async_add_n(var_list):
+            # for var in var_list:
+            #     print("async_add_n, var: ", var, ", initialized: ", var._is_initialized(), "****" * 40)
+            
             return paddle.stack(var_list).sum()
 
         sum_dtype = "float64" if len(sum_square_list) > 0 else "float32"
@@ -296,7 +316,7 @@ class AutoClipGradByGlobalNorm(paddle.nn.ClipGradByGlobalNorm):
             clip_var = paddle.divide(x=max_global_norm, y=global_norm_var)
 
         for p, g in params_grads:
-            if g is None:
+            if g is None or not g._is_initialized():
                 continue
             if getattr(p, "need_clip", True) is False:
                 params_and_grads.append((p, g))
@@ -387,6 +407,12 @@ def create_pretrained_dataset(
 
     return train_dataset, valid_dataset, test_dataset, _collate_data
 
+def print_memory_usage(message=""):
+    mem_alloc = paddle.device.cuda.memory_allocated() / (2 ** 30)
+    max_mem_alloc = paddle.device.cuda.max_memory_allocated() / (2 ** 30)
+    mem_reserve = paddle.device.cuda.memory_reserved() / (2 ** 30)
+    max_mem_reserve = paddle.device.cuda.max_memory_reserved() / (2 ** 30)
+    print("============== {}: allocated: {} GB, max_allocated: {} GB, reserved: {} GB, max_reserved: {} GB,".format(message, mem_alloc, max_mem_alloc, mem_reserve, max_mem_reserve))
 
 def get_train_data_file(args):
     if len(args.input_dir.split()) > 1:
@@ -497,7 +523,13 @@ def get_mesh(pp_idx=0):
 
 def shard_fn(layer, mesh_idx, placements):
     paran_name = layer.weight.name
+
+    print_memory_usage("Before Shard Parameter {}".format(paran_name))
     layer.weight = dist.shard_tensor(layer.weight, get_mesh(mesh_idx), placements)
+
+    print_memory_usage("After Shard Parameter {}".format(paran_name))
+    paddle.device.cuda.empty_cache()
+    print_memory_usage("After Shard Parameter {} and empty cache".format(paran_name))
     layer.weight.name = paran_name
 
 
@@ -555,6 +587,7 @@ def main():
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
 
+    # config.num_hidden_layers = 8
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
@@ -572,6 +605,10 @@ def main():
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
 
+    config.dp_degree = training_args.data_parallel_degree
+    config.mp_degree = training_args.tensor_parallel_degree
+    config.pp_degree = training_args.pipeline_parallel_degree
+
     print("Final pre-training config:", config)
 
     # Set the dtype for loading model
@@ -583,10 +620,17 @@ def main():
             dtype = "bfloat16"
 
     print("======M M M M======", model_class)
+    print_memory_usage("Before Init Whole LLaMa Model")
     model = model_class._from_config(config, dtype=dtype)
+    print_memory_usage("After Init Whole LLaMa Model")
     # load model
-    load_model(model)
+    # load_model(model)
     shard_model(model)
+    print_memory_usage("After Shard Whole LLaMa Model")
+
+    # for name, param in model.named_paramters:
+    #     print(f"name: {name}, param initialized: {param._is_initialized()}")
+    
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
@@ -659,25 +703,34 @@ def main():
     )
 
     global_step = 1
+    global_step_last_logged = global_step
     tr_loss = float(0)
 
     # hack: create dp group for distributed input data to align dygraph parallel loss.
     dp_group = None
-    global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("pp").mesh
-    mesh_shape = global_mesh.shape
-    for id in range(mesh_shape[0]):
-        pp_mesh = global_mesh[id]
-        for i in range(pp_mesh.shape[-1]):
-            ranks = pp_mesh[:, i]
-            print("dp ranks: ", ranks)
-            group = dist.new_group(ranks)
-            if dist.get_rank() in ranks:
-                dp_group = group
-    assert dp_group is not None
+    if "dp" in fleet.auto.get_mesh().dim_names:
+        global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("pp").mesh 
+    # global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("pp").mesh
+        global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("pp").mesh 
+        mesh_shape = global_mesh.shape
+        for id in range(mesh_shape[0]):
+            if len(mesh_shape) > 2:
+                pp_mesh = global_mesh[id]
+            else:
+                pp_mesh = global_mesh
+            # pp_mesh = global_mesh[id]
+            for i in range(pp_mesh.shape[-1]):
+                ranks = pp_mesh[:, i]
+                print("dp ranks: ", ranks)
+                group = dist.new_group(ranks)
+                if dist.get_rank() in ranks:
+                    dp_group = group
+    # assert dp_group is not None
 
     model.train()
     optimizer = dist.shard_optimizer(optimizer)
     for epoch_idx in range(num_train_epochs):
+        start_time_last_logged = time.time()
         for step, inputs in enumerate(train_dataloader):
             input_ids, labels = inputs["input_ids"], inputs["labels"]
 
@@ -690,12 +743,22 @@ def main():
                 res = []
                 dist.all_gather(res, paddle.Tensor(input_ids, place=paddle.CUDAPlace(cur_rank)), group=dp_group)
                 input_ids = paddle.concat(res)
-                input_ids = dist.shard_tensor(input_ids, get_mesh(), [dist.Shard(0), dist.Replicate()])
+
+                if config.dp_degree == 1 and config.mp_degree == 1:
+                    placements = [dist.Replicate()]
+                elif config.dp_degree == 1:
+                    placements = [dist.Replicate()]
+                elif config.mp_degree == 1:
+                    placements = [dist.Shard(0)]
+                else:
+                    placements = [dist.Shard(0), dist.Replicate()]
+
+                input_ids = dist.shard_tensor(input_ids, get_mesh(), placements)
 
                 res = []
                 dist.all_gather(res, paddle.Tensor(labels, place=paddle.CUDAPlace(cur_rank)), group=dp_group)
                 labels = paddle.concat(res)
-                labels = dist.shard_tensor(labels, get_mesh(-1), [dist.Shard(0), dist.Replicate()])
+                labels = dist.shard_tensor(labels, get_mesh(-1), placements)
 
             res = model(input_ids, labels=labels)
 
@@ -715,13 +778,38 @@ def main():
                 lr_scheduler.step()
                 # print_param(model)
                 optimizer.clear_grad()
-                print(
-                    f"global_step {global_step // training_args.gradient_accumulation_steps};input id {input_id}; label {label}; loss {tr_loss.numpy()}  lr: {optimizer.get_lr()}"
-                )
-                tr_loss = 0
+                # print(
+                #     f"global_step {global_step // training_args.gradient_accumulation_steps};input id {input_id}; label {label}; loss {tr_loss.numpy()}  lr: {optimizer.get_lr()}"
+                # )
+                # tr_loss = 0
 
-            if global_step // training_args.gradient_accumulation_steps >= 1:
-                sys.exit(0)
+                if (global_step % training_args.gradient_accumulation_steps) % training_args.logging_steps == 0:
+                    num_steps = (global_step - global_step_last_logged)
+                    total_train_batch_size = training_args.per_device_train_batch_size * training_args.data_parallel_degree
+                    logs = {}
+                    logs["loss"] = tr_loss.numpy()
+                    logs["learning_rate"] = float("{0:.3e}".format(optimizer.get_lr()))
+                    logs["global_step"] = int(global_step) // training_args.gradient_accumulation_steps
+                    logs.update(
+                        speed_metrics(
+                            split="interval",
+                            start_time=start_time_last_logged,
+                            num_samples=total_train_batch_size * (global_step - global_step_last_logged),
+                            num_steps=num_steps,
+                        )
+                    )
+                    logger.info(", ".join(f"{k}: {v}" for k, v in logs.items()))
+
+                    global_step_last_logged = global_step
+                    start_time_last_logged = time.time()
+                    # tr_loss = float(0)
+
+                if (global_step // training_args.gradient_accumulation_steps) >= training_args.max_steps:
+                    break
+
+
+            # if global_step // training_args.gradient_accumulation_steps >= 1:
+            #     sys.exit(0)
 
             global_step += 1
 
@@ -779,7 +867,14 @@ def shard_model(model):
         # print(f"name {name},pp_stage {pp_stage}==>", type(layer))
         if "embed_tokens" in name:
             # embedding only support column split now. it will update in the future
-            shard_fn(layer, 0, [dist.Replicate(), dist.Shard(1)])
+            if model.config.dp_degree == 1 and model.config.mp_degree == 1:
+                shard_fn(layer, pp_stage, [dist.Replicate()])
+            elif model.config.mp_degree == 1:
+                shard_fn(layer, pp_stage, [dist.Replicate()])
+            elif model.config.dp_degree == 1:
+                shard_fn(layer, pp_stage, [dist.Shard(1)])
+            else:
+                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(1)])
         for n in [
             "self_attn.q_proj",
             "self_attn.k_proj",
@@ -790,19 +885,50 @@ def shard_model(model):
             "gate_up_fused_proj",
         ]:
             if n in name:
-                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(1)])
+                if model.config.dp_degree == 1 and model.config.mp_degree == 1:
+                    shard_fn(layer, pp_stage, [dist.Replicate()])
+                elif model.config.mp_degree == 1:
+                    shard_fn(layer, pp_stage, [dist.Replicate()])
+                elif model.config.dp_degree == 1:
+                    shard_fn(layer, pp_stage, [dist.Shard(1)])
+                else:
+                    shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(1)])
                 break
         for n in ["self_attn.o_proj", "down_proj"]:
             if n in name:
-                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(0)])
+                if model.config.dp_degree == 1 and model.config.mp_degree == 1:
+                    shard_fn(layer, pp_stage, [dist.Replicate()])
+                elif model.config.mp_degree == 1:
+                    shard_fn(layer, pp_stage, [dist.Replicate()])
+                elif model.config.dp_degree == 1:
+                    shard_fn(layer, pp_stage, [dist.Shard(0)])
+                else:
+                    shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(0)])
                 break
         if "lm_head" in name:
-            shard_fn(layer, -1, [dist.Replicate(), dist.Shard(1)])
+            if model.config.dp_degree == 1 and model.config.mp_degree == 1:
+                shard_fn(layer, pp_stage, [dist.Replicate()])
+            elif model.config.mp_degree == 1:
+                shard_fn(layer, pp_stage, [dist.Replicate()])
+            elif model.config.dp_degree == 1:
+                shard_fn(layer, pp_stage, [dist.Shard(1)])
+            else:
+                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(1)])
+        if "layernorm" in name:
+            shard_fn(layer, pp_stage, [dist.Replicate()])
+            # if model.config.dp_degree == 1 and model.config.mp_degree == 1:
+            #     shard_fn(layer, pp_stage, [dist.Replicate()])
+            # elif model.config.mp_degree == 1:
+            #     shard_fn(layer, pp_stage, [dist.Replicate()])
+            # elif model.config.dp_degree == 1:
+            #     shard_fn(layer, pp_stage, [dist.Shard(1)])
+            # else:
+            #     shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(1)])
 
 
 def load_model(model):
     model_state_dict = model.state_dict()
-    state_dict = paddle.load("hand/all.pdparams")
+    state_dict = paddle.load("hand_3d/all.pdparams")
     tmp = OrderedDict()
     (tmp, state_dict) = (state_dict, tmp)
     for (k, v) in tmp.items():
@@ -819,6 +945,9 @@ def load_model(model):
     for (k, v) in state_dict.items():
         assert k in model_state_dict
         print(f"{k}=>{v.shape}")
+    # del state_dict
+    # del model_state_dict
+    # paddle.device.cuda.empty_cache()
 
 
 def print_grad(model):

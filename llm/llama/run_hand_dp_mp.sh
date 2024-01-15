@@ -31,9 +31,26 @@ export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
 export FLAGS_embedding_deterministic=1        
 export FLAGS_cudnn_deterministic=1
 export NVIDIA_TF32_OVERRIDE=0
+
+rm -rf hand_dp$1_mp$2_pp$3
+
+gpus=""
+num=$(expr $1 \* $2 \* $3 - 1)
+
+train_bsz=$4
+acc_steps=$5
+eval_bsz=$(expr $4 \* $5)
+
+# for((i=1;i<=$num;i++))
+for i in $(seq 0 $num)
+do
+    gpu="${gpu},${i}"
+done
+gpu=${gpu:1}
+
 python -u  -m paddle.distributed.launch \
     --gpus "0, 1,2,3,4,5,6,7" \
-    --log_dir "hand_load" \
+    --log_dir "hand_dp$1_mp$2_pp$3" \
     run_pretrain_hand.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
@@ -42,21 +59,21 @@ python -u  -m paddle.distributed.launch \
     --output_dir "output/$task_name" \
     --split 949,50,1 \
     --max_seq_length 2048 \
-    --per_device_train_batch_size 2 \
-    --per_device_eval_batch_size 4 \
-    --gradient_accumulation_steps 1 \
+    --per_device_train_batch_size $train_bsz \
+    --per_device_eval_batch_size $eval_bsz \
+    --gradient_accumulation_steps $acc_steps \
     --use_flash_attention 0 \
     --use_fused_rms_norm 0 \
     --fp16 0 \
     --fp16_opt_level "O2"  \
     --scale_loss 1024 \
-    --pipeline_parallel_degree 1 \
-    --tensor_parallel_degree 4 \
+    --pipeline_parallel_degree $3 \
+    --tensor_parallel_degree $2 \
     --sharding_parallel_degree 1 \
     --sharding "stage1" \
     --learning_rate 0.0001 \
     --min_learning_rate 0.00001 \
-    --max_steps 10 \
+    --max_steps 25 \
     --save_steps 5000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
@@ -67,9 +84,10 @@ python -u  -m paddle.distributed.launch \
     --eval_steps 1000 \
     --report_to "visualdl" \
     --disable_tqdm true \
-    --continue_training 0\
+    --continue_training 0 \
     --recompute 1 \
     --do_train \
     --do_eval \
     --device "gpu" \
     --data_impl "mmap" \
+    --max_grad_norm 1.0 2>&1 | tee debug_hand_dp$1_mp$2_pp$3.log

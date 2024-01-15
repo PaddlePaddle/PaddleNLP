@@ -45,6 +45,13 @@ __all__ = [
     "LlamaForCausalLMPipe",
 ]
 
+def print_memory_usage(message=""):
+    mem_alloc = paddle.device.cuda.memory_allocated() / (2 ** 30)
+    max_mem_alloc = paddle.device.cuda.max_memory_allocated() / (2 ** 30)
+    mem_reserve = paddle.device.cuda.memory_reserved() / (2 ** 30)
+    max_mem_reserve = paddle.device.cuda.max_memory_reserved() / (2 ** 30)
+    print("============== {}: allocated: {} GB, max_allocated: {} GB, reserved: {} GB, max_reserved: {} GB,".format(message, mem_alloc, max_mem_alloc, mem_reserve, max_mem_reserve))
+
 
 def parse_args(args):
     if isinstance(args, tuple):
@@ -120,15 +127,15 @@ class LlamaEmbeddingPipe(nn.Layer):
         #print(f"inputs_ids shape: {input_ids_tmp.shape} md5sum: {input_ids_tmp._md5sum()}")
         input_embeds = self.embed_tokens(input_ids)
         input_embeds_tmp = concat_dp(input_embeds)
-        print(f"inputs_embeds shape: {input_embeds_tmp.shape} md5sum: {input_embeds_tmp._md5sum()}")
-        if self.sequence_parallel:
-            from paddlenlp.transformers import ScatterOp
+        # print(f"inputs_embeds shape: {input_embeds_tmp.shape} md5sum: {input_embeds_tmp._md5sum()}")
+        # if self.sequence_parallel:
+        #     from paddlenlp.transformers import ScatterOp
 
-            # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
-            bs, seq_len, hidden_size = input_embeds.shape
-            input_embeds = paddle.reshape_(input_embeds, [bs * seq_len, hidden_size])
-            # [seq_len * bs / n, num_head * head_dim] (n is mp parallelism)
-            input_embeds = ScatterOp.apply(input_embeds)
+        #     # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
+        #     bs, seq_len, hidden_size = input_embeds.shape
+        #     input_embeds = paddle.reshape_(input_embeds, [bs * seq_len, hidden_size])
+        #     # [seq_len * bs / n, num_head * head_dim] (n is mp parallelism)
+        #     input_embeds = ScatterOp.apply(input_embeds)
 
         batch_size, seq_length = input_ids.shape
         alibi = None
@@ -240,6 +247,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         config.tensor_parallel_degree = tensor_parallel_degree
         config.tensor_parallel_rank = tensor_parallel_rank
 
+        print_memory_usage("Before LLaMa Init Model")
         self.add_sequential_layer(LayerDesc(LlamaEmbeddingPipe, config=config), "llama")
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
@@ -271,6 +279,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         )
         # You should call init here, since there is a  diamond inheritance problem
         self.apply(self._init_weights)
+        print_memory_usage("After LLaMa Init Model")
         # DON'T init PipelinePretrainedModel
         # PipelinePretrainedModel.__init__(self.super(), config=config)
 

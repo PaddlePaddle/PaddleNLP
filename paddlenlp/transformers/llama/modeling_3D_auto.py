@@ -70,6 +70,13 @@ __all__ = [
     "LlamaForCausalLM3DAuto",
 ]
 
+def print_memory_usage(message=""):
+    mem_alloc = paddle.device.cuda.memory_allocated() / (2 ** 30)
+    max_mem_alloc = paddle.device.cuda.max_memory_allocated() / (2 ** 30)
+    mem_reserve = paddle.device.cuda.memory_reserved() / (2 ** 30)
+    max_mem_reserve = paddle.device.cuda.max_memory_reserved() / (2 ** 30)
+    print("============== {}: allocated: {} GB, max_allocated: {} GB, reserved: {} GB, max_reserved: {} GB,".format(message, mem_alloc, max_mem_alloc, mem_reserve, max_mem_reserve))
+
 
 def get_mesh(pp_idx=0):
     mesh = fleet.auto.get_mesh()
@@ -95,6 +102,7 @@ def _make_causal_mask(input_ids_shape, past_key_values_length):
 
 
 attention_cnt = 0
+local_steps = 0
 
 
 def scaled_dot_product_attention(
@@ -437,6 +445,28 @@ class LlamaAttentionAuto(nn.Layer):
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
         # print(f"attention input md5sum {hidden_states._md5sum()}")
+
+        # global local_steps
+        # print("============== Steps {}, Before Attention {} Forward: memory_reserved: {} GB".format(local_steps, self.ipp, (paddle.device.cuda.memory_reserved() / (2 ** 30))))
+        # print("============== Steps {}, Before Attention {} Forward: max_memory_reserved: {} GB".format(local_steps, self.ipp, (paddle.device.cuda.max_memory_reserved() / (2 ** 30))))
+        # print("============== self.q_proj.weight.is_initialized: ", self.q_proj.weight._is_initialized())
+        # print("============== self.k_proj.weight.is_initialized: ", self.k_proj.weight._is_initialized())
+        # print("============== self.v_proj.weight.is_initialized: ", self.v_proj.weight._is_initialized())
+        if self.config.sequence_parallel:
+            if self.config.dp_degree == 1 and self.config.mp_degree == 1:
+                placements = [dist.Replicate()]
+            elif self.config.dp_degree == 1:
+                placements = [dist.Replicate()]
+            elif self.config.mp_degree == 1:
+                placements = [dist.Shard(1)]
+            else:
+                placements = [dist.Shard(1), dist.Replicate()]
+            hidden_states = dist.reshard(
+                hidden_states,
+                get_mesh(self.ipp),
+                placements,
+            )
+
         if self.fuse_attention_qkv:
             target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
             mix_layer = self.qkv_proj(hidden_states)
@@ -450,13 +480,18 @@ class LlamaAttentionAuto(nn.Layer):
             key_states = self.k_proj(hidden_states).reshape(shape=target_key_value_shape)
             value_states = self.v_proj(hidden_states).reshape(shape=target_key_value_shape)
 
+        if self.config.sequence_parallel:
+            query_states = paddle.transpose(query_states, [1, 0, 2, 3])
+            key_states = paddle.transpose(key_states, [1, 0, 2, 3])
+            value_states = paddle.transpose(value_states, [1, 0, 2, 3])
+            
         kv_seq_len = key_states.shape[-3]
 
         if past_key_value is not None:
             kv_seq_len += past_key_value[0].shape[-3]
 
         if self.config.rope:
-            print("rope")
+            # print("rope")
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
@@ -526,6 +561,20 @@ class LlamaAttentionAuto(nn.Layer):
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
         attn_output = self.o_proj(attn_output)
+        if self.config.sequence_parallel:
+            attn_output = paddle.transpose(attn_output, [1, 0, 2])
+            if self.config.dp_degree == 1 and self.config.mp_degree == 1:
+                placements = [dist.Replicate()]
+            elif self.config.dp_degree == 1:
+                placements = [dist.Shard(0)]
+            elif self.config.mp_degree == 1:
+                placements = [dist.Shard(1)]
+            else:
+                placements = [dist.Shard(1), dist.Shard(0)]
+
+            attn_output = dist.reshard(
+                attn_output, get_mesh(self.ipp), placements
+            )
 
         if not output_attentions:
             attn_weights = None
@@ -540,7 +589,8 @@ class LlamaAttentionAuto(nn.Layer):
 
         if type(outputs) is tuple and len(outputs) == 1:
             outputs = outputs[0]
-
+        # print("============== Steps {}, After Attention {} Forward: memory_reserved: {} GB".format(local_steps, self.ipp, (paddle.device.cuda.memory_reserved() / (2 ** 30))))
+        # print("============== Steps {}, After Attention {} Forward: max_memory_reserved: {} GB".format(local_steps, self.ipp, (paddle.device.cuda.max_memory_reserved() / (2 ** 30))))
         return outputs
 
 
@@ -593,6 +643,21 @@ class LlamaDecoderLayerAuto(nn.Layer):
         if self.idx == 0:
             print(f"input_layernorm_{self.idx} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()}")
         """
+        if self.config.sequence_parallel:
+            if self.config.dp_degree == 1 and self.config.mp_degree == 1:
+                placements = [dist.Replicate()]
+            elif self.config.dp_degree == 1:
+                placements = [dist.Replicate()]
+            elif self.config.mp_degree == 1:
+                placements = [dist.Shard(1)]
+            else:
+                placements = [dist.Shard(1), dist.Replicate()]
+
+            hidden_states = dist.reshard(
+                hidden_states,
+                get_mesh(self.ipp),
+                placements,
+            )
         # Self Attention
         has_gradient = not hidden_states.stop_gradient
         if (
@@ -647,7 +712,36 @@ class LlamaDecoderLayerAuto(nn.Layer):
                 f"post_attention_layernorm_{self.idx} shape: {hidden_states.shape} md5sum: {hidden_states._md5sum()}"
             )
         """
+        if self.config.sequence_parallel:
+            if self.config.dp_degree == 1 and self.config.mp_degree == 1:
+                placements = [dist.Replicate()]
+            elif self.config.dp_degree == 1:
+                placements = [dist.Replicate()]
+            elif self.config.mp_degree == 1:
+                placements = [dist.Shard(1)]
+            else:
+                placements = [dist.Shard(1), dist.Replicate()]
+
+            hidden_states = dist.reshard(
+                hidden_states,
+                get_mesh(self.ipp),
+                placements,
+            )
         hidden_states = self.mlp(hidden_states)
+        if self.config.sequence_parallel:
+            if self.config.dp_degree == 1 and self.config.mp_degree == 1:
+                placements = [dist.Replicate()]
+            elif self.config.dp_degree == 1:
+                placements = [dist.Shard(0)]
+            elif self.config.mp_degree == 1:
+                placements = [dist.Shard(1)]
+            else:
+                placements = [dist.Shard(1), dist.Shard(0)]
+            hidden_states = dist.reshard(
+                hidden_states,
+                get_mesh(self.ipp),
+                placements,
+            )
         hidden_states = residual + hidden_states
         # md5 = hidden_states._md5sum()
         # print(f"decoder_{self.idx} shape: {hidden_states.shape} md5sum: {md5}")
@@ -843,6 +937,24 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         self.norm = LlamaRMSNormAuto(config)
 
         self.gradient_checkpointing = False
+    
+        print(f"sequence_parallel: {self.config.sequence_parallel}")
+
+        if self.config.dp_degree == 1 and self.config.mp_degree == 1:
+            self.placements = [dist.Replicate()]
+        elif self.config.dp_degree == 1:
+            if self.config.sequence_parallel:
+                self.placements = [dist.Shard(0)]
+            else:
+                self.placements = [dist.Replicate()]
+        elif self.config.mp_degree == 1:
+            self.placements = [dist.Shard(0)]
+        else:
+            if self.config.sequence_parallel:
+                self.placements = [dist.Shard(1), dist.Shard(0)]
+            else:
+                self.placements = [dist.Shard(0), dist.Replicate()]
+
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -851,7 +963,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         self.embed_tokens = value
 
     @staticmethod
-    def _prepare_decoder_attention_mask(attention_mask, input_shape, past_key_values_length, dtype):
+    def _prepare_decoder_attention_mask(attention_mask, input_shape, past_key_values_length, dtype, dp_degree, mp_degree):
         if attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
             if len(attention_mask.shape) == 2:
@@ -863,8 +975,17 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                     )
                     # NOTE(zhaoyingli): infer spmd does not support [seq_len, seq_len] --> [batch, 1, seq_len, seq_len] in data_parallel
 
+                    if dp_degree == 1 and mp_degree == 1:
+                        placements = [dist.Replicate()]
+                    elif dp_degree == 1:
+                        placements = [dist.Replicate()]
+                    elif mp_degree == 1:
+                        placements = [dist.Shard(0)]
+                    else:
+                        placements = [dist.Shard(0), dist.Replicate()]
+
                     combined_attention_mask = dist.shard_tensor(
-                        combined_attention_mask, get_mesh(), [dist.Shard(0), dist.Replicate()]
+                        combined_attention_mask, get_mesh(), placements
                     )
 
                     expanded_attn_mask = expanded_attn_mask & combined_attention_mask
@@ -938,18 +1059,53 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         if position_ids is None:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
             # NOTE(zhaoyingli): infer spmd does not support [seq_len] --> [batch, seq_len] in data_parallel
-            position_ids = dist.shard_tensor(position_ids, get_mesh(), [dist.Shard(0), dist.Replicate()])
+            if self.config.dp_degree == 1 and self.config.mp_degree == 1:
+                placements = [dist.Replicate()]
+            elif self.config.dp_degree == 1:
+                placements = [dist.Replicate()]
+            elif self.config.mp_degree == 1:
+                placements = [dist.Shard(0)]
+            else:
+                placements = [dist.Shard(0), dist.Replicate()]
+
+            position_ids = dist.shard_tensor(position_ids, get_mesh(), placements)
 
         attention_mask = self._prepare_decoder_attention_mask(
-            attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
+            attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype, self.config.dp_degree, self.config.mp_degree
         )  # [bs, 1, seq_len, seq_len]
         if self.config.use_flash_attention:
             is_casual = is_casual_mask(attention_mask)
             if is_casual and alibi is None:
                 attention_mask = None
         hidden_states = inputs_embeds
-        hidden_states = dist.reshard(hidden_states, get_mesh(), [dist.Shard(0), dist.Replicate()])
 
+        if self.config.dp_degree == 1 and self.config.mp_degree == 1:
+            placements = [dist.Replicate()]
+        elif self.config.dp_degree == 1:
+            placements = [dist.Replicate()]
+        elif self.config.mp_degree == 1:
+            placements = [dist.Shard(0)]
+        else:
+            placements = [dist.Shard(0), dist.Replicate()]
+
+        hidden_states = dist.reshard(hidden_states, get_mesh(), placements)
+        
+        if self.config.sequence_parallel:
+            # [B, S, H] -> [S, B, H]
+            hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
+
+            if self.config.dp_degree == 1 and self.config.mp_degree == 1:
+                placements = [dist.Replicate()]
+            elif self.config.dp_degree == 1:
+                placements = [dist.Shard(0)]
+            elif self.config.mp_degree == 1:
+                placements = [dist.Shard(1)]
+            else:
+                placements = [dist.Shard(1), dist.Shard(0)]
+
+            hidden_states = dist.reshard(hidden_states, get_mesh(), placements)
+            
+        
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
@@ -957,6 +1113,8 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
         pre_ipp = 0
         for idx, (decoder_layer) in enumerate(self.layers):
+            # for name, param in decoder_layer.named_parameters():
+            #     print(f"name: {name}, param initialized: {param._is_initialized()}")
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
             past_key_value = past_key_values[idx] if past_key_values is not None else None
@@ -964,20 +1122,29 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             has_gradient = not hidden_states.stop_gradient
 
             if decoder_layer.ipp is not None and pre_ipp != decoder_layer.ipp:
+                if self.config.dp_degree == 1 and self.config.mp_degree == 1:
+                    placements = [dist.Replicate()]
+                elif self.config.dp_degree == 1:
+                    placements = [dist.Replicate()]
+                elif self.config.mp_degree == 1:
+                    placements = [dist.Shard(0)]
+                else:
+                    placements = [dist.Shard(0), dist.Replicate()]
+
                 hidden_states = dist.reshard(
                     hidden_states,
                     get_mesh(decoder_layer.ipp),
-                    [dist.Shard(0), dist.Replicate()],
+                    self.placements,
                 )
                 position_ids = dist.reshard(
                     position_ids,
                     get_mesh(decoder_layer.ipp),
-                    [dist.Shard(0), dist.Replicate()],
+                    placements,
                 )
                 attention_mask = dist.reshard(
                     attention_mask,
                     get_mesh(decoder_layer.ipp),
-                    [dist.Shard(0), dist.Replicate()],
+                    placements,
                 )
 
             if (
@@ -1116,10 +1283,13 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
         #    self.llama = LlamaModelAuto(config)
         #    self.lm_head = LlamaLMHeadAuto(config)
         #    self.criterion = LlamaPretrainingCriterionAuto(config)
-
+        
+        print_memory_usage("Before LLaMa Init Model")
         self.llama = LlamaModelAuto(config)
         self.lm_head = LlamaLMHeadAuto(config)
         self.criterion = LlamaPretrainingCriterionAuto(config)
+        print_memory_usage("After LLaMa Init Model")
+        
 
     def get_input_embeddings(self):
         return self.llama.embed_tokens
@@ -1207,10 +1377,23 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
         output_hidden_states=None,
         return_dict=None,
     ):
+        print_memory_usage("Before LLaMa Model Forward")
+        # paddle.device.cuda.empty_cache()
+        # print("============== Before LLaMa Model Forward and after empty_cache: memory_reserved: {} GB".format(paddle.device.cuda.memory_reserved() / (2 ** 30)))
+        # print("============== Before LLaMa Model Forward and after empty_cache: max_memory_reserved: {} GB".format(paddle.device.cuda.max_memory_reserved() / (2 ** 30)))
+        # print("============== Before LLaMa Model Forward: max_memory_allocated: {} GB".format(paddle.device.cuda.max_memory_allocated() / (2 ** 30)))
         input_ids.stop_gradient = True
-
         if not input_ids.is_dist():
-            input_ids = dist.shard_tensor(input_ids, get_mesh(), [dist.Shard(0), dist.Replicate()])
+            if self.config.dp_degree == 1 and self.config.mp_degree == 1:
+                placements = [dist.Replicate()]
+            elif self.config.dp_degree == 1:
+                placements = [dist.Replicate()]
+            elif self.config.mp_degree == 1:
+                placements = [dist.Shard(0)]
+            else:
+                placements = [dist.Shard(0), dist.Replicate()]
+
+            input_ids = dist.shard_tensor(input_ids, get_mesh(), placements)
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -1229,7 +1412,22 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
         )
 
         hidden_states = outputs[0]  # [bs, seq_len, dim]
+        if self.config.sequence_parallel:
+            if self.config.dp_degree == 1 and self.config.mp_degree == 1:
+                placements = [dist.Replicate()]
+            elif self.config.dp_degree == 1:
+                placements = [dist.Replicate()]
+            elif self.config.mp_degree == 1:
+                placements = [dist.Shard(1)]
+            else:
+                placements = [dist.Shard(1), dist.Replicate()]
 
+            hidden_states = dist.reshard(
+                hidden_states, get_mesh(-1), placements
+            )
+            hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
+        
+        
         # if labels is None，means we need full output, instead of tensor_parallel_output
         # tensor_parallel_output is togather with ParallelCrossEntropy
         tensor_parallel_output = (
@@ -1242,17 +1440,28 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
         if labels is not None:
             labels.stop_gradient = True
             if not labels.is_dist():
-                labels = dist.shard_tensor(labels, get_mesh(-1), [dist.Shard(0), dist.Replicate()])
+                if self.config.dp_degree == 1 and self.config.mp_degree == 1:
+                    placements = [dist.Replicate()]
+                elif self.config.dp_degree == 1:
+                    placements = [dist.Replicate()]
+                elif self.config.mp_degree == 1:
+                    placements = [dist.Shard(0)]
+                else:
+                    placements = [dist.Shard(0), dist.Replicate()]
+                labels = dist.shard_tensor(labels, get_mesh(-1), placements)
             loss = self.criterion(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]
+            print_memory_usage("After LLaMa Model Forward")
             return (loss,) + output if loss is not None else output
 
-        return CausalLMOutputWithCrossAttentions(
+        result = CausalLMOutputWithCrossAttentions(
             loss=loss,
             logits=logits,
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+        print_memory_usage("After LLaMa Model Forward")
+        return result

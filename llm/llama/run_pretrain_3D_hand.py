@@ -18,6 +18,7 @@ import os
 import random
 import sys
 import types
+import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import List, Optional
@@ -35,6 +36,7 @@ from paddlenlp.data.causal_dataset import (
     print_rank_0,
 )
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
+from paddlenlp.trainer.trainer_utils import speed_metrics
 from paddlenlp.trainer.utils.reshard import NodeModelState, all_gather_state_dict
 from paddlenlp.transformers import (
     AutoConfig,
@@ -272,6 +274,12 @@ def create_pretrained_dataset(
 
     return train_dataset, valid_dataset, test_dataset, _collate_data
 
+def print_memory_usage(message=""):
+    mem_alloc = paddle.device.cuda.memory_allocated() / (2 ** 30)
+    max_mem_alloc = paddle.device.cuda.max_memory_allocated() / (2 ** 30)
+    max_mem_reserve = paddle.device.cuda.memory_reserved() / (2 ** 30)
+    max_mem_reserve = paddle.device.cuda.max_memory_reserved() / (2 ** 30)
+    print("============== {}: allocated: {} GB, max_allocated: {} GB, reserved: {} GB, max_reserved: {} GB,".format(message, mem_alloc, max_mem_alloc, mem_reserve, max_mem_reserve))
 
 def get_train_data_file(args):
     if len(args.input_dir.split()) > 1:
@@ -465,6 +473,7 @@ def main():
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
 
+    # config.num_hidden_layers = 8
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
@@ -544,8 +553,8 @@ def main():
     model = fleet.distributed_model(model)
     optimizer = fleet.distributed_optimizer(optimizer)
     # skip grad sync
-    load_model(model)
-    assert optimizer._dp_enable
+    # load_model(model)
+    # assert optimizer._dp_enable
     # hack for align with auto
     # optimizer._dp_enable = False
 
@@ -585,15 +594,18 @@ def main():
     )
 
     global_step = 1
+    global_step_last_logged = global_step
     pp_data_buffer = []
-    load_model(model)
+    # load_model(model)
+    paddle.device.cuda.empty_cache()
     model.train()
     model._prepare_pipeline_inputs_func = _prepare_pipeline_inputs_func
     for epoch_idx in range(num_train_epochs):
+        start_time_last_logged = time.time()
         for step, inputs in enumerate(train_dataloader):
             input_ids, labels = inputs["input_ids"], inputs["labels"]
-            print(f"===> input_ids:  {input_ids._md5sum()}")
-            print(f"===> labels:  {labels._md5sum()}")
+            # print(f"===> input_ids:  {input_ids._md5sum()}")
+            # print(f"===> labels:  {labels._md5sum()}")
             pp_data_buffer.append(inputs)
             if len(pp_data_buffer) < training_args.gradient_accumulation_steps:
                 continue
@@ -613,12 +625,36 @@ def main():
             lr_scheduler.step()
             optimizer.clear_grad()
 
-            print(f"global_step {global_step}; loss {loss.item()}; ls {optimizer.get_lr()}")
+            # print(f"global_step {global_step}; loss {loss.item()}; ls {optimizer.get_lr()}")
             pp_data_buffer.clear()
 
-            if global_step >= 1:
-                # save_model(model)
-                sys.exit(0)
+            if global_step % training_args.logging_steps == 0:
+                num_steps = (global_step - global_step_last_logged)
+                total_train_batch_size = training_args.per_device_train_batch_size * training_args.data_parallel_degree
+                logs = {}
+                logs["loss"] = float(0)
+                logs["learning_rate"] = float("{0:.3e}".format(optimizer.get_lr()))
+                logs["global_step"] = int(global_step)
+                logs.update(
+                    speed_metrics(
+                        split="interval",
+                        start_time=start_time_last_logged,
+                        num_samples=total_train_batch_size * (global_step - global_step_last_logged) * training_args.gradient_accumulation_steps,
+                        num_steps=num_steps,
+                    )
+                )
+                logger.info(", ".join(f"{k}: {v}" for k, v in logs.items()))
+
+                global_step_last_logged = global_step
+                start_time_last_logged = time.time()
+                # tr_loss = float(0)
+
+            if global_step >= training_args.max_steps:
+                break
+
+            # if global_step >= 1:
+            #     save_model(model)
+            #     sys.exit(0)
 
             global_step += 1
 
@@ -634,7 +670,7 @@ def save_model(model):
     state_dict = model.state_dict()
     for (k, v) in state_dict.items():
         print(f"{k}=>{v.name} {v.shape}")
-    paddle.save(state_dict, f"hand/pp{pp_rank:02d}mp{mp_rank:02d}.pdparams")
+    paddle.save(state_dict, f"hand_3d/pp{pp_rank:02d}mp{mp_rank:02d}.pdparams")
     group = hcg.get_model_parallel_group()
 
     # evenly ditribute param
@@ -655,12 +691,12 @@ def save_model(model):
     all_state_dict = all_gather_state_dict(node_model_state.model_weights, filter_func, group)
     if mp_rank > 0:
         return
-    paddle.save(all_state_dict, f"hand/pp{pp_rank:02d}.pdparams")
+    paddle.save(all_state_dict, f"hand_3d/pp{pp_rank:02d}.pdparams")
     group = hcg.get_pipe_parallel_group()
     all_state_dict = all_gather_state_dict(all_state_dict, filter_func, group)
     if pp_rank > 0:
         return
-    paddle.save(all_state_dict, "hand/all.pdparams")
+    paddle.save(all_state_dict, "hand_3d/all.pdparams")
 
 
 def merge_tensor(tensor_list, fuse_num, axis):
@@ -676,7 +712,7 @@ def load_model(model):
     hcg = fleet.get_hybrid_communicate_group()
     mp_rank = hcg.get_model_parallel_rank()
     pp_rank = hcg.get_stage_id()
-    state_dict = paddle.load(f"hand/pp{pp_rank:02d}mp{mp_rank:02d}.pdparams")
+    state_dict = paddle.load(f"hand_3d/pp{pp_rank:02d}mp{mp_rank:02d}.pdparams")
     model.set_state_dict(state_dict)
 
 

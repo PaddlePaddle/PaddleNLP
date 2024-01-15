@@ -25,7 +25,9 @@ import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
+import paddle.distributed as dist
 from paddle.distributed.fleet.utils import recompute
+import numpy as np
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -52,6 +54,8 @@ from ..sequence_parallel_utils import (
     GatherOp,
     RowSequenceParallelLinear,
     ScatterOp,
+    AllGatherOp,
+    ReduceScatterOp,
     mark_as_sequence_parallel_parameter,
 )
 from .configuration import (
@@ -72,6 +76,12 @@ __all__ = [
     "LlamaPretrainingCriterion",
 ]
 
+def print_memory_usage(message=""):
+    mem_alloc = paddle.device.cuda.memory_allocated() / (2 ** 30)
+    max_mem_alloc = paddle.device.cuda.max_memory_allocated() / (2 ** 30)
+    mem_reserve = paddle.device.cuda.memory_reserved() / (2 ** 30)
+    max_mem_reserve = paddle.device.cuda.max_memory_reserved() / (2 ** 30)
+    print("============== {}: allocated: {} GB, max_allocated: {} GB, reserved: {} GB, max_reserved: {} GB,".format(message, mem_alloc, max_mem_alloc, mem_reserve, max_mem_reserve))
 
 def _get_interleave(n):
     def _get_interleave_power_of_2(n):
@@ -218,10 +228,7 @@ def scaled_dot_product_attention(
             )
             attn_weights = None
 
-        if sequence_parallel:
-            attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
-        else:
-            attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+        attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
         return (attn_output, attn_weights) if output_attentions else attn_output
     else:
         global attention_cnt
@@ -296,10 +303,7 @@ def scaled_dot_product_attention(
         """
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
-        if sequence_parallel:
-            attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
-        else:
-            attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+        attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
 
         # attn_output_tmp = concat_dp(attn_output)
         # attn_output_tmp = concat_mp(attn_output_tmp)
@@ -782,34 +786,43 @@ class LlamaAttention(nn.Layer):
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
         # hidden_states_tmp = concat_dp(hidden_states)
         # print(f"attention input md5sum {hidden_states_tmp._md5sum()}")
+
+        # global local_steps
+        # print("============== Steps {}, Before Attention {} Forward: memory_reserved: {} GB".format(local_steps, self.ipp, (paddle.device.cuda.memory_reserved() / (2 ** 30))))
+        # print("============== Steps {}, Before Attention {} Forward: max_memory_reserved: {} GB".format(local_steps, self.ipp, (paddle.device.cuda.max_memory_reserved() / (2 ** 30))))
+        if self.config.sequence_parallel:
+            hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
+
         if self.fuse_attention_qkv:
-            if self.sequence_parallel:
-                target_shape = [-1, self.seq_length, self.num_heads, 3 * self.head_dim]
-            else:
-                target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
+            target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
 
             mix_layer = self.qkv_proj(hidden_states)
             mix_layer = paddle.reshape_(mix_layer, target_shape)
             query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
         else:
-            if self.sequence_parallel:
-                target_query_shape = [-1, self.seq_length, self.num_heads, self.head_dim]
-                target_key_value_shape = [-1, self.seq_length, self.num_key_value_heads, self.head_dim]
-            else:
-                target_query_shape = [0, 0, self.num_heads, self.head_dim]
-                target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
+            # if self.sequence_parallel:
+            #     target_query_shape = [-1, self.seq_length, self.num_heads, self.head_dim]
+            #     target_key_value_shape = [-1, self.seq_length, self.num_key_value_heads, self.head_dim]
+            # else:
+            target_query_shape = [0, 0, self.num_heads, self.head_dim]
+            target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
 
             query_states = self.q_proj(hidden_states).reshape(shape=target_query_shape)
             key_states = self.k_proj(hidden_states).reshape(shape=target_key_value_shape)
             value_states = self.v_proj(hidden_states).reshape(shape=target_key_value_shape)
+
+        # if self.config.sequence_parallel:
+        #     query_states = paddle.transpose(query_states, [1, 0, 2, 3])
+        #     key_states = paddle.transpose(key_states, [1, 0, 2, 3])
+        #     value_states = paddle.transpose(value_states, [1, 0, 2, 3])
 
         kv_seq_len = key_states.shape[-3]
 
         if past_key_value is not None:
             kv_seq_len += past_key_value[0].shape[-3]
 
-        if self.config.rope:
-            print("rope")
+        if self.config.rope: 
+            # print("rope")
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
@@ -870,7 +883,7 @@ class LlamaAttention(nn.Layer):
                 attention_mask,
                 output_attentions,
                 alibi,
-                self.sequence_parallel,
+                False,
             )
         if output_attentions:
             attn_output, attn_weights = outputs
@@ -880,6 +893,8 @@ class LlamaAttention(nn.Layer):
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
         attn_output = self.o_proj(attn_output)
+        if self.config.sequence_parallel:
+            attn_output = paddle.transpose(attn_output, [1, 0, 2])
 
         if not output_attentions:
             attn_weights = None
@@ -895,6 +910,8 @@ class LlamaAttention(nn.Layer):
         if type(outputs) is tuple and len(outputs) == 1:
             outputs = outputs[0]
 
+        # print("============== Steps {}, After Attention {} Forward: memory_reserved: {} GB".format(local_steps, self.ipp, (paddle.device.cuda.memory_reserved() / (2 ** 30))))
+        # print("============== Steps {}, After Attention {} Forward: max_memory_reserved: {} GB".format(local_steps, self.ipp, (paddle.device.cuda.max_memory_reserved() / (2 ** 30))))
         return outputs
 
 
@@ -1307,11 +1324,9 @@ class LlamaModel(LlamaPretrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
-        if self.sequence_parallel:
-            # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
-            bs, seq_len, hidden_size = inputs_embeds.shape
-            inputs_embeds = paddle.reshape_(inputs_embeds, [bs * seq_len, hidden_size])
-            # [seq_len * bs / n, num_head * head_dim] (n is mp parallelism)
+        if self.config.sequence_parallel:
+            # [B, S, H] -> [S, B, H]
+            inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2])
             inputs_embeds = ScatterOp.apply(inputs_embeds)
 
         # embed positions
@@ -1496,9 +1511,9 @@ class LlamaLMHead(nn.Layer):
             self.weight.split_axis = 1
 
     def forward(self, hidden_states, tensor_parallel_output=None):
-        if self.config.sequence_parallel:
-            hidden_states = GatherOp.apply(hidden_states)
-            hidden_states = paddle.reshape_(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
+        # if self.config.sequence_parallel:
+        #     hidden_states = GatherOp.apply(hidden_states)
+        #     hidden_states = paddle.reshape_(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
 
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
@@ -1518,9 +1533,11 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         super().__init__(config)
         self.config = config
 
+        print_memory_usage("After LLaMa Model Init Model")
         self.llama = LlamaModel(config)
         self.lm_head = LlamaLMHead(config)
         self.criterion = LlamaPretrainingCriterion(config)
+        print_memory_usage("After LLaMa Model Init Model")
 
     def get_input_embeddings(self):
         return self.llama.embed_tokens
@@ -1608,6 +1625,8 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         output_hidden_states=None,
         return_dict=None,
     ):
+        # global local_steps
+        print_memory_usage("Before LLaMa Model Forward")
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -1627,6 +1646,11 @@ class LlamaForCausalLM(LlamaPretrainedModel):
 
         hidden_states = outputs[0]  # [bs, seq_len, dim]
 
+        if self.config.sequence_parallel:
+            hidden_states = GatherOp.apply(hidden_states)
+            # [S, B, H] -> [B, S, H]
+            hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
+
         # if labels is None，means we need full output, instead of tensor_parallel_output
         # tensor_parallel_output is togather with ParallelCrossEntropy
         tensor_parallel_output = (
@@ -1643,9 +1667,11 @@ class LlamaForCausalLM(LlamaPretrainedModel):
 
         if not return_dict:
             output = (logits,) + outputs[1:]
+            print_memory_usage("After LLaMa Model Forward")
+            local_steps += 1
             return (loss,) + output if loss is not None else output
 
-        return CausalLMOutputWithCrossAttentions(
+        result = CausalLMOutputWithCrossAttentions(
             loss=loss,
             logits=logits,
             past_key_values=outputs.past_key_values,
@@ -1653,6 +1679,8 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             attentions=outputs.attentions,
         )
 
+        print_memory_usage("After LLaMa Model Forward")
+        return result
 
 def concat_dp(input):
     hcg = fleet.get_hybrid_communicate_group()

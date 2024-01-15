@@ -201,7 +201,7 @@ def total_processes_number(local_rank):
     return 1
 
 
-def speed_metrics(split, start_time, num_samples=None, num_steps=None):
+def speed_metrics(split, start_time, num_samples=None, num_steps=None, memory_reserved=None, max_memory_reserved=None):
     """
     Measure and return speed performance metrics.
 

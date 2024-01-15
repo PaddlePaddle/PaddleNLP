@@ -509,7 +509,7 @@ def main():
     
     model = fleet.distributed_model(model)
     optimizer = fleet.distributed_optimizer(optimizer)
-    load_model(model)
+    # load_model(model)
 
     def loss_func(loss):
         return loss
@@ -554,7 +554,9 @@ def main():
     tr_loss = float(0)
 
     model.train()
+    paddle.device.cuda.empty_cache()
     for epoch_idx in range(num_train_epochs):
+        start_time_last_logged = time.time()
         for step, inputs in enumerate(train_dataloader):
             input_ids, labels = inputs["input_ids"], inputs["labels"]
             res = model(input_ids, labels=labels)
@@ -568,7 +570,7 @@ def main():
             # do backward every micro step.
             tr_loss_step = loss_func(tr_loss_step)
             tr_loss_step.backward()
-            print_grad(model)
+            # print_grad(model)
 
             tr_loss += tr_loss_step
 
@@ -576,13 +578,36 @@ def main():
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
-                print(f"global_step {global_step};input id {input_ids[0][0].numpy()}; label {labels[0][0].numpy()}; loss {tr_loss.numpy()}")
+                # print(f"global_step {global_step};input id {input_ids[0][0].numpy()}; label {labels[0][0].numpy()}; loss {tr_loss.numpy()}")
                 tr_loss = 0
 
+                if global_step % training_args.logging_steps == 0:
+                    num_steps = (global_step - global_step_last_logged)
+                    total_train_batch_size = training_args.per_device_train_batch_size * training_args.data_parallel_degree
+                    logs = {}
+                    logs["loss"] = float(0)
+                    logs["learning_rate"] = float("{0:.3e}".format(optimizer.get_lr()))
+                    logs["global_step"] = int(global_step)
+                    logs.update(
+                        speed_metrics(
+                            split="interval",
+                            start_time=start_time_last_logged,
+                            num_samples=total_train_batch_size * (global_step - global_step_last_logged) * training_args.gradient_accumulation_steps,
+                            num_steps=num_steps,
+                        )
+                    )
+                    logger.info(", ".join(f"{k}: {v}" for k, v in logs.items()))
+
+                    global_step_last_logged = global_step
+                    start_time_last_logged = time.time()
+
+            if step >= training_args.max_steps:
+                break
+
             global_step += 1
-            if global_step // training_args.gradient_accumulation_steps >= 0:
-                #save_model(model)
-                sys.exit(0)
+            # if global_step // training_args.gradient_accumulation_steps >= 0:
+            #     save_model(model)
+            #     sys.exit(0)
 
     '''
     for epoch_idx in range(num_train_epochs):

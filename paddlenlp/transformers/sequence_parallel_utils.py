@@ -244,10 +244,11 @@ class ColumnSequenceParallelLinear(Layer):
         if pp_degree > 1:
             strategy = fleet.fleet._user_defined_strategy
             if strategy.pipeline_configs["enable_partial_send_recv"]:
-                raise ValueError(
-                    "If using sequence parallel in pipeline mode, please set "
-                    "enable_partial_send_recv in training args to be False."
-                )
+                fleet.fleet._user_defined_strategy.pipeline_configs["enable_partial_send_recv"] = False
+                # raise ValueError(
+                #     "If using sequence parallel in pipeline mode, please set "
+                #     "enable_partial_send_recv in training args to be False."
+                # )
 
         self._name = name
         self.is_mp = self.world_size > 1
@@ -358,10 +359,11 @@ class RowSequenceParallelLinear(Layer):
         if pp_degree > 1:
             strategy = fleet.fleet._user_defined_strategy
             if strategy.pipeline_configs["enable_partial_send_recv"]:
-                raise ValueError(
-                    "If using sequence parallel in pipeline mode, please set "
-                    "enable_partial_send_recv in training args to be False."
-                )
+                fleet.fleet._user_defined_strategy.pipeline_configs["enable_partial_send_recv"] = False
+                # raise ValueError(
+                #     "If using sequence parallel in pipeline mode, please set "
+                #     "enable_partial_send_recv in training args to be False."
+                # )
 
         self.is_mp = self.world_size > 1
         assert (

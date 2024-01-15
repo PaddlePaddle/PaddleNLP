@@ -470,9 +470,10 @@ def main():
 
     model = model_class._from_config(config, dtype=dtype)
     # load model
-    load_model(model)
+    # load_model(model)
     # add shard_layer here
     shard_model(model)
+    paddle.device.cuda.empty_cache()
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
@@ -590,19 +591,42 @@ def main():
 
             # do backward every micro step.
             tr_loss_step.backward()
-            print_grad(model)
+            # print_grad(model)
             tr_loss += tr_loss_step
 
             if global_step % training_args.gradient_accumulation_steps == (training_args.gradient_accumulation_steps -1):
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
-                print(f"global_step {global_step};input id {input_id}; label {label}; loss {tr_loss.numpy()}")
+                # print(f"global_step {global_step};input id {input_id}; label {label}; loss {tr_loss.numpy()}")
                 tr_loss = 0
 
+                if global_step % training_args.logging_steps == 0:
+                    num_steps = (global_step - global_step_last_logged)
+                    total_train_batch_size = training_args.per_device_train_batch_size * training_args.data_parallel_degree
+                    logs = {}
+                    logs["loss"] = float(0)
+                    logs["learning_rate"] = float("{0:.3e}".format(optimizer.get_lr()))
+                    logs["global_step"] = int(global_step)
+                    logs.update(
+                        speed_metrics(
+                            split="interval",
+                            start_time=start_time_last_logged,
+                            num_samples=total_train_batch_size * (global_step - global_step_last_logged) * training_args.gradient_accumulation_steps,
+                            num_steps=num_steps,
+                        )
+                    )
+                    logger.info(", ".join(f"{k}: {v}" for k, v in logs.items()))
+
+                    global_step_last_logged = global_step
+                    start_time_last_logged = time.time()
+
             global_step += 1
-            if global_step // training_args.gradient_accumulation_steps >= 0:
-                sys.exit(0)
+
+            if (global_step // training_args.gradient_accumulation_steps) >= training_args.max_steps:
+                break
+            # if global_step // training_args.gradient_accumulation_steps >= 0:
+            #     sys.exit(0)
 
     '''
     for epoch_idx in range(num_train_epochs):
@@ -651,8 +675,9 @@ def main():
 
 def shard_model(model):
     pp_stage = 0
+    print("model config: ", model.config, "********" * 40)
     for name, layer in model.named_sublayers(include_self=False):
-        print(name, "==>", type(layer))
+        # print(name, "==>", type(layer))
 
         if hasattr(layer, "ipp"):
             pp_stage = layer.ipp
