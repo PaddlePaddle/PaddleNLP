@@ -22,15 +22,15 @@ from paddle.nn.quant import weight_quantize
 from paddlenlp_ops import get_padding_offset, get_padding_offset_v2
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
+    FusedBlockMultiTransformer,
+    FusedBlockMultiTransformerWeightOnly,
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
-    FusedBlockMultiTransformer,
-    FusedBlockMultiTransformerWeightOnly,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
-    GenerationInferenceModel,
     GenerationBlockInferenceModel,
+    GenerationInferenceModel,
 )
 from paddlenlp.transformers.bloom.modeling import BloomPreTrainedModel
 from paddlenlp.transformers.model_outputs import (
@@ -194,7 +194,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
             ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
             ffn2_bias_attrs=ffn2_bias_attrs,
         )
-        
+
         self.set_transformer_block(transformer_config)
 
         self.cache_kvs = []
@@ -203,7 +203,6 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
         self.ln_f = nn.LayerNorm(self.embed_dim, epsilon=config.layer_norm_epsilon)
 
         self.gradient_checkpointing = False
-
 
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
@@ -282,15 +281,6 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                 seq_lens=seq_len,
                 time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
             )
-
-        #if inputs_embeds.shape[0] == 100:
-            # print("哈哈哈")
-            # import numpy as np
-            # static_dict = {
-            #     "hidden_states": hidden_states.numpy(),
-            # }
-            # np.savez('/zhoukangkang/your.npz', **static_dict)
-            # exit(0)
 
         # Add last hidden state
         hidden_states = self.ln_f(hidden_states)
@@ -586,7 +576,6 @@ class BloomForCausalLMInferenceModel(GenerationInferenceModel, BloomPreTrainedMo
         return tuple(tuple(past_state.index_select(0, beam_idx) for past_state in layer_past) for layer_past in past)
 
 
-
 @register_base_model
 class BloomBlockInferenceModel(BloomModelInferenceModel):
     def __init__(self, config):
@@ -619,12 +608,12 @@ class BloomBlockInferenceModel(BloomModelInferenceModel):
         output_hidden_states=None,
         return_dict=False,
         **kwargs,
-    ):  
+    ):
 
         seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
         ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
-                input_ids, seq_lens_this_time
-            )
+            input_ids, seq_lens_this_time
+        )
         kwargs["cu_seqlens_q"] = cu_seqlens_q
         kwargs["cu_seqlens_k"] = cu_seqlens_k
         kwargs["padding_offsets"] = padding_offset
@@ -632,7 +621,7 @@ class BloomBlockInferenceModel(BloomModelInferenceModel):
 
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(ids_remove_padding)
-        
+
         hidden_states = self.word_embeddings_layernorm(inputs_embeds)
 
         with dy2st_nocheck_guard_context():
@@ -646,7 +635,7 @@ class BloomBlockInferenceModel(BloomModelInferenceModel):
                 rotary_embs=None,
                 **kwargs,
             )
-        
+
         # if inputs_embeds.shape[0] == 100:
         #     print("哈哈哈")
         #     import numpy as np
@@ -664,7 +653,6 @@ class BloomBlockInferenceModel(BloomModelInferenceModel):
             hidden_states=None,
             attentions=None,
         )
-
 
 
 class BlommForCausalBlockLMInferenceModel(GenerationBlockInferenceModel, BloomPreTrainedModel):
@@ -717,7 +705,7 @@ class BlommForCausalBlockLMInferenceModel(GenerationBlockInferenceModel, BloomPr
 
         # only slice a part of src_mask, because of phi::FlashAttnUnpaddedKernel.
         valid_max_encoder_len = paddle.max(seq_lens_encoder)
-        src_mask = src_mask[:,:,:valid_max_encoder_len,:valid_max_encoder_len]
+        src_mask = src_mask[:, :, :valid_max_encoder_len, :valid_max_encoder_len]
 
         model_inputs = {
             "input_ids": input_ids,
@@ -756,8 +744,8 @@ class BlommForCausalBlockLMInferenceModel(GenerationBlockInferenceModel, BloomPr
     ):
         outputs = self.bloom(
             input_ids,
-            attention_mask = src_mask,
-            tgt_mask = tgt_mask,
+            attention_mask=src_mask,
+            tgt_mask=tgt_mask,
             caches=caches,
             rope_emb=rope_emb,
             block_tables=block_tables,

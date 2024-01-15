@@ -1362,16 +1362,6 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             v_quant_scales = self.cache_v_scales
             k_dequant_scales = self.cache_k_out_scales
             v_dequant_scales = self.cache_v_out_scales
-        
-        # print(" ", kwargs.get("seq_lens_encoder"))
-        # print(" ", kwargs.get("seq_lens_decoder"))
-        # print(" ", kwargs.get("seq_lens_this_time"))
-        # print("cu_seqlens_q", kwargs.get("cu_seqlens_q", None))
-        # print("cu_seqlens_k", kwargs.get("cu_seqlens_k", None))
-        # print("cum_offsets", kwargs.get("cum_offsets", None))
-        # print("block_tables", kwargs.get("block_tables", None))
-        # print("padding_offsets", kwargs.get("padding_offsets", None))
-        # print("max_input_length", kwargs.get("max_input_length", -1))
 
         fmha_out = paddle.incubate.nn.functional.block_multihead_attention(
             qkv_out,
@@ -1406,19 +1396,6 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             quant_max_bound=self.config.quant_max_bound,
             quant_min_bound=self.config.quant_min_bound,
         )[0]
-
-        if fmha_out.shape[0] == 8 and i >= 0:
-            pass
-            # print("fhma_out", qkv_out)
-            # print("fhma_out", caches[2 * i + 1].shape)
-            # import numpy as np
-            # static_dict = {
-            #     "hidden_states": qkv_out.numpy(),
-            #     "fmha_out" : fmha_out.numpy(),
-            #     "attn_mask" : attn_mask.numpy(),
-            # }
-            # np.savez('/zhoukangkang/my.npz', **static_dict)
-            # exit(0)
 
         out_linear_out = self.compute_out_linear(fmha_out, i)
 

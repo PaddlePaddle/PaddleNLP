@@ -477,12 +477,13 @@ class GenerationBlockInferenceModel(GenerationMixin):
             src_mask_spec = paddle.static.InputSpec(shape=[None, 1, None, None], dtype=dtype, name="src_mask")
         else:
             src_mask_spec = None
-        
 
         # bloom model needs src_mask and tgt_mask!
         if "bloom" in self.config.architectures[0].lower():
             src_mask_spec = paddle.static.InputSpec(shape=[None, None, None, None], dtype=dtype, name="src_mask")
             tgt_mask_spec = paddle.static.InputSpec(shape=[None, None, 1, None], dtype=dtype, name="tgt_mask")
+        else:
+            tgt_mask_spec = None
 
         input_spec = [
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),  # input_ids
@@ -566,7 +567,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
         v_quant_scales=None,
         k_dequant_scales=None,
         v_dequant_scales=None,
-        tgt_mask = None,
+        tgt_mask=None,
         **model_kwargs,
     ):
 
@@ -704,7 +705,5 @@ class GenerationBlockInferenceModel(GenerationMixin):
             temperature,
             model_kwargs,
         )
-
-        #print("next_tokens", next_tokens)
 
         return next_tokens
