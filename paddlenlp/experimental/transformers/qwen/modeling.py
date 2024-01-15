@@ -15,17 +15,27 @@
 # limitations under the License.
 from __future__ import annotations
 
+import os
+
 import paddle
 from paddle import nn
 from paddle.nn.quant import weight_quantize
-from paddlenlp_ops import fused_get_rotary_embedding, get_padding_offset
+from paddlenlp_ops import (
+    fused_get_rotary_embedding,
+    get_padding_offset,
+    get_padding_offset_v2,
+)
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
+    FusedBlockMultiTransformer,
+    FusedBlockMultiTransformerA8W8,
+    FusedBlockMultiTransformerWeightOnly,
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
+    GenerationBlockInferenceModel,
     GenerationInferenceModel,
 )
 from paddlenlp.transformers import QWenConfig, QWenPretrainedModel
@@ -38,8 +48,12 @@ from paddlenlp.transformers.model_utils import (
     register_base_model,
 )
 from paddlenlp.transformers.qwen.modeling import QWenLMHead, QWenPretrainingCriterion
+from paddlenlp.utils.log import logger
 
-__all__ = ["QWenForCausalLMInferenceModel"]
+__all__ = [
+    "QWenForCausalLMInferenceModel",
+    "QWenForCausalLMBlockInferenceModel",
+]
 
 
 class FusedQWenRMSNorm(nn.Layer):
@@ -161,15 +175,18 @@ class QWenInferenceModel(QWenPretrainedModel):
             use_neox_rotary_style=True,
         )
 
-        if self.use_weight_only:
-            self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
-        else:
-            self.transformer_block = FusedMultiTransformerBase(transformer_config)
+        self.set_transformer_block(transformer_config)
 
         self.ln_f = FusedQWenRMSNorm(config)
 
         self.cache_kvs = None
         self.head_dim_shape_tensor = paddle.ones((self.hidden_size // self.num_attention_heads), dtype="int8")
+
+    def set_transformer_block(self, transformer_config):
+        if self.use_weight_only:
+            self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
+        else:
+            self.transformer_block = FusedMultiTransformerBase(transformer_config)
 
     def get_input_embeddings(self):
         return self.wte
@@ -180,20 +197,21 @@ class QWenInferenceModel(QWenPretrainedModel):
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         dtype = paddle.get_default_dtype()
-        wte_weight = paddle.to_tensor(state_dict["qwen.wte.weight"], dtype=dtype)
-        ln_f_weight = paddle.to_tensor(state_dict["qwen.ln_f.weight"], dtype=self.ln_f.weight.dtype)
+
+        wte_weight = paddle.to_tensor(state_dict["qwen.wte.weight"]).cast(dtype)
+        ln_f_weight = paddle.to_tensor(state_dict["qwen.ln_f.weight"]).cast(self.ln_f.weight.dtype)
         self.wte.weight.set_value(wte_weight)
         self.ln_f.weight.set_value(ln_f_weight)
 
         for idx in range(self.num_layers):
-            ln_scale = paddle.to_tensor(
-                state_dict["qwen.h.{}.ln_1.weight".format(idx)], dtype=self.transformer_block.ln_scales[idx].dtype
+            ln_scale = paddle.to_tensor(state_dict["qwen.h.{}.ln_1.weight".format(idx)]).cast(
+                self.transformer_block.ln_scales[idx].dtype
             )
             self.transformer_block.ln_scales[idx].set_value(ln_scale)
 
             qkv_weight = paddle.to_tensor(
-                state_dict["qwen.h.{}.attn.c_attn.weight".format(idx)].transpose([1, 0]), dtype=dtype
-            )
+                state_dict["qwen.h.{}.attn.c_attn.weight".format(idx)].transpose([1, 0])
+            ).cast(dtype)
             if self.use_weight_only:
                 qkv_weight = paddle.transpose(qkv_weight, perm=[1, 0])
                 qkv_quanted_weight, qkv_weight_scale = weight_quantize(qkv_weight, algo=self.quant_type)
@@ -202,10 +220,10 @@ class QWenInferenceModel(QWenPretrainedModel):
             else:
                 self.transformer_block.qkv_weights[idx].set_value(qkv_weight)
 
-            qkv_bias = paddle.to_tensor(state_dict["qwen.h.{}.attn.c_attn.bias".format(idx)], dtype=dtype)
+            qkv_bias = paddle.to_tensor(state_dict["qwen.h.{}.attn.c_attn.bias".format(idx)]).cast(dtype)
             self.transformer_block.qkv_biases[idx].set_value(qkv_bias)
 
-            linear_weight = paddle.to_tensor(state_dict["qwen.h.{}.attn.c_proj.weight".format(idx)], dtype=dtype)
+            linear_weight = paddle.to_tensor(state_dict["qwen.h.{}.attn.c_proj.weight".format(idx)]).cast(dtype)
             if self.use_weight_only:
                 linear_quanted_weight, linear_weight_scale = weight_quantize(linear_weight, algo=self.quant_type)
                 self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight)
@@ -213,13 +231,13 @@ class QWenInferenceModel(QWenPretrainedModel):
             else:
                 self.transformer_block.linear_weights[idx].set_value(linear_weight)
 
-            ffn_ln_scale = paddle.to_tensor(
-                state_dict["qwen.h.{}.ln_2.weight".format(idx)], dtype=self.transformer_block.ffn_ln_scales[idx].dtype
+            ffn_ln_scale = paddle.to_tensor(state_dict["qwen.h.{}.ln_2.weight".format(idx)]).cast(
+                self.transformer_block.ffn_ln_scales[idx].dtype
             )
             self.transformer_block.ffn_ln_scales[idx].set_value(ffn_ln_scale)
 
-            up_weight = paddle.to_tensor(state_dict["qwen.h.{}.mlp.w1.weight".format(idx)], dtype=dtype)
-            gate_weight = paddle.to_tensor(state_dict["qwen.h.{}.mlp.w2.weight".format(idx)], dtype=dtype)
+            up_weight = paddle.to_tensor(state_dict["qwen.h.{}.mlp.w1.weight".format(idx)]).cast(dtype)
+            gate_weight = paddle.to_tensor(state_dict["qwen.h.{}.mlp.w2.weight".format(idx)]).cast(dtype)
             ffn1_weight = paddle.concat(x=[gate_weight, up_weight], axis=-1)
             if self.use_weight_only:
                 ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(ffn1_weight, algo=self.quant_type)
@@ -228,7 +246,7 @@ class QWenInferenceModel(QWenPretrainedModel):
             else:
                 self.transformer_block.ffn1_weights[idx].set_value(ffn1_weight)
 
-            ffn2_weight = paddle.to_tensor(state_dict["qwen.h.{}.mlp.c_proj.weight".format(idx)], dtype=dtype)
+            ffn2_weight = paddle.to_tensor(state_dict["qwen.h.{}.mlp.c_proj.weight".format(idx)]).cast(dtype)
             if self.use_weight_only:
                 ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(ffn2_weight, algo=self.quant_type)
                 self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight)
@@ -311,6 +329,8 @@ class QWenInferenceModel(QWenPretrainedModel):
         )
 
         with dy2st_nocheck_guard_context():
+            print("input hidden_states", hidden_states)
+            print("input input_ids", input_ids)
             hidden_states, _ = self.transformer_block(
                 input_ids,
                 hidden_states,
@@ -327,6 +347,7 @@ class QWenInferenceModel(QWenPretrainedModel):
             )
 
         hidden_states = self.ln_f(hidden_states)
+        print("hidden_states", hidden_states)
 
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
@@ -339,6 +360,75 @@ class QWenInferenceModel(QWenPretrainedModel):
             past_key_values=presents,
             hidden_states=all_hidden_states,
             attentions=all_self_attentions,
+        )
+
+
+@register_base_model
+class QWenBlockInferenceModel(QWenInferenceModel):
+    def __init__(self, config: QWenConfig):
+        super().__init__(config)
+        self.max_seq_len = config.max_seq_len
+        self.block_size = config.block_size
+
+    def set_transformer_block(self, transformer_config):
+        if self.use_weight_only:
+            self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
+        elif self.quant_type == "a8w8":
+            self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
+        else:
+            self.transformer_block = FusedBlockMultiTransformer(transformer_config)
+
+    def remove_padding(self, input_ids, seq_lens_this_time):
+        cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
+        token_num = paddle.sum(seq_lens_this_time)
+        ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = get_padding_offset_v2(
+            input_ids, cum_offsets_now, token_num, seq_lens_this_time
+        )
+        return ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        caches=None,
+        pre_caches=None,
+        output_attentions=False,
+        output_hidden_states=None,
+        return_dict=False,
+        **kwargs,
+    ):
+
+        seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
+        rope_emb = kwargs.get("rope_emb", None)
+        ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
+            input_ids, seq_lens_this_time
+        )
+        kwargs["cu_seqlens_q"] = cu_seqlens_q
+        kwargs["cu_seqlens_k"] = cu_seqlens_k
+        kwargs["padding_offsets"] = padding_offset
+        kwargs["max_input_length"] = self.max_seq_len
+
+        if inputs_embeds is None:
+            inputs_embeds = self.wte(ids_remove_padding)
+        hidden_states = inputs_embeds
+        with dy2st_nocheck_guard_context():
+            hidden_states, _ = self.transformer_block(
+                input_ids=input_ids,
+                src=hidden_states,
+                cum_offsets=cum_offsets,
+                attn_mask=attention_mask,
+                caches=caches,
+                pre_caches=pre_caches,
+                rotary_embs=rope_emb,
+                **kwargs,
+            )
+        hidden_states = self.ln_f(hidden_states)
+        return BaseModelOutputWithPast(
+            last_hidden_state=hidden_states,
+            past_key_values=None,
+            hidden_states=None,
+            attentions=None,
         )
 
 
@@ -411,12 +501,12 @@ class QWenForCausalLMInferenceModel(GenerationInferenceModel, QWenPretrainedMode
         if cache is not None:
             input_ids = tgt_ids
             position_ids = tgt_pos
-            attention_mask = (tgt_generation_mask - 1) * 1e4
+            attention_mask = (1 - tgt_generation_mask) * paddle.finfo(tgt_generation_mask.dtype).min
             # make inputs_embeds be none in decoder phase.
             # in forward function, it will be assigned according to input_ids.
             inputs_embeds = None
         else:
-            attention_mask = (attention_mask - 1) * 1e4
+            attention_mask = (1 - attention_mask) * paddle.finfo(attention_mask.dtype).min
         model_inputs = {
             "input_ids": input_ids,
             "inputs_embeds": inputs_embeds,
@@ -499,6 +589,187 @@ class QWenForCausalLMInferenceModel(GenerationInferenceModel, QWenPretrainedMode
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         if "lm_head.weight" in state_dict:
-            lm_head_weight = paddle.to_tensor(state_dict["lm_head.weight"], dtype=self.lm_head.weight.dtype)
+            lm_head_weight = paddle.to_tensor(state_dict["lm_head.weight"]).cast(self.lm_head.weight.dtype)
+            self.lm_head.weight.set_value(lm_head_weight)
+        self.qwen.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
+
+
+class QWenForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, QWenPretrainedModel):
+    """
+    Dynamic Batching for QWen Model with pretraining tasks on top.
+    """
+
+    _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.qwen = QWenBlockInferenceModel(config)
+        self.lm_head = QWenLMHead(config)
+
+    @classmethod
+    def from_pretrained(
+        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
+    ):
+        # TODO: Support safetensors loading.
+        kwargs["use_safetensors"] = False
+        from paddlenlp.transformers.utils import (
+            ContextManagers,
+            is_safetensors_available,
+            resolve_cache_dir,
+        )
+
+        config = kwargs.pop("config", None)
+        from_aistudio = kwargs.get("from_aistudio", False)
+        subfolder = kwargs.get("subfolder", None)
+        variant = kwargs.pop("variant", None)
+        use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
+        convert_from_torch = kwargs.pop("convert_from_torch", None)
+        cache_dir = kwargs.pop("cache_dir", None)
+
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+
+        init_contexts = []
+        with ContextManagers(init_contexts):
+            model = cls(config)
+
+        if not config.single_card_ptq:
+            resolved_archive_file = pretrained_model_name_or_path
+        else:
+            resolved_archive_file = cls._resolve_model_file_path(
+                pretrained_model_name_or_path,
+                cache_dir=cache_dir,
+                subfolder=subfolder,
+                from_hf_hub=from_hf_hub,
+                from_aistudio=from_aistudio,
+                config=config,
+                convert_from_torch=convert_from_torch,
+                use_safetensors=use_safetensors,
+                variant=variant,
+            )[0]
+        logger.info(f"Load model form {resolved_archive_file}")
+
+        if config.tensor_parallel_degree > 1 and config.single_card_ptq:
+            logger.info(f"convert_tensor_parallel {config.tensor_parallel_degree}")
+            model.state_dict = model.convert_tensor_parallel(resolved_archive_file, config)
+        elif config.tensor_parallel_degree > 1:
+            resolved_archive_file = os.path.join(
+                resolved_archive_file, f"mp_{config.tensor_parallel_rank:0>2d}_sharding_00_pp_00", "model.pdparams"
+            )
+            model.state_dict = paddle.load(resolved_archive_file, return_numpy=True)
+        else:
+            model.state_dict = paddle.load(resolved_archive_file, return_numpy=True)
+        model.set_state_dict(model.state_dict)
+
+        return model
+
+    @classmethod
+    def get_cache_kvs_shape(
+        cls, config: QWenConfig, max_batch_size: int = None, max_length: int = None
+    ) -> list[list[int]]:
+        """get cache_kvs tensor for qwen model
+
+        Args:
+            max_batch_size (int): the max batch size
+            max_length (int | None, optional): the max_length of cache_kvs. Defaults to None.
+
+        Returns:
+            list[paddle.Tensor]: the list tensor shape for cache
+        """
+        max_block_per_seq = (config.max_seq_len + config.block_size - 1) // config.block_size
+        if max_batch_size == -1:
+            max_block_nums = None
+        else:
+            max_block_nums = max_batch_size * max_block_per_seq
+
+        cache_kvs = []
+        for _ in range(config.num_hidden_layers):
+            cache_kv_shape = [
+                max_block_nums,
+                config.num_attention_heads // max(config.tensor_parallel_degree, 1),
+                config.block_size,
+                config.hidden_size // config.num_attention_heads,
+            ]
+            cache_kvs.append(cache_kv_shape)
+            cache_kvs.append(cache_kv_shape)
+        return cache_kvs
+
+    def prepare_inputs_for_generation(self, **kwargs):
+        # only last token for inputs_ids if cache is defined in kwargs
+        input_ids = kwargs["input_ids"]
+        src_mask = kwargs.get("src_mask", None)
+        block_tables = kwargs.get("block_tables", None)
+
+        pre_caches = kwargs.get("pre_caches", None)
+        caches = kwargs.get("caches", None)
+
+        rope_emb = kwargs["rope_emb"]
+        seq_lens_this_time = kwargs["seq_lens_this_time"]
+        seq_lens_encoder = kwargs["seq_lens_encoder"]
+        seq_lens_decoder = kwargs["seq_lens_decoder"]
+        k_quant_scales = kwargs.get("k_quant_scales", None)
+        v_quant_scales = kwargs.get("v_quant_scales", None)
+        k_dequant_scales = kwargs.get("k_dequant_scales", None)
+        v_dequant_scales = kwargs.get("v_dequant_scales", None)
+        model_inputs = {
+            "input_ids": input_ids,
+            "src_mask": src_mask,
+            "rope_emb": rope_emb,
+            "pre_caches": pre_caches,
+            "caches": caches,
+            "seq_lens_this_time": seq_lens_this_time,
+            "seq_lens_encoder": seq_lens_encoder,
+            "seq_lens_decoder": seq_lens_decoder,
+            "block_tables": block_tables,
+            "k_quant_scales": k_quant_scales,
+            "v_quant_scales": v_quant_scales,
+            "k_dequant_scales": k_dequant_scales,
+            "v_dequant_scales": v_dequant_scales,
+        }
+        return model_inputs
+
+    def forward(
+        self,
+        input_ids,
+        src_mask=None,
+        pre_caches=None,
+        caches=None,
+        seq_lens_this_time=None,
+        seq_lens_encoder=None,
+        seq_lens_decoder=None,
+        rope_emb=None,
+        block_tables=None,
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
+    ):
+        outputs = self.qwen(
+            input_ids,
+            src_mask=src_mask,
+            caches=caches,
+            rope_emb=rope_emb,
+            block_tables=block_tables,
+            pre_caches=pre_caches,
+            seq_lens_this_time=seq_lens_this_time,
+            seq_lens_encoder=seq_lens_encoder,
+            seq_lens_decoder=seq_lens_decoder,
+            k_quant_scales=k_quant_scales,
+            v_quant_scales=v_quant_scales,
+            k_dequant_scales=k_dequant_scales,
+            v_dequant_scales=v_dequant_scales,
+        )
+
+        hidden_states = outputs[0]
+        logits = self.lm_head(
+            hidden_states,
+            tensor_parallel_output=False,
+        )
+
+        return logits
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict):
+        if "lm_head.weight" in state_dict:
+            lm_head_weight = paddle.to_tensor(state_dict["lm_head.weight"]).cast(self.lm_head.weight.dtype)
             self.lm_head.weight.set_value(lm_head_weight)
         self.qwen.set_state_dict({k: state_dict[k] for k in state_dict.keys()})

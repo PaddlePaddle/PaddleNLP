@@ -1348,15 +1348,30 @@ def create_predictor(
                 )
                 model.eval()
             elif "qwen" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    QWenForCausalLMInferenceModel,
-                )
+                if predictor_args.block_attn:
+                    config.max_seq_len = predictor_args.total_max_length
+                    config.block_size = predictor_args.block_size
+                    from paddlenlp.experimental.transformers import (
+                        QWenForCausalLMBlockInferenceModel as QWenInferenceModel,
+                    )
 
-                model = QWenForCausalLMInferenceModel.from_pretrained(
-                    predictor_args.model_name_or_path,
-                    config=config,
-                    dtype=predictor_args.dtype,
-                )
+                    model = QWenInferenceModel.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        config=config,
+                        dtype=predictor_args.dtype,
+                        tensor_parallel_degree=tensor_parallel_degree,
+                        tensor_parallel_rank=tensor_parallel_rank,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        QWenForCausalLMInferenceModel,
+                    )
+
+                    model = QWenForCausalLMInferenceModel.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        config=config,
+                        dtype=predictor_args.dtype,
+                    )
                 model.eval()
             else:
                 raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt, qwen]")
@@ -1424,11 +1439,19 @@ def create_predictor(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
             elif "qwen" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    QWenForCausalLMInferenceModel,
-                )
+                if predictor_args.block_attn:
+                    config.block_size = predictor_args.block_size
+                    config.max_seq_len = predictor_args.total_max_length
+                    config.use_dynamic_cachekv_quant = predictor_args.use_cachekv_int8 == "dynamic"
+                    from paddlenlp.experimental.transformers import (
+                        QWenForCausalLMBlockInferenceModel as QWenInferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        QWenForCausalLMInferenceModel as QWenInferenceModel,
+                    )
 
-                cache_kvs_shape = QWenForCausalLMInferenceModel.get_cache_kvs_shape(
+                cache_kvs_shape = QWenInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
             else:
@@ -1482,6 +1505,7 @@ def predict():
 
     else:
         source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
+        # source_texts = ["My name is"]
         target_texts = ["", ""]
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
