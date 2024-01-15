@@ -13,18 +13,29 @@
 # limitations under the License.
 
 import argparse
+import time
 
 import numpy as np
 
-import time
-
 parser = argparse.ArgumentParser()
-parser.add_argument("--similar_text_pair", type=str,
-                    default='', help="The full path of similar pair file")
-parser.add_argument("--recall_result_file", type=str,
-                    default='', help="The full path of recall result file")
-parser.add_argument("--recall_num", type=int, default=10,
-                    help="Most similar number of doc recalled from corpus per query")
+parser.add_argument(
+    "--similar_text_pair",
+    type=str,
+    default="",
+    help="The full path of similar pair file",
+)
+parser.add_argument(
+    "--recall_result_file",
+    type=str,
+    default="",
+    help="The full path of recall result file",
+)
+parser.add_argument(
+    "--recall_num",
+    type=int,
+    default=10,
+    help="Most similar number of doc recalled from corpus per query",
+)
 
 
 args = parser.parse_args()
@@ -62,16 +73,15 @@ if __name__ == "__main__":
     with open(args.recall_result_file, "r", encoding="utf-8") as f:
         relevance_labels = []
         for index, line in enumerate(f):
-
-            if index % args.recall_num == 0 and index != 0:
-                rs.append(relevance_labels)
-                relevance_labels = []
-
             text, recalled_text, cosine_sim = line.rstrip().split("\t")
             if text2similar[text] == recalled_text:
                 relevance_labels.append(1)
             else:
                 relevance_labels.append(0)
+
+            if (index + 1) % args.recall_num == 0:
+                rs.append(relevance_labels)
+                relevance_labels = []
 
     recall_N = []
     recall_num = [1, 5, 10, 20, 50]

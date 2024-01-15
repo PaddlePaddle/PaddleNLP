@@ -1069,7 +1069,17 @@ class GenerationUtilsTestCase(unittest.TestCase):
         self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, True])
 
         eos_token_id = [7, 11, 3]
-        unfinish_flag = paddle.to_tensor([[False], [False]], dtype="bool")
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, False])
+
+        eos_token_id = [[7], [11], [3]]
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, False])
+
+        eos_token_id = [7, [11], [3]]
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
         unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
         self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, False])
 
