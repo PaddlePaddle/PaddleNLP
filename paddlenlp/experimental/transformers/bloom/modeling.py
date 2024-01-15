@@ -738,7 +738,8 @@ class BlommForCausalBlockLMInferenceModel(GenerationBlockInferenceModel, BloomPr
             attention_mask=src_mask,
             tgt_mask=tgt_mask,
             caches=caches,
-            rope_emb=rope_emb,
+            # bloom does not have rope_emb!
+            rope_emb=None,
             block_tables=block_tables,
             pre_caches=pre_caches,
             seq_lens_this_time=seq_lens_this_time,
@@ -753,6 +754,9 @@ class BlommForCausalBlockLMInferenceModel(GenerationBlockInferenceModel, BloomPr
         hidden_states = outputs[0]
 
         output = self.lm_head(hidden_states)
+        
+        #print(output[0,:20])
+
         return output
 
     @paddle.no_grad()
