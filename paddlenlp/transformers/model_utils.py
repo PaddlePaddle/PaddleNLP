@@ -712,6 +712,7 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
     _convert_state_dict_dtype_and_shape(state_dict, model_to_load)
 
     error_msgs = []
+
     if len(start_prefix) > 0:
         for key in list(state_dict.keys()):
             if key.startswith(start_prefix):
