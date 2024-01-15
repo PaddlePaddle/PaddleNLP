@@ -636,15 +636,6 @@ class BloomBlockInferenceModel(BloomModelInferenceModel):
                 **kwargs,
             )
 
-        # if inputs_embeds.shape[0] == 100:
-        #     print("哈哈哈")
-        #     import numpy as np
-        #     static_dict = {
-        #         "hidden_states": hidden_states.numpy(),
-        #     }
-        #     np.savez('/zhoukangkang/my.npz', **static_dict)
-        #     exit(0)
-
         hidden_states = self.ln_f(hidden_states)
 
         return BaseModelOutputWithPastAndCrossAttentions(
