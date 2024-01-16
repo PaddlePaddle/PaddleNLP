@@ -244,7 +244,8 @@ class QWenInferenceModel(QWenPretrainedModel):
         )
         return ids_remove_padding, padding_offset, cum_offsets
 
-    # This function is a little different from prepare_input_ids_for_generation in paddlenlp/transformers/generation/utils.py
+    # This function is a little different from prepare_input_ids_for_generation in paddlenlp/transformers/generation/utils.py,
+    # it is used to generate fake input_ids according to inputs_embeds length.
     @staticmethod
     def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
         batch_size = 1
@@ -254,7 +255,7 @@ class QWenInferenceModel(QWenPretrainedModel):
         if encoder_output is not None:
             batch_size = encoder_output.shape[0]
             seq_len = encoder_output.shape[1]
-        return paddle.ones([batch_size, seq_len], dtype="int64") * bos_token_id
+        return paddle.full([batch_size, seq_len], bos_token_id, dtype="int64")
 
     def forward(
         self,
@@ -558,15 +559,15 @@ class QWenForQWenVLInferenceModel(QWenForCausalLMInferenceModel):
     ) -> paddle.Tensor:
         inputs_embeds = self.qwen.wte(input_ids)
         inputs_embeds_dtype = inputs_embeds.dtype
-        if inputs_embeds_dtype == paddle.bfloat16 or inputs_embeds_dtype == paddle.float16:
+        if inputs_embeds_dtype != paddle.float32:
             inputs_embeds = paddle.cast(inputs_embeds, paddle.float32)
             image_features = paddle.cast(image_features, paddle.float32)
 
-        for idx, (i, a, b) in enumerate(img_pos):
-            index = paddle.arange(a + 1, b).unsqueeze(-1)
+        for idx, (i, image_start_idx, image_end_idx) in enumerate(img_pos):
+            index = paddle.arange(image_start_idx + 1, image_end_idx).unsqueeze(-1)
             inputs_embeds[i] = paddle.scatter(inputs_embeds[i], index, image_features[idx])
 
-        if inputs_embeds_dtype == paddle.bfloat16 or inputs_embeds_dtype == paddle.float16:
+        if inputs_embeds_dtype != paddle.float32:
             inputs_embeds = paddle.cast(inputs_embeds, inputs_embeds_dtype)
 
         outputs = self.generate(
