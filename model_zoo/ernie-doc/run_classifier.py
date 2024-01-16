@@ -214,7 +214,7 @@ def do_train(args):
         preprocess_text_fn=preprocess_text_fn,
     )
 
-    # paddle version >= 2.5.0 or develop
+    # paddle version > 2.5 or develop
     paddle_version = float(paddle.__version__[:3])
     if (paddle_version == 0.0) or (paddle_version > 2.5):
         DataLoader = paddle.base.io.reader.DataLoader
