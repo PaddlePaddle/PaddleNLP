@@ -41,7 +41,10 @@ from huggingface_hub import (
 )
 from huggingface_hub.utils import EntryNotFoundError
 from paddle import Tensor
-from paddle.distributed.fleet.meta_parallel.parallel_layers import SharedLayerDesc
+from paddle.distributed.fleet.meta_parallel.parallel_layers import (
+    PipelineLayer,
+    SharedLayerDesc,
+)
 from paddle.nn import Embedding, Layer
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
@@ -933,6 +936,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         ):
             self.init_weights()
 
+        # Note:
+        # 1. PipelineLayer will create parameters for each layer and
+        # call `_synchronize_shared_weights()` to synchronize the shared parameters.
+        # 2. When setting the model `state_dict`, `_synchronize_shared_weights` will be called to
+        # synchronize the shared parameters.
+        # However, `self._init_weights` will re-initialize the parameters without
+        # synchronizing the shared parameters. If the following step does not load a checkpoint,
+        # the shared parameters will be different.
+
+        if isinstance(self, PipelineLayer):
+            self._synchronize_shared_weights()
+
     def _init_weights(self, layer):
         """
         Initialize the weights. This method should be overridden by derived class.
@@ -1761,9 +1776,15 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     loaded_keys, quantization_linear_list, config.quantization_config
                 )
             if keep_in_fp32_modules is None:
-                keep_in_fp32_modules = ["quant_scale"]
+                keep_in_fp32_modules = (
+                    ["quant_scale"] if config.quantization_config.weight_quantize_algo in ["nf4", "fp4"] else None
+                )
             else:
-                keep_in_fp32_modules += ["quant_scale"]
+                keep_in_fp32_modules = (
+                    keep_in_fp32_modules + ["quant_scale"]
+                    if config.quantization_config.weight_quantize_algo in ["nf4", "fp4"]
+                    else keep_in_fp32_modules
+                )
 
         missing_keys = list(set(expected_keys) - set(loaded_keys))
         unexpected_keys = list(set(loaded_keys) - set(expected_keys))
@@ -2185,7 +2206,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             logger.info("Loaded weights file from disk, setting weights to model.")
 
         # Check if `_keep_in_fp32_modules` is not None
-        use_keep_in_fp32_modules = (cls._keep_in_fp32_modules is not None) and dtype == "float16"
+        use_keep_in_fp32_modules = (cls._keep_in_fp32_modules is not None) and (
+            dtype == "float16" or dtype == "bfloat16"
+        )
 
         if is_sharded:
             loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
@@ -2220,6 +2243,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     quantization_config=config.quantization_config,
                     llm_int8_threshold=config.quantization_config.llm_int8_threshold,
                 )
+                quantization_linear_list = []
+                for key in model.state_dict().keys():
+                    if "quant_weight" in key:
+                        quantization_linear_list.append(key[:-13])
 
         model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
             model=model,

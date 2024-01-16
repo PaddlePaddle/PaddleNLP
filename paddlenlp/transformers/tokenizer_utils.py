@@ -585,6 +585,8 @@ class ChatTemplate:
         final_query = self.render_system(context_data=context_data)
         context_data["length"] = len(conversations)
         for index, conversation in enumerate(conversations[:-1]):
+            context_data["is_first"] = index == 0
+            context_data["is_last"] = False
             final_query += "".join(self.render_conversation(conversation, index=index, context_data=context_data))
 
         if not isinstance(conversations[-1], list) and not len(conversations[-1]) != 1:
@@ -668,6 +670,10 @@ class ChatTemplateMixin:
         # encode conversation
         conversation_ids = []
         for index, conversation in enumerate(conversations):
+            # give more control to chat_template
+            context_data["is_first"] = index == 0
+            context_data["is_last"] = index == len(conversations) - 1
+
             user_input, bot_output = self.chat_template.render_conversation(
                 conversation, index=index, context_data=context_data
             )

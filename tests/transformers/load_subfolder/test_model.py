@@ -20,6 +20,7 @@ import pytest
 
 from paddlenlp.transformers import AutoModel, BertModel, CLIPTextModel, T5Model
 from paddlenlp.utils.log import logger
+from tests.testing_utils import slow
 
 
 class ModelLoadTester(unittest.TestCase):
@@ -58,6 +59,7 @@ class ModelLoadTester(unittest.TestCase):
                 else:
                     assert any(".pdparams" in f for f in file_list), "*.pdparams not in cache_dir"
 
+    @slow
     def test_bert_load(self):
         # BOS
         logger.info("Download model from PaddleNLP BOS")
@@ -194,6 +196,7 @@ class ModelLoadTester(unittest.TestCase):
             use_safetensors=False,
         )
 
+    @slow
     def test_bert_load_safe(self):
         # BOS
         logger.info("Download model from PaddleNLP BOS")
@@ -320,6 +323,7 @@ class ModelLoadTester(unittest.TestCase):
             use_safetensors=True,
         )
 
+    @slow
     def test_clip_load(self):
         # BOS
         logger.info("Download model from PaddleNLP BOS")
@@ -466,6 +470,7 @@ class ModelLoadTester(unittest.TestCase):
             use_safetensors=False,
         )
 
+    @slow
     def test_clip_load_safe(self):
         # BOS
         logger.info("Download model from PaddleNLP BOS")
@@ -608,6 +613,7 @@ class ModelLoadTester(unittest.TestCase):
             use_safetensors=True,
         )
 
+    @slow
     def test_t5_load(self):
         # BOS
         logger.info("Download model from PaddleNLP BOS")
@@ -726,6 +732,7 @@ class ModelLoadTester(unittest.TestCase):
             use_safetensors=False,
         )
 
+    @slow
     def test_t5_load_safe(self):
         # BOS
         logger.info("Download model from PaddleNLP BOS")

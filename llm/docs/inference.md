@@ -61,15 +61,18 @@ PaddleNLP 中已经添加高性能推理模型相关实现，支持：
 | [ChatGLM2](../chatglm2)      | ✅               | ❌       | ❌     | ❌   |
 | [Bloom](../bloom)            | ✅               | ✅       | ✅     | ❌   |
 | [GPT-3](../gpt-3)            | ✅               | ❌       | ❌     | ❌   |
-| [Qwen](../qwen)              | ❌               | ❌       | ❌     | ❌   |
+| [Qwen](../qwen)              | ✅               | ❌       | ❌     | ❌   |
 | [BaiChuan-7B](../llama)     | ✅               | ✅       | ✅     | 🚧   |
-| [BaiChuan-13B](../llama) | ❌               | ❌       | ❌     | ❌   |
+| [BaiChuan2-7B](../llama)     | ✅               | ✅       | ✅     | 🚧   |
+| [BaiChuan2-13B](../llama) | 🚧               | 🚧       | 🚧     | 🚧   |
 
 * ✅: Supported
 * 🚧: In Progress
 * ❌: Not Supported
 * WINT8:指Weight-Only Quantization INT8，即对权重进行INT8量化的模型。
 * PTQ-A8W8:指使用PTQ对线性层的激活和权重都量化为INT8的模型。
+
+为了进一步提升推理的吞吐，我们基于PageAttention的思想设计并实现了BlockAttention，在保持高性能推理和动态插入的基础上可以动态地为cachekv分配存储空间，极大地节省显存，从而在同一时刻处理更多的query以获得吞吐的提升。下面分别给出关闭BlockAttention和打开BlockAttention进行高性能推理的命令参考。
 
 ### 2.2 环境准备
 
@@ -83,7 +86,9 @@ git clone https://github.com/PaddlePaddle/PaddleNLP
 cd ./paddlenlp/csrc && python setup_cuda.py install
 ```
 
-### 2.3 高性能动态图推理
+### 2.3 关闭BlockAttention的高性能推理
+
+#### 2.3.1 动态图推理
 
 ```shell
 # 动态图模型推理命令参考
@@ -103,7 +108,7 @@ python predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference
 2. PrefixTuning推理需要传入相应的pre_cache，需要额外设置`export_precache`为`true`，并且传入对应的PrefixTuning参数保存路径`prefix_path`。
 3. 使用Weight Only Int8 推理需要额外传入 `quant_type`。
 
-### 2.4 高性能静态图推理
+#### 2.3.2 静态图推理
 **step1：动转静**
 ```shell
 # 动转静命令参考
@@ -150,6 +155,64 @@ python predictor.py  --model_name_or_path ./inference --inference_model --quant_
 4. A8W8推理传入的 `model_name_or_path` 为PTQ校准产出的量化模型。
 
 
+### 2.4 打开BlockAttention的高性能推理
+
+#### 2.4.1 动态图推理
+
+```shell
+# 动态图模型推理命令参考
+python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn
+
+# Weight Only Int8 动态图推理参考
+python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --quant_type weight_only_int8 --block_attn
+
+# PTQ-A8W8推理命令参考
+python predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --dtype float16 --block_attn
+
+# CacheKV 动态量化推理命令参考
+python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn --cachekv_int8
+```
+
+#### 2.4.2 静态图推理
+**step1：动转静**
+```shell
+# 动转静命令参考
+python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --block_attn
+
+# Weight Only Int8 动转静命令参考
+python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --quant_type weight_only_int8 --block_attn
+
+# PTQ-A8W8动转静命令参考
+python export_model.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --output_path ./inference --dtype float16 --block_attn
+
+# CacheKV 动态量化动转静命令参考
+python export_model.py  --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --block_attn --cachekv_int8
+```
+
+**step2：静态图推理**
+```shell
+# 静态图推理命令参考
+python predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --block_attn
+
+# Weight Only Int8 静态图推理命令参考
+python predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --quant_type weight_only_int8 --block_attn
+
+# PTQ-A8W8静态图推理命令参考
+# 以下环境变量用于开启int8矩阵乘的算法选择以获得更快的推理速度，打开之后第一次执行会执行算法选择从而导致速度较慢。
+export FLAGS_use_autotune=1
+export FLAGS_cublaslt_exhaustive_search_times=10
+export FLAGS_cache_inference_while_scope=1
+
+python predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --block_attn
+
+# CacheKV 动态量化8静态图推理命令参考
+python predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --cachekv_int8 --block_attn
+```
+**Note**：
+1. 使用Weight Only Int8 推理需要额外传入 `quant_type`。
+2. A8W8推理传入的 `model_name_or_path` 为PTQ校准产出的量化模型。
+
+
 ## 3. 推理参数介绍
 
 - `model_name_or_path`: 必须，预训练模型名称或者本地的模型路径，用于热启模型和分词器，默认为None。
@@ -168,3 +231,6 @@ python predictor.py  --model_name_or_path ./inference --inference_model --quant_
 - `model_type`: 初始化不同类型模型，gpt-3: GPTForCausalLM; ernie-3.5-se: Ernie35ForCausalLM; 默认为 None。
 - `mode`: 使用动态图或者静态图推理，值为：[dynamic, static]，默认为 dynamic。
 - `inference_model`: 是否使用Inference Model 推理，默认值为 False。
+- `block_attn`: 是否使用Block Attention 推理， 默认值为False。
+- `block_size`: 如果使用Block Attention 推理，指定一个Block可以存储的token数量，默认值为64。
+- `cachekv_int8`: 是否使用cachekv int8量化用于节省显存，默认值为False。
