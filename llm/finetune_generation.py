@@ -399,11 +399,18 @@ def main():
             multi_query_group_num=prefix_tuning_params["multi_query_group_num"],
             dtype=dtype,
         )
-        model = PrefixModelForCausalLM(
-            model=model,
-            prefix_config=prefix_config,
-            postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
-        )
+        if model_args.prefix_path is None:
+            model = PrefixModelForCausalLM(
+                model=model,
+                prefix_config=prefix_config,
+                postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
+            )
+        else:
+            model = PrefixModelForCausalLM.from_pretrained(
+                model=model,
+                prefix_path=model_args.prefix_path,
+                postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
+            )
         model.print_trainable_parameters()
 
     if model_args.lora:

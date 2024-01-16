@@ -247,7 +247,7 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
         if shard_file.endswith(".safetensors") and model.config.tensor_parallel_degree > 1:
             pre_tensor_parallel_split = True
             assert loaded_keys is not None, "loaded_keys is not None."
-            if isinstance(model, LoRAModel):
+            if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
                 tp_actions = model._get_tensor_parallel_convert_actions(set(loaded_keys), is_split=True)
             else:
                 tp_actions = model.get_tensor_parallel_convert_actions(model.config, loaded_keys, ignore_error=True)
@@ -304,7 +304,7 @@ def unified_checkpoint_into_shards(
     config_to_save = copy.deepcopy(model_to_save.config)
 
     if config_to_save.tensor_parallel_degree > 1:
-        if isinstance(model_to_save, LoRAModel):
+        if isinstance(model_to_save, LoRAModel) or isinstance(model_to_save, PrefixModelForCausalLM):
             tp_actions = model_to_save._get_tensor_parallel_convert_actions(all_filter_keys, is_split=False)
         else:
             tp_actions = model_to_save.get_tensor_parallel_convert_actions(
@@ -485,7 +485,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
             if shard_file.endswith(".safetensors"):
                 # assert model_keys is not None, "model_keys is None." TODO: correct the assert
                 if model.config.tensor_parallel_degree > 1:
-                    if isinstance(model, LoRAModel):
+                    if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
                         tp_actions = model._get_tensor_parallel_convert_actions(model_keys, is_split=True)
                     else:
                         tp_actions = model.get_tensor_parallel_convert_actions(
@@ -586,7 +586,7 @@ def unified_optimizer_into_shards(
             base_model_key = key.split("/")[0]
             if base_model_key not in model_keys:
                 model_keys.append(base_model_key)
-        if isinstance(model, LoRAModel):
+        if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
             tp_actions = model._get_tensor_parallel_convert_actions(model_keys, is_split=False)
         else:
             tp_actions = model.get_tensor_parallel_convert_actions(
