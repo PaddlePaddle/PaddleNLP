@@ -1005,6 +1005,7 @@ class TrainingArguments:
                                     f"accept config is enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add"
                                 )
                     try:
+                        strategy.hybrid_configs["mp_configs"].need_broadcast_data = False
                         if "enable_mp_async_allreduce" in mp_config:
                             strategy.hybrid_configs["mp_configs"].mp_async_allreduce = True
                             if "enable_mp_skip_c_identity" in mp_config:
