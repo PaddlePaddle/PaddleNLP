@@ -68,6 +68,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
                 logger.warning(
                     f"Reset tensor_parallel_degree of prefix_config to {self.model.config.tensor_parallel_degree}."
                 )
+        self.mark_only_prefix_as_trainable()
 
     def forward(
         self,

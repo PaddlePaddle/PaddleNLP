@@ -404,7 +404,6 @@ def main():
             prefix_config=prefix_config,
             postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
         )
-        model.mark_only_prefix_as_trainable()
         model.print_trainable_parameters()
 
     if model_args.lora:
@@ -422,7 +421,6 @@ def main():
             model = LoRAModel(model, lora_config)
         else:
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
-        model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
 
     def compute_metrics_do_generation(eval_preds):

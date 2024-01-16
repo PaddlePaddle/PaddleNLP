@@ -149,11 +149,14 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
         state_dict, os.path.join(save_directory, shard_file), safe_serialization, is_sync=is_sync_save
     )
 
-    # Save prefix model past_key_values
-    if isinstance(model_to_save, PrefixModelForCausalLM):
-        local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
-        if local_rank == 0:
+    local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+    if local_rank == 0:
+        # Save prefix model past_key_values
+        if isinstance(model_to_save, PrefixModelForCausalLM):
             save_prefix_past_key_value(model_to_save, save_directory)
+            model_to_save.prefix_config.save_pretrained(save_directory)
+        if isinstance(model_to_save, LoRAModel):
+            model_to_save.lora_config.save_pretrained(save_directory)
 
     # Attach architecture to the config
     config_to_save.architectures = [model_to_save.__class__.__name__]
@@ -244,7 +247,10 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
         if shard_file.endswith(".safetensors") and model.config.tensor_parallel_degree > 1:
             pre_tensor_parallel_split = True
             assert loaded_keys is not None, "loaded_keys is not None."
-            tp_actions = model.get_tensor_parallel_convert_actions(model.config, loaded_keys, ignore_error=True)
+            if isinstance(model, LoRAModel):
+                tp_actions = model._get_tensor_parallel_convert_actions(set(loaded_keys), is_split=True)
+            else:
+                tp_actions = model.get_tensor_parallel_convert_actions(model.config, loaded_keys, ignore_error=True)
         # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
         state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys)
 
@@ -298,9 +304,12 @@ def unified_checkpoint_into_shards(
     config_to_save = copy.deepcopy(model_to_save.config)
 
     if config_to_save.tensor_parallel_degree > 1:
-        tp_actions = model_to_save.get_tensor_parallel_convert_actions(
-            model_to_save.config, state_dict.keys(), is_split=False, ignore_error=True
-        )
+        if isinstance(model_to_save, LoRAModel):
+            tp_actions = model_to_save._get_tensor_parallel_convert_actions(all_filter_keys, is_split=False)
+        else:
+            tp_actions = model_to_save.get_tensor_parallel_convert_actions(
+                model_to_save.config, state_dict.keys(), is_split=False, ignore_error=True
+            )
         state_dict = merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys)
 
     if config_to_save.tensor_parallel_degree > 1:
@@ -476,7 +485,12 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
             if shard_file.endswith(".safetensors"):
                 # assert model_keys is not None, "model_keys is None." TODO: correct the assert
                 if model.config.tensor_parallel_degree > 1:
-                    tp_actions = model.get_tensor_parallel_convert_actions(model.config, model_keys, ignore_error=True)
+                    if isinstance(model, LoRAModel):
+                        tp_actions = model._get_tensor_parallel_convert_actions(model_keys, is_split=True)
+                    else:
+                        tp_actions = model.get_tensor_parallel_convert_actions(
+                            model.config, model_keys, ignore_error=True
+                        )
                     if not is_master_weights:
                         tp_actions = mapping_optimizer_tp_actions(tp_actions, expected_keys)
 
@@ -572,9 +586,12 @@ def unified_optimizer_into_shards(
             base_model_key = key.split("/")[0]
             if base_model_key not in model_keys:
                 model_keys.append(base_model_key)
-        tp_actions = model.get_tensor_parallel_convert_actions(
-            model.config, model_keys, is_split=False, ignore_error=True
-        )
+        if isinstance(model, LoRAModel):
+            tp_actions = model._get_tensor_parallel_convert_actions(model_keys, is_split=False)
+        else:
+            tp_actions = model.get_tensor_parallel_convert_actions(
+                model.config, model_keys, is_split=False, ignore_error=True
+            )
         optim_state_dict = merge_tensor_parallel_for_optimizer(
             optim_state_dict,
             tp_actions,
@@ -1540,7 +1557,7 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
 
     if tp_rank == 0:
         tensor_bytes_dict = {}
-        model_state_dict = model_to_save.state_dict()
+        model_state_dict = get_expected_state_dict(model_to_save)
         for (k, v) in state_dict.items():
             model_v = model_state_dict[k.split("/")[0]] if is_optimizer else v
             if hasattr(model_v, "is_distributed") and model_v.is_distributed:
