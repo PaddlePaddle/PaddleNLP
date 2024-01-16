@@ -1347,21 +1347,21 @@ def create_predictor(
             elif "bloom" in config.architectures[0].lower():
                 if predictor_args.block_attn:
                     from paddlenlp.experimental.transformers import (
-                        BlommForCausalBlockLMInferenceModel as Model,
+                        BlommForCausalBlockLMInferenceModel as BloomInferenceModel,
                     )
 
                     config.block_size = predictor_args.block_size
                     config.max_seq_len = predictor_args.total_max_length
                 else:
                     from paddlenlp.experimental.transformers import (
-                        BloomForCausalLMInferenceModel as Model,
+                        BloomForCausalLMInferenceModel as BloomInferenceModel,
                     )
-                model = Model.from_pretrained(
+                model = BloomInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path,
                     config=config,
                     dtype=predictor_args.dtype,
                 )
-                cache_kvs_shape = Model.get_cache_kvs_shape(
+                cache_kvs_shape = BloomInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
                 model.eval()
@@ -1439,16 +1439,16 @@ def create_predictor(
             elif "bloom" in config.architectures[0].lower():
                 if predictor_args.block_attn:
                     from paddlenlp.experimental.transformers import (
-                        BlommForCausalBlockLMInferenceModel as Model,
+                        BlommForCausalBlockLMInferenceModel as BloomInferenceModel,
                     )
 
                     config.block_size = predictor_args.block_size
                     config.max_seq_len = predictor_args.total_max_length
                 else:
                     from paddlenlp.experimental.transformers import (
-                        BloomForCausalLMInferenceModel as Model,
+                        BloomForCausalLMInferenceModel as BloomInferenceModel,
                     )
-                cache_kvs_shape = Model.get_cache_kvs_shape(
+                cache_kvs_shape = BloomInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
             elif "gpt" in config.architectures[0].lower():
