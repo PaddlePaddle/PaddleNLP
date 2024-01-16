@@ -140,6 +140,21 @@ class ModelArguments:
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
     )
+    vocab_size: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": ".Vocabulary size of the Llama model. Defines the number of different tokens that can be represented by the `inputs_ids`"
+        },
+    )
+    hidden_size: Optional[int] = field(default=None, metadata={"help": "Dimension of the hidden representations."})
+    intermediate_size: Optional[int] = field(default=None, metadata={"help": "Dimension of the MLP representations."})
+    num_hidden_layers: Optional[int] = field(
+        default=None, metadata={"help": "Number of hidden layers in the Transformer encoder."}
+    )
+    num_attention_heads: Optional[int] = field(
+        default=None,
+        metadata={"help": "Number of attention heads for each attention layer in the Transformer encoder."},
+    )
     use_flash_attention: bool = field(
         default=False,
         metadata={"help": "use_flash_attention"},
@@ -443,6 +458,17 @@ def main():
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
 
+    config.hidden_size = model_args.hidden_size if model_args.hidden_size is not None else config.hidden_size
+    config.intermediate_size = (
+        model_args.intermediate_size if model_args.intermediate_size is not None else config.intermediate_size
+    )
+    config.num_hidden_layers = (
+        model_args.num_hidden_layers if model_args.num_hidden_layers is not None else config.num_hidden_layers
+    )
+    config.num_attention_heads = (
+        model_args.num_attention_heads if model_args.num_attention_heads is not None else config.num_attention_heads
+    )
+
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
@@ -606,8 +632,8 @@ def main():
                 )
                 tr_loss = 0
 
-            if global_step // training_args.gradient_accumulation_steps >= 1:
-                sys.exit(0)
+            if global_step // training_args.gradient_accumulation_steps >= training_args.max_steps:
+                break
 
             global_step += 1
 
