@@ -754,8 +754,6 @@ class BlommForCausalBlockLMInferenceModel(GenerationBlockInferenceModel, BloomPr
         hidden_states = outputs[0]
 
         output = self.lm_head(hidden_states)
-        
-        #print(output[0,:20])
 
         return output
 
