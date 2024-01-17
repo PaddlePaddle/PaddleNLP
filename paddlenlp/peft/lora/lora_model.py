@@ -230,12 +230,12 @@ class LoRAModel(nn.Layer):
 
         if self.is_pipelinemodel:
             self.model._single_to_pp_mapping = None
-        if self.quantized and merge_tensor_parallel and self.lora_config.tensor_parallel_degre > 1:
+        if self.quantized and merge_tensor_parallel and self.lora_config.tensor_parallel_degree > 1:
             merge_tensor_parallel = False
             logger.warning(
                 "Quantized strategy does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
             )
-        if self.is_pipelinemodel and merge_tensor_parallel and self.lora_config.tensor_parallel_degre > 1:
+        if self.is_pipelinemodel and merge_tensor_parallel and self.lora_config.tensor_parallel_degree > 1:
             merge_tensor_parallel = False
             logger.warning(
                 "Pipeline parallism does not support merge_tensor_parallel. Set merge_tensor_parallel to False."

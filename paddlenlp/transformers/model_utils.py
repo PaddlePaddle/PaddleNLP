@@ -1776,9 +1776,15 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     loaded_keys, quantization_linear_list, config.quantization_config
                 )
             if keep_in_fp32_modules is None:
-                keep_in_fp32_modules = ["quant_scale"]
+                keep_in_fp32_modules = (
+                    ["quant_scale"] if config.quantization_config.weight_quantize_algo in ["nf4", "fp4"] else None
+                )
             else:
-                keep_in_fp32_modules += ["quant_scale"]
+                keep_in_fp32_modules = (
+                    keep_in_fp32_modules + ["quant_scale"]
+                    if config.quantization_config.weight_quantize_algo in ["nf4", "fp4"]
+                    else keep_in_fp32_modules
+                )
 
         missing_keys = list(set(expected_keys) - set(loaded_keys))
         unexpected_keys = list(set(loaded_keys) - set(expected_keys))
@@ -2200,7 +2206,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             logger.info("Loaded weights file from disk, setting weights to model.")
 
         # Check if `_keep_in_fp32_modules` is not None
-        use_keep_in_fp32_modules = (cls._keep_in_fp32_modules is not None) and dtype == "float16"
+        use_keep_in_fp32_modules = (cls._keep_in_fp32_modules is not None) and (
+            dtype == "float16" or dtype == "bfloat16"
+        )
 
         if is_sharded:
             loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
@@ -2235,6 +2243,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     quantization_config=config.quantization_config,
                     llm_int8_threshold=config.quantization_config.llm_int8_threshold,
                 )
+                quantization_linear_list = []
+                for key in model.state_dict().keys():
+                    if "quant_weight" in key:
+                        quantization_linear_list.append(key[:-13])
 
         model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
             model=model,

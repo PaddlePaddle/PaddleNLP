@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import copy
 import math
 import os
 import sys
@@ -261,7 +262,7 @@ def create_pretrained_dataset(
     def _collate_data(data, stack_fn=Stack()):
         tokens_ = stack_fn([x["text"] for x in data])
 
-        labels = tokens_[:, 1:]
+        labels = copy.deepcopy(tokens_)[:, 1:]
         tokens = tokens_[:, :-1]
 
         return {
@@ -372,8 +373,10 @@ class PretrainingTrainer(Trainer):
 
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
-    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    # Support format as "args.json --arg1 value1 --arg2 value2.”
+    # In case of conflict, command line arguments take precedence.
+    if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 

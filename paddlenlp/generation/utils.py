@@ -1059,10 +1059,8 @@ class GenerationMixin(object):
 
             # pre-process distribution
             next_token_logits = self.adjust_logits_during_generation(next_token_logits)
-            next_tokens_scores = logits_processors(input_ids, next_token_logits)
+            probs = logits_processors(input_ids, next_token_logits)
             # greedy
-            probs = F.softmax(next_tokens_scores)
-            probs = paddle.log(probs)
             next_tokens = paddle.argmax(probs, axis=-1).unsqueeze(-1)
             next_scores = paddle.index_sample(probs, next_tokens)
 

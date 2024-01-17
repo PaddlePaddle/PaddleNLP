@@ -26,6 +26,7 @@ from paddlenlp.transformers import (  # ChatGLMForCausalLM,
     ChatGLMForCausalLM,
     ChatGLMv2ForCausalLM,
     LlamaForCausalLM,
+    QWenForCausalLM,
 )
 from paddlenlp.utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
@@ -43,6 +44,7 @@ from .testing_utils import LLMTest, argv_context_guard, load_test_config
         ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
         ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
         ["__internal_testing__/tiny-fused-chatglm2", ChatGLMv2ForCausalLM],
+        ["__internal_testing__/tiny-fused-qwen-inference5.2", QWenForCausalLM],
     ],
 )
 class PredictorTest(LLMTest, unittest.TestCase):
@@ -205,3 +207,82 @@ class PredictorBaseTest(LLMTest, unittest.TestCase):
 
             with argv_context_guard(config):
                 predict()
+
+
+@parameterized_class(
+    ["model_name_or_path", "model_class"],
+    [
+        ["__internal_testing__/tiny-fused-llama-inference5.2", LlamaForCausalLM],
+        ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
+    ],
+)
+class BlockAttnPredictorTest(LLMTest, unittest.TestCase):
+    config_path: str = "./tests/fixtures/llm/predictor.yaml"
+    model_name_or_path: str = None
+    model_class = None
+
+    def setUp(self) -> None:
+        super().setUp()
+        paddle.set_default_dtype("float32")
+        self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
+        AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
+
+    def test_blha(self):
+        self.run_predictor({"inference_model": True, "block_attn": True})
+        result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
+        self.run_predictor({"inference_model": False})
+        result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))
+
+        # compare the generation result of inference & dygraph model
+        assert len(result_0) == len(result_1)
+
+        count, full_match = 0, 0
+        for inference_item, no_inference_item in zip(result_0, result_1):
+            min_length = min(len(inference_item), len(no_inference_item))
+            count += int(inference_item[: min_length // 2] == no_inference_item[: min_length // 2])
+            full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
+
+        self.assertGreaterEqual(full_match / len(result_0), 0.3)
+
+        if self.model_name_or_path == "__internal_testing__/tiny-fused-chatglm":
+            self.assertGreaterEqual(count / len(result_0), 0.3)
+        else:
+            self.assertGreaterEqual(count / len(result_0), 0.4)
+
+    def test_wint8(self):
+        self.run_predictor({"inference_model": True, "quant_type": "weight_only_int8", "block_attn": True})
+        result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
+        self.run_predictor({"inference_model": True, "quant_type": "weight_only_int8"})
+        result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))
+
+        assert len(result_0) == len(result_1)
+        count, full_match = 0, 0
+
+        for inference_item, no_inference_item in zip(result_0, result_1):
+            min_length = min(len(inference_item), len(no_inference_item))
+            count += int(inference_item[: min_length // 2] == no_inference_item[: min_length // 2])
+            full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
+
+        self.assertGreaterEqual(full_match / len(result_0), 0.75)
+
+        if self.model_name_or_path == "__internal_testing__/tiny-fused-chatglm":
+            self.assertGreaterEqual(count / len(result_0), 0.3)
+        else:
+            self.assertGreaterEqual(count / len(result_0), 0.4)
+
+    def test_cachekv_int8(self):
+        self.run_predictor({"inference_model": True, "block_attn": True, "cachekv_int8": True})
+        result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
+        self.run_predictor({"inference_model": True, "block_attn": True})
+        result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))
+        print(f"result_0 {result_0}, result_1 {result_1}")
+
+        assert len(result_0) == len(result_1)
+        count, full_match = 0, 0
+
+        for inference_item, no_inference_item in zip(result_0, result_1):
+            min_length = min(len(inference_item), len(no_inference_item))
+            count += int(inference_item[: min_length // 2] == no_inference_item[: min_length // 2])
+            full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
+
+        self.assertGreaterEqual(count / len(result_0), 0.2)
