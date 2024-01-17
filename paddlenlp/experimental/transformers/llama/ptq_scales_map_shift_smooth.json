@@ -13,5 +13,9 @@
         "ffn1_1_weight_scale":"llama.layers.#.mlp.gate_proj.weight_quanter",
         "ffn1_2_weight_scale":"llama.layers.#.mlp.up_proj.weight_quanter",
         "ffn2_weight_scale":"llama.layers.#.mlp.down_proj.layer.weight_quanter"
+    },
+    "cachekv_scale":{
+        "cache_k_scale": "llama.layers.#.self_attn.cachek_matmul.activation_quanter",
+        "cache_v_scale": "llama.layers.#.self_attn.cachev_matmul.activation_quanter"
     }
 }
