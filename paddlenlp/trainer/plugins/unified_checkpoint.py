@@ -153,6 +153,8 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
         with open(path, "w") as f:
             json.dump(sharded_index, f, indent=4)
 
+    paddle.device.cuda.empty_cache()
+
 
 def load_unified_checkpoint(args, model, optimizer, resume_from_checkpoint: str, safe_serialization=False) -> None:
     """Load potential model checkpoint
@@ -266,6 +268,7 @@ def unified_checkpoint_into_shards(
     Returns:
         tuple: state_dict, config, shard_file: file name, sharded_index: map for weight to file name.
     """
+    paddle.device.cuda.empty_cache()
     assert hasattr(model_to_save, "config")
 
     state_dict = model_to_save.state_dict()
@@ -302,6 +305,8 @@ def unified_checkpoint_into_shards(
         total_size_list,
     )
 
+    paddle.device.cuda.empty_cache()
+
     return state_dict, config_to_save, shard_file, sharded_index
 
 
@@ -323,6 +328,8 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
     else:
         optim_state_dict, shard_optim_file, sharded_optim_index = results[0]
         master_weight_state_dict, shard_master_weight_file, sharded_master_weight_index = results[1]
+
+    paddle.device.cuda.empty_cache()
 
     save_directory = output_dir
     os.makedirs(save_directory, exist_ok=True)
@@ -504,6 +511,7 @@ def unified_optimizer_into_shards(
         optimizer (Optimizer): optimizer to save.
         safe_serialization (bool, optional): safe serialization using safetensors. Defaults to False.
     """
+    paddle.device.cuda.empty_cache()
     optim_state_dict = nested_copy(optimizer.state_dict())
     master_weights = None
     if "master_weights" in optim_state_dict.keys():
@@ -549,12 +557,15 @@ def unified_optimizer_into_shards(
             tp_actions,
             filter_optim_keys,
         )
+        paddle.device.cuda.empty_cache()
+
         if master_weights is not None:
             master_weights = merge_tensor_parallel_for_optimizer(
                 master_weights,
                 tp_actions,
                 filter_master_keys,
             )
+            paddle.device.cuda.empty_cache()
 
     # build index json file
     index_optimizer_file, index_master_weight_file = {}, {}
@@ -589,6 +600,7 @@ def unified_optimizer_into_shards(
         else:
             sharded_optim_index["master_weights"] = False
 
+    paddle.device.cuda.empty_cache()
     if master_weights is None:
         return [(optim_state_dict, shard_optimizer_file, sharded_optim_index)]
     else:
