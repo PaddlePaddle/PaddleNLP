@@ -25,6 +25,11 @@ def get_pretrain_arguments(pretrain_arguments):
     configs["TP8"] = train_args
 
     train_args = copy.deepcopy(pretrain_arguments)
+    train_args["tensor_parallel_degree"] = 2
+    train_args["pipeline_parallel_degree"] = 1
+    configs["TP2"] = train_args
+
+    train_args = copy.deepcopy(pretrain_arguments)
     train_args["tensor_parallel_degree"] = 4
     train_args["pipeline_parallel_degree"] = 2
     configs["TP4PP2"] = train_args

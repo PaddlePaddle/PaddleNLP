@@ -15,6 +15,7 @@
 import copy
 import gc
 import json
+import multiprocessing
 import os
 
 import paddle
@@ -22,6 +23,7 @@ import paddle.distributed as dist
 from paddle.distributed import fleet
 from tqdm.auto import tqdm
 
+from paddlenlp.trainer.trainer_utils import ExplicitEnum
 from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
 from paddlenlp.transformers.model_utils import (
     PretrainedModel,
@@ -77,8 +79,24 @@ __all__ = [
     "save_unified_optimizer",
 ]
 
+async_save_queue = []
 
-def save_unified_checkpoint(args, model, output_dir, safe_serialization=False):
+
+class UnifiedCheckpointOption(ExplicitEnum):
+    """
+    "- skip_save_model_weight: do not save model weights when the masters weight exist\n"
+    "- master_weight_compatible: 1. if the master weights exist, only load when needed\n"
+    "                            2. if master weights does not exist, convert model weights to master weights when needed\n"
+    "- async_save: enable asynchronous saving checkpoints to disk\n"
+    "- enable_all_options: enable all optimization configurations\n"
+    """
+
+    SKIP_SAVE_MODEL_WEIGHT = "skip_save_model_weight"
+    MASTER_WEIGHT_COMPATIBLE = "master_weight_compatible"
+    ASYNC_SAVE = "async_save"
+
+
+def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serialization=False):
     """save unified checkpoint
 
     Args:
@@ -97,6 +115,14 @@ def save_unified_checkpoint(args, model, output_dir, safe_serialization=False):
     else:
         raise ValueError("Unified checkpoint only supports PretrainedModel")
 
+    if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
+        if is_need_master_weight(optimizer, is_fp16_or_bp16=(args.fp16 or args.bf16)):
+            logger.info(
+                f"With {UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value}, skip the model checkpoint save."
+                "The master weight will be loaded as model weights for next resumption."
+            )
+            # not save model weight, load from master weight
+            return
     config_to_save = None
     state_dict, config_to_save, shard_file, sharded_index = unified_checkpoint_into_shards(
         args, model_to_save, safe_serialization=safe_serialization
@@ -104,13 +130,13 @@ def save_unified_checkpoint(args, model, output_dir, safe_serialization=False):
 
     save_directory = output_dir
     os.makedirs(save_directory, exist_ok=True)
-    if safe_serialization:
-        for k in list(state_dict.keys()):
-            if isinstance(state_dict[k], paddle.Tensor):
-                state_dict[k] = state_dict.pop(k).cpu().numpy()
-        safe_save_file(state_dict, os.path.join(save_directory, shard_file), metadata={"format": "np"})
-    else:
-        paddle.save(state_dict, os.path.join(save_directory, shard_file))
+
+    is_sync_save = True
+    if "async_save" in args.unified_checkpoint_config:
+        is_sync_save = False
+    file_save_async_or_sync(
+        state_dict, os.path.join(save_directory, shard_file), safe_serialization, is_sync=is_sync_save
+    )
 
     # Attach architecture to the config
     config_to_save.architectures = [model_to_save.__class__.__name__]
@@ -128,7 +154,7 @@ def save_unified_checkpoint(args, model, output_dir, safe_serialization=False):
             json.dump(sharded_index, f, indent=4)
 
 
-def load_unified_checkpoint(args, model, resume_from_checkpoint: str, safe_serialization=False) -> None:
+def load_unified_checkpoint(args, model, optimizer, resume_from_checkpoint: str, safe_serialization=False) -> None:
     """Load potential model checkpoint
 
     Args:
@@ -138,22 +164,22 @@ def load_unified_checkpoint(args, model, resume_from_checkpoint: str, safe_seria
     Returns:
         None
     """
-
     local_resume = check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serialization)
+
     if not local_resume:
         logger.info("Begin to dynamically load unified checkpoint!")
-        load_unified_checkpoint_dynamically(args, model, resume_from_checkpoint, safe_serialization)
+        load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_checkpoint, safe_serialization)
         return
 
     if args.dataset_rank == 0:
-        load_unified_checkpoint_locally(model, resume_from_checkpoint, safe_serialization)
+        load_unified_checkpoint_locally(args, model, resume_from_checkpoint, safe_serialization)
 
 
-def load_unified_checkpoint_locally(model, resume_from_checkpoint: str, safe_serialization=False):
+def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, safe_serialization=False):
     """
     Only dataset_rank == 0 can enter this function.
     """
-    index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+    index_filename = select_model_weight_index(args, model, resume_from_checkpoint, safe_serialization, local=True)
 
     resolved_archive_file, sharded_metadata = get_checkpoint_shard_files(
         pretrained_model_name_or_path=resume_from_checkpoint,
@@ -210,6 +236,7 @@ def load_unified_checkpoint_locally(model, resume_from_checkpoint: str, safe_ser
             state_dict = model.convert_tensor_parallel(
                 None, model.config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
             )
+
         error_msgs += _load_state_dict_into_model(model, state_dict, "")
 
         # force memory release
@@ -300,24 +327,20 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
     save_directory = output_dir
     os.makedirs(save_directory, exist_ok=True)
 
-    if safe_serialization:
-        for k in list(optim_state_dict.keys()):
-            if isinstance(optim_state_dict[k], paddle.Tensor):
-                optim_state_dict[k] = optim_state_dict.pop(k).cpu().numpy()
-        safe_save_file(optim_state_dict, os.path.join(save_directory, shard_optim_file), metadata={"format": "np"})
-        if master_weight_state_dict is not None:
-            for k in list(master_weight_state_dict.keys()):
-                if isinstance(master_weight_state_dict[k], paddle.Tensor):
-                    master_weight_state_dict[k] = master_weight_state_dict.pop(k).cpu().numpy()
-            safe_save_file(
-                master_weight_state_dict,
-                os.path.join(save_directory, shard_master_weight_file),
-                metadata={"format": "np"},
-            )
-    else:
-        paddle.save(optim_state_dict, os.path.join(save_directory, shard_optim_file))
-        if master_weight_state_dict is not None:
-            paddle.save(master_weight_state_dict, os.path.join(save_directory, shard_master_weight_file))
+    is_sync_save = True
+    if "async_save" in args.unified_checkpoint_config:
+        is_sync_save = False
+
+    file_save_async_or_sync(
+        optim_state_dict, os.path.join(save_directory, shard_optim_file), safe_serialization, is_sync=is_sync_save
+    )
+    if master_weight_state_dict is not None:
+        file_save_async_or_sync(
+            master_weight_state_dict,
+            os.path.join(save_directory, shard_master_weight_file),
+            safe_serialization,
+            is_sync=is_sync_save,
+        )
 
     if sharded_optim_index is not None:
         if not safe_serialization:
@@ -355,13 +378,13 @@ def load_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe_
 
     if args.data_parallel_rank == 0:
         returned_optim_state_dict = load_unified_optimizer_locally(
-            model, optimizer, resume_from_checkpoint, safe_serialization
+            args, model, optimizer, resume_from_checkpoint, safe_serialization
         )
         return returned_optim_state_dict
     return None
 
 
-def load_unified_optimizer_locally(model, optimizer, resume_from_checkpoint, safe_serialization=False):
+def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
     # init and get optimizer LR_Scheduler
     returned_optim_state_dict = nested_copy(optimizer.state_dict())
 
@@ -390,6 +413,13 @@ def load_unified_optimizer_locally(model, optimizer, resume_from_checkpoint, saf
         resolved_archive_file = [resolved_archive_file]
     if len(resolved_archive_file) > 1:
         resolved_archive_file = tqdm(resolved_archive_file, desc="Loading optimizer shards")
+
+    # update has_master_weights and index_filename_master_weights
+    # 1. if the master weight exists, only has_master_weights is set True and loaded when needed
+    # 2. if master weight does not exist, convert model weight to master weight when needed
+    has_master_weights, index_filename_master_weights = update_master_weight_status(
+        args, optimizer, has_master_weights, safe_serialization
+    )
 
     if has_master_weights:
         returned_optim_state_dict["master_weights"] = {}
@@ -569,7 +599,7 @@ def unified_optimizer_into_shards(
 
 
 def check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serialization=False):
-    index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+    index_filename = select_model_weight_index(args, model, resume_from_checkpoint, safe_serialization, local=False)
     index_filename = os.path.join(resume_from_checkpoint, index_filename)
 
     # Find index json file and distribute this file in global group.
@@ -646,7 +676,14 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
     all_optimizer_filenames = sorted(set(index["weight_map"].values()))
 
     has_master_weights = index["master_weights"]
+    # update has_master_weights and index_filename_master_weights
+    # 1. if the master weight exists, only has_master_weights is set True and loaded when needed
+    # 2. if master weight does not exist, convert model weight to master weight when needed
+    has_master_weights, index_filename_master_weights = update_master_weight_status(
+        args, optimizer, has_master_weights, safe_serialization
+    )
     if has_master_weights:
+        index_filename_master_weights = os.path.join(resume_from_checkpoint, index_filename_master_weights)
         if distributed_isfile(index_filename_master_weights):
             distributed_file(index_filename_master_weights)
         else:
@@ -835,9 +872,8 @@ def create_optimizer_dispatch_table(
     return send_table, recv_table
 
 
-def load_unified_checkpoint_dynamically(args, model, resume_from_checkpoint, safe_serialization=False):
-
-    index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
+    index_filename = select_model_weight_index(args, model, resume_from_checkpoint, safe_serialization, local=False)
     index_filename = os.path.join(resume_from_checkpoint, index_filename)
 
     with open(index_filename, "r") as f:
@@ -902,6 +938,13 @@ def load_unified_optimizer_dynamically(args, model, optimizer, resume_from_check
     file_keyname_mappings, file_machine_mappings = get_file_mappings(index, resume_from_checkpoint)
 
     has_master_weights = index["master_weights"]
+    # update has_master_weights and index_filename_master_weights
+    # 1. if the master weights exists, only has_master_weights is set True and load master weights when needed
+    # 2. if master weights does not exist, convert model weights to master weights when needed
+    has_master_weights, index_filename_mw = update_master_weight_status(
+        args, optimizer, has_master_weights, safe_serialization
+    )
+
     if has_master_weights:
         with open(os.path.join(resume_from_checkpoint, index_filename_mw), "r") as f:
             index_mw = json.loads(f.read())
@@ -1497,8 +1540,7 @@ def nested_copy_place(inputs, place=None):
             outputs[key] = nested_copy_place(inputs[key], place)
         return outputs
     if isinstance(inputs, paddle.Tensor):
-        inputs = inputs._copy_to(place, False)
-
+        inputs = inputs if inputs.place == place else inputs._copy_to(place, False)
     return inputs
 
 
@@ -1510,3 +1552,122 @@ def flatten_list(nested_list):
         else:
             flattened_list.append(item)
     return flattened_list
+
+
+def check_exitcode(task):
+    exitcode = task.exitcode
+    if exitcode != 0:
+        logger.info(f"Error: save ckpt process failed with exitcode {exitcode}!!!")
+    else:
+        logger.info(f"Success: save ckpt process with exitcode {exitcode}!!!")
+
+
+def clear_async_save_task_queue():
+    """
+    wait until all async save task to be done.
+    """
+    while len(async_save_queue) > 0:
+        task = async_save_queue.pop()
+        if task and task.is_alive():
+            task.join(timeout=60)
+            if task.is_alive():
+                logger.error("Error: save ckpt process timeout!!!")
+                async_save_queue.append(task)
+            else:
+                check_exitcode(task)
+        else:
+            check_exitcode(task)
+
+
+def file_save_async_or_sync(state_dict, path, safe_serialization, is_sync=True):
+    if safe_serialization:
+        for k in list(state_dict.keys()):
+            if isinstance(state_dict[k], paddle.Tensor):
+                state_dict[k] = state_dict.pop(k).cpu().numpy()
+
+    if is_sync:
+        if safe_serialization:
+            safe_save_file(state_dict, path, metadata={"format": "np"})
+        else:
+            paddle.save(state_dict, path)
+
+    else:
+        clear_async_save_task_queue()
+        ctx = multiprocessing.get_context("spawn")
+        if safe_serialization:
+            p = ctx.Process(target=safe_save_file, args=(state_dict, path, {"format": "np"}))
+        else:
+            p = ctx.Process(target=paddle.save, args=(state_dict, path))
+        logger.info(f"Async save {path}")
+        p.start()
+        async_save_queue.append(p)
+
+
+def select_model_weight_index(args, model, resume_from_checkpoint, safe_serialization, local=True):
+    """
+    try select model weight index from model weight or master weight index.
+    """
+
+    # find model weight index file
+    index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+    index_filename_path = os.path.join(resume_from_checkpoint, index_filename)
+    identify_func = os.path.isfile if local else distributed_isfile
+
+    if identify_func(index_filename_path):
+        return index_filename
+    else:
+        index_filename = PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
+        index_filename_path = os.path.join(resume_from_checkpoint, index_filename)
+
+        if identify_func(index_filename_path):
+            return index_filename
+        else:
+            raise ValueError("Can't find a valid unified model or master weight checkpoint to load.")
+
+
+def update_master_weight_status(args, optimizer, has_master_weight, safe_serialization):
+    if is_need_master_weight(optimizer, is_fp16_or_bp16=(args.fp16 or args.bf16)):
+        if not has_master_weight:
+            if UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value in args.unified_checkpoint_config:
+                index_filename_master_weights = (
+                    PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+                )
+                has_master_weight = True
+                logger.warning(
+                    "The unified checkpoint does not contain master weight, "
+                    "the model weight will be loaded as master weight."
+                )
+            else:
+                raise ValueError(
+                    "Can't find a valid unified master weight checkpoint,"
+                    f"add '{UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value}' into 'unified_checkpoint_config' to "
+                    "load model checkpoint as master weight"
+                )
+        else:
+            has_master_weight = True
+            index_filename_master_weights = (
+                PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
+            )
+    else:
+        has_master_weight = False
+        index_filename_master_weights = None
+
+    return has_master_weight, index_filename_master_weights
+
+
+def unwrap_optimizer(optimizer):
+    while hasattr(optimizer, "_inner_opt") or hasattr(optimizer, "_optim"):
+        if hasattr(optimizer, "_inner_opt"):
+            optimizer = optimizer._inner_opt
+        if hasattr(optimizer, "_optim"):
+            optimizer = optimizer._optim
+
+    return optimizer
+
+
+def is_need_master_weight(optimizer, is_fp16_or_bp16):
+    optimizer = unwrap_optimizer(optimizer)
+    if hasattr(optimizer, "_multi_precision"):
+        return optimizer._multi_precision and is_fp16_or_bp16
+    else:
+        return False
