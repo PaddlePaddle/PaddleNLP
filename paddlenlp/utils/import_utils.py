@@ -21,8 +21,25 @@ import sys
 from typing import Optional, Type
 
 import pip
+from packaging import version
 
 from paddlenlp.utils.log import logger
+
+__all__ = [
+    "is_paddle_cuda_available",
+    "is_paddle_available",
+    "is_psutil_available",
+    "is_package_available",
+    "is_fast_tokenizer_available",
+    "is_transformers_available",
+    "is_torch_available",
+    "install_package",
+    "uninstall_package",
+    "import_module",
+    "is_paddle_bf16_cpu_available",
+    "is_paddle_bf16_gpu_available",
+    "is_sentencepiece_available",
+]
 
 
 def is_datasets_available():
@@ -41,11 +58,54 @@ def is_paddle_cuda_available() -> bool:
 
 
 def is_paddle_available() -> bool:
-    """check if `torch` package is installed
+    """check if `paddle` package is installed
     Returns:
-        bool: if `torch` is available
+        bool: if `paddle` is available
     """
     return is_package_available("paddle")
+
+
+def is_paddle_bf16_cpu_available():
+    if not is_paddle_available():
+        return False
+
+    import paddle
+
+    curr_version = version.parse(version.parse(paddle.__version__).base_version)
+    if curr_version < version.parse("2.3") and curr_version != version.parse("0.0.0"):
+        return False
+
+    try:
+        # multiple levels of AttributeError depending on the paddle version so do them all in one check
+        _ = paddle.amp.autocast
+    except AttributeError:
+        return False
+
+    return True
+
+
+def is_paddle_bf16_gpu_available():
+    if not is_paddle_available():
+        return False
+
+    import paddle
+
+    curr_version = version.parse(version.parse(paddle.__version__).base_version)
+    if curr_version < version.parse("2.3") and curr_version != version.parse("0.0.0"):
+        return False
+
+    if paddle.is_compiled_with_cuda() and paddle.version.cuda() is not None:
+        # paddle.device.get_device()
+        if paddle.device.cuda.get_device_properties("gpu:0").major < 8:
+            return False
+        if int(paddle.version.cuda().split(".")[0]) < 11:
+            return False
+        if not hasattr(paddle.amp, "autocast"):
+            return False
+    else:
+        return False
+
+    return True
 
 
 def is_psutil_available():
@@ -54,6 +114,10 @@ def is_psutil_available():
 
 def is_tiktoken_available():
     return importlib.util.find_spec("tiktoken") is not None
+
+
+def is_sentencepiece_available():
+    return importlib.util.find_spec("sentencepiece") is not None
 
 
 def is_torch_available() -> bool:
@@ -65,7 +129,7 @@ def is_torch_available() -> bool:
 
 
 def is_package_available(package_name: str) -> bool:
-    """check if the package is avaliable
+    """check if the package is available
     Args:
         package_name (str): the installed package name
     Returns:
@@ -76,17 +140,17 @@ def is_package_available(package_name: str) -> bool:
 
 
 def is_fast_tokenizer_available() -> bool:
-    """check if `fast_tokenizer` ia avaliable
+    """check if `fast_tokenizer` ia available
     Returns:
-        bool: if `fast_tokenizer` is avaliable
+        bool: if `fast_tokenizer` is available
     """
     return is_package_available("fast_tokenizer")
 
 
 def is_paddlenlp_ops_available() -> bool:
-    """check if `paddlenlp_ops` ia avaliable
+    """check if `paddlenlp_ops` ia available
     Returns:
-        bool: if `paddlenlp_ops` is avaliable
+        bool: if `paddlenlp_ops` is available
     """
     return is_package_available("paddlenlp_ops")
 
@@ -143,7 +207,7 @@ def install_package(
 
 
 def uninstall_package(package_name: str, module_name: Optional[str] = None):
-    """uninstall the pacakge from site-packages.
+    """uninstall the package from site-packages.
 
     To remove the cache of source package module & class & method, it should:
         1. remove the source files of packages under the `site-packages` dir.
@@ -174,7 +238,7 @@ def uninstall_package(package_name: str, module_name: Optional[str] = None):
 
 
 def import_module(module_name: str) -> Optional[Type]:
-    """import moudle base on the model
+    """import module base on the model
     Args:
         module_name (str): the name of target module
     """

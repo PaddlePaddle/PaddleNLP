@@ -19,6 +19,7 @@
 """
 Utilities for the Trainer class.
 """
+import contextlib
 import datetime
 import gc
 import inspect
@@ -162,6 +163,27 @@ def set_seed(seed: int = 1234, topo=None):
         "The global seed is set to {}, local seed is set to {} and "
         "random seed is set to {}.".format(global_seed, local_seed, random_seed)
     )
+
+
+@contextlib.contextmanager
+def device_guard(device="cpu", dev_id=0):
+    origin_device = paddle.device.get_device()
+    if device == "cpu":
+        paddle.set_device(device)
+    elif device in ["gpu", "xpu", "npu"]:
+        paddle.set_device("{}:{}".format(device, dev_id))
+    try:
+        yield
+    finally:
+        paddle.set_device(origin_device)
+
+
+def paddlenlp_load(path, return_numpy=False):
+    if return_numpy:
+        with device_guard():
+            return paddle.load(path)
+    else:
+        return paddle.load(path, return_numpy=return_numpy)
 
 
 class ExplicitEnum(Enum):
