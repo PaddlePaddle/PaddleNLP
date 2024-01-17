@@ -214,6 +214,7 @@ class PredictorBaseTest(LLMTest, unittest.TestCase):
     [
         ["__internal_testing__/tiny-fused-llama-inference5.2", LlamaForCausalLM],
         ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
+        ["__internal_testing__/tiny-fused-qwen", QWenForCausalLM],
     ],
 )
 class BlockAttnPredictorTest(LLMTest, unittest.TestCase):
