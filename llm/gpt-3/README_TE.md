@@ -21,8 +21,8 @@ Refer to [OpenWebText2.md](https://github.com/PaddlePaddle/PaddleNLP/blob/develo
 docker run -it --rm --gpus=all --net=host \
     --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 \
     -v /path/to/workspace:/workspace \
-    -v /path/to/dataset/llama_openwebtext:/workspace/llama_openwebtext \
-    nvcr.io/nvidia/paddlepaddle:23.09-py3 bash
+    -v /path/to/dataset/llama_openwebtext:/dataset \
+    nvcr.io/nvidia/paddlepaddle:23.11-py3 bash
 
 cd /workspace
 git clone git@github.com:NVIDIA/TransformerEngine.git
@@ -43,7 +43,8 @@ pip install regex tool_helpers visualdl==2.5.3  # requirements
 
 ```bash
 cd /workspace/PaddleNLP/llm/gpt-3
-bash scripts/gpt3_single_node_interactive.sh <batch_size_per_device> <FSDP> <TP> <PP> <sharding_stage> <backend> <precision> <recompute> <resume_step> <init_weight> <nsys_profile>
+bash scripts/gpt3_single_node_interactive.sh <batch_size_per_device> <FSDP> <TP> <PP> <sharding_stage> <backend> <precision> <recompute> <resume_step> <init_weight> <nsys_profile> <vp> <ga> <sp> <model_name> <tokenizer_name>
+```
 ```
 `<sharing_stage>`: `stage1` or `stage2` or `stage3`.
 
@@ -60,10 +61,20 @@ Note: we usaually use `te` and `none` backend to compare the performance (and co
 
 `<nsys_profile>`: `true` or `false`. `true` means using [Nsight Systems](https://developer.nvidia.com/nsight-systems) (nsys) to profile. `false` means not using Nsight Systems to profile.
 
+`<vp>`: virtual pipeline degree, a number. Default is 1.
+
+`<ga>`: gradient accumulation, a number. Default is 1.
+
+`<sp>`: sequence parallel, true or false.
+
+`<model_name>`: model name, such as `gpt3-5B-en` or `gpt3-175B-en`
+
+`<tokenizer_name>`: tokenizer name, such as `gpt3-5B-en` or `gpt3-175B-en`
+
 
 Example:
 ```bash
-# bs=2 FSDP=1 TP=1 PP=1 DP=num_devices/FSDP/TP/PP=
+# bs=2 FSDP=1 TP=1 PP=1 DP=num_devices/FSDP/TP/PP=8
 bash scripts/gpt3_single_node_interactive.sh 2 1 1 1 stage2 none bf16 none none none false
 
 # bs=2 FSDP=1 TP=2 PP=2 DP=num_devices/FSDP/TP/PP=2
@@ -72,9 +83,9 @@ bash scripts/gpt3_single_node_interactive.sh 2 1 2 2 stage2 pd bf16 none none pa
 # bs=6 FSDP=2 TP=4 PP=1 DP=num_devices/FSDP/TP/PP=1 recompute=core_attn
 bash scripts/gpt3_single_node_interactive.sh 6 2 4 1 stage2 te bf16 core_attn none path/to/my_ckpt false
 
-# bs=6 FSDP=1 TP=1 PP=2 DP=num_devices/FSDP/TP/PP=4 recompute=full fp8_training
+# bs=6 FSDP=1 TP=1 PP=2 DP=num_devices/FSDP/TP/PP=4 recompute=full precision=fp8 vp=2 ga=32 sp=true
 # enable profile with Nsight Systems
-bash scripts/gpt3_single_node_interactive.sh 6 1 1 2 stage2 te fp8 full none path/to/my_ckpt true
+bash scripts/gpt3_single_node_interactive.sh 6 1 2 4 stage2 te fp8 full none path/to/my_ckpt true 2 32 true gpt3-13B-en gpt3-13B-en
 ```
 
 ### Convergence tests
@@ -82,7 +93,7 @@ bash scripts/gpt3_single_node_interactive.sh 6 1 1 2 stage2 te fp8 full none pat
 Training from scratch:
 ```bash
 # training from scratch
-MBS=6 TP_SIZE=4 PP_SIZE=1 FSDP_SIZE=2 SHARDING_STAGE=stage2 BACKEND=te PREC=bf16 RECOMPUTE=full RESUME_STEP=none MODEL_NAME=gpt3-5B-en sbatch -N1 ./gpt3_multi_node.sub
+MBS=6 TP_SIZE=4 PP_SIZE=1 FSDP_SIZE=2 SHARDING_STAGE=stage2 BACKEND=te PREC=bf16 RECOMPUTE=full RESUME_STEP=none MODEL_NAME=gpt3-1.3B-en sbatch -N1 ./gpt3_multi_node.sub
 ```
 
 Suspend the job at step 5000, then resume training from step 5000:
@@ -95,8 +106,7 @@ MBS=6 TP_SIZE=4 PP_SIZE=1 FSDP_SIZE=2 SHARDING_STAGE=stage2 BACKEND=te PREC=bf16
 
 Multi-node training:
 ```bash
-MBS=1 TP_SIZE=8 PP_SIZE=8 VP_SIZE=6 GA_SIZE=128 FSDP_SIZE=1 SP=true SHARDING_STAGE=stage2 BACKEND=te PREC=fp8 RECOMPUTE=full RESUME_STEP=none MODEL_NAME=gpt3-5B-en sbatch -N8 ./gpt3_multi_node.sub
-MBS=1 TP_SIZE=8 PP_SIZE=8 VP_SIZE=6 GA_SIZE=128 FSDP_SIZE=1 SHARDING_STAGE=stage2 BACKEND=te PREC=bf16 RECOMPUTE=none SP=false NSYS=true MODEL_NAME=gpt3-175B-en sbatch -N8 ./gpt3_multi_node.sub
+MBS=2 TP_SIZE=8 PP_SIZE=8 VP_SIZE=4 GA_SIZE=64 FSDP_SIZE=2 SHARDING_STAGE=stage1 BACKEND=te PREC=fp8 RECOMPUTE=none SP=true NSYS=true MODEL_NAME=gpt3-175B-en sbatch -N16 gpt3_multi_node.sub
 ```
 
 

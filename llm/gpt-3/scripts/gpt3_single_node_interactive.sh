@@ -17,7 +17,8 @@
 set -ex
 
 PNLP_PATH="/workspace/PaddleNLP"
-OUTPUT_BASE=${OUTPUT_BASE:="/workspace/experiments"}
+OUTPUT_BASE=${OUTPUT_BASE:="/workspace/outputs"}
+DATA_PATH=/workspace/dataset/llama_openwebtext
 SLURM_JOB_NUM_NODES=${SLURM_JOB_NUM_NODES:=1}
 
 export PYTHONPATH="${PNLP_PATH}:${PYTHONPATH}"
@@ -39,14 +40,13 @@ nsys_profile=${11:-"false"}
 vp=${12:-1}
 ga=${13:-1}
 sp=${14:-"false"}
-model_name=${15:-"gpt3-175B-en"}
-tokenizer_name=${16:-"gpt3-175B-en"}
-
+model_name=${15:-"gpt3-1.3B-en"}
+tokenizer_name=${16:-"gpt3-1.3B-en"}
 
 dp=`expr $((8*SLURM_JOB_NUM_NODES)) / ${tp} / ${fsdp}`
 
-log_dir="N${SLURM_JOB_NUM_NODES}_DP${dp}_TP${tp}_PP${pp}_VP${vp}_GA${ga}_SP${sp}_FSDP${fsdp}_MBS${per_device_batch_size}_${backend}_${precision}_${recompute}_${model_name}"
-rm -rf $log_dir
+log_dir=${EXP_NAME:="N${SLURM_JOB_NUM_NODES}_DP${dp}_TP${tp}_PP${pp}_VP${vp}_GA${ga}_SP${sp}_FSDP${fsdp}_MBS${per_device_batch_size}_${backend}_${precision}_${recompute}_${model_name}"}
+#rm -rf $log_dir
 output_dir="${OUTPUT_BASE}/$log_dir"
 
 IP_STR=${IP_STR:='127.0.0.1'}
@@ -99,7 +99,6 @@ else
 fi
 
 if [ "${resume_step}" == "none" ]; then
-    rm -rf $output_dir
     readonly resume_flag=""
 elif [ "${backend}" == "auto" ]; then
     readonly resume_flag=""
@@ -127,9 +126,9 @@ elif [ "${nsys_profile}" == "true" ]; then
    export PROFILE_START_STEP=3
    export PROFILE_STOP_STEP=3
    export PROFILE_EMIT_NVTX=1
-   readonly nsys_cmd="nsys profile -s none -c cudaProfilerApi -t cuda,nvtx --force-overwrite true --capture-range-end=stop -o ${OUTPUT_BASE}/profile/${log_dir} "
-   mkdir -p ${OUTPUT_BASE}/profile
-   log_dir="profile_$log_dir"
+   readonly nsys_cmd="nsys profile -s none -c cudaProfilerApi -t cuda,nvtx --force-overwrite true --capture-range-end=stop -o ${output_dir}/profile/${log_dir} "
+   #readonly nsys_cmd="nsys profile -s none -c cudaProfilerApi -t cuda,nvtx --force-overwrite true -o ${output_dir}/profile/${log_dir} "
+   mkdir -p ${output_dir}/profile
 else
    echo "Error! nsys_profile=${nsys_profile} not supported!"
    return -1
@@ -137,19 +136,18 @@ fi
 
 sp_flag=""
 if [ "${sp}" == "true" ]; then
-   sp_flag="--sequence_parallel"
+   sp_flag="--sequence_parallel --pipeline_parallel_config=disable_partial_send_recv"
 fi
 
 ${nsys_cmd} python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
-    --log_dir ${OUTPUT_BASE}/logs/${log_dir} \
     --ips="${IP_STR}" \
-    ${PNLP_PATH}/llm/gpt-3/run_pretrain.py \
-    --model_type "gpt" \
+    --log_dir ${output_dir}/logs \
+    ${PNLP_PATH}/llm/gpt-3/run_pretrain_with_te.py \
     --model_name_or_path ${model_name} \
     --tokenizer_name_or_path ${tokenizer_name} \
-    --input_dir "/dataset" \
-    --output_dir $output_dir \
+    --input_dir "$DATA_PATH" \
+    --output_dir $output_dir/output \
     --split 949,50,1 \
     --max_seq_length 2048 \
     --per_device_train_batch_size $per_device_batch_size \
@@ -157,7 +155,6 @@ ${nsys_cmd} python -u  -m paddle.distributed.launch \
     --tensor_parallel_degree $tp \
     --sharding_parallel_degree $fsdp \
     --pipeline_parallel_degree $pp \
-    --virtual_pp_degree ${vp} \
     --fuse_attention_qkv 1 \
     --use_flash_attention 0 \
     --bf16  \
@@ -165,12 +162,12 @@ ${nsys_cmd} python -u  -m paddle.distributed.launch \
     --scale_loss 1024 \
     --learning_rate 0.00001 \
     --min_learning_rate 0.000005 \
-    --max_steps 40000 \
-    --save_steps 5000 \
+    --max_steps 20000 \
+    --save_steps 200000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
     --max_grad_norm 1.0 \
-    --logging_steps 10 \
+    --logging_steps 1 \
     --dataloader_num_workers 1 \
     --hidden_dropout_prob=0.1 \
     --attention_probs_dropout_prob=0.1 \
@@ -179,8 +176,8 @@ ${nsys_cmd} python -u  -m paddle.distributed.launch \
     --disable_tqdm true \
     --gradient_accumulation_steps ${ga} \
     --do_train \
-    --do_eval \
     --continue_training 0 \
+    --virtual_pp_degree ${vp} \
     $stage_flag \
     $resume_flag \
     $backend_flag \
