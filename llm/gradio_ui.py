@@ -119,7 +119,7 @@ def launch(args, default_params: dict = {}):
             "min_length": 1,
         }
         res = requests.post(f"http://0.0.0.0:{args.flask_port}/api/chat", json=data, stream=True)
-        for line in res.iter_lines():
+        for index, line in enumerate(res.iter_lines()):
             result = json.loads(line)
             if result["error_code"] != 0:
                 gr.Warning(result["error_msg"])
@@ -133,6 +133,10 @@ def launch(args, default_params: dict = {}):
 
             if bot_response["utterance"].endswith("[END]"):
                 bot_response["utterance"] = bot_response["utterance"][:-5]
+
+            # the first character of gradio can not be "<br>" or "<br/>"
+            if bot_response["utterance"] in ["<br>", "<br/>"] and index == 0:
+                continue
 
             context[-1]["utterance"] += bot_response["utterance"]
             shown_context = get_shown_context(context)
@@ -185,7 +189,7 @@ def launch(args, default_params: dict = {}):
             with gr.Column(scale=1):
                 top_k = gr.Slider(
                     minimum=0,
-                    maximum=default_params.get("top_k", 20),
+                    maximum=100,
                     value=0,
                     step=1,
                     label="Top-k",
@@ -218,7 +222,7 @@ def launch(args, default_params: dict = {}):
                 default_src_length = default_params["src_length"]
                 total_length = default_params["src_length"] + default_params["max_length"]
                 src_length = create_src_slider(default_src_length, total_length)
-                max_length = create_max_slider(50, total_length)
+                max_length = create_max_slider(min(total_length - default_src_length, 50), total_length)
 
                 def src_length_change_event(src_length_value, max_length_value):
                     return create_max_slider(
