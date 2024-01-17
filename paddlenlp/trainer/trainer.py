@@ -2027,7 +2027,16 @@ class Trainer:
             self.model_wrapped.get_all_parameters(convert2cpu=True)
 
         if self.args.should_save_model_state:
+            unified_checkpoint_config_backup = self.args.unified_checkpoint_config
+            # backup and remove unified_checkpoint_config for not trine stage
+            if not self.is_in_train:
+                self.args.unified_checkpoint_config = []
+
             self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
+
+            # recover unified_checkpoint_config for not trine stage
+            if not self.is_in_train:
+                self.args.unified_checkpoint_config = unified_checkpoint_config_backup
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
