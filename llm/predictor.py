@@ -819,6 +819,36 @@ class BlockInferencePredictorMixin:
         self.inputs["eos_token_id"] = paddle.to_tensor(
             np.array(eos_token_id * config.batch_size).reshape(-1, 1).astype("int64")
         )
+        # bloom model needs src_mask and tgt_mask!
+        if "bloom" in self.architectures:
+            lower_one_tril = paddle.tril(
+                paddle.ones(shape=(self.total_max_length, self.total_max_length), dtype=self.dtype)
+            )
+            lower_one_tril = lower_one_tril[None, None, :, :]
+            self.inputs["src_mask"] = lower_one_tril.tile([self.batch_size, 1, 1, 1])
+            self.inputs["tgt_mask"] = paddle.full(
+                shape=[config.batch_size, 1, 1, self.total_max_length], fill_value=1, dtype=self.dtype
+            )
+            arange_tensor_encoder = paddle.arange(self.total_max_length).astype(self.dtype)
+            alibi_slopes = get_alibi_slopes(self.num_attention_heads)
+            alibi = alibi_slopes[None, :, None, None] * arange_tensor_encoder
+            alibi_encoder = alibi.tile([self.batch_size, 1, self.total_max_length, 1])
+            alibi_decoder = alibi.tile(
+                [
+                    self.batch_size,
+                    1,
+                    1,
+                    1,
+                ]
+            )
+            # self.inputs["src_mask/tgt_mask"] is read only, will not be updated!
+            self.inputs["src_mask"] = (
+                alibi_encoder + (1 - self.inputs["src_mask"]) * paddle.finfo(self.dtype).min
+            ).cast(self.dtype)
+            self.inputs["tgt_mask"] = (
+                alibi_decoder + (1 - self.inputs["tgt_mask"]) * paddle.finfo(self.dtype).min
+            ).cast(self.dtype)
+
         # need update
         self.inputs["block_tables"] = paddle.full(
             shape=[config.batch_size, self.pre_max_block_num], fill_value=-1, dtype="int32"
@@ -1324,16 +1354,23 @@ def create_predictor(
                 )
                 model.eval()
             elif "bloom" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    BloomForCausalLMInferenceModel,
-                )
+                if predictor_args.block_attn:
+                    from paddlenlp.experimental.transformers import (
+                        BlommForCausalBlockLMInferenceModel as BloomInferenceModel,
+                    )
 
-                model = BloomForCausalLMInferenceModel.from_pretrained(
+                    config.block_size = predictor_args.block_size
+                    config.max_seq_len = predictor_args.total_max_length
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        BloomForCausalLMInferenceModel as BloomInferenceModel,
+                    )
+                model = BloomInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path,
                     config=config,
                     dtype=predictor_args.dtype,
                 )
-                cache_kvs_shape = BloomForCausalLMInferenceModel.get_cache_kvs_shape(
+                cache_kvs_shape = BloomInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
                 model.eval()
@@ -1409,11 +1446,18 @@ def create_predictor(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
             elif "bloom" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    BloomForCausalLMInferenceModel,
-                )
+                if predictor_args.block_attn:
+                    from paddlenlp.experimental.transformers import (
+                        BlommForCausalBlockLMInferenceModel as BloomInferenceModel,
+                    )
 
-                cache_kvs_shape = BloomForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config.block_size = predictor_args.block_size
+                    config.max_seq_len = predictor_args.total_max_length
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        BloomForCausalLMInferenceModel as BloomInferenceModel,
+                    )
+                cache_kvs_shape = BloomInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
             elif "gpt" in config.architectures[0].lower():
