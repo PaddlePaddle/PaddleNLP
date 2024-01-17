@@ -13,22 +13,21 @@
 # limitations under the License.
 
 model_item=CE_gpt-345m_seqlen1024_pretrain
-dp_degree=2
+dp_degree=1
 mp_degree=2
 pp_degree=4
 bs_item=32
 fp_item=bf16
-run_mode=MP2-SP2-PP4-VPP2-DP2-mbs8-acc2
+run_mode=MP2-PP4-VPP2-SD2-stage1-mbs8-acc2
 device_num=N2C16
-max_iter=50000
-sharding=False
-sharding_degree=1
-
+max_iter=100
+sharding=stage1
+sharding_degree=2
 virtual_pp_degree=2
 use_recompute=True
 eval_freq=25
 use_pipeline_parallel=True
-sequence_parallel=True
+sequence_parallel=False
 
 model=gpt
 micro_bs=8
