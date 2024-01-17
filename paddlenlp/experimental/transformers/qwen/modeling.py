@@ -329,8 +329,6 @@ class QWenInferenceModel(QWenPretrainedModel):
         )
 
         with dy2st_nocheck_guard_context():
-            print("input hidden_states", hidden_states)
-            print("input input_ids", input_ids)
             hidden_states, _ = self.transformer_block(
                 input_ids,
                 hidden_states,
@@ -347,7 +345,6 @@ class QWenInferenceModel(QWenPretrainedModel):
             )
 
         hidden_states = self.ln_f(hidden_states)
-        print("hidden_states", hidden_states)
 
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
