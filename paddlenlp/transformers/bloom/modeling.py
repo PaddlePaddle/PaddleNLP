@@ -378,9 +378,23 @@ class BloomAttention(nn.Layer):
         (query_layer, key_layer, value_layer) = self._split_heads(fused_qkv)
 
         batch_size, q_length, _, _ = query_layer.shape
+
+        if layer_past is not None:
+            past_key, past_value = layer_past
+            # concatenate along seq_length dimension:
+            #  - key: [batch_size, kv_length, self.num_heads, head_dim]
+            #  - value: [batch_size, kv_length, self.num_heads, head_dim]
+            key_layer = paddle.concat((past_key, key_layer), axis=1)
+            value_layer = paddle.concat((past_value, value_layer), axis=1)
+
+        if use_cache is True:
+            present = (key_layer, value_layer)
+        else:
+            present = None
+
         version = paddle.version.full_version
         version_check = True
-        if version != "0.0.0" and version <= "2.5.2":
+        if self.config.use_flash_attention and version != "0.0.0" and version <= "2.5.2":
             logger.warning(
                 "PaddlePaddle version 2.5.3 or higher is required, please upgrade your PaddlePaddle to 2.5.3 or other higher version."
             )
@@ -397,6 +411,8 @@ class BloomAttention(nn.Layer):
                 key_states,
                 value_states,
                 attn_mask=attention_mask,
+                dropout_p=self.config.attention_dropout,
+                training=self.training,
                 is_causal=False,
             )
             attn_weights = None
@@ -404,39 +420,10 @@ class BloomAttention(nn.Layer):
             attn_output = attn_output.reshape([attn_output.shape[0], attn_output.shape[1], -1])
             output_tensor = self.dense(attn_output)
 
-            query_layer = query_layer.transpose([0, 2, 1, 3])
-            key_layer = key_layer.transpose([0, 2, 3, 1])
-            value_layer = value_layer.transpose([0, 2, 1, 3])
-            if layer_past is not None:
-                past_key, past_value = layer_past
-                # concatenate along seq_length dimension:
-                #  - key: [batch_size, self.num_heads, head_dim, kv_length]
-                #  - value: [batch_size, self.num_heads, kv_length, head_dim]
-                key_layer = paddle.concat((past_key, key_layer), axis=3)
-                value_layer = paddle.concat((past_value, value_layer), axis=2)
-
-            if use_cache:
-                present = (key_layer, value_layer)
-            else:
-                present = None
         else:
-
             query_layer = query_layer.transpose([0, 2, 1, 3])
             key_layer = key_layer.transpose([0, 2, 3, 1])
             value_layer = value_layer.transpose([0, 2, 1, 3])
-            if layer_past is not None:
-                past_key, past_value = layer_past
-                # concatenate along seq_length dimension:
-                #  - key: [batch_size, self.num_heads, head_dim, kv_length]
-                #  - value: [batch_size, self.num_heads, kv_length, head_dim]
-                key_layer = paddle.concat((past_key, key_layer), axis=3)
-                value_layer = paddle.concat((past_value, value_layer), axis=2)
-
-            if use_cache is True:
-                present = (key_layer, value_layer)
-            else:
-                present = None
-
             _, _, _, kv_length = key_layer.shape
 
             query_layer = query_layer.reshape([batch_size * self.num_heads, q_length, self.head_dim])
@@ -449,7 +436,6 @@ class BloomAttention(nn.Layer):
             attention_scores = baddbmm(
                 alibi, batch1=query_layer, batch2=key_layer, beta=self.beta, alpha=self.inv_norm_factor
             )
-
             # change view to [batch_size, num_heads, q_length, kv_length]
             # attention_scores = matmul_result.reshape([batch_size, self.num_heads, q_length, kv_length])
 
@@ -949,14 +935,13 @@ class BloomModel(BloomPreTrainedModel):
         seq_length_with_past = seq_length
         past_key_values_length = 0
         if past_key_values[0] is not None:
-            past_key_values_length = past_key_values[0][0].shape[3]
+            past_key_values_length = past_key_values[0][0].shape[1]
             seq_length_with_past = seq_length_with_past + past_key_values_length
 
         if attention_mask is None:
             attention_mask = paddle.ones([batch_size, seq_length_with_past], dtype="bool")
         elif attention_mask.dtype != paddle.bool:
             attention_mask = paddle.cast(attention_mask, "bool")
-
         if len(attention_mask.shape) > 2:
             _attention_mask = paddle.ones([batch_size, seq_length_with_past], dtype="bool")
             alibi = build_alibi_tensor(_attention_mask, self.config.n_head, dtype=hidden_states.dtype)

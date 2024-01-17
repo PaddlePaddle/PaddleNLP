@@ -40,9 +40,13 @@ def extract_pages(page_list, file_path):
     end = page_list[1]
     page_text = []
     pdf = pypdf.PdfReader(file_path)
-    for page in pdf.pages[start:end]:
-        paragraphs = page.extract_text()
-        page_text.append(paragraphs)
+    for index, page in enumerate(pdf.pages[start:end]):
+        try:
+            paragraphs = page.extract_text()
+            paragraphs = paragraphs.encode("UTF-8", "ignore").decode("UTF-8")
+            page_text.append(paragraphs)
+        except Exception as e:
+            logger.warning("Page %d of the file cannot be parsed correctly %s" % (index + start + 1, str(e)))
     return page_text
 
 
@@ -109,58 +113,14 @@ class PDFToTextConverter(BaseConverter):
                                 not one of the valid languages, then it might likely be encoding error resulting
                                 in garbled text.
         """
-        pages = self._read_pdf(file_path, layout=False, process_num=process_num)
-        if remove_numeric_tables is None:
-            remove_numeric_tables = self.remove_numeric_tables
-        if valid_languages is None:
-            valid_languages = self.valid_languages
-        if language is None:
-            language = self.language
-        cleaned_pages = []
+        pages = self._read_pdf(file_path, process_num=process_num)
+        documents = []
         for page in pages:
-            # pdftotext tool provides an option to retain the original physical layout of a PDF page. This behaviour
-            # can be toggled by using the layout param.
-            #  layout=True
-            #      + table structures get retained better
-            #      - multi-column pages(eg, research papers) gets extracted with text from multiple columns on same line
-            #  layout=False
-            #      + keeps strings in content stream order, hence multi column layout works well
-            #      - cells of tables gets split across line
-            #
-            #  Here, as a "safe" default, layout is turned off.
-            lines = page.splitlines()
+            document = {"content": page, "content_type": "text", "meta": meta}
+            documents.append(document)
+        return documents
 
-            cleaned_lines = []
-            for line in lines:
-                if self.language == "chinese":
-                    words = list(line)
-                else:
-                    words = line.split()
-                digits = [word for word in words if any(i.isdigit() for i in word)]
-
-                # remove lines having > 40% of words as digits AND not ending with a period(.)
-                if remove_numeric_tables:
-                    if words and len(digits) / len(words) > 0.4 and not line.strip().endswith("."):
-                        logger.debug(f"Removing line '{line}' from {file_path}")
-                        continue
-                cleaned_lines.append(line)
-
-            page = "\n".join(cleaned_lines)
-            cleaned_pages.append(page)
-
-        if valid_languages:
-            document_text = "".join(cleaned_pages)
-            if not self.validate_language(document_text, valid_languages):
-                logger.warning(
-                    f"The language for {file_path} is not one of {valid_languages}. The file may not have "
-                    f"been decoded in the correct text format."
-                )
-
-        text = "\f".join(cleaned_pages)
-        document = {"content": text, "content_type": "text", "meta": meta}
-        return [document]
-
-    def _read_pdf(self, file_path: Path, layout: bool, process_num: int) -> List[str]:
+    def _read_pdf(self, file_path: Path, process_num: int) -> List[str]:
         """
         Extract pages from the pdf file at file_path.
 
@@ -175,6 +135,8 @@ class PDFToTextConverter(BaseConverter):
         pdf = pypdf.PdfReader(file_path)
         page_length = len(pdf.pages)
         split_len = page_length // process_num
+        if split_len == 0:
+            split_len = page_length
         page_list = [i for i in range(0, page_length, split_len)]
         if page_length > page_list[-1]:
             page_list.append(page_length)

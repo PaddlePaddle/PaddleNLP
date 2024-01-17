@@ -41,7 +41,7 @@ class UITest(unittest.TestCase):
         # start web ui
         self.flask_port = self.avaliable_free_port()
         self.port = self.avaliable_free_port([self.flask_port])
-        self.model_path = "__internal_testing__/tiny-random-llama"
+        self.model_path = "__internal_testing__/micro-random-llama"
         command = 'cd llm && python flask_server.py --model_name_or_path {model_path} --port {port} --flask_port {flask_port} --src_length 1024 --dtype "float16"'.format(
             flask_port=self.flask_port, port=self.port, model_path=self.model_path
         )

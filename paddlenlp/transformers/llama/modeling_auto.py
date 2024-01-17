@@ -21,6 +21,7 @@ from functools import partial
 from typing import Optional, Tuple
 
 import paddle
+import paddle.distributed as dist
 import paddle.nn.functional as F
 from paddle import nn
 from paddle.distributed import fleet
@@ -362,10 +363,24 @@ class LlamaAttentionAuto(nn.Layer):
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
+        # enter tp region
+        if self.config.sequence_parallel:
+            mesh = get_mesh(self.ipp)
+            if "dp" in mesh.dim_names:
+                hidden_states = dist.reshard(
+                    hidden_states,
+                    get_mesh(self.ipp),
+                    [dist.Shard(1), dist.Replicate()],
+                )
+            else:
+                hidden_states = dist.reshard(
+                    hidden_states,
+                    get_mesh(self.ipp),
+                    [dist.Replicate()],
+                )
 
         if self.fuse_attention_qkv:
             target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
-
             fleet.auto.shard_tensor(self.qkv_proj.weight, *get_dist_attr([None, "mp"], self.ipp))
 
             mix_layer = self.qkv_proj(hidden_states)
@@ -382,6 +397,11 @@ class LlamaAttentionAuto(nn.Layer):
             query_states = self.q_proj(hidden_states).reshape(shape=target_query_shape)
             key_states = self.k_proj(hidden_states).reshape(shape=target_key_value_shape)
             value_states = self.v_proj(hidden_states).reshape(shape=target_key_value_shape)
+
+        if self.config.sequence_parallel:
+            query_states = paddle.transpose(query_states, [1, 0, 2, 3])
+            key_states = paddle.transpose(key_states, [1, 0, 2, 3])
+            value_states = paddle.transpose(value_states, [1, 0, 2, 3])
 
         kv_seq_len = key_states.shape[-3]
 
@@ -459,6 +479,22 @@ class LlamaAttentionAuto(nn.Layer):
         fleet.auto.shard_tensor(self.o_proj.weight, *get_dist_attr(["mp", None], self.ipp))
         attn_output = self.o_proj(attn_output)
 
+        # enter sp region
+        if self.config.sequence_parallel:
+            attn_output = paddle.transpose(attn_output, [1, 0, 2])
+            mesh = get_mesh(self.ipp)
+            if "dp" in mesh.dim_names:
+                attn_output = dist.reshard(
+                    attn_output,
+                    get_mesh(self.ipp),
+                    [dist.Shard(1), dist.Shard(0)],
+                )
+            else:
+                attn_output = dist.reshard(
+                    attn_output,
+                    get_mesh(self.ipp),
+                    [dist.Shard(0)],
+                )
         if not output_attentions:
             attn_weights = None
 
@@ -565,7 +601,39 @@ class LlamaDecoderLayerAuto(nn.Layer):
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
+
+        # enter tp region
+        if self.config.sequence_parallel:
+            mesh = get_mesh(self.ipp)
+            if "dp" in mesh.dim_names:
+                hidden_states = dist.reshard(
+                    hidden_states,
+                    get_mesh(self.ipp),
+                    [dist.Shard(1), dist.Replicate()],
+                )
+            else:
+                hidden_states = dist.reshard(
+                    hidden_states,
+                    get_mesh(self.ipp),
+                    [dist.Replicate()],
+                )
+
         hidden_states = self.mlp(hidden_states)
+        # enter sp region
+        if self.config.sequence_parallel:
+            mesh = get_mesh(self.ipp)
+            if "dp" in mesh.dim_names:
+                hidden_states = dist.reshard(
+                    hidden_states,
+                    get_mesh(self.ipp),
+                    [dist.Shard(1), dist.Shard(0)],
+                )
+            else:
+                hidden_states = dist.reshard(
+                    hidden_states,
+                    get_mesh(self.ipp),
+                    [dist.Shard(0)],
+                )
         hidden_states = residual + hidden_states
 
         outputs = (hidden_states,)
@@ -707,8 +775,8 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         virtual_pp_degree = getattr(self.config, "virtual_pp_degree", 1)
         assert config.num_hidden_layers % (pp_degree * virtual_pp_degree) == 0
 
-        num_layer_per_chunk = math.ceil(config.num_hidden_layers / pp_degree / virtual_pp_degree)
-        self.layer_to_ipp = [(i // num_layer_per_chunk) % pp_degree for i in range(config.num_hidden_layers)]
+        num_layer_per_stage = math.ceil(config.num_hidden_layers / pp_degree)
+        self.layer_to_ipp = [i // num_layer_per_stage for i in range(config.num_hidden_layers)]
         self.layers = nn.LayerList(
             [
                 LlamaDecoderLayerAuto(config, i not in self.no_recompute_layers, self.layer_to_ipp[i])
@@ -830,6 +898,24 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             )  # [bs, 1, seq_len, seq_len]
 
         hidden_states = inputs_embeds
+        if self.config.sequence_parallel:
+            # [B, S, H] -> [S, B, H]
+            emb_transpose = fleet.auto.shard_op(paddle.transpose, get_mesh(0))
+            hidden_states = emb_transpose(hidden_states, [1, 0, 2])
+            # enter sp region
+            mesh = get_mesh(0)
+            if "dp" in mesh.dim_names:
+                hidden_states = dist.reshard(
+                    hidden_states,
+                    get_mesh(0),
+                    [dist.Shard(1), dist.Shard(0)],
+                )
+            else:
+                hidden_states = dist.reshard(
+                    hidden_states,
+                    get_mesh(0),
+                    [dist.Shard(0)],
+                )
 
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
@@ -838,7 +924,10 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
         for idx, (decoder_layer) in enumerate(self.layers):
             ipp = decoder_layer.ipp
-            fleet.auto.shard_tensor(hidden_states, *get_dist_attr(["dp", None, None], ipp))
+            if self.config.sequence_parallel:
+                fleet.auto.shard_tensor(hidden_states, *get_dist_attr(["mp", "dp", None], ipp))
+            else:
+                fleet.auto.shard_tensor(hidden_states, *get_dist_attr(["dp", None, None], ipp))
             decoder_layer = fleet.auto.shard_op(decoder_layer, get_mesh(ipp))
 
             if output_hidden_states:
@@ -846,6 +935,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             past_key_value = past_key_values[idx] if past_key_values is not None else None
 
             has_gradient = not hidden_states.stop_gradient
+
             if (
                 self.enable_recompute
                 and idx not in self.no_recompute_layers
@@ -1107,6 +1197,22 @@ class LlamaForCausalLMAuto(LlamaPretrainedModelAuto):
         )
 
         hidden_states = outputs[0]  # [bs, seq_len, dim]
+        # enter tp region
+        if self.config.sequence_parallel:
+            mesh = get_mesh(-1)
+            if "dp" in mesh.dim_names:
+                hidden_states = dist.reshard(
+                    hidden_states,
+                    get_mesh(-1),
+                    [dist.Shard(1), dist.Replicate()],
+                )
+            else:
+                hidden_states = dist.reshard(
+                    hidden_states,
+                    get_mesh(-1),
+                    [dist.Replicate()],
+                )
+            hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
 
         # if labels is None，means we need full output, instead of tensor_parallel_output
         # tensor_parallel_output is togather with ParallelCrossEntropy

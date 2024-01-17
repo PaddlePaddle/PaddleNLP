@@ -17,6 +17,7 @@ prefix_tuning:
     do_train: true
     do_eval: true
     disable_tqdm: true
+    use_flash_attention: false
     load_best_model_at_end: true
     eval_with_do_generation: false
     metric_for_best_model: "accuracy"
