@@ -25,7 +25,7 @@ function _set_params(){
     micro_batch_size=${6:-"2"}      # (必选) micro_batch_size
     global_batch_size=${7:-"16"}    # （必选）global_batch_size
     run_mode=${8:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP2-MP8-PP2|DP1-MP8-PP4|DP4-MP8-PP1
-    device_num=${9:-"N1C1"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
+    device_num=${9:-"N1C1"}         # (必选) 使用的卡数量，N1C1|N1C8|N1C4|N4C32 （4机32卡）
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递
     model_repo="PaddleNLP"          # (必选) 模型套件的名字
     speed_unit="tokens/s"         # (必选)速度指标单位
