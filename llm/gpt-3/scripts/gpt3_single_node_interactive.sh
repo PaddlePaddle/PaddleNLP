@@ -18,7 +18,7 @@ set -ex
 
 PNLP_PATH="/workspace/PaddleNLP"
 OUTPUT_BASE=${OUTPUT_BASE:="/workspace/outputs"}
-DATA_PATH=/workspace/dataset/llama_openwebtext
+DATA_PATH=/dataset
 SLURM_JOB_NUM_NODES=${SLURM_JOB_NUM_NODES:=1}
 
 export PYTHONPATH="${PNLP_PATH}:${PYTHONPATH}"

@@ -13,7 +13,7 @@
 set -x
 
 WORK_DIR="<path/to/my/workspace>"  # change to you workspace
-WORK_DIR_C=${WORK_DIR}
+WORK_DIR_C=/workspace
 DS_DIR="<path/to/my/dataset/llama_openwebtext>"  # change to your dataset
 DS_DIR_C=/dataset
 
