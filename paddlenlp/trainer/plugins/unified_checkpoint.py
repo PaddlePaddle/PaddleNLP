@@ -1680,7 +1680,7 @@ def unified_checkpoint_load_state_dict_into_model(model_to_load, state_dict, sta
             # confirm parameter cast is executed on the same device as model
             # Note: cast(FP32 -> FP16) has diff on different devices, need to fix it
             if value_state_dict.is_floating_point() and value_state_dict.dtype != value.dtype:
-                if value_state_dict.place._equal(expected_place):
+                if value_state_dict.place._equals(expected_place):
                     value_state_dict = paddle.cast(value_state_dict, value.dtype)
                 else:
                     # confirm buffer cast is executed on the same device as model
