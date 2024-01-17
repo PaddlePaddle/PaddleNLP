@@ -145,6 +145,10 @@ class LoRAModel(nn.Layer):
         if os.path.exists(lora_weight_path):
             # load lora weight parameter
             lora_state_dict = paddle.load(lora_weight_path, return_numpy=True)
+            for key in lora_state_dict:
+                if "lora" in key:
+                    lora_state_dict[key] = lora_state_dict[key].cast(lora_model.lora_config.dtype)
+
             logger.info(f"Loading the LoRA weights from {lora_weight_path}")
 
             if (
@@ -279,6 +283,10 @@ class LoRAModel(nn.Layer):
                 if merge_tensor_parallel:
                     model_config_to_save.tensor_parallel_degree = -1
                 model_config_to_save.save_pretrained(save_directory)
+        for key in trainable_state_dict:
+            if "lora" in key:
+                lora_config_to_save.dtype = trainable_state_dict[key].dtype
+                break
 
     def _find_and_replace_module(self, model, module_name, lora_config, enable_lora):
         parent_module = model
