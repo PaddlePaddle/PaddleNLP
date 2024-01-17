@@ -24,6 +24,7 @@ import paddle.distributed as dist
 from paddle.distributed import fleet
 from tqdm.auto import tqdm
 
+from paddlenlp.trainer.plugins.timer import get_timers
 from paddlenlp.trainer.trainer_utils import ExplicitEnum
 from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
 from paddlenlp.transformers.model_utils import (
@@ -225,7 +226,10 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
             assert loaded_keys is not None, "loaded_keys is not None."
             tp_actions = model.get_tensor_parallel_convert_actions(model.config, loaded_keys, ignore_error=True)
         # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
+        timers = get_timers()
+        timers and timers("load_unified_checkpoint_file").start()
         state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys)
+        timers and timers("load_unified_checkpoint_file").stop()
 
         if not pre_tensor_parallel_split:
             # Since we load all keys but we only need one of pipeline stages
@@ -237,8 +241,9 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
             state_dict = model.convert_tensor_parallel(
                 None, model.config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
             )
-
+        timers and timers("load_unified_checkpoint_into_model").start()
         unified_checkpoint_load_state_dict_into_model(model, state_dict, "")
+        timers and timers("load_unified_checkpoint_into_model").stop()
 
         # force memory release
         del state_dict
@@ -1691,7 +1696,7 @@ def unified_checkpoint_load_state_dict_into_model(model_to_load, state_dict, sta
             value_state_dict = state_dict.pop(key)
             if isinstance(value_state_dict, np.ndarray):
                 raise ValueError(
-                    "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, plase convert numpy.ndarray to paddle.Tensor"
+                    "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, please convert numpy.ndarray to paddle.Tensor"
                 )
             # confirm parameter cast is executed on the same device as model
             # Note: cast(FP32 -> FP16) has diff on different devices, need to fix it
@@ -1708,5 +1713,3 @@ def unified_checkpoint_load_state_dict_into_model(model_to_load, state_dict, sta
                     value_state_dict = paddle.reshape(value_state_dict, value.shape)
             value.set_value(value_state_dict)
             # del value_state_dict
-
-    del state_dict
