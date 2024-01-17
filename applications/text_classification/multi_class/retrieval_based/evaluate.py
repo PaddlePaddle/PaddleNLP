@@ -18,10 +18,23 @@ import time
 import numpy as np
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--similar_text_pair", type=str, default="", help="The full path of similar pair file")
-parser.add_argument("--recall_result_file", type=str, default="", help="The full path of recall result file")
 parser.add_argument(
-    "--recall_num", type=int, default=10, help="Most similar number of doc recalled from corpus per query"
+    "--similar_text_pair",
+    type=str,
+    default="",
+    help="The full path of similar pair file",
+)
+parser.add_argument(
+    "--recall_result_file",
+    type=str,
+    default="",
+    help="The full path of recall result file",
+)
+parser.add_argument(
+    "--recall_num",
+    type=int,
+    default=10,
+    help="Most similar number of doc recalled from corpus per query",
 )
 args = parser.parse_args()
 
@@ -57,16 +70,23 @@ if __name__ == "__main__":
     with open(args.recall_result_file, "r", encoding="utf-8") as f:
         relevance_labels = []
         for index, line in enumerate(f):
-
-            if index % args.recall_num == 0 and index != 0:
-                rs.append(relevance_labels)
-                relevance_labels = []
             text_arr = line.rstrip().split("\t")
-            text_title, text_para, recalled_title, recalled_para, label, cosine_sim = text_arr
+            (
+                text_title,
+                text_para,
+                recalled_title,
+                recalled_para,
+                label,
+                cosine_sim,
+            ) = text_arr
             if text2similar["\t".join([text_title, text_para])] == label:
                 relevance_labels.append(1)
             else:
                 relevance_labels.append(0)
+
+            if (index + 1) % args.recall_num == 0:
+                rs.append(relevance_labels)
+                relevance_labels = []
 
     recall_N = []
     recall_num = [1, 5, 10, 20, 50]
