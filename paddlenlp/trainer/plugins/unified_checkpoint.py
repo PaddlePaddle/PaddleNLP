@@ -17,6 +17,7 @@ import gc
 import json
 import multiprocessing
 import os
+import time
 
 import numpy as np
 import paddle
@@ -24,7 +25,6 @@ import paddle.distributed as dist
 from paddle.distributed import fleet
 from tqdm.auto import tqdm
 
-from paddlenlp.trainer.plugins.timer import get_timers
 from paddlenlp.trainer.trainer_utils import ExplicitEnum
 from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
 from paddlenlp.transformers.model_utils import (
@@ -226,10 +226,10 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
             assert loaded_keys is not None, "loaded_keys is not None."
             tp_actions = model.get_tensor_parallel_convert_actions(model.config, loaded_keys, ignore_error=True)
         # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
-        timers = get_timers()
-        timers and timers("load_unified_checkpoint_file").start()
+        start = time.time()
         state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys)
-        timers and timers("load_unified_checkpoint_file").stop()
+        end = time.time()
+        print("unified checkpoint load_state_dict:", 1000 * (end - start))
 
         if not pre_tensor_parallel_split:
             # Since we load all keys but we only need one of pipeline stages
@@ -241,9 +241,10 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
             state_dict = model.convert_tensor_parallel(
                 None, model.config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
             )
-        timers and timers("load_unified_checkpoint_into_model").start()
+        start = time.time()
         unified_checkpoint_load_state_dict_into_model(model, state_dict, "")
-        timers and timers("load_unified_checkpoint_into_model").stop()
+        end = time.time()
+        print("unified_checkpoint_load_state_dict_into_model:", 1000 * (end - start))
 
         # force memory release
         del state_dict
@@ -895,7 +896,7 @@ def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_chec
         args, model, file_keyname_mappings, file_machine_mappings, resume_from_checkpoint
     )
 
-    # Get all the keys that are splited by tensor parallelism.
+    # Get all the keys that are splitted by tensor parallelism.
     all_tp_keys = set()
     for k, v in recv_table.items():
         if v[0][1] != -1:
@@ -1025,7 +1026,7 @@ def load_unified_optimizer_dynamically(args, model, optimizer, resume_from_check
         if has_master_weights:
             optim_state_dict_mw[k] = paddle.empty(shape, dtype="float32")
 
-    # Get all the keys that are splited by tensor parallelism.
+    # Get all the keys that are splitted by tensor parallelism.
     all_tp_keys = set()
     for k, v in recv_table.items():
         structure_name, typename = k.split("/")
@@ -1515,10 +1516,10 @@ def mapping_optimizer_tp_actions(tp_actions, optimizer_loaded_keys):
     or param.key/beta1_XXX
     or param.key/beta2_XXX
     Args:
-        tp_actions (dict): dictionay of tensor parallel actions {key: action}
+        tp_actions (dict): dictionary of tensor parallel actions {key: action}
         optimizer_loaded_keys (list or set): [param.key1/moment1_0, param.key2/beta1_XXX, param.key3/beta2_XXX]
     Returns:
-        dict: new dictionay of tensor parallel actions {key: action}
+        dict: new dictionary of tensor parallel actions {key: action}
     """
     new_actions = {}
     for key in optimizer_loaded_keys:
