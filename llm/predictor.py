@@ -27,7 +27,6 @@ import paddle
 import paddle.distributed.fleet.base.topology as tp
 import paddle.incubate.multiprocessing as mp
 from paddle.distributed import fleet
-from paddlenlp_ops import reset_stop_value
 from utils import (
     dybatch_preprocess,
     get_alibi_slopes,
@@ -56,6 +55,15 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.utils.import_utils import import_module, is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
+
+try:
+    from paddlenlp_ops import reset_stop_value
+except (ImportError, ModuleNotFoundError):
+    logger.error(
+        "Please ensure you install the paddlenlp_ops by following the instructions "
+        "provided at https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
+    )
+
 
 # Note(@RochardWooSJTU): MAX_BSZ must be the same as definition in get_output / save_output
 MAX_BSZ = 512
