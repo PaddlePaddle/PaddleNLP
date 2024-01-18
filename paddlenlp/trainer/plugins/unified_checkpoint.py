@@ -134,6 +134,7 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
         save_single_card_checkpoint(args, model_to_save, output_dir)
         return
 
+    skip_save_model_weight = False
     if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
         if is_need_master_weight(optimizer, is_fp16_or_bp16=(args.fp16 or args.bf16)):
             logger.info(
@@ -141,21 +142,34 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
                 "The master weight will be loaded as model weights for next resumption."
             )
             # not save model weight, load from master weight
-            return
-    config_to_save = None
-    state_dict, config_to_save, shard_file, sharded_index = unified_checkpoint_into_shards(
-        args, model_to_save, safe_serialization=safe_serialization
-    )
+            skip_save_model_weight = True
 
     save_directory = output_dir
     os.makedirs(save_directory, exist_ok=True)
 
-    is_sync_save = True
-    if "async_save" in args.unified_checkpoint_config:
-        is_sync_save = False
-    file_save_async_or_sync(
-        state_dict, os.path.join(save_directory, shard_file), safe_serialization, is_sync=is_sync_save
-    )
+    # save model weights
+    if not skip_save_model_weight:
+        state_dict, shard_file, sharded_index = unified_checkpoint_into_shards(
+            args, model_to_save, safe_serialization=safe_serialization
+        )
+        is_sync_save = True
+        if "async_save" in args.unified_checkpoint_config:
+            is_sync_save = False
+        file_save_async_or_sync(
+            state_dict, os.path.join(save_directory, shard_file), safe_serialization, is_sync=is_sync_save
+        )
+
+        if sharded_index is not None:
+            if isinstance(model_to_save, LoRAModel):
+                index_name = SAFE_LORA_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_LORA_WEIGHTS_INDEX_NAME
+            elif isinstance(model_to_save, PrefixModelForCausalLM):
+                index_name = SAFE_PREFIX_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_PREFIX_WEIGHTS_INDEX_NAME
+            else:
+                index_name = SAFE_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_WEIGHTS_INDEX_NAME
+            path = os.path.join(output_dir, index_name)
+
+            with open(path, "w") as f:
+                json.dump(sharded_index, f, indent=4)
 
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
     if local_rank == 0:
@@ -166,20 +180,12 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
         if isinstance(model_to_save, LoRAModel):
             model_to_save.lora_config.save_pretrained(save_directory)
 
+    # save the config
+    config_to_save = save_config(model_to_save)
     # Attach architecture to the config
     config_to_save.architectures = [model_to_save.__class__.__name__]
-    # Save the config
     if args.should_save:
         config_to_save.save_pretrained(save_directory)
-
-    if sharded_index is not None:
-        if not safe_serialization:
-            path = os.path.join(output_dir, PADDLE_WEIGHTS_INDEX_NAME)
-        else:
-            path = os.path.join(output_dir, SAFE_WEIGHTS_INDEX_NAME)
-
-        with open(path, "w") as f:
-            json.dump(sharded_index, f, indent=4)
 
 
 def load_unified_checkpoint(args, model, optimizer, resume_from_checkpoint: str, safe_serialization=False) -> None:
@@ -288,6 +294,18 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
         raise RuntimeError(f"Error(s) in loading state_dict for {model.__class__.__name__}:\n\t{error_msg}")
 
 
+def save_config(model_to_save):
+    dtype = get_parameter_dtype(model_to_save)
+    model_to_save.config.dtype = str(dtype).split(".")[1]
+    config_to_save = copy.deepcopy(model_to_save.config)
+
+    if config_to_save.tensor_parallel_degree > 1:
+        # do we need to change?
+        config_to_save.tensor_parallel_degree = 1
+
+    return config_to_save
+
+
 def unified_checkpoint_into_shards(
     args,
     model_to_save,
@@ -307,8 +325,6 @@ def unified_checkpoint_into_shards(
     state_dict = get_expected_state_dict(model_to_save)
     all_filter_keys = filter_params(model_to_save, state_dict)
 
-    dtype = get_parameter_dtype(model_to_save)
-    model_to_save.config.dtype = str(dtype).split(".")[1]
     config_to_save = copy.deepcopy(model_to_save.config)
 
     if config_to_save.tensor_parallel_degree > 1:
@@ -320,14 +336,15 @@ def unified_checkpoint_into_shards(
             )
         state_dict = merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys)
 
-    if config_to_save.tensor_parallel_degree > 1:
-        # do we need to change?
-        config_to_save.tensor_parallel_degree = 1
-
     # build index json file
     index_weight_file = {}
     total_size = 0
-    weights_name = SAFE_WEIGHTS_NAME if safe_serialization else PADDLE_WEIGHTS_NAME
+    if isinstance(model_to_save, LoRAModel):
+        weights_name = SAFE_LORA_WEIGHTS_NAME if safe_serialization else LORA_WEIGHTS_NAME
+    elif isinstance(model_to_save, PrefixModelForCausalLM):
+        weights_name = SAFE_PREFIX_WEIGHTS_NAME if safe_serialization else PREFIX_WEIGHTS_NAME
+    else:
+        weights_name = SAFE_WEIGHTS_NAME if safe_serialization else PADDLE_WEIGHTS_NAME
 
     shard_file = get_sharded_file_name(args, weights_name)
     for key, weight in state_dict.items():
@@ -340,7 +357,7 @@ def unified_checkpoint_into_shards(
         total_size_list,
     )
 
-    return state_dict, config_to_save, shard_file, sharded_index
+    return state_dict, shard_file, sharded_index
 
 
 def save_unified_optimizer(args, model, optimizer, output_dir, safe_serialization=False):
@@ -385,16 +402,17 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
         )
 
     if sharded_optim_index is not None:
-        if not safe_serialization:
-            path = os.path.join(output_dir, PADDLE_OPTIMIZER_INDEX_NAME)
-            master_path = os.path.join(output_dir, PADDLE_MASTER_WEIGHTS_INDEX_NAME)
-        else:
-            path = os.path.join(output_dir, SAFE_OPTIMIZER_INDEX_NAME)
-            master_path = os.path.join(output_dir, SAFE_MASTER_WEIGHTS_INDEX_NAME)
-
+        optimizer_index_name = SAFE_OPTIMIZER_INDEX_NAME if safe_serialization else PADDLE_OPTIMIZER_INDEX_NAME
+        path = os.path.join(output_dir, optimizer_index_name)
         with open(path, "w") as f:
             json.dump(sharded_optim_index, f, indent=4)
 
+        master_weights_name = (
+            SAFE_MASTER_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_MASTER_WEIGHTS_INDEX_NAME
+        )
+        if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
+            master_weights_name = SAFE_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_WEIGHTS_INDEX_NAME
+        master_path = os.path.join(output_dir, master_weights_name)
         if master_weight_state_dict is not None:
             with open(master_path, "w") as f:
                 json.dump(sharded_master_weight_index, f, indent=4)
@@ -617,6 +635,8 @@ def unified_optimizer_into_shards(
     total_optim_size, total_master_weight_size = 0, 0
     optimizer_name = SAFE_OPTIMIZER_NAME if safe_serialization else PADDLE_OPTIMIZER_NAME
     master_weights_name = SAFE_MASTER_WEIGHTS_NAME if safe_serialization else PADDLE_MASTER_WEIGHTS_NAME
+    if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
+        master_weights_name = SAFE_WEIGHTS_NAME if safe_serialization else PADDLE_WEIGHTS_NAME
     shard_optimizer_file = get_sharded_file_name(args, optimizer_name, is_optimizer=True)
     shard_master_weight_file = get_sharded_file_name(args, master_weights_name, is_optimizer=True)
 
@@ -838,23 +858,30 @@ def save_single_card_checkpoint(args, model_to_save, output_dir):
     """Save checkpoint for non-distributed environment."""
 
     state_dict = get_expected_state_dict(model_to_save)
+    if isinstance(model_to_save, LoRAModel):
+        weight_filename = "lora_model-00001-of-00001.safetensors"
+        index_filename = SAFE_LORA_WEIGHTS_INDEX_NAME
+    elif isinstance(model_to_save, PrefixModelForCausalLM):
+        weight_filename = "prefix_model-00001-of-00001.safetensors"
+        index_filename = SAFE_PREFIX_WEIGHTS_INDEX_NAME
+    else:
+        weight_filename = "model-00001-of-00001.safetensors"
+        index_filename = SAFE_WEIGHTS_INDEX_NAME
     # get index json
     index_weight_file = {}
     total_size = 0
     for key, weight in state_dict.items():
-        index_weight_file[key] = "model-00001-of-00001.safetensors"
+        index_weight_file[key] = weight_filename
         total_size += weight.numel().item() * dtype_byte_size(weight.dtype)
     sharded_index_json = {}
     sharded_index_json["metadata"] = {"total_size": total_size}
     sharded_index_json["weight_map"] = index_weight_file
-    path = os.path.join(output_dir, SAFE_WEIGHTS_INDEX_NAME)
+    path = os.path.join(output_dir, index_filename)
     with open(path, "w") as f:
         json.dump(sharded_index_json, f, indent=4)
 
     # save checkpoint
-    file_save_async_or_sync(
-        state_dict, os.path.join(output_dir, "model-00001-of-00001.safetensors"), safe_serialization=True
-    )
+    file_save_async_or_sync(state_dict, os.path.join(output_dir, weight_filename), safe_serialization=True)
 
     if isinstance(model_to_save, PrefixModelForCausalLM):
         save_prefix_past_key_value(model_to_save, output_dir)
@@ -1271,9 +1298,15 @@ def load_unified_optimizer_dynamically(args, model, optimizer, resume_from_check
 
 
 def load_single_card_checkpoint(args, model, resume_from_checkpoint: str):
+    if isinstance(model, LoRAModel):
+        index_filename = SAFE_LORA_WEIGHTS_INDEX_NAME
+    elif isinstance(model, PrefixModelForCausalLM):
+        index_filename = SAFE_PREFIX_WEIGHTS_INDEX_NAME
+    else:
+        index_filename = SAFE_WEIGHTS_INDEX_NAME
     resolved_archive_file, sharded_metadata = get_checkpoint_shard_files(
         pretrained_model_name_or_path=resume_from_checkpoint,
-        index_filename=os.path.join(resume_from_checkpoint, SAFE_WEIGHTS_INDEX_NAME),
+        index_filename=os.path.join(resume_from_checkpoint, index_filename),
     )
 
     loaded_keys = sharded_metadata["all_checkpoint_keys"]
@@ -1857,7 +1890,13 @@ def select_model_weight_index(args, model, resume_from_checkpoint, safe_serializ
     """
 
     # find model weight index file
-    index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+    if isinstance(model, LoRAModel):
+        index_filename = SAFE_LORA_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_LORA_WEIGHTS_INDEX_NAME
+    elif isinstance(model, PrefixModelForCausalLM):
+        index_filename = SAFE_PREFIX_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_PREFIX_WEIGHTS_INDEX_NAME
+    else:
+        index_filename = SAFE_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_WEIGHTS_INDEX_NAME
+
     index_filename_path = os.path.join(resume_from_checkpoint, index_filename)
     identify_func = os.path.isfile if local else distributed_isfile
 
@@ -1896,6 +1935,10 @@ def update_master_weight_status(args, optimizer, has_master_weight, safe_seriali
             index_filename_master_weights = (
                 PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
             )
+            if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
+                index_filename_master_weights = (
+                    PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+                )
     else:
         has_master_weight = False
         index_filename_master_weights = None

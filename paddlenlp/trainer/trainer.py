@@ -350,6 +350,12 @@ class Trainer:
         if train_dataset is not None and not isinstance(train_dataset, collections.abc.Sized) and args.max_steps <= 0:
             raise ValueError("train_dataset does not implement __len__, max_steps has to be specified")
 
+        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+            if self.args.unified_checkpoint and "skip_save_model_weight" in self.args.unified_checkpoint_config:
+                raise ValueError(
+                    "We do not support skip_save_model_weight in peft model when using unified checkpoint."
+                )
+
         self.do_grad_scaling = False
         self.enable_autocast_context_manager = False
 
@@ -2027,7 +2033,16 @@ class Trainer:
             self.model_wrapped.get_all_parameters(convert2cpu=True)
 
         if self.args.should_save_model_state:
+            unified_checkpoint_config_backup = self.args.unified_checkpoint_config
+            # backup and remove unified_checkpoint_config for not trine stage
+            if not self.is_in_train:
+                self.args.unified_checkpoint_config = []
+
             self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
+
+            # recover unified_checkpoint_config for not trine stage
+            if not self.is_in_train:
+                self.args.unified_checkpoint_config = unified_checkpoint_config_backup
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
