@@ -572,9 +572,13 @@ class Trainer:
 
                 if os.path.isfile(weights_file):
                     # We load the model state dict on the CPU to avoid an OOM error.
+                    self.timers and self.timers("load_paddle_checkpoint_file").start()
                     state_dict = paddle.load(weights_file, return_numpy=True)
+                    self.timers and self.timers("load_paddle_checkpoint_file").stop()
                     # If the model is on the GPU, it still works!
+                    self.timers and self.timers("load_paddle_checkpoint_into_model").start()
                     self._set_state_dict_in_model(state_dict)
+                    self.timers and self.timers("load_paddle_checkpoint_into_model").stop()
                     # release memory
                     del state_dict
                 else:
