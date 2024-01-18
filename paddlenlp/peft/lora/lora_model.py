@@ -167,9 +167,6 @@ class LoRAModel(nn.Layer):
                 state_dict = load_state_dict(
                     shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys
                 )
-                for key in state_dict:
-                    if "lora" in key:
-                        state_dict[key] = state_dict[key].cast(lora_config.dtype)
                 error_msgs += _load_state_dict_into_model(lora_model.model, state_dict, "")
                 del state_dict
                 gc.collect()
@@ -206,10 +203,6 @@ class LoRAModel(nn.Layer):
             # convert parameters to tensor parallel for mp model
             if lora_config_tensor_parallel_degree <= 1 and model.config.tensor_parallel_degree > 1:
                 lora_state_dict = lora_model._convert_tensor_parallel(lora_state_dict=lora_state_dict)
-
-            for key in lora_state_dict:
-                if "lora" in key:
-                    lora_state_dict[key] = lora_state_dict[key].cast(lora_config.dtype)
 
             # set lora state dict
             lora_model.set_state_dict(lora_state_dict)

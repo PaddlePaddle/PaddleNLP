@@ -1630,7 +1630,8 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
             total_size += weight_size
 
         filter_tensor_list.append(current_block)
-        assert len(filter_tensor_list) == tp_size, "Error, partition failed!"
+        if len(filter_tensor_list) < tp_size:
+            filter_tensor_list.extend([[] for i in range(tp_size - len(filter_tensor_list))])
 
     dist.broadcast_object_list(
         filter_tensor_list,
