@@ -14,6 +14,12 @@
 
 import copy
 
+import numpy as np
+import paddle
+import paddle.nn as nn
+
+from paddlenlp.transformers import PretrainedConfig, PretrainedModel
+
 
 def get_pretrain_arguments(pretrain_arguments):
 
@@ -134,3 +140,51 @@ def get_pretrain_arguments(pretrain_arguments):
     configs["DP8"] = train_args
 
     return configs
+
+
+class RegressionDataset:
+    def __init__(self, a=2, b=3, length=64, seed=42, label_names=None):
+        np.random.seed(seed)
+        self.label_names = ["labels"] if label_names is None else label_names
+        self.length = length
+        self.x = np.random.normal(size=(length,)).astype(np.float32)
+        self.ys = [a * self.x + b + np.random.normal(scale=0.1, size=(length,)) for _ in self.label_names]
+        self.ys = [y.astype(np.float32) for y in self.ys]
+
+    def __len__(self):
+        return self.length
+
+    def __getitem__(self, i):
+        result = {name: y[i] for name, y in zip(self.label_names, self.ys)}
+        result["input_x"] = self.x[i]
+        return result
+
+
+class RegressionModelConfig(PretrainedConfig):
+    def __init__(self, a=0, b=0, double_output=False, random_torch=True, **kwargs):
+        super().__init__(**kwargs)
+        self.a = a
+        self.b = b
+        self.double_output = double_output
+        self.random_torch = random_torch
+        self.hidden_size = 1
+
+
+class RegressionPretrainedModel(PretrainedModel):
+    config_class = RegressionModelConfig
+    base_model_prefix = "regression"
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.a = paddle.create_parameter(shape=[], dtype=paddle.float32)
+        self.b = paddle.create_parameter(shape=[], dtype=paddle.float32)
+        self.a.set_value(paddle.to_tensor(config.a, paddle.float32))
+        self.b.set_value(paddle.to_tensor(config.b, paddle.float32))
+        self.double_output = config.double_output
+
+    def forward(self, input_x, labels=None, **kwargs):
+        y = input_x * self.a + self.b
+        if labels is None:
+            return (y, y) if self.double_output else (y,)
+        loss = nn.functional.mse_loss(y, labels)
+        return (loss, y, y) if self.double_output else (loss, y)
