@@ -58,8 +58,9 @@ std::vector<paddle::Tensor> RMSLnFwd(const paddle::Tensor &x,
 
   auto place = x.place();
   auto y = paddle::empty(x_shape, scale.type(), place);
-  auto invvar = paddle::empty({rows}, paddle::DataType::FLOAT32, place);
-
+  auto variance_shape = x_shape;
+  variance_shape.pop_back();
+  auto invvar = paddle::empty(variance_shape, paddle::DataType::FLOAT32, place);
   cuda_rms_norm(x, scale, rows, cols, epsilon, &y, &invvar);
   return {y, invvar};
 }
@@ -104,9 +105,9 @@ std::vector<std::vector<int64_t>> RMSLnFwdInferShape(
     std::vector<int64_t> x_shape,
     std::vector<int64_t> scale_shape,
     float epsilon) {
-  int rows, cols;
-  GetRowsCols(x_shape, &rows, &cols);
-  return {x_shape, {rows}};
+  auto variance_shape = x_shape;
+  variance_shape.pop_back();
+  return {x_shape, variance_shape};
 }
 
 std::vector<paddle::DataType> LnFwdInferDtype(paddle::DataType x_dtype,
