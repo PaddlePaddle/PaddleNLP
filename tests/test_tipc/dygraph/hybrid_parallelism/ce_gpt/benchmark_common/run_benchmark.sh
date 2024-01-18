@@ -154,6 +154,7 @@ function _train(){
         workerlog_id=0
         ;;
     DP8-mbs2-acc2|SD8-stage1-mbs2-acc2|SD8-stage2-mbs2-acc2|SD8-stage3-mbs2-acc2|PP8-mbs16-acc2|MP8-mbs16-acc2|
+    
     MP2-PP2-DP2-mbs8-acc2|MP2-PP2-SD2-Stage1-mbs8-acc2|MP2-SD4-stage1-mbs4-acc2|MP2-SP2-PP2-DP2-mbs8-acc2|MP2-SP2-PP2-SD2-Stage1-mbs8-acc2|
     MP2-PP4-VPP2-DP2-mbs8-acc2|MP2-PP4-VPP2-SD2-stage1-mbs8-acc2|MP2-SP2-PP4-VPP2-DP2-mbs8-acc2|MP2-SP2-PP4-VPP2-SD2-stage1-mbs8-acc2) 
     echo "run run_mode: ${run_mode}"
