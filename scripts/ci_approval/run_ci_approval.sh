@@ -47,7 +47,7 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
     elif [[ ${dir1} =~ "paddlenlp" ]];then
         if [[ ${dir2} =~ "transformers" ]];then
             echo_line="You must have one RD (wawltor) approval for the changes of `transformers` "
-            check_approval 1 sijunhe wawltor 
+            check_approval 1 wawltor 
         elif [[ ${dir2} =~ "taskflow" ]];then
             echo_line="You must have one RD (w5688414(Recommend),DesmonDay,wawltor) approval for the changes of `taskflow`"
             check_approval 1 w5688414 DesmonDay wawltor 
@@ -70,11 +70,14 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
         if [[ ${dir3} =~ "auto_parallel" ]] ;then
             echo_line="You must have one RD (ZHUI, wawltor,ForFishes,sneaxiy,zhiqiu) approval for the changes of `llm/llama/auto_parallel/` "
             check_approval 1 ZHUI wawltor ForFishes sneaxiy zhiqiu
+        else 
+            echo_line="You must have one RD (wj-Mcat(Recommend), wawltor) approval for the changes of `llm/`"
+            check_approval 1 wj-Mcat lugimzzz DesmonDay wawltor
         fi
-    elif [[ ${dir1} =~ "tests" ]];then # 新增单测
+    elif [[ ${dir1} =~ "tests" ]];then 
         if [[ ${dir2} =~ "transformers" ]] ;then
             echo_line="You must have one RD (wawltor) approval for the changes of `transformers` "
-            check_approval 1 sijunhe wawltor
+            check_approval 1 wawltor
         elif [[ ${dir2} =~ "taskflow" ]] || [[ ${dir2} =~ "prompt" ]];then
             echo_line="You must have one RD (w5688414(Recommend),, wawltor) approval for the changes of `taskflow`"
             check_approval 1 w5688414 wawltor 
@@ -88,8 +91,8 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
             echo_line="You must have one RD (guoshengCS(Recommend),, wawltor) approval for the changes of `ops or embedding`"
             check_approval 1 guoshengCS wawltor  
         elif [[ ${dir2} =~ "model_zoo" ]] ;then
-            echo_line="You must have one RD (wawltor(Recommend), sijunhe) approval for the changes of `model_zoo`"
-            check_approval 1 sijunhe wawltor 
+            echo_line="You must have one RD (wawltor(Recommend)) approval for the changes of `model_zoo`"
+            check_approval 1 wawltor 
         elif [[ ${dir2} =~ "cli" ]] || [[ ${dir2} =~ "generation" ]];then
             echo_line="You must have one RD (wj-Mcat(Recommend), wawltor) approval for the changes of `llm/generation`"
             check_approval 1 wj-Mcat wawltor 
@@ -106,13 +109,13 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
             echo_line="You must have one RD (ZHUI(Recommend),DesmonDay,wawltor) approval for the changes of `layers/metrics/tests/llm/test_pretrain.py`"
             check_approval 1 ZHUI DesmonDay wawltor 
         elif [[ ${dir2} =~ "utils" ]] ;then
-            echo_line="You must have one RD (wawltor(Recommend), sijunhe) approval for the changes of `tests/utils`"
-            check_approval 1 sijunhe wawltor
+            echo_line="You must have one RD (wawltor(Recommend)) approval for the changes of `tests/utils`"
+            check_approval 1 wawltor
         fi
-    elif [[ ${dir1} =~ "pipelines" ]];then # 影响编包
+    elif [[ ${dir1} =~ "pipelines" ]];then 
         echo_line="You must have one RD (w5688414(Recommend), wawltor) approval for the changes of `pipelines`"
         check_approval 1 w5688414 junnyu wawltor 
-    elif [[ ${dir1} =~ "ppdiffusers" ]];then # 影响编包
+    elif [[ ${dir1} =~ "ppdiffusers" ]];then 
         echo_line="You must have one RD (junnyu(Recommend), wawltor) approval for the changes of `pipelines`"
         check_approval 1 w5688414 junnyu wawltor 
     else
