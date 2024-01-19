@@ -2116,7 +2116,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             convert_from_torch = False
 
         cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
-        target_cache_dir = "" if os.path.isdir(pretrained_model_name_or_path) else cache_dir
 
         # 1. get the PretrainedConfig to init model
         if not isinstance(config, PretrainedConfig):
@@ -2134,6 +2133,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             model_kwargs.pop("from_aistudio")
 
         if not from_hf_hub and not from_aistudio:
+            target_cache_dir = "" if os.path.isdir(pretrained_model_name_or_path) else cache_dir
             if not os.path.exists(
                 os.path.join(target_cache_dir, pretrained_model_name_or_path, subfolder, CONFIG_NAME)
             ):
