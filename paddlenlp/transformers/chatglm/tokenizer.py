@@ -76,6 +76,8 @@ class ChatGLMTokenizer(PretrainedTokenizer):
         self.sp_tokenizer = spm.SentencePieceProcessor()
         self.sp_tokenizer.Load(self.vocab_file)
 
+        self.add_special_tokens({"additional_special_tokens": [gmask_token]})
+
     @property
     def gmask_token_id(self) -> Optional[int]:
         if self.gmask_token is None:

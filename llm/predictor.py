@@ -50,6 +50,7 @@ from paddlenlp.transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     ChatGLMv2Tokenizer,
+    ChatGLMTokenizer,
     LlamaTokenizer,
     PretrainedModel,
     PretrainedTokenizer,
@@ -231,7 +232,7 @@ class BasePredictor:
             padding=True,
             # when use chat_template, it should not add special tokens
             # chatglm2 prefix-tokens can not be tokenized into ids
-            add_special_tokens=self.tokenizer.chat_template is None or isinstance(self.tokenizer, ChatGLMv2Tokenizer),
+            add_special_tokens=self.tokenizer.chat_template is None or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
         )
         return tokenized_source
 
@@ -915,7 +916,7 @@ class BlockInferencePredictorMixin:
                 max_length=self.config.src_length,
                 # if use chat_template, it will not add special_tokens
                 add_special_tokens=self.tokenizer.chat_template is None
-                or isinstance(self.tokenizer, ChatGLMv2Tokenizer),
+                or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
             )
             input_ids = tokens["input_ids"][0]
             length = len(input_ids)
