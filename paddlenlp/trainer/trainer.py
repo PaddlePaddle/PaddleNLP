@@ -1314,7 +1314,7 @@ class Trainer:
             if self.args.pipeline_parallel_degree > 1:
                 drop_last = True
                 logger.warning(
-                    "In parallel mode, the bacth_size is strictly checked. set DistributedBatchSampler drop_last=True."
+                    "In parallel mode, the batch_size is strictly checked. set DistributedBatchSampler drop_last=True."
                 )
 
             return DistributedBatchSampler(
@@ -2102,6 +2102,7 @@ class Trainer:
                 paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
 
         # Determine the new best metric / best model checkpoint
+
         if metrics is not None and self.args.metric_for_best_model is not None:
             metric_to_check = self.args.metric_for_best_model
             if not metric_to_check.startswith("eval_"):

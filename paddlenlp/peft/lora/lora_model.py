@@ -123,9 +123,51 @@ class LoRAModel(nn.Layer):
             num_attention_heads=config.num_attention_heads,
         )
 
+        rename_lora_split_mapping = {}
+        if issubclass(type(self.model), PipelineLayer):
+            # rename lora_split_mapping
+            prefixes = self.model.get_sequential_name_prefixes()
+            keys = self.lora_split_mapping.keys()
+            first_key = ""
+            for k in keys:
+                first_key = k
+                break
+            first_key = first_key.split(".")
+            use_virtual_pp_degree = first_key[0].isdigit() and first_key[1].isdigit()
+
+            for k in keys:
+                name_splited = k.split(".")
+                if use_virtual_pp_degree:
+                    if name_splited[0].isdigit():
+                        if name_splited[1].isdigit():
+                            idx = str(int(name_splited[0]) + int(name_splited[1]))
+                            single_name = [prefixes[idx]]
+                            single_name.extend(name_splited[2:])
+                        else:
+                            single_name = [prefixes[str(len(prefixes) - 1)]]
+                            single_name.extend(name_splited[2:])
+                            logger.warning(
+                                f"Please check! we treat this key as last layer, get {k}, set origin name as {'.'.join(single_name)}"
+                            )
+                    else:
+                        raise ValueError(f"Please check! {k} is not a valid key.")
+                else:
+                    idx = name_splited[0]
+                    # for normal pp layer name
+                    if idx.isdigit():
+                        single_name = [prefixes[idx]]
+                        single_name.extend(name_splited[1:])
+                    else:
+                        raise ValueError(f"Unexpected key: {k} for pp lora layer.")
+                rename_lora_split_mapping[".".join(single_name)] = self.lora_split_mapping[k]
+
+        lora_split_mapping = (
+            rename_lora_split_mapping if issubclass(type(self.model), PipelineLayer) else self.lora_split_mapping
+        )
+
         def get_tensor_parallel_split_mappings():
             final_actions = {}
-            for key, is_col in self.lora_split_mapping.items():
+            for key, is_col in lora_split_mapping.items():
                 final_actions[key] = partial(fn, is_column=is_col)
 
             return final_actions
@@ -245,11 +287,11 @@ class LoRAModel(nn.Layer):
 
         return trainable_state_dict
 
-    def _get_tensor_parallel_convert_actions(self, loaded_keys, is_split=True):
+    def _get_tensor_parallel_convert_actions(self, loaded_keys, is_split=True, ignore_error=False):
         specific_name_action_mappings = self._get_tensor_parallel_mappings(self.model.config, is_split=is_split)
         name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=is_split)
         state_keys_map = ConversionMixin._resolve_prefix_keys(
-            name_action_mappings.keys(), self.model.state_dict().keys()
+            name_action_mappings.keys(), self.model.state_dict().keys(), ignore_error=ignore_error
         )
         for k, v in state_keys_map.items():
             if v in loaded_keys:

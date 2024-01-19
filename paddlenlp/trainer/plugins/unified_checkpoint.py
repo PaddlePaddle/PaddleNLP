@@ -262,7 +262,9 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
             pre_tensor_parallel_split = True
             assert loaded_keys is not None, "loaded_keys is not None."
             if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
-                tp_actions = model._get_tensor_parallel_convert_actions(set(loaded_keys), is_split=True)
+                tp_actions = model._get_tensor_parallel_convert_actions(
+                    set(loaded_keys), is_split=True, ignore_error=True
+                )
             else:
                 tp_actions = model.get_tensor_parallel_convert_actions(model.config, loaded_keys, ignore_error=True)
         # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
@@ -329,7 +331,9 @@ def unified_checkpoint_into_shards(
 
     if config_to_save.tensor_parallel_degree > 1:
         if isinstance(model_to_save, LoRAModel) or isinstance(model_to_save, PrefixModelForCausalLM):
-            tp_actions = model_to_save._get_tensor_parallel_convert_actions(all_filter_keys, is_split=False)
+            tp_actions = model_to_save._get_tensor_parallel_convert_actions(
+                all_filter_keys, is_split=False, ignore_error=True
+            )
         else:
             tp_actions = model_to_save.get_tensor_parallel_convert_actions(
                 model_to_save.config, state_dict.keys(), is_split=False, ignore_error=True
@@ -512,7 +516,9 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
                 # assert model_keys is not None, "model_keys is None." TODO: correct the assert
                 if model.config.tensor_parallel_degree > 1:
                     if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
-                        tp_actions = model._get_tensor_parallel_convert_actions(model_keys, is_split=True)
+                        tp_actions = model._get_tensor_parallel_convert_actions(
+                            model_keys, is_split=True, ignore_error=True
+                        )
                     else:
                         tp_actions = model.get_tensor_parallel_convert_actions(
                             model.config, model_keys, ignore_error=True
@@ -613,7 +619,7 @@ def unified_optimizer_into_shards(
             if base_model_key not in model_keys:
                 model_keys.append(base_model_key)
         if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
-            tp_actions = model._get_tensor_parallel_convert_actions(model_keys, is_split=False)
+            tp_actions = model._get_tensor_parallel_convert_actions(model_keys, is_split=False, ignore_error=True)
         else:
             tp_actions = model.get_tensor_parallel_convert_actions(
                 model.config, model_keys, is_split=False, ignore_error=True
