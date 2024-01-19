@@ -1556,42 +1556,27 @@ def predict():
 
 def benchmark(predictor, predictor_args, model_args):
     # Just construct a simple benchmark input. We pad input to the src_length.
-    test_texts = "who are you"
-    benchmark_texts = [test_texts + "<pad>" * (predictor_args.src_length) for _ in range(predictor_args.batch_size)]
+    test_texts = "hello world, how are you?"
+    benchmark_texts = [test_texts + "<pad>" * predictor_args.src_length for _ in range(predictor_args.batch_size)]
 
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
-    warmup_time = 2
-    test_time = 10
+    warmup_time = 10
+    test_time = 100
 
     print("***********Start Warmup**********")
-    for i in range(warmup_time):
-        print("warm up ", i)
-        for _, batch_source_text in enumerate(batch_benchmark_texts):
-            predictor.predict(batch_source_text)
-
-    from paddle import profiler
-
-    # 创建性能分析器相关的代码
-    def my_on_trace_ready(prof):  # 定义回调函数，性能分析器结束采集数据时会被调用
-        callback = profiler.export_chrome_tracing("./profiler_demo")  # 创建导出性能数据到profiler_demo文件夹的回调函数
-        callback(prof)  # 执行该导出函数
-        prof.summary(sorted_by=profiler.SortedKeys.GPUTotal)  # 打印表单，按GPUTotal排序表单项
-
-    p = profiler.Profiler(scheduler=[3, 4], on_trace_ready=my_on_trace_ready, timer_only=False)  # 初始化Profiler对象
+    for _ in range(warmup_time):
+        for bs, batch_source_text in enumerate(batch_benchmark_texts):
+            outputs = predictor.predict(batch_source_text)
 
     print("***********Start Speed Test**********")
     start = time.perf_counter()
     output_tokens = 0
-    p.start()
-    for i in range(test_time):
-        print("test ", i)
-        for _, batch_source_text in enumerate(batch_benchmark_texts):
-            predictor.predict(batch_source_text)
-            output_tokens += predictor_args.max_length * predictor_args.batch_size
-        p.step()
-    p.stop()
+    for _ in range(test_time):
+        for bs, batch_source_text in enumerate(batch_benchmark_texts):
+            outputs = predictor.predict(batch_source_text)
+            output_tokens += sum([len(output) for output in outputs])
     end = time.perf_counter()
     print("Avg Elapse time is: ", (end - start) / test_time)
     print("Output tokens is: ", output_tokens)
