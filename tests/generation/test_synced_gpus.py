@@ -21,6 +21,7 @@ import paddle
 from paddlenlp.generation import GenerationConfig
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+from tests.testing_utils import require_gpu
 from tests.transformers.test_modeling_common import ids_tensor
 
 
@@ -56,23 +57,27 @@ class ShardingStage3Tester(unittest.TestCase):
         }
         cls.generation_config = GenerationConfig(max_length=10 + paddle.distributed.get_rank(), trunc_input=False)
 
+    @require_gpu(2)
     def test_synced_gpus_greedy(self):
         with paddle.no_grad():
             self.generation_config.decode_strategy = "greedy_search"
             self.model.generate(**self.input_kwargs, generation_config=self.generation_config)
 
+    @require_gpu(2)
     def test_synced_gpus_sample(self):
         with paddle.no_grad():
             self.generation_config.decode_strategy = "sampling"
             self.generation_config.top_k = 8
             self.model.generate(**self.input_kwargs, generation_config=self.generation_config)
 
+    @require_gpu(2)
     def test_synced_gpus_beam_search(self):
         with paddle.no_grad():
             self.generation_config.decode_strategy = "beam_search"
             self.generation_config.num_beams = 4
             self.model.generate(**self.input_kwargs, generation_config=self.generation_config)
 
+    @require_gpu(2)
     def test_synced_gpus_group_beam_search(self):
         with paddle.no_grad():
             self.generation_config.decode_strategy = "beam_search"
