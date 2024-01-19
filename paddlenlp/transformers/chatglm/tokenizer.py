@@ -57,6 +57,7 @@ class ChatGLMTokenizer(PretrainedTokenizer):
         num_image_tokens=20000,
         **kwargs
     ) -> None:
+        kwargs["additional_special_tokens"] = kwargs.pop("additional_special_tokens", []) + [gmask_token]
         super().__init__(
             pad_token=pad_token,
             unk_token=unk_token,
@@ -75,8 +76,6 @@ class ChatGLMTokenizer(PretrainedTokenizer):
 
         self.sp_tokenizer = spm.SentencePieceProcessor()
         self.sp_tokenizer.Load(self.vocab_file)
-
-        self.add_special_tokens({"additional_special_tokens": [gmask_token]})
 
     @property
     def gmask_token_id(self) -> Optional[int]:
