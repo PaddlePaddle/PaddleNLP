@@ -470,6 +470,7 @@ def dybatch_preprocess(
                 max_length=src_length,
                 return_attention_mask=False,
                 return_token_type_ids=False,
+                add_special_tokens=tokenizer.chat_template is None or isinstance(tokenizer, ChatGLMv2Tokenizer),
             )
             input_ids.append(tokens["input_ids"][0])
 
