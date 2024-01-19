@@ -393,13 +393,13 @@ def resolve_weight_file_from_hf_hub(
             PADDLE_WEIGHTS_INDEX_NAME,
             PADDLE_WEIGHTS_NAME,
         ]
-    elif use_safetensors is True:
+    elif use_safetensors:
         # only detect sharded safetensors index & no sharded safetensors weight
         file_name_list = [
             SAFE_WEIGHTS_INDEX_NAME,
             SAFE_WEIGHTS_NAME,
         ]
-    elif use_safetensors is False:
+    else:
         # only detect sharded bin index & no sharded bin weight
         file_name_list = [
             PYTORCH_WEIGHTS_INDEX_NAME,

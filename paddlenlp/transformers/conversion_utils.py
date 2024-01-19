@@ -1060,9 +1060,6 @@ class ConversionMixin:
             for layer_name in all_layer_names:
                 logger.warning(f"--- {layer_name}")
 
-        if cache_dir is not None:
-            model_weight_file = os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)
-            paddle.save(state_dict, model_weight_file)
         return state_dict
 
     @classmethod
