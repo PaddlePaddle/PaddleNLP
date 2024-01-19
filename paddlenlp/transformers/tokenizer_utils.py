@@ -561,6 +561,11 @@ class ChatTemplate:
 
         template = self._compile_jinja_template(self.query)
         return template.render(query=query, index=index, **context_data)
+    
+    def _init_context_data(self, context_data: Dict[str, Union[int, str]] = {}) -> Dict[str, Union[int, str]]:
+        """init the context data for chat-template"""
+        context_data["is_training"] = context_data.get("is_training", False)
+        return context_data
 
     def render_system(self, context_data: Dict[str, Union[int, str]] = {}) -> str:
         if self.system is None:
@@ -633,6 +638,8 @@ class ChatTemplateMixin:
         Returns:
             str | dict[str, numpy.ndarray | paddle.Tensor]: return the result of applied data
         """
+        context_data = self.chat_template._init_context_data(context_data)
+
         if isinstance(conversation, str):
             conversation = [[conversation]]
         elif isinstance(conversation, list) and isinstance(conversation[0], str):
@@ -661,6 +668,7 @@ class ChatTemplateMixin:
         Returns:
             List[list[int], list[int]]: the pair of input_ids and target_ids
         """
+        context_data = self.chat_template._init_context_data(context_data)
         # encode system
         result = {}
         if self.chat_template.system:
