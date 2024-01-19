@@ -1021,7 +1021,7 @@ class ConversionMixin:
             return True
 
     @classmethod
-    def convert(cls, weight_file: str, config: PretrainedConfig, cache_dir: str) -> None:
+    def convert(cls, weight_file: str, config: PretrainedConfig, cache_dir: str = None) -> None:
         """the entry of converting config and converting model file
 
         Args:
@@ -1060,8 +1060,9 @@ class ConversionMixin:
             for layer_name in all_layer_names:
                 logger.warning(f"--- {layer_name}")
 
-        model_weight_file = os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)
-        paddle.save(state_dict, model_weight_file)
+        if cache_dir is not None:
+            model_weight_file = os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)
+            paddle.save(state_dict, model_weight_file)
         return state_dict
 
     @classmethod
