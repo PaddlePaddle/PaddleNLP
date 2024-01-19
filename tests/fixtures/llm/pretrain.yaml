@@ -33,6 +33,7 @@ inference-predict:
     batch_size: 2
     decode_strategy: greedy_search
     dtype: float16
+    chat_template: none
 
 inference-to-static:
   default:
@@ -45,3 +46,4 @@ inference-infer:
     batch_size: 2
     decode_strategy: greedy_search
     max_length: 20
+    chat_template: none

@@ -209,6 +209,7 @@ from .opt.modeling import *
 from .auto.modeling import *
 from .auto.tokenizer import *
 from .auto.processing import *
+from .auto.image_processing import *
 from .auto.configuration import *
 from .codegen.modeling import *
 from .codegen.tokenizer import *

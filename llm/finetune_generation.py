@@ -58,10 +58,10 @@ def read_local_dataset(path):
 def main():
     # Arguments
     parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
-    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file(
-            json_file=os.path.abspath(sys.argv[1])
-        )
+    # Support format as "args.json --arg1 value1 --arg2 value2.”
+    # In case of conflict, command line arguments take precedence.
+    if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
+        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
         gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
@@ -162,7 +162,6 @@ def main():
         else:
             # NOTE(gongenlei): new add autotuner_benchmark
             model = AutoModelForCausalLM.from_config(model_config, dtype=dtype)
-
     if training_args.do_train and model_args.neftune:
         # Inspired by https://github.com/neelsjain/NEFTune
         if hasattr(model, "get_input_embeddings"):
@@ -418,6 +417,7 @@ def main():
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 dtype=dtype,
                 do_qat=quant_args.do_qat,
+                base_model_name_or_path=model_args.model_name_or_path,
             )
             model = LoRAModel(model, lora_config)
         else:
