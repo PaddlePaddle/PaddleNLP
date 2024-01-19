@@ -1,6 +1,6 @@
 {
     "dp_degree": "auto",
-    "max_search_time": 1800,
+    "max_search_time": 900,
     "max_time_per_task": 400,
     "metric_cfg": {
       "OptimizationDirection": "Maximize",

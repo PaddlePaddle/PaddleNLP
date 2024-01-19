@@ -83,22 +83,22 @@ function _train(){
     case ${device_num} in
     N1C1) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0 ${PADDLE_RANK_OPTION}\
-            --auto_tuner_json ./${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
+            --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
         workerlog_id=0
         ;;
     N1C2) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -m paddle.distributed.launch --gpus=0,1 ${PADDLE_RANK_OPTION}\
-            --auto_tuner_json ./${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
+            --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
         workerlog_id=0
         ;;
     N1C4) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3 ${PADDLE_RANK_OPTION}\
-            --auto_tuner_json ./${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
+            --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
         workerlog_id=0
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
-            --auto_tuner_json ./${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
+            --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
         workerlog_id=0
         ;;
     esac

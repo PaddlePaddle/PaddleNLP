@@ -18,15 +18,16 @@ autoconfig_json_file=$(basename "$1")   # autoconfig/llama7b_pretrain.json
 model_name=${autoconfig_json_file%.*} 
 auto_log_file=./autoconfig/${model_name}_auto_tuner.log
   
-if [ -f "$auto_log_file" ] && [ grep -q "Launch best cfg:" "$auto_log_file" ]; then
-    echo "autotuner 已找到最优配置"
-    if [ -f "./autoconfig/best_cfg" ]; then
-        echo "autotuner 已执行最优配置"
-        exit 0
-    else
-        echo "autotuner 未执行最优配置"
-        exit -1
+if [ -f "$auto_log_file" ] && grep -q "Launch best cfg:" "$auto_log_file"; then  
+    echo "autotuner 已找到最优配置"  
+    if [ -d "./autoconfig/best_cfg" ]; then  
+        echo "autotuner 已执行最优配置"  
+        exit 0  
+    else  
+        echo "autotuner 未执行最优配置"  
+        exit -1  
+    fi  
 else  
-    echo "autotuner 执行失败，请检查！"  
-    exit -1
+    echo "autotuner 执行失败，请检查日志文件是否存在或是否包含指定文本！"  
+    exit -1  
 fi
