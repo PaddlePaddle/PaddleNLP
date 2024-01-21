@@ -346,8 +346,6 @@ class QWenVLTest(LLMTest, unittest.TestCase):
         config.quant_type = None
         config.weight_only_quant_bits = None
 
-        print(config)
-
         paddle.set_default_dtype("float16")
         model = QWenForQWenVLInferenceModel.from_pretrained(self.output_dir, config=config, dtype="float16")
 
