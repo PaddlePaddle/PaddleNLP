@@ -59,7 +59,7 @@ from paddlenlp.utils.log import logger
 try:
     from paddlenlp_ops import reset_stop_value
 except (ImportError, ModuleNotFoundError):
-    logger.error(
+    logger.warning(
         "if you run predictor.py with --inference_model argument, please ensure you install "
         "the paddlenlp_ops by following the instructions "
         "provided at https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
