@@ -365,7 +365,6 @@ def resolve_weight_file_from_hf_hub(
     cache_dir: str,
     convert_from_torch: bool,
     subfolder=None,
-    use_safetensors=None,
 ):
     """find the suitable weight file name
 
@@ -376,35 +375,15 @@ def resolve_weight_file_from_hf_hub(
         subfolder (str, optional) An optional value corresponding to a folder inside the repo.
     """
     is_sharded = False
+    file_name_list = [
+        PADDLE_WEIGHTS_INDEX_NAME,
+        PADDLE_WEIGHTS_NAME,
+        SAFE_WEIGHTS_INDEX_NAME,
+        SAFE_WEIGHTS_NAME,
+        PYTORCH_WEIGHTS_INDEX_NAME,
+        PYTORCH_WEIGHTS_NAME,
+    ]
 
-    if use_safetensors is None:
-        # try to detect
-        # 1. detect sharded safetensors index
-        # 2. detect no sharded safetensors weight
-        # 3. detect sharded bin index
-        # 4. detect no sharded bin weight
-        # 5. detect sharded pdparams index
-        # 6. detect no sharded pdparams weight
-        file_name_list = [
-            SAFE_WEIGHTS_INDEX_NAME,
-            SAFE_WEIGHTS_NAME,
-            PYTORCH_WEIGHTS_INDEX_NAME,
-            PYTORCH_WEIGHTS_NAME,
-            PADDLE_WEIGHTS_INDEX_NAME,
-            PADDLE_WEIGHTS_NAME,
-        ]
-    elif use_safetensors:
-        # only detect sharded safetensors index & no sharded safetensors weight
-        file_name_list = [
-            SAFE_WEIGHTS_INDEX_NAME,
-            SAFE_WEIGHTS_NAME,
-        ]
-    else:
-        # only detect sharded bin index & no sharded bin weight
-        file_name_list = [
-            PYTORCH_WEIGHTS_INDEX_NAME,
-            PYTORCH_WEIGHTS_NAME,
-        ]
     resolved_file = None
     for fn in file_name_list:
         resolved_file = cached_file_for_hf_hub(
@@ -1487,7 +1466,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 cache_dir=cache_dir,
                 convert_from_torch=convert_from_torch,
                 subfolder=subfolder,
-                use_safetensors=use_safetensors,
             )
             # We'll need to download and cache each checkpoint shard if the checkpoint is sharded.
             resolved_sharded_files = None
@@ -2132,8 +2110,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if "from_aistudio" in model_kwargs:
             model_kwargs.pop("from_aistudio")
 
+        target_cache_dir = "" if os.path.isdir(pretrained_model_name_or_path) else cache_dir
         if not from_hf_hub and not from_aistudio:
-            target_cache_dir = "" if os.path.isdir(pretrained_model_name_or_path) else cache_dir
             if not os.path.exists(
                 os.path.join(target_cache_dir, pretrained_model_name_or_path, subfolder, CONFIG_NAME)
             ):
@@ -2202,13 +2180,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             ):
                 # try to get the name-mapping info
                 logger.info(
-                    f"Starting to convert pytorch weight <{resolved_archive_file}> to "
-                    f"paddle weight. You can save paddle weight by using `model.save_pretrained('path/to/output_dir')`."
+                    f"Starting to convert pytorch weight file<{resolved_archive_file}> to "
+                    f"paddle weight file<{os.path.join(target_cache_dir, pretrained_model_name_or_path, subfolder, PADDLE_WEIGHTS_NAME)}> ..."
                 )
                 state_dict = cls.convert(
                     resolved_archive_file,
                     config,
-                    cache_dir=None,  # we donot save the converted weight to cache_dir
+                    cache_dir=os.path.join(target_cache_dir, pretrained_model_name_or_path, subfolder),
                 )
             else:
                 raise ValueError(f"Unexpected file: {resolved_archive_file} for weight conversion.")
