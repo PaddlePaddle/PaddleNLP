@@ -25,9 +25,7 @@ function add_failed(){
 
 function check_approval(){
     github_ids=`echo $@|awk '{for (i=2;i<=NF;i++)print $i}'`
-    echo "Should be approved by one of: ${github_ids}"
     APPROVALS=`echo ${approval_line}|python check_pr_approval.py $1 $github_ids`
-    echo "Approved: ${APPROVALS}"
     if [[ "${APPROVALS}" == "FALSE" && "${echo_line}" != "" ]]; then
         add_failed "${failed_num}. ${echo_line}"
     fi
