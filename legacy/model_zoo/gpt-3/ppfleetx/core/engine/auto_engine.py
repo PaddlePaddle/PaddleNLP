@@ -534,13 +534,13 @@ class AutoEngine(BasicEngine):
 
     def load(self):
         if self._auto_mode and self._output_dir and isinstance(self._output_dir, str) and os.path.exists(self._output_dir):
-            latest_ckpt_dir = self._auto_engine.get_latest_ckpt(self._output_dir)
-            self._auto_engine.load(latest_ckpt_dir)
-            ckpt_path = os.path.basename(latest_ckpt_dir)
-            _, epoch, _, step = ckpt_path.split('_')
-            self._load_recovery = {"step": int(step), "epoch": int(epoch)}
-
-            logger.info(f"load ckpt dir: {latest_ckpt_dir}, recovery: {self._load_recovery}") 
+            latest_ckpt_path = self._auto_engine.get_latest_ckpt(self._output_dir)
+            if latest_ckpt_path:
+				self._auto_engine.load(latest_ckpt_path)
+				ckpt_path = os.path.basename(latest_ckpt_path)
+				_, epoch, _, step = ckpt_path.split('_')
+				self._load_recovery = {"step": int(step), "epoch": int(epoch)}
+				logger.info(f"Recovery from ckpt: {latest_ckpt_path}, recovery from epoch: {self._load_recovery['epoch']}, step: {self._load_recovery['step']}") 
         elif self._ckpt_dir and isinstance(self._ckpt_dir, str):
             self._auto_engine.load(self._ckpt_dir)
         else:
