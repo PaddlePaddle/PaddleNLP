@@ -106,6 +106,7 @@ class AutoEngine(BasicEngine):
         self._save_epoch = self._configs["save_load"]["save_epoch"]
         self._output_dir = self._configs["save_load"]["output_dir"]
         self._ckpt_dir = self._configs["save_load"]["ckpt_dir"]
+        self._auto_mode = self._configs["save_load"]["auto_mode"]
 
         # lr_scheduler and optimizer
         if mode == "train":
@@ -290,7 +291,7 @@ class AutoEngine(BasicEngine):
 
                 if self._save_steps > 0 and step % self._save_steps == 0:
                     device_synchronize()
-                    self.save(epoch=epoch_index, step=step)
+                    self.save(training=True, epoch=epoch_index, step=step)
             else:
                 skip_first = False
 
@@ -376,7 +377,7 @@ class AutoEngine(BasicEngine):
                 self._module.validation_epoch_end(log_dict)
 
             if self._save_epoch > 0 and self._run_mode == "epoch" and epoch_index % self._save_epoch == 0:
-                self.save(epoch=epoch_index, step=len(train_data_loader))
+                self.save(training=True, epoch=epoch_index, step=len(train_data_loader))
 
         logger.info(
             "The training process is complete and total cost of time for training is : {}".format(
@@ -520,15 +521,27 @@ class AutoEngine(BasicEngine):
     def tune(self, tune_dataset=None):
         self._auto_engine._tune(tune_dataset, tune_sample_split=tune_dataset.sample_split, batch_size=self.batch_size)
 
-    def save(self, training=True):
+    def save(self, training=True, epoch=0, step=0):
+        """
+        save the state dicts of model and optimizer into an checkpoint.
+        """
         if self._output_dir and isinstance(self._output_dir, str):
-            path = os.path.join(self._output_dir, "auto")
-            self._auto_engine.save(path, training=training)
+            output_dir = os.path.join(self._output_dir, "epoch_%d_step_%d/epoch_%d_step_%d" % (epoch, step, epoch, step))
+            logger.info("Save model to %s" % output_dir)
+            self._auto_engine.save(output_dir, training=training)
         else:
             raise TypeError("`save` requires a valid value of `output_dir`.")
 
     def load(self):
-        if self._ckpt_dir and isinstance(self._ckpt_dir, str):
+        if self._auto_mode and self._output_dir and isinstance(self._output_dir, str) and os.path.exists(self._output_dir):
+            latest_ckpt_dir = self._auto_engine.get_latest_ckpt(self._output_dir)
+            self._auto_engine.load(latest_ckpt_dir)
+            ckpt_path = os.path.basename(latest_ckpt_dir)
+            _, epoch, _, step = ckpt_path.split('_')
+            self._load_recovery = {"step": int(step), "epoch": int(epoch)}
+
+            logger.info(f"load ckpt dir: {latest_ckpt_dir}, recovery: {self._load_recovery}") 
+        elif self._ckpt_dir and isinstance(self._ckpt_dir, str):
             self._auto_engine.load(self._ckpt_dir)
         else:
             logger.warning("`load` requires a valid value of `ckpt_dir`.")

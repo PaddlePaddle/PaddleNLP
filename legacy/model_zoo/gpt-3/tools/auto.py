@@ -32,6 +32,7 @@ from ppfleetx.utils import auto_config
 if __name__ == "__main__":
     args = auto_config.parse_args()
     cfg = auto_config.get_config(args.config, overrides=args.override, show=False)
+    print(f'debug get cfg: {cfg}')
 
     paddle.set_device(cfg["Global"]["device"])
     if dist.get_world_size() > 1:
@@ -54,7 +55,7 @@ if __name__ == "__main__":
     dist.auto_parallel.parallel_manual_seed(cfg.Global.seed)
     engine = AutoEngine(configs=cfg, module=module)
 
-    if cfg.Engine.save_load.ckpt_dir is not None:
+    if cfg.Engine.save_load.auto_mode or cfg.Engine.save_load.ckpt_dir is not None:
         engine.load()
 
     if cfg.get("Tuning", None) and cfg.Tuning.enable:
