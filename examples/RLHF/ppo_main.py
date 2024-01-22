@@ -31,17 +31,6 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.utils.log import logger
 
-# launch would unset http_proxy
-# export https_proxy=http://172.19.57.45:3128
-# os.environ["http_proxy"] = "http://172.19.56.199:3128"
-# os.environ["https_proxy"] = "http://172.19.56.199:3128"
-# os.environ["http_proxy"] = "http://172.19.57.45:3128"
-# os.environ["https_proxy"] = "http://172.19.57.45:3128"
-os.environ["http_proxy"] = "http://10.162.37.16:8128"
-os.environ["https_proxy"] = "http://10.162.37.16:8128"
-os.environ["no_proxy"] = "localhost,bj.bcebos.com,su.bcebos.com,paddlepaddledeps.bj.bcebos.com,pslib.bj.bcebos.com"
-
-
 @dataclass
 class TrainingArguments(TrainingArguments):
     kl_coeff: float = field(
