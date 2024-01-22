@@ -111,17 +111,23 @@ function _train(){
         timeout 30m ${train_cmd} > ${log_file} 2>&1
         # echo ${train_cmd}
     fi
+    if [ $? -ne 0 ];then
+        echo -e "${model_name}, FAIL" >> ${log_file}
+    else
+        echo -e "${model_name}, SUCCESS" >> ${log_file}
+    fi
     bash autoconfig/check.sh ${autoconfig_json_file} >> ${log_file} 2>&1
     if [ $? -ne 0 ];then
-        echo -e "${model_name}, FAIL"
+        echo -e "auto_tuner, FAIL" >> ${log_file}
     else
-        echo -e "${model_name}, SUCCESS"
+        echo -e "auto_tuner, SUCCESS" >> ${log_file}
     fi
     #kill -9 `ps -ef|grep 'python'|awk '{print $2}'`
     if [ ${device_num} != "N1C1" -a -d mylog ]; then
         case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/tests/mylog
         cp -r ${case_path}/autoconfig/best_cfg/workerlog.* ./mylog/
-        cat ${case_path}/mylog/workerlog.${workerlog_id} >> ${log_file}
+        mv ${log_file} ${log_file}_auto_tuner
+        cp ${case_path}/mylog/workerlog.${workerlog_id} ${log_file}
     fi
 }
 
