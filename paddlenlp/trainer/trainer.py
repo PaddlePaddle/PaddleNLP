@@ -36,6 +36,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 import paddle
 import paddle.amp.auto_cast as autocast
+import paddle.base as base
 import paddle.distributed as dist
 import paddle.nn as nn
 from packaging import version
@@ -1547,8 +1548,11 @@ class Trainer:
             for device in custom_device_type:
                 if not len(checkpoint_rng_state["cuda"]) == core.get_custom_device_count(device):
                     raise ValueError("Length of custom device state list shoule be equal to the custom device count")
+                place = base.framework._current_expected_place()
                 for i in range(core.get_custom_device_count(device)):
-                    core.default_custom_device_generator(i).manual_seed(checkpoint_rng_state["cuda"][i])
+                    core.default_custom_device_generator(core.CustomPlace(place.get_device_type(), i)).manual_seed(
+                        checkpoint_rng_state["cuda"][i]
+                    )
 
         if self.args.use_hybrid_parallel:
             if "hybrid_parallel_rng_state_tracker" in checkpoint_rng_state:
