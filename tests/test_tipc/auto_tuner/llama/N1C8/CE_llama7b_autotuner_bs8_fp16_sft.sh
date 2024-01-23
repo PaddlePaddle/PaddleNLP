@@ -13,7 +13,7 @@
 # limitations under the License.
 
 param="model_item=CE_llama7b_autotuner "
-param+="run_mode=lora "
+param+="run_mode=sft "
 param+="device_num=N1C8 "
 param+="global_batch_size=8 "
 param+="autoconfig_json_file=autoconfig/llama7b_sft.json "
