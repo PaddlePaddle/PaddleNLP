@@ -13,17 +13,27 @@ prepare_ckpt() {
     ckpt_dir="output"
     latest_ckpt_dir=""
 
+	dir_list=$(ls "$ckpt_dir")
+	latest_ckpt_dir=$(ls -t "$ckpt_dir" | grep -v "^\.$" | head -1)
+
     if [ "$hostname" = "$node_1" ]; then
-        dir_list=$(ls "$ckpt_dir")
-        latest_ckpt_dir=$(ls -t "$ckpt_dir" | grep -v "^\.$" | head -1)
+        scp -P 8020 -r $target_dir/$latest_ckpt_dir $node_2:$target_dir/$latest_ckpt_dir
+        scp -P 8020 -r $target_dir/$latest_ckpt_dir $node_3:$target_dir/$latest_ckpt_dir
 
         scp -P 8020 -r $node_2:$target_dir/$latest_ckpt_dir output/
+        scp -P 8020 -r $node_3:$target_dir/$latest_ckpt_dir output/
+    if [ "$hostname" = "$node_2" ]; then
+        scp -P 8020 -r $target_dir/$latest_ckpt_dir $node_1:$target_dir/$latest_ckpt_dir
+        scp -P 8020 -r $target_dir/$latest_ckpt_dir $node_3:$target_dir/$latest_ckpt_dir
+
+        scp -P 8020 -r $node_1:$target_dir/$latest_ckpt_dir output/
+        scp -P 8020 -r $node_3:$target_dir/$latest_ckpt_dir output/
+    if [ "$hostname" = "$node_3" ]; then
+        scp -P 8020 -r $target_dir/$latest_ckpt_dir $node_1:$target_dir/$latest_ckpt_dir
+        scp -P 8020 -r $target_dir/$latest_ckpt_dir $node_2:$target_dir/$latest_ckpt_dir
+
+        scp -P 8020 -r $node_1:$target_dir/$latest_ckpt_dir output/
         scp -P 8020 -r $node_2:$target_dir/$latest_ckpt_dir output/
-
-        scp -P 8020 -r $target_dir/$latest_ckpt_dir $node_2:$target_dir
-        scp -P 8020 -r $target_dir/$latest_ckpt_dir $node_3:$target_dir
-
-
     fi
     echo $latest_ckpt_dir
 }
