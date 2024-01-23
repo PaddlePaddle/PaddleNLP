@@ -20,7 +20,7 @@ import logging
 from io import open
 
 import paddle
-import paddle.fluid as fluid
+import paddle.base as fluid
 import six
 from model.transformer_encoder import encoder, pre_process_layer
 

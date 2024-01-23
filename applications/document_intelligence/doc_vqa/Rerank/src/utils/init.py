@@ -15,7 +15,7 @@
 import logging
 import os
 
-import paddle.fluid as fluid
+import paddle.base as fluid
 
 log = logging.getLogger(__name__)
 

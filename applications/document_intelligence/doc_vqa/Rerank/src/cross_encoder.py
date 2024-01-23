@@ -17,7 +17,7 @@ import logging
 import time
 
 import numpy as np
-import paddle.fluid as fluid
+import paddle.base as fluid
 from model.ernie import ErnieModel
 from scipy.stats import pearsonr, spearmanr
 

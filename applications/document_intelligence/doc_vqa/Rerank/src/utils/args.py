@@ -18,7 +18,7 @@ import logging
 import os
 import sys
 
-import paddle.fluid as fluid
+import paddle.base as fluid
 import six
 
 from paddlenlp.trainer.argparser import strtobool
