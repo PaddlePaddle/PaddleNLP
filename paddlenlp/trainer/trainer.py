@@ -131,7 +131,6 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     ShardingOption,
     TrainerMemoryTracker,
     TrainOutput,
-    _exec_mode_guard,
     find_batch_size,
     get_last_checkpoint,
     get_scheduler,
@@ -720,11 +719,6 @@ class Trainer:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
             self._load_optimizer_and_scheduler(resume_from_checkpoint)
 
-        if self.args.use_auto_parallel and self.args.run_static_semi_auto:
-            model, train_dataloader = self._wrap_for_static(model, train_dataloader)
-
-        self.model = model
-
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples:,}")
         logger.info(f"  Num Epochs = {num_train_epochs}")
@@ -735,7 +729,24 @@ class Trainer:
         logger.info(f"  Total num train samples = {num_train_samples:,}")
         # per_device_trainable_numel = sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)
         # TODO: Temporary fix since Tensor.numel() not supported in distributed mode
-        self._print_trainable_numel()
+        per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
+        logger.info(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
+        if self.args.use_hybrid_parallel:
+            # todo fix for pipeline_parallel_degree
+            parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
+            if parts_num > 1:
+                all_reduce_dtype = "int64"
+                if paddle.get_device().split(":")[0] in ["npu", "xpu"]:
+                    # TODO(duanyanhui): fix when NPU all_reduce supports int64
+                    all_reduce_dtype = "float32"
+                trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
+                paddle.distributed.all_reduce(trainable_numel_tensor)
+                trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
+                if self.args.sep_parallel_degree > 0:
+                    trainable_numel = trainable_numel // self.args.sep_parallel_degree
+                # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
+                # so, the trainable numel is a little bigger than real.
+                logger.info(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
 
         start_time = time.time()
         self._globalstep_last_start_time = time.time()
@@ -818,8 +829,7 @@ class Trainer:
 
         self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
 
-        with _exec_mode_guard("dynamic"):
-            tr_loss = paddle.to_tensor(0.0)
+        tr_loss = paddle.to_tensor(0.0)
         self._total_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
 
@@ -880,7 +890,7 @@ class Trainer:
                 forbidden_no_sync = False
                 # stage2 and stage3 should not no_sync, because the is no DDP wrapper and no_sync API
                 # hybrid_parallel (tp or pp or sharding stage 1) should not no_sync
-                if self.args.use_hybrid_parallel or self.args.use_auto_parallel:
+                if self.args.use_hybrid_parallel:
                     forbidden_no_sync = True
 
                 availiable_no_sync = dp_enabled and not forbidden_no_sync
@@ -907,20 +917,12 @@ class Trainer:
                 else:
                     tr_loss_step = self.training_step(model, inputs)
 
-                with _exec_mode_guard("dynamic"):
-                    tr_loss += tr_loss_step
-
-                disable_accumulation = (
-                    self.args.use_auto_parallel
-                    and self.args.pipeline_parallel_degree > 1
-                    and self.args.run_static_semi_auto
-                )
+                tr_loss += tr_loss_step
 
                 if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
                     # last step in epoch but step is always smaller than gradient_accumulation_steps
                     steps_in_epoch <= args.gradient_accumulation_steps
                     and (step + 1) == steps_in_epoch
-                    or disable_accumulation
                 ):
                     if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
                         tr_loss /= self.args.gradient_accumulation_steps
@@ -933,19 +935,80 @@ class Trainer:
                     # local_rank != -1 don't means dp in networks.
                     self.timers and self.timers("all-reduce").start()
 
-                    self.synchronize_gradients(availiable_no_sync, dp_master_grad)
+                    # Case 1: Use recompute and dp / sharding stage1,
+                    # manualy collect gradient for dp.
+                    if args.recompute and availiable_no_sync:
+                        fused_allreduce_gradients(list(model.parameters()), None)
+
+                    # Case 2: hack dp with master_grad
+                    if dp_master_grad and not (args.recompute and availiable_no_sync):
+                        fused_allreduce_gradients(list(model.parameters()), None)
+
+                    # Pipeline parallel mode,  handle gradient reduce here to overlap
+                    pipeline_parallel_config = (
+                        set(args.pipeline_parallel_config.split(" ")) if args.pipeline_parallel_degree > 1 else set()
+                    )
+                    enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
+                    enable_release_grads = "enable_release_grads" in pipeline_parallel_config
+
+                    # Case 3: Pipeline parallel mode, overlap with dp
+                    if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
+                        parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
+
+                        if not enable_dp_comm_overlap:
+                            if self.optimizer._sharding_enable:
+                                assert reshard_util.is_sharding_opt(self.optimizer)
+                                self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
+
+                            if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
+                                fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
 
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
+
+                    if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss():
+                        for p in model._layers.parameters():
+                            with paddle.no_grad():
+                                if hasattr(p, "main_grad") and p.main_grad is not None:
+                                    assert p.grad is None
+                                    p.main_grad.scale_(1.0 / self.args.gradient_accumulation_steps)
+                                elif p.grad is not None:
+                                    p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
 
                     # Optimizer step
                     self.callback_handler.on_optimizer_begin(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
                     )
-
-                    self.optimizer_step()
+                    optimizer_was_run = True
+                    if self.do_grad_scaling:
+                        scale_before = paddle.assign(self.scaler._scale)
+                        self.scaler.step(self.optimizer)
+                        self.scaler.update()
+                        scale_after = self.scaler._scale
+                        optimizer_was_run = not self.scaler._cache_founf_inf
+                        if not optimizer_was_run:
+                            scale_before_value = scale_before.cpu().numpy()
+                            scale_after_value = scale_after.cpu().numpy()
+                            logger.warning(
+                                f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
+                            )
+                    elif isinstance(self.optimizer, HybridParallelOptimizer):
+                        self.optimizer._step(parameters_list)
+                    else:
+                        self.optimizer.step()
 
                     self.timers and self.timers("optimizer-step").stop()
+
+                    if optimizer_was_run:
+                        self.lr_scheduler.step()
+
+                    if enable_release_grads and args.pipeline_parallel_degree > 1:
+                        self.optimizer.clear_grad(set_to_zero=False)
+                        for _, buffers in model._chunk_2_comm_buffers.items():
+                            for buffer in buffers:
+                                buffer._clear_grad_storage()
+                    else:
+                        self.optimizer.clear_grad()
 
                     self.callback_handler.on_optimizer_end(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
@@ -1009,7 +1072,7 @@ class Trainer:
                         "on multiple nodes, you should activate `--save_on_each_node`."
                     )
 
-        self._total_loss_scalar += self._get_item_from_loss(tr_loss)
+        self._total_loss_scalar += tr_loss.item()
         train_loss = self._total_loss_scalar / self.state.global_step
 
         metrics = speed_metrics("train", start_time, num_samples=num_train_samples, num_steps=self.state.max_steps)
@@ -1025,98 +1088,6 @@ class Trainer:
         self.control = self.callback_handler.on_train_end(args, self.state, self.control)
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
-
-    def _wrap_for_static(self, model, train_dataloader):
-        pass
-
-    def _print_trainable_numel(self):
-        per_device_trainable_numel = sum(np.prod(p.shape) for p in self.model.parameters() if not p.stop_gradient)
-        logger.info(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
-
-        if self.args.use_hybrid_parallel:
-            # todo fix for pipeline_parallel_degree
-            parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
-            if parts_num > 1:
-                all_reduce_dtype = "int64"
-                if paddle.get_device().split(":")[0] in ["npu", "xpu"]:
-                    # TODO(duanyanhui): fix when NPU all_reduce supports int64
-                    all_reduce_dtype = "float32"
-                trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
-                paddle.distributed.all_reduce(trainable_numel_tensor)
-                trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
-                if self.args.sep_parallel_degree > 0:
-                    trainable_numel = trainable_numel // self.args.sep_parallel_degree
-                # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
-                # so, the trainable numel is a little bigger than real.
-                logger.info(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
-
-    def synchronize_gradients(self, availiable_no_sync, dp_master_grad):
-        # Case 1: Use recompute and dp / sharding stage1,
-        # manualy collect gradient for dp.
-        if self.args.recompute and availiable_no_sync:
-            fused_allreduce_gradients(list(self.model.parameters()), None)
-
-        # Case 2: hack dp with master_grad
-        if dp_master_grad and not (self.args.recompute and availiable_no_sync):
-            fused_allreduce_gradients(list(self.model.parameters()), None)
-
-        # Pipeline parallel mode,  handle gradient reduce here to overlap
-        pipeline_parallel_config = (
-            set(self.args.pipeline_parallel_config.split(" ")) if self.args.pipeline_parallel_degree > 1 else set()
-        )
-        enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
-
-        # Case 3: Pipeline parallel mode, overlap with dp
-        if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
-            parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
-
-            if not enable_dp_comm_overlap:
-                if self.optimizer._sharding_enable:
-                    assert reshard_util.is_sharding_opt(self.optimizer)
-                    self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
-
-                if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
-                    fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
-
-    def optimizer_step(self):
-        if self.args.pipeline_parallel_degree > 1 and self._enable_delay_scale_loss():
-            for p in self.model._layers.parameters():
-                with paddle.no_grad():
-                    if hasattr(p, "main_grad") and p.main_grad is not None:
-                        assert p.grad is None
-                        p.main_grad.scale_(1.0 / self.args.gradient_accumulation_steps)
-                    elif p.grad is not None:
-                        p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
-
-        optimizer_was_run = True
-        if self.do_grad_scaling:
-            scale_before = paddle.assign(self.scaler._scale)
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
-            scale_after = self.scaler._scale
-            optimizer_was_run = not self.scaler._cache_founf_inf
-            if not optimizer_was_run:
-                scale_before_value = scale_before.cpu().numpy()
-                scale_after_value = scale_after.cpu().numpy()
-                logger.warning(
-                    f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
-                )
-        elif isinstance(self.optimizer, HybridParallelOptimizer):
-            parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
-            self.optimizer._step(parameters_list)
-        else:
-            self.optimizer.step()
-
-        if optimizer_was_run:
-            self.lr_scheduler.step()
-
-        if self.args.pipeline_parallel_degree > 1 and "enable_release_grads" in self.args.pipeline_parallel_config:
-            self.optimizer.clear_grad(set_to_zero=False)
-            for _, buffers in self.model._chunk_2_comm_buffers.items():
-                for buffer in buffers:
-                    buffer._clear_grad_storage()
-        else:
-            self.optimizer.clear_grad()
 
     def _load_best_model_from_peft_checkpoint(self):
         convert_tp = False
@@ -1199,22 +1170,14 @@ class Trainer:
         if timer_info or paddle_timer_info:
             logger.info(f"[Profile global_step: {self.state.global_step}] {timer_info} {paddle_timer_info}")
 
-    def _get_item_from_loss(self, loss):
-        if isinstance(loss, paddle.Tensor):
-            if loss.is_dist():
-                return loss._local_value().item() if loss._is_initialized() else 0.0
-            else:
-                return loss.item() if loss._is_initialized() else 0.0
-        else:
-            return loss
-
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
 
             logs: Dict[str, float] = {}
 
             # all_gather + mean() to get average loss over all processes
-            tr_loss_scalar = self._get_item_from_loss(self._nested_gather(tr_loss).mean())
+            tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
+
             # reset tr_loss to zero
             tr_loss.subtract_(tr_loss)
 
@@ -2275,6 +2238,7 @@ class Trainer:
             self.model.save_pretrained(
                 output_dir,
                 variant=self.args.weight_name_suffix,
+                save_function=self._save_ckpt_func,
                 merge_tensor_parallel=merge_tensor_parallel,
                 is_main_process=self.args.should_save,
                 max_shard_size="1024GB",
@@ -2293,6 +2257,7 @@ class Trainer:
                         config_to_save=config_to_save,
                         merge_tensor_parallel=merge_tensor_parallel,
                         variant=weight_name_suffix,
+                        save_function=self._save_ckpt_func,
                         is_main_process=self.args.should_save,
                         max_shard_size="1024GB",
                     )
@@ -2301,6 +2266,7 @@ class Trainer:
                         output_dir,
                         merge_tensor_parallel=merge_tensor_parallel,
                         variant=self.args.weight_name_suffix,
+                        save_function=self._save_ckpt_func,
                         is_main_process=self.args.should_save,
                         max_shard_size="1024GB",
                     )
@@ -2327,6 +2293,7 @@ class Trainer:
                     config_to_save=config_to_save,
                     merge_tensor_parallel=merge_tensor_parallel,
                     variant=weight_name_suffix,
+                    save_function=self._save_ckpt_func,
                     is_main_process=self.args.should_save,
                     max_shard_size="1024GB",
                 )
@@ -2335,6 +2302,7 @@ class Trainer:
                     output_dir,
                     merge_tensor_parallel=merge_tensor_parallel,
                     variant=self.args.weight_name_suffix,
+                    save_function=self._save_ckpt_func,
                     is_main_process=self.args.should_save,
                     max_shard_size="1024GB",
                 )
@@ -2685,7 +2653,7 @@ class Trainer:
             metrics = {}
 
         if all_losses is not None:
-            metrics[f"{metric_key_prefix}_loss"] = self._get_item_from_loss(all_losses.mean())
+            metrics[f"{metric_key_prefix}_loss"] = all_losses.mean().item()
 
         # Prefix all keys with metric_key_prefix + '_'
         for key in list(metrics.keys()):

@@ -27,6 +27,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 import paddle
+import paddle.distributed as dist
 from paddle.distributed import fleet
 
 from ..utils.log import logger
@@ -1278,10 +1279,7 @@ class TrainingArguments:
             self.strategy = strategy
             order = ["dp", "pp", "mp"]
             degree = [self.data_parallel_degree, self.pipeline_parallel_degree, self.tensor_parallel_degree]
-            mesh_dims = list(filter(lambda x: x[1] > 1, list(zip(order, degree))))
-            if not mesh_dims:
-                mesh_dims = [("dp", 1)]
-
+            mesh_dims = list(zip(order, degree))
             fleet.auto.create_mesh(mesh_dims)
         else:
             world_size = paddle.distributed.get_world_size()
@@ -1400,7 +1398,7 @@ class TrainingArguments:
             return dp_group.rank
         elif self.use_auto_parallel:
             mesh = fleet.auto.get_mesh()
-            return mesh.get_dim_size("dp")
+            return mesh.get_rank_by_dim_and_process_id("dp", dist.get_rank())
         else:
             return paddle.distributed.get_rank()
 
@@ -1437,6 +1435,9 @@ class TrainingArguments:
             hcg = fleet.get_hybrid_communicate_group()
             tp_group = hcg.get_model_parallel_group()
             return max(tp_group.rank, 0)
+        elif self.use_auto_parallel:
+            mesh = fleet.auto.get_mesh()
+            return mesh.get_rank_by_dim_and_process_id("mp", dist.get_rank())
         else:
             return 0
 
@@ -1446,6 +1447,9 @@ class TrainingArguments:
             hcg = fleet.get_hybrid_communicate_group()
             rank = hcg.get_stage_id()
             return max(rank, 0)
+        elif self.use_auto_parallel:
+            mesh = fleet.auto.get_mesh()
+            return mesh.get_rank_by_dim_and_process_id("pp", dist.get_rank())
         else:
             return 0
 
@@ -1587,6 +1591,8 @@ class TrainingArguments:
             return self.local_process_index == 0
         else:
             if self.should_save_sharding_stage1_model:
+                return True
+            elif self.use_auto_parallel:
                 return True
             elif self.use_hybrid_parallel:
                 # save on dataset rank 0

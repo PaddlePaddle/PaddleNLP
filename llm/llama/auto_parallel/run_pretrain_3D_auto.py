@@ -366,13 +366,10 @@ class PretrainingTrainer(SemiAutoTrainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def _wrap_dist_loader(self, train_dataloader):
-        return dist.shard_dataloader(
-            dataloader=train_dataloader,
-            meshes=self._get_meshes_for_loader(),
-            input_keys=["input_ids", "labels"],
-            shard_dims="dp",
-        )
+    def get_train_dataloader(self):
+        dist_loader = super().get_train_dataloader()
+        dist_loader._input_keys = ["input_ids", "labels"]
+        return dist_loader
 
 
 def print_config(args, key=""):

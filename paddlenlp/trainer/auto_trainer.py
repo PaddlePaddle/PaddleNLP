@@ -40,6 +40,8 @@ class SemiAutoTrainer(Trainer):
         super().__init__(*args, **kwargs)
         assert self.args.use_auto_parallel
 
+        self.global_mesh = fleet.auto.get_mesh()
+
     def _nested_gather(self, tensors):
         """
         Gather value of `tensors` (tensor or list/tuple of nested tensors) and convert them to numpy before
@@ -54,31 +56,16 @@ class SemiAutoTrainer(Trainer):
 
     def _get_meshes_for_loader(self):
         def _get_mesh(pp_idx=0):
-            mesh = fleet.auto.get_mesh()
-            if "pp" in mesh.dim_names:
-                mesh = mesh.get_mesh_with_dim("pp")[pp_idx]
-            return mesh
+            return self.global_mesh.get_mesh_with_dim("pp")[pp_idx]
 
         meshes = []
         for pp_idx in range(self.args.pipeline_parallel_degree):
             meshes.append(_get_mesh(pp_idx))
         return meshes
 
-    def _wrap_dist_loader(self, train_dataloader):
-        return dist.shard_dataloader(
-            dataloader=train_dataloader,
-            meshes=self._get_meshes_for_loader(),
-            shard_dims="dp",
-        )
-
     def _wrap_for_static(self, model, train_dataloader):
-        # TODO: convert fleet.auto.Strategy to dist.Strategy
-        # TODO: fix bugs in paddle/distributed/auto_parallel/api.py#L981 about sample_split of engine._prepare_data_spec
-
-        dist_loader = self._wrap_dist_loader(train_dataloader)
-
-        model = dist.to_static(model, dist_loader, self.criterion, self.optimizer, strategy=self.args.strategy)
-        return model, dist_loader
+        model = dist.to_static(model, train_dataloader, self.criterion, self.optimizer, strategy=self.args.strategy)
+        return model
 
     def _wrap_for_amp_training(self):
         pass
@@ -125,14 +112,15 @@ class SemiAutoTrainer(Trainer):
             drop_last=self.args.dataloader_drop_last,
         )
 
-        # return DistributedBatchSampler(
-        #     self.train_dataset,
-        #     batch_size=self.args.per_device_train_batch_size,
-        #     shuffle=True,
-        #     num_replicas=self.args.dataset_world_size,
-        #     rank=self.args.dataset_rank,
-        #     drop_last=self.args.dataloader_drop_last,
-        # )
+    def get_train_dataloader(self):
+        train_dataloader = super().get_train_dataloader()
+        dist_loader = dist.shard_dataloader(
+            dataloader=train_dataloader,
+            meshes=self._get_meshes_for_loader(),
+            shard_dims="dp",
+        )
+
+        return dist_loader
 
     def training_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         model.train()
