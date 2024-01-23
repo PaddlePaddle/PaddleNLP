@@ -179,51 +179,6 @@ except:
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
 
 
-@contextlib.contextmanager
-def device_guard(device="cpu", dev_id=0):
-    origin_device = paddle.device.get_device()
-    if device == "cpu":
-        paddle.set_device(device)
-    elif device in ["gpu", "xpu", "npu"]:
-        paddle.set_device("{}:{}".format(device, dev_id))
-    try:
-        yield
-    finally:
-        paddle.set_device(origin_device)
-
-
-def paddlenlp_load(path, return_numpy=False):
-    if return_numpy:
-        with device_guard():
-            return paddle.load(path)
-    else:
-        return paddle.load(path, return_numpy=return_numpy)
-
-
-def extract_prefix_parameter_name(name):
-    """
-    Extract name for moment or beta
-
-        create_parameter_0.w_0_moment1_0 Tensor(shape=[1], dtype=float32)
-        create_parameter_1.w_0_moment1_0 Tensor(shape=[1], dtype=float32)
-        create_parameter_0.w_0_moment2_0 Tensor(shape=[1], dtype=float32)
-        create_parameter_1.w_0_moment2_0 Tensor(shape=[1], dtype=float32)
-        create_parameter_0.w_0_beta1_pow_acc_0 Tensor(shape=[1], dtype=float32)
-        create_parameter_1.w_0_beta1_pow_acc_0 Tensor(shape=[1], dtype=float32)
-        create_parameter_0.w_0_beta2_pow_acc_0 Tensor(shape=[1], dtype=float32)
-        create_parameter_1.w_0_beta2_pow_acc_0 Tensor(shape=[1], dtype=float32）
-        create_parameter_1.w_0_beta2_pow_acc_0 Tensor(shape=[1], dtype=float32）
-
-        custom_keys_moment1_0 Tensor(shape=[1], dtype=float32)
-    """
-    origin_name = name
-    suffix = ["_moment1_0", "_moment2_0", "_beta1_pow_acc_0", "_beta2_pow_acc_0"]
-    for x in suffix:
-        name = name.replace(x, "")
-    assert origin_name.startswith(name), f"Extract prefix faild, origin: {origin_name}, extracted: {name}"
-    return name
-
-
 def is_dp_group_support_in_group_sharded_parallel():
     return "dp_group" in set(inspect.signature(paddle.distributed.sharding.group_sharded_parallel).parameters.keys())
 
@@ -466,7 +421,7 @@ class Trainer:
         self.label_names = default_label_names if self.args.label_names is None else self.args.label_names
 
         self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
-        # self.print_config()
+        self.print_config()
 
         # very last
         self._memory_tracker.stop_and_update_metrics()
@@ -2129,32 +2084,6 @@ class Trainer:
             if not self.args.use_hybrid_parallel:
                 logger.info("Saving optimizer files.")
                 paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
-            else:
-                if self.sharding is not None:
-                    # alias for opitimizer state, should be merge on different shard!
-                    paddle.save({}, os.path.join(output_dir, OPTIMIZER_NAME))
-                else:
-                    if self.args.keep_optimizer_state_static_keys:
-                        paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
-                    else:
-                        # trans the static keys to dygraph keys.
-                        static_dygraph_name_mapping = {}
-                        for k, v in self.model.state_dict().items():
-                            if isinstance(v, paddle.Tensor):
-                                static_dygraph_name_mapping[v.name] = k
-
-                        dygraph_keys_state_dict = {}
-                        for k, v in self.optimizer.state_dict().items():
-                            if isinstance(v, paddle.Tensor):
-                                k_pure = extract_prefix_parameter_name(k)
-                                if k_pure in static_dygraph_name_mapping:
-                                    k = k.replace(k_pure, static_dygraph_name_mapping[k_pure], 1)
-                                dygraph_keys_state_dict[k] = v.cpu()
-                            else:
-                                dygraph_keys_state_dict[k] = v
-
-                        paddle.save(dygraph_keys_state_dict, os.path.join(output_dir, OPTIMIZER_NAME))
-                        del dygraph_keys_state_dict
 
             # FIXME: maybe only save one copy
             paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
@@ -2426,29 +2355,7 @@ class Trainer:
 
         if opt_state_dict is not None:
             # Load in optimizer and scheduler states
-            # self.optimizer.set_state_dict(opt_state_dict)
-
-            # fix for amp master weight, can't load with numpy must be tensor !
-            opt_state_dict = paddlenlp_load(os.path.join(checkpoint, OPTIMIZER_NAME), return_numpy=True)
-
-            if self.args.keep_optimizer_state_static_keys:
-                self.optimizer.set_state_dict(opt_state_dict)
-            else:
-                # trans the dygraph keys to satic keys.
-                dygraph_static_name_mapping = {}
-                for k, v in self.model.state_dict().items():
-                    if isinstance(v, paddle.Tensor):
-                        dygraph_static_name_mapping[k] = v.name
-                keys = list(opt_state_dict.keys())
-                for k in keys:
-                    if isinstance(opt_state_dict[k], paddle.Tensor):
-                        k_pure = extract_prefix_parameter_name(k)
-                        if k_pure in dygraph_static_name_mapping:
-                            k_new = k.replace(k_pure, dygraph_static_name_mapping[k_pure], 1)
-                        opt_state_dict[k_new] = opt_state_dict.pop(k)
-
-                self.optimizer.set_state_dict(opt_state_dict)
-                del opt_state_dict
+            self.optimizer.set_state_dict(opt_state_dict)
         else:
             raise ValueError(f"optimizer-state-dict not found, opt: {os.path.join(checkpoint, optimizer_name)}.")
 
