@@ -11,7 +11,6 @@ target_dir="/ywt01_heter/PaddleNLP/model_zoo/gpt-3/output/"
 prepare_ckpt() {
     hostname=$(hostname)
     ckpt_dir="output"
-    latest_ckpt_dir=""
 
 	latest_ckpt_dir=$(ls -t "$ckpt_dir" | grep -v "^\.$" | head -1)
 
@@ -28,16 +27,12 @@ prepare_ckpt() {
         scp -P 8020 -r $node_1:$target_dir/$latest_ckpt_dir output/ >>run.log 2>&1
         scp -P 8020 -r $node_3:$target_dir/$latest_ckpt_dir output/ >>run.log 2>&1
     elif [ "$hostname" = "$node_3" ]; then
-        #scp -P 8020 -r $target_dir/$latest_ckpt_dir $node_1:$target_dir/$latest_ckpt_dir >>run.log 2>&1
-        #scp -P 8020 -r $target_dir/$latest_ckpt_dir $node_2:$target_dir/$latest_ckpt_dir >>run.log 2>&1
 
-        if [ "$(ls -A output/$latest_ckpt_dir)" ]; then
-            scp -P 8020 -r $node_1:$target_dir/$latest_ckpt_dir ./ >>run.log 2>&1
-            scp -P 8020 -r $node_2:$target_dir/$latest_ckpt_dir ./ >>run.log 2>&1
-        else
-            scp -P 8020 -r $node_1:$target_dir/$latest_ckpt_dir output/ >>run.log 2>&1
-            scp -P 8020 -r $node_2:$target_dir/$latest_ckpt_dir output/ >>run.log 2>&1
+        if [ -z "$latest_ckpt_dir" ]; then
+            latest_ckpt_dir="epoch_0_step_50"
         fi
+        scp -P 8020 -r $node_1:$target_dir/$latest_ckpt_dir output/ >>run.log 2>&1
+        scp -P 8020 -r $node_2:$target_dir/$latest_ckpt_dir output/ >>run.log 2>&1
     fi
     echo $latest_ckpt_dir
 }
