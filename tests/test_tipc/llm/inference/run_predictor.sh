@@ -19,7 +19,6 @@ export FLAGS_fraction_of_gpu_memory_to_use=0.92
 
 model_name=${model_name:-"facebook/llama-7b"}
 output_path=${output_path:-"./llm-inference-output"}
-#output_path="/root/paddlejob/workspace/qinziang/workspace/PaddleNLP/tests/test_tmps"
 fused_model=${fused_model:-false}
 dtype=${dtype:-"float16"}
 inference_model=${inference_model:-"true"}
@@ -36,15 +35,12 @@ echo "pwd -> "
 cd ..
 
 echo "==============================run-dynamic-predictor=============================="
-echo "python ./llm/predictor.py --model_name_or_path ${model_name} --mode dynamic --output_file ${output_path}/dynamic.json ${common_arguments}"
 python ./llm/predictor.py --model_name_or_path ${model_name} --mode dynamic --output_file ${output_path}/dynamic.json ${common_arguments}
 
 echo "==============================run-export-predictor=============================="
-echo "python ./llm/export_model.py --model_name_or_path ${model_name} --output_path ${output_path} ${common_arguments}"
 python ./llm/export_model.py --model_name_or_path ${model_name} --output_path ${output_path} ${common_arguments}
 
 echo "==============================run-static-predictor=============================="
-echo "python ./llm/predictor.py --model_name_or_path ${output_path} --mode static --output_file ${output_path}/static.json ${common_arguments}"
 python ./llm/predictor.py --model_name_or_path ${output_path} --mode static --output_file ${output_path}/static.json ${common_arguments}
 
 
