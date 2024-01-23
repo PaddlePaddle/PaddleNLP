@@ -178,11 +178,6 @@ try:
 except:
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
 
-
-def is_dp_group_support_in_group_sharded_parallel():
-    return "dp_group" in set(inspect.signature(paddle.distributed.sharding.group_sharded_parallel).parameters.keys())
-
-
 __all__ = ["Trainer"]
 
 
@@ -622,7 +617,6 @@ class Trainer:
                 A list of keys in the output of your model (if it is a dictionary) that should be ignored when
                 gathering predictions for evaluation during the training.
         """
-        set_seed(self.args.seed, self.args)
         args = self.args
         self.is_in_train = True
 
