@@ -1395,11 +1395,16 @@ def create_predictor(
                 )
                 model.eval()
             elif "qwen" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    QWenForCausalLMInferenceModel,
-                )
-
-                model = QWenForCausalLMInferenceModel.from_pretrained(
+                if model_args.model_type == "qwen-img2txt":
+                    # we use qwen for img2txt.
+                    from paddlenlp.experimental.transformers import (
+                        QWenForQWenVLInferenceModel as QWenInferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        QWenForCausalLMInferenceModel as QWenInferenceModel,
+                    )
+                model = QWenInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path,
                     config=config,
                     dtype=predictor_args.dtype,
