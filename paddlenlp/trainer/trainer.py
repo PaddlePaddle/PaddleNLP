@@ -178,6 +178,7 @@ try:
 except:
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
 
+
 __all__ = ["Trainer"]
 
 
