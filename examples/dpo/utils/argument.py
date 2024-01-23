@@ -24,7 +24,7 @@ class TrainingArguments(TrainingArguments):
     logging_first_step: bool = field(
         default=True, metadata={"help": "Whether to log and evaluate the first global_step or not."}
     )
-    optim: Optional[str] = field(default="rmsprop")
+    # optim: Optional[str] = field(default="rmsprop")
 
 
 @dataclass

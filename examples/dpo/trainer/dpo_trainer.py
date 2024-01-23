@@ -153,7 +153,6 @@ class DPOTrainer(Trainer):
         """
         concatenated_batch = self.concatenated_inputs(batch)
         len_chosen = batch["chosen_labels"].shape[0]
-
         all_logits = model(
             concatenated_batch["concatenated_input_ids"],
             attention_mask=concatenated_batch["concatenated_attention_mask"],
@@ -167,6 +166,9 @@ class DPOTrainer(Trainer):
 
         chosen_logits = all_logits[:len_chosen]
         rejected_logits = all_logits[len_chosen:]
+        loss_mask = concatenated_batch["concatenated_labels"] != self.label_pad_token_id
+        chosen_logits = all_logits[:len_chosen][loss_mask[:len_chosen]]
+        rejected_logits = all_logits[len_chosen:][loss_mask[len_chosen:]]
 
         return (chosen_logps, rejected_logps, chosen_logits, rejected_logits)
 
@@ -209,16 +211,7 @@ class DPOTrainer(Trainer):
         metrics[f"{prefix}logps/chosen"] = policy_chosen_logps.detach().cpu().numpy().mean()
         metrics[f"{prefix}logits/rejected"] = policy_rejected_logits.detach().cpu().numpy().mean()
         metrics[f"{prefix}logits/chosen"] = policy_chosen_logits.detach().cpu().numpy().mean()
-        metrics_list = [
-            chosen_rewards,
-            rejected_rewards,
-            reward_accuracies,
-            (chosen_rewards - rejected_rewards),
-            policy_rejected_logps.detach(),
-            policy_chosen_logps.detach(),
-        ]
-
-        return losses.mean(), metrics, metrics_list
+        return losses.mean(), metrics
 
     def compute_loss(self, model, inputs, return_outputs=False):
         """Compute the DPO loss for the given batch of inputs."""
@@ -227,8 +220,9 @@ class DPOTrainer(Trainer):
                 "compute_loss is only implemented for DPODataCollatorWithPadding, and you passed a datacollator that is different than "
                 "DPODataCollatorWithPadding - you might see unexpected behavior. Alternatively, you can implement your own prediction_step method if you are using a custom data collator"
             )
-        loss, metrics, _ = self.get_batch_metrics(model, inputs, train_eval="train")
-
+        loss, metrics = self.get_batch_metrics(model, inputs, train_eval="train")
+        if self.args.should_save:
+            self.store_metrics(metrics, train_eval="train")
         if return_outputs:
             return (loss, metrics)
 
@@ -268,8 +262,10 @@ class DPOTrainer(Trainer):
                 ignore_keys = []
 
         with paddle.no_grad():
-            loss, metrics, metric_list = self.get_batch_metrics(model, inputs, train_eval="eval")
+            loss, metrics = self.get_batch_metrics(model, inputs, train_eval="eval")
 
+        if self.args.should_save:
+            self.store_metrics(metrics, train_eval="eval")
         if prediction_loss_only:
             return (loss.detach(), None, None)
 
@@ -280,5 +276,25 @@ class DPOTrainer(Trainer):
 
         logits = tuple(v for k, v in logits_dict.items() if k not in ignore_keys)
         logits = paddle.to_tensor(logits)
-        labels = metric_list
+        labels = paddle.zeros(logits.shape[0])
         return (loss.detach(), logits, labels)
+
+    def store_metrics(self, metrics, train_eval="train"):
+        for key, value in metrics.items():
+            self._stored_metrics[train_eval][key].append(value)
+
+    def log(self, logs, **kwargs):
+        """
+        Log `logs` on the various objects watching training, including stored metrics.
+
+        Args:
+            logs (`Dict[str, float]`):
+                The values to log.
+        """
+        # logs either has 'loss' or 'eval_loss'
+        train_eval = "train" if "loss" in logs else "eval"
+        # Add averaged stored metrics to logs
+        for key, metrics in self._stored_metrics[train_eval].items():
+            logs[key] = paddle.to_tensor(metrics).mean().item()
+        del self._stored_metrics[train_eval]
+        return super().log(logs, **kwargs)

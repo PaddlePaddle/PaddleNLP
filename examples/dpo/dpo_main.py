@@ -63,15 +63,13 @@ def main():
     # Step1: Load datasets
     # todo(lugimzzz): support mixer dataset
     ###############
-    if data_args.dataset_name_or_path is None:
-        raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
-    elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) and os.path.exists(
+    if os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) and os.path.exists(
         os.path.join(data_args.dataset_name_or_path, "dev.json")
     ):
         train_ds, dev_ds = load_dataset(
             "json",
             data_files={
-                "train": os.path.join(data_args.dataset_name_or_path, "train.json"),
+                "train": os.path.join(data_args.dataset_name_or_path, "dev.json"),
                 "dev": os.path.join(data_args.dataset_name_or_path, "dev.json"),
             },
             lazy=data_args.lazy,
@@ -87,9 +85,7 @@ def main():
             "json", data_files={"train": train_files, "dev": dev_files}, lazy=data_args.lazy
         )
     else:
-        train_ds, dev_ds = load_dataset(
-            data_args.dataset_name_or_path, data_args.task_name, splits=data_args.dataset_splits
-        )
+        raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -187,29 +183,17 @@ def main():
         tokenizer=tokenizer,
         max_length=data_args.max_length,
         max_prompt_length=data_args.max_prompt_length,
-        padding_value=tokenizer.pad_token_id,
     )
-
-    def compute_dpo_metrics(eval_pred):
-        logits, metrics = eval_pred
-        logs = {}
-        keys = ["rewards_chosen", "rewards_rejected", "accuracy", "rewards_margins", "logps_rejected", "logps_chosen"]
-        for i, met in enumerate(metrics):
-            logs[keys[i]] = met.mean().item()
-        return logs
 
     #########################
     # Step3: Instantiate DPO trainer
     #########################
-
     trainer = DPOTrainer(
         model=model,
         ref_model=ref_model,
         args=training_args,
-        data_args=data_args,
         beta=training_args.beta,
         train_dataset=train_ds,
-        compute_metrics=compute_dpo_metrics,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
         max_length=data_args.max_length,
