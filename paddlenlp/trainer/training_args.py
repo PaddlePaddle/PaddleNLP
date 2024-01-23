@@ -1307,8 +1307,10 @@ class TrainingArguments:
                 self.unified_checkpoint_config = [
                     "skip_save_model_weight",
                     "master_weight_compatible",
-                    "async_save",
+                    # "async_save",
                 ]
+            else:
+                self.unified_checkpoint_config = self.unified_checkpoint_config.split(" ")
 
         if self.report_to is None:
             logger.info(
