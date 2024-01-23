@@ -28,9 +28,11 @@ prepare_ckpt() {
     echo $latest_ckpt_dir
 }
 
-latest_ckpt=$(prepare_ckpt)
+if [ "$(ls -A $target_dir)" ]; then
+    latest_ckpt=$(prepare_ckpt)
 
-echo "latest_ckpt", $latest_ckpt
+    echo "latest_ckpt", $latest_ckpt
+fi
 
 #rm -rf $log_dir
 python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3,4,5,6,7" \
