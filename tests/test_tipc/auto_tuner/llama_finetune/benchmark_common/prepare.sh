@@ -15,7 +15,7 @@
 python -m pip install -r ../requirements.txt
 pip install regex
 
-cd ../../../llm/
+cd ../llm/
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
 
@@ -25,7 +25,7 @@ mv llama_openwebtext_100k_idx.npz ./data
 
 # mv autoconfig
 rm -rf autoconfig
-cp -r ../../tests/test_tipc/auto_tuner/autoconfig ./
+cp -r ../tests/test_tipc/auto_tuner/autoconfig ./
 unset PADDLE_ELASTIC_JOB_ID
 unset PADDLE_TRAINER_ENDPOINTS
 unset DISTRIBUTED_TRAINER_ENDPOINTS
