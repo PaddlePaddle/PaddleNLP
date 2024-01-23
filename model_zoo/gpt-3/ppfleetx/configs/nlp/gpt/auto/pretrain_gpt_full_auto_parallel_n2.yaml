@@ -8,7 +8,7 @@ Global:
 
 
 Engine:
-  max_steps: 10
+  max_steps: 50
   num_train_epochs: 1
   auto_mode: full_rule_based
   logging_freq: 1
