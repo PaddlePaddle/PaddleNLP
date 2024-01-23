@@ -25,7 +25,7 @@ function _set_params(){
     micro_batch_size=${6:-"2"}      # (必选) micro_batch_size
     global_batch_size=${7:-"16"}    # （必选）global_batch_size
     run_mode=${8:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP2-MP8-PP2|DP1-MP8-PP4|DP4-MP8-PP1
-    device_num=${9:-"N1C1"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
+    device_num=${9:-"N1C1"}         # (必选) 使用的卡数量，N1C1|N1C8|N1C4|N4C32 （4机32卡）
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递
     model_repo="PaddleNLP"          # (必选) 模型套件的名字
     speed_unit="tokens/s"         # (必选)速度指标单位
@@ -153,7 +153,8 @@ function _train(){
             run_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
-    DP8-mbs2-acc2|SD8-stage1-mbs2-acc2|SD8-stage2-mbs2-acc2|SD8-stage3-mbs2-acc2|PP8-mbs16-acc2|MP2-SD4-stage1-mbs4-acc2|MP2-SP2-PP2-DP2-mbs8-acc2|MP8-mbs16-acc2|MP2-PP2-DP2-mbs8-acc2|MP2-PP2-SD2-Stage1-mbs8-acc2|MP2-SP2-PP2-SD2-Stage1-mbs8-acc2|MP2-SP2-PP4-VPP2-SD2-stage1-mbs2-acc8) echo "run run_mode: ${run_mode}"
+    DP8-mbs2-acc2|SD8-stage1-mbs2-acc2|SD8-stage2-mbs2-acc2|SD8-stage3-mbs2-acc2|PP8-mbs16-acc2|MP8-mbs16-acc2|MP2-PP2-DP2-mbs8-acc2|MP2-PP2-SD2-Stage1-mbs8-acc2|MP2-SD4-stage1-mbs4-acc2|MP2-SP2-PP2-DP2-mbs8-acc2|MP2-SP2-PP2-SD2-Stage1-mbs8-acc2|MP2-PP4-VPP2-DP2-mbs2-acc8|MP2-PP4-VPP2-SD2-stage1-mbs2-acc8|MP2-SP2-PP4-VPP2-DP2-mbs2-acc8|MP2-SP2-PP4-VPP2-SD2-stage1-mbs2-acc8) 
+    echo "run run_mode: ${run_mode}"
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
             run_pretrain.py ${train_cmd}"
         workerlog_id=0

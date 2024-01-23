@@ -12,9 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .configuration import *
-from .modeling import *
-from .modeling_3D_auto import *
-from .modeling_auto import *
-from .modeling_pp import *
-from .tokenizer import *
+from paddle.io import Dataset
+
+from .alpaca import *
+from .base import *
+from .preference import *
+from .prompt_only import *
+from .safe_rlhf import *
+from .supervised import *
+
+
+class DummyDataset(Dataset):
+    def __init__(self, length: int) -> None:
+        self.length = length
+
+    def __len__(self) -> int:
+        return self.length
+
+    def __getitem__(self, index: int):
+        return {}
