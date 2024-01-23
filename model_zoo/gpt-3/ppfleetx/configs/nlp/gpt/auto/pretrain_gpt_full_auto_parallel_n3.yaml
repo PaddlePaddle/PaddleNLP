@@ -21,7 +21,7 @@ Engine:
     custom_black_list: ["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div"]
     custom_white_list: ["lookup_table", "lookup_table_v2"]
   save_load:
-    save_steps: 5
+    save_steps: 100
     output_dir: ./output
     ckpt_dir:
     auto_mode: True
