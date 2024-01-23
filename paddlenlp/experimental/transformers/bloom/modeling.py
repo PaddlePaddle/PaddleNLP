@@ -19,14 +19,17 @@ import paddle
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
-from paddlenlp_ops import get_padding_offset
+from paddlenlp_ops import get_padding_offset, get_padding_offset_v2
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
+    FusedBlockMultiTransformer,
+    FusedBlockMultiTransformerWeightOnly,
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
+    GenerationBlockInferenceModel,
     GenerationInferenceModel,
 )
 from paddlenlp.transformers.bloom.modeling import BloomPreTrainedModel
@@ -42,6 +45,8 @@ from paddlenlp.transformers.model_utils import (
 __all__ = [
     "BloomModelInferenceModel",
     "BloomForCausalLMInferenceModel",
+    "BloomBlockInferenceModel",
+    "BlommForCausalBlockLMInferenceModel",
 ]
 
 
@@ -190,10 +195,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
             ffn2_bias_attrs=ffn2_bias_attrs,
         )
 
-        if self.use_weight_only:
-            self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
-        else:
-            self.transformer_block = FusedMultiTransformerBase(transformer_config)
+        self.set_transformer_block(transformer_config)
 
         self.cache_kvs = []
 
@@ -201,6 +203,12 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
         self.ln_f = nn.LayerNorm(self.embed_dim, epsilon=config.layer_norm_epsilon)
 
         self.gradient_checkpointing = False
+
+    def set_transformer_block(self, transformer_config):
+        if self.use_weight_only:
+            self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
+        else:
+            self.transformer_block = FusedMultiTransformerBase(transformer_config)
 
     def get_input_embeddings(self):
         return self.word_embeddings
@@ -566,3 +574,189 @@ class BloomForCausalLMInferenceModel(GenerationInferenceModel, BloomPreTrainedMo
         beam_idx at every generation step.
         """
         return tuple(tuple(past_state.index_select(0, beam_idx) for past_state in layer_past) for layer_past in past)
+
+
+@register_base_model
+class BloomBlockInferenceModel(BloomModelInferenceModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.max_seq_len = config.max_seq_len
+        self.block_size = config.block_size
+
+    def set_transformer_block(self, transformer_config):
+        if self.use_weight_only:
+            self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
+        else:
+            self.transformer_block = FusedBlockMultiTransformer(transformer_config)
+
+    def remove_padding(self, input_ids, seq_lens_this_time):
+        cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
+        token_num = paddle.sum(seq_lens_this_time)
+        ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = get_padding_offset_v2(
+            input_ids, cum_offsets_now, token_num, seq_lens_this_time
+        )
+        return ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        caches=None,
+        pre_caches=None,
+        output_attentions=False,
+        output_hidden_states=None,
+        return_dict=False,
+        **kwargs,
+    ):
+
+        seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
+        ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
+            input_ids, seq_lens_this_time
+        )
+        kwargs["cu_seqlens_q"] = cu_seqlens_q
+        kwargs["cu_seqlens_k"] = cu_seqlens_k
+        kwargs["padding_offsets"] = padding_offset
+        kwargs["max_input_length"] = self.max_seq_len
+
+        if inputs_embeds is None:
+            inputs_embeds = self.word_embeddings(ids_remove_padding)
+
+        hidden_states = self.word_embeddings_layernorm(inputs_embeds)
+
+        with dy2st_nocheck_guard_context():
+            hidden_states, _ = self.transformer_block(
+                input_ids=input_ids,
+                src=hidden_states,
+                cum_offsets=cum_offsets,
+                attn_mask=attention_mask,
+                caches=caches,
+                pre_caches=pre_caches,
+                rotary_embs=None,
+                **kwargs,
+            )
+
+        hidden_states = self.ln_f(hidden_states)
+
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=hidden_states,
+            past_key_values=None,
+            hidden_states=None,
+            attentions=None,
+        )
+
+
+class BlommForCausalBlockLMInferenceModel(GenerationBlockInferenceModel, BloomPreTrainedModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.bloom = BloomBlockInferenceModel(config)
+        self.lm_head = BloomLMHead(config, self.bloom.word_embeddings.weight)
+
+    @classmethod
+    def get_cache_kvs_shape(cls, config, max_batch_size: int = None, max_length: int = None):
+
+        max_block_per_seq = (config.max_seq_len + config.block_size - 1) // config.block_size
+        if max_batch_size == -1:
+            max_block_nums = None
+        else:
+            max_block_nums = max_batch_size * max_block_per_seq
+
+        cache_kvs = []
+        for _ in range(config.n_layer):
+            cache_kv_shape = [
+                max_block_nums,
+                config.n_head // max(config.tensor_parallel_degree, 1),
+                config.block_size,
+                config.hidden_size // config.n_head,
+            ]
+            cache_kvs.append(cache_kv_shape)
+            cache_kvs.append(cache_kv_shape)
+        return cache_kvs
+
+    def prepare_inputs_for_generation(self, **kwargs):
+        # only last token for inputs_ids if cache is defined in kwargs
+        input_ids = kwargs["input_ids"]
+        src_mask = kwargs.get("src_mask", None)
+
+        tgt_mask = kwargs.get("tgt_mask", None)
+
+        block_tables = kwargs.get("block_tables", None)
+
+        pre_caches = kwargs.get("pre_caches", None)
+        caches = kwargs.get("caches", None)
+
+        seq_lens_this_time = kwargs["seq_lens_this_time"]
+
+        seq_lens_encoder = kwargs["seq_lens_encoder"]
+        seq_lens_decoder = kwargs["seq_lens_decoder"]
+        k_quant_scales = kwargs.get("k_quant_scales", None)
+        v_quant_scales = kwargs.get("v_quant_scales", None)
+        k_dequant_scales = kwargs.get("k_dequant_scales", None)
+        v_dequant_scales = kwargs.get("v_dequant_scales", None)
+
+        # only slice a part of src_mask, because of phi::FlashAttnUnpaddedKernel.
+        valid_max_encoder_len = paddle.max(seq_lens_encoder)
+        src_mask = src_mask[:, :, :valid_max_encoder_len, :valid_max_encoder_len]
+
+        model_inputs = {
+            "input_ids": input_ids,
+            "src_mask": src_mask,
+            "tgt_mask": tgt_mask,
+            "rope_emb": None,
+            "pre_caches": pre_caches,
+            "caches": caches,
+            "seq_lens_this_time": seq_lens_this_time,
+            "seq_lens_encoder": seq_lens_encoder,
+            "seq_lens_decoder": seq_lens_decoder,
+            "block_tables": block_tables,
+            "k_quant_scales": k_quant_scales,
+            "v_quant_scales": v_quant_scales,
+            "k_dequant_scales": k_dequant_scales,
+            "v_dequant_scales": v_dequant_scales,
+        }
+        return model_inputs
+
+    def forward(
+        self,
+        input_ids,
+        src_mask=None,
+        tgt_mask=None,
+        pre_caches=None,
+        caches=None,
+        seq_lens_this_time=None,
+        seq_lens_encoder=None,
+        seq_lens_decoder=None,
+        rope_emb=None,
+        block_tables=None,
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
+    ):
+        outputs = self.bloom(
+            input_ids,
+            attention_mask=src_mask,
+            tgt_mask=tgt_mask,
+            caches=caches,
+            # bloom does not have rope_emb!
+            rope_emb=None,
+            block_tables=block_tables,
+            pre_caches=pre_caches,
+            seq_lens_this_time=seq_lens_this_time,
+            seq_lens_encoder=seq_lens_encoder,
+            seq_lens_decoder=seq_lens_decoder,
+            k_quant_scales=k_quant_scales,
+            v_quant_scales=v_quant_scales,
+            k_dequant_scales=k_dequant_scales,
+            v_dequant_scales=v_dequant_scales,
+        )
+
+        hidden_states = outputs[0]
+
+        output = self.lm_head(hidden_states)
+
+        return output
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict):
+        self.bloom.set_state_dict(state_dict)

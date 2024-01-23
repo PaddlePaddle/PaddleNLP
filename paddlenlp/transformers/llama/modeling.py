@@ -366,10 +366,12 @@ class LlamaRMSNorm(nn.Layer):
 
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
-                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
+                hidden_states = hidden_states.astype("float32")
+                variance = hidden_states.pow(2).mean(-1, keepdim=True)
                 hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
         else:
-            variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
+            hidden_states = hidden_states.astype("float32")
+            variance = hidden_states.pow(2).mean(-1, keepdim=True)
             hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
 
         if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
@@ -1113,6 +1115,9 @@ class LlamaPretrainedModel(PretrainedModel):
                 "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
             }
 
+            if not config.vocab_size % config.tensor_parallel_degree == 0:
+                base_actions.pop("lm_head.weight")
+                base_actions.pop("embed_tokens.weight")
             # Column Linear
             if config.fuse_attention_qkv:
                 base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
@@ -1214,7 +1219,7 @@ class LlamaModel(LlamaPretrainedModel):
 
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
-        if config.tensor_parallel_degree > 1:
+        if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
             self.embed_tokens = mpu.VocabParallelEmbedding(
                 self.vocab_size,
                 self.hidden_size,
@@ -1331,6 +1336,8 @@ class LlamaModel(LlamaPretrainedModel):
 
         if past_key_values is None:
             past_key_values = tuple([None] * len(self.layers))
+        # NOTE: to make cache can be clear in-time
+        past_key_values = list(past_key_values)
 
         seq_length_with_past = seq_length
         cache_length = 0
@@ -1417,6 +1424,8 @@ class LlamaModel(LlamaPretrainedModel):
                     alibi=alibi,
                 )
 
+            # NOTE: clear outdate cache after it has been used for memory saving
+            past_key_value = past_key_values[idx] = None
             if type(layer_outputs) is tuple:
                 hidden_states = layer_outputs[0]
             else:
@@ -1511,7 +1520,7 @@ class LlamaLMHead(nn.Layer):
     def __init__(self, config: LlamaConfig):
         super(LlamaLMHead, self).__init__()
         self.config = config
-        if config.tensor_parallel_degree > 1:
+        if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
             vocab_size = config.vocab_size // config.tensor_parallel_degree
         else:
             vocab_size = config.vocab_size

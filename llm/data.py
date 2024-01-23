@@ -105,6 +105,7 @@ def tokenize_rounds_example(tokenizer, example, data_args):
     """
 
     # 0. prepare data
+    context_data = example.get("context", {})
     example["src"] = example["src"] if isinstance(example["src"], list) else [example["src"]]
     example["tgt"] = example["tgt"] if isinstance(example["tgt"], list) else [example["tgt"]]
 
@@ -113,7 +114,9 @@ def tokenize_rounds_example(tokenizer, example, data_args):
     conversations = [[src, tgt] for src, tgt in zip(example["src"], example["tgt"])]
 
     # 1. only tokenize input_ids
-    conversation_result: list[tuple[list[int], list[int]]] = tokenizer.encode_chat_inputs(conversations)
+    conversation_result: list[tuple[list[int], list[int]]] = tokenizer.encode_chat_inputs(
+        conversations, context_data=context_data
+    )
     system_ids = conversation_result.pop("system", []) or []
 
     # 2. truncate conversations based on conversation unit
