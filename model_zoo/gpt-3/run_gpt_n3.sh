@@ -16,7 +16,7 @@ prepare_ckpt() {
 	dir_list=$(ls "$ckpt_dir")
 	latest_ckpt_dir=$(ls -t "$ckpt_dir" | grep -v "^\.$" | head -1)
 
-    echo $latest_ckpt_dir
+    #echo $latest_ckpt_dir
     if [ "$hostname" = "$node_1" ]; then
         #scp -P 8020 -r $target_dir/$latest_ckpt_dir $node_2:$target_dir/$latest_ckpt_dir >run.log 2>&1
         #scp -P 8020 -r $target_dir/$latest_ckpt_dir $node_3:$target_dir/$latest_ckpt_dir >>run.log 2>&1
@@ -39,11 +39,9 @@ prepare_ckpt() {
     #echo $latest_ckpt_dir
 }
 
-if [ "$(ls -A $target_dir)" ]; then
-    latest_ckpt=$(prepare_ckpt)
+latest_ckpt=$(prepare_ckpt)
 
-    echo "latest_ckpt", $latest_ckpt
-fi
+echo "latest_ckpt", $latest_ckpt
 
 #rm -rf $log_dir
 python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3,4,5,6,7" \
