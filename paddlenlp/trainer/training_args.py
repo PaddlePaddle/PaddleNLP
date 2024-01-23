@@ -747,6 +747,8 @@ class TrainingArguments:
         default=False,
         metadata={"help": "reshard pp even if pp degree in the model and pp degree in script match"},
     )
+    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
+    run_static_semi_auto: bool = field(default=True, metadata={"help": ""})
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -1140,8 +1142,8 @@ class TrainingArguments:
                 if len(self.sharding) > 0:
                     self.sharding_parallel_degree = self.data_parallel_degree
 
-            sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
-            if sharding_parallel_degree == 1 and len(self.sharding) > 0:
+            self.sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
+            if self.sharding_parallel_degree == 1 and len(self.sharding) > 0:
                 logger.warning("sharding_parallel_degree=1 means no sharding, please set sharding to empty!")
                 self.sharding = []
 
@@ -1226,10 +1228,10 @@ class TrainingArguments:
                         "by current version of Paddle. Please try latest develop Paddle."
                     )
 
-            if sharding_parallel_degree > 1:
+            if self.sharding_parallel_degree > 1:
                 sharding = strategy.sharding
                 sharding.enable = True
-                sharding.degree = sharding_parallel_degree
+                sharding.degree = self.sharding_parallel_degree
                 if ShardingOption.SHARD_OP in self.sharding:
                     sharding.stage = 1
                 elif ShardingOption.SHARD_GRAD_OP in self.sharding:
@@ -1279,6 +1281,7 @@ class TrainingArguments:
             mesh_dims = list(filter(lambda x: x[1] > 1, list(zip(order, degree))))
             if not mesh_dims:
                 mesh_dims = [("dp", 1)]
+
             fleet.auto.create_mesh(mesh_dims)
         else:
             world_size = paddle.distributed.get_world_size()
@@ -1395,6 +1398,9 @@ class TrainingArguments:
             if dp_group.rank == -1:
                 return 0
             return dp_group.rank
+        elif self.use_auto_parallel:
+            mesh = fleet.auto.get_mesh()
+            return mesh.get_dim_size("dp")
         else:
             return paddle.distributed.get_rank()
 
@@ -1543,7 +1549,9 @@ class TrainingArguments:
         """
         Whether or not the current process should produce log.
         """
-        if self.log_on_each_node:
+        if self.use_auto_parallel:
+            return True
+        elif self.log_on_each_node:
             return self.local_process_index == 0
         else:
             return self.process_index == 0
