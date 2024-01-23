@@ -17,10 +17,10 @@
 # Test training benchmark for a model.
 # Usage：bash benchmark/run_benchmark.sh ${model_name_or_path} ${per_device_train_batch_size} ${tensor_parallel_degree} ${pipeline_parallel_degree} ${virtual_pp_degree} ${sequence_parallel} ${sharding_parallel_degree} ${sharding} ${recompute} ${run_mode} ${device_num}
 function _set_params(){
-    model_item=${model_item:-"facebook-llama-13b_seqlen2048_pretrain"}
-    run_mode=${run_mode:-"DP1-MP2-PP4"}
+    model_item=${model_item:-"CE_llama7b_autotuner"}
+    run_mode=${run_mode:-"pretrain"}
     device_num=${device_num:-"N1C8"}
-    global_batch_size=${global_batch_size:-64}
+    global_batch_size=${global_batch_size:-8}
     autoconfig_json_file=${autoconfig_json_file:-"autoconfig/llama7b_pretrain.json"}
     modle_json_file=${modle_json_file:-"autoconfig/llama7b_pretrain_params.json"}
 
@@ -34,6 +34,7 @@ function _set_params(){
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
 
     fp_item="fp16"
+    workerlog_id=0
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -80,36 +81,31 @@ function _train(){
         PADDLE_RANK_OPTION=""
     fi
     # 以下为通用执行命令，无特殊可不用修改
-    case ${device_num} in
-    N1C1) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
-        train_cmd="python -u -m paddle.distributed.launch --gpus=0 ${PADDLE_RANK_OPTION}\
+    case ${run_mode} in
+    pretrain) echo "Run with: run_mode=${run_mode}"
+        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
             --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
-        workerlog_id=0
         ;;
-    N1C2) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --gpus=0,1 ${PADDLE_RANK_OPTION}\
-            --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
-        workerlog_id=0
+    lora) echo "Run with: run_mode=${run_mode}"
+        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
+            --auto_tuner_json ${autoconfig_json_file} finetune_generation.py ${modle_json_file}"
         ;;
-    N1C4) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3 ${PADDLE_RANK_OPTION}\
-            --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
-        workerlog_id=0
+    sft) echo "Run with: run_mode=${run_mode}"
+        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
+            --auto_tuner_json ${autoconfig_json_file} finetune_generation.py ${modle_json_file}"
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
             --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
-        workerlog_id=0
         ;;
     esac
     cd ../llm/llama
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     python -c "import paddlenlp"
-    if [[ ${model_name_or_path} =~ "CE" ]];then # CE精度-不限制执行时间
+    if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间
         ${train_cmd} > ${log_file} 2>&1
     else
         timeout 30m ${train_cmd} > ${log_file} 2>&1
-        # echo ${train_cmd}
     fi
     if [ $? -ne 0 ];then
         echo -e "${model_name}, FAIL" >> ${log_file}
@@ -123,11 +119,9 @@ function _train(){
         echo -e "auto_tuner, SUCCESS" >> ${log_file}
     fi
     #kill -9 `ps -ef|grep 'python'|awk '{print $2}'`
-    if [ ${device_num} != "N1C1" -a -d mylog ]; then
+    if [ ${device_num} != "N1C1" -a -d ./autoconfig/best_cfg ]; then
         case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/tests/mylog
         cp -r ${case_path}/autoconfig/best_cfg/workerlog.* ./mylog/
-        mv ${log_file} ${log_file}_auto_tuner
-        cp ${case_path}/mylog/workerlog.${workerlog_id} ${log_file}
     fi
 }
 

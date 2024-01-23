@@ -30,6 +30,7 @@ mv llama_openwebtext_100k_ids.npy ./data
 mv llama_openwebtext_100k_idx.npz ./data
 
 # mv autoconfig
+rm -rf autoconfig
 cp -r ../../tests/test_tipc/auto_tuner/autoconfig ./
 unset PADDLE_ELASTIC_JOB_ID
 unset PADDLE_TRAINER_ENDPOINTS

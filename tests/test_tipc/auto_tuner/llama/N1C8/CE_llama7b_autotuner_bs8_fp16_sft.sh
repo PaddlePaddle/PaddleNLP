@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-param="model_item=CE_facebook-llama-7b_seqlen2048_pretrain "
-param+="run_mode=auto "
+param="model_item=CE_llama7b_autotuner "
+param+="run_mode=lora "
 param+="device_num=N1C8 "
-param+="global_batch_size=32 "
-param+="autoconfig_json_file=autoconfig/llama7b_pretrain.json "
-param+="modle_json_file=autoconfig/llama7b_pretrain_params.json "
+param+="global_batch_size=8 "
+param+="autoconfig_json_file=autoconfig/llama7b_sft.json "
+param+="modle_json_file=autoconfig/llama7b_sft_params.json "
 
 cd ./tests
 bash ./test_tipc/auto_tuner/llama/benchmark_common/prepare.sh
