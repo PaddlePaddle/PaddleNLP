@@ -33,10 +33,15 @@ prepare_ckpt() {
         #scp -P 8020 -r $target_dir/$latest_ckpt_dir $node_1:$target_dir/$latest_ckpt_dir >>run.log 2>&1
         #scp -P 8020 -r $target_dir/$latest_ckpt_dir $node_2:$target_dir/$latest_ckpt_dir >>run.log 2>&1
 
-        scp -P 8020 -r $node_1:$target_dir/$latest_ckpt_dir output/ >>run.log 2>&1
-        scp -P 8020 -r $node_2:$target_dir/$latest_ckpt_dir output/ >>run.log 2>&1
+        if [ "$(ls -A $latest_ckpt_dir)" ]; then
+			scp -P 8020 -r $node_1:$target_dir/$latest_ckpt_dir ./ >>run.log 2>&1
+			scp -P 8020 -r $node_2:$target_dir/$latest_ckpt_dir .// >>run.log 2>&1
+        else
+			scp -P 8020 -r $node_1:$target_dir/$latest_ckpt_dir output/ >>run.log 2>&1
+			scp -P 8020 -r $node_2:$target_dir/$latest_ckpt_dir output/ >>run.log 2>&1
+        fi
     fi
-    #echo $latest_ckpt_dir
+    echo $latest_ckpt_dir
 }
 
 latest_ckpt=$(prepare_ckpt)
