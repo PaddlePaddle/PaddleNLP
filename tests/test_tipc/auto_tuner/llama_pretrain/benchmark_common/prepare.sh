@@ -21,12 +21,8 @@ python setup.py install
 # install tool_helpers
 cd ../../../llm/llama
 python -m pip install tool_helpers
-ln ../finetune_generation.py finetune_generation.py
 
-rm -rf data
-wget https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
-tar -zxvf AdvertiseGen.tar.gz && rm -rf AdvertiseGen.tar.gz
-
+rm -rf data && mkdir data
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
 

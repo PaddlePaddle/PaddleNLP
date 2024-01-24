@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-param="model_item=CE_llama7b_autotuner "
+param="model_item=CE_autotuner_llama7b "
 param+="run_mode=pretrain "
 param+="device_num=N1C8 "
 param+="global_batch_size=8 "

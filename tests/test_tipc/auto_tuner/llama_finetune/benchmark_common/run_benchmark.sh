@@ -17,7 +17,7 @@
 # Test training benchmark for a model.
 # Usage：bash benchmark/run_benchmark.sh ${model_name_or_path} ${per_device_train_batch_size} ${tensor_parallel_degree} ${pipeline_parallel_degree} ${virtual_pp_degree} ${sequence_parallel} ${sharding_parallel_degree} ${sharding} ${recompute} ${run_mode} ${device_num}
 function _set_params(){
-    model_item=${model_item:-"CE_llama7b_autotuner"}
+    model_item=${model_item:-"CE_autotuner_llama7b"}
     run_mode=${run_mode:-"pretrain"}
     device_num=${device_num:-"N1C8"}
     global_batch_size=${global_batch_size:-8}
@@ -81,12 +81,12 @@ function _train(){
         PADDLE_RANK_OPTION=""
     fi
     # 以下为通用执行命令，无特殊可不用修改
-    case ${run_mode} in
-    lora) echo "Run with: run_mode=${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
+    case ${device_num} in
+    N1C1) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
+        train_cmd="python -m paddle.distributed.launch --gpus=0 ${PADDLE_RANK_OPTION}\
             --auto_tuner_json ${autoconfig_json_file} finetune_generation.py ${modle_json_file}"
         ;;
-    sft) echo "Run with: run_mode=${run_mode}"
+    N1C8|N2C16) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
         train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
             --auto_tuner_json ${autoconfig_json_file} finetune_generation.py ${modle_json_file}"
         ;;
