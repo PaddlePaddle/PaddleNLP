@@ -118,6 +118,7 @@ function _train(){
     if [ ${device_num} != "N1C1" -a -d ./autoconfig/best_cfg ]; then
         case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/tests/mylog
         cp -r ${case_path}/autoconfig/best_cfg/workerlog.* ./mylog/
+        cp -r ${case_path}/autoconfig/*.csv $(dirname "$log_file")
     fi
 }
 
