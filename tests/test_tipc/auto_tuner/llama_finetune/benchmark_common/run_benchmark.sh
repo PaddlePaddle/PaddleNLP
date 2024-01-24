@@ -82,10 +82,6 @@ function _train(){
     fi
     # 以下为通用执行命令，无特殊可不用修改
     case ${run_mode} in
-    pretrain) echo "Run with: run_mode=${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
-            --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
-        ;;
     lora) echo "Run with: run_mode=${run_mode}"
         train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
             --auto_tuner_json ${autoconfig_json_file} finetune_generation.py ${modle_json_file}"
@@ -96,10 +92,10 @@ function _train(){
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
-            --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
+            --auto_tuner_json ${autoconfig_json_file} finetune_generation.py ${modle_json_file}"
         ;;
     esac
-    cd ../llm/llama
+    cd ../llm/
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     python -c "import paddlenlp"
     if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间
