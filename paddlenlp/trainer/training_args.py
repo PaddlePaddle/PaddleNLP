@@ -24,9 +24,12 @@ import types
 import warnings
 from dataclasses import asdict, dataclass, field
 from enum import Enum
+from functools import reduce
 from typing import Any, Dict, List, Optional
 
+import numpy as np
 import paddle
+import paddle.distributed as dist
 from paddle.distributed import fleet
 
 from ..utils.log import logger
@@ -747,6 +750,8 @@ class TrainingArguments:
         default=False,
         metadata={"help": "reshard pp even if pp degree in the model and pp degree in script match"},
     )
+    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
+    run_static_semi_auto: bool = field(default=True, metadata={"help": ""})
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -1140,8 +1145,8 @@ class TrainingArguments:
                 if len(self.sharding) > 0:
                     self.sharding_parallel_degree = self.data_parallel_degree
 
-            sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
-            if sharding_parallel_degree == 1 and len(self.sharding) > 0:
+            self.sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
+            if self.sharding_parallel_degree == 1 and len(self.sharding) > 0:
                 logger.warning("sharding_parallel_degree=1 means no sharding, please set sharding to empty!")
                 self.sharding = []
 
@@ -1223,10 +1228,10 @@ class TrainingArguments:
                         "by current version of Paddle. Please try latest develop Paddle."
                     )
 
-            if sharding_parallel_degree > 1:
+            if self.sharding_parallel_degree > 1:
                 sharding = strategy.sharding
                 sharding.enable = True
-                sharding.degree = sharding_parallel_degree
+                sharding.degree = self.sharding_parallel_degree
                 if ShardingOption.SHARD_OP in self.sharding:
                     sharding.stage = 1
                 elif ShardingOption.SHARD_GRAD_OP in self.sharding:
@@ -1277,6 +1282,23 @@ class TrainingArguments:
             mesh_dims = list(filter(lambda x: x[1] > 1, list(zip(order, degree))))
             if not mesh_dims:
                 mesh_dims = [("dp", 1)]
+
+            dim_names = [mesh_dim[0] for mesh_dim in mesh_dims]
+            mesh_shape = [mesh_dim[1] for mesh_dim in mesh_dims]
+            mesh_arr = np.arange(0, reduce(lambda x, y: x * y, mesh_shape, 1)).reshape(mesh_shape)
+            self.global_mesh = dist.ProcessMesh(mesh_arr, dim_names)
+
+            from paddlenlp.ops import Topology
+
+            self.topo = Topology(
+                dist.get_rank(),
+                dist.get_world_size(),
+                dp_degree=self.data_parallel_degree,
+                pp_degree=self.pipeline_parallel_degree,
+                mp_degree=self.tensor_parallel_degree,
+                sharding_degree=self.sharding_parallel_degree,
+            )
+
             fleet.auto.create_mesh(mesh_dims)
         else:
             world_size = paddle.distributed.get_world_size()
@@ -1393,6 +1415,8 @@ class TrainingArguments:
             if dp_group.rank == -1:
                 return 0
             return dp_group.rank
+        elif self.use_auto_parallel:
+            return int(self.topo.dp_info.rank)
         else:
             return paddle.distributed.get_rank()
 
@@ -1541,6 +1565,8 @@ class TrainingArguments:
         """
         Whether or not the current process should produce log.
         """
+        return True
+
         if self.log_on_each_node:
             return self.local_process_index == 0
         else:
@@ -1557,7 +1583,9 @@ class TrainingArguments:
             work for data parallel, tensor parallel
             not work for sharding
         """
-        if self.save_on_each_node:
+        if self.use_auto_parallel:
+            return False
+        elif self.save_on_each_node:
             return self.local_process_index == 0
         else:
             return self.process_index == 0
@@ -1573,7 +1601,9 @@ class TrainingArguments:
             work for data parallel, tensor parallel
             not work for sharding
         """
-        if self.save_on_each_node:
+        if self.use_auto_parallel:
+            return False
+        elif self.save_on_each_node:
             return self.local_process_index == 0
         else:
             if self.should_save_sharding_stage1_model:
