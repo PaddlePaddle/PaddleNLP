@@ -48,8 +48,8 @@ from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
-    ChatGLMv2Tokenizer,
     ChatGLMTokenizer,
+    ChatGLMv2Tokenizer,
     LlamaTokenizer,
     PretrainedModel,
     PretrainedTokenizer,
@@ -241,7 +241,8 @@ class BasePredictor:
             padding=True,
             # when use chat_template, it should not add special tokens
             # chatglm2 prefix-tokens can not be tokenized into ids
-            add_special_tokens=self.tokenizer.chat_template is None or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
+            add_special_tokens=self.tokenizer.chat_template is None
+            or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
         )
         return tokenized_source
 
@@ -1401,6 +1402,12 @@ def create_predictor(
                     from paddlenlp.experimental.transformers import (
                         QWenForQWenVLInferenceModel as QWenInferenceModel,
                     )
+                elif predictor_args.block_attn:
+                    config.max_seq_len = predictor_args.total_max_length
+                    config.block_size = predictor_args.block_size
+                    from paddlenlp.experimental.transformers import (
+                        QWenForCausalLMBlockInferenceModel as QWenInferenceModel,
+                    )
                 else:
                     from paddlenlp.experimental.transformers import (
                         QWenForCausalLMInferenceModel as QWenInferenceModel,
@@ -1484,11 +1491,19 @@ def create_predictor(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
             elif "qwen" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    QWenForCausalLMInferenceModel,
-                )
+                if predictor_args.block_attn:
+                    config.block_size = predictor_args.block_size
+                    config.max_seq_len = predictor_args.total_max_length
+                    config.use_dynamic_cachekv_quant = predictor_args.use_cachekv_int8 == "dynamic"
+                    from paddlenlp.experimental.transformers import (
+                        QWenForCausalLMBlockInferenceModel as QWenInferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        QWenForCausalLMInferenceModel as QWenInferenceModel,
+                    )
 
-                cache_kvs_shape = QWenForCausalLMInferenceModel.get_cache_kvs_shape(
+                cache_kvs_shape = QWenInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
             else:
