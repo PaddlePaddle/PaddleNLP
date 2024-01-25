@@ -2,19 +2,18 @@
 
 ![teaser](https://github.com/PaddlePaddle/PaddleNLP/assets/48557439/30f9e365-398a-4822-b3c2-a0768f70e310)
 
-论文[Tree of Thoughts: Deliberate Problem Solving with Large Language Models](https://arxiv.org/abs/2305.10601) 的代码、prompts 和 model outputs 实现。
+论文[Tree of Thoughts: Deliberate Problem Solving with Large Language Models](https://arxiv.org/abs/2305.10601) 的代码 prompts 和 model outputs 实现。
 
 
 ## Setup
 1. 安装
 ```bash
-git clone https://github.com/PaddlePaddle/PaddleNLP.git
-cd pipelines/examples/agents
+git clone git@github.com:PaddlePaddle/PaddleNLP.git
+cd pipelines/examples/tree-of-thought/
 pip install -r requirements.txt
-pip install -e .  # install `tot` package
 ```
 
-2. 请从 https://github.com/ErnestinaQiu/tree-of-thought-llm/tree/master/src/tot/data 获取测试数据，并放置在 pipelines/examples/agents/tree-of-thought/tree/master/src/tot/data
+2. 请从 https://github.com/ErnestinaQiu/tree-of-thought-llm/tree/master/src/tot/data 获取测试数据，并放置在 pipelines/examples/tree-of-thought/tree/master/src/tot/data
 
 ## Quick Start
 以下是脚本，该脚本尝试使用4 5 6 10解决24点游戏（由于使用llama-7b-chat，可能会稍慢一些）
@@ -50,7 +49,7 @@ Answer: (5 * (10 - 4)) - 6 = 24
 
 ## 论文实验
 
-通过 ``sh scripts/{game24, text, crosswords}/{standard_sampling, cot_sampling, bfs}.sh`` 运行实验，除了在填字游戏中我们使用了 ToT 的 DFS 算法，可以通过 ``scripts/crosswords/search_crosswords-dfs.ipynb`` 运行。
+通过 ``sh scripts/{game24, text, crosswords}/{standard_sampling, cot_sampling, bfs}.sh`` 运行实验。
 
 非常简单的 ``run.py`` 实现了 ToT + BFS 算法，以及朴素的 IO/CoT 抽样。一些关键参数：
 
@@ -177,17 +176,31 @@ python run.py \
 * 在 ``tot/tasks/`` 中设置一个新的任务类和任务文件在 ``tot/data/`` 中。查看 ``tot/tasks/game24.py`` 以获取示例。将任务添加到 ``tot/tasks/__init__.py`` 中。
 * 在 ``tot/prompts/`` 中设置任务特定的提示。查看 ``tot/prompts/game24.py`` 以获取示例。根据任务的性质，选择 ``--method_generate`` (choices=[``sample``, ``propose``]) 和 ``--method_evaluate`` (choices=[``value``, ``vote``]) 及其相应的提示。
 
+## 测试结果
+本测试采用的是paddlenlp中facebook/llama-2-7b-chat 和 facebook/llama-2-13b-chat.使用的参数为 temperature=0.6, decode_strategy为"greedy_search"，max_new_tokens=512,结果如下
+|model|method|acc|
+|----|----|----|
+|llama-2-7b-chat|cot|0|
+|llama-2-7b-chat|standard sampling| 0|
+|llama-2-7b-chat|ToT| 3%|
+|llama-2-13b-chat|cot|0|
+|llama-2-13b-chat|standard sampling|0|
+|llama-2-13b-chat|ToT|2%|
+
+
 ## 致谢
 
 我们借鉴了Shunyu Yao ect.出色的框架设计，在此对Tree of Thoughts作者及其开源社区表示感谢。
 
 We learn form the excellent framework design of Shunyu Yao, and we would like to express our thanks to the authors of Tree of Thoughts and their open source community.
 
+```bibtex
 @misc{yao2023tree,
-      title={{Tree of Thoughts}: Deliberate Problem Solving with Large Language Models},
+      title={{Tree of Thoughts}: Deliberate Problem Solving with Large Language Models}, 
       author={Shunyu Yao and Dian Yu and Jeffrey Zhao and Izhak Shafran and Thomas L. Griffiths and Yuan Cao and Karthik Narasimhan},
       year={2023},
       eprint={2305.10601},
       archivePrefix={arXiv},
       primaryClass={cs.CL}
 }
+```
