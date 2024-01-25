@@ -22,11 +22,13 @@ export case_list=()
 
 target_lists_for_gpt=(
     "model_zoo/gpt-3"
+    "scripts/distribute"
 )
 
 target_lists_for_llama=(
     "llm/llama/auto_parallel"
     "paddlenlp/transformers/llama/modeling_auto.py"
+    "scripts/distribute"
 )
 
 target_path_for_ci_scripts="scripts/distribute"

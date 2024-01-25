@@ -217,7 +217,8 @@ class NodeModelState:
             for key in state_keys:
                 assert len(key) == 2
                 k, rank = key
-                assert len(k) == l
+                if isinstance(k, tuple):
+                    assert len(k) == l
                 if k != pre:
                     pre = k
                     state[k] = []
@@ -468,7 +469,8 @@ class NodeModelState:
             (state, tmp_state) = (tmp_state, state)
             state_keys = list(tmp_state.keys())
             for key in state_keys:
-                assert len(key) == l
+                if isinstance(key, tuple):
+                    assert len(key) == l
                 v = tmp_state[key]
                 v = sorted(v, key=lambda x: x[0])
                 state[key] = merge_func(key, v)

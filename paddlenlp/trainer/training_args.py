@@ -235,6 +235,7 @@ class TrainingArguments:
               enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance.
               enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.
               enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true. It can accelerate model parallel further.
+              enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.
         pipeline_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it.
             following config is support:
@@ -574,7 +575,8 @@ class TrainingArguments:
                 "following config is support:\n"
                 "enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance. \n"
                 "enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.\n"
-                "enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true.  It can accelerate model parallel further."
+                "enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true.  It can accelerate model parallel further.\n"
+                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.\n"
             )
         },
     )
@@ -996,6 +998,7 @@ class TrainingArguments:
                                 "enable_mp_async_allreduce",
                                 "enable_mp_skip_c_identity",
                                 "enable_mp_fused_linear_param_grad_add",
+                                "enable_delay_scale_loss",
                             ]:
                                 raise ValueError(
                                     f"Found unknown tensor parallell config {x}, "
@@ -1146,7 +1149,8 @@ class TrainingArguments:
                 warnings.warn("`offload` is not supported NOW!")
 
             strategy = fleet.auto.Strategy()
-            if self.pipeline_parallel_degree > 1:
+            # navie-pp: pipeline_parallel_degree > 1 and gradient_accumulation_steps == 1
+            if self.pipeline_parallel_degree > 1 and self.gradient_accumulation_steps > 1:
                 pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
                 for x in pipeline_parallel_config:
                     if len(x) > 0:
@@ -1170,9 +1174,6 @@ class TrainingArguments:
                 pipeline.micro_batch_size = self.per_device_train_batch_size
                 pipeline.schedule_mode = self.pipeline_schedule_mode
 
-                if self.amp_master_grad:
-                    warnings.warn("`amp_master_grad` is not supported NOW in AutoParallel!")
-                    self.amp_master_grad = False
                 logger.info(f"PP configs:{strategy.pipeline}, use master_grad: {self.amp_master_grad}")
 
                 if self.do_eval:
@@ -1256,6 +1257,7 @@ class TrainingArguments:
                 amp.enable = True
                 amp.dtype = "bfloat16" if self.bf16 else "float16"
                 amp.level = self.fp16_opt_level.lower()
+                amp.use_master_grad = self.amp_master_grad
                 amp.init_loss_scaling = self.scale_loss
                 amp.custom_black_list = self.amp_custom_black_list if self.amp_custom_black_list is not None else []
                 amp.custom_white_list = self.amp_custom_white_list if self.amp_custom_white_list is not None else []
@@ -1305,8 +1307,10 @@ class TrainingArguments:
                 self.unified_checkpoint_config = [
                     "skip_save_model_weight",
                     "master_weight_compatible",
-                    "async_save",
+                    # "async_save",
                 ]
+            else:
+                self.unified_checkpoint_config = self.unified_checkpoint_config.split(" ")
 
         if self.report_to is None:
             logger.info(

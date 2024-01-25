@@ -58,10 +58,10 @@ def read_local_dataset(path):
 def main():
     # Arguments
     parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
-    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file(
-            json_file=os.path.abspath(sys.argv[1])
-        )
+    # Support format as "args.json --arg1 value1 --arg2 value2.”
+    # In case of conflict, command line arguments take precedence.
+    if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
+        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
         gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
@@ -162,7 +162,6 @@ def main():
         else:
             # NOTE(gongenlei): new add autotuner_benchmark
             model = AutoModelForCausalLM.from_config(model_config, dtype=dtype)
-
     if training_args.do_train and model_args.neftune:
         # Inspired by https://github.com/neelsjain/NEFTune
         if hasattr(model, "get_input_embeddings"):
@@ -418,6 +417,7 @@ def main():
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 dtype=dtype,
                 do_qat=quant_args.do_qat,
+                base_model_name_or_path=model_args.model_name_or_path,
             )
             model = LoRAModel(model, lora_config)
         else:
@@ -556,7 +556,13 @@ def main():
             raise NotImplementedError(
                 "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
             )
-        from quant import apply_ptq, apply_shift, apply_smooth, get_ptq_model_config
+        from quant import (
+            apply_autoclip,
+            apply_ptq,
+            apply_shift,
+            apply_smooth,
+            get_ptq_model_config,
+        )
 
         trainer.model.eval()
         trainer.model.config.quantization_config.quant_type = quant_args.quant_type
@@ -574,6 +580,9 @@ def main():
 
         if quant_args.smooth:
             apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config)
+
+        if quant_args.auto_clip:
+            apply_autoclip(quant_args, trainer, ptq_dataloader)
 
         apply_ptq(quant_args, trainer, ptq_dataloader)
         trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)

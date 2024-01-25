@@ -26,10 +26,11 @@ from contextlib import contextmanager
 
 import numpy as np
 import paddle
+import paddle.distributed.fleet as fleet
 import yaml
 
 from paddlenlp.trainer.argparser import strtobool
-from paddlenlp.utils.import_utils import is_package_available
+from paddlenlp.utils.import_utils import is_package_available, is_paddle_available
 
 __all__ = ["get_vocab_list", "stable_softmax", "cross_entropy"]
 
@@ -407,3 +408,99 @@ def run_command(command: list[str], return_stdout=False):
         raise SubprocessCallException(
             f"Command `{' '.join(command)}` failed with the following error:\n\n{e.output.decode()}"
         ) from e
+
+
+def require_paddle_multi_gpu(test_case):
+    """
+    Decorator marking a test that requires a multi-GPU setup (in PaddlePaddle). These tests are skipped on a machine without
+    multiple GPUs.
+
+    To run *only* the multi_gpu tests, assuming all test names contain multi_gpu: $ pytest -sv ./tests -k "multi_gpu"
+    """
+    if not is_paddle_available():
+        return unittest.skip("test requires PaddlePaddle")(test_case)
+
+    import paddle
+
+    return unittest.skipUnless(paddle.device.cuda.device_count() > 1, "test requires multiple GPUs")(test_case)
+
+
+def require_paddle_non_multi_gpu(test_case):
+    """
+    Decorator marking a test that requires 0 or 1 GPU setup (in PaddlePaddle).
+    """
+    if not is_paddle_available():
+        return unittest.skip("test requires PaddlePaddle")(test_case)
+
+    import paddle
+
+    return unittest.skipUnless(paddle.device.cuda.device_count() < 2, "test requires 0 or 1 GPU")(test_case)
+
+
+def require_paddle_at_least_2_gpu(test_case):
+    """
+    Decorator marking a test that requires >= 2 GPU setup (in PaddlePaddle).
+    """
+    if not is_paddle_available():
+        return unittest.skip("test requires PaddlePaddle")(test_case)
+
+    import paddle
+
+    return unittest.skipUnless(paddle.device.cuda.device_count() >= 2, "test requires at least 2 GPUs")(test_case)
+
+
+def require_paddle_at_least_8_gpu(test_case):
+    """
+    Decorator marking a test that requires >= 8 GPU setup (in PaddlePaddle).
+    """
+    if not is_paddle_available():
+        return unittest.skip("test requires PaddlePaddle")(test_case)
+
+    import paddle
+
+    return unittest.skipUnless(paddle.device.cuda.device_count() >= 8, "test requires at least 8 GPUs")(test_case)
+
+
+def require_paddle_up_to_2_gpus(test_case):
+    """
+    Decorator marking a test that requires 0 or 1 or 2 GPU setup (in PaddlePaddle).
+    """
+    if not is_paddle_available():
+        return unittest.skip("test requires PaddlePaddle")(test_case)
+
+    import paddle
+
+    return unittest.skipUnless(paddle.device.cuda.device_count() < 3, "test requires 0 or 1 or 2 GPUs")(test_case)
+
+
+def require_gpu(min_gpus: int = 1):
+    def actual_decorator(func):
+        gpu_count = paddle.device.cuda.device_count()
+
+        if gpu_count < min_gpus:
+            return unittest.skip(f"test requires {min_gpus} GPUs")(func)
+
+        def wrapper(*args, **kwargs):
+            result = func(*args, **kwargs)
+            return result
+
+        return wrapper
+
+    return actual_decorator
+
+
+class GPUsTesting(unittest.TestCase):
+    def init_dist_env(self, config: dict = {}):
+        world_size = paddle.distributed.get_world_size()
+        strategy = fleet.DistributedStrategy()
+        hybrid_configs = {
+            "dp_degree": 1,
+            "mp_degree": world_size,
+            "pp_degree": 1,
+            "sharding_degree": 1,
+        }
+        hybrid_configs.update(config)
+        strategy.hybrid_configs = hybrid_configs
+
+        fleet.init(is_collective=True, strategy=strategy)
+        fleet.get_hybrid_communicate_group()
