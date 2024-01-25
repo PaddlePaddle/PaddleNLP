@@ -45,6 +45,7 @@ class ArgparserTest(unittest.TestCase):
         "amp_master_grad": False,
         "adam_beta1": 0.9,
         "adam_beta2": 0.999,
+        "amp_custom_black_list": ["reduce_sum", "sin", "cos"],
         "adam_epsilon": 1e-08,
         "bf16": False,
         "enable_linear_fused_grad_add": False,
@@ -68,7 +69,10 @@ class ArgparserTest(unittest.TestCase):
     def test_parse_cmd_lines(self):
         cmd_line_args = [ArgparserTest.script_name]
         for key, value in ArgparserTest.args_dict.items():
-            cmd_line_args.extend([f"--{key}", str(value)])
+            if isinstance(value, list):
+                cmd_line_args.extend([f"--{key}", *[str(v) for v in value]])
+            else:
+                cmd_line_args.extend([f"--{key}", str(value)])
         with patch("sys.argv", cmd_line_args):
             model_args = vars(parse_args()[0])
         for key, value in ArgparserTest.args_dict.items():
@@ -93,7 +97,10 @@ class ArgparserTest(unittest.TestCase):
             tmpfile_path = tmpfile.name
         cmd_line_args = [ArgparserTest.script_name, tmpfile_path]
         for key, value in cmd_line_part.items():
-            cmd_line_args.extend([f"--{key}", str(value)])
+            if isinstance(value, list):
+                cmd_line_args.extend([f"--{key}", *[str(v) for v in value]])
+            else:
+                cmd_line_args.extend([f"--{key}", str(value)])
         with patch("sys.argv", cmd_line_args):
             model_args = vars(parse_args()[0])
         for key, value in ArgparserTest.args_dict.items():
