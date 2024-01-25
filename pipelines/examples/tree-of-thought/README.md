@@ -159,6 +159,17 @@ python run.py \
     --temperature 1.0 \
 ```
 
+## 测试结果
+本测试采用的是paddlenlp中facebook/llama-2-7b-chat 和 facebook/llama-2-13b-chat.使用的参数为 temperature=0.6, decode_strategy为"greedy_search"，max_new_tokens=512,结果如下
+|model|method|acc|
+|----|----|----|
+|llama-2-7b-chat|cot|0|
+|llama-2-7b-chat|standard sampling| 0|
+|llama-2-7b-chat|ToT| 3%|
+|llama-2-13b-chat|cot|0|
+|llama-2-13b-chat|standard sampling|0|
+|llama-2-13b-chat|ToT|2%|
+
 
 ## 如何添加新任务
 
