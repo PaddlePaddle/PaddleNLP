@@ -1574,6 +1574,8 @@ class TrainingArguments:
         if self.save_on_each_node:
             return self.local_process_index == 0
         else:
+            if self.use_auto_parallel:
+                return self.data_parallel_rank == 0
             return self.process_index == 0
 
     @property
@@ -1593,7 +1595,7 @@ class TrainingArguments:
             if self.should_save_sharding_stage1_model:
                 return True
             elif self.use_auto_parallel:
-                return True
+                return self.data_parallel_rank == 0
             elif self.use_hybrid_parallel:
                 # save on dataset rank 0
                 return self.sharding_parallel_rank == 0 and self.data_parallel_rank == 0

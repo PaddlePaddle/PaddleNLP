@@ -602,51 +602,27 @@ class Trainer:
             self._load_from_checkpoint(resume_from_checkpoint)
         return model
 
-    def train(
-        self,
-        resume_from_checkpoint: Optional[Union[str, bool]] = None,
-        ignore_keys_for_eval: Optional[List[str]] = None,
-    ):
-        """
-        Main training entry point.
-
-        Args:
-            resume_from_checkpoint (`str` or `bool`, *optional*):
-                If a `str`, local path to a saved checkpoint as saved by a previous instance of [`Trainer`]. If a
-                `bool` and equals `True`, load the last checkpoint in *args.output_dir* as saved by a previous instance
-                of [`Trainer`]. If present, training will resume from the model/optimizer/scheduler states loaded here.
-            ignore_keys_for_eval (`List[str]`, *optional*)
-                A list of keys in the output of your model (if it is a dictionary) that should be ignored when
-                gathering predictions for evaluation during the training.
-        """
-        args = self.args
-        self.is_in_train = True
-
+    def _sync_resume_states(self, resume_from_checkpoint):
         logger.info(f"Starting training from resume_from_checkpoint : {resume_from_checkpoint}")
 
         # The resume_from_checkpoint could be None in some machine node.
         # Here we reset None to temp directory.
-        if args.world_size > 1:
+        if self.args.world_size > 1:
             is_resume_from_checkpoint = paddle.to_tensor([resume_from_checkpoint is not None])
             paddle.distributed.all_reduce(is_resume_from_checkpoint)
             is_resume_from_checkpoint = is_resume_from_checkpoint.item()
+
             if is_resume_from_checkpoint > 0 and is_resume_from_checkpoint < paddle.distributed.get_world_size():
                 if resume_from_checkpoint is None:
                     resume_from_checkpoint = os.path.join(self.args.output_dir, "local_tempdir")
                     if os.path.exists(resume_from_checkpoint) and self.args.local_rank == 0:
                         shutil.rmtree(resume_from_checkpoint)
                     os.makedirs(resume_from_checkpoint, exist_ok=True)
+
                     logger.info(f"Reset resume_from_checkpoint to temp directory : {resume_from_checkpoint}")
 
-        # memory metrics - must set up as early as possible
-        self._memory_tracker.start()
+    def _get_train_steps_and_samples(self, args, train_dataloader, total_train_batch_size):
 
-        if not self.args.should_load_sharding_stage1_model:
-            self._load_from_checkpoint(resume_from_checkpoint)
-
-        train_dataloader = self.get_train_dataloader()
-
-        total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.dataset_world_size
         len_dataloader = None
         if has_length(train_dataloader):
             len_dataloader = len(train_dataloader)
@@ -682,6 +658,56 @@ class Trainer:
             raise ValueError(
                 f"args.max_steps must be set to a positive value if dataloader does not have a length, was {args.max_steps}"
             )
+
+        logger.info("***** Running training *****")
+        logger.info(f"  Num examples = {num_examples:,}")
+        logger.info(f"  Num Epochs = {num_train_epochs}")
+        logger.info(f"  Instantaneous batch size per device = {args.per_device_train_batch_size}")
+        logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}")
+        logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
+        logger.info(f"  Total optimization steps = {max_steps:,}")
+        logger.info(f"  Total num train samples = {num_train_samples:,}")
+
+        return len_dataloader, max_steps, num_train_epochs, num_update_steps_per_epoch, num_examples, num_train_samples
+
+    def train(
+        self,
+        resume_from_checkpoint: Optional[Union[str, bool]] = None,
+        ignore_keys_for_eval: Optional[List[str]] = None,
+    ):
+        """
+        Main training entry point.
+
+        Args:
+            resume_from_checkpoint (`str` or `bool`, *optional*):
+                If a `str`, local path to a saved checkpoint as saved by a previous instance of [`Trainer`]. If a
+                `bool` and equals `True`, load the last checkpoint in *args.output_dir* as saved by a previous instance
+                of [`Trainer`]. If present, training will resume from the model/optimizer/scheduler states loaded here.
+            ignore_keys_for_eval (`List[str]`, *optional*)
+                A list of keys in the output of your model (if it is a dictionary) that should be ignored when
+                gathering predictions for evaluation during the training.
+        """
+        args = self.args
+        self.is_in_train = True
+
+        self._sync_resume_states(resume_from_checkpoint)
+
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
+
+        if not self.args.should_load_sharding_stage1_model:
+            self._load_from_checkpoint(resume_from_checkpoint)
+
+        train_dataloader = self.get_train_dataloader()
+        total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.dataset_world_size
+        (
+            len_dataloader,
+            max_steps,
+            num_train_epochs,
+            num_update_steps_per_epoch,
+            num_examples,
+            num_train_samples,
+        ) = self._get_train_steps_and_samples(args, train_dataloader, total_train_batch_size)
 
         # delay_optimizer_creation = (
         #     self.sharding is not None
@@ -1170,13 +1196,17 @@ class Trainer:
         if timer_info or paddle_timer_info:
             logger.info(f"[Profile global_step: {self.state.global_step}] {timer_info} {paddle_timer_info}")
 
+    def _get_item_from_loss(self, loss):
+        assert isinstance(loss, paddle.Tensor) and loss._is_initialized()
+        return loss.item()
+
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
 
             logs: Dict[str, float] = {}
 
             # all_gather + mean() to get average loss over all processes
-            tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
+            tr_loss_scalar = self._get_item_from_loss(self._nested_gather(tr_loss).mean())
 
             # reset tr_loss to zero
             tr_loss.subtract_(tr_loss)

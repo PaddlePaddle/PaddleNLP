@@ -68,6 +68,7 @@ except:
 
 __all__ = [
     "LlamaForCausalLM3DAuto",
+    "LlamaPretrainingCriterion3DAuto",
 ]
 
 
@@ -1018,7 +1019,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         )
 
 
-class LlamaPretrainingCriterionAuto(paddle.nn.Layer):
+class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
     """
     Criterion for Llama.
     It calculates the final loss.
@@ -1026,7 +1027,7 @@ class LlamaPretrainingCriterionAuto(paddle.nn.Layer):
 
     def __init__(self, config):
 
-        super(LlamaPretrainingCriterionAuto, self).__init__()
+        super(LlamaPretrainingCriterion3DAuto, self).__init__()
         self.ignore_index = getattr(config, "ignore_index", -100)
         self.config = config
         self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
@@ -1041,23 +1042,23 @@ class LlamaPretrainingCriterionAuto(paddle.nn.Layer):
                 self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
         # Force Replicated to match dy & st
-        prediction_scores1 = dist.reshard(
+        prediction_scores = dist.reshard(
             prediction_scores,
             get_mesh(-1),
             [dist.Replicate(), dist.Replicate()],
         )
-        masked_lm_labels1 = dist.reshard(masked_lm_labels, get_mesh(-1), [dist.Replicate(), dist.Replicate()])
+        masked_lm_labels = dist.reshard(masked_lm_labels, get_mesh(-1), [dist.Replicate(), dist.Replicate()])
 
         # Force entropy same kernel
-        if isinstance(prediction_scores1, paddle.Tensor):
+        if isinstance(prediction_scores, paddle.Tensor):
             masked_lm_loss = self.loss_func(
-                prediction_scores1.astype("float32")._use_gpudnn(False),
-                masked_lm_labels1.unsqueeze(2),
+                prediction_scores.astype("float32")._use_gpudnn(False),
+                masked_lm_labels.unsqueeze(2),
             )
         else:
             masked_lm_loss = self.loss_func(
-                prediction_scores1.astype("float32"),
-                masked_lm_labels1.unsqueeze(2),
+                prediction_scores.astype("float32"),
+                masked_lm_labels.unsqueeze(2),
             )
 
         masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
@@ -1096,7 +1097,6 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
 
         self.llama = LlamaModelAuto(config)
         self.lm_head = LlamaLMHeadAuto(config)
-        self.criterion = LlamaPretrainingCriterionAuto(config)
 
     def get_input_embeddings(self):
         return self.llama.embed_tokens
@@ -1220,19 +1220,21 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
 
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
 
-        loss = None
-        if labels is not None:
-            labels.stop_gradient = True
-            loss = self.criterion(logits, labels)
+        return logits
 
-        if not return_dict:
-            output = (logits,) + outputs[1:]
-            return (loss,) + output if loss is not None else output
+        # loss = None
+        # if labels is not None:
+        #     labels.stop_gradient = True
+        #     loss = self.criterion(logits, labels)
 
-        return CausalLMOutputWithCrossAttentions(
-            loss=loss,
-            logits=logits,
-            past_key_values=outputs.past_key_values,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
+        # if not return_dict:
+        #     output = (logits,) + outputs[1:]
+        #     return (loss,) + output if loss is not None else output
+
+        # return CausalLMOutputWithCrossAttentions(
+        #     loss=loss,
+        #     logits=logits,
+        #     past_key_values=outputs.past_key_values,
+        #     hidden_states=outputs.hidden_states,
+        #     attentions=outputs.attentions,
+        # )

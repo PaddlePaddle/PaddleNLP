@@ -37,11 +37,12 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     LlamaConfig,
     LlamaForCausalLM3DAuto,
+    LlamaPretrainingCriterion3DAuto,
 )
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "llama": (LlamaConfig, LlamaForCausalLM3DAuto),
+    "llama": (LlamaConfig, LlamaForCausalLM3DAuto, LlamaPretrainingCriterion3DAuto),
 }
 
 
@@ -487,7 +488,7 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    config_class, model_class = MODEL_CLASSES[model_args.model_type]
+    config_class, model_class, criterion_class = MODEL_CLASSES[model_args.model_type]
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
 
@@ -551,8 +552,7 @@ def main():
 
     with paddle.LazyGuard():
         model = model_class.from_config(config, dtype=dtype)
-
-    criterion = None
+        criterion = criterion_class(config)
 
     for param in model.parameters():
         assert not param._is_initialized()
@@ -597,11 +597,6 @@ def main():
         tokenizer,
         need_data=training_args.should_load_dataset,
     )
-
-    # total_train_batch_size_per_acc_step = (
-    #     training_args.per_device_train_batch_size * training_args.data_parallel_degree
-    # )
-    # total_train_batch_size = total_train_batch_size_per_acc_step * training_args.gradient_accumulation_steps
 
     trainer = PretrainingTrainer(
         model=model,
