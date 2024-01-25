@@ -33,5 +33,6 @@
 	"sharding_parallel_degree": 8,
 	"sharding": "stage3",
 	"recompute_granularity": "full_attn",
-	"autotuner_benchmark": 1
+	"autotuner_benchmark": 1,
+	"benchmark": 1
 }

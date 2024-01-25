@@ -3,7 +3,7 @@
   "invalid_strategy": [
     "stage3_mp*"
   ],
-  "max_search_time": 1800,
+  "max_search_time": 900,
   "max_time_per_task": 300,
   "metric_cfg": {
     "OptimizationDirection": "Maximize",
