@@ -69,7 +69,7 @@ def main():
         train_ds, dev_ds = load_dataset(
             "json",
             data_files={
-                "train": os.path.join(data_args.dataset_name_or_path, "dev.json"),
+                "train": os.path.join(data_args.dataset_name_or_path, "train.json"),
                 "dev": os.path.join(data_args.dataset_name_or_path, "dev.json"),
             },
             lazy=data_args.lazy,
