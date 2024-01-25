@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-param="model_name_or_path=qwen/qwen-14b "
+param="model_name_or_path=qwen/qwen-7b "
 param+="per_device_train_batch_size=1 "
 param+="data_parallel_degree=1 "
 param+="tensor_parallel_degree=8 "
@@ -26,7 +26,7 @@ param+="recompute=1 "
 param+="run_mode=MP8-PP1-mbs1-acc16 "
 param+="device_num=N1C8 "
 param+="global_batch_size=16 "
-param+="model_item=qwen-qwen-14b_seqlen2048_pretrain "
+param+="model_item=qwen-qwen-7b_seqlen2048_pretrain "
 param+="max_steps=150 "
 param+="gradient_accumulation_steps=16 "
 param+="pp_recompute_interval=1 "

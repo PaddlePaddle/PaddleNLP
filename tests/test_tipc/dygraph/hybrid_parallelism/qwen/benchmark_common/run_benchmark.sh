@@ -17,7 +17,7 @@
 # Test training benchmark for a model.
 # Usage：bash benchmark/run_benchmark.sh ${model_name_or_path} ${per_device_train_batch_size} ${tensor_parallel_degree} ${pipeline_parallel_degree} ${virtual_pp_degree} ${sequence_parallel} ${sharding_parallel_degree} ${sharding} ${recompute} ${run_mode} ${device_num}
 function _set_params(){
-    model_name_or_path=${model_name_or_path:-"qwen/qwen-14b"}
+    model_name_or_path=${model_name_or_path:-"qwen/qwen-7b"}
     per_device_train_batch_size=${per_device_train_batch_size:-1}
     tensor_parallel_degree=${tensor_parallel_degree:-1}
     data_parallel_degree=${data_parallel_degree:-1}
@@ -30,7 +30,7 @@ function _set_params(){
     run_mode=${run_mode:-"DP1-MP1-PP4-mbs1-acc8-recompute"}
     device_num=${device_num:-"N1C8"}
     global_batch_size=${global_batch_size:-16}
-    model_item=${model_item:-"qwen-qwen-14b_seqlen2048_pretrain"}
+    model_item=${model_item:-"qwen-qwen-7b_seqlen2048_pretrain"}
     max_steps=${max_steps:-150}
     gradient_accumulation_steps=${gradient_accumulation_steps:-8}
     pp_recompute_interval=${pp_recompute_interval:-1}
