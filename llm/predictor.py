@@ -135,6 +135,12 @@ class PredictorArgument:
         },
     )
 
+    speculative_decoding: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use speculative decoding. If set as `True`, the model will predict a next token with probability."
+        })
+
     @property
     def total_max_length(self):
         return self.src_length + self.max_length
@@ -1309,6 +1315,7 @@ def create_predictor(
                 elif predictor_args.block_attn:
                     config.max_seq_len = predictor_args.total_max_length
                     config.block_size = predictor_args.block_size
+                    config.speculative_decoding = predictor_args.speculative_decoding
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMBlockInferenceModel as LlamaInferenceModel,
                     )
@@ -1430,6 +1437,7 @@ def create_predictor(
                     config.block_size = predictor_args.block_size
                     config.max_seq_len = predictor_args.total_max_length
                     config.use_dynamic_cachekv_quant = predictor_args.use_cachekv_int8 == "dynamic"
+                    
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMBlockInferenceModel as LlamaInferenceModel,
                     )
