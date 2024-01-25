@@ -14,19 +14,70 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from src.llm import llamaChatCompletion
+import os
+from src.llm import llamaChatCompletion, llm_config, Ernie_llm_list
+import logging
 
 completion_tokens = prompt_tokens = 0
 
 
 def completions_with_backoff(**kwargs):
     chatter = kwargs["chatter"]
-    print(kwargs["messages"])
-    return chatter.create(messages=kwargs["messages"], temperature=kwargs["temperature"])
+    return chatter.create(messages=kwargs["messages"], temperature=kwargs["temperature"], max_gen_len=kwargs["max_tokens"])
 
 
-def gpt(prompt, model="llama-2-7b-chat", temperature=0.6, max_tokens=1000, n=1, stop=None) -> list:
-    messages = [[{"role": "user", "content": prompt}]]
+def chatgpt(
+    messages, model="llama-2-7b-chat", temperature=0.6, max_tokens=1000, n=1, stop=None, chatter=None, args=None) -> list:
+    global completion_tokens, prompt_tokens
+    if chatter is None:
+        chatter = llamaChatCompletion(model="llama-2-7b-chat")
+        logging.info("Chatter is None. Use llama-2-7b-chat as default.")
+    outputs = []
+    while n > 0:
+        cnt = min(n, 20)
+        n -= cnt
+        if model in Ernie_llm_list:
+            one_turn_mes = messages[0]   # one_turn_mes is like [{'role': 'user', 'content': "请问你能以《你好，世界》为题，写一首现代诗吗？"}]
+            out_content = chatter.create(model=model, messages=one_turn_mes)
+            outputs.append(out_content)  # is like ['content']
+            # log completion tokens
+            completion_tokens += len(out_content)
+            prompt_tokens += len(one_turn_mes)
+        else:
+            res = chatter.create(messages=messages, temperature=temperature)
+            outputs.extend([choice["message"]["content"] for choice in res["choices"]])
+            # log completion tokens
+            completion_tokens += res["usage"]["completion_tokens"]
+            prompt_tokens += res["usage"]["prompt_tokens"]
+    
+    if args is not None:
+        f = open(args.log_fp, 'a', encoding="utf8")
+        f.write(f"\n [messages]: \n {messages}")
+        f.write("\n [outputs]:\n")
+        f.write(str(outputs))
+        f.close()
+    else:
+        log_fp = os.path.join(os.getcwd(), "logs", "tot_log.txt")
+        os.makedirs(os.path.basename(log_fp), exist_ok=True)
+        f.write(f"\n [messages]: \n {messages}")
+        f.write("\n [outputs]:\n")
+        f.write(str(outputs))
+        f.close()
+    assert len(outputs) == 1, f"len(outputs) == {len(outputs)}, \n outputs"
+    
+    if model in llm_config.keys():
+        outputs = outputs[0]
+        return outputs
+    elif model in Ernie_llm_list:
+        return outputs
+
+
+def gpt(
+    prompt, model="llama-2-7b-chat", temperature=0.6, max_tokens=512, n=1, stop=None, args=None, chatter=None
+) -> list:
+    messages = [
+        [{"role": "user", "content": prompt}]
+    ]
     return chatgpt(
         messages=messages,
         model=model,
@@ -34,44 +85,9 @@ def gpt(prompt, model="llama-2-7b-chat", temperature=0.6, max_tokens=1000, n=1, 
         max_tokens=max_tokens,
         n=1,
         stop=stop,
+        args=args,
+        chatter=chatter
     )
-
-
-def chatgpt(messages, model="llama-2-7b-chat", temperature=0.7, max_tokens=1000, n=1, stop=None) -> list:
-    global completion_tokens, prompt_tokens
-    models_included = [
-        "llama-2-7b-chat",
-        "llama-2-7b",
-        "llama2-13b-chat",
-        "llama2-13b",
-        "llama2-70b-chat",
-        "llama2-70b",
-    ]
-    if model in models_included:
-        chatter = llamaChatCompletion(model)
-    else:
-        print(f"Not support for llm {model}, and use llama-2-7b-chat instead.")
-        chatter = llamaChatCompletion(model="llama-2-7b-chat")
-
-    outputs = []
-    while n > 0:
-        cnt = min(n, 20)
-        n -= cnt
-        print("messages: {}".format(messages))
-        res = completions_with_backoff(
-            chatter=chatter,
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            n=cnt,
-        )
-        outputs.extend([choice["message"]["content"] for choice in res["choices"]])
-        # log completion tokens
-        completion_tokens += res["usage"]["completion_tokens"]
-        prompt_tokens += res["usage"]["prompt_tokens"]
-    outputs = outputs[0]
-    return outputs
 
 
 def gpt_usage(backend="llama-2-7b-chat"):
