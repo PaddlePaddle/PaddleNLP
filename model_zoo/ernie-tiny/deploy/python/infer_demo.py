@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import re
 
 import fastdeploy as fd
 import numpy as np
@@ -128,12 +129,15 @@ class Predictor(object):
         return fd.Runtime(option)
 
     def preprocess(self, data):
-        data = self.tokenizer(data, max_length=self.max_length, padding=True, truncation=True)
+        data = self.tokenizer(data, max_length=self.max_length, padding=True, truncation=True, \
+            return_attention_mask=True)
         input_ids_name = self.runtime.get_input_info(0).name
         input_map = {
             input_ids_name: np.array(data["input_ids"], dtype="int32"),
         }
-        return input_map
+        attention_mask = data["attention_mask"]
+
+        return input_map, attention_mask
 
     def infer(self, input_map):
         results = self.runtime.infer(input_map)
@@ -146,44 +150,60 @@ class Predictor(object):
         out_dict = {"intent": probs.argmax(axis=-1), "confidence": probs.max(axis=-1)}
         return out_dict
 
-    def slot_cls_postprocess(self, slot_logits, input_data):
+    def slot_cls_postprocess(self, slot_logits, input_data, attention_masks):
         batch_preds = slot_logits.argmax(axis=-1).tolist()
+
         value = []
         for batch, preds in enumerate(batch_preds):
             start = -1
             label_name = ""
             items = []
-            text_length = len(input_data[batch])
-            for i, pred in enumerate(preds):
-                if (
-                    self.slot_label_map[pred] == "O" or "B-" in self.slot_label_map[pred] or i - 1 >= text_length
-                ) and start >= 0:
-                    entity = input_data[batch][start : i - 1]
+            token_length = len(input_data[batch])
 
-                    if isinstance(entity, list):
-                        entity = "".join(entity)
-                    items.append(
-                        {
-                            "slot": label_name,
-                            "entity": entity,
-                            "pos": [start, i - 2],
-                        }
-                    )
+            mask_token_ids = self.tokenizer.get_special_tokens_mask(input_data[batch], already_has_special_tokens=True)
+            attention_mask = attention_masks[batch]
+
+            for i, pred in enumerate(preds):
+                slot_label_name = self.slot_label_map[pred]
+                
+                if (slot_label_name[:2] in ["O", "B-"] or i == token_length - 1) and start >= 0:
+
+                    entity = []
+                    for index in range(start, i):
+                        if mask_token_ids[index] == 1 or not attention_mask[index]:
+                            continue
+
+                        token_char = self.tokenizer.decode(input_data[batch][index])
+                
+                        # tokenizer's result may contain '#' subword, and there may be spaces between digits
+                        token_char = re.sub(r'(?<=\d) +(?=\d)', '', token_char.replace("#", ""))
+
+                        entity.append(token_char.strip())
+
+                    if len(entity) > 0:
+                        items.append(
+                            {
+                                "slot": label_name,
+                                "entity": "".join(entity),
+                                "pos": [start, i - 1],
+                            }
+                        )
                     start = -1
-                    if i - 1 >= text_length:
-                        break
-                if "B-" in self.slot_label_map[pred]:
-                    start = i - 1
+
+                # if "B-" in self.slot_label_map[pred]:
+                if slot_label_name[:2] == "B-": 
+                    start = i
                     label_name = self.slot_label_map[pred][2:]
+
             value.append(items)
         out_dict = {"value": value}
         return out_dict
 
-    def postprocess(self, infer_data, data):
+    def postprocess(self, infer_data, data, attention_mask):
         intent_logits = np.array(infer_data[0])
         intent_out = self.intent_cls_postprocess(intent_logits)
         slot_logits = np.array(infer_data[1])
-        slot_out = self.slot_cls_postprocess(slot_logits, data)
+        slot_out = self.slot_cls_postprocess(slot_logits, data, attention_mask)
         out_list = [
             {
                 "intent": self.intent_label_map[intent_out["intent"][i]],
@@ -195,16 +215,16 @@ class Predictor(object):
         return out_list
 
     def predict(self, data):
-        input_map = self.preprocess(data)
+        input_map, attention_mask = self.preprocess(data)
         infer_result = self.infer(input_map)
-        output = self.postprocess(infer_result, data)
+        output = self.postprocess(infer_result, input_map["input_ids"], attention_mask)
         return output
 
 
 if __name__ == "__main__":
     args = parse_arguments()
     predictor = Predictor(args)
-    data = ["来一首周华健的花心", "播放我们都一样", "到信阳市汽车配件城"]
+    data = ["来一首周华健的花心", "播放我们都一样", "到信阳市汽车配件城", "打电话给18866668888"]
     batch_data = batchify_text(data, args.batch_size)
     j = 0
     for batch in batch_data:
@@ -213,3 +233,4 @@ if __name__ == "__main__":
             print(f"No. {j} text = {data[j]}")
             print(out)
             j += 1
+
