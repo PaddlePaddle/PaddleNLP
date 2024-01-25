@@ -2274,7 +2274,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     subfolder=subfolder,
                     **kwargs,
                 )
-            except OSError:
+            except (ValueError, OSError):
                 logger.info(
                     "Generation config file not found, using a generation config created from the model config."
                 )
