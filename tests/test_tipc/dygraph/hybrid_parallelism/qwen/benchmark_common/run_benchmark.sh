@@ -37,6 +37,7 @@ function _set_params(){
     tensor_parallel_config=${tensor_parallel_config:-"enable_mp_async_allreduce,enable_mp_skip_c_identity,enable_mp_fused_linear_param_grad_add"}
     pipeline_parallel_config=${pipeline_parallel_config:-""}
     recompute_use_reentrant=${recompute_use_reentrant:-"true"}
+    recompute_granularity=${recompute_granularity:-"full"}
 
     base_batch_size=${global_batch_size}
 
