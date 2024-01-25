@@ -13,9 +13,10 @@
 # limitations under the License.
 
 import argparse
+
+from src.llm import Ernie, Ernie_llm_list, llamaChatCompletion, llm_config
 from src.tot.methods.bfs import solve
 from src.tot.tasks.game24 import Game24Task
-from src.llm import llm_config, llamaChatCompletion, Ernie_llm_list, Ernie
 
 args = argparse.Namespace(
     backend="llama-2-7b-chat",
@@ -29,7 +30,7 @@ args = argparse.Namespace(
     n_generate_sample=1,
     n_evaluate_sample=3,
     n_select_sample=5,
-    log_fp="log.txt"
+    log_fp="log.txt",
 )
 
 task = Game24Task()
@@ -40,4 +41,3 @@ elif args.backend in Ernie_llm_list:
 ys, infos = solve(args, task, 900, chatter=chatter)
 print(ys[0])
 print(infos)
-
