@@ -1702,21 +1702,21 @@ class TrainingArguments:
         """
         print all config values.
         """
-        logger.info("=" * 60)
+        logger.debug("=" * 60)
         if args is None:
             args = self
             key = "Training"
 
         import paddlenlp
 
-        logger.info("{:^40}".format("{} Configuration Arguments".format(key)))
-        logger.info("{:30}: {}".format("paddle commit id", paddle.version.commit))
-        logger.info("{:30}: {}".format("paddlenlp commit id", paddlenlp.version.commit))
+        logger.debug("{:^40}".format("{} Configuration Arguments".format(key)))
+        logger.debug("{:30}: {}".format("paddle commit id", paddle.version.commit))
+        logger.debug("{:30}: {}".format("paddlenlp commit id", paddlenlp.version.commit))
 
         for a in dir(args):
             if a[:2] != "__":  # don't print double underscore methods
                 v = getattr(args, a)
                 if not isinstance(v, types.MethodType):
-                    logger.info("{:30}: {}".format(a, v))
+                    logger.debug("{:30}: {}".format(a, v))
 
-        logger.info("")
+        logger.debug("")
