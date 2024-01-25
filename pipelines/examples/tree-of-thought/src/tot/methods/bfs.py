@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import itertools
+import logging
 from functools import partial
+
 import numpy as np
 from src.tot.models import gpt
 
@@ -89,7 +90,7 @@ def solve(args, task, idx, to_print=True, chatter=None):
                     prompt_sample=args.prompt_sample,
                     stop=task.stops[step],
                     chatter=chatter,
-                    args=args
+                    args=args,
                 )
                 for y in ys
             ]
@@ -128,7 +129,7 @@ def solve(args, task, idx, to_print=True, chatter=None):
         ys = select_new_ys
 
     if args.query_fp and chatter:
-        f = open(args.query_fp, 'w', encoding="utf8")
+        f = open(args.query_fp, "w", encoding="utf8")
         f.write(str(chatter.query))
         f.close()
 
