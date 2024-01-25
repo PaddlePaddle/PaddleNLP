@@ -490,7 +490,7 @@ def main():
     if model_args.continue_training:
         # NOTE(gongenlei): new add
         if training_args.autotuner_benchmark:
-            model = model_class.from_config(config, dtype=dtype)
+            model = model_class.from_config(config, dtype=dtype, fp16_level=training_args.fp16_opt_level)
         else:
             model = model_class.from_pretrained(
                 model_args.model_name_or_path,
@@ -498,7 +498,7 @@ def main():
                 dtype=dtype,
             )
     else:
-        model = model_class.from_config(config, dtype=dtype)
+        model = model_class.from_config(config, dtype=dtype, fp16_level=training_args.fp16_opt_level)
 
     if model_args.sequence_parallel:
         register_sequence_parallel_allreduce_hooks(
