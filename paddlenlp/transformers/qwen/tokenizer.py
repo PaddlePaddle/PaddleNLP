@@ -70,6 +70,7 @@ class QWenTokenizer(PretrainedTokenizer):
         self,
         vocab_file,
         errors="replace",
+        padding_side="left",
         **kwargs,
     ):
         super().__init__(**kwargs)

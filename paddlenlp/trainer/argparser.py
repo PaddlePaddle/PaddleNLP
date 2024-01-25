@@ -269,7 +269,10 @@ class PdArgumentParser(ArgumentParser):
                 data = json.load(file)
             json_args = []
             for key, value in data.items():
-                json_args.extend([f"--{key}", str(value)])
+                if isinstance(value, list):
+                    json_args.extend([f"--{key}", *[str(v) for v in value]])
+                else:
+                    json_args.extend([f"--{key}", str(value)])
         else:
             raise FileNotFoundError(f"The argument file {json_file} does not exist.")
         # In case of conflict, command line arguments take precedence

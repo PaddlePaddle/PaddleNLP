@@ -477,6 +477,14 @@ class GenerationBlockInferenceModel(GenerationMixin):
             src_mask_spec = paddle.static.InputSpec(shape=[None, 1, None, None], dtype=dtype, name="src_mask")
         else:
             src_mask_spec = None
+
+        # bloom model needs src_mask and tgt_mask!
+        if "bloom" in self.config.architectures[0].lower():
+            src_mask_spec = paddle.static.InputSpec(shape=[None, None, None, None], dtype=dtype, name="src_mask")
+            tgt_mask_spec = paddle.static.InputSpec(shape=[None, None, 1, None], dtype=dtype, name="tgt_mask")
+        else:
+            tgt_mask_spec = None
+
         input_spec = [
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),  # input_ids
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="temperature"),  # temperature
@@ -509,6 +517,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             cache_v_quant_scales,
             cache_k_dequant_scales,
             cache_v_dequant_scales,
+            tgt_mask_spec,
         ]
         model = paddle.jit.to_static(self.generate, input_spec=input_spec)
         paddle.jit.save(
@@ -558,6 +567,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
         v_quant_scales=None,
         k_dequant_scales=None,
         v_dequant_scales=None,
+        tgt_mask=None,
         **model_kwargs,
     ):
 
@@ -587,6 +597,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
         model_kwargs["next_tokens"] = next_tokens
         model_kwargs["is_block_step"] = is_block_step
         model_kwargs["src_mask"] = src_mask
+        model_kwargs["tgt_mask"] = tgt_mask
 
         ret = self.sample(
             eos_token_id,
