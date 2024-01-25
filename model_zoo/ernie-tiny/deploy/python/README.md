@@ -41,7 +41,8 @@ No. 1 text = 播放我们都一样
 {'intent': 'music.play', 'confidence': 0.9985164, 'slot': [{'slot': 'song', 'entity': '我们都一样', 'pos': [2, 6]}]}
 No. 2 text = 到信阳市汽车配件城
 {'intent': 'navigation.navigation', 'confidence': 0.998626, 'slot': [{'slot': 'destination', 'entity': '信阳市汽车配件城', 'pos': [1, 8]}]}
-
+No. 3 text = 打电话给18866668888
+{'intent': 'App.Phone', 'confidence': 0.9999325, 'slot': [{'slot': 'action', 'entity': '打电话给', 'pos': [1, 4]}, {'slot': 'phonenumber', 'entity': '18866668888', 'pos': [5, 8]}]}
 ```
 
 ### 量化模型部署
