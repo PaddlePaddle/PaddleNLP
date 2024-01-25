@@ -19,6 +19,7 @@
 import dataclasses
 import json
 import sys
+import warnings
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, ArgumentTypeError
 from copy import copy
 from enum import Enum
@@ -245,6 +246,49 @@ class PdArgumentParser(ArgumentParser):
             inputs = {k: v for k, v in data.items() if k in keys}
             obj = dtype(**inputs)
             outputs.append(obj)
+        return (*outputs,)
+
+    def parse_json_file_and_cmd_lines(self) -> Tuple[DataClass, ...]:
+        """
+        Extend the functionality of `parse_json_file` to handle command line arguments in addition to loading a JSON
+        file.
+
+        When there is a conflict between the command line arguments and the JSON file configuration,
+        the command line arguments will take precedence.
+
+        Returns:
+            Tuple consisting of:
+
+                - the dataclass instances in the same order as they were passed to the initializer.abspath
+        """
+        if not sys.argv[1].endswith(".json"):
+            raise ValueError(f"The first argument should be a JSON file, but it is {sys.argv[1]}")
+        json_file = Path(sys.argv[1])
+        if json_file.exists():
+            with open(json_file, "r") as file:
+                data = json.load(file)
+            json_args = []
+            for key, value in data.items():
+                if isinstance(value, list):
+                    json_args.extend([f"--{key}", *[str(v) for v in value]])
+                else:
+                    json_args.extend([f"--{key}", str(value)])
+        else:
+            raise FileNotFoundError(f"The argument file {json_file} does not exist.")
+        # In case of conflict, command line arguments take precedence
+        args = json_args + sys.argv[2:]
+        namespace, remaining_args = self.parse_known_args(args=args)
+        outputs = []
+        for dtype in self.dataclass_types:
+            keys = {f.name for f in dataclasses.fields(dtype) if f.init}
+            inputs = {k: v for k, v in vars(namespace).items() if k in keys}
+            for k in keys:
+                delattr(namespace, k)
+            obj = dtype(**inputs)
+            outputs.append(obj)
+        if remaining_args:
+            warnings.warn(f"Some specified arguments are not used by the PdArgumentParser: {remaining_args}")
+
         return (*outputs,)
 
     def parse_dict(self, args: dict) -> Tuple[DataClass, ...]:
