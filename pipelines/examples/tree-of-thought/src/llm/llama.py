@@ -57,7 +57,9 @@ class llamaChatCompletion:
         self.model_name = model
         self.tokenizer = AutoTokenizer.from_pretrained(config_path)
         self.generator = AutoModelForCausalLM.from_pretrained(config_path, dtype="float16")
-        self.tokenizer.init_chat_template(os.path.join(os.getcwd(), "pipelines", "examples", "tree-of-thought", "src", "llm", "chat_template.json"))
+        self.tokenizer.init_chat_template(
+            os.path.join(os.getcwd(), "pipelines", "examples", "tree-of-thought", "src", "llm", "chat_template.json")
+        )
         self.query = []
         self.query_count = 0
 
@@ -98,7 +100,13 @@ class llamaChatCompletion:
                 pop_size = len("".join(self.query.pop(0)))
                 self.query_count -= pop_size
             input_features = self.tokenizer.apply_chat_template(self.query, return_tensors="pd")
-            outputs = self.generator.generate(**input_features, decode_strategy="greedy_search", temperature=temperature, top_p=top_p, max_new_tokens=max_gen_len)
+            outputs = self.generator.generate(
+                **input_features,
+                decode_strategy="greedy_search",
+                temperature=temperature,
+                top_p=top_p,
+                max_new_tokens=max_gen_len,
+            )
             out_0 = self.tokenizer.batch_decode(outputs[0])
             self.query[-1].append(out_0[0])
             self.query_count += len(out_0[0])
