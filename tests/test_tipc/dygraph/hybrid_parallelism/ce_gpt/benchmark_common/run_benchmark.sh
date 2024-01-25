@@ -44,6 +44,7 @@ function _set_params(){
     sequence_parallel=${17:-"False"}  # (可选)是否开启sequence_parallel
     acc=${18:-"2"} 
     seed=${19:-"1234"}
+    sharding_v2=${20:-"False"}
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -100,6 +101,12 @@ function _train(){
         pp_config_disable_partial_send_recv="--pipeline_parallel_config disable_partial_send_recv"
     fi
 
+    if [ "False" = ${sharding_v2} ]; then
+        sharding_parallel_config=""
+    else
+        sharding_parallel_config="--sharding_parallel_config split_param"
+    fi
+
     model_config="gpt2-medium-en"
     train_cmd="--model_name_or_path ${model_config} \
                 --tokenizer_name_or_path ${model_config} \
@@ -110,6 +117,7 @@ function _train(){
                 --tensor_parallel_degree ${mp_degree} \
                 --pipeline_parallel_degree ${pp_degree} \
                 ${pp_config_disable_partial_send_recv} \
+                ${sharding_parallel_config} \
                 --virtual_pp_degree ${vpp_degree} \
                 --sequence_parallel ${sequence_parallel} \
                 --split 949,50,1 \
