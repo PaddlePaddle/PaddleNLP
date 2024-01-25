@@ -14,4 +14,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from src.llm.llama import llamaChatCompletion
+from src.llm.llama import llamaChatCompletion, llm_config
+from src.llm.ernie_bot import Ernie, Ernie_llm_list
