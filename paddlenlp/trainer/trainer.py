@@ -1548,7 +1548,9 @@ class Trainer:
                 if not len(checkpoint_rng_state["cuda"]) == core.get_custom_device_count(device):
                     raise ValueError("Length of custom device state list shoule be equal to the custom device count")
                 for i in range(core.get_custom_device_count(device)):
-                    core.default_custom_device_generator(i).manual_seed(checkpoint_rng_state["cuda"][i])
+                    core.default_custom_device_generator(paddle.CustomPlace(device, i)).manual_seed(
+                        checkpoint_rng_state["cuda"][i]
+                    )
 
         if self.args.use_hybrid_parallel:
             if "hybrid_parallel_rng_state_tracker" in checkpoint_rng_state:
