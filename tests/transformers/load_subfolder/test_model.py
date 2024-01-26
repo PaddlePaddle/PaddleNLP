@@ -52,7 +52,7 @@ class ModelLoadTester(unittest.TestCase):
             assert len(file_list) > 0, "cache_dir is empty"
             assert "config.json" in file_list, "config.json not in cache_dir"
             if use_safetensors:
-                assert any(".safetensors" in f for f in file_list), "*.safetensors not in cache_dir"
+                assert any(".pdtensors" in f for f in file_list), "*.pdtensors not in cache_dir"
             else:
                 if from_hf_hub:
                     assert any(".bin" in f for f in file_list), "*.bin not in cache_dir"
