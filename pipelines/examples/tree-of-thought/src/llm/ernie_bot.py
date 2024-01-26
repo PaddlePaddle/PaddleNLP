@@ -57,8 +57,8 @@ class Ernie:
         return new_out
 
 
-# 检查字符串中是否存在中文 和 数字
 def contains_number(input_string):
+    # 检查字符串中是否存在中文 和 数字
     return bool(re.search(r"\d", input_string))
 
 
