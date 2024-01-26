@@ -70,7 +70,6 @@ class Game24Task(Task):
         if sorted(numbers) != sorted(problem_numbers):
             return {"r": 0}
         try:
-            # print(sympy.simplify(expression))
             return {"r": int(sympy.simplify(expression) == 24)}
         except Exception as e:
             print(e)
@@ -89,7 +88,6 @@ class Game24Task(Task):
         current_numbers = get_current_numbers(y if y else x)
         if current_numbers == "24":
             prompt = cot_prompt.format(input=x) + "Steps:" + y
-            # print([prompt])
         else:
             prompt = propose_prompt.format(input=current_numbers)
         return prompt
@@ -99,7 +97,6 @@ class Game24Task(Task):
         last_line = y.strip().split("\n")[-1]
         if "left: " not in last_line:  # last step
             ans = last_line.lower().replace("answer: ", "")
-            # print([value_last_step_prompt.format(input=x, answer=ans)])
             return value_last_step_prompt.format(input=x, answer=ans)
         current_numbers = get_current_numbers(y)
         return value_prompt.format(input=current_numbers)
