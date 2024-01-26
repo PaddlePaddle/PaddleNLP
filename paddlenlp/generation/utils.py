@@ -397,17 +397,10 @@ class GenerationMixin(object):
         # Add more pre_processing for distribution
 
         if logits_processors is not None:
-            custom_processors = LogitsProcessorList()
-            custom_processors_type = [type(lp) for lp in logits_processors]
+            for logits_processor in logits_processors._processors.values():
+                processors.append(logits_processor)
 
-            for processor in processors:
-                if type(processor) not in custom_processors_type:
-                    custom_processors.append(processor)
-            custom_processors.extend(logits_processors)
-
-            return custom_processors
-        else:
-            return processors
+        return processors
 
     @staticmethod
     def expand_inputs_for_generation(input_ids, expand_size, attention_mask=None, **model_kwargs):
