@@ -176,17 +176,6 @@ python run.py \
 * 在 ``tot/tasks/`` 中设置一个新的任务类和任务文件在 ``tot/data/`` 中。查看 ``tot/tasks/game24.py`` 以获取示例。将任务添加到 ``tot/tasks/__init__.py`` 中。
 * 在 ``tot/prompts/`` 中设置任务特定的提示。查看 ``tot/prompts/game24.py`` 以获取示例。根据任务的性质，选择 ``--method_generate`` (choices=[``sample``, ``propose``]) 和 ``--method_evaluate`` (choices=[``value``, ``vote``]) 及其相应的提示。
 
-## 测试结果
-本测试采用的是paddlenlp中facebook/llama-2-7b-chat 和 facebook/llama-2-13b-chat.使用的参数为 temperature=0.6, decode_strategy为"greedy_search"，max_new_tokens=512,结果如下
-|model|method|acc|
-|----|----|----|
-|llama-2-7b-chat|cot|0|
-|llama-2-7b-chat|standard sampling| 0|
-|llama-2-7b-chat|ToT| 3%|
-|llama-2-13b-chat|cot|0|
-|llama-2-13b-chat|standard sampling|0|
-|llama-2-13b-chat|ToT|2%|
-
 
 ## 致谢
 
