@@ -1177,9 +1177,6 @@ class TrainingArguments:
                 pipeline.micro_batch_size = self.per_device_train_batch_size
                 pipeline.schedule_mode = self.pipeline_schedule_mode
 
-                if self.amp_master_grad:
-                    warnings.warn("`amp_master_grad` is not supported NOW in AutoParallel!")
-                    self.amp_master_grad = False
                 logger.info(f"PP configs:{strategy.pipeline}, use master_grad: {self.amp_master_grad}")
 
                 if self.do_eval:
@@ -1263,6 +1260,7 @@ class TrainingArguments:
                 amp.enable = True
                 amp.dtype = "bfloat16" if self.bf16 else "float16"
                 amp.level = self.fp16_opt_level.lower()
+                amp.use_master_grad = self.amp_master_grad
                 amp.init_loss_scaling = self.scale_loss
                 amp.custom_black_list = self.amp_custom_black_list if self.amp_custom_black_list is not None else []
                 amp.custom_white_list = self.amp_custom_white_list if self.amp_custom_white_list is not None else []
@@ -1310,7 +1308,7 @@ class TrainingArguments:
                 self.unified_checkpoint_config = [
                     "skip_save_model_weight",
                     "master_weight_compatible",
-                    "async_save",
+                    # "async_save",
                 ]
             else:
                 self.unified_checkpoint_config = self.unified_checkpoint_config.split(" ")
@@ -1575,7 +1573,7 @@ class TrainingArguments:
             return self.local_process_index == 0
         else:
             if self.use_auto_parallel:
-                return self.data_parallel_rank == 0
+                return True
             return self.process_index == 0
 
     @property
@@ -1595,7 +1593,7 @@ class TrainingArguments:
             if self.should_save_sharding_stage1_model:
                 return True
             elif self.use_auto_parallel:
-                return self.data_parallel_rank == 0
+                return True
             elif self.use_hybrid_parallel:
                 # save on dataset rank 0
                 return self.sharding_parallel_rank == 0 and self.data_parallel_rank == 0

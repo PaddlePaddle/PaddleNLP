@@ -57,6 +57,7 @@ class ChatGLMTokenizer(PretrainedTokenizer):
         num_image_tokens=20000,
         **kwargs
     ) -> None:
+        kwargs["additional_special_tokens"] = kwargs.pop("additional_special_tokens", []) + [gmask_token]
         super().__init__(
             pad_token=pad_token,
             unk_token=unk_token,

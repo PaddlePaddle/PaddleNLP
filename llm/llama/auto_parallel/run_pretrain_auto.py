@@ -27,6 +27,7 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 import paddle.distributed.auto_parallel as auto
+from paddle.base.data_feeder import convert_uint16_to_float
 from paddle.profiler.utils import job_schedule_profiler_range
 
 from paddlenlp.ops import Topology
@@ -668,7 +669,10 @@ def main():
                 outs = engine.run(micro_batch, mode="train")
 
                 if "loss" in outs:
-                    tr_loss_step = np.sum(outs["loss"])
+                    if outs["loss"].dtype == np.uint16:
+                        tr_loss_step = np.sum(convert_uint16_to_float(outs["loss"]))
+                    else:
+                        tr_loss_step = np.sum(outs["loss"])
                 else:
                     tr_loss_step = float(0)
 

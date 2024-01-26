@@ -106,6 +106,8 @@ def tokenize_rounds_example(tokenizer, example, data_args):
 
     # 0. prepare data
     context_data = example.get("context", {})
+    context_data["is_training"] = True
+    
     example["src"] = example["src"] if isinstance(example["src"], list) else [example["src"]]
     example["tgt"] = example["tgt"] if isinstance(example["tgt"], list) else [example["tgt"]]
 

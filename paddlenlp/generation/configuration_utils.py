@@ -129,6 +129,8 @@ class GenerationConfig:
                 for FastGeneration. Default to False.
             use_fp16_decoding: (bool, optional): Whether to use fp16 for decoding.
                 Only works when fast entry is avalible. Default to False.
+            trunc_input: (bool, optional): Whether to truncate the inputs from
+                output sequences . Default to True.
             model_kwargs (dict): It can be used to specify additional kwargs
                 passed to the model.
     """
@@ -151,6 +153,7 @@ class GenerationConfig:
         self.max_length = kwargs.pop("max_length", 0)
         self.min_length = kwargs.pop("min_length", 0)
         self.early_stopping = kwargs.pop("early_stopping", False)
+        self.trunc_input = kwargs.pop("trunc_input", True)
 
         # Parameters for manipulation of the model output logits
         self.diversity_rate = kwargs.pop("diversity_rate", 0.0)

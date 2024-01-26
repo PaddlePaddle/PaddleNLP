@@ -15,7 +15,7 @@
 import os
 import random
 import time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import paddle
@@ -36,6 +36,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     PREFIX_CHECKPOINT_DIR,
     TrainOutput,
     _exec_mode_guard,
+    get_last_checkpoint,
     has_length,
     speed_metrics,
 )
@@ -50,7 +51,7 @@ TRAINER_STATE_NAME = "trainer_state.json"
 
 MODEL_NAME = "model"
 OPTIMIZER_NAME = "optimizer"
-DIST_CKPT_NAME = "dist_ckpt"
+DIST_CKPT_PATH = "dist_ckpt"
 SCHEDULER_NAME = "scheduler.pdparams"
 SCALER_NAME = "scaler.pdparams"
 
@@ -109,65 +110,19 @@ class SemiAutoTrainer(Trainer):
         else:
             return loss
 
-    def train(
+    def _inner_training_loop(
         self,
-        resume_from_checkpoint: Optional[Union[str, bool]] = None,
-        ignore_keys_for_eval: Optional[List[str]] = None,
+        args,
+        model,
+        train_dataloader,
+        len_dataloader,
+        max_steps,
+        num_train_epochs,
+        num_update_steps_per_epoch,
+        num_train_samples,
+        resume_from_checkpoint,
+        ignore_keys_for_eval,
     ):
-        """
-        Main training entry point.
-
-        Args:
-            resume_from_checkpoint (`str` or `bool`, *optional*):
-                If a `str`, local path to a saved checkpoint as saved by a previous instance of [`Trainer`]. If a
-                `bool` and equals `True`, load the last checkpoint in *args.output_dir* as saved by a previous instance
-                of [`Trainer`]. If present, training will resume from the model/optimizer/scheduler states loaded here.
-            ignore_keys_for_eval (`List[str]`, *optional*)
-                A list of keys in the output of your model (if it is a dictionary) that should be ignored when
-                gathering predictions for evaluation during the training.
-        """
-        args = self.args
-        self.is_in_train = True
-
-        self._sync_resume_states(resume_from_checkpoint)
-
-        # memory metrics - must set up as early as possible
-        self._memory_tracker.start()
-
-        if not self.args.should_load_sharding_stage1_model:
-            self._load_from_checkpoint(resume_from_checkpoint)
-
-        train_dataloader = self.get_train_dataloader()
-        total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.dataset_world_size
-        (
-            len_dataloader,
-            max_steps,
-            num_train_epochs,
-            num_update_steps_per_epoch,
-            num_examples,
-            num_train_samples,
-        ) = self._get_train_steps_and_samples(args, train_dataloader, total_train_batch_size)
-
-        delay_optimizer_creation = False
-
-        if not delay_optimizer_creation:
-            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-
-        self.state = TrainerState()
-
-        model = self._wrap_for_auto(self.model_wrapped, train_dataloader)
-
-        # for the rest of this function `model` is the outside model, whether it was wrapped or not
-        if model is not self.model:
-            self.model = model
-
-        if delay_optimizer_creation:
-            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-
-        self._load_optimizer_and_scheduler(resume_from_checkpoint)
-
-        self._print_trainable_numel()
-
         start_time = time.time()
         self._globalstep_last_start_time = time.time()
         self.state.epoch = 0
@@ -249,9 +204,7 @@ class SemiAutoTrainer(Trainer):
 
         self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
 
-        with _exec_mode_guard("dynamic"):
-            tr_loss = paddle.to_tensor(0.0)
-
+        tr_loss = paddle.to_tensor(0.0)
         self._total_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
 
@@ -391,33 +344,6 @@ class SemiAutoTrainer(Trainer):
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
-    def _print_trainable_numel(self):
-        if not self.args.run_static_semi_auto:
-            per_device_trainable_numel = sum(np.prod(p.shape) for p in self.model.parameters() if not p.stop_gradient)
-        else:
-            per_device_trainable_numel = sum(
-                np.prod(p.shape) for p in self.model._engine._model.parameters() if not p.stop_gradient
-            )
-        logger.info(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
-
-        parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
-        if parts_num > 1:
-            all_reduce_dtype = "int64"
-            if paddle.get_device().split(":")[0] in ["npu", "xpu"]:
-                # TODO(duanyanhui): fix when NPU all_reduce supports int64
-                all_reduce_dtype = "float32"
-
-            with _exec_mode_guard("dynamic"):
-                trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
-                paddle.distributed.all_reduce(trainable_numel_tensor)
-                trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
-
-            if self.args.sep_parallel_degree > 0:
-                trainable_numel = trainable_numel // self.args.sep_parallel_degree
-            # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
-            # so, the trainable numel is a little bigger than real.
-            logger.info(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
-
     def _get_train_sampler(self) -> Optional[paddle.io.Sampler]:
         if self.train_dataset is None or not has_length(self.train_dataset):
             return None
@@ -537,8 +463,8 @@ class SemiAutoTrainer(Trainer):
                     OPTIMIZER_NAME: optim_state_dict,
                 }
 
-                self._save_ckpt_func(state_dict, os.path.join(output_dir, DIST_CKPT_NAME), self.comm_group_in_dp)
-                logger.info(f"Model weights and optimizer states saved in {output_dir}/{DIST_CKPT_NAME}")
+                self._save_ckpt_func(state_dict, os.path.join(output_dir, DIST_CKPT_PATH))
+                logger.info(f"Model weights and optimizer states saved in {output_dir}/{DIST_CKPT_PATH}")
 
                 # FIXME: maybe only save one copy
                 paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
@@ -606,5 +532,57 @@ class SemiAutoTrainer(Trainer):
             paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
 
         if self.args.should_save_model_state:
-            self._save_ckpt_func(self.model.state_dict(), os.path.join(output_dir, MODEL_NAME), self.comm_group_in_dp)
+            self._save_ckpt_func(self.model.state_dict(), os.path.join(output_dir, MODEL_NAME))
             logger.info(f"Model weights saved in {output_dir}/{MODEL_NAME}")
+
+    def _load_from_checkpoint(self, resume_from_checkpoint=None):
+
+        resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
+
+        # Load potential model checkpoint
+        if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
+            resume_from_checkpoint = get_last_checkpoint(self.args.output_dir)
+            if resume_from_checkpoint is None:
+                raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
+
+        if resume_from_checkpoint is not None:
+
+            logger.info(f"Loading model from {resume_from_checkpoint} .")
+
+            if not self.args.ignore_load_lr_and_optim:
+                with _exec_mode_guard("dynamic"):
+                    if distributed_isfile(os.path.join(resume_from_checkpoint, SCHEDULER_NAME)):
+                        self.lr_scheduler.set_state_dict(
+                            paddle.load(distributed_file(os.path.join(resume_from_checkpoint, SCHEDULER_NAME)))
+                        )
+                    else:
+                        raise ValueError(
+                            f"scheduler-file not found, scheduler:{os.path.join(resume_from_checkpoint, SCHEDULER_NAME)}"
+                        )
+
+                    if self.do_grad_scaling and distributed_isfile(os.path.join(resume_from_checkpoint, SCALER_NAME)):
+                        self.scaler.load_state_dict(
+                            paddle.load(
+                                distributed_file(os.path.join(resume_from_checkpoint, SCALER_NAME)), return_numpy=True
+                            )
+                        )
+
+            ckpt_path = os.path.join(resume_from_checkpoint, DIST_CKPT_PATH)
+
+            if not os.path.isdir(ckpt_path):
+                raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
+
+            optim_state_dict = self.optimizer.state_dict()
+            optim_state_dict.pop("LR_Scheduler", None)
+
+            state_dict = {
+                MODEL_NAME: self.model.state_dict(),
+                OPTIMIZER_NAME: optim_state_dict,
+            }
+
+            print("state_dict :", state_dict)
+
+            self._load_ckpt_func(state_dict, ckpt_path)
+
+            # release memory
+            del state_dict
