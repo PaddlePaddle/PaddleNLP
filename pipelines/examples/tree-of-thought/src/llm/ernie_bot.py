@@ -6,10 +6,6 @@ import erniebot
 
 Ernie_llm_list = ["ernie-3.5", "ernie-4.0"]
 
-erniebot.api_type = "aistudio"
-erniebot.access_token = "your token in aistudio, please change the value when use"  # need to change
-
-
 class Ernie:
     def __init__(self, model):
         self.query = []
