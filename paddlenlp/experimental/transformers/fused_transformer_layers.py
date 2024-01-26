@@ -577,6 +577,7 @@ class FusedMultiTransformerBase(Layer):
             return qkv_out
         else:
             # This method requires CUDA version >= 11.6.
+            print(f"i: {i}, qkv_weights: {self.qkv_weights[i].shape}")
             return self.linear(ln_out, self.qkv_weights[i], self.qkv_biases[i], transpose_weight=True)
 
     def compute_qkv(self, src, residual_input, i):
@@ -651,6 +652,8 @@ class FusedMultiTransformerBase(Layer):
         )[0]
 
     def compute_out_linear(self, fmha_out, i):
+        print("!!!!!!!!!!!!fmha_out.shape: ", fmha_out.shape)
+        print("!!!!!!!!!!!!self.linear_weights[i].shape: ", self.linear_weights[i].shape)
         return paddle.matmul(fmha_out, self.linear_weights[i])
 
     def compute_attn(
@@ -819,6 +822,7 @@ class FusedMultiTransformerBase(Layer):
         residual_input = src
         for i in range(self.num_layers):
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
+            print("!!!!!!!!!qkv_out's shape: ", qkv_out.shape)
             out_linear_out = self.compute_attn(
                 time_step,
                 qkv_out,
@@ -864,6 +868,7 @@ class FusedMultiTransformerBase(Layer):
         kwargs["input_ids"] = input_ids
 
         out = self.post_process(**kwargs)
+        print("-------!!!generated a new token!!!--------")
         return out, caches
 
 
@@ -1395,6 +1400,64 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             quant_round_type=self.config.quant_round_type,
             quant_max_bound=self.config.quant_max_bound,
             quant_min_bound=self.config.quant_min_bound,
+        )[0]
+
+        out_linear_out = self.compute_out_linear(fmha_out, i)
+
+        return out_linear_out
+
+    def post_process(self, **kwargs):
+        multi_block_output = kwargs.get("multi_block_output", None)
+        cum_offsets = kwargs.get("cum_offsets", None)
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
+        max_input_length = kwargs.get("max_input_length", -1)
+
+        out = rebuild_padding_v2(multi_block_output, cum_offsets, seq_lens_decoder, seq_lens_encoder, max_input_length)
+
+        return out
+
+class FusedSpeculativeMultiTransformer(FusedMultiTransformerBase):
+    def __init__(self, config: FusedMultiTransformerConfig):
+        super().__init__(config)
+
+    def compute_attn(
+        self,
+        time_step,
+        qkv_out,
+        padding_offset,
+        seq_lens,
+        input_ids,
+        rotary_embs,
+        rotary_emb_dims,
+        caches,
+        pre_caches,
+        pre_caches_length,
+        attn_mask,
+        i,
+        **kwargs,
+    ):
+        fmha_out = paddle.incubate.nn.functional.speculative_decoding_multihead_attention(
+            qkv_out,
+            caches[2 * i],
+            caches[2 * i + 1],
+            kwargs.get("seq_lens_encoder", None),
+            kwargs.get("seq_lens_decoder", None),
+            kwargs.get("seq_lens_this_time", None),
+            kwargs.get("padding_offsets", None),
+            kwargs.get("cum_offsets", None),
+            kwargs.get("cu_seqlens_q", None),
+            kwargs.get("cu_seqlens_k", None),
+            pre_caches[2 * i] if pre_caches is not None else None,  # pre_key_cache
+            pre_caches[2 * i + 1] if pre_caches is not None else None,  # pre_value_cache
+            None,  # qkv_bias
+            None,  # out_shifts
+            None,  # out_smooths
+            rotary_embs,
+            attn_mask,
+            kwargs.get("tgt_mask", None),
+            kwargs.get("max_input_length", -1),
+            self.use_neox_rotary_style,
         )[0]
 
         out_linear_out = self.compute_out_linear(fmha_out, i)

@@ -13,7 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
-from typing import List, Union
+from typing import List, Union, Optional
 
 import paddle
 import paddle.nn.functional as F
@@ -29,7 +29,7 @@ from paddlenlp_ops import (
     update_inputs,
 )
 
-from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList
+from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList, StoppingCriteriaList
 
 __all__ = ["GenerationInferenceModel", "GenerationBlockInferenceModel"]
 
@@ -265,6 +265,279 @@ class GenerationInferenceModel(GenerationMixin):
 
         model_kwargs["next_tokens"] = next_tokens
         return model_kwargs
+
+    # def assisted_decoding(
+    #     self,
+    #     input_ids: paddle.Tensor,
+    #     assistant_model = None,
+    #     candidate_generator = None,
+    #     do_sample: bool = False,
+    #     logits_processor: Optional[LogitsProcessorList] = None,
+    #     logits_warper: Optional[LogitsProcessorList] = None,
+    #     stopping_criteria: Optional[StoppingCriteriaList] = None,
+    #     pad_token_id: Optional[int] = None,
+    #     eos_token_id: Optional[Union[int, List[int]]] = None,
+    #     output_attentions: Optional[bool] = None,
+    #     output_hidden_states: Optional[bool] = None,
+    #     output_scores: Optional[bool] = None,
+    #     return_dict_in_generate: Optional[bool] = None,
+    #     synced_gpus: bool = False,
+    #     streamer = None,
+    #     **model_kwargs,
+    # ):
+    #   # handling deprecated arguments
+    #     if (assistant_model is None) == (candidate_generator is None):
+    #         raise ValueError("One (and only one) of `assistant_model` and `candidate_generator` should be defined.")
+
+    #     if assistant_model is not None:
+    #         candidate_generator = AssistedCandidateGenerator(
+    #             input_ids=input_ids,
+    #             assistant_model=assistant_model,
+    #             logits_processor=logits_processor,
+    #             model_kwargs=model_kwargs,
+    #             eos_token_id=eos_token_id,
+    #         )
+    #         warnings.warn(
+    #             "Passing `assistant_model` to `assisted_decoding` is deprecated and will be removed in v4.38. "
+    #             "Pass the `candidate_generator` argument instead.",
+    #             FutureWarning,
+    #         )
+
+    #     # init values
+    #     logits_processor = logits_processor if logits_processor is not None else LogitsProcessorList()
+    #     logits_warper = logits_warper if logits_warper is not None else LogitsProcessorList()
+    #     stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
+    #     pad_token_id = pad_token_id if pad_token_id is not None else self.generation_config.pad_token_id
+    #     eos_token_id = eos_token_id if eos_token_id is not None else self.generation_config.eos_token_id
+    #     if eos_token_id is not None and pad_token_id is None:
+    #         raise ValueError("If `eos_token_id` is defined, make sure that `pad_token_id` is defined.")
+    #     if isinstance(eos_token_id, int):
+    #         eos_token_id = [eos_token_id]
+    #     eos_token_id_tensor = paddle.tensor(eos_token_id).to(input_ids.device) if eos_token_id is not None else None
+    #     output_scores = output_scores if output_scores is not None else self.generation_config.output_scores
+    #     output_attentions = (
+    #         output_attentions if output_attentions is not None else self.generation_config.output_attentions
+    #     )
+    #     output_hidden_states = (
+    #         output_hidden_states if output_hidden_states is not None else self.generation_config.output_hidden_states
+    #     )
+    #     return_dict_in_generate = (
+    #         return_dict_in_generate
+    #         if return_dict_in_generate is not None
+    #         else self.generation_config.return_dict_in_generate
+    #     )
+
+    #     # init attention / hidden states / scores tuples
+    #     scores = () if (return_dict_in_generate and output_scores) else None
+    #     decoder_attentions = () if (return_dict_in_generate and output_attentions) else None
+    #     cross_attentions = () if (return_dict_in_generate and output_attentions) else None
+    #     decoder_hidden_states = () if (return_dict_in_generate and output_hidden_states) else None
+
+    #     this_peer_finished = False  # used by synced_gpus only
+    #     while True:
+    #         if synced_gpus:
+    #             # Under synced_gpus the `forward` call must continue until all gpus complete their sequence.
+    #             # The following logic allows an early break if all peers finished generating their sequence
+    #             this_peer_finished_flag = paddle.tensor(0.0 if this_peer_finished else 1.0).to(input_ids.device)
+    #             # send 0.0 if we finished, 1.0 otherwise
+    #             dist.all_reduce(this_peer_finished_flag, op=dist.ReduceOp.SUM)
+    #             # did all peers finish? the reduced sum will be 0.0 then
+    #             if this_peer_finished_flag.item() == 0.0:
+    #                 break
+
+    #         cur_len = input_ids.shape[-1]
+
+    #         #  1. Fetch candidate sequences from a `CandidateGenerator`
+    #         candidate_input_ids, candidate_logits = candidate_generator.get_candidates(input_ids)
+    #         candidate_input_ids = candidate_input_ids.to(self.device)
+    #         if candidate_logits is not None:
+    #             candidate_logits = candidate_logits.to(self.device)
+
+    #         candidate_length = candidate_input_ids.shape[1] - input_ids.shape[1]
+    #         last_assistant_token_is_eos = (
+    #             ~candidate_input_ids[:, -1]
+    #             .tile(eos_token_id_tensor.shape[0], 1)
+    #             .ne(eos_token_id_tensor.unsqueeze(1))
+    #             .prod(dim=0)
+    #             .bool()
+    #         )
+
+    #         # 2. Use the original model to obtain the next token logits given the candidate sequence. We obtain
+    #         # `candidate_length + 1` relevant logits from this process: in the event that all candidates are correct,
+    #         # we use this forward pass to also pick the subsequent logits in the original model.
+
+    #         # 2.1. Prepare the model inputs
+    #         candidate_kwargs = copy.copy(model_kwargs)
+    #         candidate_kwargs = _prepare_attention_mask(
+    #             candidate_kwargs, candidate_input_ids.shape[1], self.config.is_encoder_decoder
+    #         )
+    #         candidate_kwargs = _prepare_token_type_ids(candidate_kwargs, candidate_input_ids.shape[1])
+
+    #         model_inputs = self.prepare_inputs_for_generation(candidate_input_ids, **candidate_kwargs)
+
+    #         # 2.2. Run a forward pass on the candidate sequence
+    #         outputs = self(
+    #             **model_inputs,
+    #             output_attentions=output_attentions,
+    #             output_hidden_states=output_hidden_states,
+    #         )
+
+    #         # 2.3. Process the new logits
+    #         new_logits = outputs.logits[:, -candidate_length - 1 :]  # excludes the input prompt if present
+    #         if len(logits_processor) > 0:
+    #             for i in range(candidate_length + 1):
+    #                 new_logits[:, i, :] = logits_processor(candidate_input_ids[:, : cur_len + i], new_logits[:, i, :])
+    #         if len(logits_warper) > 0:
+    #             for i in range(candidate_length + 1):
+    #                 new_logits[:, i, :] = logits_warper(candidate_input_ids[:, : cur_len + i], new_logits[:, i, :])
+
+    #         # 3. Select the accepted tokens. There are two possible cases:
+    #         # Case 1: `do_sample=True` and we have logits for the candidates (originally from speculative decoding)
+    #         # 👉 Apply algorithm 1 from the speculative decoding paper (https://arxiv.org/pdf/2211.17192.pdf).
+    #         max_matches = max_len - cur_len - 1
+    #         if do_sample and candidate_logits is not None:
+    #             valid_tokens, n_matches = _speculative_sampling(
+    #                 candidate_input_ids,
+    #                 candidate_logits,
+    #                 candidate_length,
+    #                 new_logits,
+    #                 last_assistant_token_is_eos,
+    #                 max_matches,
+    #             )
+
+    #         # Case 2: all other cases (originally from assisted generation) 👉 Compare the tokens selected from the
+    #         # original model logits with the candidate tokens. We can keep the candidate tokens until the first
+    #         # mismatch, or until the max length is reached.
+    #         else:
+    #             if do_sample:
+    #                 probs = new_logits.softmax(dim=-1)
+    #                 selected_tokens = torch.multinomial(probs[0, :, :], num_samples=1).squeeze(1)[None, :]
+    #             else:
+    #                 selected_tokens = new_logits.argmax(dim=-1)
+
+    #             candidate_new_tokens = candidate_input_ids[:, -candidate_length:]
+    #             n_matches = ((~(candidate_new_tokens == selected_tokens[:, :-1])).cumsum(dim=-1) < 1).sum()
+
+    #             # Ensure we don't generate beyond max_len or an EOS token
+    #             if last_assistant_token_is_eos and n_matches == candidate_length:
+    #                 n_matches -= 1
+    #             n_matches = min(n_matches, max_matches)
+    #             valid_tokens = selected_tokens[:, : n_matches + 1]
+
+    #         # 4. Update variables according to the number of matching assistant tokens. Remember: the token generated
+    #         # by the model after the last candidate match is also valid, as it is generated from a correct sequence.
+    #         # Because of this last token, assisted generation search reduces to a normal greedy search/sample if there
+    #         # is no match.
+
+    #         # 4.1. Get the valid continuation, after the matching tokens
+    #         input_ids = torch.cat((input_ids, valid_tokens), dim=-1)
+    #         if streamer is not None:
+    #             streamer.put(valid_tokens.cpu())
+    #         new_cur_len = input_ids.shape[-1]
+
+    #         # 4.2. Discard past key values relative to unused assistant tokens
+    #         new_cache_size = new_cur_len - 1
+    #         outputs.past_key_values = _crop_past_key_values(self, outputs.past_key_values, new_cache_size)
+
+    #         # 5. Update the candidate generation strategy if needed
+    #         candidate_generator.update_candidate_strategy(input_ids, new_logits, n_matches)
+
+    #         if synced_gpus and this_peer_finished:
+    #             continue  # don't waste resources running the code we don't need
+
+    #         # Store scores, attentions and hidden_states when required
+    #         # Assistant: modified to append one tuple element per token, as in the other generation methods.
+    #         if return_dict_in_generate:
+    #             if output_scores:
+    #                 scores += tuple(new_logits[:, i, :] for i in range(n_matches + 1))
+
+    #             if "past_key_values" not in model_kwargs:
+    #                 added_len = new_cur_len
+    #             else:
+    #                 added_len = n_matches + 1
+
+    #             if output_attentions:
+    #                 if self.config.is_encoder_decoder:
+    #                     cross_attentions = _split_model_outputs(
+    #                         cross_attentions, outputs.cross_attentions, cur_len, added_len
+    #                     )
+    #                     decoder_attentions = _split_model_outputs(
+    #                         decoder_attentions,
+    #                         outputs.decoder_attentions,
+    #                         cur_len,
+    #                         added_len,
+    #                         is_decoder_attention=True,
+    #                     )
+    #                 else:
+    #                     decoder_attentions = _split_model_outputs(
+    #                         decoder_attentions,
+    #                         outputs.attentions,
+    #                         cur_len,
+    #                         added_len,
+    #                         is_decoder_attention=True,
+    #                     )
+    #             if output_hidden_states:
+    #                 if self.config.is_encoder_decoder:
+    #                     decoder_hidden_states = _split_model_outputs(
+    #                         decoder_hidden_states, outputs.decoder_hidden_states, cur_len, added_len
+    #                     )
+    #                 else:
+    #                     decoder_hidden_states = _split_model_outputs(
+    #                         decoder_hidden_states, outputs.hidden_states, cur_len, added_len
+    #                     )
+
+    #         model_kwargs = self._update_model_kwargs_for_generation(
+    #             outputs, model_kwargs, is_encoder_decoder=self.config.is_encoder_decoder
+    #         )
+
+    #         # if eos_token was found in one sentence, set sentence to finished
+    #         if eos_token_id_tensor is not None:
+    #             unfinished_sequences = unfinished_sequences.mul(
+    #                 input_ids[:, -1]
+    #                 .tile(eos_token_id_tensor.shape[0], 1)
+    #                 .ne(eos_token_id_tensor.unsqueeze(1))
+    #                 .prod(dim=0)
+    #             )
+
+    #             # stop when each sentence is finished
+    #             if unfinished_sequences.max() == 0:
+    #                 this_peer_finished = True
+
+    #         # stop if we exceed the maximum length
+    #         if stopping_criteria(input_ids, scores):
+    #             this_peer_finished = True
+
+    #         if this_peer_finished and not synced_gpus:
+    #             break
+
+    #     if streamer is not None:
+    #         streamer.end()
+
+    #     if return_dict_in_generate:
+    #         if self.config.is_encoder_decoder:
+    #             return GenerateEncoderDecoderOutput(
+    #                 sequences=input_ids,
+    #                 scores=scores,
+    #                 encoder_attentions=encoder_attentions,
+    #                 encoder_hidden_states=encoder_hidden_states,
+    #                 decoder_attentions=decoder_attentions,
+    #                 cross_attentions=cross_attentions,
+    #                 decoder_hidden_states=decoder_hidden_states,
+    #                 past_key_values=model_kwargs.get("past_key_values"),
+    #             )
+    #         else:
+    #             return GenerateDecoderOnlyOutput(
+    #                 sequences=input_ids,
+    #                 scores=scores,
+    #                 attentions=decoder_attentions,
+    #                 hidden_states=decoder_hidden_states,
+    #                 past_key_values=model_kwargs.get("past_key_values"),
+    #             )
+    #     else:
+    #         return input_ids
+
+
+
 
     def sample(
         self,

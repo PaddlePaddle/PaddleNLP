@@ -41,6 +41,7 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
+    FusedSpeculativeMultiTransformer,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
@@ -108,6 +109,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
         self.use_weight_only = False
         self.weight_only_quant_bits = config.weight_only_quant_bits
+        self.speculative_decoding = config.speculative_decoding
 
         if self.quant_type is not None and "weight_only_int" in self.quant_type:
             self.use_weight_only = True
@@ -789,12 +791,16 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         super().__init__(config)
         self.max_seq_len = config.max_seq_len
         self.block_size = config.block_size
+        self.speculative_decoding = config.speculative_decoding
 
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
         elif self.quant_type == "a8w8":
             self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
+        elif self.speculative_decoding == True:
+            print("!!!!!!!!!!!start use speculative decoding!!!!!!!!")
+            self.transformer_block = FusedSpeculativeMultiTransformer(transformer_config)
         else:
             self.transformer_block = FusedBlockMultiTransformer(transformer_config)
 
@@ -1176,12 +1182,20 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
 
         cache_kvs = []
         for _ in range(config.num_hidden_layers):
-            cache_kv_shape = [
-                max_block_nums,
-                config.num_attention_heads // max(config.tensor_parallel_degree, 1),
-                config.block_size,
-                config.hidden_size // config.num_attention_heads,
-            ]
+            if config.speculative_decoding == True:
+                cache_kv_shape = [
+                    max_batch_size,
+                    config.num_attention_heads // max(config.tensor_parallel_degree, 1),
+                    config.seq_length,
+                    config.hidden_size // config.num_attention_heads,
+                ]
+            else:
+                cache_kv_shape = [
+                    max_block_nums,
+                    config.num_attention_heads // max(config.tensor_parallel_degree, 1),
+                    config.block_size,
+                    config.hidden_size // config.num_attention_heads,
+                ]
             cache_kvs.append(cache_kv_shape)
             cache_kvs.append(cache_kv_shape)
         return cache_kvs
