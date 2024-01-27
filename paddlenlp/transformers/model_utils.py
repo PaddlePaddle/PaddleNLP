@@ -2156,12 +2156,31 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     or resolved_archive_file.endswith(SAFE_WEIGHTS_NAME)
                     or resolved_archive_file.endswith(SAFE_WEIGHTS_INDEX_NAME)
                 ):
-                    # try to get the name-mapping info
-                    logger.info(
-                        f"Starting to convert pytorch weight file<{resolved_archive_file}> to "
-                        f"paddle weight file<{os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)}> ..."
+                    converted_paddle_weights = os.path.join(
+                        os.path.dirname(resolved_archive_file), PADDLE_WEIGHTS_NAME
                     )
-                    state_dict = cls.convert(resolved_archive_file, config, cache_dir)
+                    if not os.path.exists(converted_paddle_weights):
+                        # try to get the name-mapping info
+                        logger.info(
+                            f"Starting to convert pytorch weight file <{resolved_archive_file}> to "
+                            f"paddle weight file <{converted_paddle_weights}> ..."
+                        )
+                        state_dict = cls.convert(resolved_archive_file, config, os.path.dirname(resolved_archive_file))
+                    else:
+                        # try to load the converted paddle weight file
+                        resolved_archive_file = converted_paddle_weights
+                        sharded_metadata = None
+                        is_sharded = False
+                        logger.info(
+                            f"Detect the converted Paddle weight file <{converted_paddle_weights}>. We intend to reuse this file."
+                        )
+                        if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith(
+                            "model_state.pdparams"
+                        ):
+                            state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
+                        else:
+                            state_dict = load_state_dict(resolved_archive_file)
+                        logger.info("Loaded weights file from disk, setting weights to model.")
                 else:
                     raise ValueError(f"Unexpected file: {resolved_archive_file} for weight conversion.")
             else:

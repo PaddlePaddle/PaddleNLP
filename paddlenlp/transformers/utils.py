@@ -564,8 +564,8 @@ def cached_file_for_hf_hub(
         subfolder = ""
 
     path_or_repo_id = str(path_or_repo_id)
-    full_filename = os.path.join(subfolder, filename)
     if os.path.isdir(path_or_repo_id):
+        full_filename = os.path.join(subfolder, filename)
         resolved_file = os.path.join(os.path.join(path_or_repo_id, subfolder), filename)
         if not os.path.isfile(resolved_file):
             if _raise_exceptions_for_missing_entries:
@@ -584,10 +584,10 @@ def cached_file_for_hf_hub(
 
     try:
         # Load from URL or cache if already cached
-        download_check(path_or_repo_id, full_filename, addition="from_hf_hub")
+        download_check(path_or_repo_id, filename, addition="from_hf_hub")
         resolved_file = hf_hub_download(
             repo_id=path_or_repo_id,
-            filename=full_filename,
+            filename=filename,
             cache_dir=cache_dir,
             subfolder=subfolder,
             library_name="PaddleNLP",
