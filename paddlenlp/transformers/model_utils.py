@@ -52,7 +52,7 @@ from paddle.nn import Embedding, Layer
 from paddle.utils.download import is_url as is_remote_url
 from tqdm.auto import tqdm
 
-from paddlenlp.utils.downloader import get_path_from_url_with_filelock, hf_file_exists
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from paddlenlp.utils.env import (
     CONFIG_NAME,
     LEGACY_CONFIG_NAME,
@@ -367,28 +367,7 @@ def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conver
         support_conversion (bool): whether support converting pytorch weight file to paddle weight file
         subfolder (str, optional) An optional value corresponding to a folder inside the repo.
     """
-    is_local = os.path.isdir(repo_id)
-    if not is_local:
-        if hf_file_exists(repo_id, PADDLE_WEIGHTS_NAME, subfolder=subfolder):
-            file_name = PADDLE_WEIGHTS_NAME
-            assert (
-                support_conversion is False
-            ), "Please call set convert_from_torch for paddle weights on huggingface hub, eg. Model.from_pretrained(model_name, from_hf_hub=True, convert_from_torch=False)"
-        elif hf_file_exists(repo_id, PYTORCH_WEIGHTS_NAME, subfolder=subfolder):
-            if not support_conversion:
-                raise EntryNotFoundError(
-                    f"can not download `{PADDLE_WEIGHTS_NAME} from https://huggingface.co/{repo_id}` "
-                    "and current model doesn't support conversion from pytorch weight file to paddle weight file"
-                )
-            file_name = PYTORCH_WEIGHTS_NAME
-        else:
-            raise EntryNotFoundError(
-                message=f"can not find the paddle/pytorch weight file from: https://huggingface.co/{repo_id}",
-                response=None,
-            )
-    else:
-        # for local file, we use support_conversion to select paddle or torch weight.
-        file_name = PYTORCH_WEIGHTS_NAME if support_conversion else PADDLE_WEIGHTS_NAME
+    file_name = PYTORCH_WEIGHTS_NAME if support_conversion else PADDLE_WEIGHTS_NAME
 
     file_name_list = [SAFE_WEIGHTS_NAME] + [file_name] + [PYTORCH_WEIGHTS_INDEX_NAME] + [SAFE_WEIGHTS_INDEX_NAME]
     resolved_file = None
