@@ -104,7 +104,7 @@ from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
 from .argparser import strtobool
 from .integrations import get_reporting_integration_callbacks
-from .plugins.timer import get_timers, set_timers
+from .plugins.timer import get_timers, set_timers, RuntimeTimer
 from .plugins.unified_checkpoint import (
     load_unified_checkpoint,
     load_unified_optimizer,
@@ -304,6 +304,7 @@ class Trainer:
         if not args.skip_profile_timer:
             set_timers()
         self.timers = get_timers()
+        self.runtime_timer = RuntimeTimer("RuntimeTimer")
 
         self.model_wrapped = model
         self.model = model
@@ -639,9 +640,10 @@ class Trainer:
 
         # memory metrics - must set up as early as possible
         self._memory_tracker.start()
-
         if not self.args.should_load_sharding_stage1_model:
+            self.runtime_timer.start("checkpoint loading time")
             self._load_from_checkpoint(resume_from_checkpoint)
+            logger.info(f"{self.runtime_timer.log()}")
 
         train_dataloader = self.get_train_dataloader()
 
@@ -694,7 +696,9 @@ class Trainer:
         self.state = TrainerState()
 
         if self.args.should_load_sharding_stage1_model:
+            self.runtime_timer.start("checkpoint loading time")
             model = self._wrap_model_and_load_sharded_checkpoint(resume_from_checkpoint)
+            logger.info(f"{self.runtime_timer.log()}")
         elif self.args.should_save_sharding_stage1_model:
             # In the non-sharded mode, should invoke _load_from_checkpoint before _wrap_model.
             # In this mode, the rank0 load all params and the _wrap_model implicitly broadcast params from rank0 to the other ranks.
@@ -2040,7 +2044,7 @@ class Trainer:
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
-
+        self.runtime_timer.start("checkpoint saving time")
         # Save model checkpoint
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
 
@@ -2086,6 +2090,7 @@ class Trainer:
             if self.do_grad_scaling:
                 paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
 
+        logger.info(f"{self.runtime_timer.log()}")
         # Determine the new best metric / best model checkpoint
         if metrics is not None and self.args.metric_for_best_model is not None:
             metric_to_check = self.args.metric_for_best_model

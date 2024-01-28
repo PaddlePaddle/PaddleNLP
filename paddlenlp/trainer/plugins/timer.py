@@ -31,7 +31,7 @@ class _Timer:
 
     def start(self):
         """Start the timer."""
-        assert not self.started_, "timer has already started"
+        assert not self.started_, f"{self.name}timer has already started"
         paddle.device.synchronize()
         self.start_time = time.time()
         self.started_ = True
@@ -63,6 +63,29 @@ class _Timer:
         if started_:
             self.start()
         return elapsed_
+
+class RuntimeTimer:
+    def __init__(self, name):
+        self.timer =  _Timer(name)
+    
+    def start(self, name):
+        self.timer.name = name
+        self.timer.start()
+
+    def stop(self):
+        self.timer.stop()
+
+    def log(self, reset=True):
+        """Log the RuntimeTimer."""
+        if reset:
+            runtime = self.timer.elapsed(reset=True)
+            self.timer.stop()
+            self.timer.reset()
+        else:
+            self.timer.elapsed(reset=False)
+
+        string = "[timelog] {}: {:.2f}s ({}) ".format(self.timer.name, runtime, time.strftime("%Y-%m-%d %H:%M:%S"))
+        return string
 
 
 class Timers:
