@@ -104,7 +104,7 @@ from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
 from .argparser import strtobool
 from .integrations import get_reporting_integration_callbacks
-from .plugins.timer import get_timers, set_timers, RuntimeTimer
+from .plugins.timer import RuntimeTimer, get_timers, set_timers
 from .plugins.unified_checkpoint import (
     load_unified_checkpoint,
     load_unified_optimizer,

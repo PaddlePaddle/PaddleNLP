@@ -64,15 +64,20 @@ class _Timer:
             self.start()
         return elapsed_
 
+
 class RuntimeTimer:
+    """A timer that can be dynamically adjusted during runtime."""
+
     def __init__(self, name):
-        self.timer =  _Timer(name)
-    
+        self.timer = _Timer(name)
+
     def start(self, name):
+        """Start the RuntimeTimer."""
         self.timer.name = name
         self.timer.start()
 
     def stop(self):
+        """Stop the RuntimeTimer."""
         self.timer.stop()
 
     def log(self, reset=True):
