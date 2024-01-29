@@ -35,7 +35,10 @@ from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 import numpy as np
 import paddle
 from paddle.distributed import fleet
-from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+from paddle.distributed.fleet.meta_parallel import (
+    get_rng_state_tracker,
+    model_parallel_random_seed,
+)
 from paddle.io import IterableDataset
 from paddle.optimizer.lr import LambdaDecay
 
@@ -147,8 +150,12 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
 def set_seed(seed: int = 1234, topo=None):
     global_seed, local_seed, random_seed = _get_distributed_seeds(seed, topo)
 
+    # clear tracker.states_ and tracker.seeds_
+    # and add model_parallel_rng
+    model_parallel_random_seed()
     tracker = get_rng_state_tracker()
-    tracker.reset()  # clear tracker.states_ and tracker.seeds_
+
+    # re-add global_seed and local_seed
     tracker.add("global_seed", global_seed)
     tracker.add("local_seed", local_seed)
 
