@@ -392,8 +392,8 @@ def main():
     paddle.set_device(training_args.device)
     set_seed(seed=training_args.seed)
 
-    training_args.eval_iters = 10
-    training_args.test_iters = training_args.eval_iters * 10
+    training_args.eval_iters = 1
+    training_args.test_iters = training_args.eval_iters * 1
 
     # Log model and data config
     training_args.print_config(model_args, "Model")

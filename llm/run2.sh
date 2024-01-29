@@ -19,14 +19,26 @@ unset FLAGS_START_PORT
 unset PADDLE_ELASTIC_TIMEOUT
 unset CUDA_VISIBLE_DEVICES
 
+unset PADDLE_ELASTIC_JOB_ID
+unset PADDLE_TRAINER_ENDPOINTS
+unset DISTRIBUTED_TRAINER_ENDPOINTS
+unset FLAGS_START_PORT
+unset PADDLE_ELASTIC_TIMEOUT
+
+export PADDLE_JOB_ID=zzzzssxx
+
+# 启动方式
+# export PADDLE_MASTER=10.174.137.30:8678
+# export PADDLE_NNODES=2  # 机器数量
+
 python=python3.10
 
 # cd ../model_zoo/gpt-3/external_ops/ &&  ${python} setup.py install && cd -
 
 ${python} -m paddle.distributed.launch \
-	--log_dir log1 \
-    --master "10.174.137.30:8678" \
-	--nnodes 2 --gpus 0,1,2,3,4,5,6,7 \
+    --ips=10.174.137.30,10.174.137.140 \
+	--log_dir /root/paddle_log \
+	--gpus 0,1,2,3,4,5,6,7 \
 	run_pretrain.py \
     "llama/pretrain-llama_13b-pp4tp2sd2_stage1.json"
 
