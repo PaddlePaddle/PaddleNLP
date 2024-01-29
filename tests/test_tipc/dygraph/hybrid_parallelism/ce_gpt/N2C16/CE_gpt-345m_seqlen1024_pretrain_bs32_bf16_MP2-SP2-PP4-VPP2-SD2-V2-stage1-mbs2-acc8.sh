@@ -32,6 +32,7 @@ sequence_parallel=True
 model=gpt
 micro_bs=2
 acc=8
+seed=1234
 sharding_v2=True
 
 bash ./test_tipc/dygraph/hybrid_parallelism/ce_gpt/benchmark_common/prepare.sh
