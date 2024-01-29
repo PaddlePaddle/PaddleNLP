@@ -80,15 +80,12 @@ class RuntimeTimer:
         """Stop the RuntimeTimer."""
         self.timer.stop()
 
-    def log(self, reset=True):
-        """Log the RuntimeTimer."""
-        if reset:
-            runtime = self.timer.elapsed(reset=True)
-            if self.timer.started_ is True:
-                self.timer.stop()
-            self.timer.reset()
-        else:
-            self.timer.elapsed(reset=False)
+    def log(self):
+        """Log, stop and reset the RuntimeTimer."""
+        runtime = self.timer.elapsed(reset=True)
+        if self.timer.started_ is True:
+            self.timer.stop()
+        self.timer.reset()
 
         string = "[timelog] {}: {:.2f}s ({}) ".format(self.timer.name, runtime, time.strftime("%Y-%m-%d %H:%M:%S"))
         return string
