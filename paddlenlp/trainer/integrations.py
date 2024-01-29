@@ -96,7 +96,7 @@ class VisualDLCallback(TrainerCallback):
 
         if self.vdl_writer is not None:
             self.vdl_writer.add_text("args", args.to_json_string())
-            if "model" in kwargs:
+            if "model" in kwargs and logger.logger.level < 20:
                 model = kwargs["model"]
                 if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
                     model = kwargs["model"].model

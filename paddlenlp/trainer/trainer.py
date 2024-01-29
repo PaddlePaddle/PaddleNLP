@@ -731,7 +731,7 @@ class Trainer:
         # per_device_trainable_numel = sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)
         # TODO: Temporary fix since Tensor.numel() not supported in distributed mode
         per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
-        logger.info(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
+        logger.debug(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
         if self.args.use_hybrid_parallel:
             # todo fix for pipeline_parallel_degree
             parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
@@ -747,7 +747,7 @@ class Trainer:
                     trainable_numel = trainable_numel // self.args.sep_parallel_degree
                 # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
                 # so, the trainable numel is a little bigger than real.
-                logger.info(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
+                logger.debug(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
 
         return self._inner_training_loop(
             args,
@@ -2424,7 +2424,7 @@ class Trainer:
         kwargs.update(timer=self.timers, paddle_pipeline_timers=paddle_pipeline_timers)
 
         if self.state.epoch is not None:
-            logs["epoch"] = round(self.state.epoch, 4)
+            logs["progress_or_epoch"] = round(self.state.epoch, 4)
         output = {**logs, **{"step": self.state.global_step}}
         self.state.log_history.append(output)
         self.control = self.callback_handler.on_log(self.args, self.state, self.control, logs, **kwargs)
@@ -2985,23 +2985,23 @@ class Trainer:
         """
         print config values
         """
-        logger.info("=" * 60)
+        logger.debug("=" * 60)
         if args is None:
             args = self.args
             key = "Training"
         import paddlenlp
 
-        logger.info("{:^40}".format("{} Configuration Arguments".format(key)))
-        logger.info("{:30}: {}".format("paddle commit id", paddle.version.commit))
-        logger.info("{:30}: {}".format("paddlenlp commit id", paddlenlp.version.commit))
+        logger.debug("{:^40}".format("{} Configuration Arguments".format(key)))
+        logger.debug("{:30}: {}".format("paddle commit id", paddle.version.commit))
+        logger.debug("{:30}: {}".format("paddlenlp commit id", paddlenlp.version.commit))
 
         for a in dir(args):
             if a[:2] != "__":  # don't print double underscore methods
                 v = getattr(args, a)
                 if not isinstance(v, types.MethodType):
-                    logger.info("{:30}: {}".format(a, v))
+                    logger.debug("{:30}: {}".format(a, v))
 
-        logger.info("")
+        logger.debug("")
 
     def is_unified_checkpoint(self, resume_from_checkpoint, safe_serialization=True):
         is_unified_checkpoint_type = False
