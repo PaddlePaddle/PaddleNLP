@@ -282,7 +282,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
                 freeze_numel += np.prod(weight.shape)
             else:
                 trainable_numel += np.prod(weight.shape)
-        logger.info(
+        logger.debug(
             f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel+trainable_numel:.2e}|| Trainable:{trainable_numel / (freeze_numel+trainable_numel):.2%}"
         )
 
