@@ -35,6 +35,9 @@ function _set_params(){
 
     fp_item="bf16"
     workerlog_id=0
+    ip_lists=($(echo $TRAINER_INSTANCES | tr ',' ' '))
+    master_ip=${ip_lists[0]}
+    nnodes=$PADDLE_TRAINERS_NUM
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -86,9 +89,14 @@ function _train(){
         train_cmd="python -m paddle.distributed.launch --gpus=0 ${PADDLE_RANK_OPTION}\
             --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
         ;;
-    N1C8|N2C16) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
+    N1C8) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
             --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
+        ;;
+    N2C16) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
+        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
+            --auto_tuner_json ${autoconfig_json_file} --master etcd://$master_ip:2379 --nnodes $nnodes:$nnodes \
+            finetune_generation.py ${modle_json_file}"
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
