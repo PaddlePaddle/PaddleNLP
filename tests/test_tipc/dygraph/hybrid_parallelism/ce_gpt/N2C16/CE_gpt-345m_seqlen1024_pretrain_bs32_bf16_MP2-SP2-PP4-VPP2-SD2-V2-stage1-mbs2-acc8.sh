@@ -23,6 +23,7 @@ device_num=N2C16
 max_iter=50000
 sharding=stage1
 sharding_degree=2
+
 virtual_pp_degree=2
 use_recompute=True
 eval_freq=25
