@@ -42,18 +42,18 @@ unset PADDLE_TRAINERS_NUM
 if [ -z "$1" ]; then  
   echo "单机任务"
 else
-    
   echo "多机任务, 启动etcd服务"
-  pip install httpx, etcd3, protobuf==3.20.0
+  pip install httpx etcd3 protobuf==3.20.0 --force-reinstall
   rank=$PADDLE_TRAINER_ID
   ip_lists=($(echo $TRAINER_INSTANCES | tr ',' ' '))
   master_ip=${ip_lists[0]}
   echo $master_ip $rank
-  if [ rank == 0 ]; then
+  if [ $rank == 0 ]; then
     net=$(netstat -anp | grep 2379 | grep "LISTEN")
     if [ ${#net} == 0 ]; then
-        apt-get install -y --force-yes etcd
+        apt-get install -y --allow-downgrades etcd
         nohup etcd -data-dir ~/data.etcd -advertise-client-urls  http://0.0.0.0:2379 -listen-client-urls http://0.0.0.0:2379 &
+        ps -ef |grep etcd
     fi  
   else
       sleep 5
