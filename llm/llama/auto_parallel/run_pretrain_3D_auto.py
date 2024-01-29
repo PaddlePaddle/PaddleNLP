@@ -367,8 +367,8 @@ class PretrainingTrainer(SemiAutoTrainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def get_train_dataloader(self):
-        dist_loader = super().get_train_dataloader()
+    def _wrap_for_dist_loader(self, train_dataloader):
+        dist_loader = super()._wrap_for_dist_loader(train_dataloader)
         dist_loader._input_keys = ["input_ids", "labels"]
         return dist_loader
 

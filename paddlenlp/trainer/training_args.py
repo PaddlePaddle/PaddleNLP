@@ -1609,12 +1609,16 @@ class TrainingArguments:
 
     @property
     def should_save_sharding_stage1_model(self):
+        if self.use_auto_parallel:
+            return False
         return (
             ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.save_sharded_model
         )
 
     @property
     def should_load_sharding_stage1_model(self):
+        if self.use_auto_parallel:
+            return False
         return (
             ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.load_sharded_model
         )

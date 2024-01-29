@@ -82,6 +82,9 @@ class SemiAutoTrainer(Trainer):
         """
         return tensors
 
+    def _wrap_model(self, model, training=True):
+        return model
+
     def _get_meshes_for_loader(self):
         def _get_mesh(pp_idx=0):
             return self.global_mesh.get_mesh_with_dim("pp")[pp_idx]
@@ -91,12 +94,25 @@ class SemiAutoTrainer(Trainer):
             meshes.append(_get_mesh(pp_idx))
         return meshes
 
+    def _wrap_for_dist_loader(self, train_dataloader):
+        dist_loader = dist.shard_dataloader(
+            dataloader=train_dataloader,
+            meshes=self._get_meshes_for_loader(),
+            shard_dims="dp",
+        )
+        return dist_loader
+
     def _wrap_for_auto(self, model, train_dataloader):
+        dist_loader = self._wrap_for_dist_loader(train_dataloader)
+
         if self.args.run_static_semi_auto:
-            return dist.to_static(model, train_dataloader, self.criterion, self.optimizer, strategy=self.args.strategy)
+            return (
+                dist.to_static(model, dist_loader, self.criterion, self.optimizer, strategy=self.args.strategy),
+                dist_loader,
+            )
         else:
             self.optimizer = dist.shard_optimizer(self.optimizer)
-            return model
+            return model, dist_loader
 
     def _wrap_for_amp_training(self):
         pass
@@ -213,6 +229,9 @@ class SemiAutoTrainer(Trainer):
 
             npu_accelerate_plugin(self.optimizer)
 
+        model, dist_loader = self._wrap_for_auto(model, train_dataloader)
+        train_dataloader = dist_loader()
+
         self.timers and self.timers("read-data").start()
 
         for epoch in range(epochs_trained, num_train_epochs):
@@ -224,7 +243,7 @@ class SemiAutoTrainer(Trainer):
             step_control = 0  # used in loop control, reset to 0 after every step
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
-            for step, inputs in enumerate(epoch_iterator):
+            for step, inputs in enumerate(train_dataloader):
                 if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim(inputs)
                 self.timers and self.timers("read-data").stop()
@@ -358,16 +377,6 @@ class SemiAutoTrainer(Trainer):
             batch_size=batch_size,
             drop_last=self.args.dataloader_drop_last,
         )
-
-    def get_train_dataloader(self):
-        train_dataloader = super().get_train_dataloader()
-        dist_loader = dist.shard_dataloader(
-            dataloader=train_dataloader,
-            meshes=self._get_meshes_for_loader(),
-            shard_dims="dp",
-        )
-
-        return dist_loader
 
     def dynamic_traning(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         with self.autocast_smart_context_manager():

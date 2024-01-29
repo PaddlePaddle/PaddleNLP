@@ -1045,7 +1045,7 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
         prediction_scores = dist.reshard(
             prediction_scores,
             get_mesh(-1),
-            [dist.Replicate(), dist.Replicate()],
+            [dist.Replicate(), dist.Replicate(), dist.Replicate()],
         )
         masked_lm_labels = dist.reshard(masked_lm_labels, get_mesh(-1), [dist.Replicate(), dist.Replicate()])
 
