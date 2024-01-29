@@ -1056,6 +1056,7 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                 masked_lm_labels.unsqueeze(2),
             )
         else:
+
             masked_lm_loss = self.loss_func(
                 prediction_scores.astype("float32"),
                 masked_lm_labels.unsqueeze(2),

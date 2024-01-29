@@ -109,7 +109,7 @@ def show():
         f.write(content)
 
 
-__version__ = "2.7.0.post"
+__version__ = "2.7.1.post"
 if os.getenv(PADDLENLP_STABLE_VERSION):
     __version__ = __version__.replace(".post", "")
 

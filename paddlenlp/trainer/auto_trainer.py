@@ -22,16 +22,14 @@ import paddle
 import paddle.distributed as dist
 import paddle.nn as nn
 from paddle.distributed import fleet
-from paddle.io import DistributedBatchSampler
 from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
 
-from ..transformers.segment_parallel_utils import split_inputs_sequence_dim
-from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.log import logger
 from .argparser import strtobool
-from .trainer_callback import DefaultFlowCallback, ProgressCallback, TrainerState
+from .trainer import SCALER_NAME, SCHEDULER_NAME, TRAINER_STATE_NAME, TRAINING_ARGS_NAME
+from .trainer_callback import TrainerState
 from .trainer_utils import (  # set_hyrbid_parallel_seed,
     PREFIX_CHECKPOINT_DIR,
     TrainOutput,
@@ -42,24 +40,15 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
 )
 from .utils.helper import distributed_file, distributed_isfile  # nested_truncate,
 
-DEFAULT_CALLBACKS = [DefaultFlowCallback]
-DEFAULT_PROGRESS_CALLBACK = ProgressCallback
-
-# Name of the files used for checkpointing
-TRAINING_ARGS_NAME = "training_args.bin"
-TRAINER_STATE_NAME = "trainer_state.json"
-
 MODEL_NAME = "model"
 OPTIMIZER_NAME = "optimizer"
 DIST_CKPT_PATH = "dist_ckpt"
-SCHEDULER_NAME = "scheduler.pdparams"
-SCALER_NAME = "scaler.pdparams"
 
 
-class SemiAutoTrainer(Trainer):
+class AutoTrainer(Trainer):
     def __init__(self, *args, **kwargs):
 
-        if kwargs.get("args", None) is not None and kwargs["args"].run_static_semi_auto:
+        if kwargs.get("args", None) is not None and kwargs["args"].run_static_auto:
             if kwargs.get("criterion", None) is None:
 
                 def loss_func(loss, outputs):
@@ -73,14 +62,27 @@ class SemiAutoTrainer(Trainer):
         self.global_mesh = fleet.auto.get_mesh()
 
         self.mesh_in_dp = self.global_mesh.get_mesh_with_dim("dp")[self.args.data_parallel_rank]
-        self.comm_group_in_dp = dist.new_group(list(self.mesh_in_dp.process_ids))
+        self.mesh_for_pp = self.mesh_in_dp.get_mesh_with_dim("mp")[self.args.tensor_parallel_rank]
+        self.comm_group_in_pp = dist.new_group(list(self.mesh_for_pp.process_ids))
 
     def _nested_gather(self, tensors):
         """
         Gather value of `tensors` (tensor or list/tuple of nested tensors) and convert them to numpy before
         concatenating them to `gathered`
         """
-        return tensors
+        with _exec_mode_guard("dynamic"):
+            if isinstance(tensors, paddle.Tensor):
+                tr_loss = tensors._local_value() if tensors.is_dist() else tensors
+            else:
+                tr_loss = paddle.to_tensor([tensors])
+
+        if self.args.pipeline_parallel_degree <= 1:
+            return super()._nested_gather(tr_loss)
+
+        assert len(self.comm_group_in_pp.ranks) >= 2
+        paddle.distributed.broadcast(tr_loss, src=max(self.comm_group_in_pp.ranks), group=self.comm_group_in_pp).wait()
+
+        return super()._nested_gather(tr_loss)
 
     def _wrap_model(self, model, training=True):
         return model
@@ -105,7 +107,7 @@ class SemiAutoTrainer(Trainer):
     def _wrap_for_auto(self, model, train_dataloader):
         dist_loader = self._wrap_for_dist_loader(train_dataloader)
 
-        if self.args.run_static_semi_auto:
+        if self.args.run_static_auto:
             return (
                 dist.to_static(model, dist_loader, self.criterion, self.optimizer, strategy=self.args.strategy),
                 dist_loader,
@@ -114,8 +116,12 @@ class SemiAutoTrainer(Trainer):
             self.optimizer = dist.shard_optimizer(self.optimizer)
             return model, dist_loader
 
-    def _wrap_for_amp_training(self):
-        pass
+    def _wrap_amp_model(self):
+        logger.info("Using half precision")
+        self.enable_autocast_context_manager = True
+        self.do_grad_scaling = True if self.args.fp16 else False
+        self.amp_dtype = "float16" if self.args.fp16 else "bfloat16"
+        self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
 
     def _get_item_from_loss(self, loss):
         if isinstance(loss, paddle.Tensor):
@@ -125,6 +131,23 @@ class SemiAutoTrainer(Trainer):
                 return loss.item() if loss._is_initialized() else 0.0
         else:
             return loss
+
+    def _split_batches_for_accumulation(self, inputs):
+        if self.args.gradient_accumulation_steps == 1:
+            return [inputs]
+
+        # if self.args.run_static_auto:
+        if self.args.run_static_auto and self.args.pipeline_parallel_degree > 1:
+            return [inputs]
+
+        local_batches = [{} for i in range(self.args.gradient_accumulation_steps)]
+
+        for key, value in inputs.items():
+            local_datas = value.split(self.args.gradient_accumulation_steps, axis=0)
+            for index, data in enumerate(local_datas):
+                local_batches[index].update({key: data})
+
+        return local_batches
 
     def _inner_training_loop(
         self,
@@ -183,18 +206,6 @@ class SemiAutoTrainer(Trainer):
                 if self.is_local_process_zero() and not args.disable_tqdm:
                     steps_trained_progress_bar = tqdm(total=steps_trained_in_current_epoch)
                     steps_trained_progress_bar.set_description("Skipping the first batches")
-            if not args.ignore_data_skip:
-                if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
-                    train_dataloader.batch_sampler, NlpDistributedBatchSampler
-                ):
-                    consumed_samples = (
-                        self.state.global_step
-                        * args.train_batch_size
-                        * args.gradient_accumulation_steps
-                        * args.dataset_world_size
-                    )
-                    train_dataloader.batch_sampler.set_epoch(consumed_samples=consumed_samples)
-                    logger.info(f"Set DistributedBatchSampler consumed_samples to {consumed_samples}")
 
         epoch_iterator = train_dataloader
         # steps_in_epoch = len(epoch_iterator)
@@ -235,35 +246,19 @@ class SemiAutoTrainer(Trainer):
         self.timers and self.timers("read-data").start()
 
         for epoch in range(epochs_trained, num_train_epochs):
-            if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
-                train_dataloader.batch_sampler, DistributedBatchSampler
-            ):
-                train_dataloader.batch_sampler.set_epoch(epoch)
 
             step_control = 0  # used in loop control, reset to 0 after every step
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
+            # read global-batch from dist_loader
             for step, inputs in enumerate(train_dataloader):
-                if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
-                    inputs = split_inputs_sequence_dim(inputs)
                 self.timers and self.timers("read-data").stop()
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
 
                 # Skip past any already trained steps if resuming training
-                # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
                 # We use consumed_samples to reset the status
-                if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
-                    train_dataloader.batch_sampler, NlpDistributedBatchSampler
-                ):
-                    if step == 0:
-                        if steps_trained_progress_bar is not None:
-                            steps_trained_progress_bar.update(steps_trained_in_current_epoch)
-                            steps_trained_progress_bar.close()
-                            steps_trained_progress_bar = None
-                        self._load_rng_state(resume_from_checkpoint)
-                    step += steps_trained_in_current_epoch
-                elif steps_trained_in_current_epoch > 0:
+                if steps_trained_in_current_epoch > 0:
                     steps_trained_in_current_epoch -= 1
                     if steps_trained_progress_bar is not None:
                         steps_trained_progress_bar.update(1)
@@ -274,52 +269,54 @@ class SemiAutoTrainer(Trainer):
                     steps_trained_progress_bar.close()
                     steps_trained_progress_bar = None
 
-                if step_control % args.gradient_accumulation_steps == 0:
-                    self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
-                    self.timers and self.timers("forward-backward").start()
+                inputs_list = self._split_batches_for_accumulation(inputs)
 
-                tr_loss_step = self.training_step(model, inputs)
+                for inputs in inputs_list:
+                    if step_control % args.gradient_accumulation_steps == 0:
+                        self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
+                        self.timers and self.timers("forward-backward").start()
 
-                with _exec_mode_guard("dynamic"):
-                    tr_loss += tr_loss_step
+                    tr_loss_step = self.training_step(model, inputs)
 
-                disable_accumulation = self.args.pipeline_parallel_degree > 1 and self.args.run_static_semi_auto
+                    with _exec_mode_guard("dynamic"):
+                        tr_loss += tr_loss_step
 
-                if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
-                    # last step in epoch but step is always smaller than gradient_accumulation_steps
-                    steps_in_epoch <= args.gradient_accumulation_steps
-                    and (step + 1) == steps_in_epoch
-                    or disable_accumulation
-                ):
-                    if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
-                        tr_loss /= self.args.gradient_accumulation_steps
+                    disable_accumulation = self.args.pipeline_parallel_degree > 1 and self.args.run_static_auto
+                    # disable_accumulation = self.args.run_static_auto
 
-                    self.timers and self.timers("forward-backward").stop()
+                    if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
+                        # last step in epoch but step is always smaller than gradient_accumulation_steps
+                        steps_in_epoch <= args.gradient_accumulation_steps
+                        and (step + 1) == steps_in_epoch
+                        or disable_accumulation
+                    ):
 
-                    self.timers and self.timers("optimizer-step").start()
+                        self.timers and self.timers("forward-backward").stop()
 
-                    # Optimizer step
-                    self.callback_handler.on_optimizer_begin(
-                        args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
-                    )
+                        self.timers and self.timers("optimizer-step").start()
 
-                    self.optimizer_step()
+                        # Optimizer step
+                        self.callback_handler.on_optimizer_begin(
+                            args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                        )
 
-                    self.timers and self.timers("optimizer-step").stop()
+                        self.optimizer_step()
 
-                    self.callback_handler.on_optimizer_end(
-                        args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
-                    )
+                        self.timers and self.timers("optimizer-step").stop()
 
-                    self.state.global_step += 1
-                    self.state.epoch = epoch + (step + 1) / steps_in_epoch
-                    self.control = self.callback_handler.on_step_end(args, self.state, self.control)
-                    self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
-                    self._print_timer()
-                    step_control = 0
-                else:
-                    self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
-                    step_control += 1
+                        self.callback_handler.on_optimizer_end(
+                            args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                        )
+
+                        self.state.global_step += 1
+                        self.state.epoch = epoch + (step + 1) / steps_in_epoch
+                        self.control = self.callback_handler.on_step_end(args, self.state, self.control)
+                        self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+                        self._print_timer()
+                        step_control = 0
+                    else:
+                        self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
+                        step_control += 1
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
@@ -369,12 +366,11 @@ class SemiAutoTrainer(Trainer):
 
         total_batch_size_per_acc_step = self.args.per_device_train_batch_size * self.args.dataset_world_size
         total_batch_size = total_batch_size_per_acc_step * self.args.gradient_accumulation_steps
-        batch_size = total_batch_size if self.args.run_static_semi_auto else total_batch_size_per_acc_step
 
         return paddle.io.BatchSampler(
             dataset=self.train_dataset,
             shuffle=True,
-            batch_size=batch_size,
+            batch_size=total_batch_size,
             drop_last=self.args.dataloader_drop_last,
         )
 
@@ -396,9 +392,6 @@ class SemiAutoTrainer(Trainer):
         input_ids, labels = tuple(inputs.values())
         loss = model(input_ids, labels)
 
-        if loss is not None and self.args.gradient_accumulation_steps > 1:
-            loss = loss / self.args.gradient_accumulation_steps
-
         return loss
 
     def training_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
@@ -406,7 +399,7 @@ class SemiAutoTrainer(Trainer):
 
         inputs = self._prepare_inputs(inputs)
 
-        if not self.args.run_static_semi_auto:
+        if not self.args.run_static_auto:
             loss = self.dynamic_traning(model, inputs)
         else:
             loss = self.static_traning(model, inputs)
@@ -421,7 +414,7 @@ class SemiAutoTrainer(Trainer):
             return float(loss)
 
     def optimizer_step(self):
-        if not self.args.run_static_semi_auto:
+        if not self.args.run_static_auto:
             optimizer_was_run = True
             if self.do_grad_scaling:
                 scale_before = paddle.assign(self.scaler._scale)
@@ -443,7 +436,8 @@ class SemiAutoTrainer(Trainer):
 
             self.optimizer.clear_grad()
         else:
-            pass
+            # TODO: support optimizer_was_run in static mode
+            self.lr_scheduler.step()
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         with _exec_mode_guard("dynamic"):

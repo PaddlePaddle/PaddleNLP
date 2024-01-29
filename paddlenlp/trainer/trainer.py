@@ -356,14 +356,9 @@ class Trainer:
 
         self.do_grad_scaling = False
         self.enable_autocast_context_manager = False
-
         if args.fp16 or args.bf16:
-            logger.info("Using half precision")
-            self.enable_autocast_context_manager = True
-            self.do_grad_scaling = True if args.fp16 else False
-            self.amp_dtype = "float16" if args.fp16 else "bfloat16"
-            self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
-            self._wrap_for_amp_training()
+            # set do_grad_scaling, enable_autocast_context_manager
+            self._wrap_amp_model(args, model)
 
         if args.recompute:
 
@@ -387,6 +382,50 @@ class Trainer:
 
         # very last
         self._memory_tracker.stop_and_update_metrics()
+
+    def _wrap_amp_model(self, args, model):
+        logger.info("Using half precision")
+        self.enable_autocast_context_manager = True
+        self.do_grad_scaling = True if args.fp16 else False
+        self.amp_dtype = "float16" if args.fp16 else "bfloat16"
+        # fix for load saved fp16 or bf16 ckpt, decorate model first.
+        if self.args.fp16_opt_level == "O2":
+            paddle.amp.decorate(
+                models=model,
+                level=self.args.fp16_opt_level,
+                dtype=self.amp_dtype,
+                excluded_layers=QuantizationLinear,
+            )
+        # for pipeline mode and pure tensor parallel
+        if self.args.pipeline_parallel_degree > 1 or (self.args.tensor_parallel_degree > 1 and self.sharding is None):
+            self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
+            if self.args.amp_master_grad:
+                mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
+            self.scaler = fleet.distributed_scaler(self.scaler)
+        elif self.sharding is not None:
+            self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
+            if self.amp_dtype == "float16" or self.amp_dtype == "bfloat16":
+                if ShardingOption.SHARD_OP in self.args.sharding:
+                    self.scaler = fleet.distributed_scaler(self.scaler)
+                    if self.args.amp_master_grad:
+                        mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
+                else:
+                    # scaler for stage2 and stage3
+                    from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
+                        GroupShardedScaler,
+                    )
+
+                    if self.args.amp_master_grad:
+                        mix_precision_utils.MixPrecisionScaler(self.scaler)  # return value has no use
+
+                    self.scaler = GroupShardedScaler(self.scaler)
+            else:
+                self.do_grad_scaling = False
+                self.use_cuda_amp = False
+                self.amp_dtype = None
+
+        else:
+            self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
 
     def add_callback(self, callback):
         """
@@ -421,41 +460,6 @@ class Trainer:
                first case, will remove the first member of that class found in the list of callbacks.
         """
         self.callback_handler.remove_callback(callback)
-
-    def _wrap_for_amp_training(self):
-        # fix for load saved fp16 or bf16 ckpt, decorate model first.
-        if self.args.fp16_opt_level == "O2":
-            paddle.amp.decorate(
-                models=self.model,
-                level=self.args.fp16_opt_level,
-                dtype=self.amp_dtype,
-                excluded_layers=QuantizationLinear,
-            )
-        # for pipeline mode and pure tensor parallel
-        if self.args.pipeline_parallel_degree > 1 or (self.args.tensor_parallel_degree > 1 and self.sharding is None):
-            if self.args.amp_master_grad:
-                mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
-            self.scaler = fleet.distributed_scaler(self.scaler)
-        elif self.sharding is not None:
-            if self.amp_dtype == "float16" or self.amp_dtype == "bfloat16":
-                if ShardingOption.SHARD_OP in self.args.sharding:
-                    self.scaler = fleet.distributed_scaler(self.scaler)
-                    if self.args.amp_master_grad:
-                        mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
-                else:
-                    # scaler for stage2 and stage3
-                    from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
-                        GroupShardedScaler,
-                    )
-
-                    if self.args.amp_master_grad:
-                        mix_precision_utils.MixPrecisionScaler(self.scaler)  # return value has no use
-
-                    self.scaler = GroupShardedScaler(self.scaler)
-            else:
-                self.do_grad_scaling = False
-                self.use_cuda_amp = False
-                self.amp_dtype = None
 
     def _load_from_peft_checkpoint(self, resume_from_checkpoint=None):
         """load state_dict from checkpoint, Only for PEFT Model.
@@ -730,7 +734,7 @@ class Trainer:
         # per_device_trainable_numel = sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)
         # TODO: Temporary fix since Tensor.numel() not supported in distributed mode
         per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
-        logger.info(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
+        logger.debug(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
         if self.args.use_hybrid_parallel:
             # todo fix for pipeline_parallel_degree
             parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
@@ -746,7 +750,7 @@ class Trainer:
                     trainable_numel = trainable_numel // self.args.sep_parallel_degree
                 # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
                 # so, the trainable numel is a little bigger than real.
-                logger.info(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
+                logger.debug(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
 
         return self._inner_training_loop(
             args,
@@ -1579,7 +1583,9 @@ class Trainer:
                 if not len(checkpoint_rng_state["cuda"]) == core.get_custom_device_count(device):
                     raise ValueError("Length of custom device state list shoule be equal to the custom device count")
                 for i in range(core.get_custom_device_count(device)):
-                    core.default_custom_device_generator(i).manual_seed(checkpoint_rng_state["cuda"][i])
+                    core.default_custom_device_generator(paddle.CustomPlace(device, i)).manual_seed(
+                        checkpoint_rng_state["cuda"][i]
+                    )
 
         if self.args.use_hybrid_parallel:
             if "hybrid_parallel_rng_state_tracker" in checkpoint_rng_state:
@@ -2429,7 +2435,7 @@ class Trainer:
         kwargs.update(timer=self.timers, paddle_pipeline_timers=paddle_pipeline_timers)
 
         if self.state.epoch is not None:
-            logs["epoch"] = round(self.state.epoch, 4)
+            logs["progress_or_epoch"] = round(self.state.epoch, 4)
         output = {**logs, **{"step": self.state.global_step}}
         self.state.log_history.append(output)
         self.control = self.callback_handler.on_log(self.args, self.state, self.control, logs, **kwargs)
@@ -2990,23 +2996,23 @@ class Trainer:
         """
         print config values
         """
-        logger.info("=" * 60)
+        logger.debug("=" * 60)
         if args is None:
             args = self.args
             key = "Training"
         import paddlenlp
 
-        logger.info("{:^40}".format("{} Configuration Arguments".format(key)))
-        logger.info("{:30}: {}".format("paddle commit id", paddle.version.commit))
-        logger.info("{:30}: {}".format("paddlenlp commit id", paddlenlp.version.commit))
+        logger.debug("{:^40}".format("{} Configuration Arguments".format(key)))
+        logger.debug("{:30}: {}".format("paddle commit id", paddle.version.commit))
+        logger.debug("{:30}: {}".format("paddlenlp commit id", paddlenlp.version.commit))
 
         for a in dir(args):
             if a[:2] != "__":  # don't print double underscore methods
                 v = getattr(args, a)
                 if not isinstance(v, types.MethodType):
-                    logger.info("{:30}: {}".format(a, v))
+                    logger.debug("{:30}: {}".format(a, v))
 
-        logger.info("")
+        logger.debug("")
 
     def is_unified_checkpoint(self, resume_from_checkpoint, safe_serialization=True):
         is_unified_checkpoint_type = False

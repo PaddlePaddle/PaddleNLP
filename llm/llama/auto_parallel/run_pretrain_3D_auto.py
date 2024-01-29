@@ -29,7 +29,7 @@ from paddle.distributed import fleet
 
 from paddlenlp.ops import Topology
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
-from paddlenlp.trainer.auto_trainer import SemiAutoTrainer
+from paddlenlp.trainer.auto_trainer import AutoTrainer
 from paddlenlp.trainer.trainer_utils import IntervalStrategy, _get_distributed_seeds
 from paddlenlp.transformers import (
     AutoTokenizer,
@@ -363,7 +363,7 @@ def get_train_data_file(args):
     return files
 
 
-class PretrainingTrainer(SemiAutoTrainer):
+class PretrainingTrainer(AutoTrainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

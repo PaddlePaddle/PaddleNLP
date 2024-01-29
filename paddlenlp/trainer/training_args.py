@@ -748,8 +748,18 @@ class TrainingArguments:
         default=False,
         metadata={"help": "reshard pp even if pp degree in the model and pp degree in script match"},
     )
-    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
-    run_static_semi_auto: bool = field(default=True, metadata={"help": ""})
+    parallel_mode: str = field(
+        default="hybrid",
+        metadata={
+            "help": (
+                "Which parallel mode to use for distributed training.\n"
+                "Following options are supports:\n"
+                "- hybrid: under the hybrid parallel mode with combined distributed strategies.\n"
+                "- auto: under the auto parallel mode with AutoTrainer \n"
+            )
+        },
+    )
+    run_static_auto: bool = field(default=True, metadata={"help": "whether to run static graph in auto parallel mode"})
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -1722,21 +1732,21 @@ class TrainingArguments:
         """
         print all config values.
         """
-        logger.info("=" * 60)
+        logger.debug("=" * 60)
         if args is None:
             args = self
             key = "Training"
 
         import paddlenlp
 
-        logger.info("{:^40}".format("{} Configuration Arguments".format(key)))
-        logger.info("{:30}: {}".format("paddle commit id", paddle.version.commit))
-        logger.info("{:30}: {}".format("paddlenlp commit id", paddlenlp.version.commit))
+        logger.debug("{:^40}".format("{} Configuration Arguments".format(key)))
+        logger.debug("{:30}: {}".format("paddle commit id", paddle.version.commit))
+        logger.debug("{:30}: {}".format("paddlenlp commit id", paddlenlp.version.commit))
 
         for a in dir(args):
             if a[:2] != "__":  # don't print double underscore methods
                 v = getattr(args, a)
                 if not isinstance(v, types.MethodType):
-                    logger.info("{:30}: {}".format(a, v))
+                    logger.debug("{:30}: {}".format(a, v))
 
-        logger.info("")
+        logger.debug("")
