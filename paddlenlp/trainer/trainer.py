@@ -330,7 +330,8 @@ class Trainer:
                 "Passing `optimizers` is not allowed if sharding is enabled."
                 "You should subclass `Trainer` and override the `create_optimizer_and_scheduler` method."
             )
-        if self.args.pipeline_parallel_degree > 1:
+
+        if self.args.pipeline_parallel_degree > 1 and self.args.use_hybrid_parallel:
             from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
             assert (isinstance(model, LoRAModel) and isinstance(model.model, PipelineLayer)) or isinstance(
@@ -352,52 +353,9 @@ class Trainer:
 
         self.do_grad_scaling = False
         self.enable_autocast_context_manager = False
-
         if args.fp16 or args.bf16:
-            logger.info("Using half precision")
-            self.enable_autocast_context_manager = True
-            self.do_grad_scaling = True if args.fp16 else False
-            self.amp_dtype = "float16" if args.fp16 else "bfloat16"
-            # fix for load saved fp16 or bf16 ckpt, decorate model first.
-            if self.args.fp16_opt_level == "O2":
-                paddle.amp.decorate(
-                    models=model,
-                    level=self.args.fp16_opt_level,
-                    dtype=self.amp_dtype,
-                    excluded_layers=QuantizationLinear,
-                )
-            # for pipeline mode and pure tensor parallel
-            if self.args.pipeline_parallel_degree > 1 or (
-                self.args.tensor_parallel_degree > 1 and self.sharding is None
-            ):
-                self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
-                if self.args.amp_master_grad:
-                    mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
-                self.scaler = fleet.distributed_scaler(self.scaler)
-            elif self.sharding is not None:
-                self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
-                if self.amp_dtype == "float16" or self.amp_dtype == "bfloat16":
-                    if ShardingOption.SHARD_OP in self.args.sharding:
-                        self.scaler = fleet.distributed_scaler(self.scaler)
-                        if self.args.amp_master_grad:
-                            mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
-                    else:
-                        # scaler for stage2 and stage3
-                        from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
-                            GroupShardedScaler,
-                        )
-
-                        if self.args.amp_master_grad:
-                            mix_precision_utils.MixPrecisionScaler(self.scaler)  # return value has no use
-
-                        self.scaler = GroupShardedScaler(self.scaler)
-                else:
-                    self.do_grad_scaling = False
-                    self.use_cuda_amp = False
-                    self.amp_dtype = None
-
-            else:
-                self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
+            # set do_grad_scaling, enable_autocast_context_manager
+            self._wrap_amp_model(args, model)
 
         if args.recompute:
 
@@ -421,6 +379,50 @@ class Trainer:
 
         # very last
         self._memory_tracker.stop_and_update_metrics()
+
+    def _wrap_amp_model(self, args, model):
+        logger.info("Using half precision")
+        self.enable_autocast_context_manager = True
+        self.do_grad_scaling = True if args.fp16 else False
+        self.amp_dtype = "float16" if args.fp16 else "bfloat16"
+        # fix for load saved fp16 or bf16 ckpt, decorate model first.
+        if self.args.fp16_opt_level == "O2":
+            paddle.amp.decorate(
+                models=model,
+                level=self.args.fp16_opt_level,
+                dtype=self.amp_dtype,
+                excluded_layers=QuantizationLinear,
+            )
+        # for pipeline mode and pure tensor parallel
+        if self.args.pipeline_parallel_degree > 1 or (self.args.tensor_parallel_degree > 1 and self.sharding is None):
+            self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
+            if self.args.amp_master_grad:
+                mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
+            self.scaler = fleet.distributed_scaler(self.scaler)
+        elif self.sharding is not None:
+            self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
+            if self.amp_dtype == "float16" or self.amp_dtype == "bfloat16":
+                if ShardingOption.SHARD_OP in self.args.sharding:
+                    self.scaler = fleet.distributed_scaler(self.scaler)
+                    if self.args.amp_master_grad:
+                        mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
+                else:
+                    # scaler for stage2 and stage3
+                    from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
+                        GroupShardedScaler,
+                    )
+
+                    if self.args.amp_master_grad:
+                        mix_precision_utils.MixPrecisionScaler(self.scaler)  # return value has no use
+
+                    self.scaler = GroupShardedScaler(self.scaler)
+            else:
+                self.do_grad_scaling = False
+                self.use_cuda_amp = False
+                self.amp_dtype = None
+
+        else:
+            self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
 
     def add_callback(self, callback):
         """
@@ -626,7 +628,7 @@ class Trainer:
         # The resume_from_checkpoint could be None in some machine node.
         # Here we reset None to temp directory.
         if args.world_size > 1:
-            is_resume_from_checkpoint = paddle.to_tensor([resume_from_checkpoint is not None])
+            is_resume_from_checkpoint = paddle.to_tensor([resume_from_checkpoint is not None], dtype="int32")
             paddle.distributed.all_reduce(is_resume_from_checkpoint)
             is_resume_from_checkpoint = is_resume_from_checkpoint.item()
             if is_resume_from_checkpoint > 0 and is_resume_from_checkpoint < paddle.distributed.get_world_size():
@@ -746,6 +748,33 @@ class Trainer:
                 # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
                 # so, the trainable numel is a little bigger than real.
                 logger.info(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
+
+        return self._inner_training_loop(
+            args,
+            model,
+            train_dataloader,
+            len_dataloader,
+            max_steps,
+            num_train_epochs,
+            num_update_steps_per_epoch,
+            num_train_samples,
+            resume_from_checkpoint,
+            ignore_keys_for_eval,
+        )
+
+    def _inner_training_loop(
+        self,
+        args,
+        model,
+        train_dataloader,
+        len_dataloader,
+        max_steps,
+        num_train_epochs,
+        num_update_steps_per_epoch,
+        num_train_samples,
+        resume_from_checkpoint,
+        ignore_keys_for_eval,
+    ):
 
         start_time = time.time()
         self._globalstep_last_start_time = time.time()
@@ -1548,7 +1577,9 @@ class Trainer:
                 if not len(checkpoint_rng_state["cuda"]) == core.get_custom_device_count(device):
                     raise ValueError("Length of custom device state list shoule be equal to the custom device count")
                 for i in range(core.get_custom_device_count(device)):
-                    core.default_custom_device_generator(i).manual_seed(checkpoint_rng_state["cuda"][i])
+                    core.default_custom_device_generator(paddle.CustomPlace(device, i)).manual_seed(
+                        checkpoint_rng_state["cuda"][i]
+                    )
 
         if self.args.use_hybrid_parallel:
             if "hybrid_parallel_rng_state_tracker" in checkpoint_rng_state:
@@ -2272,6 +2303,7 @@ class Trainer:
                     logger.warning("Trainer.model is not a `PretrainedModel`, not suppor for merge_tensor_parallel.")
                 if state_dict is None:
                     state_dict = self.model.state_dict()
+
                 paddle.save(
                     state_dict,
                     os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix)),

@@ -417,8 +417,8 @@ class LlamaRotaryEmbedding(nn.Layer):
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
-        cos = self.cos_cached[:, :, :seq_len, ...]
-        sin = self.sin_cached[:, :, :seq_len, ...]
+        cos = self.cos_cached[:, :seq_len, :, :]
+        sin = self.sin_cached[:, :seq_len, :, :]
         return (
             cos.cast(x.dtype) if cos.dtype != x.dtype else cos,
             sin.cast(x.dtype) if sin.dtype != x.dtype else sin,
@@ -1489,7 +1489,7 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
                 _hcg = fleet.get_hybrid_communicate_group()
                 masked_lm_loss = ConcatSePMaskedLoss.apply(masked_lm_loss, axis=1, group=_hcg.get_sep_parallel_group())
             # skip ignore_index which loss == 0
-            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
+            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
             loss = paddle.mean(masked_lm_loss)
 
         return loss

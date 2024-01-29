@@ -44,6 +44,7 @@ function _set_params(){
     sequence_parallel=${17:-"False"}  # (可选)是否开启sequence_parallel
     acc=${18:-"2"} 
     seed=${19:-"1234"}
+    sharding_v2=${20:-"False"}
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -100,6 +101,12 @@ function _train(){
         pp_config_disable_partial_send_recv="--pipeline_parallel_config disable_partial_send_recv"
     fi
 
+    if [ "False" = ${sharding_v2} ]; then
+        sharding_parallel_config=""
+    else
+        sharding_parallel_config="--sharding_parallel_config split_param"
+    fi
+
     model_config="gpt2-medium-en"
     train_cmd="--model_name_or_path ${model_config} \
                 --tokenizer_name_or_path ${model_config} \
@@ -110,6 +117,7 @@ function _train(){
                 --tensor_parallel_degree ${mp_degree} \
                 --pipeline_parallel_degree ${pp_degree} \
                 ${pp_config_disable_partial_send_recv} \
+                ${sharding_parallel_config} \
                 --virtual_pp_degree ${vpp_degree} \
                 --sequence_parallel ${sequence_parallel} \
                 --split 949,50,1 \
@@ -147,24 +155,27 @@ function _train(){
         PADDLE_RANK_OPTION=""
     fi
     # 以下为通用执行命令，无特殊可不用修改
-    case ${run_mode} in
-    DP1-mbs16-acc2) echo "run run_mode: ${run_mode}"
+    case ${device_num} in
+    N1C1) echo "run device_num: ${device_num} run_mode: ${run_mode}"
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0 ${PADDLE_RANK_OPTION}\
             run_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
-    DP8-mbs2-acc2|SD8-stage1-mbs2-acc2|SD8-stage2-mbs2-acc2|SD8-stage3-mbs2-acc2|PP8-mbs16-acc2|MP8-mbs16-acc2|MP2-PP2-DP2-mbs8-acc2|MP2-PP2-SD2-Stage1-mbs8-acc2|MP2-SD4-stage1-mbs4-acc2|MP2-SP2-PP2-DP2-mbs8-acc2|MP2-SP2-PP2-SD2-Stage1-mbs8-acc2|MP2-PP4-VPP2-DP2-mbs2-acc8|MP2-PP4-VPP2-SD2-stage1-mbs2-acc8|MP2-SP2-PP4-VPP2-DP2-mbs2-acc8|MP2-SP2-PP4-VPP2-SD2-stage1-mbs2-acc8) 
-    echo "run run_mode: ${run_mode}"
+    N1C8|N2C16) echo "run device_num: ${device_num} run_mode: ${run_mode}"
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
             run_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
-    MP2-SP2-SD2-Stage1-mbs8-acc2) echo "run run_mode: ${run_mode}"
+    N1C4) echo "run device_num: ${device_num} run_mode: ${run_mode}"
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3 ${PADDLE_RANK_OPTION}\
             run_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
-    *) echo "choose run_mode "; exit 1;
+    *) echo "run device_num: ${device_num} run_mode: ${run_mode}"
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
+            run_pretrain.py ${train_cmd}"
+        workerlog_id=0
+        ;;
     esac
     cd ../llm/gpt-3
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
