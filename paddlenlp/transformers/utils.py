@@ -587,7 +587,7 @@ def cached_file_for_hf_hub(
         download_check(path_or_repo_id, full_filename, addition="from_hf_hub")
         resolved_file = hf_hub_download(
             repo_id=path_or_repo_id,
-            filename=full_filename,
+            filename=filename,
             cache_dir=cache_dir,
             subfolder=subfolder,
             library_name="PaddleNLP",
