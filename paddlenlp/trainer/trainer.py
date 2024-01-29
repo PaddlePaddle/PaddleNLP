@@ -507,6 +507,7 @@ class Trainer:
                 `bool` and equals `True`, load the last checkpoint in *args.output_dir* as saved by a previous instance
                 of [`Trainer`]. Only load model state dict.
         """
+        self.runtime_timer.start("checkpoint loading time")
         resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
 
         # Load potential model checkpoint
@@ -532,10 +533,12 @@ class Trainer:
                         safe_serialization=True,
                     )
                     logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
+                    self.runtime_timer.stop()
                     return
 
         if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
             self._load_from_peft_checkpoint(resume_from_checkpoint)
+            self.runtime_timer.stop()
             return
 
         weight_name = PADDLE_WEIGHTS_NAME
@@ -585,6 +588,7 @@ class Trainer:
 
             elif resume_from_checkpoint is not None:
                 logger.info(f"not loading ckpt :{self.args.dataset_rank}")
+        self.runtime_timer.stop()
 
     def _wrap_model_and_load_sharded_checkpoint(self, resume_from_checkpoint):
         # In the sharded mode, should invoke _load_from_checkpoint after _wrap_model.
@@ -641,9 +645,7 @@ class Trainer:
         # memory metrics - must set up as early as possible
         self._memory_tracker.start()
         if not self.args.should_load_sharding_stage1_model:
-            self.runtime_timer.start("checkpoint loading time")
             self._load_from_checkpoint(resume_from_checkpoint)
-            logger.info(f"{self.runtime_timer.log()}")
 
         train_dataloader = self.get_train_dataloader()
 
@@ -696,9 +698,8 @@ class Trainer:
         self.state = TrainerState()
 
         if self.args.should_load_sharding_stage1_model:
-            self.runtime_timer.start("checkpoint loading time")
             model = self._wrap_model_and_load_sharded_checkpoint(resume_from_checkpoint)
-            logger.info(f"{self.runtime_timer.log()}")
+
         elif self.args.should_save_sharding_stage1_model:
             # In the non-sharded mode, should invoke _load_from_checkpoint before _wrap_model.
             # In this mode, the rank0 load all params and the _wrap_model implicitly broadcast params from rank0 to the other ranks.
@@ -721,6 +722,8 @@ class Trainer:
             if delay_optimizer_creation:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
             self._load_optimizer_and_scheduler(resume_from_checkpoint)
+
+        logger.info(f"{self.runtime_timer.log()}")
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples:,}")
@@ -1243,6 +1246,7 @@ class Trainer:
                 paddle.device.cuda.synchronize()
 
             self._save_checkpoint(model, metrics=metrics)
+            logger.info(f"{self.runtime_timer.log()}")
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
 
     def _get_learning_rate(self):
@@ -2090,7 +2094,7 @@ class Trainer:
             if self.do_grad_scaling:
                 paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
 
-        logger.info(f"{self.runtime_timer.log()}")
+        self.runtime_timer.stop()
         # Determine the new best metric / best model checkpoint
         if metrics is not None and self.args.metric_for_best_model is not None:
             metric_to_check = self.args.metric_for_best_model
@@ -2309,10 +2313,13 @@ class Trainer:
 
     def _load_optimizer_and_scheduler(self, checkpoint):
         """If optimizer and scheduler states exist, load them."""
+        self.runtime_timer.start("checkpoint loading time")
         if checkpoint is None:
+            self.runtime_timer.stop()
             return
 
         if (not self.args.should_load_sharding_stage1_model) and self.args.ignore_load_lr_and_optim:
+            self.runtime_timer.stop()
             return
 
         opt_state_dict = None
@@ -2371,6 +2378,7 @@ class Trainer:
                 self.scaler.load_state_dict(
                     paddle.load(distributed_file(os.path.join(checkpoint, SCALER_NAME)), return_numpy=True)
                 )
+        self.runtime_timer.stop()
 
     def log(self, logs: Dict[str, float], **kwargs) -> None:
         """

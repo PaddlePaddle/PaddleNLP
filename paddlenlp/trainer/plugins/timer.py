@@ -84,7 +84,8 @@ class RuntimeTimer:
         """Log the RuntimeTimer."""
         if reset:
             runtime = self.timer.elapsed(reset=True)
-            self.timer.stop()
+            if self.timer.started_ is True:
+                self.timer.stop()
             self.timer.reset()
         else:
             self.timer.elapsed(reset=False)
