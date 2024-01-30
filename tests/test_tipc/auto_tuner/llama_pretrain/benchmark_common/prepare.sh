@@ -44,10 +44,11 @@ if [ -z "$1" ]; then
 else
   echo "多机任务, 启动etcd服务"
   pip install httpx etcd3 protobuf==3.20.0 --force-reinstall
-  rank=$PADDLE_TRAINER_ID
   ip_lists=($(echo $TRAINER_INSTANCES | tr ',' ' '))
-  master_ip=${ip_lists[0]}
-  echo $master_ip $rank
+  export master_ip=${ip_lists[0]}
+  export rank=$PADDLE_TRAINER_ID
+  export nnodes=$PADDLE_TRAINERS_NUM
+  echo $master_ip $rank $nnodes
   unset PADDLE_ELASTIC_JOB_ID
   unset PADDLE_TRAINER_ENDPOINTS
   unset DISTRIBUTED_TRAINER_ENDPOINTS
