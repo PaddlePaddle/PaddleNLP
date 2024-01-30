@@ -20,7 +20,7 @@ def register_pp_reshard_information(num_hidden_layers):
     from paddlenlp.trainer.utils.reshard.pp_reshard import (
         register_index_layer_func,
         register_layername_prefix,
-        regitser_extract_layer_name_func,
+        register_extract_layer_name_func,
     )
 
     # register layer names
@@ -31,8 +31,8 @@ def register_pp_reshard_information(num_hidden_layers):
     register_layername_prefix("create_parameter")
     register_layername_prefix("llama_lm_head")
 
-    # register func to extract layer from stuctural param name
-    # register func to extract layer index  from stuctural param name
+    # register func to extract layer from structural param name
+    # register func to extract layer index from structural param name
 
     def extract_layer_name(param_name):
         patterns = [r"^llama\.embed_tokens", "^llama\.norm", r"^lm_head", r"^llama\.layers((\.\d+))"]
@@ -57,5 +57,5 @@ def register_pp_reshard_information(num_hidden_layers):
             assert index <= num_hidden_layers, f"{index} {num_hidden_layers}"
             return index
 
-    regitser_extract_layer_name_func(extract_layer_name)
+    register_extract_layer_name_func(extract_layer_name)
     register_index_layer_func(index_layer)

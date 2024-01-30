@@ -61,12 +61,12 @@ def add_start_docstrings(*docstr):
 class PreTrainingArguments(TrainingArguments):
     min_learning_rate: float = field(
         default=1e-5,
-        metadata={"help": "Minimum learning rate deacyed to."},
+        metadata={"help": "Minimum learning rate decayed to."},
     )
     decay_steps: float = field(
         default=None,
         metadata={
-            "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
+            "help": "The steps use to control the learning rate. If the step > decay_steps, will use the min_learning_rate."
         },
     )
     enable_linear_fused_grad_add: bool = field(
@@ -508,7 +508,7 @@ def main():
     if training_args.recompute:
         model.recompute_enable()
 
-    # Create the learning_rate sheduler and optimizer
+    # Create the learning_rate scheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
 

@@ -315,7 +315,7 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
 
 
 def load_state_dict(
-    checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None, fliter_dict_keys=None
+    checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None, filter_dict_keys=None
 ):
     """
     Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
@@ -341,7 +341,7 @@ def load_state_dict(
             state_dict = {}
             with safe_open(checkpoint_file, framework="np") as f:
                 for key in f.keys():
-                    if fliter_dict_keys is not None and key not in fliter_dict_keys:
+                    if filter_dict_keys is not None and key not in filter_dict_keys:
                         continue
                     py_safe_slice_ = f.get_slice(key)
                     if key in tensor_parallel_split_mapping:
