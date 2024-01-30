@@ -288,7 +288,7 @@ def convert_files_to_dicts_splitter(
         separator=separator, chunk_size=chunk_size, chunk_overlap=chunk_overlap, filters=filters
     )
 
-    imgage_splitter = CharacterTextSplitter(
+    imgage_splitter = SpacyTextSplitter(
         separator=separator, chunk_size=chunk_size, chunk_overlap=chunk_overlap, filters=filters
     )
     documents = []
@@ -303,7 +303,7 @@ def convert_files_to_dicts_splitter(
         if file_suffix == ".docx":
             suffix2converter[file_suffix] = DocxTotxtConverter()
             suffix2splitter[file_suffix] = docx_splitter
-        if file_suffix == ".png" or file_suffix == ".jpg":
+        if file_suffix in [".jpg", ".png", ".jpeg", ".JPG", ".JPEG"]:
             suffix2converter[file_suffix] = ImageToTextConverter()
             suffix2splitter[file_suffix] = imgage_splitter
         if file_suffix == ".md":
