@@ -48,7 +48,7 @@ DIST_CKPT_PATH = "dist_ckpt"
 class AutoTrainer(Trainer):
     def __init__(self, *args, **kwargs):
 
-        if kwargs.get("args", None) is not None and kwargs["args"].run_static_auto:
+        if kwargs.get("args", None) is not None and kwargs["args"].to_static:
             if kwargs.get("criterion", None) is None:
 
                 def loss_func(loss, outputs):
@@ -57,7 +57,7 @@ class AutoTrainer(Trainer):
                 kwargs.update({"criterion": loss_func})
 
         super().__init__(*args, **kwargs)
-        assert self.args.use_auto_parallel
+        assert self.args.enable_auto_parallel
 
         self.global_mesh = fleet.auto.get_mesh()
 
@@ -107,7 +107,7 @@ class AutoTrainer(Trainer):
     def _wrap_for_auto(self, model, train_dataloader):
         dist_loader = self._wrap_for_dist_loader(train_dataloader)
 
-        if self.args.run_static_auto:
+        if self.args.to_static:
             return (
                 dist.to_static(model, dist_loader, self.criterion, self.optimizer, strategy=self.args.strategy),
                 dist_loader,
@@ -136,8 +136,8 @@ class AutoTrainer(Trainer):
         if self.args.gradient_accumulation_steps == 1:
             return [inputs]
 
-        # if self.args.run_static_auto:
-        if self.args.run_static_auto and self.args.pipeline_parallel_degree > 1:
+        # if self.args.to_static:
+        if self.args.to_static and self.args.pipeline_parallel_degree > 1:
             return [inputs]
 
         local_batches = [{} for i in range(self.args.gradient_accumulation_steps)]
@@ -281,8 +281,8 @@ class AutoTrainer(Trainer):
                     with _exec_mode_guard("dynamic"):
                         tr_loss += tr_loss_step
 
-                    disable_accumulation = self.args.pipeline_parallel_degree > 1 and self.args.run_static_auto
-                    # disable_accumulation = self.args.run_static_auto
+                    disable_accumulation = self.args.pipeline_parallel_degree > 1 and self.args.to_static
+                    # disable_accumulation = self.args.to_static
 
                     if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
                         # last step in epoch but step is always smaller than gradient_accumulation_steps
@@ -399,7 +399,7 @@ class AutoTrainer(Trainer):
 
         inputs = self._prepare_inputs(inputs)
 
-        if not self.args.run_static_auto:
+        if not self.args.to_static:
             loss = self.dynamic_traning(model, inputs)
         else:
             loss = self.static_traning(model, inputs)
@@ -414,7 +414,7 @@ class AutoTrainer(Trainer):
             return float(loss)
 
     def optimizer_step(self):
-        if not self.args.run_static_auto:
+        if not self.args.to_static:
             optimizer_was_run = True
             if self.do_grad_scaling:
                 scale_before = paddle.assign(self.scaler._scale)

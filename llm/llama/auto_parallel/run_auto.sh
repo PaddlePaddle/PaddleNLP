@@ -68,6 +68,6 @@ python -u -m paddle.distributed.launch \
     --do_eval \
     --device "gpu" \
     --data_impl "mmap" \
-    --parallel_mode "auto"
+    --enable_auto_parallel 1
 
     # --resume_from_checkpoint "output/llama_auto_serial/checkpoint-2" \

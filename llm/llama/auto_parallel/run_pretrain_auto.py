@@ -99,7 +99,6 @@ class PreTrainingArguments(TrainingArguments):
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
         },
     )
-    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
     fused_linear_param_grad_add: bool = field(
         default=False,
         metadata={
@@ -114,7 +113,6 @@ class PreTrainingArguments(TrainingArguments):
         default=-1,
         metadata={"help": "The step to end job_schedule_profiler."},
     )
-    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
     pipeline_schedule_mode: str = field(
         default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
     )
@@ -128,7 +126,7 @@ class PreTrainingArguments(TrainingArguments):
 
     def __post_init__(self):
         super().__post_init__()
-        assert self.use_auto_parallel
+        assert self.enable_auto_parallel
         if self.fused_linear_param_grad_add:
             fused_passes = self.strategy.fused_passes
             fused_passes.enable = True
@@ -414,7 +412,7 @@ def init_seed(seed: int = 1234, args=None):
         np.random.seed(seed)
         paddle.seed(seed)
     else:
-        assert not args.use_hybrid_parallel and args.use_auto_parallel
+        assert not args.use_hybrid_parallel and args.enable_auto_parallel
         if dist.get_world_size() > 1:
             topo = Topology(
                 dist.get_rank(),

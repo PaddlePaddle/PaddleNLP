@@ -345,8 +345,8 @@ class Trainer:
         )
         self.add_callback(PrinterCallback if self.args.disable_tqdm else DEFAULT_PROGRESS_CALLBACK)
 
-        self._save_ckpt_func = dist.save_state_dict if self.args.use_auto_parallel else paddle.save
-        self._load_ckpt_func = dist.load_state_dict if self.args.use_auto_parallel else paddle.load
+        self._save_ckpt_func = dist.save_state_dict if self.args.enable_auto_parallel else paddle.save
+        self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
 
         if args.max_steps > 0:
             logger.info("max_steps is given, it will override any value given in num_train_epochs")

@@ -112,7 +112,7 @@ class PreTrainingArguments(TrainingArguments):
 
     def __post_init__(self):
         super().__post_init__()
-        assert self.use_auto_parallel
+        assert self.enable_auto_parallel
 
         # NOTE(gongenlei): new add autotuner_benchmark
         if self.autotuner_benchmark:
@@ -402,7 +402,7 @@ def init_seed(seed: int = 1234, args=None):
         np.random.seed(seed)
         paddle.seed(seed)
     else:
-        assert not args.use_hybrid_parallel and args.use_auto_parallel
+        assert not args.use_hybrid_parallel and args.enable_auto_parallel
         if dist.get_world_size() > 1:
             topo = Topology(
                 dist.get_rank(),
