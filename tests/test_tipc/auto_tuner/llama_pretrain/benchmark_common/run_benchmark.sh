@@ -77,29 +77,23 @@ function _train(){
         log_file=${train_log_file}
     fi
 
-    if [ ${PADDLE_TRAINER_ID} ]
-    then
-        PADDLE_RANK_OPTION=" --rank ${PADDLE_TRAINER_ID}"
-    else
-        PADDLE_RANK_OPTION=""
-    fi
     # 以下为通用执行命令，无特殊可不用修改
     case ${device_num} in
     N1C1) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --gpus=0 ${PADDLE_RANK_OPTION}\
+        train_cmd="python -m paddle.distributed.launch --gpus=0 \
             --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
         ;;
     N1C8) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
+        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
         ;;
     N2C16) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
+        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --auto_tuner_json ${autoconfig_json_file} --master etcd://$master_ip:2379 --nnodes $nnodes:$nnodes \
             finetune_generation.py ${modle_json_file}"
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
+        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
         ;;
     esac
