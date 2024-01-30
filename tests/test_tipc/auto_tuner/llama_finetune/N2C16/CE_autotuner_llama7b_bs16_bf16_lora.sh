@@ -13,11 +13,11 @@
 # limitations under the License.
 
 param="model_item=CE_autotuner_llama7b "
-param+="run_mode=sft "
+param+="run_mode=lora "
 param+="device_num=N2C16 "
-param+="global_batch_size=8 "
-param+="autoconfig_json_file=autoconfig/llama7b_sft.json "
-param+="modle_json_file=autoconfig/llama7b_sft_params.json "
+param+="global_batch_size=16 "
+param+="autoconfig_json_file=autoconfig/llama7b_lora_N2C16.json "
+param+="modle_json_file=autoconfig/llama7b_lora_params.json "
 
 cd ./tests
 bash ./test_tipc/auto_tuner/llama_finetune/benchmark_common/prepare.sh multi
