@@ -25,9 +25,11 @@ import paddle.distributed as dist
 import paddle.incubate.multiprocessing as mp
 from paddle.distributed import fleet
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
-from paddlenlp_ops import get_output
+
+# from paddlenlp_ops import get_output
 from sklearn.metrics import accuracy_score
 
+CPU_MODE = True
 from paddlenlp.datasets import InTokensIterableDataset
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length

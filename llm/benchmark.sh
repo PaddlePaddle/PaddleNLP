@@ -14,23 +14,29 @@
 
 export PYTHONPATH=$(dirname $(pwd)):$PYTHONPATH
 
-export FLAGS_control_flow_use_new_executor=1
-export FLAGS_new_executor_serial_run=1
-export FLAGS_allocator_strategy=naive_best_fit
-export FLAGS_fraction_of_gpu_memory_to_use=0.92
+# export FLAGS_control_flow_use_new_executor=1
+# export FLAGS_new_executor_serial_run=1
+# export FLAGS_allocator_strategy=naive_best_fit
+# export FLAGS_fraction_of_gpu_memory_to_use=0.92
 
-export FLAGS_use_autotune=1
-export FLAGS_cublaslt_exhaustive_search_times=10
-export FLAGS_cache_inference_while_scope=1
+# export FLAGS_use_autotune=1
+# export FLAGS_cublaslt_exhaustive_search_times=10
+# export FLAGS_cache_inference_while_scope=1
 
+
+# python export_model.py \
+#     --model_name_or_path meta-llama/Llama-2-7b-chat \
+#     --output_path ./inference \
+#     --dtype float32
 
 python predictor.py \
-    --model_name_or_path ./llama7b-inference_model_fp16 \
-    --dtype float16 \
-    --src_length 300 \
-    --max_length 100 \
+    --model_name_or_path ./inference \
+    --dtype float32 \
+    --src_length 128 \
+    --max_length 15 \
     --output_file "infer.json" \
-    --mode "static" \
     --batch_size 1 \
-    --benchmark \
-    --inference_model 
+    --mode "static"\
+    --benchmark True\
+    --device "cpu"
+

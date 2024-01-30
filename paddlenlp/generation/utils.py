@@ -1329,8 +1329,10 @@ class GenerationMixin(object):
             # compute next_tokens
             if use_top_p:
                 logits = logits / temperature
-                top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
-                _, next_tokens = paddle.tensor.top_p_sampling(probs, top_ps_tensor)
+                probs = TopPProcess(probs, top_p, min_tokens_to_keep)
+                next_tokens = paddle.multinomial(probs)
+                # top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
+                # _, next_tokens = paddle.tensor.top_p_sampling(probs, top_ps_tensor)
             else:
                 probs = TopKProcess(probs, top_k, min_tokens_to_keep)
                 if top_k == 1:
@@ -1392,8 +1394,10 @@ class GenerationMixin(object):
                         unfinished_flag,
                         model_kwargs,
                     )
-                    paddle.increment(cur_len)
-                    paddle.increment(cur_len_gpu)
+                    # paddle.increment(cur_len)
+                    # paddle.increment(cur_len_gpu)
+                    cur_len += 1
+                    cur_len_gpu += 1
         else:
             while cur_len < max_new_tokens and paddle.any(unfinished_flag):
                 input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
