@@ -16,6 +16,7 @@ param="model_item=CE_autotuner_llama7b "
 param+="run_mode=lora "
 param+="device_num=N2C16 "
 param+="global_batch_size=16 "
+param+="nnodes=2 "
 param+="autoconfig_json_file=autoconfig/llama7b_lora_N2C16.json "
 param+="modle_json_file=autoconfig/llama7b_lora_params.json "
 

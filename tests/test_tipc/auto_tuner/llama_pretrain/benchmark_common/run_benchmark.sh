@@ -35,6 +35,9 @@ function _set_params(){
 
     fp_item="bf16"
     workerlog_id=0
+    ip_lists=($(echo $TRAINER_INSTANCES | tr ',' ' '))
+    master_ip=${ip_lists[0]}
+    nnodes=${nnodes:-1}
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
