@@ -25,7 +25,7 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
-from paddle.io import DataLoader, DistributedBatchSampler
+from paddle.io import DataLoader, BatchSampler
 
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
 from paddlenlp.transformers import (
@@ -465,6 +465,7 @@ def main():
     config.num_hidden_layers = (
         model_args.num_hidden_layers if model_args.num_hidden_layers is not None else config.num_hidden_layers
     )
+
     config.num_attention_heads = (
         model_args.num_attention_heads if model_args.num_attention_heads is not None else config.num_attention_heads
     )
@@ -548,12 +549,12 @@ def main():
     print(
         f"===> worldsize = {training_args.per_device_train_batch_size}  rank: {dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree)}"
     )
-    train_sampler = DistributedBatchSampler(
+
+    global_batch_size = training_args.per_device_train_batch_size * training_args.data_parallel_degree
+    train_sampler = BatchSampler(
         train_dataset,
-        batch_size=training_args.per_device_train_batch_size,
+        batch_size=global_batch_size,
         shuffle=False,
-        num_replicas=training_args.data_parallel_degree,
-        rank=dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree),
         drop_last=training_args.dataloader_drop_last,
     )
 
@@ -564,7 +565,14 @@ def main():
         num_workers=training_args.dataloader_num_workers,
     )
 
-    num_update_steps_per_epoch = len(train_dataloader) // training_args.gradient_accumulation_steps
+    dist_dataloader = dist.shard_dataloader(
+        dataloader=train_dataloader,
+        meshes=[get_mesh(0), get_mesh(-1)],
+        shard_dims="dp",
+        input_keys=["input_ids", "labels"],
+    )
+
+    num_update_steps_per_epoch = len(dist_dataloader) // training_args.gradient_accumulation_steps
     num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
     num_train_epochs = training_args.max_steps // num_update_steps_per_epoch + int(
         training_args.max_steps % num_update_steps_per_epoch > 0
@@ -573,42 +581,14 @@ def main():
     global_step = 1
     tr_loss = float(0)
 
-    # hack: create dp group for distributed input data to align dygraph parallel loss.
-    dp_group = None
-    global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("pp").mesh
-    mesh_shape = global_mesh.shape
-    for id in range(mesh_shape[0]):
-        pp_mesh = global_mesh[id]
-        for i in range(pp_mesh.shape[-1]):
-            ranks = pp_mesh[:, i]
-            print("dp ranks: ", ranks)
-            group = dist.new_group(ranks)
-            if dist.get_rank() in ranks:
-                dp_group = group
-    assert dp_group is not None
-
     model.train()
     optimizer = dist.shard_optimizer(optimizer)
     for epoch_idx in range(num_train_epochs):
-        for step, inputs in enumerate(train_dataloader):
+        for step, inputs in enumerate(dist_dataloader()):
             input_ids, labels = inputs["input_ids"], inputs["labels"]
 
             input_id = input_ids[0][0].numpy()
             label = labels[0][0].numpy()
-
-            # hack for align dygraph parallel.
-            if dp_group is not None:
-                cur_rank = dist.get_rank()
-                res = []
-                dist.all_gather(res, paddle.Tensor(input_ids, place=paddle.CUDAPlace(cur_rank)), group=dp_group)
-                input_ids = paddle.concat(res)
-                input_ids = dist.shard_tensor(input_ids, get_mesh(), [dist.Shard(0), dist.Replicate()])
-
-                res = []
-                dist.all_gather(res, paddle.Tensor(labels, place=paddle.CUDAPlace(cur_rank)), group=dp_group)
-                labels = paddle.concat(res)
-                labels = dist.shard_tensor(labels, get_mesh(-1), [dist.Shard(0), dist.Replicate()])
-
             res = model(input_ids, labels=labels)
 
             # add criterion in the future.
