@@ -46,6 +46,7 @@ class BertFastTokenizer(PretrainedFastTokenizer):
         strip_accents=None,
         **kwargs
     ):
+        # breakpoint()
         super().__init__(
             vocab_file,
             tokenizer_file=tokenizer_file,

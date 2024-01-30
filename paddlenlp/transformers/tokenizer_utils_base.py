@@ -1515,6 +1515,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     subfolder=subfolder,
                 )
             elif from_hf_hub:
+                # breakpoint()
                 resolved_vocab_files[file_id] = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=file_path,
@@ -1621,8 +1622,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 init_kwargs[args_name] = file_path
 
         # TODO(zhoushunjie): It's not supportted to load tokenizer.json of hf so far.
-        if from_hf_hub and "tokenizer_file" in init_kwargs:
-            init_kwargs.pop("tokenizer_file")
+        # if from_hf_hub and "tokenizer_file" in init_kwargs:
+            # init_kwargs.pop("tokenizer_file")
 
         # TODO(guosheng): avoid reduplication of position args and key word args
         tokenizer = cls(*init_args, **init_kwargs)

@@ -297,6 +297,7 @@ class AutoTokenizer:
                     if pattern == pretrained_model_name_or_path:
                         actual_tokenizer_class = None
                         # Default setting the python tokenizer to actual_tokenizer_class
+                        # 为什么要多重复设置一次默认的，好像可以合并进入下面
                         for tokenizer_class in tokenizer_classes:
                             if not tokenizer_class[1]:
                                 actual_tokenizer_class = tokenizer_class[0]
@@ -321,7 +322,6 @@ class AutoTokenizer:
                                     "please ensure install fast_tokenizer correctly. "
                                     "You can install fast_tokenizer by `pip install fast-tokenizer-python`."
                                 )
-
                         logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
                         return actual_tokenizer_class.from_pretrained(
                             pretrained_model_name_or_path, *model_args, **kwargs
