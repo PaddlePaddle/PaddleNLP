@@ -89,7 +89,7 @@ def convert_to_unicode(text):
 
 def whitespace_tokenize(text):
     """
-    Runs basic whitespace cleaning and splitting on a peice of text.
+    Runs basic whitespace cleaning and splitting on a piece of text.
     Args:
         text (str): Text to be tokenized.
     Returns:
@@ -106,7 +106,7 @@ def _is_whitespace(char):
     """
     Checks whether `chars` is a whitespace character.
     """
-    # \t, \n, and \r are technically contorl characters but we treat them
+    # \t, \n, and \r are technically control characters but we treat them
     # as whitespace since they are generally considered as such.
     if char == " " or char == "\t" or char == "\n" or char == "\r":
         return True
@@ -1426,7 +1426,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
                         sequence = ids + pair_ids if pair else ids
                         token_type_ids = [0] * len(ids) + ([0] * len(pair_ids) if pair else [])
                     encoded_inputs["offset_mapping"] = offset_mapping
-                    # Build output dictionnary
+                    # Build output dictionary
                     encoded_inputs["input_ids"] = sequence
                     if return_token_type_ids:
                         encoded_inputs["token_type_ids"] = token_type_ids
