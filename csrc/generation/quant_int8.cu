@@ -251,7 +251,7 @@ std::vector<paddle::DataType> QuantInt8Dtype(const paddle::DataType& input_dtype
 }
 
 PD_BUILD_OP(quant_int8)
-    .Inputs({"intput", paddle::Optional("shift"),paddle::Optional("smooth") })
+    .Inputs({"input", paddle::Optional("shift"),paddle::Optional("smooth") })
     .Outputs({"output"})
     .Attrs({"scale: float","round_type: int","max_bound: float", "min_bound: float"})
     .SetKernelFn(PD_KERNEL(QuantInt8))
