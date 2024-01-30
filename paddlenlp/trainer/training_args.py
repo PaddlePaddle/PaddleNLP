@@ -1178,9 +1178,6 @@ class TrainingArguments:
                 pipeline.micro_batch_size = self.per_device_train_batch_size
                 pipeline.schedule_mode = self.pipeline_schedule_mode
 
-                if self.amp_master_grad:
-                    warnings.warn("`amp_master_grad` is not supported NOW in AutoParallel!")
-                    self.amp_master_grad = False
                 logger.info(f"PP configs:{strategy.pipeline}, use master_grad: {self.amp_master_grad}")
 
                 if self.do_eval:
@@ -1264,6 +1261,7 @@ class TrainingArguments:
                 amp.enable = True
                 amp.dtype = "bfloat16" if self.bf16 else "float16"
                 amp.level = self.fp16_opt_level.lower()
+                amp.use_master_grad = self.amp_master_grad
                 amp.init_loss_scaling = self.scale_loss
                 amp.custom_black_list = self.amp_custom_black_list if self.amp_custom_black_list is not None else []
                 amp.custom_white_list = self.amp_custom_white_list if self.amp_custom_white_list is not None else []
@@ -1708,21 +1706,21 @@ class TrainingArguments:
         """
         print all config values.
         """
-        logger.info("=" * 60)
+        logger.debug("=" * 60)
         if args is None:
             args = self
             key = "Training"
 
         import paddlenlp
 
-        logger.info("{:^40}".format("{} Configuration Arguments".format(key)))
-        logger.info("{:30}: {}".format("paddle commit id", paddle.version.commit))
-        logger.info("{:30}: {}".format("paddlenlp commit id", paddlenlp.version.commit))
+        logger.debug("{:^40}".format("{} Configuration Arguments".format(key)))
+        logger.debug("{:30}: {}".format("paddle commit id", paddle.version.commit))
+        logger.debug("{:30}: {}".format("paddlenlp commit id", paddlenlp.version.commit))
 
         for a in dir(args):
             if a[:2] != "__":  # don't print double underscore methods
                 v = getattr(args, a)
                 if not isinstance(v, types.MethodType):
-                    logger.info("{:30}: {}".format(a, v))
+                    logger.debug("{:30}: {}".format(a, v))
 
-        logger.info("")
+        logger.debug("")
