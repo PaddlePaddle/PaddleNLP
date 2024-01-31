@@ -320,8 +320,11 @@ class TrainingArguments:
             than computing them on train startup. Ignored unless `group_by_length` is `True` and the dataset is an
             instance of `Dataset`.
         report_to (`str` or `List[str]`, *optional*, defaults to `"visualdl"`):
-            The list of integrations to report the results and logs to. Supported platforms is `"visualdl"`.
+            The list of integrations to report the results and logs to.
+            Supported platforms are `"visualdl"`/`"wandb"`/`"tensorboard"`.
             `"none"` for no integrations.
+        wandb_api_key (`str`, *optional*):
+            Weights & Biases (WandB) API key(s) for authentication with the WandB service.
         resume_from_checkpoint (`str`, *optional*):
             The path to a folder with a valid checkpoint for your model. This argument is not directly used by
             [`Trainer`], it's intended to be used by your training/evaluation scripts instead. See the [example
@@ -695,6 +698,10 @@ class TrainingArguments:
     )
     report_to: Optional[List[str]] = field(
         default=None, metadata={"help": "The list of integrations to report the results and logs to."}
+    )
+    wandb_api_key: Optional[str] = field(
+        default=None,
+        metadata={"help": "Weights & Biases (WandB) API key(s) for authentication with the WandB service."},
     )
     resume_from_checkpoint: Optional[str] = field(
         default=None,
@@ -1330,7 +1337,7 @@ class TrainingArguments:
                 "integrations to none). In v5, you will need to use `--report_to all` to get the same behavior as "
                 "now. You should start updating your code and make this info disappear :-)."
             )
-            self.report_to = "all"
+            self.report_to = "visualdl"
         if self.report_to == "all" or self.report_to == ["all"]:
             # Import at runtime to avoid a circular import.
             from .integrations import get_available_reporting_integrations
