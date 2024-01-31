@@ -17,7 +17,9 @@ import gc
 import json
 import multiprocessing
 import os
+import time
 
+import numpy as np
 import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
@@ -27,7 +29,6 @@ from paddlenlp.trainer.trainer_utils import ExplicitEnum
 from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
 from paddlenlp.transformers.model_utils import (
     PretrainedModel,
-    _load_state_dict_into_model,
     get_parameter_dtype,
     load_state_dict,
     unwrap_model,
@@ -213,8 +214,6 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
     if not isinstance(resolved_archive_file, list):
         resolved_archive_file = [resolved_archive_file]
 
-    error_msgs = []
-
     if len(resolved_archive_file) > 1:
         resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
 
@@ -229,7 +228,10 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
             assert loaded_keys is not None, "loaded_keys is not None."
             tp_actions = model.get_tensor_parallel_convert_actions(model.config, loaded_keys, ignore_error=True)
         # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
+        start = time.time()
         state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys)
+        end = time.time()
+        print("unified checkpoint load_state_dict:", 1000 * (end - start))
 
         if not pre_tensor_parallel_split:
             # Since we load all keys but we only need one of pipeline stages
@@ -241,20 +243,14 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
             state_dict = model.convert_tensor_parallel(
                 None, model.config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
             )
-
-        error_msgs += _load_state_dict_into_model(model, state_dict, "")
+        start = time.time()
+        unified_checkpoint_load_state_dict_into_model(model, state_dict, "")
+        end = time.time()
+        print("unified_checkpoint_load_state_dict_into_model:", 1000 * (end - start))
 
         # force memory release
         del state_dict
         gc.collect()
-
-    if len(error_msgs) > 0:
-        error_msg = "\n\t".join(error_msgs)
-        if " but the expected shape is" in error_msg:
-            error_msg += (
-                "\n\tYou may consider adding `ignore_mismatched_sizes=True` in the model `from_pretrained` method."
-            )
-        raise RuntimeError(f"Error(s) in loading state_dict for {model.__class__.__name__}:\n\t{error_msg}")
 
 
 def save_config(model_to_save):
@@ -912,7 +908,7 @@ def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_chec
         args, model, file_keyname_mappings, file_machine_mappings, resume_from_checkpoint
     )
 
-    # Get all the keys that are splited by tensor parallelism.
+    # Get all the keys that are splitted by tensor parallelism.
     all_tp_keys = set()
     for k, v in recv_table.items():
         if v[0][1] != -1:
@@ -938,10 +934,7 @@ def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_chec
     )
     dist.barrier()
 
-    error_msgs = _load_state_dict_into_model(model, state_dict, "")
-    if len(error_msgs) > 0:
-        error_msg = "\n\t".join(error_msgs)
-        raise RuntimeError(f"Error(s) in loading dynamic state_dict for {model.__class__.__name__}:\n\t{error_msg}")
+    unified_checkpoint_load_state_dict_into_model(model, state_dict, "")
 
 
 def load_unified_optimizer_dynamically(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
@@ -1045,7 +1038,7 @@ def load_unified_optimizer_dynamically(args, model, optimizer, resume_from_check
         if has_master_weights:
             optim_state_dict_mw[k] = paddle.empty(shape, dtype="float32")
 
-    # Get all the keys that are splited by tensor parallelism.
+    # Get all the keys that are splitted by tensor parallelism.
     all_tp_keys = set()
     for k, v in recv_table.items():
         structure_name, typename = k.split("/")
@@ -1535,10 +1528,10 @@ def mapping_optimizer_tp_actions(tp_actions, optimizer_loaded_keys):
     or param.key/beta1_XXX
     or param.key/beta2_XXX
     Args:
-        tp_actions (dict): dictionay of tensor parallel actions {key: action}
+        tp_actions (dict): dictionary of tensor parallel actions {key: action}
         optimizer_loaded_keys (list or set): [param.key1/moment1_0, param.key2/beta1_XXX, param.key3/beta2_XXX]
     Returns:
-        dict: new dictionay of tensor parallel actions {key: action}
+        dict: new dictionary of tensor parallel actions {key: action}
     """
     new_actions = {}
     for key in optimizer_loaded_keys:
@@ -1699,3 +1692,37 @@ def is_need_master_weight(optimizer, is_fp16_or_bp16):
         return optimizer._multi_precision and is_fp16_or_bp16
     else:
         return False
+
+
+def unified_checkpoint_load_state_dict_into_model(model_to_load, state_dict, start_prefix):
+    def is_0d_or_1d(tensor):
+        return len(tensor.shape) == 0 or list(tensor.shape) == [1]
+
+    if len(start_prefix) > 0:
+        for key in list(state_dict.keys()):
+            if key.startswith(start_prefix):
+                state_dict[key.replace(start_prefix, "")] = state_dict.pop(key)
+
+    expected_place = paddle.framework._current_expected_place()
+    for key, value in model_to_load.state_dict().items():
+        if key in state_dict:
+            value_state_dict = state_dict.pop(key)
+            if isinstance(value_state_dict, np.ndarray):
+                raise ValueError(
+                    "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, please convert numpy.ndarray to paddle.Tensor"
+                )
+            # confirm parameter cast is executed on the same device as model
+            # Note: cast(FP32 -> FP16) has diff on different devices, need to fix it
+            if value_state_dict.is_floating_point() and value_state_dict.dtype != value.dtype:
+                if value_state_dict.place._equals(expected_place):
+                    value_state_dict = paddle.cast(value_state_dict, value.dtype)
+                else:
+                    # confirm buffer cast is executed on the same device as model
+                    value_state_dict = paddle.cast(value_state_dict._copy_to(expected_place, False), value.dtype)
+
+            # unified 0d and 1d tensor
+            if is_0d_or_1d(value) and is_0d_or_1d(value_state_dict):
+                if list(value.shape) != list(value_state_dict.shape):
+                    value_state_dict = paddle.reshape(value_state_dict, value.shape)
+            value.set_value(value_state_dict)
+            # del value_state_dict

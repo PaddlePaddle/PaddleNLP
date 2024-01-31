@@ -1059,3 +1059,76 @@ class TestUnifiedCheckpointOnN1C8EnableAll(TestUnifiedCheckpointBase):
 
     def rerun(self, train_args):
         self.run_n1c8(self.run_pretrain_file, **train_args)
+
+
+class TestUnifiedCheckpointOnN1C8SaveLoadSpeed(TestUnifiedCheckpointBase):
+    def setUp(self):
+        super().setUp()
+        for config_key in self.configs:
+            self.configs[config_key]["skip_profile_timer"] = 0
+            self.configs[config_key]["unified_checkpoint"] = 1
+            self.configs[config_key]["unified_checkpoint_config"] = "skip_save_model_weight master_weight_compatible"
+
+        self.need_allclose = False
+        self.rtol = 1e-7
+
+    def runfrist(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, **train_args)
+
+    def rerun(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, **train_args)
+
+
+class TestPaddleCheckpointOnN1C8SaveLoadSpeed(TestUnifiedCheckpointBase):
+    def setUp(self):
+        super().setUp()
+        for config_key in self.configs:
+            self.configs[config_key]["skip_profile_timer"] = 0
+            self.configs[config_key]["unified_checkpoint"] = 0
+
+        self.need_allclose = False
+        self.rtol = 1e-7
+
+    def runfrist(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, **train_args)
+
+    def rerun(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, **train_args)
+
+
+class TestUnifiedCheckpointOnN1C8SaveLoadSpeedNoOptimizer(TestUnifiedCheckpointBase):
+    def setUp(self):
+        super().setUp()
+        for config_key in self.configs:
+            self.configs[config_key]["skip_profile_timer"] = 0
+            self.configs[config_key]["unified_checkpoint"] = 1
+            self.configs[config_key]["unified_checkpoint_config"] = "master_weight_compatible"
+            self.configs[config_key]["ignore_load_lr_and_optim"] = 1
+            self.configs[config_key]["ignore_save_lr_and_optim"] = 1
+        self.need_allclose = False
+        self.rtol = 1e-7
+
+    def runfrist(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, **train_args)
+
+    def rerun(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, **train_args)
+
+
+class TestPaddleCheckpointOnN1C8SaveLoadSpeedNoOptimizer(TestUnifiedCheckpointBase):
+    def setUp(self):
+        super().setUp()
+        for config_key in self.configs:
+            self.configs[config_key]["skip_profile_timer"] = 0
+            self.configs[config_key]["unified_checkpoint"] = 0
+            self.configs[config_key]["ignore_load_lr_and_optim"] = 1
+            self.configs[config_key]["ignore_save_lr_and_optim"] = 1
+
+        self.need_allclose = False
+        self.rtol = 1e-7
+
+    def runfrist(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, **train_args)
+
+    def rerun(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, **train_args)

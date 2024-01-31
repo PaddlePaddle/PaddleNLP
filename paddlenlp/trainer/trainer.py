@@ -527,6 +527,7 @@ class Trainer:
                     logger.info("Loading origin checkpoint, the next checkpoint will be saved as unified checkpoint")
 
                 if use_unified_checkpoint:
+                    start = time.time()
                     load_unified_checkpoint(
                         self.args,
                         self.model,
@@ -534,6 +535,7 @@ class Trainer:
                         resume_from_checkpoint,
                         safe_serialization=True,
                     )
+                    print("load_unified_checkpoint", 1000 * (time.time() - start))
                     logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
                     self.runtime_timer.stop()
                     return
@@ -555,7 +557,7 @@ class Trainer:
             self.model.set_state_dict(state_dict)
         else:
             if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
-
+                start_paddle = time.time()
                 weights_file = os.path.join(
                     resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
                 )
@@ -576,9 +578,13 @@ class Trainer:
 
                 if os.path.isfile(weights_file):
                     # We load the model state dict on the CPU to avoid an OOM error.
+                    start = time.time()
                     state_dict = paddle.load(weights_file, return_numpy=True)
+                    print("paddle_load_checkpoint_file", 1000 * (time.time() - start))
                     # If the model is on the GPU, it still works!
+                    start = time.time()
                     self._set_state_dict_in_model(state_dict)
+                    print("paddle_load_checkpoint_into_model", 1000 * (time.time() - start))
                     # release memory
                     del state_dict
                 else:
@@ -587,7 +593,7 @@ class Trainer:
                         self.model, resume_from_checkpoint, self.args.weight_name_suffix, prefer_safe=False
                     )
                     logger.info(f"set state_dict: {missing_keys, unexpected_keys}")
-
+                print("load_paddle_checkpoint", 1000 * (time.time() - start_paddle))
             elif resume_from_checkpoint is not None:
                 logger.info(f"not loading ckpt :{self.args.dataset_rank}")
         self.runtime_timer.stop()
@@ -2096,11 +2102,12 @@ class Trainer:
 
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
-        if self.args.use_hybrid_parallel:
+        if not self.args.ignore_save_lr_and_optim and self.args.use_hybrid_parallel:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
                 logger.info("Saving optimizer files.")
                 if self.args.unified_checkpoint:
+                    start = time.time()
                     save_unified_optimizer(
                         self.args,
                         self.model,
@@ -2108,19 +2115,25 @@ class Trainer:
                         output_dir,
                         safe_serialization=True,
                     )
+                    print("save_unified_optimizer", 1000 * (time.time() - start))
                 else:
+                    start = time.time()
                     paddle.save(
                         self.optimizer.state_dict(),
                         os.path.join(output_dir, optimizer_name),
                     )
+                    print("save_paddle_optimizer", 1000 * (time.time() - start))
 
         if self.args.should_save:
-            if not self.args.use_hybrid_parallel:
-                logger.info("Saving optimizer files.")
-                paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+            if not self.args.ignore_save_lr_and_optim:
+                if not self.args.use_hybrid_parallel:
+                    logger.info("Saving optimizer files.")
+                    start = time.time()
+                    paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+                    print("save_paddle_optimizer", 1000 * (time.time() - start))
 
-            # FIXME: maybe only save one copy
-            paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
+                # FIXME: maybe only save one copy
+                paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
 
             if self.do_grad_scaling:
                 paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
@@ -2268,7 +2281,9 @@ class Trainer:
             paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
 
         if self.args.unified_checkpoint:
+            start = time.time()
             save_unified_checkpoint(self.args, self.model, self.optimizer, output_dir, safe_serialization=True)
+            print("save_unified_checkpoint", 1000 * (time.time() - start))
             return
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
@@ -2333,6 +2348,8 @@ class Trainer:
                     max_shard_size="1024GB",
                 )
             else:
+                self.timers and self.timers("save_paddle_checkpoint").start()
+                start = time.time()
                 self.model.save_pretrained(
                     output_dir,
                     merge_tensor_parallel=merge_tensor_parallel,
@@ -2340,6 +2357,7 @@ class Trainer:
                     is_main_process=self.args.should_save,
                     max_shard_size="1024GB",
                 )
+                print("save_paddle_checkpoint", 1000 * (time.time() - start))
         if self.args.should_save_sharding_stage1_model:
             self.sharding_io.save_distributed_model_meta(output_dir)
 
@@ -2368,6 +2386,7 @@ class Trainer:
                     logger.info("Loading checkpoint, the next checkpoint will be saved as unified checkpoint")
 
             if not use_unified_checkpoint:
+                start = time.time()
                 if self.args.data_parallel_rank == 0:
                     optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
                     path = os.path.join(checkpoint, optimizer_name)
@@ -2375,7 +2394,9 @@ class Trainer:
                         opt_state_dict = paddle.load(path)
                 else:
                     opt_state_dict = None
+                print("load_paddle_optimizer", 1000 * (time.time() - start))
             else:
+                start = time.time()
                 opt_state_dict = load_unified_optimizer(
                     args=self.args,
                     model=self.model,
@@ -2383,6 +2404,7 @@ class Trainer:
                     resume_from_checkpoint=checkpoint,
                     safe_serialization=True,
                 )
+                print("load_unified_optimizer", 1000 * (time.time() - start))
 
         if self.args.ignore_load_lr_and_optim and opt_state_dict:
             tmp = self.optimizer.state_dict()
