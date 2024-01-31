@@ -19,6 +19,7 @@
 import collections
 import contextlib
 import copy
+import ctypes
 import inspect
 import json
 import math
@@ -157,7 +158,8 @@ async_save_queue = []
 g_cpu_optimizer_state_dict = {}
 
 
-def _save_func(obj, path, saved_signal_path, protocol):
+def _save_func(obj, path, saved_signal_path, protocol, shared_value):
+    shared_value.value = 1
     paddle.save(obj, path, protocol)
     # dump savd_siganl
     with open(saved_signal_path, mode="w+") as f:
@@ -203,9 +205,19 @@ def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol
             g_cpu_optimizer_state_dict[k] = v.pin_memory()
         paddle.device.cuda.synchronize()
     clear_async_save_task_queue()
-    ctx = multiprocessing.get_context("spawn")
-    p = ctx.Process(target=_save_func, args=(g_cpu_optimizer_state_dict, path, saved_signal_path, protocol))
+    shared_value = multiprocessing.Value(ctypes.c_int, 0)
+    ctx = multiprocessing.get_context("fork")
+    p = ctx.Process(
+        target=_save_func, args=(g_cpu_optimizer_state_dict, path, saved_signal_path, protocol, shared_value)
+    )
     p.start()
+    while shared_value.value == 0:
+        if not p.is_alive():
+            logger.error("create new process error, retry")
+            p = ctx.Process(
+                target=_save_func, args=(g_cpu_optimizer_state_dict, path, saved_signal_path, protocol, shared_value)
+            )
+            p.start()
     async_save_queue.append(p)
 
 
