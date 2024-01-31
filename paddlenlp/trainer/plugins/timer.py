@@ -32,14 +32,16 @@ class _Timer:
     def start(self):
         """Start the timer."""
         assert not self.started_, f"{self.name} timer has already started"
-        paddle.device.synchronize()
+        if "gpu" in paddle.device.get_device():
+            paddle.device.synchronize()
         self.start_time = time.time()
         self.started_ = True
 
     def stop(self):
         """Stop the timers."""
         assert self.started_, f"{self.name} timer is not started."
-        paddle.device.synchronize()
+        if "gpu" in paddle.device.get_device():
+            paddle.device.synchronize()
         self.elapsed_ += time.time() - self.start_time
         self.started_ = False
 
