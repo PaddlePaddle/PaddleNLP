@@ -19,8 +19,10 @@ import os
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from fast_tokenizer import Encoding as FastEncoding
-from fast_tokenizer import Tokenizer as FastTokenizer
+# from fast_tokenizer import Encoding as FastEncoding
+# from fast_tokenizer import Tokenizer as FastTokenizer
+from tokenizers import Encoding as FastEncoding
+from tokenizers import Tokenizer as FastTokenizer
 
 from .convert_slow_tokenizer import convert_slow_tokenizer
 from .tokenizer_utils import PretrainedTokenizer
@@ -95,13 +97,13 @@ class PretrainedFastTokenizer(PretrainedTokenizerBase):
         """
         `int`: Size of the base vocabulary (without the added tokens).
         """
-        if self.from_hub == 'huggingface':
+        if self.from_hub == 'huggingface' or self.from_hub is None:
             return self._tokenizer.get_vocab_size(with_added_tokens=False)
         else:
             return self._tokenizer.get_vocab_size(with_added_vocabulary=False)
 
     def get_vocab(self) -> Dict[str, int]:
-        if self.from_hub == 'huggingface':
+        if self.from_hub == 'huggingface' or self.from_hub is None:
             return self._tokenizer.get_vocab(with_added_tokens=True)
         else:
             return self._tokenizer.get_vocab(with_added_vocabulary=True)
@@ -117,7 +119,7 @@ class PretrainedFastTokenizer(PretrainedTokenizerBase):
         Returns:
             `Dict[str, int]`: The added tokens.
         """
-        if self.from_hub == 'huggingface':
+        if self.from_hub == 'huggingface' or self.from_hub is None:
             base_vocab = self._tokenizer.get_vocab(with_added_tokens=False)
         else:
             base_vocab = self._tokenizer.get_vocab(with_added_vocabulary=False)
