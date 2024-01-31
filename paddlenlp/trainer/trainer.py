@@ -346,6 +346,9 @@ class Trainer:
         )
         self.add_callback(PrinterCallback if self.args.disable_tqdm else DEFAULT_PROGRESS_CALLBACK)
 
+        self._save_ckpt_func = dist.save_state_dict if self.args.enable_auto_parallel else paddle.save
+        self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
+
         if args.max_steps > 0:
             logger.info("max_steps is given, it will override any value given in num_train_epochs")
 
@@ -782,7 +785,6 @@ class Trainer:
         resume_from_checkpoint,
         ignore_keys_for_eval,
     ):
-
         start_time = time.time()
         self._globalstep_last_start_time = time.time()
         self.state.epoch = 0
@@ -1205,13 +1207,17 @@ class Trainer:
         if timer_info or paddle_timer_info:
             logger.info(f"[Profile global_step: {self.state.global_step}] {timer_info} {paddle_timer_info}")
 
+    def _get_item_from_loss(self, loss):
+        assert isinstance(loss, paddle.Tensor) and loss._is_initialized()
+        return loss.item()
+
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
 
             logs: Dict[str, float] = {}
 
             # all_gather + mean() to get average loss over all processes
-            tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
+            tr_loss_scalar = self._get_item_from_loss(self._nested_gather(tr_loss).mean())
 
             # reset tr_loss to zero
             tr_loss.subtract_(tr_loss)
@@ -2109,7 +2115,7 @@ class Trainer:
                         safe_serialization=True,
                     )
                 else:
-                    paddle.save(
+                    self._save_ckpt_func(
                         self.optimizer.state_dict(),
                         os.path.join(output_dir, optimizer_name),
                     )
@@ -2117,7 +2123,7 @@ class Trainer:
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
                 logger.info("Saving optimizer files.")
-                paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+                self._save_ckpt_func(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
             # FIXME: maybe only save one copy
             paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
@@ -2277,6 +2283,7 @@ class Trainer:
             self.model.save_pretrained(
                 output_dir,
                 variant=self.args.weight_name_suffix,
+                save_function=self._save_ckpt_func,
                 merge_tensor_parallel=merge_tensor_parallel,
                 is_main_process=self.args.should_save,
                 max_shard_size="1024GB",
@@ -2295,6 +2302,7 @@ class Trainer:
                         config_to_save=config_to_save,
                         merge_tensor_parallel=merge_tensor_parallel,
                         variant=weight_name_suffix,
+                        save_function=self._save_ckpt_func,
                         is_main_process=self.args.should_save,
                         max_shard_size="1024GB",
                     )
@@ -2303,6 +2311,7 @@ class Trainer:
                         output_dir,
                         merge_tensor_parallel=merge_tensor_parallel,
                         variant=self.args.weight_name_suffix,
+                        save_function=self._save_ckpt_func,
                         is_main_process=self.args.should_save,
                         max_shard_size="1024GB",
                     )
@@ -2313,7 +2322,7 @@ class Trainer:
                 if state_dict is None:
                     state_dict = self.model.state_dict()
 
-                paddle.save(
+                self._save_ckpt_func(
                     state_dict,
                     os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix)),
                 )
@@ -2329,6 +2338,7 @@ class Trainer:
                     config_to_save=config_to_save,
                     merge_tensor_parallel=merge_tensor_parallel,
                     variant=weight_name_suffix,
+                    save_function=self._save_ckpt_func,
                     is_main_process=self.args.should_save,
                     max_shard_size="1024GB",
                 )
@@ -2337,6 +2347,7 @@ class Trainer:
                     output_dir,
                     merge_tensor_parallel=merge_tensor_parallel,
                     variant=self.args.weight_name_suffix,
+                    save_function=self._save_ckpt_func,
                     is_main_process=self.args.should_save,
                     max_shard_size="1024GB",
                 )

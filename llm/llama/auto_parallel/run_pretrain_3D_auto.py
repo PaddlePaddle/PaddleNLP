@@ -18,6 +18,7 @@ import os
 import random
 import sys
 import types
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -25,24 +26,25 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
-from paddle.io import DataLoader, DistributedBatchSampler
 
-from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
+from paddlenlp.ops import Topology
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
+from paddlenlp.trainer.auto_trainer import AutoTrainer
+from paddlenlp.trainer.trainer_utils import IntervalStrategy, _get_distributed_seeds
 from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
     LlamaConfig,
     LlamaForCausalLM3DAuto,
+    LlamaPretrainingCriterion3DAuto,
 )
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "llama": (LlamaConfig, LlamaForCausalLM3DAuto),
+    "llama": (LlamaConfig, LlamaForCausalLM3DAuto, LlamaPretrainingCriterion3DAuto),
 }
 
-
-from collections import OrderedDict
 
 from paddlenlp.data.causal_dataset import (
     build_train_valid_test_datasets,
@@ -78,11 +80,59 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
     )
-    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
-
+    fused_linear_param_grad_add: bool = field(
+        default=False,
+        metadata={
+            "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
+        },
+    )
+    job_schedule_profiler_start: int = field(
+        default=-1,
+        metadata={"help": "The step to start job_schedule_profiler."},
+    )
+    job_schedule_profiler_end: int = field(
+        default=-1,
+        metadata={"help": "The step to end job_schedule_profiler."},
+    )
     pipeline_schedule_mode: str = field(
         default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
     )
+    sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
+    refined_ops_patterns: Optional[List[str]] = field(
+        default=None, metadata={"help": "The pattern of refined recompute."}
+    )
+    virtual_pipeline_seg_method: str = field(
+        default="LlamaDecoderLayerAuto", metadata={"help": "The seg method of spliting pp layer for virtual pipeline."}
+    )
+    # NOTE(gongenlei): new add autotuner_benchmark
+    autotuner_benchmark: bool = field(
+        default=False,
+        metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
+    )
+
+    def __post_init__(self):
+        super().__post_init__()
+        assert self.enable_auto_parallel
+
+        # NOTE(gongenlei): new add autotuner_benchmark
+        if self.autotuner_benchmark:
+            self.max_steps = 5
+            self.do_train = True
+            self.do_export = False
+            self.do_predict = False
+            self.do_eval = False
+            self.overwrite_output_dir = True
+            self.load_best_model_at_end = False
+            self.report_to = []
+            self.save_strategy = IntervalStrategy.NO
+            self.evaluation_strategy = IntervalStrategy.NO
+
+        if self.fused_linear_param_grad_add:
+            fused_passes = self.strategy.fused_passes
+            fused_passes.enable = True
+            fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
+
+        logger.info(self.strategy)
 
 
 @dataclass
@@ -244,7 +294,6 @@ def create_pretrained_dataset(
         print_rank_0("    test:       {}".format(train_val_test_num_samples[2]))
 
     # Build the datasets.
-    print("====data seed====", training_args.seed)
     train_dataset, valid_dataset, test_dataset = build_train_valid_test_datasets(
         data_prefix=data_file,
         data_impl=data_args.data_impl,
@@ -314,29 +363,14 @@ def get_train_data_file(args):
     return files
 
 
-def create_optimizer(model, lr_scheduler, training_args):
-    decay_parameters = [
-        p.name
-        for n, p in model.named_parameters()
-        if (not any(nd in n for nd in ["bias", "norm"])) or n == "llama.norm.weight"
-    ]
+class PretrainingTrainer(AutoTrainer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-    def apply_decay_param_fun(x):
-        return x in decay_parameters
-
-    optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(training_args)
-    optimizer = optimizer_cls(
-        learning_rate=lr_scheduler if lr_scheduler is None else lr_scheduler,
-        apply_decay_param_fun=apply_decay_param_fun,
-        parameters=model.parameters(),
-        weight_decay=training_args.weight_decay,
-        grad_clip=paddle.nn.ClipGradByGlobalNorm(training_args.max_grad_norm)
-        if training_args.max_grad_norm > 0
-        else None,
-        **optimizer_kwargs,
-    )
-
-    return optimizer
+    def _wrap_for_dist_loader(self, train_dataloader):
+        dist_loader = super()._wrap_for_dist_loader(train_dataloader)
+        dist_loader._input_keys = ["input_ids", "labels"]
+        return dist_loader
 
 
 def print_config(args, key=""):
@@ -367,24 +401,28 @@ def init_seed(seed: int = 1234, args=None):
         random.seed(seed)
         np.random.seed(seed)
         paddle.seed(seed)
+    else:
+        assert not args.use_hybrid_parallel and args.enable_auto_parallel
+        if dist.get_world_size() > 1:
+            topo = Topology(
+                dist.get_rank(),
+                dist.get_world_size(),
+                dp_degree=args.data_parallel_degree,
+                pp_degree=args.pipeline_parallel_degree,
+                mp_degree=args.tensor_parallel_degree,
+                sharding_degree=1,  # auto_parallel's sharding is not orthogonal with dp, mp and pp
+            )
 
-    if args is not None:
-        if args.use_hybrid_parallel:
-            from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+            global_seed, local_seed, random_seed = _get_distributed_seeds(args.seed, topo)
 
-            random.seed(args.seed + args.dataset_rank)
-            np.random.seed(args.seed + args.dataset_rank)
-            paddle.seed(args.seed + args.dataset_rank)
+            paddle.seed(local_seed)
+            random.seed(random_seed)
+            np.random.seed(random_seed)
 
-            # local_seed/ global_seed is used to control dropout in ModelParallel
-            local_seed = args.seed + 59999 + args.tensor_parallel_rank * 10 + args.pipeline_parallel_rank * 1000
-            global_seed = args.seed + 100003 + args.dataset_rank
-            tracker = get_rng_state_tracker()
-
-            if "global_seed" not in tracker.states_:
-                tracker.add("global_seed", global_seed)
-            if "local_seed" not in tracker.states_:
-                tracker.add("local_seed", local_seed)
+            logger.info(
+                "The global seed is set to {}, local seed is set to {} and "
+                "random seed is set to {}.".format(global_seed, local_seed, random_seed)
+            )
         else:
             random.seed(args.seed)
             np.random.seed(args.seed)
@@ -440,7 +478,17 @@ def main():
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
 
-    config_class, model_class = MODEL_CLASSES[model_args.model_type]
+    # Detecting last checkpoint.
+    last_checkpoint = None
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
+        last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
+            logger.info(
+                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+            )
+
+    config_class, model_class, criterion_class = MODEL_CLASSES[model_args.model_type]
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
 
@@ -458,6 +506,7 @@ def main():
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
 
+    config.vocab_size = model_args.vocab_size if model_args.vocab_size is not None else config.vocab_size
     config.hidden_size = model_args.hidden_size if model_args.hidden_size is not None else config.hidden_size
     config.intermediate_size = (
         model_args.intermediate_size if model_args.intermediate_size is not None else config.intermediate_size
@@ -486,6 +535,11 @@ def main():
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
 
+    if training_args.strategy.pipeline.enable and config.virtual_pp_degree > 1:
+        pipeline = training_args.strategy.pipeline
+        pipeline.vpp_degree = config.virtual_pp_degree
+        pipeline.vpp_seg_method = training_args.virtual_pipeline_seg_method
+
     print("Final pre-training config:", config)
 
     # Set the dtype for loading model
@@ -496,11 +550,22 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
-    print("======M M M M======", model_class)
-    model = model_class._from_config(config, dtype=dtype)
-    # load model
-    # load_model(model)
-    shard_model(model)
+    with paddle.LazyGuard():
+        model = model_class.from_config(config, dtype=dtype)
+        criterion = criterion_class(config)
+
+    for param in model.parameters():
+        assert not param._is_initialized()
+        param.initialize()
+
+    if training_args.recompute:
+
+        def fn(layer):
+            if hasattr(layer, "enable_recompute") and (layer.enable_recompute is False or layer.enable_recompute == 0):
+                layer.enable_recompute = True
+
+        model.apply(fn)
+
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
@@ -525,7 +590,7 @@ def main():
         )
 
     data_file = get_train_data_file(data_args)
-    train_dataset, _, _, data_collator = create_pretrained_dataset(
+    train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(
         data_args,
         training_args,
         data_file,
@@ -533,109 +598,44 @@ def main():
         need_data=training_args.should_load_dataset,
     )
 
-    optimizer = create_optimizer(model, lr_scheduler, training_args)
-
-    def loss_func(loss, outputs):
-        return loss
-
-    print_config(training_args)
-
-    # create sampler and dataloader
-    # each rank read (training_args.per_device_train_batch_size * training_args.data_parallel_degree) samples
-    print(
-        "dp_rank: ", dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree)
-    )
-    print(
-        f"===> worldsize = {training_args.per_device_train_batch_size}  rank: {dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree)}"
-    )
-    train_sampler = DistributedBatchSampler(
-        train_dataset,
-        batch_size=training_args.per_device_train_batch_size,
-        shuffle=False,
-        num_replicas=training_args.data_parallel_degree,
-        rank=dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree),
-        drop_last=training_args.dataloader_drop_last,
+    trainer = PretrainingTrainer(
+        model=model,
+        criterion=criterion,
+        args=training_args,
+        data_collator=data_collator,
+        train_dataset=train_dataset if training_args.do_train else None,
+        eval_dataset=eval_dataset if training_args.do_eval else None,
+        optimizers=(None, lr_scheduler),
+        tokenizer=tokenizer,
     )
 
-    train_dataloader = DataLoader(
-        train_dataset,
-        batch_sampler=train_sampler,
-        collate_fn=data_collator,
-        num_workers=training_args.dataloader_num_workers,
-    )
+    checkpoint = None
+    if training_args.resume_from_checkpoint is not None:
+        checkpoint = training_args.resume_from_checkpoint
+    elif last_checkpoint is not None:
+        checkpoint = last_checkpoint
 
-    num_update_steps_per_epoch = len(train_dataloader) // training_args.gradient_accumulation_steps
-    num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
-    num_train_epochs = training_args.max_steps // num_update_steps_per_epoch + int(
-        training_args.max_steps % num_update_steps_per_epoch > 0
-    )
+    # Training
+    if training_args.do_train:
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
 
-    global_step = 1
-    tr_loss = float(0)
+        # NOTE(gongenlei): new add
+        if not training_args.autotuner_benchmark:
+            metrics = train_result.metrics
+            if not int(os.getenv("test_ci_no_save_model", 0)):
+                trainer.save_model()
+            trainer.log_metrics("train", metrics)
+            trainer.save_metrics("train", metrics)
+            trainer.save_state()
 
-    # hack: create dp group for distributed input data to align dygraph parallel loss.
-    dp_group = None
-    global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("pp").mesh
-    mesh_shape = global_mesh.shape
-    for id in range(mesh_shape[0]):
-        pp_mesh = global_mesh[id]
-        for i in range(pp_mesh.shape[-1]):
-            ranks = pp_mesh[:, i]
-            print("dp ranks: ", ranks)
-            group = dist.new_group(ranks)
-            if dist.get_rank() in ranks:
-                dp_group = group
-    assert dp_group is not None
+    if training_args.do_predict:
+        test_ret = trainer.predict(test_dataset)
+        trainer.log_metrics("test", test_ret.metrics)
 
-    model.train()
-    optimizer = dist.shard_optimizer(optimizer)
-    for epoch_idx in range(num_train_epochs):
-        for step, inputs in enumerate(train_dataloader):
-            input_ids, labels = inputs["input_ids"], inputs["labels"]
-
-            input_id = input_ids[0][0].numpy()
-            label = labels[0][0].numpy()
-
-            # hack for align dygraph parallel.
-            if dp_group is not None:
-                cur_rank = dist.get_rank()
-                res = []
-                dist.all_gather(res, paddle.Tensor(input_ids, place=paddle.CUDAPlace(cur_rank)), group=dp_group)
-                input_ids = paddle.concat(res)
-                input_ids = dist.shard_tensor(input_ids, get_mesh(), [dist.Shard(0), dist.Replicate()])
-
-                res = []
-                dist.all_gather(res, paddle.Tensor(labels, place=paddle.CUDAPlace(cur_rank)), group=dp_group)
-                labels = paddle.concat(res)
-                labels = dist.shard_tensor(labels, get_mesh(-1), [dist.Shard(0), dist.Replicate()])
-
-            res = model(input_ids, labels=labels)
-
-            # add criterion in the future.
-            tr_loss_step = res[0]
-
-            if training_args.gradient_accumulation_steps > 1:
-                tr_loss_step /= training_args.gradient_accumulation_steps
-
-            # do backward every micro step.
-            tr_loss_step.backward()
-            tr_loss += tr_loss_step
-
-            if global_step % training_args.gradient_accumulation_steps == 0:
-                # print_grad(model)
-                optimizer.step()
-                lr_scheduler.step()
-                # print_param(model)
-                optimizer.clear_grad()
-                print(
-                    f"global_step {global_step // training_args.gradient_accumulation_steps};input id {input_id}; label {label}; loss {tr_loss.numpy()}  lr: {optimizer.get_lr()}"
-                )
-                tr_loss = 0
-
-            if global_step // training_args.gradient_accumulation_steps >= training_args.max_steps:
-                break
-
-            global_step += 1
+    # if training_args.should_load_dataset:
+    #     effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
+    #     print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
+    #     print(f"ips: {effective_tokens_per_second:.2f} tokens/s")
 
 
 def shard_model(model):

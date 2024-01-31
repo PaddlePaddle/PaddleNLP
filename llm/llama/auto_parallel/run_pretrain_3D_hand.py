@@ -74,7 +74,6 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
     )
-    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
 
 
 @dataclass
