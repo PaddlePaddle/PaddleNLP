@@ -326,6 +326,7 @@ class AutoTokenizer:
                         return actual_tokenizer_class.from_pretrained(
                             pretrained_model_name_or_path, *model_args, **kwargs
                         )
+            breakpoint()
         # From AI Studio or HF Hub
         elif from_aistudio or from_hf_hub:
             if from_aistudio:

@@ -1526,7 +1526,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     subfolder=subfolder,
                 )
             elif from_hf_hub:
-                # breakpoint()
                 resolved_vocab_files[file_id] = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=file_path,
@@ -1570,6 +1569,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                                 "- or a correct model-identifier of community-contributed pretrained models,\n"
                                 "- or the correct path to a directory containing relevant tokenizer files.\n"
                             )
+        # breakpoint()
         tokenizer_config_file_dir_list = set()
         for k, v in resolved_vocab_files.items():
             if v is not None and os.path.isfile(v):
