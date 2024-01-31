@@ -60,10 +60,7 @@ class AutoTrainer(Trainer):
         assert self.args.enable_auto_parallel
 
         self.global_mesh = fleet.auto.get_mesh()
-
-        self.mesh_in_dp = self.global_mesh.get_mesh_with_dim("dp")[self.args.data_parallel_rank]
-        self.mesh_for_pp = self.mesh_in_dp.get_mesh_with_dim("mp")[self.args.tensor_parallel_rank]
-        self.comm_group_in_pp = dist.new_group(list(self.mesh_for_pp.process_ids))
+        self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
 
     def _nested_gather(self, tensors):
         """
@@ -79,8 +76,7 @@ class AutoTrainer(Trainer):
         if self.args.pipeline_parallel_degree <= 1:
             return super()._nested_gather(tr_loss)
 
-        assert len(self.comm_group_in_pp.ranks) >= 2
-        paddle.distributed.broadcast(tr_loss, src=max(self.comm_group_in_pp.ranks), group=self.comm_group_in_pp).wait()
+        paddle.distributed.broadcast(tr_loss, src=self.comm_group_in_pp.ranks[-1], group=self.comm_group_in_pp)
 
         return super()._nested_gather(tr_loss)
 
@@ -143,9 +139,12 @@ class AutoTrainer(Trainer):
         local_batches = [{} for i in range(self.args.gradient_accumulation_steps)]
 
         for key, value in inputs.items():
-            local_datas = value.split(self.args.gradient_accumulation_steps, axis=0)
+            ori_mesh, ori_placements = value.process_mesh, value.placements
+            replicate_value = dist.reshard(value, ori_mesh, [dist.Replicate(), dist.Replicate()])
+            local_datas = replicate_value.split(self.args.gradient_accumulation_steps, axis=0)
+
             for index, data in enumerate(local_datas):
-                local_batches[index].update({key: data})
+                local_batches[index].update({key: dist.reshard(data, ori_mesh, ori_placements)})
 
         return local_batches
 
@@ -378,7 +377,7 @@ class AutoTrainer(Trainer):
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
 
-        if self.args.gradient_accumulation_steps > 1:
+        if loss is not None and self.args.gradient_accumulation_steps > 1:
             loss = loss / self.args.gradient_accumulation_steps
 
         if self.do_grad_scaling:
@@ -391,6 +390,9 @@ class AutoTrainer(Trainer):
     def static_traning(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         input_ids, labels = tuple(inputs.values())
         loss = model(input_ids, labels)
+
+        if loss is not None and self.args.gradient_accumulation_steps > 1:
+            loss = loss / self.args.gradient_accumulation_steps
 
         return loss
 

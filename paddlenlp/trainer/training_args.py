@@ -1281,6 +1281,16 @@ class TrainingArguments:
             degree = [self.data_parallel_degree, self.pipeline_parallel_degree, self.tensor_parallel_degree]
             mesh_dims = list(zip(order, degree))
             fleet.auto.create_mesh(mesh_dims)
+
+            # init hcg for communication in trainer
+            strategy = fleet.DistributedStrategy()
+            strategy.hybrid_configs = {
+                "dp_degree": self.data_parallel_degree,
+                "mp_degree": self.tensor_parallel_degree,
+                "pp_degree": self.pipeline_parallel_degree,
+            }
+            fleet.init(is_collective=True, strategy=strategy)
+
         else:
             if world_size > 1:
                 if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized():
