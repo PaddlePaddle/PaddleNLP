@@ -1334,6 +1334,15 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             {}
         )  # Use to store when we have already noticed a deprecation warning (avoid overlogging).
 
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        from_aistudio = kwargs.pop("from_aistudio", False)
+        if from_hf_hub:
+            self.from_hub = 'huggingface'
+        elif from_aistudio:
+            self.from_hub = 'aistudio'
+        else:
+            self.from_hub = None # record where from
+
         super().__init__(**kwargs)
 
     @property
@@ -1451,7 +1460,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         cache_dir = kwargs.pop("cache_dir", None)
-        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        # from_hf_hub = kwargs.pop("from_hf_hub", False)
+        from_hf_hub = kwargs.get("from_hf_hub", False)
+        # from_aistudio = kwargs.pop("from_aistudio", False)
         from_aistudio = kwargs.pop("from_aistudio", False)
         subfolder = kwargs.pop("subfolder", "")
         return_tokenizer_file_dir = kwargs.pop("return_tokenizer_file_dir", False)
