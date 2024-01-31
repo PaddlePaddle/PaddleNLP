@@ -19,39 +19,55 @@ unset CUDA_VISIBLE_DEVICES
 
 task_name="llama_auto_dp2sharding2mp2pp2_vpp2"
 # rm -rf output/$task_name/  # ckpt is saved in 'output/''
-rm -rf "output/$task_name""_log"
+rm -rf log_newir/$task_name/
+rm -rf "log_newir/$task_name""_log"
+rm -rf debug_program*
 
-export PARALLEL_CROSS_ENTROPY=true
+# export PARALLEL_CROSS_ENTROPY=true
 export FLAGS_call_stack_level=2
 export PYTHONPATH=../../../:$PYTHONPATH
+
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+
+export FLAGS_new_executor_micro_batching=True
+export FLAGS_enable_pir_in_executor=1
+export FLAGS_enable_prim_after_distribute=True
+# export GLOG_v=4
+
+# --pipeline_parallel_degree 1 \
+# --tensor_parallel_degree 2 \
+# --sharding_parallel_degree 2 \
+# --sharding "stage1" \
+# --sharding "" \
+
 python -u -m paddle.distributed.launch \
-    --gpus "0,1,2,3,4,5,6,7" \
-    --log_dir "output/$task_name""_log" \
-    run_pretrain_auto.py \
+    --gpus "0,1,2,3" \
+    --log_dir "log_newir/$task_name""_log" \
+    auto_parallel/run_pretrain_auto.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
     --tokenizer_name_or_path "facebook/llama-7b" \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --split 949,50,1 \
-    --max_seq_length 2048 \
-    --per_device_train_batch_size 1 \
-    --per_device_eval_batch_size 8 \
-    --gradient_accumulation_steps 8 \
+    --max_seq_length 256 \
+    --hidden_size 1024 \
+    --intermediate_size 256 \
+    --num_hidden_layers 2 \
+    --per_device_train_batch_size 2 \
+    --per_device_eval_batch_size 2 \
+    --gradient_accumulation_steps 1 \
     --use_flash_attention 0 \
     --use_fused_rms_norm 0 \
+    --tensor_parallel_degree 2 \
+    --sharding_parallel_degree 2 \
+    --sharding "stage1" \
     --fp16 0 \
     --fp16_opt_level "O2"  \
     --scale_loss 1024 \
-    --tensor_parallel_degree 2 \
-    --pipeline_parallel_degree 2 \
-    --virtual_pp_degree 2 \
-    --pipeline_schedule_mode "VPP" \
-    --sharding_parallel_degree 2 \
-    --sharding "stage2" \
     --learning_rate 0.0001 \
     --min_learning_rate 0.00001 \
-    --max_steps 10 \
+    --max_steps 3 \
     --save_steps 5000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
@@ -61,9 +77,8 @@ python -u -m paddle.distributed.launch \
     --eval_steps 1000 \
     --report_to "visualdl" \
     --disable_tqdm true \
-    --continue_training 0 \
-    --recompute 1 \
-    --recompute_granularity full \
+    --continue_training 0\
+    --recompute 0 \
     --do_train \
     --do_eval \
     --device "gpu" \
