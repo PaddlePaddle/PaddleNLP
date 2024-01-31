@@ -649,6 +649,23 @@ class FusedMultiTransformerBase(Layer):
             rotary_emb_dims=rotary_emb_dims,
             use_neox_rotary_style=self.use_neox_rotary_style,
         )[0]
+        
+        # import numpy as np
+        # print(qkv_out.shape)
+        # print(caches[i].shape)
+        # print(attn_mask.shape)
+        # print(seq_lens.shape)
+        # print(aa.shape)
+
+        # array_dict = {'qkv_out': qkv_out.numpy(), 
+        #                'caches[i]': caches[i].numpy(),
+        #                "attn_mask" : attn_mask.numpy(),
+        #                "seq_lens" : seq_lens.numpy(),
+        #                "aa" : aa.numpy()}
+        # np.savez('/zhoukangkang/my.npz', **array_dict)
+        #exit(0)
+
+        return aa
 
     def compute_out_linear(self, fmha_out, i):
         return paddle.matmul(fmha_out, self.linear_weights[i])
@@ -819,6 +836,13 @@ class FusedMultiTransformerBase(Layer):
         residual_input = src
         for i in range(self.num_layers):
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
+
+            import numpy as np
+            #qkv_out = dequant_int8(qkv_out, self.qkv_out_scales[i], self._dtype)
+            array_dict = {'qkv_out': qkv_out.numpy(), "src": src.numpy()}
+            np.savez('/zhoukangkang/float.npz', **array_dict)
+            exit(0)
+
             out_linear_out = self.compute_attn(
                 time_step,
                 qkv_out,
@@ -1306,11 +1330,21 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
 
     def compute_bias_residual_layernorm(self, ffn2_out, residual_input, i, num_layers):
         if i != num_layers - 1:
+            # import numpy as np
+            # array_dict = {'ffn2_out': ffn2_out.numpy(), 
+            #                'self.ln_scales[i + 1]': self.ln_scales[i + 1].numpy(),
+            #                "self.ln_biases[i + 1]" : self.ln_biases[i + 1].numpy(),
+            #                "residual_input" : residual_input.numpy()}
+            # np.savez('/zhoukangkang/my.npz', **array_dict)
+            # print(self.norm_func)
+            # exit(0)
+
             norm_out = self.norm_func(
                 ffn2_out,
                 self.ln_scales[i + 1],
                 self.ln_biases[i + 1],
                 self._epsilon,
+                bias=self.ffn2_biases[i],
                 residual=residual_input,
                 begin_norm_axis=1,
                 quant_scale=self.act_scales["qkv_in_scale"][i + 1],

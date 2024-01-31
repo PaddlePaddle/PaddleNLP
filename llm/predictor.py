@@ -11,7 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from __future__ import annotations
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 
 import json
 import os
@@ -78,7 +81,7 @@ class PredictorArgument:
     src_length: int = field(default=None, metadata={"help": "The max length of source text."})
     max_length: int = field(default=None, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
-    top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
+    top_p: float = field(default=0.0, metadata={"help": "top_p parameter for generation"})
     temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
     repetition_penalty: float = field(default=1.0, metadata={"help": "repetition penalty parameter for generation"})
     device: str = field(default="gpu", metadata={"help": "Device"})
