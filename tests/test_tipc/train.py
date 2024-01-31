@@ -25,6 +25,7 @@ from benchmark import options
 from benchmark.modules.benchmark_utils import clone_inputs
 from benchmark.options import LR_SCHEDULER_REGISTRY, MODEL_REGISTRY, OPTIMIZER_REGISTRY
 from benchmark.utils.record import AverageStatistical
+from paddle.fluid import core
 
 from paddlenlp.utils import profiler
 from paddlenlp.utils.log import logger
@@ -255,6 +256,18 @@ def do_train(args):
         batch_id = 0
         batch_start = time.time()
         for input_data in train_loader:
+            if args.use_nsys:
+                iter_id = step_id
+                if iter_id == 100:
+                    core.nvprof_start()
+                    core.nvprof_enable_record_event()
+                    core.nvprof_nvtx_push(str(iter_id))
+                if iter_id == 110:
+                    core.nvprof_nvtx_pop()
+                    core.nvprof_stop()
+                if iter_id > 100 and iter_id < 110:
+                    core.nvprof_nvtx_pop()
+                    core.nvprof_nvtx_push(str(iter_id))
             train_reader_cost = time.time() - batch_start
 
             if args.use_amp:
