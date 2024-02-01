@@ -907,6 +907,7 @@ def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_chec
     # `file_machine_mappings` indicates the machine where the files appear. For example, {"model-00001-of-00002.safetensors": [machine_0, machine_1], "model-00002-of-00002.safetensors": [machine_0]}
     file_keyname_mappings, file_machine_mappings = get_file_mappings(index, resume_from_checkpoint)
 
+    logger.debug("Creating dispatch table for unified checkpoint load ...")
     # Get send_table and recv_table. The send table indicates which workers are responsible for sending tensors, and the recv table indicates which workers should receive the tensors.
     send_table, recv_table = create_dispatch_table(
         args, model, file_keyname_mappings, file_machine_mappings, resume_from_checkpoint
@@ -925,6 +926,8 @@ def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_chec
     else:
         # Get corresponding tensor parallel actions.
         tp_actions = model.get_tensor_parallel_convert_actions(config_revise, all_tp_keys, ignore_error=True)
+
+    logger.debug("Distributed send recv for state dict load ...")
     # Distribute the checkpoint tensor dynamically, using the `send_table` and `recv_table` we create before.
     state_dict = distributed_send_recv(
         config_revise,
@@ -937,7 +940,7 @@ def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_chec
         file_machine_mappings,
     )
     dist.barrier()
-
+    logger.debug("Setting state dict into model ...")
     error_msgs = _load_state_dict_into_model(model, state_dict, "")
     if len(error_msgs) > 0:
         error_msg = "\n\t".join(error_msgs)
