@@ -212,6 +212,7 @@ def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol
     )
     p.start()
     while shared_value.value == 0:
+        time.sleep(0.05)
         if not p.is_alive():
             logger.error("create new process error, retry")
             p = ctx.Process(
