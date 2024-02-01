@@ -850,7 +850,7 @@ function llama_static_auto_recompute_bs8_fp32_DP1-MP1-PP1() {
     rm -rf $case_out_dir
     rm -rf $case_log_dir
 
-    python -u -m paddle.distributed.launch --gpus "0" --log_dir $case_log_dir run_pretrain_auto.py \
+    python -u -m paddle.distributed.launch --gpus "0" --log_dir $case_log_dir run_pretrain_auto_static.py \
         --model_type "llama" \
         --model_name_or_path "facebook/llama-7b" \
         --tokenizer_name_or_path "facebook/llama-7b" \
@@ -916,7 +916,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP1-PP1() {
     rm -rf $case_out_dir
     rm -rf $case_log_dir
 
-    python -u -m paddle.distributed.launch --gpus "0,1" --log_dir $case_log_dir run_pretrain_auto.py \
+    python -u -m paddle.distributed.launch --gpus "0,1" --log_dir $case_log_dir run_pretrain_auto_static.py \
         --model_type "llama" \
         --model_name_or_path "facebook/llama-7b" \
         --tokenizer_name_or_path "facebook/llama-7b" \
@@ -982,7 +982,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP1() {
     rm -rf $case_out_dir
     rm -rf $case_log_dir
 
-    python -u -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir $case_log_dir run_pretrain_auto.py \
+    python -u -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir $case_log_dir run_pretrain_auto_static.py \
         --model_type "llama" \
         --model_name_or_path "facebook/llama-7b" \
         --tokenizer_name_or_path "facebook/llama-7b" \
@@ -1048,7 +1048,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2() {
     rm -rf $case_out_dir
     rm -rf $case_log_dir
 
-    python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto.py \
+    python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto_static.py \
         --model_type "llama" \
         --model_name_or_path "facebook/llama-7b" \
         --tokenizer_name_or_path "facebook/llama-7b" \
@@ -1114,7 +1114,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
     rm -rf $case_out_dir
     rm -rf $case_log_dir
 
-    python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto.py \
+    python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto_static.py \
         --model_type "llama" \
         --model_name_or_path "facebook/llama-7b" \
         --tokenizer_name_or_path "facebook/llama-7b" \
@@ -1182,7 +1182,7 @@ function llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
     rm -rf $case_out_dir
     rm -rf $case_log_dir
 
-    python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto.py \
+    python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto_static.py \
         --model_type "llama" \
         --model_name_or_path "facebook/llama-7b" \
         --tokenizer_name_or_path "facebook/llama-7b" \
