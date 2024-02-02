@@ -19,7 +19,7 @@ from typing import Any, Dict, Tuple
 
 import paddle
 from data import PromptOnlyDataset, SupervisedDataset, parse_dataset
-from new_ppo_trainer import PPOTrainer
+from ppo_trainer import PPOTrainer
 
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoConfig, AutoTokenizer, LlamaTokenizer
