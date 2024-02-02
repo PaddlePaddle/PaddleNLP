@@ -610,7 +610,8 @@ class Trainer:
         # The resume_from_checkpoint could be None in some machine node.
         # Here we reset None to temp directory.
         if args.world_size > 1:
-            is_resume_from_checkpoint = paddle.to_tensor([resume_from_checkpoint is not None])
+            is_resume_from_checkpoint = paddle.to_tensor([int(resume_from_checkpoint is not None)])
+            # is_resume_from_checkpoint = paddle.to_tensor([resume_from_checkpoint is not None])
             paddle.distributed.all_reduce(is_resume_from_checkpoint)
             is_resume_from_checkpoint = is_resume_from_checkpoint.item()
             if is_resume_from_checkpoint > 0 and is_resume_from_checkpoint < paddle.distributed.get_world_size():
@@ -701,6 +702,13 @@ class Trainer:
             if delay_optimizer_creation:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
             self._load_optimizer_and_scheduler(resume_from_checkpoint)
+
+        load_on_step0 = os.environ.get("HACK_LOAD_MODEL_ON_STEP0", 0)
+        if load_on_step0:
+            logger.info("***** start load model parameters *****")
+            model_state_dict = paddle.load("model_param/model.pdparams" + str(args.local_rank))
+            model.set_state_dict(model_state_dict)
+            logger.info("***** end load model parameters *****")
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples:,}")
