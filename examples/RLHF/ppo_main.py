@@ -19,17 +19,12 @@ from typing import Any, Dict, Tuple
 
 import paddle
 from data import PromptOnlyDataset, SupervisedDataset, parse_dataset
-from models import AutoModelForScore
-from ppo_trainer import PPOTrainer
+from new_ppo_trainer import PPOTrainer
 
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
-from paddlenlp.transformers import (
-    AutoConfig,
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    LlamaTokenizer,
-)
+from paddlenlp.transformers import AutoConfig, AutoTokenizer, LlamaTokenizer
 from paddlenlp.utils.log import logger
+
 
 @dataclass
 class TrainingArguments(TrainingArguments):
@@ -220,59 +215,67 @@ def main():
     training_args.max_length = data_args.max_length
 
     if training_args.pipeline_parallel_degree > 1:
-        raise ValueError("Not support pipeline parallel mode.")
-    else:
-        # actor model
-        model_config = AutoConfig.from_pretrained(
-            model_args.actor_model_name_or_path,
-            tensor_parallel_output=False,
-            tensor_parallel_degree=training_args.tensor_parallel_degree,
-            tensor_parallel_rank=training_args.tensor_parallel_rank,
-            dtype=dtype,
-        )
-        if hasattr(model_config, "use_flash_attention"):
-            model_config.use_flash_attention = model_args.use_flash_attention
-        actor_model = AutoModelForCausalLM.from_pretrained(
-            model_args.actor_model_name_or_path,
-            config=model_config,
-        )
-        # reference model
-        actor_reference_model = AutoModelForCausalLM.from_pretrained(
-            model_args.actor_model_name_or_path,
-            config=model_config,
-        )
-        actor_tokenizer = AutoTokenizer.from_pretrained(
-            model_args.actor_model_name_or_path, model_max_length=data_args.max_length, padding_side="left"
-        )
+        global AutoModelForCausalLM, AutoModelForScore
+        from models.model_pp import LlamaPolicyPipe, LlamaValuePipe
 
-        # reward model
-        model_config = AutoConfig.from_pretrained(
-            model_args.reward_model_name_or_path,
-            tensor_parallel_output=False,
-            tensor_parallel_degree=training_args.tensor_parallel_degree,
-            tensor_parallel_rank=training_args.tensor_parallel_rank,
-            dtype=dtype,
-        )
-        if hasattr(model_config, "use_flash_attention"):
-            model_config.use_flash_attention = model_args.use_flash_attention
-        reward_model = AutoModelForScore.from_pretrained(
-            model_args.reward_model_name_or_path,
-            config=model_config,
-            score_type="reward",
-            do_normalize=training_args.normalize_reward,
-        )
-        reward_tokenizer = AutoTokenizer.from_pretrained(
-            model_args.reward_model_name_or_path, model_max_length=data_args.max_length, padding_side="right"
-        )
-        # critic model
-        if model_args.reward_critic_model_name_or_path is None:
-            model_args.reward_critic_model_name_or_path = model_args.reward_model_name_or_path
-        reward_critic_model = AutoModelForScore.from_pretrained(
-            model_args.reward_critic_model_name_or_path, config=model_config, score_type="critic", do_normalize=False
-        )
-        reward_critic_tokenizer = AutoTokenizer.from_pretrained(
-            model_args.reward_critic_model_name_or_path, model_max_length=data_args.max_length, padding_side="left"
-        )
+        AutoModelForCausalLM = LlamaPolicyPipe
+        AutoModelForScore = LlamaValuePipe
+    else:
+        from models import AutoModelForScore
+
+        from paddlenlp.transformers import AutoModelForCausalLM
+
+    # actor model
+    model_config = AutoConfig.from_pretrained(
+        model_args.actor_model_name_or_path,
+        tensor_parallel_output=False,
+        tensor_parallel_degree=training_args.tensor_parallel_degree,
+        tensor_parallel_rank=training_args.tensor_parallel_rank,
+        dtype=dtype,
+    )
+    if hasattr(model_config, "use_flash_attention"):
+        model_config.use_flash_attention = model_args.use_flash_attention
+    actor_model = AutoModelForCausalLM.from_pretrained(
+        model_args.actor_model_name_or_path,
+        config=model_config,
+    )
+    # reference model
+    actor_reference_model = AutoModelForCausalLM.from_pretrained(
+        model_args.actor_model_name_or_path,
+        config=model_config,
+    )
+    actor_tokenizer = AutoTokenizer.from_pretrained(
+        model_args.actor_model_name_or_path, model_max_length=data_args.max_length, padding_side="left"
+    )
+
+    # reward model
+    model_config = AutoConfig.from_pretrained(
+        model_args.reward_model_name_or_path,
+        tensor_parallel_output=False,
+        tensor_parallel_degree=training_args.tensor_parallel_degree,
+        tensor_parallel_rank=training_args.tensor_parallel_rank,
+        dtype=dtype,
+    )
+    if hasattr(model_config, "use_flash_attention"):
+        model_config.use_flash_attention = model_args.use_flash_attention
+    reward_model = AutoModelForScore.from_pretrained(
+        model_args.reward_model_name_or_path,
+        config=model_config,
+        score_type="reward",
+        do_normalize=training_args.normalize_reward,
+    )
+    reward_tokenizer = AutoTokenizer.from_pretrained(
+        model_args.reward_model_name_or_path, model_max_length=data_args.max_length, padding_side="right"
+    )
+    # critic model
+    if model_args.reward_critic_model_name_or_path is None:
+        model_args.reward_critic_model_name_or_path = model_args.reward_model_name_or_path
+    reward_critic_model = AutoModelForScore.from_pretrained(
+        model_args.reward_critic_model_name_or_path, config=model_config, score_type="critic", do_normalize=False
+    )
+    reward_critic_tokenizer = AutoTokenizer.from_pretrained(
+        model_args.reward_critic_model_name_or_path, model_max_length=data_args.max_length, padding_side="left"
+    )
     for tokenizer in [actor_tokenizer, reward_tokenizer, reward_critic_tokenizer]:
         if isinstance(tokenizer, LlamaTokenizer) and tokenizer.pad_token_id is None:
             tokenizer.pad_token_id = tokenizer.eos_token_id

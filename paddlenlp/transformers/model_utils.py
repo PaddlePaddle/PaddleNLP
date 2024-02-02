@@ -2515,7 +2515,8 @@ class PipelinePretrainedModel(PretrainedModel):
                     idx = name_splited[0]
                     # for normal pp layer
                     if idx.isdigit():
-                        single_name = [prefixes[idx]]
+                        # allow empty prefix
+                        single_name = [] if prefixes[idx] == "" else [prefixes[idx]]
                         single_name.extend(name_splited[1:])
                     elif idx == "shared_layers":
                         single_name = [self.get_shardlayer_prefix(name_splited)]
