@@ -1,0 +1,7 @@
+job_id,mp_degree,sharding_degree,pp_degree,dp_degree,sharding_stage,micro_batch_size,vpp_degree,use_recompute,recompute_granularity,acc_steps,global_batch_size,exec_time,interval_samples_per_second,max_mem_usage,error_info
+4,8,1,1,1,3,1,1,False,full,8,8,48.33,3.53148,27472,
+5,8,1,1,1,3,2,1,True,full,4,8,47.33,3.21711,19944,
+3,8,1,1,1,3,1,1,True,core_attn,8,8,52.37,3.17475,27600,
+2,8,1,1,1,3,1,1,True,full_attn,8,8,53.36,2.606,25308,
+1,8,1,1,1,3,1,1,True,full,8,8,56.34,2.2891,19050,
+
