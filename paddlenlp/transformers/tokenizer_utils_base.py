@@ -1457,7 +1457,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 # Load from local directory path
                 tokenizer = BertTokenizer.from_pretrained('./my_bert/')
         """
-
+        kwargs_for_slow = copy.deepcopy(kwargs)
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         cache_dir = kwargs.pop("cache_dir", None)
         # from_hf_hub = kwargs.pop("from_hf_hub", False)
@@ -1579,7 +1579,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         assert len(tokenizer_config_file_dir_list) > 0, "All tokenizer files should be in the same directory."
         # Prepare tokenizer initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
-        has_tokenizer_file = resolved_vocab_files.get("tokenizer_file", None) is not None
+
         tokenizer_config_file = resolved_vocab_files.pop("tokenizer_config_file", None)
         if tokenizer_config_file is not None:
             with io.open(tokenizer_config_file, encoding="utf-8") as f:
@@ -1615,6 +1615,22 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 init_kwargs["model_max_length"] = min(init_kwargs.get("model_max_length", int(1e30)), model_max_length)
 
         added_tokens_file = resolved_vocab_files.pop("added_tokens_file", None)
+
+        from_slow = kwargs.get("from_slow", False)
+        has_tokenizer_file = resolved_vocab_files.get("tokenizer_file", None) is not None
+        # If there is no tokenizer_file, load fast tokenizer from slow tokenizer.
+        if (from_slow or not has_tokenizer_file) and cls.slow_tokenizer_class is not None:
+            slow_tokenizer = (cls.slow_tokenizer_class).from_pretrained(
+                pretrained_model_name_or_path,
+                *args,
+                **kwargs_for_slow,
+            )
+        else:
+            slow_tokenizer = None
+
+        if slow_tokenizer is not None:
+            init_kwargs["__slow_tokenizer"] = slow_tokenizer
+
         init_kwargs["name_or_path"] = pretrained_model_name_or_path
         # Merge resolved_vocab_files arguments in init_kwargs if not including.
         # Maybe need more ways to load resources.
@@ -1632,10 +1648,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             # it still work, use the vocab file under this dir.
             elif not os.path.isfile(init_kwargs[args_name] or "") and os.path.isfile(file_path):
                 init_kwargs[args_name] = file_path
-
-        # TODO(zhoushunjie): It's not supportted to load tokenizer.json of hf so far.
-        # if from_hf_hub and "tokenizer_file" in init_kwargs:
-        # init_kwargs.pop("tokenizer_file")
 
         # TODO(guosheng): avoid reduplication of position args and key word args
         tokenizer = cls(*init_args, **init_kwargs)

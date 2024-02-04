@@ -54,21 +54,22 @@ class PretrainedFastTokenizer(PretrainedTokenizerBase):
     def __init__(self, *args, **kwargs):
         tokenizer_object = kwargs.pop("tokenizer_object", None)
         slow_tokenizer = kwargs.pop("__slow_tokenizer", None)
-        fast_tokenizer_file = kwargs.pop("tokenizer_file", None)  # 仅hf含有此字段
+        fast_tokenizer_file = kwargs.pop("tokenizer_file", None)
         from_slow = kwargs.pop("from_slow", False)
         # breakpoint()
         if tokenizer_object is not None:
             fast_tokenizer = tokenizer_object
-        elif fast_tokenizer_file is not None and not from_slow and kwargs.get("from_hf_hub", False):
+        elif fast_tokenizer_file is not None and not from_slow:
             # We have a serialization from tokenizers which let us directly build the backend
             # From json file
             fast_tokenizer = FastTokenizer.from_file(fast_tokenizer_file)
         elif slow_tokenizer is not None:
             # We need to convert a slow tokenizer to build the backend
+            print("[Convert] 开始转换slow_tokenizer --1")
             fast_tokenizer = convert_slow_tokenizer(slow_tokenizer)
         elif self.slow_tokenizer_class is not None:
             # We need to create and convert a slow tokenizer to build the backend
-            print("[Convert] 开始转换slow_tokenizer")
+            print("[Convert] 开始转换slow_tokenizer --2")
             slow_tokenizer = self.slow_tokenizer_class(*args, **kwargs)
             fast_tokenizer = convert_slow_tokenizer(slow_tokenizer)
         else:
