@@ -26,12 +26,6 @@ cp -r ../tests/test_tipc/auto_tuner/autoconfig ./
 
 if [ -z "$1" ]; then  
   echo "单机任务"
-  unset PADDLE_ELASTIC_JOB_ID
-  unset PADDLE_TRAINER_ENDPOINTS
-  unset DISTRIBUTED_TRAINER_ENDPOINTS
-  unset FLAGS_START_PORT
-  unset PADDLE_ELASTIC_TIMEOUT
-  unset PADDLE_TRAINERS_NUM
 else
   echo "多机任务, 启动etcd服务"
   pip install httpx etcd3 protobuf==3.20.0 --force-reinstall
@@ -39,13 +33,6 @@ else
   master_ip=${ip_lists[0]}
   rank=$PADDLE_TRAINER_ID
   echo $master_ip $rank
-  unset PADDLE_ELASTIC_JOB_ID
-  unset PADDLE_TRAINER_ENDPOINTS
-  unset DISTRIBUTED_TRAINER_ENDPOINTS
-  unset FLAGS_START_PORT
-  unset PADDLE_ELASTIC_TIMEOUT
-  unset PADDLE_TRAINERS_NUM
-  unset PADDLE_TRAINER_ID
   if [ $rank == 0 ]; then
     net=$(netstat -anp | grep 2379 | grep "LISTEN")
     if [ ${#net} == 0 ]; then
