@@ -1615,6 +1615,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 init_kwargs["model_max_length"] = min(init_kwargs.get("model_max_length", int(1e30)), model_max_length)
 
         added_tokens_file = resolved_vocab_files.pop("added_tokens_file", None)
+        init_kwargs["name_or_path"] = pretrained_model_name_or_path
         # Merge resolved_vocab_files arguments in init_kwargs if not including.
         # Maybe need more ways to load resources.
         for args_name, file_path in resolved_vocab_files.items():
