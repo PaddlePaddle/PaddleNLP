@@ -1337,11 +1337,11 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         from_hf_hub = kwargs.pop("from_hf_hub", False)
         from_aistudio = kwargs.pop("from_aistudio", False)
         if from_hf_hub:
-            self.from_hub = 'huggingface'
+            self.from_hub = "huggingface"
         elif from_aistudio:
-            self.from_hub = 'aistudio'
+            self.from_hub = "aistudio"
         else:
-            self.from_hub = None # record where from
+            self.from_hub = None  # record where from
 
         super().__init__(**kwargs)
 
@@ -1635,7 +1635,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         # TODO(zhoushunjie): It's not supportted to load tokenizer.json of hf so far.
         # if from_hf_hub and "tokenizer_file" in init_kwargs:
-            # init_kwargs.pop("tokenizer_file")
+        # init_kwargs.pop("tokenizer_file")
 
         # TODO(guosheng): avoid reduplication of position args and key word args
         tokenizer = cls(*init_args, **init_kwargs)

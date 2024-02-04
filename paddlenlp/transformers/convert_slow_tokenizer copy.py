@@ -15,8 +15,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tokenizers import Tokenizer, decoders, normalizers, pre_tokenizers, processors
-from tokenizers.models import BPE, Unigram, WordPiece
+from fast_tokenizer import (
+    Tokenizer,
+    decoders,
+    normalizers,
+    postprocessors,
+    pretokenizers,
+)
+from fast_tokenizer.models import BPE, FastWordPiece, Unigram
 
 
 # Extract the vocab and merge file from sentencepiece file
@@ -57,148 +63,14 @@ class Converter:
         raise NotImplementedError()
 
 
-class SpmConverter(Converter):
-    def __init__(self, *args):
-        requires_backends(self, "protobuf")
-
-        super().__init__(*args)
-
-        # from .utils import sentencepiece_model_pb2 as model_pb2
-        model_pb2 = import_protobuf()
-
-        m = model_pb2.ModelProto()
-        with open(self.original_tokenizer.vocab_file, "rb") as f:
-            m.ParseFromString(f.read())
-        self.proto = m
-
-        if self.proto.trainer_spec.byte_fallback:
-            if not getattr(self, "handle_byte_fallback", None):
-                warnings.warn(
-                    "The sentencepiece tokenizer that you are converting to a fast tokenizer uses the byte fallback option"
-                    " which is not implemented in the fast tokenizers. In practice this means that the fast version of the"
-                    " tokenizer can produce unknown tokens whereas the sentencepiece version would have converted these "
-                    "unknown tokens into a sequence of byte tokens matching the original piece of text."
-                )
-
-    def vocab(self, proto):
-        return [(piece.piece, piece.score) for piece in proto.pieces]
-
-    def unk_id(self, proto):
-        return proto.trainer_spec.unk_id
-
-    def tokenizer(self, proto):
-        model_type = proto.trainer_spec.model_type
-        vocab_scores = self.vocab(proto)
-        unk_id = self.unk_id(proto)
-
-        if model_type == 1:
-            tokenizer = Tokenizer(Unigram(vocab_scores, unk_id))
-        elif model_type == 2:
-            _, merges = SentencePieceExtractor(self.original_tokenizer.vocab_file).extract()
-            bpe_vocab = {word: i for i, (word, score) in enumerate(vocab_scores)}
-            tokenizer = Tokenizer(
-                BPE(
-                    bpe_vocab,
-                    merges,
-                    unk_token=proto.trainer_spec.unk_piece,
-                    fuse_unk=True,
-                )
-            )
-        else:
-            raise Exception(
-                "You're trying to run a `Unigram` model but you're file was trained with a different algorithm"
-            )
-
-        return tokenizer
-
-    def normalizer(self, proto):
-        precompiled_charsmap = proto.normalizer_spec.precompiled_charsmap
-        _normalizers = [
-            normalizers.Strip(left=False, right=True),  # stripping is important
-            normalizers.Replace(Regex(" {2,}"), "▁"),
-        ]
-        if not precompiled_charsmap:
-            return normalizers.Sequence(_normalizers)
-        else:
-            return normalizers.Sequence([normalizers.Precompiled(precompiled_charsmap)] + _normalizers)
-
-    def pre_tokenizer(self, replacement, add_prefix_space):
-        prepend_scheme = "always"
-        if hasattr(self.original_tokenizer, "legacy") and not self.original_tokenizer.legacy:
-            prepend_scheme = "first"
-        return pre_tokenizers.Metaspace(
-            replacement=replacement, add_prefix_space=add_prefix_space, prepend_scheme=prepend_scheme
-        )
-
-    def post_processor(self):
-        return None
-
-    def decoder(self, replacement, add_prefix_space):
-        return decoders.Metaspace(replacement=replacement, add_prefix_space=add_prefix_space)
-
-    def converted(self) -> Tokenizer:
-        tokenizer = self.tokenizer(self.proto)
-
-        # Tokenizer assemble
-        normalizer = self.normalizer(self.proto)
-        if normalizer is not None:
-            tokenizer.normalizer = normalizer
-
-        replacement = "▁"
-        add_prefix_space = True
-        pre_tokenizer = self.pre_tokenizer(replacement, add_prefix_space)
-        if pre_tokenizer is not None:
-            tokenizer.pre_tokenizer = pre_tokenizer
-
-        tokenizer.decoder = self.decoder(replacement, add_prefix_space)
-        post_processor = self.post_processor()
-        if post_processor:
-            tokenizer.post_processor = post_processor
-
-        return tokenizer
-
-
-class AlbertConverter(SpmConverter):
-    def vocab(self, proto):
-        return [
-            (piece.piece, piece.score) if check_number_comma(piece.piece) else (piece.piece, piece.score - 100)
-            for piece in proto.pieces
-        ]
-
-    def normalizer(self, proto):
-        list_normalizers = [
-            normalizers.Replace("``", '"'),
-            normalizers.Replace("''", '"'),
-        ]
-        if not self.original_tokenizer.keep_accents:
-            list_normalizers.append(normalizers.NFKD())
-            list_normalizers.append(normalizers.StripAccents())
-        if self.original_tokenizer.do_lower_case:
-            list_normalizers.append(normalizers.Lowercase())
-
-        precompiled_charsmap = proto.normalizer_spec.precompiled_charsmap
-
-        if precompiled_charsmap:
-            list_normalizers.append(normalizers.Precompiled(precompiled_charsmap))
-
-        list_normalizers.append(normalizers.Replace(Regex(" {2,}"), " "))
-        return normalizers.Sequence(list_normalizers)
-
-    def post_processor(self):
-        return processors.TemplateProcessing(
-            single="[CLS]:0 $A:0 [SEP]:0",
-            pair="[CLS]:0 $A:0 [SEP]:0 $B:1 [SEP]:1",
-            special_tokens=[
-                ("[CLS]", self.original_tokenizer.convert_tokens_to_ids("[CLS]")),
-                ("[SEP]", self.original_tokenizer.convert_tokens_to_ids("[SEP]")),
-            ],
-        )
-
-
 class BertConverter(Converter):
     def converted(self) -> Tokenizer:
         vocab = self.original_tokenizer.vocab
-        tokenizer = Tokenizer(WordPiece(vocab._token_to_idx, unk_token=str(self.original_tokenizer.unk_token)))
+        tokenizer = Tokenizer(
+            FastWordPiece(
+                vocab._token_to_idx, unk_token=str(self.original_tokenizer.unk_token), with_pretokenization=True
+            )
+        )
 
         tokenize_chinese_chars = True
         strip_accents = True
@@ -212,57 +84,24 @@ class BertConverter(Converter):
             strip_accents=strip_accents,
             lowercase=do_lower_case,
         )
-        tokenizer.pre_tokenizer = pre_tokenizers.BertPreTokenizer()
+        # No need to init pretokenizer because FastWordPiece can pretokenize
+        # tokenizer.pretokenizer = pretokenizers.BertPreTokenizer()
 
         cls_token = str(self.original_tokenizer.cls_token)
         sep_token = str(self.original_tokenizer.sep_token)
         cls_token_id = self.original_tokenizer.cls_token_id
         sep_token_id = self.original_tokenizer.sep_token_id
 
-        tokenizer.post_processor = processors.TemplateProcessing(
-            single=f"{cls_token}:0 $A:0 {sep_token}:0",
-            pair=f"{cls_token}:0 $A:0 {sep_token}:0 $B:1 {sep_token}:1",
-            special_tokens=[
-                (cls_token, cls_token_id),
-                (sep_token, sep_token_id),
-            ],
+        tokenizer.postprocessor = postprocessors.BertPostProcessor(
+            (str(sep_token), sep_token_id), (str(cls_token), cls_token_id)
         )
-        tokenizer.decoder = decoders.WordPiece(prefix="##")
 
+        tokenizer.decoder = decoders.WordPiece(prefix="##")
         return tokenizer
 
 
 class ErnieConverter(BertConverter):
     pass
-
-
-class RobertaConverter(Converter):
-    def converted(self) -> Tokenizer:
-        ot = self.original_tokenizer
-        vocab = ot.encoder
-        merges = list(ot.bpe_ranks.keys())
-
-        tokenizer = Tokenizer(
-            BPE(
-                vocab=vocab,
-                merges=merges,
-                dropout=None,
-                continuing_subword_prefix="",
-                end_of_word_suffix="",
-                fuse_unk=False,
-            )
-        )
-
-        tokenizer.pre_tokenizer = pre_tokenizers.ByteLevel(add_prefix_space=ot.add_prefix_space)
-        tokenizer.decoder = decoders.ByteLevel()
-        tokenizer.post_processor = processors.RobertaProcessing(
-            sep=(ot.sep_token, ot.sep_token_id),
-            cls=(ot.cls_token, ot.cls_token_id),
-            add_prefix_space=ot.add_prefix_space,
-            trim_offsets=True,  # True by default on Roberta (historical)
-        )
-
-        return tokenizer
 
 
 class TinyBertConverter(BertConverter):
@@ -403,10 +242,10 @@ class ErnieMConverter(SpmConverter):
         return self.original_tokenizer.convert_tokens_to_ids(str(self.original_tokenizer.unk_token))
 
     def pretokenizer(self, replacement, add_prefix_space):
-        return pre_tokenizers.SequencePreTokenizer(
+        return pretokenizers.SequencePreTokenizer(
             [
-                pre_tokenizers.Whitespace(),
-                pre_tokenizers.MetaSpacePreTokenizer(replacement=replacement, add_prefix_space=add_prefix_space),
+                pretokenizers.WhitespacePreTokenizer(),
+                pretokenizers.MetaSpacePreTokenizer(replacement=replacement, add_prefix_space=add_prefix_space),
             ]
         )
 
@@ -416,7 +255,7 @@ class ErnieMConverter(SpmConverter):
         - single sequence:       ``[CLS] X [SEP]``
         - pair of sequences:        ``[CLS] A [SEP] [SEP] B [SEP]``
         """
-        return processors.TemplatePostProcessor(
+        return postprocessors.TemplatePostProcessor(
             single="[CLS]:0 $A:0 [SEP]:0",
             pair="[CLS]:0 $A:0 [SEP]:0 [SEP]:1 $B:1 [SEP]:1",
             special_tokens=[
@@ -452,6 +291,7 @@ def convert_slow_tokenizer(transformer_tokenizer) -> Tokenizer:
     """
 
     tokenizer_class_name = transformer_tokenizer.__class__.__name__
+    breakpoint()
     if tokenizer_class_name not in SLOW_TO_FAST_CONVERTERS:
         raise ValueError(
             f"An instance of tokenizer class {tokenizer_class_name} cannot be converted in a Fast tokenizer instance. "

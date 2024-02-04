@@ -30,8 +30,25 @@ class BertFastTokenizer(PretrainedFastTokenizer):
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
     pretrained_resource_files_map.update(
         {
-            'tokenizer_file': {
+            "tokenizer_file": {
                 "bert-base-uncased": "fake/tokenizer.json",
+                "bert-large-uncased": "fake/tokenizer.json",
+                "bert-base-cased": "fake/tokenizer.json",
+                "bert-large-cased": "fake/tokenizer.json",
+                "bert-base-multilingual-uncased": "fake/tokenizer.json",
+                "bert-base-multilingual-cased": "fake/tokenizer.json",
+                "bert-base-chinese": "fake/tokenizer.json",
+                "bert-wwm-chinese": "fake/tokenizer.json",
+                "bert-wwm-ext-chinese": "fake/tokenizer.json",
+                "macbert-large-chinese": "fake/tokenizer.json",
+                "macbert-base-chinese": "fake/tokenizer.json",
+                "simbert-base-chinese": "fake/tokenizer.json",
+                "uer/chinese-roberta-base": "fake/tokenizer.json",
+                "uer/chinese-roberta-medium": "fake/tokenizer.json",
+                "uer/chinese-roberta-6l-768h": "fake/tokenizer.json",
+                "uer/chinese-roberta-small": "fake/tokenizer.json",
+                "uer/chinese-roberta-mini": "fake/tokenizer.json",
+                "uer/chinese-roberta-tiny": "fake/tokenizer.json",
             }
         }
     )

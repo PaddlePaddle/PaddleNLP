@@ -59,16 +59,16 @@ class PretrainedFastTokenizer(PretrainedTokenizerBase):
         # breakpoint()
         if tokenizer_object is not None:
             fast_tokenizer = tokenizer_object
-        elif fast_tokenizer_file is not None and not from_slow:
+        elif fast_tokenizer_file is not None and not from_slow and kwargs.get("from_hf_hub", False):
             # We have a serialization from tokenizers which let us directly build the backend
             # From json file
-            from tokenizers import Tokenizer as FastTokenizer
             fast_tokenizer = FastTokenizer.from_file(fast_tokenizer_file)
         elif slow_tokenizer is not None:
             # We need to convert a slow tokenizer to build the backend
             fast_tokenizer = convert_slow_tokenizer(slow_tokenizer)
         elif self.slow_tokenizer_class is not None:
             # We need to create and convert a slow tokenizer to build the backend
+            print("[Convert] 开始转换slow_tokenizer")
             slow_tokenizer = self.slow_tokenizer_class(*args, **kwargs)
             fast_tokenizer = convert_slow_tokenizer(slow_tokenizer)
         else:
@@ -97,13 +97,13 @@ class PretrainedFastTokenizer(PretrainedTokenizerBase):
         """
         `int`: Size of the base vocabulary (without the added tokens).
         """
-        if self.from_hub == 'huggingface' or self.from_hub is None:
+        if self.from_hub == "huggingface" or self.from_hub is None:
             return self._tokenizer.get_vocab_size(with_added_tokens=False)
         else:
             return self._tokenizer.get_vocab_size(with_added_vocabulary=False)
 
     def get_vocab(self) -> Dict[str, int]:
-        if self.from_hub == 'huggingface' or self.from_hub is None:
+        if self.from_hub == "huggingface" or self.from_hub is None:
             return self._tokenizer.get_vocab(with_added_tokens=True)
         else:
             return self._tokenizer.get_vocab(with_added_vocabulary=True)
@@ -119,7 +119,7 @@ class PretrainedFastTokenizer(PretrainedTokenizerBase):
         Returns:
             `Dict[str, int]`: The added tokens.
         """
-        if self.from_hub == 'huggingface' or self.from_hub is None:
+        if self.from_hub == "huggingface" or self.from_hub is None:
             base_vocab = self._tokenizer.get_vocab(with_added_tokens=False)
         else:
             base_vocab = self._tokenizer.get_vocab(with_added_vocabulary=False)

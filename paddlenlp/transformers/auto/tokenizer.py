@@ -112,6 +112,7 @@ FAST_TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("TinyBertFastTokenizer", "tinybert"),
         ("ErnieMFastTokenizer", "ernie_m"),
         ("NystromformerFastTokenizer", "nystromformer"),
+        ("DistilBertFastTokenizer", "distilbert"),
     ]
 )
 # For FastTokenizer
