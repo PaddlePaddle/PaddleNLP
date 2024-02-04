@@ -14,18 +14,27 @@
 
 import time
 
-import numpy as np
-import paddle
 import psutil
 import pytest
 from tokenizers import Tokenizer as HFTokenizer
 
+from fast_tokenizer import Tokenizer as FastTokenizer
 from paddlenlp.transformers import AutoTokenizer
 
-MODEL_NAME = "distilbert-base-uncased"
+MODEL_HF = r"/Users/tanzhehao/.paddlenlp/models/models--bert-base-uncased/snapshots/1dbc166cf8765166998eff31ade2eb64c8a40076/tokenizer.json"
+MODEL_FAST = r"/Users/tanzhehao/.paddlenlp/models/bert-base-uncased/tokenizer.json"
+MODEL_NAME = "bert-base-uncased"
 
 
-def measure_time_and_memory(func, *args, **kwargs):
+def pytest_addoption(parser):
+    parser.addoption(
+        "--test-times",
+        action="store",
+        default=10000,
+    )
+
+
+def measure_time_and_memory(func: callable, *args, **kwargs):
     start_time = time.time()
     process = psutil.Process()
     start_memory = process.memory_info().rss / 1024 / 1024
@@ -42,24 +51,25 @@ def measure_time_and_memory(func, *args, **kwargs):
 
 
 @pytest.fixture
+def test_times(request):
+    return request.config.getoption("--test-times")
+
+
+@pytest.fixture
 def setup_inputs():
-    single_s = (
-        "In the intricate tapestry of linguistic expression, the amalgamation of diverse syntactic structures, nuanced vocabulary,"
-        "and convoluted clauses not only challenges the adeptness of tokenization algorithms but also underscores the formidable complexity inherent in natural language processing tasks."
-    )
-    # single_s = '今天天气很好'
+    single_s = "natual language processing"
     return single_s
 
 
 @pytest.fixture
 def tokenizer_fast_hf():
-    fast_tokenizer_hf = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True, from_hf_hub=True)
+    fast_tokenizer_hf = HFTokenizer.from_file(MODEL_HF)
     return fast_tokenizer_hf
 
 
 @pytest.fixture
 def tokenizer_fast():
-    fast_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True)
+    fast_tokenizer = FastTokenizer.from_file(MODEL_FAST)
     return fast_tokenizer
 
 
@@ -70,32 +80,34 @@ def tokenizer_base():
 
 
 def test_tokenizer_type(tokenizer_fast_hf, tokenizer_fast, tokenizer_base):
-    assert isinstance(tokenizer_fast_hf._tokenizer, HFTokenizer)
-    assert isinstance(tokenizer_fast._tokenizer, HFTokenizer)
+    assert isinstance(tokenizer_fast_hf, HFTokenizer)
+    assert isinstance(tokenizer_fast, FastTokenizer)
     assert not hasattr(tokenizer_base, "_tokenizer")
-    assert tokenizer_fast_hf.from_hub == "huggingface"
-    assert tokenizer_fast.from_hub == tokenizer_base.from_hub
 
 
-def test_tokenizer_cost(tokenizer_fast_hf, tokenizer_fast, tokenizer_base, setup_inputs):
+def test_tokenizer_cost(tokenizer_fast_hf, tokenizer_fast, tokenizer_base, setup_inputs, test_times):
+    # breakpoint()
+    print(test_times)
     costs = []
     for tokenizer in ["tokenizer_fast_hf", "tokenizer_fast", "tokenizer_base"]:
-        (
-            _,
-            _time,
-            _memory,
-        ) = measure_time_and_memory(eval(tokenizer), [setup_inputs] * 10000)
+        if tokenizer != "tokenizer_base":
+            (
+                _,
+                _time,
+                _memory,
+            ) = measure_time_and_memory(eval(f"{tokenizer}.encode_batch"), [setup_inputs] * test_times)
+        else:
+            (
+                _,
+                _time,
+                _memory,
+            ) = measure_time_and_memory(eval(tokenizer), [setup_inputs] * test_times)
         costs.append({tokenizer: (_memory, _time)})
     print(costs)
 
 
 def test_tokenizer_decode(tokenizer_fast_hf, tokenizer_fast, tokenizer_base, setup_inputs):
-    token_hf = tokenizer_fast_hf(setup_inputs)
-    token_fast = tokenizer_fast(setup_inputs)
+    token_hf = tokenizer_fast_hf.encode(setup_inputs)
+    token_fast = tokenizer_fast.encode(setup_inputs)
     token_base = tokenizer_base(setup_inputs)
-    assert token_hf["input_ids"] == token_fast["input_ids"] == token_base["input_ids"]
-
-
-def test_output_type(tokenizer_fast, setup_inputs):
-    isinstance(tokenizer_fast.encode(setup_inputs, return_tensors="pd")["input_ids"], paddle.Tensor)
-    isinstance(tokenizer_fast.encode(setup_inputs, return_tensors="np")["input_ids"], np.ndarray)
+    assert token_hf.ids == token_fast.ids == token_base["input_ids"]
