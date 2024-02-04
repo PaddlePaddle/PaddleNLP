@@ -562,9 +562,9 @@ class PolicyTrainer(Trainer):
         elif isinstance(outputs, tuple):
             logits = outputs[0]
 
-        log_probs = gather_log_probabilities(logits[:, :-1], input_ids[:, 1:])
+        log_probs = gather_log_probabilities(logits[:, :-1], input_ids[:, 1:])[:, -old_log_probs.shape[1] :]
         actor_loss = self.actor_loss_fn(
-            log_probs[:, -old_log_probs.shape[1] :],
+            log_probs,
             old_log_probs,
             reward_advantages,
             sequence_mask,
@@ -729,8 +729,8 @@ class PipeEvalModel(GenerationMixin):
         self.prepare_inputs_for_generation = types.MethodType(
             self.model._layers._non_pipe_model_class.prepare_inputs_for_generation, self
         )
-        self.update_model_kwargs_for_generation = (
-            self.model._layers._non_pipe_model_class.update_model_kwargs_for_generation
+        self.update_model_kwargs_for_generation = types.MethodType(
+            self.model._layers._non_pipe_model_class.update_model_kwargs_for_generation, self
         )
 
     def eval(self):
@@ -790,8 +790,16 @@ class PipeEvalModel(GenerationMixin):
         if self._is_gen:
             # inputs by `prepare_inputs_for_generation` is a dict with following keys:
             # "input_ids", "position_ids", "past_key_values", "use_cache", "attention_mask"
-            # NOTE: cache/past_key_values should be rather than pass like
-            pass
+            # NOTE: 1. cache/past_key_values should be passed across decoding steps
+            # by using as model attr rather than input args to reduce comm overhead.
+            # Also, pipe model defined for training not support this cache input.
+            # 2. ignore use_cache since _check_data_vaild requires tensor if not None.
+            # 3. attention_mask can reuse _prepare_decoder_attention_mask in LlamaEmbeddingPipe.
+            # 4. TODO(guosheng): position_ids in _prepare_pipeline_inputs_func cause error, fix.
+            inputs, labels = model._prepare_pipeline_inputs_func(*args, **kwargs)
+            with guard_set_args(model, {"_compute_loss": False}):
+                outputs = model.eval_batch([inputs, labels], compute_loss=False)
+            outputs = self._broadcast_outputs(outputs)
         else:
             # use _prepare_pipeline_inputs_func to convert pipeline inputs
             inputs, labels = model._prepare_pipeline_inputs_func(*args, **kwargs)
@@ -1594,6 +1602,7 @@ class PPOTrainer(Trainer):
         input_ids = rl_batch["input_ids"]
         attention_mask = rl_batch["attention_mask"]
 
+        # log_probs has shifted by one for predicted logits
         start = prompt.shape[-1] - 1
         sequence_mask = attention_mask[:, 1:]
 
@@ -1617,7 +1626,7 @@ class PPOTrainer(Trainer):
             mean_generated_length = sequence_mask[:, start:].cast(paddle.float32).sum(axis=-1).mean()
             max_generated_length = sequence_mask[:, start:].cast(paddle.float32).sum(axis=-1).max()
             rewards = rewards.mean()
-            # trainer inputs
+            # trainer inputs with target length
             old_log_probs = old_log_probs[:, start:]
             old_reward_values = old_reward_values[:, start:]
             sequence_mask = sequence_mask[:, start:]

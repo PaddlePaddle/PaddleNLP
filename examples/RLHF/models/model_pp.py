@@ -175,19 +175,20 @@ def make_position_ids(attention_mask):
 
 
 @paddle.no_grad()
-def pad_batches_inputs(inputs, padding_value=0, max_len=None):
+def pad_batches_inputs(inputs, padding_value=0, max_len=None, pad_len=None):
     """Pad length for tensors shaped [bs, seq_len] to [bs, max(seq_lens)]"""
-    if max_len is None:
+    if pad_len is not None:
+        pad_len = [pad_len] * len(inputs) if isinstance(pad_len, int) else pad_len
+    elif max_len is None:
         # max_len = max([x.shape[-1] for x in inputs if x is not None])
         max_len = max([x.shape[-1] if isinstance(x, paddle.Tensor) else 0 for x in inputs])
+        pad_len = [max_len - x.shape[-1] if isinstance(x, paddle.Tensor) else 0 for x in inputs]
     for i in range(len(inputs)):
         x = inputs[i]
         # if x is None or x.shape[-1] == max_len:
         if not isinstance(x, paddle.Tensor) or x.shape[-1] == max_len:
             continue
-        inputs[i] = paddle.concat(
-            [x, paddle.full([x.shape[0], max_len - x.shape[-1]], padding_value, dtype=x.dtype)], -1
-        )
+        inputs[i] = paddle.concat([x, paddle.full([x.shape[0], pad_len[i]], padding_value, dtype=x.dtype)], -1)
     return inputs
 
 
@@ -227,6 +228,7 @@ class LlamaPolicyPipe(LlamaForCausalLMPipe):
     @fwd_args_to_dict
     def _prepare_pipeline_inputs_func(self, inputs):
         first_stage_keys = ["input_ids", "attention_mask"]
+        # first_stage_keys = ["input_ids", "attention_mask", "position_ids"]
         # last_stage_keys = [
         #     "labels", "input_ids", "log_probs", "advantages", "sequence_mask"
         # ]
@@ -238,7 +240,9 @@ class LlamaPolicyPipe(LlamaForCausalLMPipe):
         if type(inputs) is dict:
             # ppo-loss and ptx-loss need different labels, and data iter provides
             # corrensponding data, thus add the not provided fields here.
+            # policy trian and infer has different inputs, infer uses position_ids.
             for key in last_stage_keys:
+                # for key in first_stage_keys + last_stage_keys:
                 if key not in inputs:
                     inputs[key] = None
             return [
@@ -248,6 +252,7 @@ class LlamaPolicyPipe(LlamaForCausalLMPipe):
 
         for data in inputs:
             for key in last_stage_keys:
+                # for key in first_stage_keys + last_stage_keys:
                 if key not in data:
                     data[key] = None
         # keys = list(inputs[0].keys())
@@ -256,15 +261,36 @@ class LlamaPolicyPipe(LlamaForCausalLMPipe):
         # micro-batches/accu-steps have the same shape. Thus pad here, maybe
         # should make data collator do padding and pad optionally here, since
         # padding strategy may not be clear here.
+        # 1. For input_ids/attention_mask/labels (prompt+target) padding:
         # Some data fields, such as input_ids/attention_mask/labels, should
         # have same shape after padding, and each of them cannot pad only
         # according to its own max length which might be different since the
         # filed value is None for different batches/tasks.
+        src_tgt_keys = ["input_ids", "attention_mask", "labels"]
         max_len = max([x.shape[-1] for x in inputs_batch["input_ids"]])
-        for key, value in inputs_batch.items():
+        pad_len = [max_len - x.shape[-1] for x in inputs_batch["input_ids"]]
+        for key in src_tgt_keys:
             padding_value = self._ignore_index if key == "labels" else 0
-            max_len = max_len if key in ["input_ids", "attention_mask", "labels"] else None
-            inputs_batch[key] = pad_batches_inputs(value, padding_value, max_len)
+            inputs_batch[key] = pad_batches_inputs(inputs_batch[key], padding_value, pad_len=pad_len)
+        # 2. For old_log_probs/reward_advantages/sequence_mask (target) padding:
+        # hard to pad acorss batches, think in some cases one batch might have the
+        # longest prompt+target length but the shortest target lengh, which might
+        # cause mismatch between inputs with prompt+target length and labels with
+        # target length. NOTE: however trick can be used here, label fields with
+        # target length such as old_log_probs/reward_advantages/sequence_mask do
+        # not need to join comm and thus there is no need to keep same shape among
+        # batches of accumulation steps, they just need to pad as prompt+target
+        # fields such as input_ids.
+        tgt_keys = ["old_log_probs", "reward_advantages", "sequence_mask"]
+        for key in tgt_keys:
+            padding_value = 0
+            inputs_batch[key] = pad_batches_inputs(inputs_batch[key], padding_value, pad_len=pad_len)
+        # for key, value in inputs_batch.items():
+        #     padding_value = self._ignore_index if key == "labels" else 0
+        #     max_len = max_len if key in [
+        #         "input_ids", "attention_mask", "labels"
+        #     ] else None
+        #     inputs_batch[key] = pad_batches_inputs(value, padding_value, max_len)
         return [
             get_expected_keys(inputs_batch, first_stage_keys),
             get_expected_keys(inputs_batch, last_stage_keys),
@@ -346,12 +372,20 @@ class LlamaValuePipe(LlamaForCausalLMPipe):
 
         # keys = list(inputs[0].keys())
         inputs_batch = {key: [data.get(key) for data in inputs] for key in first_stage_keys + last_stage_keys}
-        # NOTE(guosheng): PipelineParallel requires send/recv tensors among
-        # micro-batches/accu-steps have the same shape. Thus pad here, maybe
-        # should make data collator do padding and pad optionally here, since
-        # padding strategy may not be clear here.
-        for key, value in inputs_batch.items():
-            inputs_batch[key] = pad_batches_inputs(value, padding_value=0)
+        # 1. For input_ids/attention_mask (prompt+target) padding:
+        src_tgt_keys = ["input_ids", "attention_mask"]
+        max_len = max([x.shape[-1] for x in inputs_batch["input_ids"]])
+        pad_len = [max_len - x.shape[-1] for x in inputs_batch["input_ids"]]
+        for key in src_tgt_keys:
+            padding_value = self._ignore_index if key == "labels" else 0
+            inputs_batch[key] = pad_batches_inputs(inputs_batch[key], padding_value, pad_len=pad_len)
+        # 2. For old_reward_values/reward_returns/sequence_mask (target) padding:
+        tgt_keys = ["old_reward_values", "reward_returns", "sequence_mask"]
+        for key in tgt_keys:
+            padding_value = 0
+            inputs_batch[key] = pad_batches_inputs(inputs_batch[key], padding_value, pad_len=pad_len)
+        # for key, value in inputs_batch.items():
+        #     inputs_batch[key] = pad_batches_inputs(value, padding_value=0)
         if "position_ids" not in inputs:
             inputs_batch["position_ids"] = [
                 make_position_ids(attention_mask) for attention_mask in inputs_batch["attention_mask"]

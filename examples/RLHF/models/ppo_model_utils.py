@@ -77,12 +77,24 @@ class RLHFPPOLoss(nn.Layer):
         return paddle.sum(paddle.maximum(pg_loss1, pg_loss2) * mask) / mask.sum()
 
     def forward(self, logits, input_ids, old_log_probs, reward_advantages, sequence_mask, start=None):
+        # When used in pipe mode, batches among accumulation steps should be paded.
+        # Hard to pad acorss batches, think in some cases one batch might have the
+        # longest prompt+target length but the shortest target lengh, which might
+        # cause mismatch between inputs with prompt+target length and labels with
+        # target length. NOTE: Thus, we might make all fields be prompt+target
+        # length rather rather than target and company an extra start input.
+        # However trick can be used in pipe_model._prepare_pipeline_inputs_func,
+        # label fields with target length such as old_log_probs/reward_advantages/sequence_mask
+        # not need to join comm and thus there is no need to keep same shape among
+        # batches of accumulation steps, they just need to pad as prompt+target
+        # fields such as input_ids.
         log_probs = gather_log_probabilities(logits[:, :-1], input_ids[:, 1:])
         if start is not None:
             old_log_probs = old_log_probs[:, start:]
             sequence_mask = sequence_mask[:, start:]
+        log_probs = log_probs[:, -old_log_probs.shape[1] :]
         actor_loss = self.actor_loss_fn(
-            log_probs[:, -old_log_probs.shape[1] :],
+            log_probs,
             old_log_probs,
             reward_advantages,
             sequence_mask,
