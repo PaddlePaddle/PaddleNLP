@@ -23,13 +23,14 @@ from .tokenizer import DistilBertTokenizer
 
 VOCAB_FILES_NAMES = {"vocab_file": "vocab.txt", "tokenizer_file": "tokenizer.json"}
 
+
 class DistilBertFastTokenizer(PretrainedFastTokenizer):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     slow_tokenizer_class = DistilBertTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
     pretrained_resource_files_map.update(
         {
-            'tokenizer_file': {
+            "tokenizer_file": {
                 "distilbert-base-uncased": "fake/tokenizer.json",
                 "distilbert-base-cased": "fake/tokenizer.json",
             }
@@ -53,7 +54,6 @@ class DistilBertFastTokenizer(PretrainedFastTokenizer):
         strip_accents=None,
         **kwargs
     ):
-        # breakpoint()
         super().__init__(
             vocab_file,
             tokenizer_file=tokenizer_file,

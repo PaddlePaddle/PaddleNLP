@@ -1482,7 +1482,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         }
 
         vocab_files_target = {**cls.resource_files_names, **additional_files_names}
-
         # From HF Hub or AI Studio
         if from_hf_hub or from_aistudio:
             # Only include the necessary resource files specified by the tokenizer cls
@@ -1526,14 +1525,16 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     subfolder=subfolder,
                 )
             elif from_hf_hub:
-                resolved_vocab_files[file_id] = hf_hub_download(
-                    repo_id=pretrained_model_name_or_path,
-                    filename=file_path,
-                    subfolder=subfolder,
-                    cache_dir=cache_dir,
-                    library_name="PaddleNLP",
-                    library_version=__version__,
-                )
+                if file_id != "tokenizer_config_file":
+                    # config file is downloaded in `AutoTokenizer.from_pretrained``
+                    resolved_vocab_files[file_id] = hf_hub_download(
+                        repo_id=pretrained_model_name_or_path,
+                        filename=file_path,
+                        subfolder=subfolder,
+                        cache_dir=cache_dir,
+                        library_name="PaddleNLP",
+                        library_version=__version__,
+                    )
             else:
                 path = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder, file_path.split("/")[-1])
                 if os.path.exists(path):
