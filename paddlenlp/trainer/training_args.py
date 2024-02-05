@@ -1246,12 +1246,6 @@ class TrainingArguments:
                 elif ShardingOption.FULL_SHARD in self.sharding:
                     sharding.stage = 3
 
-                if sharding.stage == 3 and self.unified_checkpoint:
-                    logger.warning(
-                        "Unified checkpoint currently do not support sharding stage3, set `unified_checkpoint` to False."
-                    )
-                    self.unified_checkpoint = False
-
                 sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
                 for x in sharding_parallel_config:
                     if len(x) > 0:
@@ -1313,6 +1307,16 @@ class TrainingArguments:
                         fleet.init(is_collective=True, strategy=strategy)
                     else:
                         paddle.distributed.init_parallel_env()
+
+        if (
+            self.unified_checkpoint
+            and self.sharding_parallel_degree > 0
+            and ShardingOption.FULL_SHARD in self.sharding
+        ):
+            logger.warning(
+                "Unified checkpoint currently do not support sharding stage3, set `unified_checkpoint` to False."
+            )
+            self.unified_checkpoint = False
 
         if self.unified_checkpoint:
             unified_checkpoint_config = set(self.unified_checkpoint_config.split(" "))
