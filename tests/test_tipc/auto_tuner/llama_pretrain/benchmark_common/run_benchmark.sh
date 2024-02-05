@@ -111,11 +111,12 @@ function _train(){
     else
         echo -e "${model_name}, SUCCESS" >> ${log_file}
     fi
-    resume_flag="true"
     if [[ ${model_item} =~ "resume" ]];then 
         bash autoconfig/check_resume.sh $PWD/autoconfig/resume.csv $PWD/autoconfig/llama7b_pretrain_history.csv >> ${log_file} 2>&1
         if [ $? -ne 0 ];then
-            resume_flag="false"
+            echo -e "auto_tuner_resume, FAIL" >> ${log_file}
+            sed '/ips/d' "$log_file" > "$log_file.tmp"
+            mv "$log_file.tmp" "$log_file"
         else
             echo -e "auto_tuner_resume, SUCCESS" >> ${log_file}
         fi
@@ -128,15 +129,13 @@ function _train(){
         fi
     fi
     #kill -9 `ps -ef|grep 'python'|awk '{print $2}'`
-    if [ "$resume_flag" = "true" ]; then
-        if [ ${device_num} != "N1C1" -a -d ./autoconfig/best_cfg ]; then
-            case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/tests/mylog
-            cp -r ${case_path}/autoconfig/best_cfg/workerlog.* ./mylog/
-            cp -r ${case_path}/autoconfig/*.csv $(dirname "$log_file")
-        fi
+    if [ ${device_num} != "N1C1" -a -d ./autoconfig/best_cfg ]; then
+        case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/tests/mylog
+        cp -r ${case_path}/autoconfig/best_cfg/workerlog.* ./mylog/
+        cp -r ${case_path}/autoconfig/*.csv $(dirname "$log_file")
     else
-        :> ${log_file}
-        echo -e "auto_tuner_resume, FAIL" >> ${log_file}
+        sed '/ips/d' "$log_file" > "$log_file.tmp"
+        mv "$log_file.tmp" "$log_file" 
     fi
 }
 
