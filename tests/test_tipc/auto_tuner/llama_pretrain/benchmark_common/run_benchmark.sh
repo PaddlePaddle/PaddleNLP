@@ -90,7 +90,7 @@ function _train(){
     N2C16) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
         train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --auto_tuner_json ${autoconfig_json_file} --master etcd://$master_ip:2379 --nnodes $nnodes:$nnodes \
-            finetune_generation.py ${modle_json_file}"
+            run_pretrain.py ${modle_json_file}"
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
