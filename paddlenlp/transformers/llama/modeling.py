@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import math
+import os
 import warnings
 from functools import partial
 from typing import Optional, Tuple
@@ -63,6 +64,11 @@ from .configuration import (
 )
 
 try:
+    from paddle.base import core
+
+    for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
+        if lib.endswith(".so"):
+            paddle.utils.cpp_extension.extension_utils.load_op_meta_info_and_register_op(lib)
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
@@ -189,7 +195,6 @@ def scaled_dot_product_attention(
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
-
     if config.use_flash_attention and flash_attention:
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
@@ -209,13 +214,26 @@ def scaled_dot_product_attention(
             if alibi is not None:
                 alibi = alibi.reshape([bsz, num_heads, 1, -1])
                 attention_mask = attention_mask.cast(alibi.dtype) + alibi
-            attn_output = F.scaled_dot_product_attention(
+            fixed_seed_offset = None
+            dropout = 0.0
+            return_softmax = True
+            is_test = False
+            # print('query_states', query_states)
+            # print('key_states', key_states)
+            # print('value_states', value_states)
+
+            attn_output = core.eager._run_custom_op(
+                "flash_attention_npu",
                 query_states,
                 key_states,
                 value_states,
-                attn_mask=attention_mask,
-                is_causal=attention_mask is None,
-            )
+                fixed_seed_offset,
+                attention_mask,
+                dropout,
+                attention_mask is None,
+                return_softmax,
+                is_test,
+            )[0]
             attn_weights = None
 
         if reshard_layer is not None:
