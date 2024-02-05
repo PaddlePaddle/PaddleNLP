@@ -147,11 +147,14 @@ class SpmConverter(Converter):
 
         super().__init__(*args)
 
-        # from .utils import sentencepiece_model_pb2 as model_pb2
         from . import sentencepiece_model_pb2 as model_pb2
 
         m = model_pb2.ModelProto()
-        with open(self.original_tokenizer.vocab_file, "rb") as f:
+        if hasattr(self.original_tokenizer, "sentencepiece_model_file"):
+            spm_vocab_file = self.original_tokenizer.sentencepiece_model_file
+        else:
+            spm_vocab_file = self.original_tokenizer.vocab_file
+        with open(spm_vocab_file, "rb") as f:
             m.ParseFromString(f.read())
         self.proto = m
 
@@ -282,16 +285,6 @@ class AlbertConverter(SpmConverter):
 
 
 class ErnieMConverter(SpmConverter):
-    def set_model(self, tokenizer):
-        if self.model_type == 1:
-            # Unigram
-            chinese_chars = r"\x{4e00}-\x{9fff}"
-            punc_chars = r",;:.?!~，；：。？！《》【】"
-            digits = r"0-9"
-            tokenizer.model.set_split_rule(
-                rf"[{chinese_chars}]|[{punc_chars}]|[{digits}]+|[^{chinese_chars}{punc_chars}{digits}]+"
-            )
-
     def normalizer(self, proto):
         list_normalizers = []
         precompiled_charsmap = proto.normalizer_spec.precompiled_charsmap
@@ -323,7 +316,7 @@ class ErnieMConverter(SpmConverter):
             ]
         )
 
-    def postprocessor(self):
+    def post_processor(self):
         """
          An ERNIE-M sequence has the following format:
         - single sequence:       ``[CLS] X [SEP]``
