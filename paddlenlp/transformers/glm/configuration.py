@@ -226,6 +226,7 @@ class GLMConfig(PretrainedConfig):
         pool_token="cls",
         layernorm_epsilon=1e-5,
         use_scaled_init_for_output_weights=False,
+        fuse_attention_qkv=False,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -250,3 +251,4 @@ class GLMConfig(PretrainedConfig):
         self.layernorm_epsilon = layernorm_epsilon
         self.use_scaled_init_for_output_weights = use_scaled_init_for_output_weights
         self._fast_entry = None
+        self.fuse_attention_qkv = fuse_attention_qkv

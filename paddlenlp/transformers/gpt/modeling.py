@@ -804,6 +804,29 @@ class GPTPretrainedModel(PretrainedModel):
         return mappings
 
     @classmethod
+    def _get_fused_param_mappings(cls):
+        # return parameter fuse utils
+        from paddlenlp.transformers.conversion_utils import merged_as_tensor_parallel_qkv
+        # attention: q,k,v -> qkv, ffn: gate, up -> gate_up
+        mappings = {
+            'fuse_action': [merged_as_tensor_parallel_qkv, None],
+            'split_action': [None, None],
+            'attn_param_names': {
+                'qkv_proj': 'gpt.decoder.layers.0.self_attn.qkv_proj.weight',
+                'q_proj': 'gpt.decoder.layers.0.self_attn.q_proj.weight',
+                'k_proj': 'gpt.decoder.layers.0.self_attn.k_proj.weight',
+                'v_proj': 'gpt.decoder.layers.0.self_attn.v_proj.weight'
+            },
+            'ffn_param_names': {
+                'gate_up_proj': None,
+                'gate_proj': None,
+                'up_proj': None
+            }
+        }
+
+        return mappings
+
+    @classmethod
     def _get_name_mappings(cls, config: GPTConfig) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [

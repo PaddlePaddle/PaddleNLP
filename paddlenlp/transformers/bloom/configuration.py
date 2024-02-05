@@ -125,6 +125,8 @@ class BloomConfig(PretrainedConfig):
         use_recompute=False,
         use_pure_fp16=False,
         use_flash_attention=False,
+        fuse_attention_qkv: bool = False,
+        fuse_attention_ffn: bool = False,
         **kwargs,
     ):
 
@@ -150,3 +152,5 @@ class BloomConfig(PretrainedConfig):
         self.use_recompute = use_recompute
         self.use_pure_fp16 = use_pure_fp16
         self.use_flash_attention = use_flash_attention
+        self.fuse_attention_qkv = fuse_attention_qkv
+        self.fuse_attention_ffn = fuse_attention_ffn

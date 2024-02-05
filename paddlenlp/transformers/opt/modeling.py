@@ -650,6 +650,26 @@ class OPTPretrainedModel(PretrainedModel):
         return actions
 
     @classmethod
+    def _get_fused_param_mappings(cls):
+        # return parameter fuse utils
+        from paddlenlp.transformers.conversion_utils import merged_as_tensor_parallel_qkv
+        # attention: q,k,v -> qkv, ffn: gate, up -> gate_up
+        mappings = {
+            'fuse_action': [merged_as_tensor_parallel_qkv, None],
+            'split_action': [None, None],
+            'attn_param_names': [
+                ["decoder.layers.0.self_attn.qkv_proj.weight"], 
+                ["decoder.layers.0.self_attn.q_proj.weight", "decoder.layers.0.self_attn.k_proj.weight", "decoder.layers.0.self_attn.v_proj.weight"]
+            ],
+            'ffn_param_names': [
+                [None],
+                [None, None]
+            ]
+        }
+        
+        return mappings
+
+    @classmethod
     def _get_name_mappings(cls, config: OPTConfig) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
@@ -686,6 +706,10 @@ class OPTPretrainedModel(PretrainedModel):
                 [
                     f"decoder.layers.{layer_index}.self_attn.q_proj.bias",
                     f"decoder.layers.{layer_index}.self_attn.q_proj.bias",
+                ],
+                [
+                    f"decoder.layers.{layer_index}.self_attn.qkv_proj.weight",
+                    f"decoder.layers.{layer_index}.self_attn.qkv_proj.weight",
                 ],
                 [
                     f"decoder.layers.{layer_index}.self_attn.out_proj.weight",

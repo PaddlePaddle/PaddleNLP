@@ -15,6 +15,7 @@
 """Paddle Llama model"""
 from __future__ import annotations
 
+import re
 import math
 import warnings
 from functools import partial
@@ -813,6 +814,15 @@ class LlamaAttention(nn.Layer):
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
 
         if self.fuse_attention_qkv:
+            # import pdb; pdb.set_trace()
+            # print("\n\nself.qkv_proj.weight")
+            # print(type(self.qkv_proj), self.qkv_proj)
+            # print(self.qkv_proj.weight)
+            # print(self.qkv_proj.weight.shape)
+            # print("\n\nhidden_states")
+            # print(hidden_states)
+            # print(hidden_states.shape, type(hidden_states))
+
             mix_layer = self.qkv_proj(hidden_states)
             # NOTE for GQA attention fusion (compatible with MHA and MQA):
             # The weight for qkv_proj is in shape like [hidden_size, hidden_size + 2 * num_kv_heads * head_dim].
@@ -1167,6 +1177,11 @@ class LlamaPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = LLAMA_PRETRAINED_RESOURCE_FILES_MAP
     _keys_to_ignore_on_load_unexpected = [r"self_attn.rotary_emb.inv_freq"]
 
+    # @classmethod
+    # def _get_parameter_fuse_action(cls):
+    #     from paddlenlp.transformers.conversion_utils import merged_as_tensor_parallel_qkv
+    #     return merged_as_tensor_parallel_qkv, None
+
     @classmethod
     def _get_name_mappings(cls, config: LlamaConfig) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
@@ -1179,11 +1194,13 @@ class LlamaPretrainedModel(PretrainedModel):
                 [f"layers.{layer_index}.self_attn.q_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.k_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.v_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.qkv_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.o_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.rotary_emb.inv_freq"],
                 [f"layers.{layer_index}.mlp.gate_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.mlp.down_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.mlp.up_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.mlp.gate_up_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.input_layernorm.weight"],
                 [f"layers.{layer_index}.post_attention_layernorm.weight"],
             ]
@@ -1227,7 +1244,7 @@ class LlamaPretrainedModel(PretrainedModel):
                 base_actions.pop("lm_head.weight")
                 base_actions.pop("embed_tokens.weight")
             # Column Linear
-            if config.fuse_attention_qkv:
+            if config.fuse_attention_qkv:  # debug: branch-1️⃣2️⃣,这里config的语义变化了,不再是说明而是指令,与实际state-dict状态不同步
                 base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
             else:
                 base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
@@ -1255,6 +1272,46 @@ class LlamaPretrainedModel(PretrainedModel):
         mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
 
         return mappings
+
+
+    @classmethod
+    def _get_fused_param_mappings(cls):
+        # return parameter fuse utils
+        from paddlenlp.transformers.conversion_utils import merged_as_tensor_parallel_qkv
+        # attention: q,k,v -> qkv, ffn: gate, up -> gate_up
+        mappings = {
+            'fuse_action': [merged_as_tensor_parallel_qkv, None],
+            'split_action': [None, None],
+            'attn_param_names': {
+                'qkv_proj': lambda layer_id: re.sub(r'\d+', str(layer_id), 'llama.layers.0.self_attn.qkv_proj.weight'),
+                'q_proj': lambda layer_id: re.sub(r'\d+', str(layer_id), 'llama.layers.0.self_attn.q_proj.weight'),
+                'k_proj': lambda layer_id: re.sub(r'\d+', str(layer_id), 'llama.layers.0.self_attn.k_proj.weight'),
+                'v_proj': lambda layer_id: re.sub(r'\d+', str(layer_id), 'llama.layers.0.self_attn.v_proj.weight')
+            },
+            'ffn_param_names': {
+                'gate_up_proj': lambda layer_id: re.sub(r'\d+', str(layer_id), 'llama.layers.0.mlp.gate_up_proj.weight'),
+                'gate_proj': lambda layer_id: re.sub(r'\d+', str(layer_id), 'llama.layers.0.mlp.gate_proj.weight'),
+                'up_proj': lambda layer_id: re.sub(r'\d+', str(layer_id), 'llama.layers.0.mlp.up_proj.weight')
+            }
+        }
+
+        return mappings
+
+        # # ffn: gate, up -> gate_up
+        # if is_split:
+        #     # qkv-> q,k,v
+        #     # src -> dst:
+        #     mapping = [
+        #         ["layers.0.self_attn.qkv_proj.weight"],  
+        #         ["layers.0.self_attn.q_proj.weight", "layers.0.self_attn.k_proj.weight", "layers.0.self_attn.v_proj.weight"],
+        #         spilt_func=xx,
+        #         ]
+
+        #     mapping.append([
+        #         ["layers.0.mlp.gate_up_fused_proj.weight"],
+        #         ["layers.0.mlp.gate_proj.weight", "layers.0.mlp.up_proj.weight"],
+        #         spilt_func=xx,
+        #     ])
 
     def _init_weights(self, layer):
         """Initialization hook"""
@@ -1769,6 +1826,30 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        # print("\n\nself.llama.layers[1].self_attn.qkv_proj.weight:")
+        # print(self.llama.layers[1].self_attn.qkv_proj.weight)
+        # print(self.llama.layers[1].self_attn.qkv_proj.weight.shape)
+        # print("\n\ninput_ids:")
+        # print(input_ids)
+        # print("\n\nposition_ids:")
+        # print(position_ids)
+        # print("\n\nattention_mask:")
+        # print(attention_mask)
+        # print("\n\ninputs_embeds:")
+        # print(inputs_embeds)
+        # print("\n\nuse_cache:")
+        # print(use_cache)
+        # print("\n\npast_key_values:")
+        # print(past_key_values)
+        # print("\n\noutput_attentions:")
+        # print(output_attentions)
+        # print("\n\noutput_hidden_states:")
+        # print(output_hidden_states)
+        # print("\n\nreturn_dict:")
+        # print(return_dict)
+        # import pdb; pdb.set_trace()
+
         outputs = self.llama(
             input_ids,  # [bs, seq_len]
             position_ids=position_ids,

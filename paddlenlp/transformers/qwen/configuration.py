@@ -50,6 +50,8 @@ class QWenConfig(PretrainedConfig):
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
+        fuse_attention_qkv: bool = False,
+        fuse_attention_ffn: bool = False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -74,6 +76,8 @@ class QWenConfig(PretrainedConfig):
         self.use_fused_rms_norm = use_fused_rms_norm
         self.use_fused_rope = use_fused_rope
         self.no_bias = no_bias
+        self.fuse_attention_qkv = fuse_attention_qkv
+        self.fuse_attention_ffn = fuse_attention_ffn
 
         super().__init__(
             pad_token_id=pad_token_id,
