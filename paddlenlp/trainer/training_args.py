@@ -1246,6 +1246,12 @@ class TrainingArguments:
                 elif ShardingOption.FULL_SHARD in self.sharding:
                     sharding.stage = 3
 
+                if sharding.stage == 3 and self.unified_checkpoint:
+                    logger.warning(
+                        "Unified checkpoint currently do not support sharding stage3, set `unified_checkpoint` to False."
+                    )
+                    self.unified_checkpoint = False
+
                 sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
                 for x in sharding_parallel_config:
                     if len(x) > 0:
