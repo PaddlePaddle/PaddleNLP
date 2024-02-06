@@ -329,7 +329,6 @@ class AutoTokenizer:
                         return actual_tokenizer_class.from_pretrained(
                             pretrained_model_name_or_path, *model_args, **kwargs
                         )
-            breakpoint()
         # From AI Studio or HF Hub
         elif from_aistudio or from_hf_hub:
             if from_aistudio:
@@ -357,7 +356,6 @@ class AutoTokenizer:
         # Assuming from community-contributed pretrained models
         else:
             url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
-            breakpoint()
             cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
             if subfolder != "":
                 url_list.insert(2, subfolder)

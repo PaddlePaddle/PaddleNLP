@@ -56,7 +56,6 @@ class PretrainedFastTokenizer(PretrainedTokenizerBase):
         slow_tokenizer = kwargs.pop("__slow_tokenizer", None)
         fast_tokenizer_file = kwargs.pop("tokenizer_file", None)
         from_slow = kwargs.pop("from_slow", False)
-        # breakpoint()
         if tokenizer_object is not None:
             fast_tokenizer = tokenizer_object
         elif fast_tokenizer_file is not None and not from_slow:

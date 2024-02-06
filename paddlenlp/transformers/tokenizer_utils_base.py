@@ -1570,7 +1570,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                                 "- or a correct model-identifier of community-contributed pretrained models,\n"
                                 "- or the correct path to a directory containing relevant tokenizer files.\n"
                             )
-        # breakpoint()
         tokenizer_config_file_dir_list = set()
         for k, v in resolved_vocab_files.items():
             if v is not None and os.path.isfile(v):
