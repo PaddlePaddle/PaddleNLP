@@ -300,7 +300,6 @@ class AutoTokenizer:
                     if pattern == pretrained_model_name_or_path:
                         actual_tokenizer_class = None
                         # Default setting the python tokenizer to actual_tokenizer_class
-                        # 为什么要多重复设置一次默认的，好像可以合并进入下面
                         for tokenizer_class in tokenizer_classes:
                             if not tokenizer_class[1]:
                                 actual_tokenizer_class = tokenizer_class[0]
