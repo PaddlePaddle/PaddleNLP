@@ -70,7 +70,7 @@ class PretrainedFastTokenizer(PretrainedTokenizerBase):
         else:
             raise ValueError(
                 "Couldn't instantiate the backend tokenizer from one of: \n"
-                "(1) a `fast_tokenizer` library serialization file, \n"
+                "(1) a `tokenizers` library serialization file, \n"
                 "(2) a slow tokenizer instance to convert or \n"
                 "(3) an equivalent slow tokenizer class to instantiate and convert. \n"
                 "You need to have sentencepiece installed to convert a slow tokenizer to a fast one."
