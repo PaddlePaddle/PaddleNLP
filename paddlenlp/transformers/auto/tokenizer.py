@@ -181,9 +181,9 @@ class AutoTokenizer:
                 )
         else:
             logger.warning(
-                "Can't find the fast_tokenizer package, "
+                "Can't find the tokenizers package, "
                 "please ensure install fast_tokenizer correctly. "
-                "You can install fast_tokenizer by `pip install fast-tokenizer-python`."
+                "You can install tokenizers by `pip install tokenizers`."
             )
         return tokenizer_class
 
