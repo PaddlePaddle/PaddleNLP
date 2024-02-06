@@ -112,6 +112,9 @@ FAST_TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("TinyBertFastTokenizer", "tinybert"),
         ("ErnieMFastTokenizer", "ernie_m"),
         ("NystromformerFastTokenizer", "nystromformer"),
+        ("DistilBertFastTokenizer", "distilbert"),
+        ("AlbertEnglishFastTokenizer", "albert"),
+        ("RobertaBPEFastTokenizer", "roberta"),
     ]
 )
 # For FastTokenizer
@@ -297,6 +300,7 @@ class AutoTokenizer:
                     if pattern == pretrained_model_name_or_path:
                         actual_tokenizer_class = None
                         # Default setting the python tokenizer to actual_tokenizer_class
+                        # 为什么要多重复设置一次默认的，好像可以合并进入下面
                         for tokenizer_class in tokenizer_classes:
                             if not tokenizer_class[1]:
                                 actual_tokenizer_class = tokenizer_class[0]
@@ -321,11 +325,11 @@ class AutoTokenizer:
                                     "please ensure install fast_tokenizer correctly. "
                                     "You can install fast_tokenizer by `pip install fast-tokenizer-python`."
                                 )
-
                         logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
                         return actual_tokenizer_class.from_pretrained(
                             pretrained_model_name_or_path, *model_args, **kwargs
                         )
+            breakpoint()
         # From AI Studio or HF Hub
         elif from_aistudio or from_hf_hub:
             if from_aistudio:
@@ -353,6 +357,7 @@ class AutoTokenizer:
         # Assuming from community-contributed pretrained models
         else:
             url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
+            breakpoint()
             cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
             if subfolder != "":
                 url_list.insert(2, subfolder)

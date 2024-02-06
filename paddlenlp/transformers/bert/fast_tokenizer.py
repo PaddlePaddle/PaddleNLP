@@ -16,7 +16,7 @@
 import json
 from typing import Optional, Tuple
 
-from fast_tokenizer import normalizers
+from tokenizers import normalizers
 
 from ..tokenizer_utils_fast import PretrainedFastTokenizer
 from .tokenizer import BertTokenizer
@@ -28,6 +28,30 @@ class BertFastTokenizer(PretrainedFastTokenizer):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     slow_tokenizer_class = BertTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
+    pretrained_resource_files_map.update(
+        {
+            "tokenizer_file": {
+                "bert-base-uncased": "fake/tokenizer.json",
+                "bert-large-uncased": "fake/tokenizer.json",
+                "bert-base-cased": "fake/tokenizer.json",
+                "bert-large-cased": "fake/tokenizer.json",
+                "bert-base-multilingual-uncased": "fake/tokenizer.json",
+                "bert-base-multilingual-cased": "fake/tokenizer.json",
+                "bert-base-chinese": "fake/tokenizer.json",
+                "bert-wwm-chinese": "fake/tokenizer.json",
+                "bert-wwm-ext-chinese": "fake/tokenizer.json",
+                "macbert-large-chinese": "fake/tokenizer.json",
+                "macbert-base-chinese": "fake/tokenizer.json",
+                "simbert-base-chinese": "fake/tokenizer.json",
+                "uer/chinese-roberta-base": "fake/tokenizer.json",
+                "uer/chinese-roberta-medium": "fake/tokenizer.json",
+                "uer/chinese-roberta-6l-768h": "fake/tokenizer.json",
+                "uer/chinese-roberta-small": "fake/tokenizer.json",
+                "uer/chinese-roberta-mini": "fake/tokenizer.json",
+                "uer/chinese-roberta-tiny": "fake/tokenizer.json",
+            }
+        }
+    )
     pretrained_init_configuration = slow_tokenizer_class.pretrained_init_configuration
 
     padding_side = "right"
@@ -46,6 +70,7 @@ class BertFastTokenizer(PretrainedFastTokenizer):
         strip_accents=None,
         **kwargs
     ):
+        # breakpoint()
         super().__init__(
             vocab_file,
             tokenizer_file=tokenizer_file,
