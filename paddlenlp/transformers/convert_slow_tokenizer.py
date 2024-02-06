@@ -332,6 +332,10 @@ class ErnieMConverter(SpmConverter):
         )
 
 
+class ErnieTinyConverter(ErnieMConverter):
+    pass
+
+
 SLOW_TO_FAST_CONVERTERS = {
     "BertTokenizer": BertConverter,
     "ErnieTokenizer": ErnieConverter,
@@ -342,6 +346,7 @@ SLOW_TO_FAST_CONVERTERS = {
     "AlbertEnglishTokenizer": AlbertConverter,
     # "AlbertEnglishTokenizer": AlbertConverter,
     "RobertaBPETokenizer": RobertaConverter,
+    "ErnieTinyTokenizer": ErnieTinyConverter
     # TODO(zhoushunjie): Need to implement more TokenizerConverter
 }
 
