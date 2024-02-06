@@ -173,11 +173,8 @@ class ErnieMTokenizer(PretrainedTokenizer):
         else:
             pieces = self.sp_model.SampleEncodeAsPieces(text, 64, 0.1)
         new_pieces = []
-        # breakpoint()
-        for i, piece in enumerate(pieces):
+        for piece in pieces:
             if piece == SPIECE_UNDERLINE:
-                if i > 0:
-                    new_pieces.append(SPIECE_UNDERLINE)
                 continue
             lst_i = 0
             for i, c in enumerate(piece):
@@ -202,24 +199,8 @@ class ErnieMTokenizer(PretrainedTokenizer):
 
     def convert_tokens_to_string(self, tokens):
         """Converts a sequence of tokens (strings for sub-words) in a single string."""
-        current_sub_tokens = []
-        out_string = ""
-        prev_is_special = False
-        for token in tokens:
-            # make sure that special tokens are not decoded using sentencepiece model
-            if token in self.all_special_tokens:
-                if not prev_is_special:
-                    out_string += " "
-                out_string += self.sp_model.decode(current_sub_tokens) + token
-                prev_is_special = True
-                current_sub_tokens = []
-            else:
-                current_sub_tokens.append(token)
-                prev_is_special = False
-        out_string += self.sp_model.decode(current_sub_tokens)
-        return out_string.strip()
-        # out_string = "".join(tokens).replace(SPIECE_UNDERLINE, " ").strip()
-        # return out_string
+        out_string = "".join(tokens).replace(SPIECE_UNDERLINE, " ").strip()
+        return out_string
 
     def convert_ids_to_string(self, ids):
         """
