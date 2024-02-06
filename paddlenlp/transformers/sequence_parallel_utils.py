@@ -341,7 +341,6 @@ class ColumnSequenceParallelLinear(Layer):
             )
 
         self.weight.is_distributed = True if self.is_mp else False
-        self.fuse_matmul_bias = fuse_matmul_bias
 
         if has_bias:
             # initialize bias to zero like Megatron
