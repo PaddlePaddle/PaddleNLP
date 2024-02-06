@@ -1290,6 +1290,16 @@ class TrainingArguments:
                     else:
                         paddle.distributed.init_parallel_env()
 
+        if (
+            self.unified_checkpoint
+            and self.sharding_parallel_degree > 0
+            and ShardingOption.FULL_SHARD in self.sharding
+        ):
+            logger.warning(
+                "Unified checkpoint currently do not support sharding stage3, set `unified_checkpoint` to False."
+            )
+            self.unified_checkpoint = False
+
         if self.unified_checkpoint:
             unified_checkpoint_config = set(self.unified_checkpoint_config.split(" "))
             for x in unified_checkpoint_config:
