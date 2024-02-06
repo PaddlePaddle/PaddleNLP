@@ -222,6 +222,62 @@ def is_fused_matmul_bias_supported():
         return False
 
 
+class SPInnerOverlapLinear(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, x, weight, bias, fuse_matmul_bias, model_parallel_group):
+        
+        ctx.model_parallel_group = model_parallel_group
+        world_size = model_parallel_group.nranks
+        is_mp = world_size > 1
+        if is_mp:
+            input_parallel = all_gather(x)
+        else:
+            input_parallel = x
+        
+        ctx.save_for_backward(x, weight, bias, input_parallel)
+        if not fuse_matmul_bias:
+            output = paddle._C_ops.linear(input_parallel, weight, bias)
+        else:
+            output = paddle._legacy_C_ops.fused_gemm_epilogue(input_parallel, weight, bias)
+        return output
+
+    @staticmethod
+    def backward(ctx, dy):
+        x, weight, bias, input_parallel = ctx.saved_tensor()
+        parallelism = ctx.model_parallel_group.nranks
+        
+        dinput_parallel = paddle.matmul(
+            dy.reshape([-1, dy.shape[-1]]),
+            weight,
+            transpose_y=True
+        )
+        
+        assert (
+            dinput_parallel.shape[0] % parallelism == 0
+        ), "Input sequence length {0} can't be divided exactly by sequence parallelism {1}".format(
+            dinput_parallel.shape[0], parallelism
+        )
+        dx_shape = dinput_parallel.shape
+        dx_shape[0] = dx_shape[0] // parallelism
+        dx = paddle.empty(shape=dx_shape, dtype=dinput_parallel.dtype)
+        hcg = fleet.get_hybrid_communicate_group()
+        group = hcg.get_model_parallel_group()
+        task = dist.stream.reduce_scatter(dx, dinput_parallel, op=dist.ReduceOp.SUM, group=group, sync_op=False)
+        # dx = reduce_scatter(dinput_parallel)
+
+        dw = paddle.matmul(
+            input_parallel.reshape([-1, input_parallel.shape[-1]]),
+            dy,
+            transpose_x=True
+        )
+        if bias is None:
+            task.wait()
+            return dx, dw
+        else:
+            dbias = paddle.sum(dy, axis=0)
+            task.wait()
+            return dx, dw, dbias
+        
 class ColumnSequenceParallelLinear(Layer):
     def __init__(
         self,
@@ -285,6 +341,7 @@ class ColumnSequenceParallelLinear(Layer):
             )
 
         self.weight.is_distributed = True if self.is_mp else False
+        self.fuse_matmul_bias = fuse_matmul_bias
 
         if has_bias:
             # initialize bias to zero like Megatron
@@ -316,12 +373,14 @@ class ColumnSequenceParallelLinear(Layer):
         # sequence parallelism is same as model parallelism
         # if sequence parallel is true, input shape is [s, b, h]
         # else input shape is [b, s, h]
-        if self.is_mp:
-            input_parallel = AllGatherOp.apply(x)
-        else:
-            input_parallel = x
-        output = self.linear(input_parallel, self.weight, self.bias, name=self._name)
-        return output
+        # if self.is_mp:
+        #     input_parallel = AllGatherOp.apply(x)
+        # else:
+        #     input_parallel = x
+        # output = self.linear(input_parallel, self.weight, self.bias, name=self._name)
+        # return output
+        # print("begin x.shape is", x.shape)
+        return SPInnerOverlapLinear.apply(x, self.weight, self.bias, self.fuse_matmul_bias, self.model_parallel_group)
 
 
 class RowSequenceParallelLinear(Layer):
