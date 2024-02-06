@@ -220,10 +220,16 @@ def main():
 
         AutoModelForCausalLM = LlamaPolicyPipe
         AutoModelForScore = LlamaValuePipe
+        extra_args = {
+            "ptx_coeff": training_args.ptx_coeff,
+            "clip_range_ratio": training_args.clip_range_ratio,
+        }
     else:
         from models import AutoModelForScore
 
         from paddlenlp.transformers import AutoModelForCausalLM
+
+        extra_args = {}
 
     # actor model
     model_config = AutoConfig.from_pretrained(
@@ -238,6 +244,9 @@ def main():
     actor_model = AutoModelForCausalLM.from_pretrained(
         model_args.actor_model_name_or_path,
         config=model_config,
+        **extra_args,
+        # ptx_coeff=training_args.ptx_coeff,
+        # clip_range_ratio=training_args.clip_range_ratio,
     )
     # reference model
     actor_reference_model = AutoModelForCausalLM.from_pretrained(
@@ -271,7 +280,11 @@ def main():
     if model_args.reward_critic_model_name_or_path is None:
         model_args.reward_critic_model_name_or_path = model_args.reward_model_name_or_path
     reward_critic_model = AutoModelForScore.from_pretrained(
-        model_args.reward_critic_model_name_or_path, config=model_config, score_type="critic", do_normalize=False
+        model_args.reward_critic_model_name_or_path,
+        config=model_config,
+        score_type="critic",
+        do_normalize=False,
+        clip_range_value=training_args.clip_range_value,
     )
     reward_critic_tokenizer = AutoTokenizer.from_pretrained(
         model_args.reward_critic_model_name_or_path, model_max_length=data_args.max_length, padding_side="left"

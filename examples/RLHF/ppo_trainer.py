@@ -729,8 +729,8 @@ class PipeEvalModel(GenerationMixin):
         self.prepare_inputs_for_generation = types.MethodType(
             self.model._layers._non_pipe_model_class.prepare_inputs_for_generation, self
         )
-        self.update_model_kwargs_for_generation = types.MethodType(
-            self.model._layers._non_pipe_model_class.update_model_kwargs_for_generation, self
+        self.update_model_kwargs_for_generation = (
+            self.model._layers._non_pipe_model_class.update_model_kwargs_for_generation
         )
 
     def eval(self):
@@ -812,10 +812,26 @@ class PipeEvalModel(GenerationMixin):
         return outputs
 
     def generate(self, *args, **kwargs):
-        # when generate, cache should be
         self._is_gen = True
-        super().generate(*args, **kwargs)
+        # patch DecoderLayerPipe to use cache, DecoderLayerPipe is subclass of
+        # DecoderLayer, and would call super().forward
+        ori_decoder_layer_forward = self.model._layers._non_pipe_decoder_layer_class.forward
+
+        def decoder_layer_forward(self, *args, **kwargs):
+            kwargs.update({"use_cache": True, "past_key_value": getattr(self, "_cache", None)})
+            outputs = ori_decoder_layer_forward(self, *args, **kwargs)
+            output = outputs[0]
+            self._cache = outputs[1]
+            return output
+
+        with guard_set_args(self.model._layers._non_pipe_decoder_layer_class, {"forward": decoder_layer_forward}):
+            super().generate(*args, **kwargs)
         self._is_gen = False
+        # clear cache of decoder layers, sublayers is incursive thus suitable
+        # to both 1F1B and interleave
+        for layer in self.model._layers.sublayers():
+            if isinstance(layer, self.model._layers._non_pipe_decoder_layer_class):
+                layer._cache = None
 
 
 class PPOTrainer(Trainer):
@@ -1203,27 +1219,35 @@ class PPOTrainer(Trainer):
             )
         return policy_model, value_model
 
-    @staticmethod
-    def load_sing_gen_data(as_batches=True):
+    def load_sing_gen_data(self, as_batches=True, use_counter=False):
+        if use_counter:
+            iter_counter = getattr(self, "iter_counter", 0)
+            self.iter_counter = iter_counter + 1
+        else:
+            iter_counter = ""
         import pickle
 
         from paddle.distributed import fleet
 
         hcg = fleet.get_hybrid_communicate_group()
         data_rank = hcg.get_sharding_parallel_rank()
-        with open(f"rl_batch-{data_rank}.data", "rb") as f:
+        with open(f"{iter_counter}rl_batch-{data_rank}.data", "rb") as f:
             data = pickle.load(f)
         rl_batch = map_structure(lambda x: paddle.to_tensor(x), data)
         rl_batches = [rl_batch] if as_batches else rl_batch
         return rl_batches
 
-    @staticmethod
-    def save_single_gen_data(rl_batch):
+    def save_single_gen_data(self, rl_batch, use_counter=False):
+        if use_counter:
+            iter_counter = getattr(self, "iter_counter", 0)
+            self.iter_counter = iter_counter + 1
+        else:
+            iter_counter = ""
         import pickle
 
         import paddle.distributed as dist
 
-        with open(f"rl_batch-{dist.get_rank()}.data", "wb") as f:
+        with open(f"{iter_counter}rl_batch-{dist.get_rank()}.data", "wb") as f:
             rl_batch = map_structure(lambda x: x.numpy(), rl_batch)
             pickle.dump(rl_batch, f)
         # exit(0)
@@ -1242,7 +1266,8 @@ class PPOTrainer(Trainer):
                 # generate batches
                 self.set_eval()
                 rl_batches = self.split_rl_micro_batches(prompt_only_batch)
-                # rl_batches = self.load_sing_gen_data(as_batches=True)
+                # rl_batches = self.load_sing_gen_data(as_batches=True,
+                #                                      use_counter=True)
                 if self.use_ptx:
                     ptx_batches = self.split_ptx_micro_batches(ptx_batch)
                 else:
@@ -1252,6 +1277,7 @@ class PPOTrainer(Trainer):
                 self.set_train()
                 for _ in range(self.args.update_iters):
                     for rl_batch, ptx_batch in zip(rl_batches, ptx_batches):
+                        # self.save_single_gen_data(rl_batch, use_counter=True)
                         yield rl_batch, ptx_batch
 
         class EpochIterator:
@@ -1718,7 +1744,7 @@ class PPOTrainer(Trainer):
         #     synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
         # )[0]
         # sequences = sequences.reshape([input_ids.shape[0], self.args.num_return_sequences, -1]).transpose([1, 0, 2])
-        sequences = [self.load_sing_gen_data(as_batches=False)["input_ids"]]
+        sequences = [self.load_sing_gen_data(as_batches=False, use_counter=False)["input_ids"]]
 
         return [
             self.post_rollout(

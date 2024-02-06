@@ -20,6 +20,7 @@ import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import LayerDesc
 
 from paddlenlp.transformers import LlamaForCausalLM, LlamaForCausalLMPipe
+from paddlenlp.transformers.llama.modeling import LlamaDecoderLayer
 from paddlenlp.transformers.llama.modeling_pp import (
     LlamaRMSNormPipe,
     parse_args,
@@ -202,6 +203,7 @@ def get_expected_keys(inputs, keys):
 # patches for base pipe model
 # non-pipe model class, can be used to parse and convert forward args
 LlamaForCausalLMPipe._non_pipe_model_class = LlamaForCausalLM
+LlamaForCausalLMPipe._non_pipe_decoder_layer_class = LlamaDecoderLayer
 
 
 def fwd_args_to_dict(fun):
@@ -227,8 +229,8 @@ class LlamaPolicyPipe(LlamaForCausalLMPipe):
 
     @fwd_args_to_dict
     def _prepare_pipeline_inputs_func(self, inputs):
-        first_stage_keys = ["input_ids", "attention_mask"]
-        # first_stage_keys = ["input_ids", "attention_mask", "position_ids"]
+        # first_stage_keys = ["input_ids", "attention_mask"]
+        first_stage_keys = ["input_ids", "attention_mask", "position_ids"]
         # last_stage_keys = [
         #     "labels", "input_ids", "log_probs", "advantages", "sequence_mask"
         # ]
@@ -241,8 +243,8 @@ class LlamaPolicyPipe(LlamaForCausalLMPipe):
             # ppo-loss and ptx-loss need different labels, and data iter provides
             # corrensponding data, thus add the not provided fields here.
             # policy trian and infer has different inputs, infer uses position_ids.
-            for key in last_stage_keys:
-                # for key in first_stage_keys + last_stage_keys:
+            # for key in last_stage_keys:
+            for key in first_stage_keys + last_stage_keys:
                 if key not in inputs:
                     inputs[key] = None
             return [
@@ -251,8 +253,8 @@ class LlamaPolicyPipe(LlamaForCausalLMPipe):
             ]
 
         for data in inputs:
-            for key in last_stage_keys:
-                # for key in first_stage_keys + last_stage_keys:
+            # for key in last_stage_keys:
+            for key in first_stage_keys + last_stage_keys:
                 if key not in data:
                     data[key] = None
         # keys = list(inputs[0].keys())

@@ -21,9 +21,9 @@ from .score_model import LlamaModelForScore
 
 # TODO(guosheng): create Mixin and make model classes using metaclass.
 class LlamaPolicyModel(LlamaForCausalLM):
-    def __init__(self, config: PretrainedConfig):
+    def __init__(self, config: PretrainedConfig, **kwargs):
         super().__init__(config)
-        self.loss_fn = RLHFPPOMixedLoss(config)
+        self.loss_fn = RLHFPPOMixedLoss(config, **kwargs)
 
     def forward(
         self,
@@ -72,7 +72,7 @@ class LlamaPolicyModel(LlamaForCausalLM):
 class LlamaValueModel(LlamaModelForScore):
     def __init__(self, config, **kwargs):
         super().__init__(config, **kwargs)
-        self.loss_fn = RLHFValueLoss(config)
+        self.loss_fn = RLHFValueLoss(config, **kwargs)
 
     def forward(
         self,
