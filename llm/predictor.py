@@ -947,6 +947,7 @@ class BlockInferencePredictorMixin:
             self.inputs["top_p"][i : i + 1] = self.config.top_p
             self.inputs["temperature"][i : i + 1] = self.config.temperature
             self.inputs["seq_lens_this_time"][i : i + 1] = length
+            # TODO(Wanglongzhi2001): check here
             self.inputs["seq_lens_encoder"][i : i + 1] = length
             self.inputs["seq_lens_decoder"][i : i + 1] = 0
             self.inputs["step_idx"][i : i + 1] = 0
@@ -1328,6 +1329,7 @@ def create_predictor(
                         tensor_parallel_rank=tensor_parallel_rank,
                     )
                 else:
+                    config.speculative_decoding = predictor_args.speculative_decoding
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMInferenceModel as LlamaInferenceModel,
                     )

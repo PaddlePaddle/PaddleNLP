@@ -339,6 +339,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
         elif self.quant_type == "a8w8":
             self.transformer_block = FusedMultiTransformerA8W8(transformer_config)
+        elif self.speculative_decoding == True:
+            print("!!!!!!!!!!!start use speculative decoding!!!!!!!!")
+            self.transformer_block = FusedSpeculativeMultiTransformer(transformer_config)
         else:
             self.transformer_block = FusedMultiTransformerBase(transformer_config)
 
@@ -827,6 +830,7 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
 
         seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
         rope_emb = kwargs.get("rope_emb", None)
+        print("----------input_ids's shape: ", input_ids.shape)
         ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
             input_ids, seq_lens_this_time
         )
@@ -1217,6 +1221,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         v_quant_scales = kwargs.get("v_quant_scales", None)
         k_dequant_scales = kwargs.get("k_dequant_scales", None)
         v_dequant_scales = kwargs.get("v_dequant_scales", None)
+        step_idx = kwargs.get("step_idx", None)
         model_inputs = {
             "input_ids": input_ids,
             "src_mask": src_mask,
@@ -1231,6 +1236,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             "v_quant_scales": v_quant_scales,
             "k_dequant_scales": k_dequant_scales,
             "v_dequant_scales": v_dequant_scales,
+            "step_idx": step_idx
         }
         return model_inputs
 

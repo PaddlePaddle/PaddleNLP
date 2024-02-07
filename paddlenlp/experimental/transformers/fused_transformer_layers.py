@@ -577,7 +577,6 @@ class FusedMultiTransformerBase(Layer):
             return qkv_out
         else:
             # This method requires CUDA version >= 11.6.
-            print(f"i: {i}, qkv_weights: {self.qkv_weights[i].shape}")
             return self.linear(ln_out, self.qkv_weights[i], self.qkv_biases[i], transpose_weight=True)
 
     def compute_qkv(self, src, residual_input, i):
@@ -652,8 +651,6 @@ class FusedMultiTransformerBase(Layer):
         )[0]
 
     def compute_out_linear(self, fmha_out, i):
-        print("!!!!!!!!!!!!fmha_out.shape: ", fmha_out.shape)
-        print("!!!!!!!!!!!!self.linear_weights[i].shape: ", self.linear_weights[i].shape)
         return paddle.matmul(fmha_out, self.linear_weights[i])
 
     def compute_attn(
@@ -822,7 +819,6 @@ class FusedMultiTransformerBase(Layer):
         residual_input = src
         for i in range(self.num_layers):
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
-            print("!!!!!!!!!qkv_out's shape: ", qkv_out.shape)
             out_linear_out = self.compute_attn(
                 time_step,
                 qkv_out,
@@ -1357,6 +1353,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
         i,
         **kwargs,
     ):
+        print("-------cu_seqlens_q: ", kwargs.get("cu_seqlens_q", None))
+        print("-------cu_seqlens_k: ", kwargs.get("cu_seqlens_k", None))
+
         k_quant_scales = kwargs.get("k_quant_scales", None)
         v_quant_scales = kwargs.get("v_quant_scales", None)
         k_dequant_scales = kwargs.get("k_dequant_scales", None)
@@ -1437,9 +1436,16 @@ class FusedSpeculativeMultiTransformer(FusedMultiTransformerBase):
         i,
         **kwargs,
     ):
-        fmha_out = paddle.incubate.nn.functional.speculative_decoding_multihead_attention(
+        # qkv_out_specu:(token_num, 3 * hidden_dim)
+        step_idx = kwargs.get("step_idx", None)
+        print("step_idx: ", step_idx)
+        hidden_size = caches[2 * i].shape[1] * caches[2 * i].shape[3]
+        cu_seqlens_q = kwargs.get("cu_seqlens_q", None)
+        cur_seq_len = step_idx
+        cu_seqlens_k = kwargs.get("cu_seqlens_k", None)
+        fmha_out, qkv_out_specu, _, _ = paddle.incubate.nn.functional.speculative_decoding_multihead_attention(
             qkv_out,
-            caches[2 * i],
+            caches[2 * i], # [bsz, num_heads, seqlen, head_dim]
             caches[2 * i + 1],
             kwargs.get("seq_lens_encoder", None),
             kwargs.get("seq_lens_decoder", None),
@@ -1457,9 +1463,25 @@ class FusedSpeculativeMultiTransformer(FusedMultiTransformerBase):
             attn_mask,
             kwargs.get("tgt_mask", None),
             kwargs.get("max_input_length", -1),
+            cur_seq_len,
             self.use_neox_rotary_style,
-        )[0]
+        )
 
+        # 更新 cache
+        # qkv_out_specu: (cur_token_num, 3*hidden_dim)
+        # caches[2*i]: (bsz, num_heads, max_seqlen, head_dim)
+        k = qkv_out_specu[:, hidden_size:2*hidden_size]
+        v = qkv_out_specu[:, 2*hidden_size:]
+        # print(f"key_cache: {key_cache.shape}, value_cache: {value_cache.shape}")
+        # print("caches[2 * i]: ", caches[2 * i].shape)
+        # prefill stage
+        if paddle.equal_all(cu_seqlens_q, cu_seqlens_k):
+            caches[2 * i][:, :, :cur_seq_len, :] = k.reshape(caches[2 * i][:, :, :cur_seq_len, :].shape)
+            caches[2 * i + 1][:, :, :cur_seq_len, :] = v.reshape(caches[2 * i + 1][:, :, :cur_seq_len, :].shape)
+        # decode stage
+        else:
+            caches[2 * i][:, :, cur_seq_len, :] = k.reshape(caches[2 * i][:, :, cur_seq_len, :].shape)
+            caches[2 * i + 1][:, :, cur_seq_len, :] = v.reshape(caches[2 * i + 1][:, :, cur_seq_len, :].shape)
         out_linear_out = self.compute_out_linear(fmha_out, i)
 
         return out_linear_out

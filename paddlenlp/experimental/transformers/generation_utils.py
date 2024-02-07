@@ -641,7 +641,6 @@ class GenerationInferenceModel(GenerationMixin):
             model_kwargs,
         )
         step_idx_ori += 1
-
         # gives it a value, means we will entered into decoder phase.
         model_kwargs["cache"] = 0
 
@@ -658,6 +657,7 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs,
             )
             step_idx_ori += 1
+            print("-----next_tokens: ", next_tokens)
 
         return (
             next_tokens,
@@ -938,7 +938,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             probs = F.softmax(logits)
             # _, next_tokens = top_p_sampling(probs, top_p, -1)
             _, next_tokens = paddle.topk(probs, 1, -1)
-
+            print("-------next_tokens: ", next_tokens)
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
 
