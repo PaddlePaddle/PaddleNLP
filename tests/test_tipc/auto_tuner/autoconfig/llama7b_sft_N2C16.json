@@ -66,6 +66,10 @@
     "use_recompute": [
       "./autoconfig/llama7b_sft_params.json",
       "recompute"
+    ],
+    "recompute_granularity": [
+      "./autoconfig/llama7b_lora_params.json",
+      "recompute_granularity"
     ]
   },
   "schedule_prior": [
@@ -74,5 +78,6 @@
   "sharding_degree": "auto",
   "sharding_stage": "auto",
   "task_limit": 2000,
-  "use_recompute": "auto"
+  "use_recompute": "auto",
+  "recompute_granularity":"auto"
 }
