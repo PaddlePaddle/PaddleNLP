@@ -15,7 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Dict, List, Optional, Tuple
+
 from tokenizers import (
+    AddedToken,
     Regex,
     Tokenizer,
     decoders,
@@ -34,19 +37,26 @@ class SentencePieceExtractor:
         self.sp = SentencePieceProcessor()
         self.sp.Load(model)
 
-    def extract(self):
+    def extract(self, vocab_scores: Optional[Tuple[str, float]] = None) -> Tuple[Dict[str, int], List[Tuple]]:
         sp = self.sp
         vocab = {sp.id_to_piece(index): index for index in range(sp.GetPieceSize())}
+        if vocab_scores is not None:
+            vocab_scores, reverse = dict(vocab_scores), True
+        else:
+            vocab_scores, reverse = vocab, False
 
         # Merges
         merges = []
-        for piece_l in vocab.keys():
-            for piece_r in vocab.keys():
-                merge = f"{piece_l}{piece_r}"
-                piece_id = vocab.get(merge, None)
-                if piece_id:
-                    merges += [(piece_l, piece_r, piece_id)]
-        merges = sorted(merges, key=lambda val: val[2])
+        for merge, piece_score in vocab_scores.items():
+            local = []
+            for index in range(1, len(merge)):
+                piece_l, piece_r = merge[:index], merge[index:]
+                if piece_l in vocab and piece_r in vocab:
+                    local.append((piece_l, piece_r, piece_score))
+            local = sorted(local, key=lambda x: (vocab[x[0]], vocab[x[1]]))
+            merges.extend(local)
+
+        merges = sorted(merges, key=lambda val: val[2], reverse=reverse)
         merges = [(val[0], val[1]) for val in merges]
 
         return vocab, merges
@@ -332,6 +342,80 @@ class ErnieMConverter(SpmConverter):
         )
 
 
+class LlamaConverter(SpmConverter):
+    handle_byte_fallback = True
+
+    def vocab(self, proto):
+        vocab = [
+            ("<unk>", 0.0),
+            ("<s>", 0.0),
+            ("</s>", 0.0),
+        ]
+        vocab += [(piece.piece, piece.score) for piece in proto.pieces[3:]]
+        return vocab
+
+    def unk_id(self, proto):
+        unk_id = 0
+        return unk_id
+
+    def decoder(self, replacement, add_prefix_space):
+        return decoders.Sequence(
+            [
+                decoders.Replace("▁", " "),
+                decoders.ByteFallback(),
+                decoders.Fuse(),
+                decoders.Strip(content=" ", left=1),
+            ]
+        )
+
+    def tokenizer(self, proto):
+        model_type = proto.trainer_spec.model_type
+        vocab_scores = self.vocab(proto)
+        if model_type == 1:
+            import tokenizers
+            from packaging import version
+
+            if version.parse(tokenizers.__version__) < version.parse("0.14.0"):
+                tokenizer = Tokenizer(Unigram(vocab_scores, 0))
+            else:
+                tokenizer = Tokenizer(Unigram(vocab_scores, 0, byte_fallback=True))
+
+        elif model_type == 2:
+            _, merges = SentencePieceExtractor(self.original_tokenizer.vocab_file).extract(vocab_scores)
+            bpe_vocab = {word: i for i, (word, _score) in enumerate(vocab_scores)}
+            tokenizer = Tokenizer(
+                BPE(bpe_vocab, merges, unk_token=proto.trainer_spec.unk_piece, fuse_unk=True, byte_fallback=True)
+            )
+            tokenizer.add_special_tokens(
+                [
+                    AddedToken("<unk>", normalized=False, special=True),
+                    AddedToken("<s>", normalized=False, special=True),
+                    AddedToken("</s>", normalized=False, special=True),
+                ]
+            )
+        else:
+            raise Exception(
+                "You're trying to run a `Unigram` model but your file was trained with a different algorithm"
+            )
+
+        return tokenizer
+
+    def normalizer(self, proto):
+        return normalizers.Sequence(
+            [
+                normalizers.Prepend(prepend="▁"),
+                normalizers.Replace(pattern=" ", content="▁"),
+            ]
+        )
+
+    def pre_tokenizer(self, replacement, add_prefix_space):
+        return None
+
+    def post_processor(self):
+        # the post_processor is defined in LlamaTokenizerFast class.
+        return None
+
+
 class ErnieTinyConverter(ErnieMConverter):
     pass
 
@@ -346,7 +430,8 @@ SLOW_TO_FAST_CONVERTERS = {
     "AlbertEnglishTokenizer": AlbertConverter,
     # "AlbertEnglishTokenizer": AlbertConverter,
     "RobertaBPETokenizer": RobertaConverter,
-    "ErnieTinyTokenizer": ErnieTinyConverter
+    "ErnieTinyTokenizer": ErnieTinyConverter,
+    "LlamaTokenizer": LlamaConverter,
     # TODO(zhoushunjie): Need to implement more TokenizerConverter
 }
 
