@@ -23,14 +23,6 @@ from .tokenizer import AlbertEnglishTokenizer
 
 VOCAB_FILES_NAMES = {"sentencepiece_model_file": "spiece.model", "tokenizer_file": "tokenizer.json"}
 logger = logging.getLogger(__name__)
-# (
-# "albert-chinese-tiny": "fake/tokenizer.json",
-# "albert-chinese-small": "fake/tokenizer.json",
-# "albert-chinese-base": "fake/tokenizer.json",
-# "albert-chinese-large": "fake/tokenizer.json",
-# "albert-chinese-xlarge": "fake/tokenizer.json",
-# "albert-chinese-xxlarge": "fake/tokenizer.json",
-# )
 
 
 class AlbertEnglishFastTokenizer(PretrainedFastTokenizer):
