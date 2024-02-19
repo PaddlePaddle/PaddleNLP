@@ -60,7 +60,7 @@ class PredictorTest(LLMTest, unittest.TestCase):
         paddle.set_default_dtype("float32")
         self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
-    
+
     def tearDown(self) -> None:
         LLMTest.tearDown(self)
 
@@ -146,7 +146,7 @@ class PredictorPrecacheTest(LLMTest, unittest.TestCase):
 
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
         self.download_precache_files()
-    
+
     def tearDown(self) -> None:
         LLMTest.tearDown(self)
 
@@ -315,7 +315,7 @@ class GPUsPredictorTest(LLMTest, GPUsTesting, unittest.TestCase):
         super().setUp()
         self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
-    
+
     def tearDown(self) -> None:
         LLMTest.tearDown(self)
 
