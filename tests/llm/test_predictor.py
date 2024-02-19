@@ -60,6 +60,9 @@ class PredictorTest(LLMTest, unittest.TestCase):
         paddle.set_default_dtype("float32")
         self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
+    
+    def tearDown(self) -> None:
+        LLMTest.tearDown(self)
 
     def test_predictor(self):
         self.run_predictor({"inference_model": True})
@@ -143,6 +146,9 @@ class PredictorPrecacheTest(LLMTest, unittest.TestCase):
 
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
         self.download_precache_files()
+    
+    def tearDown(self) -> None:
+        LLMTest.tearDown(self)
 
     def download_precache_files(self):
         files = [
@@ -230,6 +236,9 @@ class BlockAttnPredictorTest(LLMTest, unittest.TestCase):
         self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
 
+    def tearDown(self) -> None:
+        LLMTest.tearDown(self)
+
     def test_blha(self):
         self.run_predictor({"inference_model": True, "block_attn": True})
         result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
@@ -306,6 +315,9 @@ class GPUsPredictorTest(LLMTest, GPUsTesting, unittest.TestCase):
         super().setUp()
         self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
+    
+    def tearDown(self) -> None:
+        LLMTest.tearDown(self)
 
     @require_gpu(2)
     def test_predictor(self):
@@ -339,6 +351,9 @@ class QWenVLTest(LLMTest, unittest.TestCase):
         paddle.set_default_dtype("float32")
         self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
+
+    def tearDown(self) -> None:
+        LLMTest.tearDown(self)
 
     def test_forward(self):
         self.disable_static()
