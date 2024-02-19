@@ -82,7 +82,11 @@ class ErnieFastTokenizer(PretrainedFastTokenizer):
 
 
 class ErnieTinyFastTokenizer(PretrainedFastTokenizer):
-    resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
+    resource_files_names = {
+        "sentencepiece_model_file": "spm_cased_simp_sampled.model",
+        "vocab_file": "vocab.txt",
+        "word_dict": "dict.wordseg.pickle",
+    }  # for save_pretrained  # for save_pretrained
     slow_tokenizer_class = ErnieTinyTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
     pretrained_init_configuration = slow_tokenizer_class.pretrained_init_configuration
