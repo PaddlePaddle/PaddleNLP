@@ -93,11 +93,15 @@ from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
     LORA_WEIGHTS_NAME,
+    PADDLE_LORA_WEIGHTS_INDEX_NAME,
     PADDLE_MASTER_WEIGHTS_INDEX_NAME,
+    PADDLE_PREFIX_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
     PREFIX_WEIGHTS_NAME,
+    SAFE_LORA_WEIGHTS_INDEX_NAME,
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
+    SAFE_PREFIX_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
 )
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
@@ -2417,6 +2421,8 @@ class Trainer:
             opt_state_dict = tmp
 
         # broadcast optimizer state in dp group
+        if self.args.local_rank != -1:
+            dist.barrier()
         opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
 
         if opt_state_dict is not None:
@@ -3045,7 +3051,16 @@ class Trainer:
 
     def is_unified_checkpoint(self, resume_from_checkpoint, safe_serialization=True):
         is_unified_checkpoint_type = False
-        weights_index_name = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+        if isinstance(self.model, LoRAModel):
+            weights_index_name = (
+                PADDLE_LORA_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_LORA_WEIGHTS_INDEX_NAME
+            )
+        elif isinstance(self.model, PrefixModelForCausalLM):
+            weights_index_name = (
+                PADDLE_PREFIX_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_PREFIX_WEIGHTS_INDEX_NAME
+            )
+        else:
+            weights_index_name = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
         master_weights_index_name = (
             PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
         )

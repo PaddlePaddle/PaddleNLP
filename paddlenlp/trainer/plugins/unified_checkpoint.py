@@ -1128,7 +1128,12 @@ def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_chec
         tp_actions = {}
     else:
         # Get corresponding tensor parallel actions.
-        tp_actions = model.get_tensor_parallel_convert_actions(config_revise, all_tp_keys, ignore_error=True)
+        if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
+            tp_actions = model._get_tensor_parallel_convert_actions(
+                set(all_tp_keys), is_split=True, ignore_error=True, config=config_revise
+            )
+        else:
+            tp_actions = model.get_tensor_parallel_convert_actions(config_revise, all_tp_keys, ignore_error=True)
 
     logger.debug("Distributed send recv for state dict load ...")
     # Distribute the checkpoint tensor dynamically, using the `send_table` and `recv_table` we create before.
@@ -1265,7 +1270,12 @@ def load_unified_optimizer_dynamically(args, model, optimizer, resume_from_check
     if len(all_tp_keys) == 0:
         tp_actions = {}
     else:
-        tp_actions = model.get_tensor_parallel_convert_actions(config_revise, all_tp_keys, ignore_error=True)
+        if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
+            tp_actions = model._get_tensor_parallel_convert_actions(
+                set(all_tp_keys), is_split=True, ignore_error=True, config=config_revise
+            )
+        else:
+            tp_actions = model.get_tensor_parallel_convert_actions(config_revise, all_tp_keys, ignore_error=True)
     optimizer_keys = list(index["weight_map"].keys())
     optimizer_tp_actions = mapping_optimizer_tp_actions(tp_actions, optimizer_keys)
     if has_master_weights:
@@ -1465,7 +1475,6 @@ def distributed_send_recv(
         for key in file_keyname_mappings[filename]:
             recv_info = recv_table[key]
             recv_ranklist = [a for (a, b) in recv_info]
-
             if is_src and global_rank == send_table[key]:
                 py_safe_slice_ = f.get_slice(key)
                 # send

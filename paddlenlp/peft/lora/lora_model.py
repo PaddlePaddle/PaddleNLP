@@ -287,9 +287,11 @@ class LoRAModel(nn.Layer):
 
         return trainable_state_dict
 
-    def _get_tensor_parallel_convert_actions(self, loaded_keys, is_split=True, ignore_error=False):
-        specific_name_action_mappings = self._get_tensor_parallel_mappings(self.model.config, is_split=is_split)
-        name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=is_split)
+    def _get_tensor_parallel_convert_actions(self, loaded_keys, is_split=True, ignore_error=False, config=None):
+        if config is None:
+            config = self.model.config
+        specific_name_action_mappings = self._get_tensor_parallel_mappings(config, is_split=is_split)
+        name_action_mappings = self.model._get_tensor_parallel_mappings(config, is_split=is_split)
         state_keys_map = ConversionMixin._resolve_prefix_keys(
             name_action_mappings.keys(), self.model.state_dict().keys(), ignore_error=ignore_error
         )
