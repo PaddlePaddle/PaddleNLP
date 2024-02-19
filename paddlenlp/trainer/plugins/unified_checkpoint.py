@@ -168,8 +168,9 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
                 index_name = SAFE_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_WEIGHTS_INDEX_NAME
             path = os.path.join(output_dir, index_name)
 
-            with open(path, "w") as f:
-                json.dump(sharded_index, f, indent=4)
+            if args.should_save:
+                with open(path, "w") as f:
+                    json.dump(sharded_index, f, indent=4)
 
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
     if local_rank == 0:
@@ -186,6 +187,8 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
     config_to_save.architectures = [model_to_save.__class__.__name__]
     if args.should_save:
         config_to_save.save_pretrained(save_directory)
+
+    paddle.device.cuda.empty_cache()
 
 
 def load_unified_checkpoint(args, model, optimizer, resume_from_checkpoint: str, safe_serialization=False) -> None:
@@ -322,6 +325,7 @@ def unified_checkpoint_into_shards(
     Returns:
         tuple: state_dict, config, shard_file: file name, sharded_index: map for weight to file name.
     """
+    paddle.device.cuda.empty_cache()
     assert hasattr(model_to_save, "config")
 
     state_dict = get_expected_state_dict(model_to_save)
@@ -361,6 +365,8 @@ def unified_checkpoint_into_shards(
         total_size_list,
     )
 
+    paddle.device.cuda.empty_cache()
+
     return state_dict, shard_file, sharded_index
 
 
@@ -387,6 +393,8 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
         optim_state_dict, shard_optim_file, sharded_optim_index = results[0]
         master_weight_state_dict, shard_master_weight_file, sharded_master_weight_index = results[1]
 
+    paddle.device.cuda.empty_cache()
+
     save_directory = output_dir
     os.makedirs(save_directory, exist_ok=True)
 
@@ -408,8 +416,9 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
     if sharded_optim_index is not None:
         optimizer_index_name = SAFE_OPTIMIZER_INDEX_NAME if safe_serialization else PADDLE_OPTIMIZER_INDEX_NAME
         path = os.path.join(output_dir, optimizer_index_name)
-        with open(path, "w") as f:
-            json.dump(sharded_optim_index, f, indent=4)
+        if args.should_save:
+            with open(path, "w") as f:
+                json.dump(sharded_optim_index, f, indent=4)
 
         master_weights_name = (
             SAFE_MASTER_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_MASTER_WEIGHTS_INDEX_NAME
@@ -418,8 +427,9 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
             master_weights_name = SAFE_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_WEIGHTS_INDEX_NAME
         master_path = os.path.join(output_dir, master_weights_name)
         if master_weight_state_dict is not None:
-            with open(master_path, "w") as f:
-                json.dump(sharded_master_weight_index, f, indent=4)
+            if args.should_save:
+                with open(master_path, "w") as f:
+                    json.dump(sharded_master_weight_index, f, indent=4)
 
 
 def load_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
@@ -580,6 +590,7 @@ def unified_optimizer_into_shards(
         optimizer (Optimizer): optimizer to save.
         safe_serialization (bool, optional): safe serialization using safetensors. Defaults to False.
     """
+    paddle.device.cuda.empty_cache()
     optim_state_dict = nested_copy(optimizer.state_dict())
     master_weights = None
     if "master_weights" in optim_state_dict.keys():
@@ -629,12 +640,15 @@ def unified_optimizer_into_shards(
             tp_actions,
             filter_optim_keys,
         )
+        paddle.device.cuda.empty_cache()
+
         if master_weights is not None:
             master_weights = merge_tensor_parallel_for_optimizer(
                 master_weights,
                 tp_actions,
                 filter_master_keys,
             )
+            paddle.device.cuda.empty_cache()
 
     # build index json file
     index_optimizer_file, index_master_weight_file = {}, {}
@@ -671,6 +685,7 @@ def unified_optimizer_into_shards(
         else:
             sharded_optim_index["master_weights"] = False
 
+    paddle.device.cuda.empty_cache()
     if master_weights is None:
         return [(optim_state_dict, shard_optimizer_file, sharded_optim_index)]
     else:
@@ -1095,6 +1110,7 @@ def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_chec
     # `file_machine_mappings` indicates the machine where the files appear. For example, {"model-00001-of-00002.safetensors": [machine_0, machine_1], "model-00002-of-00002.safetensors": [machine_0]}
     file_keyname_mappings, file_machine_mappings = get_file_mappings(index, resume_from_checkpoint)
 
+    logger.debug("Creating dispatch table for unified checkpoint load ...")
     # Get send_table and recv_table. The send table indicates which workers are responsible for sending tensors, and the recv table indicates which workers should receive the tensors.
     send_table, recv_table = create_dispatch_table(
         args, model, file_keyname_mappings, file_machine_mappings, resume_from_checkpoint
@@ -1113,6 +1129,8 @@ def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_chec
     else:
         # Get corresponding tensor parallel actions.
         tp_actions = model.get_tensor_parallel_convert_actions(config_revise, all_tp_keys, ignore_error=True)
+
+    logger.debug("Distributed send recv for state dict load ...")
     # Distribute the checkpoint tensor dynamically, using the `send_table` and `recv_table` we create before.
     state_dict = distributed_send_recv(
         config_revise,
@@ -1125,7 +1143,7 @@ def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_chec
         file_machine_mappings,
     )
     dist.barrier()
-
+    logger.debug("Setting state dict into model ...")
     error_msgs = _load_state_dict_into_model(model, state_dict, "")
     if len(error_msgs) > 0:
         error_msg = "\n\t".join(error_msgs)

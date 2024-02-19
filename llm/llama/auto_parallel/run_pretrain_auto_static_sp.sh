@@ -27,7 +27,7 @@ export PYTHONPATH=../../../:$PYTHONPATH
 python -u -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "output/$task_name""_log" \
-    run_pretrain_auto.py \
+    run_pretrain_auto_static.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
     --tokenizer_name_or_path "facebook/llama-7b" \
@@ -68,7 +68,7 @@ python -u -m paddle.distributed.launch \
     --do_eval \
     --device "gpu" \
     --data_impl "mmap" \
-    --parallel_mode "auto" \
+    --enable_auto_parallel 1 \
     --sequence_parallel true \
 
     # --resume_from_checkpoint "output/llama_auto_serial/checkpoint-2" \
