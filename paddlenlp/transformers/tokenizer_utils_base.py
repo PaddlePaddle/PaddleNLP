@@ -47,29 +47,33 @@ from ..utils.downloader import (
     url_file_exists,
 )
 from ..utils.env import CHAT_TEMPLATE_CONFIG_NAME, TOKENIZER_CONFIG_NAME
+from ..utils.import_utils import is_fast_tokenizer_available
 from ..utils.log import logger
 from .aistudio_utils import aistudio_download
 from .utils import resolve_cache_dir
 
+if is_fast_tokenizer_available():
+    from tokenizers import AddedToken
+else:
 
-@dataclass(frozen=True, eq=True)
-class AddedToken:
-    """
-    AddedToken represents a token to be added to a Tokenizer An AddedToken can have special options defining the
-    way it should behave.
-    """
+    @dataclass(frozen=True, eq=True)
+    class AddedToken:
+        """
+        AddedToken represents a token to be added to a Tokenizer An AddedToken can have special options defining the
+        way it should behave.
+        """
 
-    content: str = field(default_factory=str)
-    single_word: bool = False
-    lstrip: bool = False
-    rstrip: bool = False
-    normalized: bool = True
+        content: str = field(default_factory=str)
+        single_word: bool = False
+        lstrip: bool = False
+        rstrip: bool = False
+        normalized: bool = True
 
-    def __getstate__(self):
-        return self.__dict__
+        def __getstate__(self):
+            return self.__dict__
 
-    def __str__(self):
-        return self.content
+        def __str__(self):
+            return self.content
 
 
 @dataclass
