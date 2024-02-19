@@ -39,7 +39,8 @@ class ErnieMFastTokenizer(PretrainedFastTokenizer):
 
     def __init__(
         self,
-        vocab_file,
+        vocab_file=None,
+        *,
         sentencepiece_model_file,
         tokenizer_file=None,
         do_lower_case=True,
