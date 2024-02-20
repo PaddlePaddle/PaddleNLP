@@ -797,9 +797,10 @@ class PipeEvalModel(GenerationMixin):
             # Also, pipe model defined for training not support this cache input.
             # 2. ignore use_cache since _check_data_vaild requires tensor if not None.
             # 3. attention_mask can reuse _prepare_decoder_attention_mask in LlamaEmbeddingPipe.
-            # 4. TODO(guosheng): position_ids in _prepare_pipeline_inputs_func cause error, fix.
+            # 4. position_ids pass through _prepare_pipeline_inputs_func and PipeLayer.
             inputs, labels = model._prepare_pipeline_inputs_func(*args, **kwargs)
-            with guard_set_args(model, {"_compute_loss": False}):
+            # currently, set accumulate_steps to 1 to avoid multi-batch eval/gen
+            with guard_set_args(model, {"_compute_loss": False, "accumulate_steps": 1}):
                 outputs = model.eval_batch([inputs, labels], compute_loss=False)
             # TODO(guosheng): Broadcasted logits are used to get next_scores, remove
             # it to reduce comm overhead. Also note that we still need broadcast
@@ -818,7 +819,7 @@ class PipeEvalModel(GenerationMixin):
             # NOTE(guosheng): bug seems exist. pp.eval_batch(compute_loss=False)
             # will set pp._compute_loss to False and would not set it back. Thus
             # hack here to set it back.
-            with guard_set_args(model, {"_compute_loss": False}):
+            with guard_set_args(model, {"_compute_loss": False, "accumulate_steps": 1}):
                 outputs = model.eval_batch([inputs, labels], compute_loss=False)
             outputs = self._broadcast_outputs(outputs)
         return outputs
@@ -1120,12 +1121,7 @@ class PPOTrainer(Trainer):
         prediction_loss_only: bool,
         ignore_keys: Optional[List[str]] = None,
     ) -> Tuple[Optional[paddle.Tensor], Optional[paddle.Tensor], Optional[paddle.Tensor]]:
-        if self.args.pipeline_parallel_degree > 1:
-            # hack for pipeline mode
-            inputs = self._prepare_inputs(inputs)
-            return self.prediction_pipeline_step(model, inputs, prediction_loss_only, ignore_keys)
-        else:
-            inputs = self._prepare_inputs(inputs)
+        inputs = self._prepare_inputs(inputs)
 
         with paddle.no_grad():
             with self.autocast_smart_context_manager():
@@ -1153,9 +1149,15 @@ class PPOTrainer(Trainer):
                     reward_input_ids = seq
                     reward_attention_mask = attention_mask
 
+                # unify PP with others since PP always return tuple
                 reward_score = self.reward_model(
-                    reward_input_ids, attention_mask=reward_attention_mask, return_dict=True
-                ).end_scores.squeeze(axis=-1)
+                    reward_input_ids,
+                    attention_mask=reward_attention_mask,
+                    # return_dict=True,
+                )[
+                    1
+                ]  # .end_scores
+                reward_score = reward_score.squeeze(axis=-1)
 
         # keep the first batch of eval output sequence to print and check
         prompt = self.tokenizer.batch_decode(inputs["input_ids"], skip_special_tokens=True)
