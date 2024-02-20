@@ -13,11 +13,11 @@
 # limitations under the License.
 
 import copy
+import inspect
 import itertools
 import math
 import os
 import time
-import types
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -726,12 +726,16 @@ class PipeEvalModel(GenerationMixin):
         # self.gen_fn = None
         # self.fwd_fn = None
         # use non-pipe model generetion related methods
-        self.prepare_inputs_for_generation = types.MethodType(
-            self.model._layers._non_pipe_model_class.prepare_inputs_for_generation, self
-        )
+        # self.prepare_inputs_for_generation = types.MethodType(
+        #     self.model._layers._non_pipe_model_class.prepare_inputs_for_generation, self
+        # )
         self.update_model_kwargs_for_generation = (
             self.model._layers._non_pipe_model_class.update_model_kwargs_for_generation
         )
+
+    @property
+    def pp_group(self):
+        return self.model.pp_group
 
     def eval(self):
         self.model.eval()
@@ -785,8 +789,6 @@ class PipeEvalModel(GenerationMixin):
     def __call__(self, *args, **kwargs):
         model = self.model
         assert self.model.training is False
-        # TODO(guosheng): hack for post-process in eval, so we can let last stage
-        # do more to reduce comm overhead.
         if self._is_gen:
             # inputs by `prepare_inputs_for_generation` is a dict with following keys:
             # "input_ids", "position_ids", "past_key_values", "use_cache", "attention_mask"
@@ -799,6 +801,16 @@ class PipeEvalModel(GenerationMixin):
             inputs, labels = model._prepare_pipeline_inputs_func(*args, **kwargs)
             with guard_set_args(model, {"_compute_loss": False}):
                 outputs = model.eval_batch([inputs, labels], compute_loss=False)
+            # TODO(guosheng): Broadcasted logits are used to get next_scores, remove
+            # it to reduce comm overhead. Also note that we still need broadcast
+            # next_tokens though logits are broadcasted since pp ranks' seeds differs.
+            # Currently, just slice the last token to reduce comm overhead.
+            outputs = [
+                micro_batch_output[:, -1, :].unsqueeze(1)
+                if isinstance(micro_batch_output, paddle.Tensor)
+                else micro_batch_output[0][:, -1, :].unsqueeze(1)
+                for micro_batch_output in outputs
+            ]
             outputs = self._broadcast_outputs(outputs)
         else:
             # use _prepare_pipeline_inputs_func to convert pipeline inputs
@@ -817,21 +829,45 @@ class PipeEvalModel(GenerationMixin):
         # DecoderLayer, and would call super().forward
         ori_decoder_layer_forward = self.model._layers._non_pipe_decoder_layer_class.forward
 
-        def decoder_layer_forward(self, *args, **kwargs):
-            kwargs.update({"use_cache": True, "past_key_value": getattr(self, "_cache", None)})
-            outputs = ori_decoder_layer_forward(self, *args, **kwargs)
+        def decoder_layer_forward(layer_self, *args, **kwargs):
+            kwargs.update({"use_cache": True, "past_key_value": getattr(layer_self, "_cache", None)})
+            outputs = ori_decoder_layer_forward(layer_self, *args, **kwargs)
             output = outputs[0]
-            self._cache = outputs[1]
+            layer_self._cache = outputs[1]
+            self._has_cache = True
             return output
 
         with guard_set_args(self.model._layers._non_pipe_decoder_layer_class, {"forward": decoder_layer_forward}):
-            super().generate(*args, **kwargs)
+            outputs = super().generate(*args, **kwargs)
         self._is_gen = False
         # clear cache of decoder layers, sublayers is incursive thus suitable
         # to both 1F1B and interleave
         for layer in self.model._layers.sublayers():
             if isinstance(layer, self.model._layers._non_pipe_decoder_layer_class):
                 layer._cache = None
+        self._has_cache = False
+        return outputs
+
+    def prepare_inputs_for_generation(self, *args, **kwargs):
+        arg_bind = inspect.signature(self.model._layers._non_pipe_model_class.prepare_inputs_for_generation).bind(
+            *((self,) + args), **kwargs
+        )
+        arg_bind.apply_defaults()
+        arg_dict = arg_bind.arguments
+        last_arg_name, last_arg_value = arg_dict.popitem()
+        if arg_bind.signature.parameters[last_arg_name].kind == inspect.Parameter.VAR_KEYWORD:
+            arg_dict.update(last_arg_value)
+        else:
+            arg_dict[last_arg_name] = last_arg_value
+        arg_dict.pop("self")
+        past_key_values = arg_dict.get("past_key_values", None)
+        # prepare_inputs_for_generation use past_key_values to discrimate prefill
+        # or decode and slice inputs accordingly.
+        if getattr(self, "_has_cache", False):
+            arg_dict.update({"past_key_values": True})
+        model_inputs = self.model._layers._non_pipe_model_class.prepare_inputs_for_generation(self, **arg_dict)
+        model_inputs.update({"past_key_values": past_key_values})
+        return model_inputs
 
 
 class PPOTrainer(Trainer):
@@ -1219,7 +1255,7 @@ class PPOTrainer(Trainer):
             )
         return policy_model, value_model
 
-    def load_sing_gen_data(self, as_batches=True, use_counter=False):
+    def load_sing_gen_data(self, as_batches=True, use_counter=False, data_dir="pkl_data"):
         if use_counter:
             iter_counter = getattr(self, "iter_counter", 0)
             self.iter_counter = iter_counter + 1
@@ -1231,13 +1267,13 @@ class PPOTrainer(Trainer):
 
         hcg = fleet.get_hybrid_communicate_group()
         data_rank = hcg.get_sharding_parallel_rank()
-        with open(f"{iter_counter}rl_batch-{data_rank}.data", "rb") as f:
+        with open(os.path.join(data_dir, f"{iter_counter}rl_batch-{data_rank}.data"), "rb") as f:
             data = pickle.load(f)
         rl_batch = map_structure(lambda x: paddle.to_tensor(x), data)
         rl_batches = [rl_batch] if as_batches else rl_batch
         return rl_batches
 
-    def save_single_gen_data(self, rl_batch, use_counter=False):
+    def save_single_gen_data(self, rl_batch, use_counter=False, data_dir="pkl_data"):
         if use_counter:
             iter_counter = getattr(self, "iter_counter", 0)
             self.iter_counter = iter_counter + 1
@@ -1247,7 +1283,7 @@ class PPOTrainer(Trainer):
 
         import paddle.distributed as dist
 
-        with open(f"{iter_counter}rl_batch-{dist.get_rank()}.data", "wb") as f:
+        with open(os.path.join(data_dir, f"{iter_counter}rl_batch-{dist.get_rank()}.data"), "wb") as f:
             rl_batch = map_structure(lambda x: x.numpy(), rl_batch)
             pickle.dump(rl_batch, f)
         # exit(0)
@@ -1737,14 +1773,14 @@ class PPOTrainer(Trainer):
         input_ids = prompt_only_batch["input_ids"]
         # NOTE: generation output of paddlenlp do not contain prompt, we should
         # change sequences here.
-        # sequences = self.actor_model.generate(
-        #     input_ids=input_ids,
-        #     attention_mask=prompt_only_batch["attention_mask"],
-        #     generation_config=self.generation_config,
-        #     synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
-        # )[0]
-        # sequences = sequences.reshape([input_ids.shape[0], self.args.num_return_sequences, -1]).transpose([1, 0, 2])
-        sequences = [self.load_sing_gen_data(as_batches=False, use_counter=False)["input_ids"]]
+        sequences = self.actor_model.generate(
+            input_ids=input_ids,
+            attention_mask=prompt_only_batch["attention_mask"],
+            generation_config=self.generation_config,
+            synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
+        )[0]
+        sequences = sequences.reshape([input_ids.shape[0], self.args.num_return_sequences, -1]).transpose([1, 0, 2])
+        # sequences = [self.load_sing_gen_data(as_batches=False, use_counter=False)["input_ids"]]
 
         return [
             self.post_rollout(

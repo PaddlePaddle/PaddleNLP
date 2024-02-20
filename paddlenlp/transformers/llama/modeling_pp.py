@@ -177,15 +177,25 @@ class LlamaDecoderLayerPipe(LlamaDecoderLayer):
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
             if attention_mask is not None or alibi is not None:
                 hidden_states = recompute(
-                    super().forward, hidden_states, attention_mask=attention_mask, alibi=alibi, use_reentrant=False
+                    super().forward,
+                    hidden_states,
+                    position_ids=position_ids,
+                    attention_mask=attention_mask,
+                    alibi=alibi,
+                    use_reentrant=False,
                 )
             else:
                 # for pretrain
                 hidden_states = recompute(
-                    super().forward, hidden_states, use_reentrant=self.config.recompute_use_reentrant
+                    super().forward,
+                    hidden_states,
+                    position_ids=position_ids,
+                    use_reentrant=self.config.recompute_use_reentrant,
                 )
         else:
-            hidden_states = super().forward(hidden_states, attention_mask=attention_mask, alibi=alibi)
+            hidden_states = super().forward(
+                hidden_states, position_ids=position_ids, attention_mask=attention_mask, alibi=alibi
+            )
 
         return return_args(hidden_states, attention_mask, position_ids, alibi)
 
