@@ -170,7 +170,7 @@ class InTokensIterDatasetCallback(TrainerCallback):
             dataset = train_dataloader.dataset.dataset
         else:
             raise ValueError(
-                "Unexpected dataset format: InTokensIterDatasetCallback expectes `paddlenlp.datasets.InTokensIterableDataset`"
+                "Unexpected dataset format: InTokensIterDatasetCallback expects `paddlenlp.datasets.InTokensIterableDataset`"
             )
         if state.trial_params is None:
             state.trial_params = {}

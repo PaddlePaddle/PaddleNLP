@@ -114,7 +114,7 @@ def main():
     )
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
-            raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
+            raise ValueError("Please set eval_with_do_generation to false in pipeline parallel mode.")
         from paddlenlp.transformers import AutoModelForCausalLMPipe
 
         if not training_args.autotuner_benchmark:

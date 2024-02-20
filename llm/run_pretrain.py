@@ -61,12 +61,12 @@ def add_start_docstrings(*docstr):
 class PreTrainingArguments(TrainingArguments):
     min_learning_rate: float = field(
         default=1e-5,
-        metadata={"help": "Minimum learning rate deacyed to."},
+        metadata={"help": "Minimum learning rate decayed to."},
     )
     decay_steps: float = field(
         default=None,
         metadata={
-            "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
+            "help": "The steps use to control the learning rate. If the step > decay_steps, will use the min_learning_rate."
         },
     )
     enable_linear_fused_grad_add: bool = field(
@@ -432,7 +432,7 @@ def main():
 
     if not model_args.continue_training:
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
-        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
+        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp performance.")
 
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()

@@ -158,14 +158,14 @@ class QuantArgument:
 
     weight_quant_method: str = field(
         default="abs_max_channel_wise",
-        metadata={"help": "Weight quantization method, choosen from ['abs_max_channel_wise', 'groupwise']"},
+        metadata={"help": "Weight quantization method, chosen from ['abs_max_channel_wise', 'groupwise']"},
     )
 
     # Pre-quant method Shift related parameters
     shift: bool = field(default=False, metadata={"help": "Whether to use Shift"})
     shift_all_linears: bool = field(default=False, metadata={"help": "Whether to shift all linears"})
     shift_sampler: str = field(
-        default="ema", metadata={"help": "The name of shift sampler, choosen from ['ema', 'none']"}
+        default="ema", metadata={"help": "The name of shift sampler, chosen from ['ema', 'none']"}
     )
     shift_step: int = field(default=32, metadata={"help": "Sample steps when shift"})
 
@@ -173,7 +173,7 @@ class QuantArgument:
     smooth: bool = field(default=False, metadata={"help": "Whether to use Smooth"})
     smooth_all_linears: bool = field(default=False, metadata={"help": "Whether to smooth all linears"})
     smooth_sampler: str = field(
-        default="none", metadata={"help": "The name of smooth sampler, choosen from ['multi_step','none']"}
+        default="none", metadata={"help": "The name of smooth sampler, chosen from ['multi_step','none']"}
     )
     smooth_step: int = field(default=32, metadata={"help": "Sample steps when smooth"})
     smooth_piecewise_search: bool = field(
