@@ -599,6 +599,11 @@ def unified_optimizer_into_shards(
     if "LR_Scheduler" in optim_state_dict.keys():
         optim_state_dict.pop("LR_Scheduler")
 
+    # gather global master_weights status.
+    global_master_weights = reduce_master_weights_status(master_weights is not None)
+    if master_weights is None and global_master_weights:
+        master_weights = {}
+
     # get optimizer param mappings
     static2struct_name_mappings = {}
     state_dict = get_expected_state_dict(model)
@@ -1557,6 +1562,24 @@ def get_sharded_index(
         return sharded_index_json
 
     return None
+
+
+def reduce_master_weights_status(has_master_weights=False):
+    data = paddle.to_tensor([has_master_weights], dtype="int32")
+
+    hcg = fleet.get_hybrid_communicate_group()
+    tp_group = hcg.get_model_parallel_group()
+    pp_group = hcg.get_pipe_parallel_group()
+    sharding_group = hcg.get_sharding_parallel_group()
+
+    if tp_group.nranks > 1:
+        dist.all_reduce(data, op=dist.ReduceOp.SUM, group=tp_group)
+    if pp_group.nranks > 1:
+        dist.all_reduce(data, op=dist.ReduceOp.SUM, group=pp_group)
+    if sharding_group.nranks > 1:
+        dist.all_reduce(data, op=dist.ReduceOp.SUM, group=sharding_group)
+
+    return data.item() > 0
 
 
 def gather_sharded_object(index_file, total_size, is_optimizer=False):
