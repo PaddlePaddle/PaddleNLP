@@ -66,23 +66,6 @@ def check_number_comma(piece: str) -> bool:
     return len(piece) < 2 or piece[-1] != "," or not piece[-2].isdigit()
 
 
-def _bpe(mergeable_ranks, token: bytes, max_rank=None) -> list[bytes]:
-    parts = [bytes([b]) for b in token]
-    while True:
-        min_idx = None
-        min_rank = None
-        for i, pair in enumerate(zip(parts[:-1], parts[1:])):
-            rank = mergeable_ranks.get(pair[0] + pair[1])
-            if rank is not None and (min_rank is None or rank < min_rank):
-                min_idx = i
-                min_rank = rank
-        if min_rank is None or (max_rank is not None and min_rank >= max_rank):
-            break
-        assert min_idx is not None
-        parts = parts[:min_idx] + [parts[min_idx] + parts[min_idx + 1]] + parts[min_idx + 2 :]
-    return parts
-
-
 class Converter:
     def __init__(self, original_tokenizer):
         self.original_tokenizer = original_tokenizer
@@ -165,11 +148,38 @@ class TinyBertConverter(BertConverter):
     pass
 
 
+class TikTokenConverter(Converter):
+    def extract(self, tiktoken_file: str):
+        from .tiktoken_model_utils import bpe, bytes_to_unicode, load_tiktoken_bpe
+
+        bpe_ranks = (
+            self.original_tokenizer.mergeable_ranks
+            if hasattr(self.original_tokenizer, "mergeable_ranks") and self.original_tokenizer.mergeable_ranks
+            else load_tiktoken_bpe(tiktoken_file)
+        )
+        byte_encoder = bytes_to_unicode()
+
+        def token_bytes_to_string(b):
+            return "".join([byte_encoder[ord(char)] for char in b.decode("latin-1")])
+
+        merges = []
+        vocab = {}
+        for token, rank in bpe_ranks.items():
+            vocab[token_bytes_to_string(token)] = rank
+            if len(token) == 1:
+                continue
+            merged = tuple(bpe(bpe_ranks, token, max_rank=rank))
+            if len(merged) == 2:
+                merges.append(tuple(map(token_bytes_to_string, merged)))
+
+        return vocab, merges
+
+
 class NystromformerConverter(BertConverter):
     pass
 
 
-class QWenConverter(Converter):
+class QWenConverter(TikTokenConverter):
     def converted(self) -> Tokenizer:
         from .qwen.tokenizer import PAT_STR
 
@@ -207,31 +217,6 @@ class QWenConverter(Converter):
         tokenizer.decoder = decoders.ByteLevel()
         tokenizer.post_processor = processors.ByteLevel(trim_offsets=False)
         return tokenizer
-
-    def extract(self, tiktoken_file: str):
-        from .qwen.tokenizer import _load_tiktoken_bpe, bytes_to_unicode
-
-        bpe_ranks = (
-            self.original_tokenizer.mergeable_ranks
-            if self.original_tokenizer.mergeable_ranks
-            else _load_tiktoken_bpe(tiktoken_file)
-        )
-        byte_encoder = bytes_to_unicode()
-
-        def token_bytes_to_string(b):
-            return "".join([byte_encoder[ord(char)] for char in b.decode("latin-1")])
-
-        merges = []
-        vocab = {}
-        for token, rank in bpe_ranks.items():
-            vocab[token_bytes_to_string(token)] = rank
-            if len(token) == 1:
-                continue
-            merged = tuple(_bpe(bpe_ranks, token, max_rank=rank))
-            if len(merged) == 2:  # account for empty token
-                merges.append(tuple(map(token_bytes_to_string, merged)))
-
-        return vocab, merges
 
 
 class SpmConverter(Converter):
