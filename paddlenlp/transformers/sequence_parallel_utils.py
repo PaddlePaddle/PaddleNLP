@@ -221,12 +221,18 @@ def is_fused_matmul_bias_supported():
     else:
         return False
 
+def is_fused_linear_param_grad_add_supported():
+    if paddle.is_compiled_with_cuda() and not paddle.is_compiled_with_rocm():
+        return hasattr(paddle._C_ops, 'fused_linear_param_grad_add')
+    else:
+        return False
 
 class SPInnerOverlapLinear(paddle.autograd.PyLayer):
     @staticmethod
-    def forward(ctx, x, weight, bias, fuse_matmul_bias, model_parallel_group):
-        
+    def forward(ctx, x, weight, bias, fuse_matmul_bias, sp_fused_linear_param_grad_add, model_parallel_group):
+        ctx.sp_fused_linear_param_grad_add = sp_fused_linear_param_grad_add
         ctx.model_parallel_group = model_parallel_group
+
         world_size = model_parallel_group.nranks
         is_mp = world_size > 1
         if is_mp:
@@ -265,18 +271,92 @@ class SPInnerOverlapLinear(paddle.autograd.PyLayer):
         task = dist.stream.reduce_scatter(dx, dinput_parallel, op=dist.ReduceOp.SUM, group=group, sync_op=False)
         # dx = reduce_scatter(dinput_parallel)
 
-        dw = paddle.matmul(
-            input_parallel.reshape([-1, input_parallel.shape[-1]]),
-            dy,
-            transpose_x=True
-        )
-        if bias is None:
-            task.wait()
-            return dx, dw
+        if ctx.sp_fused_linear_param_grad_add:
+            if not is_fused_linear_param_grad_add_supported():
+                raise NotImplementedError(
+                     "You set sp_fused_linear_param_grad_add=True, "
+                    "however, the paddle you are using not support this operation. "
+                    "Please unset fused_linear_param_grad_add or use paddle compiled "
+                    "with cuda 11.6 or higher."
+                )
+            if bias is None:
+                if hasattr(weight, "main_grad"):
+                    (
+                        weight.main_grad, 
+                        _,
+                    ) = paddle._C_ops.fused_linear_param_grad_add(
+                        input_parallel, dy, weight.main_grad, None, True, False
+                    )
+                task.wait()
+                return dx, None
+            else:
+                if weight.grad is not None:
+                    (
+                        weight.grad, 
+                        _,
+                    ) = paddle._C_ops.fused_linear_param_grad_add(
+                        input_parallel, dy, weight.grad, None, False, False
+                    )
+                    task.wait()
+                    return dx, None
+                else:
+                    (
+                        dw,
+                        _,
+                    ) = paddle._C_ops.fused_linear_param_grad_add(
+                        input_parallel, dy, None, None, False, False
+                    )
+                    task.wait()
+                    return dx, dw
+
+            
+            if hasattr(weight, "main_grad") and hasattr(bias, "main_grad"):
+                (
+                    weight.main_grad,
+                    bias.main_grad,
+                ) = paddle._C_ops.fused_linear_param_grad_add(
+                    input_parallel,
+                    dy,
+                    weight.main_grad,
+                    bias.main_grad,
+                    True,
+                    True,
+                )
+                task.wait()
+                return dx, None, None
+            else:
+                if weight.grad is not None:
+                    assert bias.grad is not None
+                    (
+                        weight.grad,
+                        bias.grad,
+                    ) = paddle._C_ops.fused_linear_param_grad_add(
+                        input_parallel, dy, weight.grad, bias.grad, False, True
+                    )
+                    task.wait()
+                    return dx, None, None
+                else:
+                    (
+                        dw,
+                        dbias,
+                    ) = paddle._C_ops.fused_linear_param_grad_add(
+                        input_parallel, dy, None, None, False, True
+                    )
+                    task.wait()
+                    return dx, dw, dbias
         else:
-            dbias = paddle.sum(dy, axis=0)
-            task.wait()
-            return dx, dw, dbias
+            dw = paddle.matmul(
+                input_parallel.reshape([-1, input_parallel.shape[-1]]),
+                dy,
+                transpose_x=True
+            )
+            if bias is None:
+                task.wait()
+                return dx, dw
+            else:
+                dbias = paddle.sum(dy, axis=0)
+                task.wait()
+                return dx, dw, dbias
         
 class ColumnSequenceParallelLinear(Layer):
     def __init__(
@@ -368,19 +448,31 @@ class ColumnSequenceParallelLinear(Layer):
             from paddle.incubate.nn.functional import fused_linear
 
             self.linear = fused_linear
+        
+        # sp_configs = fleet.fleet._user_defined_strategy.hybrid_configs["sp_configs"]
+        # self.sp_asyn_reduce_scatter = self.is_mp and sp_configs.sp_asyn_reduce_scatter
+
+        # self.sp_fused_linear_param_grad_add = (
+        #     self.is_mp
+        #     and sp_configs.sp_asyn_reduce_scatter
+        #     and sp_configs.sp_fused_linear_param_grad_add
+        # )
+
+        self.sp_asyn_reduce_scatter = True
+        self.sp_fused_linear_param_grad_add = True
 
     def forward(self, x):
         # sequence parallelism is same as model parallelism
         # if sequence parallel is true, input shape is [s, b, h]
         # else input shape is [b, s, h]
-        # if self.is_mp:
-        #     input_parallel = AllGatherOp.apply(x)
-        # else:
-        #     input_parallel = x
-        # output = self.linear(input_parallel, self.weight, self.bias, name=self._name)
-        # return output
+        if self.is_mp:
+            input_parallel = AllGatherOp.apply(x)
+        else:
+            input_parallel = x
+        output = self.linear(input_parallel, self.weight, self.bias, name=self._name)
+        return output
         # print("begin x.shape is", x.shape)
-        return SPInnerOverlapLinear.apply(x, self.weight, self.bias, self.fuse_matmul_bias, self.model_parallel_group)
+        # return SPInnerOverlapLinear.apply(x, self.weight, self.bias, self.fuse_matmul_bias, self.sp_fused_linear_param_grad_add, self.model_parallel_group)
 
 
 class RowSequenceParallelLinear(Layer):
