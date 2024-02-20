@@ -1501,7 +1501,7 @@ class GPTForGenerationHybrid(nn.Layer):
 
         attn_mask = model_kwargs["attention_mask"]
         # make the shape of attention_mask = (-1, -1, -1, -1) in dy2static.
-        paddle.jit.dy2static.utils_helper.set_dynamic_shape(model_kwargs["attention_mask"], [-1, -1, -1, -1])
+        paddle.jit.api.set_dynamic_shape(model_kwargs["attention_mask"], [-1, -1, -1, -1])
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
         while cur_len < max_length:
             # Note(GuoxiaWang): Remove outputs = _forward_(**model_kwargs)
