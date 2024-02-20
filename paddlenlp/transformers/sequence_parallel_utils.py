@@ -465,14 +465,13 @@ class ColumnSequenceParallelLinear(Layer):
         # sequence parallelism is same as model parallelism
         # if sequence parallel is true, input shape is [s, b, h]
         # else input shape is [b, s, h]
-        if self.is_mp:
-            input_parallel = AllGatherOp.apply(x)
-        else:
-            input_parallel = x
-        output = self.linear(input_parallel, self.weight, self.bias, name=self._name)
-        return output
-        # print("begin x.shape is", x.shape)
-        # return SPInnerOverlapLinear.apply(x, self.weight, self.bias, self.fuse_matmul_bias, self.sp_fused_linear_param_grad_add, self.model_parallel_group)
+        # if self.is_mp:
+        #     input_parallel = AllGatherOp.apply(x)
+        # else:
+        #     input_parallel = x
+        # output = self.linear(input_parallel, self.weight, self.bias, name=self._name)
+        # return output
+        return SPInnerOverlapLinear.apply(x, self.weight, self.bias, self.fuse_matmul_bias, self.sp_fused_linear_param_grad_add, self.model_parallel_group)
 
 
 class RowSequenceParallelLinear(Layer):
