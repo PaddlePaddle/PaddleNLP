@@ -25,6 +25,8 @@ from ..feature_extraction_sequence_utils import SequenceFeatureExtractor
 from ..feature_extraction_utils import BatchFeature
 from ..tokenizer_utils_base import PaddingStrategy
 
+__all__ = ["SpeechT5FeatureExtractor"]
+
 
 class SpeechT5FeatureExtractor(SequenceFeatureExtractor):
     r"""
