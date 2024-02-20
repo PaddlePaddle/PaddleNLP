@@ -1157,7 +1157,7 @@ class PPOTrainer(Trainer):
                 )[
                     1
                 ]  # .end_scores
-                reward_score = reward_score.squeeze(axis=-1)
+                reward_score = reward_score.squeeze(axis=-1).cast(paddle.float32)
 
         # keep the first batch of eval output sequence to print and check
         prompt = self.tokenizer.batch_decode(inputs["input_ids"], skip_special_tokens=True)
@@ -1170,7 +1170,7 @@ class PPOTrainer(Trainer):
             # generateds.extend(generated)
             self._eval_seq = (prompt, generated, reward_score.tolist())
 
-        return reward_score.cast(paddle.float32).mean(), None, None
+        return reward_score.mean(), None, None
 
     def evaluation_loop(
         self,
