@@ -410,6 +410,21 @@ def run_command(command: list[str], return_stdout=False):
         ) from e
 
 
+def skip_for_none_ce_case(test_case):
+    """
+    There are too many test case, we need skip for none CE envirmonet.
+    """
+    import os
+
+    ce_env = strtobool(os.getenv("CE_TEST_ENV", "0"))
+    if not ce_env:
+        return unittest.skip("test skip for NONE CE case. If you want run this ci, please export CE_TEST_ENV=1 ")(
+            test_case
+        )
+
+    return test_case
+
+
 def require_paddle_multi_gpu(test_case):
     """
     Decorator marking a test that requires a multi-GPU setup (in PaddlePaddle). These tests are skipped on a machine without
