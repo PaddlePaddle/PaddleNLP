@@ -37,7 +37,7 @@ environment_variables = {
     "test_ci_no_save_model": "1",
 }
 
-peft_arguments = {
+lora_arguments = {
     "model_name_or_path": "__internal_testing__/unified-ckpt-llama-170m-for-peft",
     "dataset_name_or_path": "./unified_checkpoint/peft_input/data/",
     "output_dir": "./unified_checkpoint/checkpoints/llama_lora_ckpts",
@@ -106,11 +106,11 @@ def remove_ckpt(ckpt_dir):
 
 class TestUnifiedCheckpointSingle(TestMultipleGpus):
     def setUp(self):
-        self.config = peft_arguments
+        self.config = lora_arguments
         os.environ.update(environment_variables)
 
         file_ = "https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz"
-        input_dir = "unified_checkpoint/peft_input/"  # unified_checkpoint/peft/data
+        input_dir = "unified_checkpoint/lora_input/"  # unified_checkpoint/lora/data
         os.makedirs(input_dir, exist_ok=True)
         file_path = os.path.join(input_dir, "AdvertiseGen.tar.gz")
         if not os.path.exists(file_path):
@@ -118,18 +118,18 @@ class TestUnifiedCheckpointSingle(TestMultipleGpus):
 
         self.need_allclose = True
         self.rtol = 1e-7
-        self.run_peft_file = "llm/finetune_generation.py"
+        self.run_lora_file = "llm/finetune_generation.py"
         self.num_nodes = 1
 
     def runfirst(self, train_args):
-        self.run_1gpu(self.run_peft_file, **train_args)
+        self.run_1gpu(self.run_lora_file, **train_args)
 
     def rerun(self, train_args):
-        self.run_1gpu(self.run_peft_file, **train_args)
+        self.run_1gpu(self.run_lora_file, **train_args)
 
     def testDP1(self):
         remove_logs()
-        remove_ckpt(peft_arguments["output_dir"])
+        remove_ckpt(lora_arguments["output_dir"])
 
         self.runfirst(self.config)
         # self.rerun(self.config)  # not work here, why?
@@ -153,11 +153,11 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
         3. update rtol to the relative value you want to check
         """
 
-        self.configs = get_pretrain_arguments(peft_arguments)
+        self.configs = get_pretrain_arguments(lora_arguments)
         os.environ.update(environment_variables)
 
         file_ = "https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz"
-        input_dir = "unified_checkpoint/peft_input/"  # unified_checkpoint/peft/data
+        input_dir = "unified_checkpoint/peft_input/"  # unified_checkpoint/lora/data
         os.makedirs(input_dir, exist_ok=True)
         file_path = os.path.join(input_dir, "AdvertiseGen.tar.gz")
         if not os.path.exists(file_path):
@@ -166,18 +166,18 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
         self.need_allclose = True
         self.rtol = 1e-7
 
-        self.run_peft_file = "llm/finetune_generation.py"
+        self.run_lora_file = "llm/finetune_generation.py"
 
     def runfrist(self, train_args):
-        self.run_n1c8(self.run_peft_file, **train_args)
+        self.run_n1c8(self.run_lora_file, **train_args)
 
     def rerun(self, train_args):
-        self.run_n1c8(self.run_peft_file, **train_args)
+        self.run_n1c8(self.run_lora_file, **train_args)
 
     @require_paddle_at_least_8_gpu
     def testTP4PP2(self):
         remove_logs()
-        remove_ckpt(peft_arguments["output_dir"])
+        remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["TP4PP2"]
         self.runfrist(train_args)
@@ -192,7 +192,7 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
     @require_paddle_at_least_8_gpu
     def testTP2Sharding4(self):
         remove_logs()
-        remove_ckpt(peft_arguments["output_dir"])
+        remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["TP2Sharding4"]
         self.runfrist(train_args)
@@ -209,7 +209,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
     @require_paddle_at_least_8_gpu
     def testTP8(self):
         remove_logs()
-        remove_ckpt(peft_arguments["output_dir"])
+        remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["TP8"]
         self.runfrist(train_args)
@@ -223,7 +223,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
     @require_paddle_at_least_8_gpu
     def testTP4DP2(self):
         remove_logs()
-        remove_ckpt(peft_arguments["output_dir"])
+        remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["TP4DP2"]
         self.runfrist(train_args)
@@ -238,7 +238,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
     @require_paddle_at_least_8_gpu
     def testTP4Sharding2(self):
         remove_logs()
-        remove_ckpt(peft_arguments["output_dir"])
+        remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["TP4Sharding2"]
         self.runfrist(train_args)
@@ -253,7 +253,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
     @require_paddle_at_least_8_gpu
     def testTP2PP4(self):
         remove_logs()
-        remove_ckpt(peft_arguments["output_dir"])
+        remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["TP2PP4"]
         self.runfrist(train_args)
@@ -268,7 +268,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
     @require_paddle_at_least_8_gpu
     def testPP8(self):
         remove_logs()
-        remove_ckpt(peft_arguments["output_dir"])
+        remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["PP8"]
         self.runfrist(train_args)
@@ -283,7 +283,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
     @require_paddle_at_least_8_gpu
     def testPP4DP2(self):
         remove_logs()
-        remove_ckpt(peft_arguments["output_dir"])
+        remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["PP4DP2"]
         self.runfrist(train_args)
@@ -298,7 +298,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
     @require_paddle_at_least_8_gpu
     def testPP4Sharding2(self):
         remove_logs()
-        remove_ckpt(peft_arguments["output_dir"])
+        remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["PP4Sharding2"]
         self.runfrist(train_args)
@@ -313,7 +313,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
     @require_paddle_at_least_8_gpu
     def testSharding8S1(self):
         remove_logs()
-        remove_ckpt(peft_arguments["output_dir"])
+        remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["Sharding8S1"]
         self.runfrist(train_args)
@@ -328,7 +328,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
     @require_paddle_at_least_8_gpu
     def testSharding8S2(self):
         remove_logs()
-        remove_ckpt(peft_arguments["output_dir"])
+        remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["Sharding8S2"]
         self.runfrist(train_args)
@@ -343,7 +343,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
     @require_paddle_at_least_8_gpu
     def testSharding4S1DP2(self):
         remove_logs()
-        remove_ckpt(peft_arguments["output_dir"])
+        remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["Sharding4S1DP2"]
         self.runfrist(train_args)
@@ -358,7 +358,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
     @require_paddle_at_least_8_gpu
     def testSharding4S2DP2(self):
         remove_logs()
-        remove_ckpt(peft_arguments["output_dir"])
+        remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["Sharding4S2DP2"]
         self.runfrist(train_args)
@@ -373,7 +373,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
     @require_paddle_at_least_8_gpu
     def testSharding2S1DP4(self):
         remove_logs()
-        remove_ckpt(peft_arguments["output_dir"])
+        remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["Sharding2S1DP4"]
         self.runfrist(train_args)
@@ -388,7 +388,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
     @require_paddle_at_least_8_gpu
     def testSharding2S2DP4(self):
         remove_logs()
-        remove_ckpt(peft_arguments["output_dir"])
+        remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["Sharding2S2DP4"]
         self.runfrist(train_args)
@@ -403,7 +403,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
     @require_paddle_at_least_8_gpu
     def testDP8(self):
         remove_logs()
-        remove_ckpt(peft_arguments["output_dir"])
+        remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["DP8"]
         self.runfrist(train_args)
@@ -422,10 +422,10 @@ class TestUnifiedCheckpointOnN2C4(TestUnifiedCheckpointBase):
         self.rtol = 1e-7
 
     def runfrist(self, train_args):
-        self.run_n2c4(self.run_peft_file, **train_args)
+        self.run_n2c4(self.run_lora_file, **train_args)
 
     def rerun(self, train_args):
-        self.run_n2c4(self.run_peft_file, **train_args)
+        self.run_n2c4(self.run_lora_file, **train_args)
 
 
 class TestUnifiedCheckpointOnN1C8CheckpointCompatible(TestUnifiedCheckpointBase):
@@ -437,11 +437,11 @@ class TestUnifiedCheckpointOnN1C8CheckpointCompatible(TestUnifiedCheckpointBase)
 
     def runfrist(self, train_args):
         train_args["unified_checkpoint"] = 0
-        self.run_n1c8(self.run_peft_file, **train_args)
+        self.run_n1c8(self.run_lora_file, **train_args)
 
     def rerun(self, train_args):
         train_args["unified_checkpoint"] = 1
-        self.run_n1c8(self.run_peft_file, **train_args)
+        self.run_n1c8(self.run_lora_file, **train_args)
 
 
 class TestPaddleCheckpointOnN1C8Reset(TestUnifiedCheckpointBase):
@@ -453,11 +453,11 @@ class TestPaddleCheckpointOnN1C8Reset(TestUnifiedCheckpointBase):
 
     def runfrist(self, train_args):
         train_args["unified_checkpoint"] = 0
-        self.run_n1c8(self.run_peft_file, **train_args)
+        self.run_n1c8(self.run_lora_file, **train_args)
 
     def rerun(self, train_args):
         train_args["unified_checkpoint"] = 0
-        self.run_n1c8(self.run_peft_file, **train_args)
+        self.run_n1c8(self.run_lora_file, **train_args)
 
 
 @pytest.mark.skipif(True, reason="Skip for None CE")
@@ -470,8 +470,8 @@ class TestUnifiedCheckpointOnN2C4CheckpointCompatible(TestUnifiedCheckpointBase)
 
     def runfrist(self, train_args):
         train_args["unified_checkpoint"] = 0
-        self.run_n2c4(self.run_peft_file, **train_args)
+        self.run_n2c4(self.run_lora_file, **train_args)
 
     def rerun(self, train_args):
         train_args["unified_checkpoint"] = 1
-        self.run_n2c4(self.run_peft_file, **train_args)
+        self.run_n2c4(self.run_lora_file, **train_args)

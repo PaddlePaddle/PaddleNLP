@@ -3073,11 +3073,7 @@ class Trainer:
             master_weights_index_name,
         )
 
-        if paddle.distributed.get_world_size() <= 1:
-            if os.path.exists(weights_index_file):
-                is_unified_checkpoint_type = True
-        else:
-            if distributed_isfile(weights_index_file) or distributed_isfile(master_weights_index_file):
-                is_unified_checkpoint_type = True
+        if distributed_isfile(weights_index_file) or distributed_isfile(master_weights_index_file):
+            is_unified_checkpoint_type = True
 
         return is_unified_checkpoint_type
