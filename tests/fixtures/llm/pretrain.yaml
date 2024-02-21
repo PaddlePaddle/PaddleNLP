@@ -18,7 +18,6 @@ pretrain:
     use_flash_attention: 0
     use_fused_rms_norm: 0
     continue_training: 1
-    ignore_save_lr_and_optim: 1
 
   default:
     llama:

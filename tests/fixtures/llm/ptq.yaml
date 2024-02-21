@@ -12,7 +12,6 @@ ptq:
     eval_with_do_generation: false
     do_ptq: true
     ptq_step: 4
-    ignore_save_lr_and_optim: 1
 
   default:
     llama:

@@ -25,7 +25,6 @@ prefix_tuning:
     save_total_limit: 1
     tensor_parallel_degree: 1
     pipeline_parallel_degree: 1
-    ignore_save_lr_and_optim: 1
     prefix_tuning: true
 
   default:
