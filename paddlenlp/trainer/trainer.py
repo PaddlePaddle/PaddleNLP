@@ -360,8 +360,9 @@ class Trainer:
 
         if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
             if self.args.unified_checkpoint and "skip_save_model_weight" in self.args.unified_checkpoint_config:
-                raise ValueError(
-                    "We do not support skip_save_model_weight in peft model when using unified checkpoint."
+                self.args.unified_checkpoint_config.remove("skip_save_model_weight")
+                logger.warning(
+                    "We do not support skip_save_model_weight in peft model when using unified checkpoint, remove this config."
                 )
 
         self.do_grad_scaling = False
@@ -1101,23 +1102,31 @@ class Trainer:
                 f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
             )
             if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
-                # TODO(daisiming): support unified checkpoint.
                 self._load_best_model_from_peft_checkpoint()
             else:
-                weight_name = PADDLE_WEIGHTS_NAME
-                best_model_path = os.path.join(
-                    self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
-                )
-                if os.path.exists(best_model_path):
-                    # We load the model state dict on the CPU to avoid an OOM error.
-                    state_dict = paddle.load(best_model_path, return_numpy=True)
-                    # If the model is on the GPU, it still works!
-                    self._set_state_dict_in_model(state_dict)
-                else:
-                    logger.warning(
-                        f"Could not locate the best model at {best_model_path}, if you are running a distributed training "
-                        "on multiple nodes, you should activate `--save_on_each_node`."
+                if self.args.unified_checkpoint:
+                    load_unified_checkpoint(
+                        self.args,
+                        self.model,
+                        self.optimizer,
+                        self.state.best_model_checkpoint,
+                        safe_serialization=True,
                     )
+                else:
+                    weight_name = PADDLE_WEIGHTS_NAME
+                    best_model_path = os.path.join(
+                        self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
+                    )
+                    if os.path.exists(best_model_path):
+                        # We load the model state dict on the CPU to avoid an OOM error.
+                        state_dict = paddle.load(best_model_path, return_numpy=True)
+                        # If the model is on the GPU, it still works!
+                        self._set_state_dict_in_model(state_dict)
+                    else:
+                        logger.warning(
+                            f"Could not locate the best model at {best_model_path}, if you are running a distributed training "
+                            "on multiple nodes, you should activate `--save_on_each_node`."
+                        )
 
         self._total_loss_scalar += tr_loss.item()
         train_loss = self._total_loss_scalar / self.state.global_step
@@ -1137,6 +1146,16 @@ class Trainer:
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
     def _load_best_model_from_peft_checkpoint(self):
+        if self.args.unified_checkpoint:
+            load_unified_checkpoint(
+                self.args,
+                self.model,
+                self.optimizer,
+                self.state.best_model_checkpoint,
+                safe_serialization=True,
+            )
+            return
+
         convert_tp = False
         if isinstance(self.model, LoRAModel):
             if self.model.quantized or self.args.pipeline_parallel_degree > 1:
@@ -2152,7 +2171,6 @@ class Trainer:
 
         self.runtime_timer.stop()
         # Determine the new best metric / best model checkpoint
-
         if metrics is not None and self.args.metric_for_best_model is not None:
             metric_to_check = self.args.metric_for_best_model
             if not metric_to_check.startswith("eval_"):

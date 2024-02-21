@@ -170,8 +170,7 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
                 with open(path, "w") as f:
                     json.dump(sharded_index, f, indent=4)
 
-    local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
-    if local_rank == 0:
+    if args.should_save:
         # Save prefix model past_key_values
         if isinstance(model_to_save, PrefixModelForCausalLM):
             save_prefix_past_key_value(model_to_save, save_directory)
