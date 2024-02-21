@@ -119,6 +119,8 @@ class AutoTrainer(Trainer):
 
     def _wrap_amp_model(self, args, model):
         logger.info("Using half precision")
+        if args.to_static:
+            return
         self.enable_autocast_context_manager = True
         self.do_grad_scaling = True if self.args.fp16 else False
         self.amp_dtype = "float16" if self.args.fp16 else "bfloat16"
