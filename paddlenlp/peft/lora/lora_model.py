@@ -42,7 +42,7 @@ from ...transformers.model_utils import (
 )
 from ...transformers.utils import get_checkpoint_shard_files, weight_name_suffix
 from ...utils.distributed import distributed_gather
-from ...utils.env import LORA_WEIGHTS_NAME, SAFE_LORA_WEIGHTS_INDEX_NAME
+from ...utils.env import LORA_WEIGHTS_NAME, SAFE_PEFT_WEIGHTS_INDEX_NAME
 from ...utils.log import logger
 from .lora_config import LoRAConfig
 from .lora_layers import (
@@ -186,7 +186,7 @@ class LoRAModel(nn.Layer):
         lora_config_tensor_parallel_degree = lora_config.tensor_parallel_degree
         lora_model = cls(model, lora_config)
 
-        lora_model_index_file = os.path.join(lora_path, SAFE_LORA_WEIGHTS_INDEX_NAME)
+        lora_model_index_file = os.path.join(lora_path, SAFE_PEFT_WEIGHTS_INDEX_NAME)
         if os.path.exists(lora_model_index_file):
             # load safetensors format file.
             resolved_archieve_file, sharded_metadata = get_checkpoint_shard_files(

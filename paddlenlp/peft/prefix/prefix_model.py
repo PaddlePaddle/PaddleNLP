@@ -36,7 +36,7 @@ from ...utils.distributed import distributed_gather
 from ...utils.env import (
     PAST_KEY_VALUES_FILE_NAME,
     PREFIX_WEIGHTS_NAME,
-    SAFE_PREFIX_WEIGHTS_INDEX_NAME,
+    SAFE_PEFT_WEIGHTS_INDEX_NAME,
 )
 from ...utils.log import logger
 from .prefix_config import PrefixConfig
@@ -313,7 +313,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         prefix_config_tensor_parallel_degree = prefix_config.tensor_parallel_degree
         prefix_model = cls(model, prefix_config, postprocess_past_key_value, pad_attention_mask)
 
-        prefix_model_index_file = os.path.join(prefix_path, SAFE_PREFIX_WEIGHTS_INDEX_NAME)
+        prefix_model_index_file = os.path.join(prefix_path, SAFE_PEFT_WEIGHTS_INDEX_NAME)
         if os.path.exists(prefix_model_index_file):
             # load safetensors format file.
             resolved_archieve_file, sharded_metadata = get_checkpoint_shard_files(

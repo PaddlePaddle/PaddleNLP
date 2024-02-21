@@ -99,9 +99,8 @@ from ..utils.env import (
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
     PREFIX_WEIGHTS_NAME,
-    SAFE_LORA_WEIGHTS_INDEX_NAME,
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
-    SAFE_PREFIX_WEIGHTS_INDEX_NAME,
+    SAFE_PEFT_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
 )
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
@@ -1102,6 +1101,7 @@ class Trainer:
                 f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
             )
             if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+                # TODO(daisiming): support unified checkpoint.
                 self._load_best_model_from_peft_checkpoint()
             else:
                 weight_name = PADDLE_WEIGHTS_NAME
@@ -3053,11 +3053,11 @@ class Trainer:
         is_unified_checkpoint_type = False
         if isinstance(self.model, LoRAModel):
             weights_index_name = (
-                PADDLE_LORA_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_LORA_WEIGHTS_INDEX_NAME
+                PADDLE_LORA_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_PEFT_WEIGHTS_INDEX_NAME
             )
         elif isinstance(self.model, PrefixModelForCausalLM):
             weights_index_name = (
-                PADDLE_PREFIX_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_PREFIX_WEIGHTS_INDEX_NAME
+                PADDLE_PREFIX_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_PEFT_WEIGHTS_INDEX_NAME
             )
         else:
             weights_index_name = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME

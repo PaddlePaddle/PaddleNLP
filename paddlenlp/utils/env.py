@@ -103,8 +103,5 @@ PADDLE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.pdparams.index.json"
 SAFE_MASTER_WEIGHTS_NAME = "master_weights.safetensors"
 SAFE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.safetensors.index.json"
 
-SAFE_LORA_WEIGHTS_NAME = "lora_model.safetensors"
-SAFE_LORA_WEIGHTS_INDEX_NAME = "lora_model.safetensors.index.json"
-
-SAFE_PREFIX_WEIGHTS_NAME = "prefix_model.safetensors"
-SAFE_PREFIX_WEIGHTS_INDEX_NAME = "prefix_model.safetensors.index.json"
+SAFE_PEFT_WEIGHTS_NAME = "peft_model.safetensors"
+SAFE_PEFT_WEIGHTS_INDEX_NAME = "peft_model.safetensors.index.json"

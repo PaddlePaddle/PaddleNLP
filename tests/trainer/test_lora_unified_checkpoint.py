@@ -132,11 +132,11 @@ class TestUnifiedCheckpointSingle(TestMultipleGpus):
         remove_ckpt(lora_arguments["output_dir"])
 
         self.runfirst(self.config)
-        # self.rerun(self.config)  # not work here, why?
-        # if self.need_allclose:
-        #     res = check_acc()
-        #     assert len(res) == 2
-        #     np.testing.assert_allclose(res[0], res[1], self.rtol)
+        self.rerun(self.config)
+        if self.need_allclose:
+            res = check_acc()
+            assert len(res) == 2
+            np.testing.assert_allclose(res[0], res[1], self.rtol)
 
 
 # Test Unified Checkpoint Hybrid Parallel Strategy on N1C8 and N2C4
