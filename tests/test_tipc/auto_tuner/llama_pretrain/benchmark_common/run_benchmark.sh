@@ -139,6 +139,7 @@ function _train(){
         else
             echo -e "${model_name}, mem_usage buffer check SUCCESS" >> ${log_file}
         fi
+    fi
     #kill -9 `ps -ef|grep 'python'|awk '{print $2}'`
     if [ ${device_num} != "N1C1" -a -d ./autoconfig/best_cfg ]; then
         case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/tests/mylog

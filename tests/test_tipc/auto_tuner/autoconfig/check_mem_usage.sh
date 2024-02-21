@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-autoconfig_json_file=$(basename "$1")   # autoconfig/llama7b_pretrain.json
-model_name=${autoconfig_json_file%.*} 
+autoconfig_json_file="$1"   # autoconfig/llama7b_pretrain_buffer.json
+autoconfig_json_file_name=$(basename "$1")
+model_name=${autoconfig_json_file_name%.*} 
 auto_log_file=./autoconfig/${model_name}_auto_tuner.log
 
 log="./llama7b_pretrain_auto_tuner.log"
