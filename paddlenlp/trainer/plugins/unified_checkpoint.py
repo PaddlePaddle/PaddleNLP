@@ -1406,7 +1406,9 @@ def load_single_card_optimizer(args, model, optimizer, resume_from_checkpoint: s
             returned_optim_state_dict["master_weights"][static_name].name = "_".join([static_name, FP32_MASTER])
 
     returned_optim_state_dict = nested_copy_place(
-        returned_optim_state_dict, place=paddle.framework._current_expected_place()
+        returned_optim_state_dict,
+        place=paddle.framework._current_expected_place(),
+        blocking=True,
     )
     return returned_optim_state_dict
 
@@ -1871,14 +1873,14 @@ def nested_copy(inputs):
     return inputs
 
 
-def nested_copy_place(inputs, place=None):
+def nested_copy_place(inputs, place=None, blocking=False):
     if isinstance(inputs, dict):
         outputs = {}
         for key in list(inputs.keys()):
-            outputs[key] = nested_copy_place(inputs[key], place)
+            outputs[key] = nested_copy_place(inputs[key], place, blocking)
         return outputs
     if isinstance(inputs, paddle.Tensor):
-        inputs = inputs if inputs.place == place else inputs._copy_to(place, False)
+        inputs = inputs if inputs.place == place else inputs._copy_to(place, blocking)
     return inputs
 
 
