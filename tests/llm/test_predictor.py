@@ -50,7 +50,7 @@ from .testing_utils import LLMTest, argv_context_guard, load_test_config
         ["__internal_testing__/tiny-fused-qwen-inference5.2", QWenForCausalLM],
     ],
 )
-class PredictorTest(LLMTest, unittest.TestCase):
+class PredictorTest(unittest.TestCase, LLMTest):
     config_path: str = "./tests/fixtures/llm/predictor.yaml"
     model_name_or_path: str = None
     model_class = None
@@ -136,7 +136,7 @@ class PredictorTest(LLMTest, unittest.TestCase):
     ["model_name_or_path", "model_class"],
     [["__internal_testing__/tiny-random-llama", LlamaForCausalLM]],
 )
-class PredictorPrecacheTest(LLMTest, unittest.TestCase):
+class PredictorPrecacheTest(unittest.TestCase, LLMTest):
     config_path: str = "./tests/fixtures/llm/predictor.yaml"
     model_name_or_path: str = None
     model_class = None
@@ -183,7 +183,7 @@ class PredictorPrecacheTest(LLMTest, unittest.TestCase):
         self.assertGreaterEqual(count / len(result_0), 0.8)
 
 
-class PredictorBaseTest(LLMTest, unittest.TestCase):
+class PredictorBaseTest(unittest.TestCase, LLMTest):
     def load_test_config(self):
         config = load_test_config("./tests/fixtures/llm/predictor.yaml", "inference-predict")
         config["model_name_or_path"] = "__internal_testing__/micro-random-llama"
@@ -225,7 +225,7 @@ class PredictorBaseTest(LLMTest, unittest.TestCase):
         ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
     ],
 )
-class BlockAttnPredictorTest(LLMTest, unittest.TestCase):
+class BlockAttnPredictorTest(unittest.TestCase, LLMTest):
     config_path: str = "./tests/fixtures/llm/predictor.yaml"
     model_name_or_path: str = None
     model_class = None
@@ -306,7 +306,7 @@ class BlockAttnPredictorTest(LLMTest, unittest.TestCase):
         ["__internal_testing__/tiny-random-llama", LlamaForCausalLM],
     ],
 )
-class GPUsPredictorTest(LLMTest, GPUsTesting, unittest.TestCase):
+class GPUsPredictorTest(GPUsTesting, unittest.TestCase, LLMTest):
     config_path: str = "./tests/fixtures/llm/predictor.yaml"
     model_name_or_path: str = None
     model_class = None
@@ -341,7 +341,7 @@ class GPUsPredictorTest(LLMTest, GPUsTesting, unittest.TestCase):
         self.assertGreaterEqual(count / len(result_0), 0.4)
 
 
-class QWenVLTest(LLMTest, unittest.TestCase):
+class QWenVLTest(unittest.TestCase, LLMTest):
     config_path: str = "./tests/fixtures/llm/predictor.yaml"
     model_name_or_path: str = "__internal_testing__/tiny-fused-qwen"
     model_class = QWenForCausalLM

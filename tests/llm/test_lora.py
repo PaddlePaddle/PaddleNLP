@@ -36,7 +36,7 @@ from .testing_utils import LLMTest
         ["baichuan"],
     ],
 )
-class LoraTest(LLMTest, unittest.TestCase):
+class LoraTest(unittest.TestCase, LLMTest):
     config_path: str = "./tests/fixtures/llm/lora.yaml"
     model_dir: str = None
 
@@ -87,7 +87,7 @@ class LoraTest(LLMTest, unittest.TestCase):
 #         ["qwen"],
 #     ],
 # )
-# class LoraChatTemplateTest(LLMTest, unittest.TestCase):
+# class LoraChatTemplateTest(unittest.TestCase, LLMTest):
 #     config_path: str = "./tests/fixtures/llm/lora.yaml"
 #     model_dir: str = None
 

@@ -36,7 +36,7 @@ from .testing_utils import LLMTest
         ["baichuan"],
     ],
 )
-class PrefixTuningTest(LLMTest, unittest.TestCase):
+class PrefixTuningTest(unittest.TestCase, LLMTest):
     config_path: str = "./tests/fixtures/llm/prefix_tuning.yaml"
     model_dir: str = None
 

@@ -34,7 +34,7 @@ from .testing_utils import LLMTest
         ["gpt"],
     ],
 )
-class PretrainTest(LLMTest, unittest.TestCase):
+class PretrainTest(unittest.TestCase, LLMTest):
     config_path: str = "./tests/fixtures/llm/pretrain.yaml"
     model_dir: str = None
 

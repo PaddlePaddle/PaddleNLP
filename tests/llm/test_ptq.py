@@ -27,7 +27,7 @@ from tests.testing_utils import argv_context_guard, load_test_config
     ["model_dir"],
     [["llama"]],
 )
-class FinetuneTest(LLMTest, unittest.TestCase):
+class FinetuneTest(unittest.TestCase, LLMTest):
     config_path: str = "./tests/fixtures/llm/ptq.yaml"
     model_dir: str = None
 
