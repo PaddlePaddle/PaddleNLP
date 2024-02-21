@@ -56,7 +56,7 @@ class PredictorTest(unittest.TestCase, LLMTest):
     model_class = None
 
     def setUp(self) -> None:
-        super().setUp()
+        LLMTest.setUp(self)
         paddle.set_default_dtype("float32")
         self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
@@ -142,7 +142,7 @@ class PredictorPrecacheTest(unittest.TestCase, LLMTest):
     model_class = None
 
     def setUp(self) -> None:
-        super().setUp()
+        LLMTest.setUp(self)
 
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
         self.download_precache_files()
@@ -231,7 +231,7 @@ class BlockAttnPredictorTest(unittest.TestCase, LLMTest):
     model_class = None
 
     def setUp(self) -> None:
-        super().setUp()
+        LLMTest.setUp(self)
         paddle.set_default_dtype("float32")
         self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
@@ -312,7 +312,7 @@ class GPUsPredictorTest(GPUsTesting, unittest.TestCase, LLMTest):
     model_class = None
 
     def setUp(self) -> None:
-        super().setUp()
+        LLMTest.setUp(self)
         self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
 
@@ -347,7 +347,7 @@ class QWenVLTest(unittest.TestCase, LLMTest):
     model_class = QWenForCausalLM
 
     def setUp(self) -> None:
-        super().setUp()
+        LLMTest.setUp(self)
         paddle.set_default_dtype("float32")
         self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
