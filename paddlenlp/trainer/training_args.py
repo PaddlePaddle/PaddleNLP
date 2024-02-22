@@ -538,6 +538,10 @@ class TrainingArguments:
             )
         },
     )
+    sequence_parallel: bool = field(
+        default=False,
+        metadata={"help": "whether to use sequence parallel"},
+    )
     tensor_parallel_degree: int = field(
         default=-1,
         metadata={
@@ -941,6 +945,11 @@ class TrainingArguments:
 
             if ShardingOption.OFFLOAD in self.sharding:
                 warnings.warn("`offload` is not supported NOW!")
+
+            self.sequence_parallel = self.tensor_parallel_degree > 1
+
+            if self.sequence_parallel:
+                self.pipeline_parallel_config += " disable_partial_send_recv "
 
             if self.pipeline_parallel_degree > 1:
                 if ShardingOption.FULL_SHARD in self.sharding or ShardingOption.SHARD_GRAD_OP in self.sharding:
