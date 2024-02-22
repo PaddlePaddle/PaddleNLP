@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import importlib
+import inspect
 import types
 
 import paddle
@@ -27,7 +28,7 @@ from paddlenlp.transformers.llama.modeling_pp import (
     return_args,
 )
 
-from .ppo_model_utils import RLHFPPOMixedLoss, RLHFValueLoss
+from .ppo_model_utils import RLHFPPOMixedLoss, RLHFValueLoss, create_loss
 from .score_model_utils import ScoreModelMixin
 
 
@@ -213,7 +214,6 @@ def fwd_args_to_dict(fun):
         except TypeError:
             # otherwise, inputs is any valid format of non_pipe_model forward args,
             # convert to dict, to support more args format in prediction_pipeline_step
-            import inspect
 
             arg_dict = (
                 inspect.signature(self._non_pipe_model_class.forward).bind(*((self,) + args), **kwargs).arguments
@@ -311,10 +311,8 @@ class LlamaPolicyPipe(LlamaForCausalLMPipe):
         super().__init__(config)
         self._ignore_index = self._loss_fn.sft_criterion.ignore_index
 
-    # @loss_fwd_wrapper
     def get_loss_fn(self, config):
-        init_kwargs = self._init_kwargs
-        return RLHFPPOMixedLoss(config, **init_kwargs)
+        return create_loss(RLHFPPOMixedLoss, config, self._init_kwargs)
 
     @property
     def head_out_meta(self):
@@ -416,12 +414,8 @@ class LlamaValuePipe(LlamaForCausalLMPipe):
         self.add_sequential_layer(LayerDesc(_LlamaRMSNormPipe, config=config), norm_prefix)
         self.add_sequential_layer(LayerDesc(ValueHead, config, **init_kwargs), "")
 
-    # @loss_fwd_wrapper
     def get_loss_fn(self, config):
-        init_kwargs = self._init_kwargs
-        # TODO(guosheng): make wraper for loss to make original loss adapt to
-        # pipeline only one args
-        return RLHFValueLoss(config, **init_kwargs)
+        return create_loss(RLHFValueLoss, config, self._init_kwargs)
 
     @property
     def head_out_meta(self):

@@ -27,7 +27,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import tqdm
 from data import DummyDataset, PromptOnlyBatch
-from models.ppo_model_utils import RLHFPPOMixedLoss, RLHFValueLoss
+from models.ppo_model_utils import RLHFPPOMixedLoss, RLHFValueLoss, create_loss
 from paddle.distributed import fleet
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from paddle.utils import map_structure
@@ -498,7 +498,7 @@ class PolicyTrainer(Trainer):
         preprocess_logits_for_metrics: Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor] = None,
     ):
         # only used for non-PipelineParallel models
-        criterion = RLHFPPOMixedLoss(model.config, ptx_coeff=args.ptx_coeff)
+        criterion = create_loss(RLHFPPOMixedLoss, model.config, args)
         super().__init__(
             model,
             criterion,
@@ -533,67 +533,6 @@ class PolicyTrainer(Trainer):
         # broadcast them, thus do not or optionally use these inputs. labels use
         # in criterion not send to model can workaround this.
         return inputs
-
-    def actor_loss_fn(
-        self,
-        log_probs: paddle.Tensor,
-        old_log_probs: paddle.Tensor,
-        advantages: paddle.Tensor,
-        mask: paddle.Tensor,
-    ) -> paddle.Tensor:
-        # policy gradient loss
-        ratio = paddle.exp(log_probs - old_log_probs)
-        pg_loss1 = -advantages * ratio
-        pg_loss2 = -advantages * paddle.clip(
-            ratio,
-            1.0 - self.clip_range_ratio,
-            1.0 + self.clip_range_ratio,
-        )
-        return paddle.sum(paddle.maximum(pg_loss1, pg_loss2) * mask) / mask.sum()
-
-    def _compute_loss(self, model, inputs, return_outputs=False):
-        """
-        How the loss is computed by Trainer. By default, all models return the loss in the first element.
-        Subclass and override for custom behavior.
-        """
-        labels = inputs.get("labels", None)
-        if labels is not None:
-            labels = inputs.get("labels", None)
-            outputs = model(**inputs)
-            ptx_loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
-            ptx_loss = self.ptx_coeff * ptx_loss
-            return ptx_loss
-
-        input_ids = inputs["input_ids"]
-        attention_mask = inputs["attention_mask"]
-        reward_advantages = inputs["reward_advantages"]
-        # NOTE: TensorParallel model requires non-Tensor inputs to be lists and
-        # broadcast them, thus do not or optionally use these inputs currently.
-        # use_cache = inputs["use_cache"]
-        # return_dict = inputs["return_dict"]
-        start = inputs.pop("start", None)
-        old_log_probs = inputs["old_log_probs"][:, start:] if start is not None else inputs["old_log_probs"]
-        sequence_mask = inputs["sequence_mask"][:, start:] if start is not None else inputs["sequence_mask"]
-        outputs = model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,  # use_cache=use_cache, return_dict=return_dict
-        )
-
-        logits = outputs["logits"] if isinstance(outputs, dict) else outputs
-        if isinstance(outputs, dict):
-            logits = outputs["logits"]
-        elif isinstance(outputs, tuple):
-            logits = outputs[0]
-
-        log_probs = gather_log_probabilities(logits[:, :-1], input_ids[:, 1:])[:, -old_log_probs.shape[1] :]
-        actor_loss = self.actor_loss_fn(
-            log_probs,
-            old_log_probs,
-            reward_advantages,
-            sequence_mask,
-        )
-
-        return actor_loss
 
     def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs):
         labels = inputs.get("labels", None)
@@ -626,7 +565,8 @@ class ValueTrainer(Trainer):
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor] = None,
     ):
-        criterion = RLHFValueLoss(model.config, clip_range_value=args.clip_range_value)
+        # only used for non-PipelineParallel models
+        criterion = create_loss(RLHFValueLoss, model.config, args)
         super().__init__(
             model,
             criterion,
@@ -661,62 +601,6 @@ class ValueTrainer(Trainer):
         # broadcast them, thus do not or optionally use these inputs. labels use
         # in criterion not send to model can workaround this.
         return inputs
-
-    def critic_loss_fn(
-        self,
-        values: paddle.Tensor,
-        old_values: paddle.Tensor,
-        returns: paddle.Tensor,
-        mask: paddle.Tensor,
-    ) -> paddle.Tensor:
-        """Compute critic loss."""
-        # TODO(guosheng): use paddle.clip when its min/max can support more than
-        # 0D Tensor
-        values_clipped = paddle.minimum(
-            paddle.maximum(values, old_values - self.clip_range_value), old_values + self.clip_range_value
-        )
-        vf_loss1 = paddle.square(values - returns)
-        vf_loss2 = paddle.square(values_clipped - returns)
-        return 0.5 * paddle.sum(paddle.maximum(vf_loss1, vf_loss2) * mask) / mask.sum()
-
-    def _compute_loss(self, model, inputs, return_outputs=False):
-        """
-        How the loss is computed by Trainer. By default, all models return the loss in the first element.
-        Subclass and override for custom behavior.
-        """
-        input_ids = inputs["input_ids"]
-        attention_mask = inputs["attention_mask"]
-        reward_returns = inputs["reward_returns"]
-        # NOTE: TensorParallel model requires non-Tensor inputs to be lists and
-        # broadcast them, thus do not or optionally use these inputs currently.
-        # use_cache = inputs["use_cache"]
-        # return_dict = inputs["return_dict"]
-        start = inputs.pop("start", None)
-        old_reward_values = (
-            inputs["old_reward_values"][:, start:] if start is not None else inputs["old_reward_values"]
-        )
-        sequence_mask = inputs["sequence_mask"][:, start:] if start is not None else inputs["sequence_mask"]
-        outputs = model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,  # use_cache=use_cache, return_dict=return_dict
-        )
-
-        # We don't use .loss here since the model may return tuples instead of ModelOutput.
-        reward_values = outputs["scores"] if isinstance(outputs, dict) else outputs
-        if isinstance(outputs, dict):
-            reward_values = outputs["scores"]
-        elif isinstance(outputs, tuple):
-            reward_values = outputs[0]
-
-        reward_values = reward_values.squeeze(axis=-1)[:, :-1]
-        reward_critic_loss = self.critic_loss_fn(
-            reward_values[:, -old_reward_values.shape[1] :],
-            old_reward_values,
-            reward_returns,
-            sequence_mask,
-        )
-
-        return reward_critic_loss
 
     def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs):
         # TODO(guosheng): Make these training control vars mapping as class attr,

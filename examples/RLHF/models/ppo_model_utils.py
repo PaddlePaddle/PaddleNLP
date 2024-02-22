@@ -51,6 +51,37 @@ class ValueOutput(ModelOutput):
     cross_attentions: Optional[Tuple[paddle.Tensor]] = None
 
 
+def merge_fwd_labels(loss_cls):
+    """
+    PipelineParallel and trainer.criterion both use labels as tuple, thus wrap.
+    """
+    ori_fwd = loss_cls.forward
+
+    def loss_fwd(self, predict, labels):
+        return ori_fwd(self, predict, *labels)
+
+    fwd_params = inspect.signature(ori_fwd).parameters
+    # forward(self, predict, label1, label2, ...)
+    loss_cls.label_names = list(fwd_params.keys())[2:]
+    loss_cls.label_default_values = {}
+    for label_name in loss_cls.label_names:
+        if fwd_params[label_name].default is not inspect.Parameter.empty:
+            loss_cls.label_default_values[label_name] = fwd_params[label_name].default
+    loss_cls.forward = loss_fwd
+    return loss_cls
+
+
+def create_loss(loss_cls, config, extra_args):
+    # forward(self, predict, label1, label2, ...)
+    loss_arg_names = list(inspect.signature(loss_cls.__init__).parameters.keys())[2:]
+    if isinstance(extra_args, dict):
+        loss_kwargs = dict([(name, extra_args[name]) for name in loss_arg_names if name in extra_args])
+    else:
+        # create from TrainingArguments
+        loss_kwargs = dict([(name, getattr(extra_args, name)) for name in loss_arg_names if hasattr(extra_args, name)])
+    return loss_cls(config, **loss_kwargs)
+
+
 def gather_log_probabilities(logits: paddle.Tensor, labels: paddle.Tensor) -> paddle.Tensor:
     """Gather log probabilities of the given labels from the logits."""
     log_probs = F.log_softmax(logits, axis=-1)
@@ -59,9 +90,9 @@ def gather_log_probabilities(logits: paddle.Tensor, labels: paddle.Tensor) -> pa
 
 
 class RLHFPPOLoss(nn.Layer):
-    def __init__(self, config, **kwargs):
+    def __init__(self, config, clip_range_ratio=0.2):
         super().__init__()
-        self.clip_range_ratio = kwargs.pop("clip_range_ratio", getattr(config, "clip_range_ratio", 0.2))
+        self.clip_range_ratio = clip_range_ratio
         self.config = config
 
     def actor_loss_fn(
@@ -105,34 +136,14 @@ class RLHFPPOLoss(nn.Layer):
         return actor_loss
 
 
-def merge_fwd_labels(loss_cls):
-    """
-    PipelineParallel and trainer.criterion both use labels as tuple, thus wrap.
-    """
-    ori_fwd = loss_cls.forward
-
-    def loss_fwd(self, predict, labels):
-        return ori_fwd(self, predict, *labels)
-
-    fwd_params = inspect.signature(ori_fwd).parameters
-    # forward(self, predict, label1, label2, ...)
-    loss_cls.label_names = list(fwd_params.keys())[2:]
-    loss_cls.label_default_values = {}
-    for label_name in loss_cls.label_names:
-        if fwd_params[label_name].default is not inspect.Parameter.empty:
-            loss_cls.label_default_values[label_name] = fwd_params[label_name].default
-    loss_cls.forward = loss_fwd
-    return loss_cls
-
-
 @merge_fwd_labels
 class RLHFPPOMixedLoss(nn.Layer):
     """provide two losses, one for PPO loss, the other for SFT loss."""
 
-    def __init__(self, config, **kwargs):
+    def __init__(self, config, ptx_coeff=16, clip_range_ratio=0.2):
         super(RLHFPPOMixedLoss, self).__init__()
-        self.ptx_coeff = kwargs.pop("ptx_coeff", getattr(config, "ptx_coeff", 16.0))
-        self.ppo_criterion = RLHFPPOLoss(config, **kwargs)
+        self.ptx_coeff = ptx_coeff
+        self.ppo_criterion = RLHFPPOLoss(config, clip_range_ratio)
         self.sft_criterion = PretrainingCriterion(config)
 
     def forward(self, logits, labels, input_ids, old_log_probs, reward_advantages, sequence_mask):
@@ -153,9 +164,9 @@ class RLHFPPOMixedLoss(nn.Layer):
 
 @merge_fwd_labels
 class RLHFValueLoss(nn.Layer):
-    def __init__(self, config, **kwargs):
+    def __init__(self, config, clip_range_value=5.0):
         super().__init__()
-        self.clip_range_value = kwargs.pop("clip_range_value", getattr(config, "clip_range_value", 5.0))
+        self.clip_range_value = clip_range_value
         self.config = config
 
     def critic_loss_fn(
