@@ -23,7 +23,7 @@ from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoModelFo
 
 
 class TestLlama(unittest.TestCase):
-    def test_sequence_model(self):
+    def test_GQA(self):
         world_size = paddle.distributed.get_world_size()
         pp_degree = world_size
         tp_degree = 1
@@ -105,4 +105,4 @@ class TestLlama(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    TestLlama().test_sequence_model()
+    TestLlama().test_GQA()
