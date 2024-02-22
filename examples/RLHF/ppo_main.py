@@ -319,6 +319,9 @@ def main():
         else None
     )
 
+    # offload
+    # cleanup actor_eval_model, reward_critic_eval_model
+    # offload actor_reference_model reward_model
     trainer = PPOTrainer(
         #  (policy_model, reference_model, reward_model, value_model)
         #   policy_model, sft_model,       reward_model, value_model

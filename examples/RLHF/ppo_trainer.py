@@ -64,6 +64,8 @@ from paddlenlp.transformers.tokenizer_utils_base import (
 )
 from paddlenlp.utils.distributed import distributed_gather
 
+global_dev_id = 0 if paddle.get_device() == "cpu" else int(paddle.get_device().split(":")[1])
+
 
 def batch_retokenize(
     input_ids: paddle.Tensor,
@@ -474,14 +476,38 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
     return kwargs
 
 
-def offload_model(self: Trainer, **kwargs):
-    for k, v in self.model.state_dict():
-        v = paddle.copy_(v, paddle.CPUPlace())
+def offload_tensor_to_cpu(tensor):
+    if isinstance(tensor, dict):
+        for _, v in tensor.items():
+            offload_tensor_to_cpu(v)
+    elif isinstance(tensor, paddle.Tensor):
+        if not tensor.place.is_cpu_place():
+            cpu_tensor = tensor._copy_to(paddle.CPUPlace(), True)
+            tensor.value().get_tensor()._share_data_with(cpu_tensor.value().get_tensor())
+    else:
+        raise ValueError(f"Can't parse for type {type(tensor)}")
 
 
-def reload_model(self: Trainer, **kwargs):
-    for k, v in self.model.state_dict():
-        v = paddle.copy_(v, paddle.GPUPlace())
+def reload_tensor_to_gpu(tensor):
+    if isinstance(tensor, dict):
+        for _, v in tensor.items():
+            reload_tensor_to_gpu(v)
+    elif isinstance(tensor, paddle.Tensor):
+        if not tensor.place.is_gpu_place():
+            gpu_tensor = tensor._copy_to(paddle.CUDAPlace(global_dev_id), True)
+            tensor.value().get_tensor()._share_data_with(gpu_tensor.value().get_tensor())
+    else:
+        raise ValueError(f"Can't parse for type {type(tensor)}")
+
+
+def cleanup_tensor_space(tensor):
+    if isinstance(tensor, dict):
+        for _, v in tensor.items():
+            cleanup_tensor_space(v)
+    elif isinstance(tensor, paddle.Tensor):
+        tensor._clear_data()
+    else:
+        raise ValueError(f"Can't parse for type {type(tensor)}")
 
 
 def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
@@ -541,7 +567,7 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
                         eval_state_dict[key].set_value(tensor)
 
                     if with_offload:
-                        train_state_dict[key].copy_(train_state_dict[key]._copy_to(paddle.CPUPlace(), False))
+                        offload_tensor_to_cpu(train_state_dict[key])
             else:
                 # single to single
                 # tp+pp -> single
@@ -596,12 +622,12 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
 
                 # Offload train model if need
                 if global_rank == src_rank and with_offload:
-                    train_state_dict[key].copy_(train_state_dict[key]._copy_to(paddle.CPUPlace(), blocking=False))
+                    offload_tensor_to_cpu(train_state_dict[key])
     else:
         # 其他 DP rank 的state dict, 适配 offload 和初始化
         if with_offload:
             for key in list(train_state_dict.keys()):
-                train_state_dict[key].copy_(train_state_dict[key]._copy_to(paddle.CPUPlace(), blocking=False))
+                offload_tensor_to_cpu(train_state_dict[key])
         for k, v in eval_state_dict.items():
             if not v._is_initialized():
                 v.set_value(paddle.random())
@@ -620,17 +646,11 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
             )
 
 
-def cleanup_model(sefl: Trainer, **kwargs):
-    pass
-
-
 Trainer.init_train_model_opt = init_train_model_opt
 Trainer.init_train_log = init_train_log
 Trainer.init_train_state = init_train_state
 Trainer.full_training_step = full_training_step
 
-Trainer.offload = offload_model
-Trainer.reload = reload_model
 Trainer.export_evaluate_model = export_evaluate_model
 
 
@@ -883,6 +903,7 @@ class PPOTrainer(Trainer):
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor] = None,
     ):
+
         with guard_set_args(args, {"recompute": False, "fp16_opt_level": "O1"}):
             # just used to create trival attrs might be used in the training
             # process of trainer, while changing some args to avoid model usage
@@ -1262,6 +1283,8 @@ class PPOTrainer(Trainer):
 
                 # self.reference_model.reload()
                 # self.reward_model.reload()
+                # reload_tensor_to_gpu(self.reference_model.state_dict())
+                # reload_tensor_to_gpu(self.reward_model.state_dict())
 
                 # 生成数据
                 rl_batches = self.split_rl_micro_batches(prompt_only_batch)
@@ -1276,6 +1299,10 @@ class PPOTrainer(Trainer):
                 # self.reward_model.offload()
                 # policy_model_eval.cleanup()
                 # value_model_eval.cleanup()
+                # offload_tensor_to_cpu(self.reference_model.state_dict())
+                # offload_tensor_to_cpu(self.reward_model.state_dict())
+                # cleanup_tensor_space(self._policy_model_eval.state_dict())
+                # cleanup_tensor_space(self._value_model_eval.state_dict())
 
                 self.set_train()
                 for _ in range(self.args.update_iters):
@@ -1460,6 +1487,8 @@ class PPOTrainer(Trainer):
 
                 # policy_model.reload()
                 # value_model.reload()
+                reload_tensor_to_gpu(self.actor_model.state_dict())
+                reload_tensor_to_gpu(self.reward_critic_model.state_dict())
 
                 rl_info, train_step_kwargs = self.rl_step(rl_batch, **train_step_kwargs)
 
