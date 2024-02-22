@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import os
 import sys
 from dataclasses import dataclass, field
@@ -20,6 +21,7 @@ from typing import Any, Dict, Tuple
 import paddle
 from data import PromptOnlyDataset, SupervisedDataset, parse_dataset
 from models import AutoModelForScore
+from models.score_model import LlamaModelForScore  # noqa
 from ppo_trainer import PPOTrainer
 
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
@@ -30,6 +32,17 @@ from paddlenlp.transformers import (
     LlamaTokenizer,
 )
 from paddlenlp.utils.log import logger
+
+# launch would unset http_proxy
+# export https_proxy=http://172.19.57.45:3128
+# os.environ["http_proxy"] = "http://172.19.56.199:3128"
+# os.environ["https_proxy"] = "http://172.19.56.199:3128"
+# os.environ["http_proxy"] = "http://172.19.57.45:3128"
+# os.environ["https_proxy"] = "http://172.19.57.45:3128"
+os.environ["http_proxy"] = "http://10.162.37.16:8128"
+os.environ["https_proxy"] = "http://10.162.37.16:8128"
+os.environ["no_proxy"] = "localhost,bcebos.com"
+
 
 @dataclass
 class TrainingArguments(TrainingArguments):
@@ -230,12 +243,19 @@ def main():
             tensor_parallel_rank=training_args.tensor_parallel_rank,
             dtype=dtype,
         )
+        model_config.num_hidden_layers = 2
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
         actor_model = AutoModelForCausalLM.from_pretrained(
             model_args.actor_model_name_or_path,
             config=model_config,
         )
+
+        config = copy.deepcopy(actor_model.config)
+        config.tensor_parallel_degree = -1
+        config.tensor_parallel_rank = 0
+        actor_eval_model = AutoModelForCausalLM.from_config(config)
+
         # reference model
         actor_reference_model = AutoModelForCausalLM.from_pretrained(
             model_args.actor_model_name_or_path,
@@ -253,6 +273,7 @@ def main():
             tensor_parallel_rank=training_args.tensor_parallel_rank,
             dtype=dtype,
         )
+        model_config.num_hidden_layers = 2
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
         reward_model = AutoModelForScore.from_pretrained(
@@ -264,6 +285,7 @@ def main():
         reward_tokenizer = AutoTokenizer.from_pretrained(
             model_args.reward_model_name_or_path, model_max_length=data_args.max_length, padding_side="right"
         )
+
         # critic model
         if model_args.reward_critic_model_name_or_path is None:
             model_args.reward_critic_model_name_or_path = model_args.reward_model_name_or_path
@@ -273,6 +295,12 @@ def main():
         reward_critic_tokenizer = AutoTokenizer.from_pretrained(
             model_args.reward_critic_model_name_or_path, model_max_length=data_args.max_length, padding_side="left"
         )
+
+        config = copy.deepcopy(reward_critic_model.config)
+        config.tensor_parallel_degree = -1
+        config.tensor_parallel_rank = 0
+        reward_critic_eval_model = AutoModelForScore.from_config(config)
+
     for tokenizer in [actor_tokenizer, reward_tokenizer, reward_critic_tokenizer]:
         if isinstance(tokenizer, LlamaTokenizer) and tokenizer.pad_token_id is None:
             tokenizer.pad_token_id = tokenizer.eos_token_id
@@ -292,7 +320,19 @@ def main():
     )
 
     trainer = PPOTrainer(
-        model=(actor_model, actor_reference_model, reward_model, reward_critic_model),
+        #  (policy_model, reference_model, reward_model, value_model)
+        #   policy_model, sft_model,       reward_model, value_model
+        #  (policy_model, reference_model, reward_model, value_model,
+        #  (policy_model, reference_model, reward_model, value_model, policy_eval_model, value_eval_model
+        #  (actor_model, actor_reference_model, reward_model, reward_critic_model, actor_eval_model, reward_critic_eval_model
+        model=(
+            actor_model,
+            actor_reference_model,
+            reward_model,
+            reward_critic_model,
+            actor_eval_model,
+            reward_critic_eval_model,
+        ),
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=dev_ds,

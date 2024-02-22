@@ -17,6 +17,7 @@ from typing import Any
 import paddle
 from paddle import nn
 
+import paddlenlp
 from paddlenlp.transformers import (
     LlamaConfig,
     LlamaModel,
@@ -131,3 +132,6 @@ class LlamaModelForScore(ScoreModelMixin, LlamaPretrainedModel):
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
+
+
+paddlenlp.transformers.LlamaModelForScore = LlamaModelForScore
