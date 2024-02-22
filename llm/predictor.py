@@ -48,8 +48,8 @@ from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
-    ChatGLMv2Tokenizer,
     ChatGLMTokenizer,
+    ChatGLMv2Tokenizer,
     LlamaTokenizer,
     PretrainedModel,
     PretrainedTokenizer,
@@ -241,7 +241,8 @@ class BasePredictor:
             padding=True,
             # when use chat_template, it should not add special tokens
             # chatglm2 prefix-tokens can not be tokenized into ids
-            add_special_tokens=self.tokenizer.chat_template is None or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
+            add_special_tokens=self.tokenizer.chat_template is None
+            or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
         )
         return tokenized_source
 
@@ -733,6 +734,7 @@ class BlockInferencePredictorMixin:
         self.model_name_or_path = config.model_name_or_path
 
         self.architectures = self.model_config.architectures[0].lower()
+        self.alibi = self.model_config.alibi
 
         self.dtype = config.dtype or self.model_config
 
@@ -830,7 +832,7 @@ class BlockInferencePredictorMixin:
             np.array(eos_token_id * config.batch_size).reshape(-1, 1).astype("int64")
         )
         # bloom model needs src_mask and tgt_mask!
-        if "bloom" in self.architectures:
+        if "bloom" in self.architectures or self.alibi is True:
             lower_one_tril = paddle.tril(
                 paddle.ones(shape=(self.total_max_length, self.total_max_length), dtype=self.dtype)
             )
