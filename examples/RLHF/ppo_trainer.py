@@ -27,6 +27,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import tqdm
 from data import DummyDataset, PromptOnlyBatch
+from models.ppo_model_utils import RLHFPPOMixedLoss, RLHFValueLoss
 from paddle.distributed import fleet
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from paddle.utils import map_structure
@@ -496,7 +497,8 @@ class PolicyTrainer(Trainer):
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor] = None,
     ):
-
+        # only used for non-PipelineParallel models
+        criterion = RLHFPPOMixedLoss(model.config, ptx_coeff=args.ptx_coeff)
         super().__init__(
             model,
             criterion,
@@ -510,6 +512,27 @@ class PolicyTrainer(Trainer):
             optimizers,
             preprocess_logits_for_metrics,
         )
+
+    def _prepare_inputs(self, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> Dict[str, Union[paddle.Tensor, Any]]:
+        inputs = super()._prepare_input(inputs)
+        label_names = self.criterion.__class__.label_names
+        # some data fields are used both in model and loss
+        shared_fields = set(["input_ids", "attention_mask"])
+        labels = []
+        for name in label_names:
+            if name not in inputs:
+                label = self.criterion.__class__.label_default_values.get(name, None)
+            elif name in shared_fields:
+                label = inputs[name]
+            else:
+                label = inputs.pop(name)
+            labels.append(label)
+        # "labels" is the pre-defined label name in Trainer
+        inputs["labels"] = labels
+        # NOTE: TensorParallel model requires non-Tensor inputs to be lists and
+        # broadcast them, thus do not or optionally use these inputs. labels use
+        # in criterion not send to model can workaround this.
+        return inputs
 
     def actor_loss_fn(
         self,
@@ -528,7 +551,7 @@ class PolicyTrainer(Trainer):
         )
         return paddle.sum(paddle.maximum(pg_loss1, pg_loss2) * mask) / mask.sum()
 
-    def compute_loss(self, model, inputs, return_outputs=False):
+    def _compute_loss(self, model, inputs, return_outputs=False):
         """
         How the loss is computed by Trainer. By default, all models return the loss in the first element.
         Subclass and override for custom behavior.
@@ -603,7 +626,7 @@ class ValueTrainer(Trainer):
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor] = None,
     ):
-
+        criterion = RLHFValueLoss(model.config, clip_range_value=args.clip_range_value)
         super().__init__(
             model,
             criterion,
@@ -617,6 +640,27 @@ class ValueTrainer(Trainer):
             optimizers,
             preprocess_logits_for_metrics,
         )
+
+    def _prepare_inputs(self, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> Dict[str, Union[paddle.Tensor, Any]]:
+        inputs = super()._prepare_input(inputs)
+        label_names = self.criterion.__class__.label_names
+        # some data fields are used both in model and loss
+        shared_fields = set(["input_ids", "attention_mask"])
+        labels = []
+        for name in label_names:
+            if name not in inputs:
+                label = self.criterion.__class__.label_default_values.get(name, None)
+            elif name in shared_fields:
+                label = inputs[name]
+            else:
+                label = inputs.pop(name)
+            labels.append(label)
+        # "labels" is the pre-defined label name in Trainer
+        inputs["labels"] = labels
+        # NOTE: TensorParallel model requires non-Tensor inputs to be lists and
+        # broadcast them, thus do not or optionally use these inputs. labels use
+        # in criterion not send to model can workaround this.
+        return inputs
 
     def critic_loss_fn(
         self,
@@ -635,7 +679,7 @@ class ValueTrainer(Trainer):
         vf_loss2 = paddle.square(values_clipped - returns)
         return 0.5 * paddle.sum(paddle.maximum(vf_loss1, vf_loss2) * mask) / mask.sum()
 
-    def compute_loss(self, model, inputs, return_outputs=False):
+    def _compute_loss(self, model, inputs, return_outputs=False):
         """
         How the loss is computed by Trainer. By default, all models return the loss in the first element.
         Subclass and override for custom behavior.
@@ -1667,6 +1711,9 @@ class PPOTrainer(Trainer):
         attention_mask = rl_batch["attention_mask"]
 
         # log_probs has shifted by one for predicted logits
+        # TODO(guosheng): When using flash_attn with casual mask and right padding
+        # inputs, responses of batch input cannot be got by sliced from start. And
+        # use sequences (as labels) with full length instead of target length.
         start = prompt.shape[-1] - 1
         sequence_mask = attention_mask[:, 1:]
 
@@ -1803,15 +1850,16 @@ class PPOTrainer(Trainer):
         sequence: paddle.Tensor,
         attention_mask: paddle.Tensor,
     ) -> Dict[str, Any]:
-        if self.reward_tokenizer is not self.tokenizer:
+        if False:  # self.reward_tokenizer is not self.tokenizer:
+            # right padding
             reward_tokenize_output = batch_retokenize(
                 sequence,
                 src_tokenizer=self.tokenizer,
                 dest_tokenizer=self.reward_tokenizer,
                 skip_special_tokens=True,
             )
-            reward_seq = reward_tokenize_output["input_ids"]
-            reward_attention_mask = reward_tokenize_output["attention_mask"]
+            reward_seq = sequence = reward_tokenize_output["input_ids"]
+            reward_attention_mask = attention_mask = reward_tokenize_output["attention_mask"]
         else:
             # for text in self.tokenizer.batch_decode(
             #     sequence,
@@ -1854,17 +1902,19 @@ class PPOTrainer(Trainer):
         ]  # .scores
         # TODO(guosheng): move these to model methods such as get_logprobs
         reward_score = reward_score.squeeze(axis=-1)
-        reward_value = reward_value.squeeze(axis=-1)[:, :-1]
+        reward_value = reward_value.squeeze(axis=-1)
+
+        reward_value = reward_value[:, :-1]
         log_probs = gather_log_probabilities(logits[:, :-1], sequence[:, 1:])
         ref_log_probs = gather_log_probabilities(ref_logits[:, :-1], sequence[:, 1:])
         return {
             "prompt": prompt,
-            "log_probs": log_probs,
-            "ref_log_probs": ref_log_probs,
-            "rewards": reward_score,
-            "reward_values": reward_value,
             "input_ids": sequence,
             "attention_mask": attention_mask,
+            "rewards": reward_score,
+            "reward_values": reward_value,
+            "log_probs": log_probs,
+            "ref_log_probs": ref_log_probs,
         }
 
     # @paddle.no_grad()

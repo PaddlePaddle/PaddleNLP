@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
@@ -77,6 +78,8 @@ class RLHFPPOLoss(nn.Layer):
         return paddle.sum(paddle.maximum(pg_loss1, pg_loss2) * mask) / mask.sum()
 
     def forward(self, logits, input_ids, old_log_probs, reward_advantages, sequence_mask, start=None):
+        # tgt_mask or sequence_mask according to length
+
         # When used in pipe mode, batches among accumulation steps should be paded.
         # Hard to pad acorss batches, think in some cases one batch might have the
         # longest prompt+target length but the shortest target lengh, which might
@@ -102,6 +105,27 @@ class RLHFPPOLoss(nn.Layer):
         return actor_loss
 
 
+def merge_fwd_labels(loss_cls):
+    """
+    PipelineParallel and trainer.criterion both use labels as tuple, thus wrap.
+    """
+    ori_fwd = loss_cls.forward
+
+    def loss_fwd(self, predict, labels):
+        return ori_fwd(self, predict, *labels)
+
+    fwd_params = inspect.signature(ori_fwd).parameters
+    # forward(self, predict, label1, label2, ...)
+    loss_cls.label_names = list(fwd_params.keys())[2:]
+    loss_cls.label_default_values = {}
+    for label_name in loss_cls.label_names:
+        if fwd_params[label_name].default is not inspect.Parameter.empty:
+            loss_cls.label_default_values[label_name] = fwd_params[label_name].default
+    loss_cls.forward = loss_fwd
+    return loss_cls
+
+
+@merge_fwd_labels
 class RLHFPPOMixedLoss(nn.Layer):
     """provide two losses, one for PPO loss, the other for SFT loss."""
 
@@ -111,9 +135,11 @@ class RLHFPPOMixedLoss(nn.Layer):
         self.ppo_criterion = RLHFPPOLoss(config, **kwargs)
         self.sft_criterion = PretrainingCriterion(config)
 
-    def forward(self, logits, label_info):
-        labels, input_ids, old_log_probs, reward_advantages, sequence_mask = label_info
+    def forward(self, logits, labels, input_ids, old_log_probs, reward_advantages, sequence_mask):
+        # def forward(self, logits, label_info):
+        #     labels, input_ids, old_log_probs, reward_advantages, sequence_mask = label_info
 
+        logits = logits if isinstance(logits, paddle.Tensor) else logits[0]
         loss = None
         # sft, pt loss
         if labels is not None:
@@ -125,6 +151,7 @@ class RLHFPPOMixedLoss(nn.Layer):
         return loss
 
 
+@merge_fwd_labels
 class RLHFValueLoss(nn.Layer):
     def __init__(self, config, **kwargs):
         super().__init__()
@@ -151,15 +178,14 @@ class RLHFValueLoss(nn.Layer):
     def forward(
         self,
         reward_values,
-        # old_reward_values,
-        # reward_returns,
-        # sequence_mask,
-        # start=None,
-        label_info,
+        old_reward_values,
+        reward_returns,
+        sequence_mask,
+        start=None,
+        # label_info,
     ):
-        if not isinstance(reward_values, paddle.Tensor):
-            reward_values = reward_values[0]
-        old_reward_values, reward_returns, sequence_mask = label_info
+        # old_reward_values, reward_returns, sequence_mask = label_info
+        reward_values = reward_values if isinstance(reward_values, paddle.Tensor) else reward_values[0]
         # if start is not None:
         #     old_reward_values = old_reward_values[:, start:]
         #     sequence_mask = sequence_mask[:, start:]
