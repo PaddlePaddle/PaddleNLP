@@ -631,7 +631,7 @@ class Trainer:
         # The resume_from_checkpoint could be None in some machine node.
         # Here we reset None to temp directory.
         if args.world_size > 1:
-            is_resume_from_checkpoint = paddle.to_tensor([resume_from_checkpoint is not None])
+            is_resume_from_checkpoint = paddle.to_tensor([resume_from_checkpoint is not None], dtype="int32")
             paddle.distributed.all_reduce(is_resume_from_checkpoint)
             is_resume_from_checkpoint = is_resume_from_checkpoint.item()
             if is_resume_from_checkpoint > 0 and is_resume_from_checkpoint < paddle.distributed.get_world_size():
@@ -1556,7 +1556,9 @@ class Trainer:
                 if not len(checkpoint_rng_state["cuda"]) == core.get_custom_device_count(device):
                     raise ValueError("Length of custom device state list shoule be equal to the custom device count")
                 for i in range(core.get_custom_device_count(device)):
-                    core.default_custom_device_generator(i).manual_seed(checkpoint_rng_state["cuda"][i])
+                    core.default_custom_device_generator(paddle.CustomPlace(device, i)).manual_seed(
+                        checkpoint_rng_state["cuda"][i]
+                    )
 
         if self.args.use_hybrid_parallel:
             if "hybrid_parallel_rng_state_tracker" in checkpoint_rng_state:
