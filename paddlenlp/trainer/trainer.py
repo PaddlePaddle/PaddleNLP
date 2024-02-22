@@ -2063,36 +2063,38 @@ class Trainer:
         else:
             self.save_model(output_dir)
 
-        optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+        # only save model state dict, ignore optimizer and scheduler
+        if not self.args.ignore_save_lr_and_optim:
+            optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
-        if self.args.use_hybrid_parallel:
-            if self.dp_group.rank <= 0:
-                os.makedirs(output_dir, exist_ok=True)
-                logger.info("Saving optimizer files.")
-                if self.args.unified_checkpoint:
-                    save_unified_optimizer(
-                        self.args,
-                        self.model,
-                        self.optimizer,
-                        output_dir,
-                        safe_serialization=True,
-                    )
-                else:
-                    paddle.save(
-                        self.optimizer.state_dict(),
-                        os.path.join(output_dir, optimizer_name),
-                    )
+            if self.args.use_hybrid_parallel:
+                if self.dp_group.rank <= 0:
+                    os.makedirs(output_dir, exist_ok=True)
+                    logger.info("Saving optimizer files.")
+                    if self.args.unified_checkpoint:
+                        save_unified_optimizer(
+                            self.args,
+                            self.model,
+                            self.optimizer,
+                            output_dir,
+                            safe_serialization=True,
+                        )
+                    else:
+                        paddle.save(
+                            self.optimizer.state_dict(),
+                            os.path.join(output_dir, optimizer_name),
+                        )
 
-        if self.args.should_save:
-            if not self.args.use_hybrid_parallel:
-                logger.info("Saving optimizer files.")
-                paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+            if self.args.should_save:
+                if not self.args.use_hybrid_parallel:
+                    logger.info("Saving optimizer files.")
+                    paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
-            # FIXME: maybe only save one copy
-            paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
+                # FIXME: maybe only save one copy
+                paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
 
-            if self.do_grad_scaling:
-                paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
+                if self.do_grad_scaling:
+                    paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
 
         self.runtime_timer.stop()
         # Determine the new best metric / best model checkpoint

@@ -743,6 +743,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "whether to ignore load optimizer and scheduler."},
     )
+    ignore_save_lr_and_optim: Optional[bool] = field(
+        default=False,
+        metadata={"help": "whether to ignore save optimizer and scheduler."},
+    )
     force_reshard_pp: Optional[bool] = field(
         default=False,
         metadata={"help": "reshard pp even if pp degree in the model and pp degree in script match"},
