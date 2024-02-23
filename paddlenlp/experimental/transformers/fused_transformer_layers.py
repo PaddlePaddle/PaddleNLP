@@ -1353,9 +1353,6 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
         i,
         **kwargs,
     ):
-        print("-------cu_seqlens_q: ", kwargs.get("cu_seqlens_q", None))
-        print("-------cu_seqlens_k: ", kwargs.get("cu_seqlens_k", None))
-
         k_quant_scales = kwargs.get("k_quant_scales", None)
         v_quant_scales = kwargs.get("v_quant_scales", None)
         k_dequant_scales = kwargs.get("k_dequant_scales", None)
@@ -1437,12 +1434,18 @@ class FusedSpeculativeMultiTransformer(FusedMultiTransformerBase):
         **kwargs,
     ):
         # qkv_out_specu:(token_num, 3 * hidden_dim)
-        step_idx = kwargs.get("step_idx", None)
-        print("step_idx: ", step_idx)
+
         hidden_size = caches[2 * i].shape[1] * caches[2 * i].shape[3]
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
         cu_seqlens_q = kwargs.get("cu_seqlens_q", None)
-        cur_seq_len = step_idx
         cu_seqlens_k = kwargs.get("cu_seqlens_k", None)
+        # prefill stage
+        if cu_seqlens_q == cu_seqlens_k:
+            cur_seq_len = seq_lens_encoder[0][0]
+        else:
+            cur_seq_len = seq_lens_decoder[0][0]
+        
         fmha_out, qkv_out_specu, _, _ = paddle.incubate.nn.functional.speculative_decoding_multihead_attention(
             qkv_out,
             caches[2 * i], # [bsz, num_heads, seqlen, head_dim]
@@ -1456,14 +1459,13 @@ class FusedSpeculativeMultiTransformer(FusedMultiTransformerBase):
             kwargs.get("cu_seqlens_k", None),
             pre_caches[2 * i] if pre_caches is not None else None,  # pre_key_cache
             pre_caches[2 * i + 1] if pre_caches is not None else None,  # pre_value_cache
+            attn_mask,  # mask
+            kwargs.get("tgt_mask", None),
             None,  # qkv_bias
             None,  # out_shifts
             None,  # out_smooths
-            rotary_embs,
-            attn_mask,
-            kwargs.get("tgt_mask", None),
-            kwargs.get("max_input_length", -1),
-            cur_seq_len,
+            cur_seq_len, # token_num_in_cache
+            kwargs.get("max_input_length", -1), # 
             self.use_neox_rotary_style,
         )
 
@@ -1472,10 +1474,9 @@ class FusedSpeculativeMultiTransformer(FusedMultiTransformerBase):
         # caches[2*i]: (bsz, num_heads, max_seqlen, head_dim)
         k = qkv_out_specu[:, hidden_size:2*hidden_size]
         v = qkv_out_specu[:, 2*hidden_size:]
-        # print(f"key_cache: {key_cache.shape}, value_cache: {value_cache.shape}")
-        # print("caches[2 * i]: ", caches[2 * i].shape)
+
         # prefill stage
-        if paddle.equal_all(cu_seqlens_q, cu_seqlens_k):
+        if cu_seqlens_q == cu_seqlens_k:
             caches[2 * i][:, :, :cur_seq_len, :] = k.reshape(caches[2 * i][:, :, :cur_seq_len, :].shape)
             caches[2 * i + 1][:, :, :cur_seq_len, :] = v.reshape(caches[2 * i + 1][:, :, :cur_seq_len, :].shape)
         # decode stage

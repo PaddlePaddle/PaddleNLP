@@ -861,6 +861,172 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
             attentions=None,
         )
 
+class LlamaForCausalLMSpecuInferenceModel(GenerationInferenceModel, LlamaPretrainedModel):
+    """
+    Dynamic Batching for LLaMA Model with pretraining tasks on top.
+    """
+
+    _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.llama = LlamaInferenceModel(config)
+        self.lm_head = LlamaLMHead(config)
+        self.gamma = config.gamma
+
+    @classmethod
+    def from_pretrained(
+        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
+    ):
+        # TODO: Support safetensors loading.
+        kwargs["use_safetensors"] = False
+        return super().from_pretrained(pretrained_model_name_or_path, from_hf_hub, subfolder, *args, **kwargs)
+
+    @classmethod
+    def get_cache_kvs_shape(
+        cls, config: LlamaConfig, max_batch_size: int = 1, max_length: int = None
+    ) -> list[list[int]]:
+        """get cache_kvs tensor for llama model
+
+        Args:
+            max_batch_size (int): the max batch size
+            max_length (int | None, optional): the max_length of cache_kvs. Defaults to None.
+
+        Returns:
+            list[paddle.Tensor]: the list tensor shape for cache
+        """
+        if max_length is None:
+            max_length = config.max_position_embeddings
+
+        cache_kvs = []
+        for _ in range(config.num_hidden_layers):
+            cache_kvs.append(
+                [
+                    2,
+                    max_batch_size,
+                    config.num_attention_heads // max(config.tensor_parallel_degree, 1),
+                    max_length,
+                    config.hidden_size // config.num_attention_heads,
+                ]
+            )
+        return cache_kvs
+
+    def prepare_inputs_for_generation(
+        self,
+        input_ids,
+        cache_kvs,
+        seq_len_encoder,
+        seq_len_decoder,
+        tgt_ids,
+        tgt_pos,
+        tgt_generation_mask,
+        **kwargs,
+    ):
+        position_ids = kwargs.get("position_ids", None)
+        attention_mask = kwargs.get("attention_mask", None)
+        cache = kwargs.get("cache", None)
+        pre_caches = kwargs.get("pre_caches", None)
+        inputs_embeds = kwargs.get("inputs_embeds", None)
+        if cache is not None:
+            input_ids = tgt_ids
+            position_ids = tgt_pos
+            attention_mask = (tgt_generation_mask - 1) * 1e4
+            # make inputs_embeds be none in decoder phase.
+            # in forward function, it will be assigned according to input_ids.
+            inputs_embeds = None
+        else:
+            attention_mask = (attention_mask - 1) * 1e4
+        model_inputs = {
+            "input_ids": input_ids,
+            "inputs_embeds": inputs_embeds,
+            "position_ids": position_ids,
+            "attention_mask": attention_mask,
+            "cache_kvs": cache_kvs,
+            "seq_len_encoder": seq_len_encoder,
+            "seq_len_decoder": seq_len_decoder,
+            "cache": cache,
+            "pre_caches": pre_caches,
+        }
+        return model_inputs
+
+    def forward(
+        self,
+        input_ids,
+        position_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        use_cache=False,
+        cache=None,
+        cache_kvs=None,
+        num_tokens_accepted=None,
+        pre_caches=None,
+        seq_len_encoder=None,
+        seq_len_decoder=None,
+        past_key_values=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+    ):
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        # decoder phase 的 cache_kv 擦除
+        # 1.生成gamma个token之后再进行擦除
+        if num_tokens_accepted and cache is not None:
+            attention_mask[:, :, seq_len_decoder[0][0] - (self.gamma -  num_tokens_accepted):, :] = 0
+            cache_kvs[:, :, seq_len_decoder[0][0] - (self.gamma -  num_tokens_accepted):, :] = 0
+
+        outputs = self.llama(
+            input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            cache=cache,
+            cache_kvs=cache_kvs,
+            pre_caches=pre_caches,
+            seq_len_encoder=seq_len_encoder,
+            seq_len_decoder=seq_len_decoder,
+            past_key_values=past_key_values,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+        hidden_states = outputs[0]
+        logits = self.lm_head(
+            hidden_states,
+            tensor_parallel_output=False,
+        )
+
+        loss = None
+        if labels is not None:
+            # Shift so that tokens < n predict n
+            shift_logits = logits[..., :-1, :]
+            shift_labels = labels[..., 1:]
+            # Flatten the tokens
+            loss = self.criterion(shift_logits, shift_labels)
+
+        if not return_dict:
+            output = (logits,) + outputs[1:]
+            return (loss,) + output if loss is not None else output
+
+        return CausalLMOutputWithCrossAttentions(
+            loss=loss,
+            logits=logits,
+            past_key_values=outputs.past_key_values,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict):
+        if "lm_head.weight" in state_dict:
+            self.lm_head.weight.set_value(state_dict["lm_head.weight"])
+        self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
 
 class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedModel):
     """
@@ -965,6 +1131,8 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         output_hidden_states=None,
         return_dict=None,
     ):
+        self.cache_kvs = cache_kvs
+        self.attention_mask = attention_mask
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -1255,6 +1423,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         v_quant_scales=None,
         k_dequant_scales=None,
         v_dequant_scales=None,
+        step_idx=None,
     ):
         outputs = self.llama(
             input_ids,
@@ -1270,6 +1439,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             v_quant_scales=v_quant_scales,
             k_dequant_scales=k_dequant_scales,
             v_dequant_scales=v_dequant_scales,
+            step_idx=step_idx,
         )
 
         hidden_states = outputs[0]
