@@ -74,151 +74,6 @@ class Converter:
         raise NotImplementedError()
 
 
-class BertConverter(Converter):
-    def converted(self) -> Tokenizer:
-        vocab = self.original_tokenizer.vocab
-        tokenizer = Tokenizer(WordPiece(vocab._token_to_idx, unk_token=str(self.original_tokenizer.unk_token)))
-
-        tokenize_chinese_chars = True
-        strip_accents = True
-        do_lower_case = False
-        if hasattr(self.original_tokenizer, "basic_tokenizer"):
-            do_lower_case = self.original_tokenizer.basic_tokenizer.do_lower_case
-
-        tokenizer.normalizer = normalizers.BertNormalizer(
-            clean_text=True,
-            handle_chinese_chars=tokenize_chinese_chars,
-            strip_accents=strip_accents,
-            lowercase=do_lower_case,
-        )
-        tokenizer.pre_tokenizer = pre_tokenizers.BertPreTokenizer()
-
-        cls_token = str(self.original_tokenizer.cls_token)
-        sep_token = str(self.original_tokenizer.sep_token)
-        cls_token_id = self.original_tokenizer.cls_token_id
-        sep_token_id = self.original_tokenizer.sep_token_id
-
-        tokenizer.post_processor = processors.TemplateProcessing(
-            single=f"{cls_token}:0 $A:0 {sep_token}:0",
-            pair=f"{cls_token}:0 $A:0 {sep_token}:0 $B:1 {sep_token}:1",
-            special_tokens=[
-                (cls_token, cls_token_id),
-                (sep_token, sep_token_id),
-            ],
-        )
-        tokenizer.decoder = decoders.WordPiece(prefix="##")
-
-        return tokenizer
-
-
-class ErnieConverter(BertConverter):
-    pass
-
-
-class RobertaConverter(Converter):
-    def converted(self) -> Tokenizer:
-        ot = self.original_tokenizer
-        vocab = ot.encoder
-        merges = list(ot.bpe_ranks.keys())
-
-        tokenizer = Tokenizer(
-            BPE(
-                vocab=vocab,
-                merges=merges,
-                dropout=None,
-                continuing_subword_prefix="",
-                end_of_word_suffix="",
-                fuse_unk=False,
-            )
-        )
-
-        tokenizer.pre_tokenizer = pre_tokenizers.ByteLevel(add_prefix_space=ot.add_prefix_space)
-        tokenizer.decoder = decoders.ByteLevel()
-        tokenizer.post_processor = processors.RobertaProcessing(
-            sep=(ot.sep_token, ot.sep_token_id),
-            cls=(ot.cls_token, ot.cls_token_id),
-            add_prefix_space=ot.add_prefix_space,
-            trim_offsets=True,  # True by default on Roberta (historical)
-        )
-
-        return tokenizer
-
-
-class TinyBertConverter(BertConverter):
-    pass
-
-
-class TikTokenConverter(Converter):
-    def extract(self, tiktoken_file: str):
-        from .tiktoken_model_utils import bpe, bytes_to_unicode, load_tiktoken_bpe
-
-        bpe_ranks = (
-            self.original_tokenizer.mergeable_ranks
-            if hasattr(self.original_tokenizer, "mergeable_ranks") and self.original_tokenizer.mergeable_ranks
-            else load_tiktoken_bpe(tiktoken_file)
-        )
-        byte_encoder = bytes_to_unicode()
-
-        def token_bytes_to_string(b):
-            return "".join([byte_encoder[ord(char)] for char in b.decode("latin-1")])
-
-        merges = []
-        vocab = {}
-        for token, rank in bpe_ranks.items():
-            vocab[token_bytes_to_string(token)] = rank
-            if len(token) == 1:
-                continue
-            merged = tuple(bpe(bpe_ranks, token, max_rank=rank))
-            if len(merged) == 2:
-                merges.append(tuple(map(token_bytes_to_string, merged)))
-
-        return vocab, merges
-
-
-class NystromformerConverter(BertConverter):
-    pass
-
-
-class QWenConverter(TikTokenConverter):
-    def converted(self) -> Tokenizer:
-        from .qwen.tokenizer import PAT_STR
-
-        ot = self.original_tokenizer
-        bpe_vocab, merges = self.extract(ot.tiktoken_file)
-        tokenizer = Tokenizer(
-            BPE(
-                bpe_vocab,  # ot.mergeable_ranks
-                merges,
-                dropout=None,
-                unk_token=None,
-                continuing_subword_prefix="",
-                end_of_word_suffix="",
-                fuse_unk=False,
-                byte_fallback=False,
-            )
-        )
-
-        tokenizer.normalizer = normalizers.NFC()
-
-        tokenizer.pre_tokenizer = pre_tokenizers.Sequence(
-            [
-                pre_tokenizers.Split(
-                    Regex(PAT_STR),
-                    behavior="isolated",
-                    invert=False,
-                ),
-                pre_tokenizers.ByteLevel(
-                    add_prefix_space=getattr(self.original_tokenizer, "add_prefix_space", False),
-                    use_regex=False,
-                ),
-            ]
-        )
-
-        tokenizer.decoder = decoders.ByteLevel()
-        tokenizer.post_processor = processors.ByteLevel(trim_offsets=False)
-        return tokenizer
-
-
 class SpmConverter(Converter):
     def __init__(self, *args):
 
@@ -324,6 +179,33 @@ class SpmConverter(Converter):
         return tokenizer
 
 
+class TikTokenConverter(Converter):
+    def extract(self, tiktoken_file: str):
+        from .tiktoken_model_utils import bpe, bytes_to_unicode, load_tiktoken_bpe
+
+        bpe_ranks = (
+            self.original_tokenizer.mergeable_ranks
+            if hasattr(self.original_tokenizer, "mergeable_ranks") and self.original_tokenizer.mergeable_ranks
+            else load_tiktoken_bpe(tiktoken_file)
+        )
+        byte_encoder = bytes_to_unicode()
+
+        def token_bytes_to_string(b):
+            return "".join([byte_encoder[ord(char)] for char in b.decode("latin-1")])
+
+        merges = []
+        vocab = {}
+        for token, rank in bpe_ranks.items():
+            vocab[token_bytes_to_string(token)] = rank
+            if len(token) == 1:
+                continue
+            merged = tuple(bpe(bpe_ranks, token, max_rank=rank))
+            if len(merged) == 2:
+                merges.append(tuple(map(token_bytes_to_string, merged)))
+
+        return vocab, merges
+
+
 class AlbertConverter(SpmConverter):
     def vocab(self, proto):
         return [
@@ -361,6 +243,87 @@ class AlbertConverter(SpmConverter):
         )
 
 
+class BertConverter(Converter):
+    def converted(self) -> Tokenizer:
+        vocab = self.original_tokenizer.vocab
+        tokenizer = Tokenizer(WordPiece(vocab._token_to_idx, unk_token=str(self.original_tokenizer.unk_token)))
+
+        tokenize_chinese_chars = True
+        strip_accents = True
+        do_lower_case = False
+        if hasattr(self.original_tokenizer, "basic_tokenizer"):
+            do_lower_case = self.original_tokenizer.basic_tokenizer.do_lower_case
+
+        tokenizer.normalizer = normalizers.BertNormalizer(
+            clean_text=True,
+            handle_chinese_chars=tokenize_chinese_chars,
+            strip_accents=strip_accents,
+            lowercase=do_lower_case,
+        )
+        tokenizer.pre_tokenizer = pre_tokenizers.BertPreTokenizer()
+
+        cls_token = str(self.original_tokenizer.cls_token)
+        sep_token = str(self.original_tokenizer.sep_token)
+        cls_token_id = self.original_tokenizer.cls_token_id
+        sep_token_id = self.original_tokenizer.sep_token_id
+
+        tokenizer.post_processor = processors.TemplateProcessing(
+            single=f"{cls_token}:0 $A:0 {sep_token}:0",
+            pair=f"{cls_token}:0 $A:0 {sep_token}:0 $B:1 {sep_token}:1",
+            special_tokens=[
+                (cls_token, cls_token_id),
+                (sep_token, sep_token_id),
+            ],
+        )
+        tokenizer.decoder = decoders.WordPiece(prefix="##")
+
+        return tokenizer
+
+
+class ChatGLMv2Converter(SpmConverter):
+    def vocab(self, proto):
+        vocab = [
+            ("<unk>", 0.0),
+            ("<bos>", 0.0),
+            ("<eos>", 0.0),
+            ("<pad>", 0.0),
+        ]
+        vocab += [(piece.piece, piece.score) for piece in proto.pieces[4:]]
+        return vocab
+
+    def unk_id(self, proto):
+        return 0
+
+    def post_processor(self):
+        """
+        - single sequence:       ``[gMask]sop X``
+        - pair of sequences:        ``[gMask]sop A B <eos>``
+        """
+        eos = self.original_tokenizer.eos_token
+        eos_token_id = self.original_tokenizer.eos_token_id
+
+        single = "[gMASK]:0 sop:0 $A:0"
+        pair = f"[gMASK]:0 sop:0 $A:0 $B:1{' '+eos+':1'}"
+
+        special_tokens = [
+            ("[gMASK]", self.original_tokenizer.get_command("[gMASK]")),
+            ("sop", self.original_tokenizer.get_command("sop")),
+            (eos, eos_token_id),
+        ]
+
+        return processors.TemplateProcessing(single=single, pair=pair, special_tokens=special_tokens)
+
+    def converted(self) -> Tokenizer:
+        _tokenizer = super().converted()
+        _tokenizer.padding["pad_id"] = 0
+        _tokenizer.padding["pad_token"] = "<pad>"
+        return _tokenizer
+
+
+class ErnieConverter(BertConverter):
+    pass
+
+
 class ErnieMConverter(SpmConverter):
     def normalizer(self, proto):
         list_normalizers = []
@@ -385,7 +348,7 @@ class ErnieMConverter(SpmConverter):
     def unk_id(self, proto):
         return self.original_tokenizer.convert_tokens_to_ids(str(self.original_tokenizer.unk_token))
 
-    def pretokenizer(self, replacement, add_prefix_space):
+    def pre_tokenizer(self, replacement, add_prefix_space):
         return pre_tokenizers.Sequence(
             [
                 pre_tokenizers.Whitespace(),
@@ -407,6 +370,83 @@ class ErnieMConverter(SpmConverter):
                 ("[SEP]", self.original_tokenizer.convert_tokens_to_ids("[SEP]")),
             ],
         )
+
+
+class RobertaConverter(Converter):
+    def converted(self) -> Tokenizer:
+        ot = self.original_tokenizer
+        vocab = ot.encoder
+        merges = list(ot.bpe_ranks.keys())
+
+        tokenizer = Tokenizer(
+            BPE(
+                vocab=vocab,
+                merges=merges,
+                dropout=None,
+                continuing_subword_prefix="",
+                end_of_word_suffix="",
+                fuse_unk=False,
+            )
+        )
+
+        tokenizer.pre_tokenizer = pre_tokenizers.ByteLevel(add_prefix_space=ot.add_prefix_space)
+        tokenizer.decoder = decoders.ByteLevel()
+        tokenizer.post_processor = processors.RobertaProcessing(
+            sep=(ot.sep_token, ot.sep_token_id),
+            cls=(ot.cls_token, ot.cls_token_id),
+            add_prefix_space=ot.add_prefix_space,
+            trim_offsets=True,  # True by default on Roberta (historical)
+        )
+
+        return tokenizer
+
+
+class TinyBertConverter(BertConverter):
+    pass
+
+
+class NystromformerConverter(BertConverter):
+    pass
+
+
+class QWenConverter(TikTokenConverter):
+    def converted(self) -> Tokenizer:
+        from .qwen.tokenizer import PAT_STR
+
+        ot = self.original_tokenizer
+        bpe_vocab, merges = self.extract(ot.tiktoken_file)
+        tokenizer = Tokenizer(
+            BPE(
+                bpe_vocab,  # ot.mergeable_ranks
+                merges,
+                dropout=None,
+                unk_token=None,
+                continuing_subword_prefix="",
+                end_of_word_suffix="",
+                fuse_unk=False,
+                byte_fallback=False,
+            )
+        )
+
+        tokenizer.normalizer = normalizers.NFC()
+
+        tokenizer.pre_tokenizer = pre_tokenizers.Sequence(
+            [
+                pre_tokenizers.Split(
+                    Regex(PAT_STR),
+                    behavior="isolated",
+                    invert=False,
+                ),
+                pre_tokenizers.ByteLevel(
+                    add_prefix_space=getattr(self.original_tokenizer, "add_prefix_space", False),
+                    use_regex=False,
+                ),
+            ]
+        )
+
+        tokenizer.decoder = decoders.ByteLevel()
+        tokenizer.post_processor = processors.ByteLevel(trim_offsets=False)
+        return tokenizer
 
 
 class LlamaConverter(SpmConverter):
@@ -462,7 +502,7 @@ class LlamaConverter(SpmConverter):
             )
         else:
             raise Exception(
-                "You're trying to run a `Unigram` model but your file was trained with a different algorithm"
+                "You're trying to run a `Unigram` model but you're file was trained with a different algorithm"
             )
 
         return tokenizer
@@ -479,7 +519,7 @@ class LlamaConverter(SpmConverter):
         return None
 
     def post_processor(self):
-        # the post_processor is defined in LlamaTokenizerFast class.
+        # the processor is defined in the LlamaTokenizerFast class.
         return None
 
 
@@ -495,11 +535,11 @@ SLOW_TO_FAST_CONVERTERS = {
     "NystromformerTokenizer": NystromformerConverter,
     "DistilBertTokenizer": BertConverter,
     "AlbertEnglishTokenizer": AlbertConverter,
-    # "AlbertEnglishTokenizer": AlbertConverter,
     "RobertaBPETokenizer": RobertaConverter,
     "ErnieTinyTokenizer": ErnieTinyConverter,
     "LlamaTokenizer": LlamaConverter,
     "QWenTokenizer": QWenConverter,
+    "ChatGLMv2Tokenizer": ChatGLMv2Converter,
     # TODO(zhoushunjie): Need to implement more TokenizerConverter
 }
 
