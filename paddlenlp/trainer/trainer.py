@@ -575,10 +575,13 @@ class Trainer:
             if param.name in master_weights:
                 assert param.shape == master_weights[param.name].shape
                 paddle.assign(master_weights[param.name].cuda(), model_state_dict[key])
-
+            else:
+                logger.info(f"param {key} not found in master_weights")
+        logger.info(f"state-dict-keys: {state_dict.keys()}")
         logger.info("after recover, casted model_state_dict number: {}".format(len(model_state_dict)))
-        state_dict.update(model_state_dict)
-        return state_dict
+        # state_dict.update(model_state_dict)
+        model_state_dict.update(state_dict)
+        return model_state_dict
 
     def load_state_dict_from_checkpoint_with_reshard(self, resume_from_checkpoint):
         """load state_dict from_checkpoint with reshard, Only load model state dict."""
@@ -599,6 +602,8 @@ class Trainer:
             if self.args.pipeline_parallel_degree > 1:
                 name.append(f"pp{self.args.pipeline_parallel_rank:0>2d}")
             name.append(f"shard{i:0>2d}")
+            if self.args.use_moe:
+                name.append(f"moe{self.args.data_parallel_rank:0>2d}")
             return "_".join(name)
 
         for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
@@ -780,10 +785,8 @@ class Trainer:
         steps_trained_progress_bar = None
 
         # Check if continuing training from a checkpoint
-        if (
-            not self.args.ignore_load_lr_and_optim
-            and resume_from_checkpoint is not None
-            and os.path.isfile(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
+        if (resume_from_checkpoint is not None and os.path.isfile(
+            os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
         ):
             self.state = TrainerState.load_from_json(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
@@ -921,6 +924,7 @@ class Trainer:
 
                 if (step + 1) % args.gradient_accumulation_steps == 0:
                     if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
+                        # map_structure(lambda x: x.__idiv__(self.args.gradient_accumulation_steps), tr_loss)
                         tr_loss /= self.args.gradient_accumulation_steps
 
                     self.timers and self.timers("forward-backward").stop()
@@ -1958,16 +1962,28 @@ class Trainer:
         if self.args.should_save_model_state:
             self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
 
-    def _save_moe_weights(self, output_dir):
+    def _save_moe_weights(
+        self,
+        output_dir: Optional[str] = None,
+        merge_tensor_parallel: Optional[bool] = False,):
         # save moe optimizer and model state # TODO 默认为冗余存储
-        self.save_func(
-            self.model.state_dict(),
-            os.path.join(output_dir, _add_variant(PADDLE_WEIGHT_FILE_NAME, self.args.weight_name_suffix)),
-        )
-        self.save_func(
-            self.optimizer.state_dict(),
-            os.path.join(output_dir, _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)),
-        )
+
+        self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
+        optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+        saved_signal_path = os.path.join(output_dir, f"saved_signal_{dist.get_rank()}")
+        if self.args.use_async_save:
+                    # assert not self.args.use_moe, "moe no support async save"
+            async_save_optimizer(
+                self.optimizer.state_dict(),
+                os.path.join(output_dir, optimizer_name),
+                saved_signal_path=saved_signal_path,
+            )
+
+        else:
+            self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, optimizer_name))
+            with open(saved_signal_path, mode="w+") as f:
+                f.write("1")
+
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
@@ -2047,7 +2063,7 @@ class Trainer:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
                 if self.args.use_async_save:
-                    assert not self.args.use_moe, "moe no support async save"
+                    # assert not self.args.use_moe, "moe no support async save"
                     async_save_optimizer(
                         self.optimizer.state_dict(),
                         os.path.join(output_dir, optimizer_name),
@@ -2235,7 +2251,10 @@ class Trainer:
 
         suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
         sharding_metas[suffix] = sharding_meta
-        sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_model_parallel_group())
+        if self.args.tensor_parallel_degree > 1:
+            sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_model_parallel_group())
+        else:
+            sharding_metas_list = [sharding_metas]
         sharding_metas = {k: v for e in sharding_metas_list for (k, v) in e.items()}
         if self.args.tensor_parallel_rank != 0:
             return None
@@ -2440,6 +2459,8 @@ class Trainer:
             if self.args.pipeline_parallel_degree > 1:
                 name.append(f"pp{self.args.pipeline_parallel_rank:0>2d}")
             name.append(f"shard{i:0>2d}")
+            if self.args.use_moe:
+                name.append(f"moe{self.args.data_parallel_rank:0>2d}")
             return "_".join(name)
 
         structure_name_map = {k: v.name for (k, v) in self.model.state_dict().items()}
