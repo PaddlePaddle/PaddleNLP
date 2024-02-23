@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import os
 import sys
 
@@ -24,11 +25,23 @@ from typing import Any, Dict, Tuple
 
 import paddle
 from data import PromptOnlyDataset, SupervisedDataset, parse_dataset
-from ppo_trainer import PPOTrainer
+from models import AutoModelForScore
+from models.score_model import LlamaModelForScore  # noqa
+from ppo_trainer import PPOTrainer, cleanup_tensor_space, offload_tensor_to_cpu
 
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoConfig, AutoTokenizer, LlamaTokenizer
 from paddlenlp.utils.log import logger
+
+# launch would unset http_proxy
+# export https_proxy=http://172.19.57.45:3128
+# os.environ["http_proxy"] = "http://172.19.56.199:3128"
+# os.environ["https_proxy"] = "http://172.19.56.199:3128"
+# os.environ["http_proxy"] = "http://172.19.57.45:3128"
+# os.environ["https_proxy"] = "http://172.19.57.45:3128"
+os.environ["http_proxy"] = "http://10.162.37.16:8128"
+os.environ["https_proxy"] = "http://10.162.37.16:8128"
+os.environ["no_proxy"] = "localhost,bcebos.com"
 
 
 @dataclass
@@ -113,6 +126,18 @@ class TrainingArguments(TrainingArguments):
         default=16,
         metadata={"help": "Batch size (per device) for the training dataloader."},
     )
+    eval_mode: str = field(
+        default=None,
+        metadata={
+            "help": "eval mode for actor model and reward_critic_model, optional for: None, single, tensor_parallel."
+        },
+    )
+
+    offload_level: str = field(
+        default=None,
+        metadata={"help": "Offload model, optional for: eval, reward, eval reward, ."},
+    )
+
     # save_generation_output: bool = field(
     #     default=False,
     #     metadata={"help": "Whether to save generated text to file when eval"},
@@ -184,6 +209,10 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
+    if training_args.eval_mode is not None and len(training_args.eval_mode) == 0:
+        training_args.eval_mode = None
+    if training_args.eval_mode is None and training_args.offload_level is not None:
+        training_args.offload_level = training_args.offload_level.replace("eval", "")
 
     # Setup GPU & distributed training
     paddle.set_device(training_args.device)
@@ -246,6 +275,7 @@ def main():
     )
     if hasattr(model_config, "use_flash_attention"):
         model_config.use_flash_attention = model_args.use_flash_attention
+
     actor_model = AutoModelForCausalLM.from_pretrained(
         model_args.actor_model_name_or_path,
         config=model_config,
@@ -253,6 +283,15 @@ def main():
         # ptx_coeff=training_args.ptx_coeff,
         # clip_range_ratio=training_args.clip_range_ratio,
     )
+    if training_args.eval_mode is not None:
+        config = copy.deepcopy(actor_model.config)
+        if training_args.eval_mode == "single":
+            config.tensor_parallel_degree = -1
+            config.tensor_parallel_rank = 0
+        actor_eval_model = AutoModelForCausalLM.from_config(config)
+    else:
+        actor_eval_model = None
+
     # reference model
     actor_reference_model = AutoModelForCausalLM.from_pretrained(
         model_args.actor_model_name_or_path,
@@ -294,6 +333,90 @@ def main():
     reward_critic_tokenizer = AutoTokenizer.from_pretrained(
         model_args.reward_critic_model_name_or_path, model_max_length=data_args.max_length, padding_side="left"
     )
+    if training_args.eval_mode is not None:
+        config = copy.deepcopy(reward_critic_model.config)
+        if training_args.eval_mode == "single":
+            config.tensor_parallel_degree = -1
+            config.tensor_parallel_rank = 0
+        reward_critic_eval_model = AutoModelForScore.from_config(config)
+    else:
+        reward_critic_eval_model = None
+
+
+#         # actor model
+#         model_config = AutoConfig.from_pretrained(
+#             model_args.actor_model_name_or_path,
+#             tensor_parallel_output=False,
+#             tensor_parallel_degree=training_args.tensor_parallel_degree,
+#             tensor_parallel_rank=training_args.tensor_parallel_rank,
+#             dtype=dtype,
+#         )
+#         model_config.num_hidden_layers = 2
+#         if hasattr(model_config, "use_flash_attention"):
+#             model_config.use_flash_attention = model_args.use_flash_attention
+#         actor_model = AutoModelForCausalLM.from_pretrained(
+#             model_args.actor_model_name_or_path,
+#             config=model_config,
+#         )
+# 
+#         if training_args.eval_mode is not None:
+#             config = copy.deepcopy(actor_model.config)
+#             if training_args.eval_mode == "single":
+#                 config.tensor_parallel_degree = -1
+#                 config.tensor_parallel_rank = 0
+#             actor_eval_model = AutoModelForCausalLM.from_config(config)
+#         else:
+#             actor_eval_model = None
+# 
+#         # reference model
+#         actor_reference_model = AutoModelForCausalLM.from_pretrained(
+#             model_args.actor_model_name_or_path,
+#             config=model_config,
+#         )
+#         actor_tokenizer = AutoTokenizer.from_pretrained(
+#             model_args.actor_model_name_or_path, model_max_length=data_args.max_length, padding_side="left"
+#         )
+# 
+#         # reward model
+#         model_config = AutoConfig.from_pretrained(
+#             model_args.reward_model_name_or_path,
+#             tensor_parallel_output=False,
+#             tensor_parallel_degree=training_args.tensor_parallel_degree,
+#             tensor_parallel_rank=training_args.tensor_parallel_rank,
+#             dtype=dtype,
+#         )
+#         model_config.num_hidden_layers = 2
+#         if hasattr(model_config, "use_flash_attention"):
+#             model_config.use_flash_attention = model_args.use_flash_attention
+#         reward_model = AutoModelForScore.from_pretrained(
+#             model_args.reward_model_name_or_path,
+#             config=model_config,
+#             score_type="reward",
+#             do_normalize=training_args.normalize_reward,
+#         )
+#         reward_tokenizer = AutoTokenizer.from_pretrained(
+#             model_args.reward_model_name_or_path, model_max_length=data_args.max_length, padding_side="right"
+#         )
+# 
+#         # critic model
+#         if model_args.reward_critic_model_name_or_path is None:
+#             model_args.reward_critic_model_name_or_path = model_args.reward_model_name_or_path
+#         reward_critic_model = AutoModelForScore.from_pretrained(
+#             model_args.reward_critic_model_name_or_path, config=model_config, score_type="critic", do_normalize=False
+#         )
+#         reward_critic_tokenizer = AutoTokenizer.from_pretrained(
+#             model_args.reward_critic_model_name_or_path, model_max_length=data_args.max_length, padding_side="left"
+#         )
+# 
+#         if training_args.eval_mode is not None:
+#             config = copy.deepcopy(reward_critic_model.config)
+#             if training_args.eval_mode == "single":
+#                 config.tensor_parallel_degree = -1
+#                 config.tensor_parallel_rank = 0
+#             reward_critic_eval_model = AutoModelForScore.from_config(config)
+#         else:
+#             reward_critic_eval_model = None
+
     for tokenizer in [actor_tokenizer, reward_tokenizer, reward_critic_tokenizer]:
         if isinstance(tokenizer, LlamaTokenizer) and tokenizer.pad_token_id is None:
             tokenizer.pad_token_id = tokenizer.eos_token_id
@@ -312,8 +435,32 @@ def main():
         else None
     )
 
+    # offload
+    # cleanup actor_eval_model, reward_critic_eval_model
+    # offload actor_reference_model reward_model
+
+    if training_args.offload_level is not None:
+        if "eval" in training_args.offload_level:
+            cleanup_tensor_space(actor_eval_model.state_dict())
+            cleanup_tensor_space(reward_critic_eval_model.state_dict())
+        if "reward" in training_args.offload_level:
+            offload_tensor_to_cpu(actor_reference_model.state_dict())
+            offload_tensor_to_cpu(reward_model.state_dict())
+
     trainer = PPOTrainer(
-        model=(actor_model, actor_reference_model, reward_model, reward_critic_model),
+        #  (policy_model, reference_model, reward_model, value_model)
+        #   policy_model, sft_model,       reward_model, value_model
+        #  (policy_model, reference_model, reward_model, value_model,
+        #  (policy_model, reference_model, reward_model, value_model, policy_eval_model, value_eval_model
+        #  (actor_model, actor_reference_model, reward_model, reward_critic_model, actor_eval_model, reward_critic_eval_model
+        model=(
+            actor_model,
+            actor_reference_model,
+            reward_model,
+            reward_critic_model,
+            actor_eval_model,
+            reward_critic_eval_model,
+        ),
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=dev_ds,

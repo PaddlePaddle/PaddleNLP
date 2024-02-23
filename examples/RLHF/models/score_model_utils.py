@@ -49,9 +49,10 @@ class AutoModelForScore(_BaseAutoModelClass):
     _score_module_name: str = "models.score_model"
 
     @classmethod
-    def _get_model_class_from_config(cls, pretrained_model_name_or_path, config_file_path):
-        with io.open(config_file_path, encoding="utf-8") as f:
-            config = json.load(f)
+    def _get_model_class_from_config(cls, pretrained_model_name_or_path, config_file_path, config=None):
+        if config is None:
+            with io.open(config_file_path, encoding="utf-8") as f:
+                config = json.load(f)
 
         # Get class name corresponds to this configuration
         if is_standard_config(config):
