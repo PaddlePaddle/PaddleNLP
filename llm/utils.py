@@ -25,7 +25,6 @@ import paddle.distributed as dist
 import paddle.incubate.multiprocessing as mp
 from paddle.distributed import fleet
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
-from paddlenlp_ops import get_output
 from sklearn.metrics import accuracy_score
 
 from paddlenlp.datasets import InTokensIterableDataset
@@ -470,6 +469,7 @@ def dybatch_preprocess(
                 max_length=src_length,
                 return_attention_mask=False,
                 return_token_type_ids=False,
+                add_special_tokens=tokenizer.chat_template is None or isinstance(tokenizer, ChatGLMv2Tokenizer),
             )
             input_ids.append(tokens["input_ids"][0])
 
@@ -703,6 +703,9 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
 
     logger.info("Start read result message")
     logger.info(f"Current path is {os.getcwd()}")
+
+    from paddlenlp_ops import get_output
+
     while True:
         get_output(output_tensor, 0, True)
         if output_tensor[0, 0] == -2:  # read none

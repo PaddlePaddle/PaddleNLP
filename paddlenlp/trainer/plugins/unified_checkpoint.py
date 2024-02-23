@@ -115,6 +115,7 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
     else:
         raise ValueError("Unified checkpoint only supports PretrainedModel")
 
+    skip_save_model_weight = False
     if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
         if is_need_master_weight(optimizer, is_fp16_or_bp16=(args.fp16 or args.bf16)):
             logger.info(
@@ -122,36 +123,41 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
                 "The master weight will be loaded as model weights for next resumption."
             )
             # not save model weight, load from master weight
-            return
-    config_to_save = None
-    state_dict, config_to_save, shard_file, sharded_index = unified_checkpoint_into_shards(
-        args, model_to_save, safe_serialization=safe_serialization
-    )
+            skip_save_model_weight = True
 
     save_directory = output_dir
     os.makedirs(save_directory, exist_ok=True)
 
-    is_sync_save = True
-    if "async_save" in args.unified_checkpoint_config:
-        is_sync_save = False
-    file_save_async_or_sync(
-        state_dict, os.path.join(save_directory, shard_file), safe_serialization, is_sync=is_sync_save
-    )
+    # save model weights
+    if not skip_save_model_weight:
+        state_dict, shard_file, sharded_index = unified_checkpoint_into_shards(
+            args, model_to_save, safe_serialization=safe_serialization
+        )
+        is_sync_save = True
+        if "async_save" in args.unified_checkpoint_config:
+            is_sync_save = False
+        file_save_async_or_sync(
+            state_dict, os.path.join(save_directory, shard_file), safe_serialization, is_sync=is_sync_save
+        )
 
+        if sharded_index is not None:
+            if not safe_serialization:
+                path = os.path.join(output_dir, PADDLE_WEIGHTS_INDEX_NAME)
+            else:
+                path = os.path.join(output_dir, SAFE_WEIGHTS_INDEX_NAME)
+
+            if args.should_save:
+                with open(path, "w") as f:
+                    json.dump(sharded_index, f, indent=4)
+
+    # save the config
+    config_to_save = save_config(model_to_save)
     # Attach architecture to the config
     config_to_save.architectures = [model_to_save.__class__.__name__]
-    # Save the config
     if args.should_save:
         config_to_save.save_pretrained(save_directory)
 
-    if sharded_index is not None:
-        if not safe_serialization:
-            path = os.path.join(output_dir, PADDLE_WEIGHTS_INDEX_NAME)
-        else:
-            path = os.path.join(output_dir, SAFE_WEIGHTS_INDEX_NAME)
-
-        with open(path, "w") as f:
-            json.dump(sharded_index, f, indent=4)
+    paddle.device.cuda.empty_cache()
 
 
 def load_unified_checkpoint(args, model, optimizer, resume_from_checkpoint: str, safe_serialization=False) -> None:
@@ -252,6 +258,18 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
         raise RuntimeError(f"Error(s) in loading state_dict for {model.__class__.__name__}:\n\t{error_msg}")
 
 
+def save_config(model_to_save):
+    dtype = get_parameter_dtype(model_to_save)
+    model_to_save.config.dtype = str(dtype).split(".")[1]
+    config_to_save = copy.deepcopy(model_to_save.config)
+
+    if config_to_save.tensor_parallel_degree > 1:
+        # do we need to change?
+        config_to_save.tensor_parallel_degree = 1
+
+    return config_to_save
+
+
 def unified_checkpoint_into_shards(
     args,
     model_to_save,
@@ -266,14 +284,13 @@ def unified_checkpoint_into_shards(
     Returns:
         tuple: state_dict, config, shard_file: file name, sharded_index: map for weight to file name.
     """
+    paddle.device.cuda.empty_cache()
     assert hasattr(model_to_save, "config")
 
     state_dict = model_to_save.state_dict()
 
     all_filter_keys = filter_params(model_to_save, state_dict)
 
-    dtype = get_parameter_dtype(model_to_save)
-    model_to_save.config.dtype = str(dtype).split(".")[1]
     config_to_save = copy.deepcopy(model_to_save.config)
 
     if config_to_save.tensor_parallel_degree > 1:
@@ -281,10 +298,6 @@ def unified_checkpoint_into_shards(
             model_to_save.config, state_dict.keys(), is_split=False, ignore_error=True
         )
         state_dict = merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys)
-
-    if config_to_save.tensor_parallel_degree > 1:
-        # do we need to change?
-        config_to_save.tensor_parallel_degree = 1
 
     # build index json file
     index_weight_file = {}
@@ -302,7 +315,9 @@ def unified_checkpoint_into_shards(
         total_size_list,
     )
 
-    return state_dict, config_to_save, shard_file, sharded_index
+    paddle.device.cuda.empty_cache()
+
+    return state_dict, shard_file, sharded_index
 
 
 def save_unified_optimizer(args, model, optimizer, output_dir, safe_serialization=False):
@@ -324,6 +339,8 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
         optim_state_dict, shard_optim_file, sharded_optim_index = results[0]
         master_weight_state_dict, shard_master_weight_file, sharded_master_weight_index = results[1]
 
+    paddle.device.cuda.empty_cache()
+
     save_directory = output_dir
     os.makedirs(save_directory, exist_ok=True)
 
@@ -343,19 +360,22 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
         )
 
     if sharded_optim_index is not None:
-        if not safe_serialization:
-            path = os.path.join(output_dir, PADDLE_OPTIMIZER_INDEX_NAME)
-            master_path = os.path.join(output_dir, PADDLE_MASTER_WEIGHTS_INDEX_NAME)
-        else:
-            path = os.path.join(output_dir, SAFE_OPTIMIZER_INDEX_NAME)
-            master_path = os.path.join(output_dir, SAFE_MASTER_WEIGHTS_INDEX_NAME)
+        optimizer_index_name = SAFE_OPTIMIZER_INDEX_NAME if safe_serialization else PADDLE_OPTIMIZER_INDEX_NAME
+        path = os.path.join(output_dir, optimizer_index_name)
+        if args.should_save:
+            with open(path, "w") as f:
+                json.dump(sharded_optim_index, f, indent=4)
 
-        with open(path, "w") as f:
-            json.dump(sharded_optim_index, f, indent=4)
-
+        master_weights_name = (
+            SAFE_MASTER_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_MASTER_WEIGHTS_INDEX_NAME
+        )
+        if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
+            master_weights_name = SAFE_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_WEIGHTS_INDEX_NAME
+        master_path = os.path.join(output_dir, master_weights_name)
         if master_weight_state_dict is not None:
-            with open(master_path, "w") as f:
-                json.dump(sharded_master_weight_index, f, indent=4)
+            if args.should_save:
+                with open(master_path, "w") as f:
+                    json.dump(sharded_master_weight_index, f, indent=4)
 
 
 def load_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
@@ -504,6 +524,7 @@ def unified_optimizer_into_shards(
         optimizer (Optimizer): optimizer to save.
         safe_serialization (bool, optional): safe serialization using safetensors. Defaults to False.
     """
+    paddle.device.cuda.empty_cache()
     optim_state_dict = nested_copy(optimizer.state_dict())
     master_weights = None
     if "master_weights" in optim_state_dict.keys():
@@ -549,18 +570,23 @@ def unified_optimizer_into_shards(
             tp_actions,
             filter_optim_keys,
         )
+        paddle.device.cuda.empty_cache()
+
         if master_weights is not None:
             master_weights = merge_tensor_parallel_for_optimizer(
                 master_weights,
                 tp_actions,
                 filter_master_keys,
             )
+            paddle.device.cuda.empty_cache()
 
     # build index json file
     index_optimizer_file, index_master_weight_file = {}, {}
     total_optim_size, total_master_weight_size = 0, 0
     optimizer_name = SAFE_OPTIMIZER_NAME if safe_serialization else PADDLE_OPTIMIZER_NAME
     master_weights_name = SAFE_MASTER_WEIGHTS_NAME if safe_serialization else PADDLE_MASTER_WEIGHTS_NAME
+    if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
+        master_weights_name = SAFE_WEIGHTS_NAME if safe_serialization else PADDLE_WEIGHTS_NAME
     shard_optimizer_file = get_sharded_file_name(args, optimizer_name, is_optimizer=True)
     shard_master_weight_file = get_sharded_file_name(args, master_weights_name, is_optimizer=True)
 
@@ -589,6 +615,7 @@ def unified_optimizer_into_shards(
         else:
             sharded_optim_index["master_weights"] = False
 
+    paddle.device.cuda.empty_cache()
     if master_weights is None:
         return [(optim_state_dict, shard_optimizer_file, sharded_optim_index)]
     else:
@@ -883,6 +910,7 @@ def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_chec
     # `file_machine_mappings` indicates the machine where the files appear. For example, {"model-00001-of-00002.safetensors": [machine_0, machine_1], "model-00002-of-00002.safetensors": [machine_0]}
     file_keyname_mappings, file_machine_mappings = get_file_mappings(index, resume_from_checkpoint)
 
+    logger.debug("Creating dispatch table for unified checkpoint load ...")
     # Get send_table and recv_table. The send table indicates which workers are responsible for sending tensors, and the recv table indicates which workers should receive the tensors.
     send_table, recv_table = create_dispatch_table(
         args, model, file_keyname_mappings, file_machine_mappings, resume_from_checkpoint
@@ -901,6 +929,8 @@ def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_chec
     else:
         # Get corresponding tensor parallel actions.
         tp_actions = model.get_tensor_parallel_convert_actions(config_revise, all_tp_keys, ignore_error=True)
+
+    logger.debug("Distributed send recv for state dict load ...")
     # Distribute the checkpoint tensor dynamically, using the `send_table` and `recv_table` we create before.
     state_dict = distributed_send_recv(
         config_revise,
@@ -913,7 +943,7 @@ def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_chec
         file_machine_mappings,
     )
     dist.barrier()
-
+    logger.debug("Setting state dict into model ...")
     error_msgs = _load_state_dict_into_model(model, state_dict, "")
     if len(error_msgs) > 0:
         error_msg = "\n\t".join(error_msgs)
@@ -1648,6 +1678,10 @@ def update_master_weight_status(args, optimizer, has_master_weight, safe_seriali
             index_filename_master_weights = (
                 PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
             )
+            if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
+                index_filename_master_weights = (
+                    PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+                )
     else:
         has_master_weight = False
         index_filename_master_weights = None

@@ -26,6 +26,7 @@ from contextlib import contextmanager
 
 import numpy as np
 import paddle
+import paddle.distributed.fleet as fleet
 import yaml
 
 from paddlenlp.trainer.argparser import strtobool
@@ -409,6 +410,21 @@ def run_command(command: list[str], return_stdout=False):
         ) from e
 
 
+def skip_for_none_ce_case(test_case):
+    """
+    There are too many test case, we need skip for none CE envirmonet.
+    """
+    import os
+
+    ce_env = strtobool(os.getenv("CE_TEST_ENV", "0"))
+    if not ce_env:
+        return unittest.skip("test skip for NONE CE case. If you want run this ci, please export CE_TEST_ENV=1 ")(
+            test_case
+        )
+
+    return test_case
+
+
 def require_paddle_multi_gpu(test_case):
     """
     Decorator marking a test that requires a multi-GPU setup (in PaddlePaddle). These tests are skipped on a machine without
@@ -470,3 +486,36 @@ def require_paddle_up_to_2_gpus(test_case):
     import paddle
 
     return unittest.skipUnless(paddle.device.cuda.device_count() < 3, "test requires 0 or 1 or 2 GPUs")(test_case)
+
+
+def require_gpu(min_gpus: int = 1):
+    def actual_decorator(func):
+        gpu_count = paddle.device.cuda.device_count()
+
+        if gpu_count < min_gpus:
+            return unittest.skip(f"test requires {min_gpus} GPUs")(func)
+
+        def wrapper(*args, **kwargs):
+            result = func(*args, **kwargs)
+            return result
+
+        return wrapper
+
+    return actual_decorator
+
+
+class GPUsTesting(unittest.TestCase):
+    def init_dist_env(self, config: dict = {}):
+        world_size = paddle.distributed.get_world_size()
+        strategy = fleet.DistributedStrategy()
+        hybrid_configs = {
+            "dp_degree": 1,
+            "mp_degree": world_size,
+            "pp_degree": 1,
+            "sharding_degree": 1,
+        }
+        hybrid_configs.update(config)
+        strategy.hybrid_configs = hybrid_configs
+
+        fleet.init(is_collective=True, strategy=strategy)
+        fleet.get_hybrid_communicate_group()

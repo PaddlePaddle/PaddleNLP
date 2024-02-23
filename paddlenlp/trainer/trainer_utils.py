@@ -29,6 +29,7 @@ import random
 import re
 import threading
 import time
+from contextlib import contextmanager
 from enum import Enum
 from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
@@ -162,6 +163,24 @@ def set_seed(seed: int = 1234, topo=None):
         "The global seed is set to {}, local seed is set to {} and "
         "random seed is set to {}.".format(global_seed, local_seed, random_seed)
     )
+
+
+def _switch_mode(mode="dynamic"):
+    assert mode in ["dynamic", "static"]
+    if mode == "dynamic":
+        paddle.disable_static()
+    else:
+        paddle.enable_static()
+
+
+@contextmanager
+def _exec_mode_guard(mode="dynamic"):
+    origin_mode = "dynamic" if paddle.in_dynamic_mode() else "static"
+    _switch_mode(mode)
+    try:
+        yield
+    finally:
+        _switch_mode(origin_mode)
 
 
 class ExplicitEnum(Enum):
