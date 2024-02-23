@@ -511,6 +511,9 @@ def cleanup_tensor_space(tensor):
 
 
 def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
+    if eval_model is None:
+        return None
+
     with_offload = kwargs.pop("with_offload", False)
     train_tp_size = max(train_model.config.tensor_parallel_degree, 1)
     eval_tp_size = max(eval_model.config.tensor_parallel_degree, 1)
@@ -566,6 +569,11 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
                         # print(tensor.shape)
                         eval_state_dict[key].set_value(tensor)
 
+                    if not eval_state_dict[key]._is_initialized():
+                        v = eval_state_dict[key]
+                        t = paddle._C_ops.full_like(v, 0, v.dtype, paddle.CUDAPlace(global_dev_id))
+                        v.get_tensor()._share_data_with(t.get_tensor())
+
                     if with_offload:
                         offload_tensor_to_cpu(train_state_dict[key])
             else:
@@ -612,7 +620,9 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
             for key, src_rank, dst_rank in table:
                 # Init tensor for model is cleaned
                 if global_rank == dst_rank and not eval_state_dict[key]._is_initialized():
-                    eval_state_dict[key] = paddle.random()
+                    v = eval_state_dict[key]
+                    t = paddle._C_ops.full_like(v, 0, v.dtype, paddle.CUDAPlace(global_dev_id))
+                    v.get_tensor()._share_data_with(t.get_tensor())
 
                 if global_rank == src_rank:
                     dist.stream.send(train_state_dict[key], dst=dst_rank)
@@ -630,7 +640,8 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
                 offload_tensor_to_cpu(train_state_dict[key])
         for k, v in eval_state_dict.items():
             if not v._is_initialized():
-                v.set_value(paddle.random())
+                t = paddle._C_ops.full_like(v, 0, v.dtype, paddle.CUDAPlace(global_dev_id))
+                v.get_tensor()._share_data_with(t.get_tensor())
 
     paddle.distributed.barrier()
     if eval_tp_size == 1:
@@ -1271,14 +1282,15 @@ class PPOTrainer(Trainer):
                 # generate batches
                 self.set_eval()
 
-                policy_model_train = self.policy_trainer.model
                 self.policy_trainer.export_evaluate_model(
-                    policy_model_train, self._policy_model_eval, with_offload=True
+                    self.policy_trainer.model,
+                    self._policy_model_eval,
+                    with_offload=self.args.offload_level is not None,
                 )
                 # todo: zhui
                 # self.optimizer.offload()
                 self.value_trainer.export_evaluate_model(
-                    self.value_trainer.model, self._value_model_eval, with_offload=True
+                    self.value_trainer.model, self._value_model_eval, with_offload=self.args.offload_level is not None
                 )
 
                 # self.reference_model.reload()
@@ -1299,10 +1311,13 @@ class PPOTrainer(Trainer):
                 # self.reward_model.offload()
                 # policy_model_eval.cleanup()
                 # value_model_eval.cleanup()
-                # offload_tensor_to_cpu(self.reference_model.state_dict())
-                # offload_tensor_to_cpu(self.reward_model.state_dict())
-                # cleanup_tensor_space(self._policy_model_eval.state_dict())
-                # cleanup_tensor_space(self._value_model_eval.state_dict())
+                if self.args.offload_level is not None:
+                    if "eval" in self.args.offload_level:
+                        cleanup_tensor_space(self._policy_model_eval.state_dict())
+                        cleanup_tensor_space(self._value_model_eval.state_dict())
+                    if "reward" in self.args.offload_level:
+                        offload_tensor_to_cpu(self.reference_model.state_dict())
+                        offload_tensor_to_cpu(self.reward_model.state_dict())
 
                 self.set_train()
                 for _ in range(self.args.update_iters):

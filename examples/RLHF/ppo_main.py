@@ -22,7 +22,7 @@ import paddle
 from data import PromptOnlyDataset, SupervisedDataset, parse_dataset
 from models import AutoModelForScore
 from models.score_model import LlamaModelForScore  # noqa
-from ppo_trainer import PPOTrainer
+from ppo_trainer import PPOTrainer, cleanup_tensor_space, offload_tensor_to_cpu
 
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import (
@@ -126,6 +126,18 @@ class TrainingArguments(TrainingArguments):
         default=16,
         metadata={"help": "Batch size (per device) for the training dataloader."},
     )
+    eval_mode: str = field(
+        default=None,
+        metadata={
+            "help": "eval mode for actor model and reward_critic_model, optional for: None, single, tensor_parallel."
+        },
+    )
+
+    offload_level: str = field(
+        default=None,
+        metadata={"help": "Offload model, optional for: eval, reward, eval reward, ."},
+    )
+
     # save_generation_output: bool = field(
     #     default=False,
     #     metadata={"help": "Whether to save generated text to file when eval"},
@@ -197,6 +209,8 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
+    if training_args.eval_mode is None and training_args.offload_level is not None:
+        training_args.offload_level = training_args.offload_level.replace("eval", "")
 
     # Setup GPU & distributed training
     paddle.set_device(training_args.device)
@@ -251,10 +265,14 @@ def main():
             config=model_config,
         )
 
-        config = copy.deepcopy(actor_model.config)
-        config.tensor_parallel_degree = -1
-        config.tensor_parallel_rank = 0
-        actor_eval_model = AutoModelForCausalLM.from_config(config)
+        if training_args.eval_mode is not None:
+            config = copy.deepcopy(actor_model.config)
+            if training_args.eval_mode == "single":
+                config.tensor_parallel_degree = -1
+                config.tensor_parallel_rank = 0
+            actor_eval_model = AutoModelForCausalLM.from_config(config)
+        else:
+            actor_eval_model = None
 
         # reference model
         actor_reference_model = AutoModelForCausalLM.from_pretrained(
@@ -296,10 +314,14 @@ def main():
             model_args.reward_critic_model_name_or_path, model_max_length=data_args.max_length, padding_side="left"
         )
 
-        config = copy.deepcopy(reward_critic_model.config)
-        config.tensor_parallel_degree = -1
-        config.tensor_parallel_rank = 0
-        reward_critic_eval_model = AutoModelForScore.from_config(config)
+        if training_args.eval_mode is not None:
+            config = copy.deepcopy(reward_critic_model.config)
+            if training_args.eval_mode == "single":
+                config.tensor_parallel_degree = -1
+                config.tensor_parallel_rank = 0
+            reward_critic_eval_model = AutoModelForScore.from_config(config)
+        else:
+            reward_critic_eval_model = None
 
     for tokenizer in [actor_tokenizer, reward_tokenizer, reward_critic_tokenizer]:
         if isinstance(tokenizer, LlamaTokenizer) and tokenizer.pad_token_id is None:
@@ -322,6 +344,15 @@ def main():
     # offload
     # cleanup actor_eval_model, reward_critic_eval_model
     # offload actor_reference_model reward_model
+
+    if training_args.offload_level is not None:
+        if "eval" in training_args.offload_level:
+            cleanup_tensor_space(actor_eval_model.state_dict())
+            cleanup_tensor_space(reward_critic_eval_model.state_dict())
+        if "reward" in training_args.offload_level:
+            offload_tensor_to_cpu(actor_reference_model.state_dict())
+            offload_tensor_to_cpu(reward_model.state_dict())
+
     trainer = PPOTrainer(
         #  (policy_model, reference_model, reward_model, value_model)
         #   policy_model, sft_model,       reward_model, value_model
