@@ -313,12 +313,6 @@ class ChatGLMv2Converter(SpmConverter):
 
         return processors.TemplateProcessing(single=single, pair=pair, special_tokens=special_tokens)
 
-    def converted(self) -> Tokenizer:
-        _tokenizer = super().converted()
-        _tokenizer.padding["pad_id"] = 0
-        _tokenizer.padding["pad_token"] = "<pad>"
-        return _tokenizer
-
 
 class ErnieConverter(BertConverter):
     pass
