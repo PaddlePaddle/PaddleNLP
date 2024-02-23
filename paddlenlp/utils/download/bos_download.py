@@ -43,6 +43,7 @@ from .common import (
     DEFALUT_LOCAL_DIR_AUTO_SYMLINK_THRESHOLD,
     DEFAULT_ETAG_TIMEOUT,
     DEFAULT_REQUEST_TIMEOUT,
+    REPO_ID_SEPARATOR,
     AistudioBosFileMetadata,
     OfflineModeIsEnabled,
     _as_int,
@@ -56,8 +57,19 @@ from .common import (
     _to_local_dir,
     http_get,
     raise_for_status,
-    repo_folder_name,
 )
+
+
+def repo_folder_name(*, repo_id: str, repo_type: str) -> str:
+    """Return a serialized version of a aistudio repo name and type, safe for disk storage
+    as a single non-nested folder.
+
+    Example: models--julien-c--EsperBERTo-small
+    """
+    # remove all `/` occurrences to correctly convert repo to directory name
+    parts = [f"{repo_type}", *repo_id.split("/")]
+    return REPO_ID_SEPARATOR.join(parts)
+
 
 ENDPOINT = os.getenv("PPNLP_ENDPOINT", "https://bj.bcebos.com/paddlenlp")
 ENDPOINT_v2 = "https://paddlenlp.bj.bcebos.com"
@@ -78,7 +90,7 @@ BOS_CACHE = os.getenv("BOS_CACHE", default_cache_path)
 
 
 DEFAULT_REVISION = "main"
-REPO_TYPE_MODEL = "model"
+REPO_TYPE_MODEL = "models"
 REPO_TYPES = [None, REPO_TYPE_MODEL]
 
 
@@ -163,9 +175,6 @@ def bos_url(
         repo_type = REPO_TYPES[-1]
     if repo_type not in REPO_TYPES:
         raise ValueError("Invalid repo type")
-
-    if repo_type == "model":
-        repo_type = "models"
     if revision is None:
         revision = DEFAULT_REVISION
 
@@ -216,7 +225,10 @@ def bos_download(
             ENDPOINT_v2
         ), f"URL must start with {ENDPOINT} or {ENDPOINT_v2}"
         if repo_id is None:
-            repo_id = "/".join(url[len(ENDPOINT) + 1 :].split("/")[:-1])
+            if url.startswith(ENDPOINT):
+                repo_id = "/".join(url[len(ENDPOINT) + 1 :].split("/")[:-1])
+            else:
+                repo_id = "/".join(url[len(ENDPOINT_v2) + 1 :].split("/")[:-1])
         if filename is None:
             filename = url.split("/")[-1]
         subfolder = None
@@ -592,7 +604,7 @@ def bos_try_to_load_from_cache(
         cache_dir = BOS_CACHE
 
     object_id = repo_id.replace("/", "--")
-    repo_cache = os.path.join(cache_dir, f"{repo_type}s--{object_id}")
+    repo_cache = os.path.join(cache_dir, f"{repo_type}--{object_id}")
     if not os.path.isdir(repo_cache):
         # No cache for this model
         return None

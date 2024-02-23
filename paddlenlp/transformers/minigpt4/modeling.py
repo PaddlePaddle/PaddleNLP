@@ -166,7 +166,7 @@ class MiniGPT4PretrainedModel(PretrainedModel):
         subfolder = kwargs.pop("subfolder", None)
 
         model = super().from_pretrained(
-            pretrained_model_name_or_path, from_hf_hub=from_hf_hub, subfolder=subfolder, *args, **kwargs
+            pretrained_model_name_or_path, *args, **kwargs
         )
 
         logger.info("Trying to convert dtype for MiniGPT4 model, it may take a while.")
