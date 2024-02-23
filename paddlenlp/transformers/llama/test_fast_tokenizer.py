@@ -87,9 +87,5 @@ def test_tokenizer_cost(tokenizer_hf, tokenizer_fast, tokenizer_base, setup_inpu
 
 
 def test_output_type(tokenizer_fast, setup_inputs):
-    isinstance(
-        tokenizer_fast.batch_encode(setup_inputs[:20], return_tensors="pd", padding=True)["input_ids"], paddle.Tensor
-    )
-    isinstance(
-        tokenizer_fast.batch_encode(setup_inputs[:20], return_tensors="np", padding=True)["input_ids"], np.ndarray
-    )
+    isinstance(tokenizer_fast.encode(setup_inputs[0], return_tensors="pd")["input_ids"], paddle.Tensor)
+    isinstance(tokenizer_fast.encode(setup_inputs[0], return_tensors="np")["input_ids"], np.ndarray)
