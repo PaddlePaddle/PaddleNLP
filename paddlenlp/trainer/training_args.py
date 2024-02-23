@@ -917,6 +917,10 @@ class TrainingArguments:
                 self.pipeline_parallel_degree = -1
                 self.sep_parallel_degree = -1
 
+        if self.hybrid_parallel_topo_order is None:
+            self.hybrid_parallel_topo_order = "pp_first"
+        assert self.hybrid_parallel_topo_order in ["pp_first", "sharding_first"]
+
         if self.use_hybrid_parallel and self.enable_auto_parallel:
             self.use_hybrid_parallel = False
 
@@ -1042,10 +1046,6 @@ class TrainingArguments:
                             "The enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add are not supported "
                             "by current version of Paddle. Please try latest develop Paddle."
                         )
-
-                if self.hybrid_parallel_topo_order is None:
-                    self.hybrid_parallel_topo_order = "pp_first"
-                assert self.hybrid_parallel_topo_order in ["pp_first", "sharding_first"]
 
                 def is_segment_parallel_supported():
                     import inspect
@@ -1288,8 +1288,12 @@ class TrainingArguments:
                         recompute.refined_ops_patterns.append(eval(pattern))
 
             self.strategy = strategy
-            order = ["dp", "pp", "mp"]
-            degree = [self.data_parallel_degree, self.pipeline_parallel_degree, self.tensor_parallel_degree]
+            if self.hybrid_parallel_topo_order == "pp_first":
+                order = ["pp", "dp", "mp"]
+                degree = [self.pipeline_parallel_degree, self.data_parallel_degree, self.tensor_parallel_degree]
+            elif self.hybrid_parallel_topo_order == "sharding_first":
+                order = ["dp", "pp", "mp"]
+                degree = [self.data_parallel_degree, self.pipeline_parallel_degree, self.tensor_parallel_degree]
             mesh_dims = list(zip(order, degree))
             fleet.auto.create_mesh(mesh_dims)
 
