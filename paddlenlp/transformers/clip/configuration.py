@@ -277,11 +277,8 @@ class CLIPTextConfig(Old2NewPretrainedConfig):
     def from_pretrained(
         cls,
         pretrained_model_name_or_path: Union[str, os.PathLike],
-        from_hf_hub: bool = False,
-        cache_dir: Optional[str] = None,
         **kwargs
     ) -> PretrainedConfig:
-        kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         # get the text config dict if we are loading from CLIPConfig
@@ -395,11 +392,8 @@ class CLIPVisionConfig(Old2NewPretrainedConfig):
     def from_pretrained(
         cls,
         pretrained_model_name_or_path: Union[str, os.PathLike],
-        from_hf_hub: bool = False,
-        cache_dir: Optional[str] = None,
         **kwargs
     ) -> PretrainedConfig:
-        kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         # get the vision config dict if we are loading from CLIPConfig

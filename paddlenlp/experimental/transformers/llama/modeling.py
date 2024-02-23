@@ -866,11 +866,11 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
 
     @classmethod
     def from_pretrained(
-        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
+        cls, pretrained_model_name_or_path, *args, **kwargs
     ):
         # TODO: Support safetensors loading.
         kwargs["use_safetensors"] = False
-        return super().from_pretrained(pretrained_model_name_or_path, from_hf_hub, subfolder, *args, **kwargs)
+        return super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
@@ -1107,7 +1107,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
 
     @classmethod
     def from_pretrained(
-        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
+        cls, pretrained_model_name_or_path, *args, **kwargs
     ):
         # TODO: Support safetensors loading.
         kwargs["use_safetensors"] = False
@@ -1116,7 +1116,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             is_safetensors_available,
             resolve_cache_dir,
         )
-
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
         config = kwargs.pop("config", None)
         from_aistudio = kwargs.get("from_aistudio", False)
         subfolder = kwargs.get("subfolder", None)

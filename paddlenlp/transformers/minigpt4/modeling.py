@@ -157,11 +157,13 @@ class MiniGPT4PretrainedModel(PretrainedModel):
 
     @classmethod
     def from_pretrained(
-        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str = "", *args, **kwargs
+        cls, pretrained_model_name_or_path, *args, **kwargs
     ):
         vit_dtype = kwargs.pop("vit_dtype", "float16")
         qformer_dtype = kwargs.pop("qformer_dtype", "float32")
         llama_dtype = kwargs.pop("llama_dtype", "float16")
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        subfolder = kwargs.pop("subfolder", None)
 
         model = super().from_pretrained(
             pretrained_model_name_or_path, from_hf_hub=from_hf_hub, subfolder=subfolder, *args, **kwargs

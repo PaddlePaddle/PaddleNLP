@@ -26,6 +26,8 @@ from ...utils.import_utils import import_module, is_fast_tokenizer_available
 from ...utils.log import logger
 from ..aistudio_utils import aistudio_download
 from ..utils import resolve_cache_dir
+from ...utils.download import get_file
+
 
 __all__ = [
     "AutoTokenizer",
@@ -149,7 +151,7 @@ class AutoTokenizer:
     _tokenizer_mapping = MAPPING_NAMES
     _name_mapping = TOKENIZER_MAPPING_NAMES
     _fast_name_mapping = FAST_TOKENIZER_MAPPING_NAMES
-    tokenizer_config_file = "tokenizer_config.json"
+    tokenizer_config_file = ["tokenizer_config.json", 'config.json', 'model_config.json']
 
     def __init__(self, *args, **kwargs):
         raise EnvironmentError(
@@ -269,7 +271,7 @@ class AutoTokenizer:
             subfolder = ""
         from_aistudio = kwargs.get("from_aistudio", False)
         from_hf_hub = kwargs.get("from_hf_hub", False)
-        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
+        # cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
 
         if "use_faster" in kwargs:
             use_fast = kwargs.pop("use_faster", False)
@@ -279,19 +281,9 @@ class AutoTokenizer:
         for names, tokenizer_class in cls._tokenizer_mapping.items():
             for name in names:
                 all_tokenizer_names.append(name)
-        # From local dir path
-        if os.path.isdir(pretrained_model_name_or_path):
-            config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.tokenizer_config_file)
-            if os.path.exists(config_file):
-                tokenizer_class = cls._get_tokenizer_class_from_config(
-                    pretrained_model_name_or_path, config_file, use_fast
-                )
-                logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
-                return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-            else:
-                raise FileNotFoundError(f"{config_file} is not found under '{pretrained_model_name_or_path}'")
+                
         # From built-in pretrained models
-        elif pretrained_model_name_or_path in all_tokenizer_names:
+        if pretrained_model_name_or_path in all_tokenizer_names:
             for names, tokenizer_classes in cls._tokenizer_mapping.items():
                 for pattern in names:
                     if pattern == pretrained_model_name_or_path:
@@ -326,42 +318,18 @@ class AutoTokenizer:
                         return actual_tokenizer_class.from_pretrained(
                             pretrained_model_name_or_path, *model_args, **kwargs
                         )
-        # From AI Studio or HF Hub
-        elif from_aistudio or from_hf_hub:
-            if from_aistudio:
-                config_file = aistudio_download(
-                    repo_id=pretrained_model_name_or_path,
-                    filename=cls.tokenizer_config_file,
-                    cache_dir=cache_dir,
-                    subfolder=subfolder,
-                )
-            else:
-                config_file = hf_hub_download(
-                    repo_id=pretrained_model_name_or_path,
-                    filename=cls.tokenizer_config_file,
-                    subfolder=subfolder,
-                    cache_dir=cache_dir,
-                    library_name="PaddleNLP",
-                    library_version=__version__,
-                )
-            if os.path.exists(config_file):
-                tokenizer_class = cls._get_tokenizer_class_from_config(
-                    pretrained_model_name_or_path, config_file, use_fast
-                )
-                logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
-                return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-        # Assuming from community-contributed pretrained models
+                        
+        config_file = get_file(pretrained_model_name_or_path, cls.tokenizer_config_file, subfolder, cache_dir=cache_dir, 
+                              from_hf_hub=from_hf_hub, from_aistudio=from_aistudio)
+        
+        if os.path.exists(config_file):
+            tokenizer_class = cls._get_tokenizer_class_from_config(
+                pretrained_model_name_or_path, config_file, use_fast
+            )
+            logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
+            return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         else:
-            url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
-            cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
-            if subfolder != "":
-                url_list.insert(2, subfolder)
-            community_config_path = "/".join(url_list)
-            try:
-                resolved_vocab_file = get_path_from_url_with_filelock(community_config_path, cache_dir)
-            except RuntimeError as err:
-                logger.error(err)
-                raise RuntimeError(
+            raise RuntimeError(
                     f"Can't load tokenizer for '{pretrained_model_name_or_path}'.\n"
                     f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
                     "- a correct model-identifier of built-in pretrained models,\n"
@@ -369,9 +337,99 @@ class AutoTokenizer:
                     "- or the correct path to a directory containing relevant tokenizer files.\n"
                 )
 
-            if os.path.exists(resolved_vocab_file):
-                tokenizer_class = cls._get_tokenizer_class_from_config(
-                    pretrained_model_name_or_path, resolved_vocab_file, use_fast
-                )
-                logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
-                return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+        # # From local dir path
+        # if os.path.isdir(pretrained_model_name_or_path):
+        #     config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.tokenizer_config_file)
+        #     if os.path.exists(config_file):
+        #         tokenizer_class = cls._get_tokenizer_class_from_config(
+        #             pretrained_model_name_or_path, config_file, use_fast
+        #         )
+        #         logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
+        #         return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+        #     else:
+        #         raise FileNotFoundError(f"{config_file} is not found under '{pretrained_model_name_or_path}'")
+        # # From built-in pretrained models
+        # elif pretrained_model_name_or_path in all_tokenizer_names:
+        #     for names, tokenizer_classes in cls._tokenizer_mapping.items():
+        #         for pattern in names:
+        #             if pattern == pretrained_model_name_or_path:
+        #                 actual_tokenizer_class = None
+        #                 # Default setting the python tokenizer to actual_tokenizer_class
+        #                 for tokenizer_class in tokenizer_classes:
+        #                     if not tokenizer_class[1]:
+        #                         actual_tokenizer_class = tokenizer_class[0]
+        #                         break
+        #                 if use_fast:
+        #                     if is_fast_tokenizer_available():
+        #                         is_support_fast_tokenizer = False
+        #                         for tokenizer_class in tokenizer_classes:
+        #                             if tokenizer_class[1]:
+        #                                 actual_tokenizer_class = tokenizer_class[0]
+        #                                 is_support_fast_tokenizer = True
+        #                                 break
+        #                         if not is_support_fast_tokenizer:
+        #                             logger.warning(
+        #                                 f"The tokenizer {actual_tokenizer_class} doesn't have the fast version."
+        #                                 " Please check the map `paddlenlp.transformers.auto.tokenizer.FAST_TOKENIZER_MAPPING_NAMES`"
+        #                                 " to see which fast tokenizers are currently supported."
+        #                             )
+        #                     else:
+        #                         logger.warning(
+        #                             "Can't find the fast_tokenizer package, "
+        #                             "please ensure install fast_tokenizer correctly. "
+        #                             "You can install fast_tokenizer by `pip install fast-tokenizer-python`."
+        #                         )
+
+        #                 logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
+        #                 return actual_tokenizer_class.from_pretrained(
+        #                     pretrained_model_name_or_path, *model_args, **kwargs
+        #                 )
+        # # From AI Studio or HF Hub
+        # elif from_aistudio or from_hf_hub:
+        #     if from_aistudio:
+        #         config_file = aistudio_download(
+        #             repo_id=pretrained_model_name_or_path,
+        #             filename=cls.tokenizer_config_file,
+        #             cache_dir=cache_dir,
+        #             subfolder=subfolder,
+        #         )
+        #     else:
+        #         config_file = hf_hub_download(
+        #             repo_id=pretrained_model_name_or_path,
+        #             filename=cls.tokenizer_config_file,
+        #             subfolder=subfolder,
+        #             cache_dir=cache_dir,
+        #             library_name="PaddleNLP",
+        #             library_version=__version__,
+        #         )
+        #     if os.path.exists(config_file):
+        #         tokenizer_class = cls._get_tokenizer_class_from_config(
+        #             pretrained_model_name_or_path, config_file, use_fast
+        #         )
+        #         logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
+        #         return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+        # # Assuming from community-contributed pretrained models
+        # else:
+        #     url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
+        #     cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
+        #     if subfolder != "":
+        #         url_list.insert(2, subfolder)
+        #     community_config_path = "/".join(url_list)
+        #     try:
+        #         resolved_vocab_file = get_path_from_url_with_filelock(community_config_path, cache_dir)
+        #     except RuntimeError as err:
+        #         logger.error(err)
+        #         raise RuntimeError(
+        #             f"Can't load tokenizer for '{pretrained_model_name_or_path}'.\n"
+        #             f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
+        #             "- a correct model-identifier of built-in pretrained models,\n"
+        #             "- or a correct model-identifier of community-contributed pretrained models,\n"
+        #             "- or the correct path to a directory containing relevant tokenizer files.\n"
+        #         )
+
+        #     if os.path.exists(resolved_vocab_file):
+        #         tokenizer_class = cls._get_tokenizer_class_from_config(
+        #             pretrained_model_name_or_path, resolved_vocab_file, use_fast
+        #         )
+        #         logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
+        #         return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
