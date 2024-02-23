@@ -98,6 +98,9 @@ function _train(){
         ;;
     esac
     cd ../llm/llama
+    if [[ ${model_item} =~ "resume" ]];then
+        cp $PWD/autoconfig/resume.csv $PWD/autoconfig/llama7b_pretrain_history.csv
+    fi
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     python -c "import paddlenlp"
     if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间
@@ -110,17 +113,31 @@ function _train(){
     else
         echo -e "${model_name}, SUCCESS" >> ${log_file}
     fi
-    bash autoconfig/check.sh ${autoconfig_json_file} >> ${log_file} 2>&1
-    if [ $? -ne 0 ];then
-        echo -e "auto_tuner, FAIL" >> ${log_file}
+    if [[ ${model_item} =~ "resume" ]];then 
+        bash autoconfig/check_resume.sh $PWD/autoconfig/resume.csv $PWD/autoconfig/llama7b_pretrain_history.csv >> ${log_file} 2>&1
+        if [ $? -ne 0 ];then
+            echo -e "auto_tuner_resume, FAIL" >> ${log_file}
+            sed '/ips/d' "$log_file" > "$log_file.tmp"
+            mv "$log_file.tmp" "$log_file"
+        else
+            echo -e "auto_tuner_resume, SUCCESS" >> ${log_file}
+        fi
     else
-        echo -e "auto_tuner, SUCCESS" >> ${log_file}
+        bash autoconfig/check.sh ${autoconfig_json_file} >> ${log_file} 2>&1
+        if [ $? -ne 0 ];then
+            echo -e "auto_tuner, FAIL" >> ${log_file}
+        else
+            echo -e "auto_tuner, SUCCESS" >> ${log_file}
+        fi
     fi
     #kill -9 `ps -ef|grep 'python'|awk '{print $2}'`
     if [ ${device_num} != "N1C1" -a -d ./autoconfig/best_cfg ]; then
         case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/tests/mylog
         cp -r ${case_path}/autoconfig/best_cfg/workerlog.* ./mylog/
         cp -r ${case_path}/autoconfig/*.csv $(dirname "$log_file")
+    else
+        sed '/ips/d' "$log_file" > "$log_file.tmp"
+        mv "$log_file.tmp" "$log_file" 
     fi
 }
 
