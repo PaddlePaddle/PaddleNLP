@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +16,7 @@
 import json
 from typing import Optional, Tuple
 
-from tokenizers import pre_tokenizers, processors
+from tokenizers import AddedToken, pre_tokenizers, processors
 
 from ..tokenizer_utils_fast import PretrainedFastTokenizer
 from .tokenizer import RobertaBPETokenizer
@@ -58,6 +58,11 @@ class RobertaBPEFastTokenizer(PretrainedFastTokenizer):
         trim_offsets=True,
         **kwargs,
     ):
+        mask_token = (
+            AddedToken(mask_token, lstrip=True, rstrip=False, normalized=False)
+            if isinstance(mask_token, str)
+            else mask_token
+        )
         super().__init__(
             vocab_file,
             merges_file,
@@ -112,3 +117,33 @@ class RobertaBPEFastTokenizer(PretrainedFastTokenizer):
     def save_vocabulary(self, save_directory: str, filename_prefix: Optional[str] = None) -> Tuple[str]:
         files = self._tokenizer.model.save(save_directory, name=filename_prefix)
         return tuple(files)
+
+    @property
+    def mask_token(self) -> str:
+        """
+        `str`: Mask token, to use when training a model with masked-language modeling. Log an error if used while not
+        having been set.
+
+        Roberta tokenizer has a special mask token to be usable in the fill-mask pipeline. The mask token will greedily
+        comprise the space before the *<mask>*.
+        """
+        return str(self._mask_token)
+
+    @mask_token.setter
+    def mask_token(self, value):
+        """
+        Overriding the default behavior of the mask token to have it eat the space before it.
+
+        This is needed to preserve backward compatibility with all the previously used models based on Roberta.
+        """
+        # Mask token behave like a normal word, i.e. include the space before it
+        # So we set lstrip to True
+        value = AddedToken(value, lstrip=True, rstrip=False) if isinstance(value, str) else value
+        self._mask_token = value
+
+    def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
+        output = [self.bos_token_id] + token_ids_0 + [self.eos_token_id]
+        if token_ids_1 is None:
+            return output
+
+        return output + [self.eos_token_id] + token_ids_1 + [self.eos_token_id]

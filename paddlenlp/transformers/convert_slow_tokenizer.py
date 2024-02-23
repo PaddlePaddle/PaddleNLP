@@ -230,6 +230,7 @@ class AlbertConverter(SpmConverter):
             list_normalizers.append(normalizers.Precompiled(precompiled_charsmap))
 
         list_normalizers.append(normalizers.Replace(Regex(" {2,}"), " "))
+        list_normalizers.append(normalizers.Strip())
         return normalizers.Sequence(list_normalizers)
 
     def post_processor(self):
@@ -254,11 +255,16 @@ class BertConverter(Converter):
         if hasattr(self.original_tokenizer, "basic_tokenizer"):
             do_lower_case = self.original_tokenizer.basic_tokenizer.do_lower_case
 
-        tokenizer.normalizer = normalizers.BertNormalizer(
-            clean_text=True,
-            handle_chinese_chars=tokenize_chinese_chars,
-            strip_accents=strip_accents,
-            lowercase=do_lower_case,
+        tokenizer.normalizer = normalizers.Sequence(
+            [
+                normalizers.BertNormalizer(
+                    clean_text=True,
+                    handle_chinese_chars=tokenize_chinese_chars,
+                    strip_accents=strip_accents,
+                    lowercase=do_lower_case,
+                ),
+                normalizers.Strip(),
+            ]
         )
         tokenizer.pre_tokenizer = pre_tokenizers.BertPreTokenizer()
 
@@ -360,7 +366,54 @@ class ChatGLMv2Converter(SpmConverter):
 
 
 class ErnieConverter(BertConverter):
-    pass
+    def converted(self) -> Tokenizer:
+        vocab = self.original_tokenizer.vocab
+        tokenizer = Tokenizer(WordPiece(vocab._token_to_idx, unk_token=str(self.original_tokenizer.unk_token)))
+
+        tokenize_chinese_chars = True
+        strip_accents = True
+        do_lower_case = False
+        if hasattr(self.original_tokenizer, "basic_tokenizer"):
+            do_lower_case = self.original_tokenizer.basic_tokenizer.do_lower_case
+
+        tokenizer.normalizer = normalizers.Sequence(
+            [
+                normalizers.BertNormalizer(
+                    clean_text=True,
+                    handle_chinese_chars=tokenize_chinese_chars,
+                    strip_accents=strip_accents,
+                    lowercase=do_lower_case,
+                ),
+                normalizers.Strip(),
+            ]
+        )
+        tokenizer.pre_tokenizer = pre_tokenizers.Sequence(
+            [
+                # logic in ernie _is_punctuation and _is_symbol
+                pre_tokenizers.Split(
+                    pattern=Regex(r"\p{S}|\u00AD|\u00B2|\u00BA|\u3007|\u00B5|\u00D8|\u014B|\u01B1"),
+                    behavior="isolated",
+                ),
+                pre_tokenizers.BertPreTokenizer(),
+            ]
+        )
+
+        cls_token = str(self.original_tokenizer.cls_token)
+        sep_token = str(self.original_tokenizer.sep_token)
+        cls_token_id = self.original_tokenizer.cls_token_id
+        sep_token_id = self.original_tokenizer.sep_token_id
+
+        tokenizer.post_processor = processors.TemplateProcessing(
+            single=f"{cls_token}:0 $A:0 {sep_token}:0",
+            pair=f"{cls_token}:0 $A:0 {sep_token}:0 $B:1 {sep_token}:1",
+            special_tokens=[
+                (cls_token, cls_token_id),
+                (sep_token, sep_token_id),
+            ],
+        )
+        tokenizer.decoder = decoders.WordPiece(prefix="##")
+
+        return tokenizer
 
 
 class ErnieMConverter(SpmConverter):
@@ -416,7 +469,6 @@ class RobertaConverter(Converter):
         ot = self.original_tokenizer
         vocab = ot.encoder
         merges = list(ot.bpe_ranks.keys())
-
         tokenizer = Tokenizer(
             BPE(
                 vocab=vocab,
@@ -562,10 +614,6 @@ class LlamaConverter(SpmConverter):
         return None
 
 
-class ErnieTinyConverter(ErnieMConverter):
-    pass
-
-
 SLOW_TO_FAST_CONVERTERS = {
     "BertTokenizer": BertConverter,
     "ErnieTokenizer": ErnieConverter,
@@ -575,7 +623,6 @@ SLOW_TO_FAST_CONVERTERS = {
     "DistilBertTokenizer": BertConverter,
     "AlbertEnglishTokenizer": AlbertConverter,
     "RobertaBPETokenizer": RobertaConverter,
-    "ErnieTinyTokenizer": ErnieTinyConverter,
     "LlamaTokenizer": LlamaConverter,
     "QWenTokenizer": QWenConverter,
     "ChatGLMv2Tokenizer": ChatGLMv2Converter,

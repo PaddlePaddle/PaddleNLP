@@ -22,7 +22,7 @@ from tokenizers import Tokenizer as HFTokenizer
 
 from paddlenlp.transformers import AutoTokenizer
 
-MODEL_NAME = "THUDM/chatglm2-6b"
+MODEL_NAME = "ernie-tiny"
 
 
 def measure_time(func, *args, **kwargs):
@@ -37,16 +37,8 @@ def measure_time(func, *args, **kwargs):
 
 @pytest.fixture
 def setup_inputs():
-    dataset = load_dataset("pleisto/wikipedia-cn-20230720-filtered")
-    return dataset["train"]["completion"]
-
-
-@pytest.fixture
-def tokenizer_hf():
-    from transformers import AutoTokenizer as AutoTokenizer_HF
-
-    fast_tokenizer_hf = AutoTokenizer_HF.from_pretrained(MODEL_NAME, use_fast=True, trust_remote_code=True)
-    return fast_tokenizer_hf
+    dataset = load_dataset("tatsu-lab/alpaca")
+    return dataset["train"]["text"]
 
 
 @pytest.fixture
@@ -61,15 +53,15 @@ def tokenizer_base():
     return tokenizer
 
 
-def test_tokenizer_type(tokenizer_hf, tokenizer_fast, tokenizer_base):
+def test_tokenizer_type(tokenizer_fast, tokenizer_base):
     assert isinstance(tokenizer_fast._tokenizer, HFTokenizer)
     assert not hasattr(tokenizer_base, "_tokenizer")
 
 
-def test_tokenizer_cost(tokenizer_hf, tokenizer_fast, tokenizer_base, setup_inputs):
+def test_tokenizer_cost(tokenizer_fast, tokenizer_base, setup_inputs):
     costs = {}
     results = []
-    for tokenizer in ["tokenizer_hf", "tokenizer_fast", "tokenizer_base"]:
+    for tokenizer in ["tokenizer_fast", "tokenizer_base"]:
         (
             _result,
             _time,
@@ -78,13 +70,9 @@ def test_tokenizer_cost(tokenizer_hf, tokenizer_fast, tokenizer_base, setup_inpu
         results.append(_result["input_ids"])
 
     print(costs)
-    assert results[0] == results[1]  # glm in paddlenlp slow tokenizer is not equal to that in huggingface tokenizer
+    assert results[0] == results[1]
 
 
 def test_output_type(tokenizer_fast, setup_inputs):
-    isinstance(
-        tokenizer_fast.batch_encode(setup_inputs[:20], return_tensors="pd", padding=True)["input_ids"], paddle.Tensor
-    )
-    isinstance(
-        tokenizer_fast.batch_encode(setup_inputs[:20], return_tensors="np", padding=True)["input_ids"], np.ndarray
-    )
+    isinstance(tokenizer_fast.encode(setup_inputs[0], return_tensors="pd")["input_ids"], paddle.Tensor)
+    isinstance(tokenizer_fast.encode(setup_inputs[0], return_tensors="np")["input_ids"], np.ndarray)

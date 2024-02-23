@@ -51,7 +51,7 @@ def tokenizer_hf():
 
 @pytest.fixture
 def tokenizer_fast():
-    fast_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True, from_slow=True)
+    fast_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True)
     return fast_tokenizer
 
 
