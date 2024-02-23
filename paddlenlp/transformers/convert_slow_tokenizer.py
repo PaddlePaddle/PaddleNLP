@@ -286,10 +286,55 @@ class ChatGLMv2Converter(SpmConverter):
             ("<unk>", 0.0),
             ("<bos>", 0.0),
             ("<eos>", 0.0),
-            ("<pad>", 0.0),
+            # ("<pad>", 0.0),
         ]
-        vocab += [(piece.piece, piece.score) for piece in proto.pieces[4:]]
+        vocab += [(piece.piece, piece.score) for piece in proto.pieces[3:]]
         return vocab
+
+    def tokenizer(self, proto):
+        model_type = proto.trainer_spec.model_type
+        vocab_scores = self.vocab(proto)
+        if model_type == 1:
+            import tokenizers
+            from packaging import version
+
+            if version.parse(tokenizers.__version__) < version.parse("0.14.0"):
+                tokenizer = Tokenizer(Unigram(vocab_scores, 0))
+            else:
+                tokenizer = Tokenizer(Unigram(vocab_scores, 0, byte_fallback=True))
+
+        elif model_type == 2:
+            _, merges = SentencePieceExtractor(self.original_tokenizer.vocab_file).extract(vocab_scores)
+            bpe_vocab = {word: i for i, (word, _score) in enumerate(vocab_scores)}
+            tokenizer = Tokenizer(
+                BPE(bpe_vocab, merges, unk_token=proto.trainer_spec.unk_piece, fuse_unk=True, byte_fallback=True)
+            )
+            # some special tokens are not used, eg: eop
+            tokenizer.add_special_tokens(
+                [
+                    AddedToken("<unk>", normalized=False, special=True),
+                    AddedToken("<pad>", normalized=False, special=True),
+                    AddedToken("[gMASK]", normalized=False, special=True),
+                    AddedToken("<eos>", normalized=False, special=True),
+                ]
+            )
+        else:
+            raise Exception(
+                "You're trying to run a `Unigram` model but you're file was trained with a different algorithm"
+            )
+
+        return tokenizer
+
+    def normalizer(self, proto):
+        return normalizers.Sequence(
+            [
+                normalizers.Prepend(prepend="▁"),
+                normalizers.Replace(pattern=" ", content="▁"),
+            ]
+        )
+
+    def pre_tokenizer(self, replacement, add_prefix_space):
+        return None
 
     def unk_id(self, proto):
         return 0
