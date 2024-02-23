@@ -6,7 +6,7 @@
     "reward_model_name_or_path": "PKU-Alignment/beaver-7b-v1.0-reward",
     "_actor_model_name_or_path": "facebook/llama-7b",
     "_reward_model_name_or_path": "facebook/llama-7b",
-    "output_dir": "/root/paddlejob/workspace/guosheng/checkpoints/ppo-sd14pp2-test",
+    "output_dir": "./ppo-sd14pp2-test",
     "max_length": 512,
     "temperature": 1.0,
     "num_return_sequences":1,

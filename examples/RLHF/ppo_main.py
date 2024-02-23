@@ -14,6 +14,11 @@
 
 import os
 import sys
+
+os.environ["http_proxy"] = "http://10.162.37.16:8128"
+os.environ["https_proxy"] = "http://10.162.37.16:8128"
+os.environ["no_proxy"] = "localhost,bcebos.com"
+
 from dataclasses import dataclass, field
 from typing import Any, Dict, Tuple
 
