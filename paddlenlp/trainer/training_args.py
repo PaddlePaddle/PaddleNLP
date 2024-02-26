@@ -1298,11 +1298,17 @@ class TrainingArguments:
             fleet.auto.create_mesh(mesh_dims)
 
             # init hcg for communication in trainer
+            if self.hybrid_parallel_topo_order == "pp_first":
+                order = ["pp", "dp", "sharding", "sep", "mp"]
+            elif self.hybrid_parallel_topo_order == "sharding_first":
+                order = ["dp", "sharding", "pp", "sep", "mp"]
+
             strategy = fleet.DistributedStrategy()
             strategy.hybrid_configs = {
                 "dp_degree": self.data_parallel_degree,
                 "mp_degree": self.tensor_parallel_degree,
                 "pp_degree": self.pipeline_parallel_degree,
+                "order": order,
             }
             fleet.init(is_collective=True, strategy=strategy)
 
