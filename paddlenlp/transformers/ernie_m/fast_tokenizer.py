@@ -35,6 +35,16 @@ class ErnieMFastTokenizer(PretrainedFastTokenizer):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     slow_tokenizer_class = ErnieMTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
+    pretrained_resource_files_map.update(
+        {
+            "tokenizer_file": {
+                "ernie-m-base": "fake/tokenizer.json",
+                "ernie-m-large": "fake/tokenizer.json",
+                "uie-m-base": "fake/tokenizer.json",
+                "uie-m-large": "fake/tokenizer.json",
+            }
+        }
+    )
     pretrained_init_configuration = slow_tokenizer_class.pretrained_init_configuration
 
     def __init__(
