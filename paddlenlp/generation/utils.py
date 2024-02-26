@@ -1449,6 +1449,7 @@ class GenerationMixin(object):
             # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
             # removed after static graphs support inplace and stride.
             with paddle.framework._no_check_dy2st_diff():
+                # llama infer while begin
                 while cur_len < max_new_tokens and paddle.any(unfinished_flag):
                     input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
                         _forward_(**model_kwargs),
@@ -1461,6 +1462,7 @@ class GenerationMixin(object):
                     )
                     paddle.increment(cur_len)
                     paddle.increment(cur_len_gpu)
+                # llama infer while end
         else:
             while cur_len < max_new_tokens and paddle.any(unfinished_flag):
                 input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
