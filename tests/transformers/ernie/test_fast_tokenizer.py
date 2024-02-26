@@ -76,3 +76,24 @@ def test_tokenizer_cost(tokenizer_fast, tokenizer_base, setup_inputs):
 def test_output_type(tokenizer_fast, setup_inputs):
     isinstance(tokenizer_fast.encode(setup_inputs[0], return_tensors="pd")["input_ids"], paddle.Tensor)
     isinstance(tokenizer_fast.encode(setup_inputs[0], return_tensors="np")["input_ids"], np.ndarray)
+
+
+def test_para():
+    tokenizer = AutoTokenizer.from_pretrained(
+        MODEL_NAME,
+        use_fast=True,
+        do_lower_case=False,
+        tokenize_chinese_chars=False,
+        strip_accents=True,
+    )
+    assert tokenizer.do_lower_case is False
+    assert tokenizer("Héllò")["input_ids"] == [
+        tokenizer.cls_token_id,
+        tokenizer.unk_token_id,
+        tokenizer.sep_token_id,
+    ]  # strip_accents
+    assert tokenizer("H")["input_ids"] == [
+        tokenizer.cls_token_id,
+        tokenizer.unk_token_id,
+        tokenizer.sep_token_id,
+    ]  # do_lower_case
