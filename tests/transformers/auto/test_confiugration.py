@@ -20,15 +20,18 @@ import random
 import tempfile
 import unittest
 
+from parameterized import parameterized
+
 from paddlenlp.transformers import AutoConfig
 from paddlenlp.utils.env import CONFIG_NAME
 
 
 class AutoConfigTest(unittest.TestCase):
-    def test_built_in_model_class_config(self):
-        config = AutoConfig.from_pretrained("bert-base-uncased")
+    @parameterized.expand([("bert-base-uncased", 768, False), ("bigscience/bloom-7b1", 4096, True)])
+    def test_built_in_model_class_config(self, model_name, hidden_size, has_architectures):
+        config = AutoConfig.from_pretrained(model_name)
         number = random.randint(0, 10000)
-        self.assertEqual(config.hidden_size, 768)
+        self.assertEqual(config.hidden_size, hidden_size)
 
         config.hidden_size = number
 
@@ -39,7 +42,10 @@ class AutoConfigTest(unittest.TestCase):
             with open(os.path.join(tempdir, AutoConfig.config_file), "r", encoding="utf-8") as f:
                 config_data = json.load(f)
 
-            self.assertNotIn("architectures", config_data)
+            if has_architectures:
+                self.assertIn("architectures", config_data)
+            else:
+                self.assertNotIn("architectures", config_data)
 
             # but it can load it as the PretrainedConfig class
             auto_config = AutoConfig.from_pretrained(tempdir)
