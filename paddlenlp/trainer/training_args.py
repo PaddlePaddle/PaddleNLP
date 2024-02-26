@@ -1238,9 +1238,9 @@ class TrainingArguments:
                 for x in sharding_parallel_config:
                     if len(x) > 0:
                         if x not in [
-                            # "enable_stage1_tensor_fusion",
-                            # "enable_stage1_overlap",
-                            # "enable_stage2_overlap",
+                            "enable_stage1_tensor_fusion",
+                            "enable_stage1_overlap",
+                            "enable_stage2_overlap",
                         ]:
                             raise ValueError(
                                 f"Found unknown pipeline mode config {x}, " f"accpet config is reduce_overlap."
@@ -1250,7 +1250,10 @@ class TrainingArguments:
                         "enable_stage1_overlap" in sharding_parallel_config
                         or "enable_stage2_overlap" in sharding_parallel_config
                     ):
-                        sharding.reduce_overlap = True
+                        sharding.enable_overlap = True
+
+                    if "enable_stage1_tensor_fusion" in sharding_parallel_config:
+                        sharding.grad_bucket_size_numel = 210355872
 
             if self.bf16 or self.fp16:
                 amp = strategy.amp
