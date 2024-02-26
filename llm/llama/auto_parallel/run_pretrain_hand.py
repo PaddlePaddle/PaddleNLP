@@ -15,6 +15,7 @@
 GPT/Llama auto parallel pretraining scripts.
 """
 import os
+import time
 import random
 import sys
 import types
@@ -35,6 +36,7 @@ from paddlenlp.data.causal_dataset import (
     print_rank_0,
 )
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
+from paddlenlp.trainer.trainer_utils import speed_metrics
 from paddlenlp.trainer.utils.reshard import NodeModelState, all_gather_state_dict
 from paddlenlp.transformers import (
     AutoConfig,
@@ -46,6 +48,12 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.utils.log import logger
 
+def print_memory_usage(message=""):
+    mem_alloc = paddle.device.cuda.memory_allocated() / (2 ** 30)
+    max_mem_alloc = paddle.device.cuda.max_memory_allocated() / (2 ** 30)
+    mem_reserve = paddle.device.cuda.memory_reserved() / (2 ** 30)
+    max_mem_reserve = paddle.device.cuda.max_memory_reserved() / (2 ** 30)
+    print("============== {}: allocated: {} GB, max_allocated: {} GB, reserved: {} GB, max_reserved: {} GB,".format(message, mem_alloc, max_mem_alloc, mem_reserve, max_mem_reserve))
 
 def add_start_docstrings(*docstr):
     def docstring_decorator(fn):
@@ -73,6 +81,10 @@ class PreTrainingArguments(TrainingArguments):
         metadata={
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
+    )
+    fine_grained_log: bool = field(
+        default=False,
+        metadata={"help": "whether print find-grained performance log"},
     )
 
 
@@ -472,6 +484,10 @@ def main():
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
+    config.dp_degree = training_args.data_parallel_degree
+    config.mp_degree = training_args.tensor_parallel_degree
+    config.pp_degree = training_args.pipeline_parallel_degree
+    config.fine_grained_log = training_args.fine_grained_log
 
     print("Final pre-training config:", config)
 
@@ -535,13 +551,13 @@ def main():
     model = fleet.distributed_model(model)
     optimizer = fleet.distributed_optimizer(optimizer)
     # skip grad sync
-    load_model(model)
-    assert optimizer._dp_enable
+    # load_model(model)
+    # assert optimizer._dp_enable
     # hack for align with auto
     # optimizer._dp_enable = False
 
-    def loss_func(loss):
-        return loss
+    # def loss_func(loss):
+    #     return loss
         # hcg = fleet.get_hybrid_communicate_group()
         # group = hcg.get_data_parallel_group()
         # return LossMean.apply(loss, group)
@@ -576,15 +592,17 @@ def main():
     )
 
     global_step = 1
+    global_step_last_logged = 0
+    start_time_last_logged = time.time()
     pp_data_buffer = []
-    load_model(model)
+    # load_model(model)
     model.train()
     model._prepare_pipeline_inputs_func = _prepare_pipeline_inputs_func
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
-            input_ids, labels = inputs["input_ids"], inputs["labels"]
-            print(f"===> input_ids:  {input_ids._md5sum()}")
-            print(f"===> labels:  {labels._md5sum()}")
+            # input_ids, labels = inputs["input_ids"], inputs["labels"]
+            # print(f"===> input_ids:  {input_ids._md5sum()}")
+            # print(f"===> labels:  {labels._md5sum()}")
             pp_data_buffer.append(inputs)
             if len(pp_data_buffer) < training_args.gradient_accumulation_steps:
                 continue
@@ -604,12 +622,31 @@ def main():
             lr_scheduler.step()
             optimizer.clear_grad()
 
-            print(f"global_step {global_step}; loss {loss.item()}; ls {optimizer.get_lr()}")
+            if global_step % training_args.logging_steps == 0:
+                num_steps = (global_step - global_step_last_logged)
+                total_train_batch_size = training_args.per_device_train_batch_size * training_args.data_parallel_degree
+                logs = {}
+                logs["loss"] = loss
+                logs["learning_rate"] = float("{0:.3e}".format(optimizer.get_lr()))
+                logs["global_step"] = int(global_step) // training_args.gradient_accumulation_steps
+                logs.update(
+                    speed_metrics(
+                        split="interval",
+                        start_time=start_time_last_logged,
+                        num_samples=total_train_batch_size * (global_step - global_step_last_logged) * training_args.gradient_accumulation_steps,
+                        num_steps=num_steps,
+                    )
+                )
+                logger.info(", ".join(f"{k}: {v}" for k, v in logs.items()))
+
+                global_step_last_logged = global_step
+                start_time_last_logged = time.time()
+
+            # print(f"global_step {global_step}; loss {loss.item()}; ls {optimizer.get_lr()}")
             pp_data_buffer.clear()
 
-            if global_step >= 1:
-                # save_model(model)
-                sys.exit(0)
+            if (global_step // training_args.gradient_accumulation_steps) >= training_args.max_steps:
+                break
 
             global_step += 1
 

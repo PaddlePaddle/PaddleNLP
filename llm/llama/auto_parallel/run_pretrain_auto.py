@@ -30,6 +30,7 @@ from paddle.distributed import fleet
 from paddlenlp.ops import Topology
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.trainer.auto_trainer import AutoTrainer
+from paddlenlp.trainer.trainer_utils import speed_metrics
 from paddlenlp.trainer.trainer_utils import IntervalStrategy, _get_distributed_seeds
 from paddlenlp.transformers import (
     AutoTokenizer,
@@ -108,6 +109,14 @@ class PreTrainingArguments(TrainingArguments):
     autotuner_benchmark: bool = field(
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
+    )
+    fine_grained_log: bool = field(
+        default=False,
+        metadata={"help": "whether print find-grained performance log"},
+    )
+    lazy_init: bool = field(
+        default=False,
+        metadata={"help": "whether use lazy init for model parameters"},
     )
 
     def __post_init__(self):
@@ -262,6 +271,12 @@ class ModelArguments:
         metadata={"help": "recompute_use_reentrant"},
     )
 
+def print_memory_usage(message=""):
+    mem_alloc = paddle.device.cuda.memory_allocated() / (2 ** 30)
+    max_mem_alloc = paddle.device.cuda.max_memory_allocated() / (2 ** 30)
+    mem_reserve = paddle.device.cuda.memory_reserved() / (2 ** 30)
+    max_mem_reserve = paddle.device.cuda.max_memory_reserved() / (2 ** 30)
+    print("============== {}: allocated: {} GB, max_allocated: {} GB, reserved: {} GB, max_reserved: {} GB,".format(message, mem_alloc, max_mem_alloc, mem_reserve, max_mem_reserve))
 
 def create_pretrained_dataset(
     data_args,
@@ -438,7 +453,9 @@ def get_mesh(pp_idx=0):
 
 def shard_fn(layer, mesh_idx, placements):
     paran_name = layer.weight.name
+    print_memory_usage("Before Shard Parameter {}".format(paran_name))
     layer.weight = dist.shard_tensor(layer.weight, get_mesh(mesh_idx), placements)
+    print_memory_usage("After Shard Parameter {}".format(paran_name))
     layer.weight.name = paran_name
 
 
@@ -540,6 +557,13 @@ def main():
         pipeline.vpp_degree = config.virtual_pp_degree
         pipeline.vpp_seg_method = training_args.virtual_pipeline_seg_method
 
+    config.dp_degree = training_args.data_parallel_degree
+    config.mp_degree = training_args.tensor_parallel_degree
+    config.pp_degree = training_args.pipeline_parallel_degree
+    # config.to_static = training_args.to_static
+    config.fine_grained_log = training_args.fine_grained_log
+    config.lazy_init = training_args.lazy_init
+
     print("Final pre-training config:", config)
 
     # Set the dtype for loading model
@@ -551,12 +575,14 @@ def main():
             dtype = "bfloat16"
 
     with paddle.LazyGuard():
+        print_memory_usage("Before Init Whole LLaMa Model lazy init")
         model = model_class.from_config(config, dtype=dtype)
         criterion = criterion_class(config)
 
     for param in model.parameters():
         assert not param._is_initialized()
         param.initialize()
+    print_memory_usage("After Init Whole LLaMa Model lazy init")
 
     if training_args.recompute:
 

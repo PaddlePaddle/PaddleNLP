@@ -43,6 +43,13 @@ __all__ = [
     "LlamaForCausalLMPipe",
 ]
 
+def print_memory_usage(message=""):
+    mem_alloc = paddle.device.cuda.memory_allocated() / (2 ** 30)
+    max_mem_alloc = paddle.device.cuda.max_memory_allocated() / (2 ** 30)
+    mem_reserve = paddle.device.cuda.memory_reserved() / (2 ** 30)
+    max_mem_reserve = paddle.device.cuda.max_memory_reserved() / (2 ** 30)
+    print("============== {}: allocated: {} GB, max_allocated: {} GB, reserved: {} GB, max_reserved: {} GB,".format(message, mem_alloc, max_mem_alloc, mem_reserve, max_mem_reserve))
+
 
 def parse_args(args):
     if isinstance(args, tuple):
@@ -114,7 +121,24 @@ class LlamaEmbeddingPipe(nn.Layer):
             _type_: _description_
         """
         input_ids, attention_mask, position_ids, alibi = parse_args(args)
+
+        if self.config.fine_grained_log:
+            def backward_hook(grad):
+                print_memory_usage("After LLaMa Model Embedding Backward")
+                return grad
+            # inputs_embeds.register_hook(backward_hook)
+            tmp = paddle.ones([1])
+            tmp.stop_gradient = False
+            tmp.register_hook(backward_hook)
+            print_memory_usage("Before LLaMa Model Embedding Forward")
         input_embeds = self.embed_tokens(input_ids)
+        if self.config.fine_grained_log:
+            def backward_hook(grad):
+                print_memory_usage("Before LLaMa Model Embedding Backward")
+                return grad
+            input_embeds.register_hook(backward_hook)
+            print_memory_usage("After LLaMa Model Embedding Forward")
+
         if self.sequence_parallel:
             from paddlenlp.transformers import ScatterOp
 
@@ -149,9 +173,13 @@ class LlamaEmbeddingPipe(nn.Layer):
             alibi.stop_gradient = True
 
         if attention_mask is not None:
+            if self.config.fine_grained_log:
+                print_memory_usage("Before LLaMa Model Prepare Attention Mask Forward")
             attention_mask = LlamaModel._prepare_decoder_attention_mask(
                 attention_mask, (batch_size, seq_length), 0, input_embeds.dtype
             )
+            if self.config.fine_grained_log:
+                print_memory_usage("After LLaMa Model Prepare Attention Mask Forward")
             attention_mask.stop_gradient = True
 
         if self.config.alibi and attention_mask is None:
@@ -163,7 +191,15 @@ class LlamaEmbeddingPipe(nn.Layer):
         return return_args(input_embeds, attention_mask, position_ids, alibi)
 
 
+decoder_layer_count = 0
 class LlamaDecoderLayerPipe(LlamaDecoderLayer):
+    def __init__(self, config, layerwise_recompute: bool = False):
+        super(LlamaDecoderLayerPipe, self).__init__(config, layerwise_recompute)
+        self.config = config
+        global decoder_layer_count
+        self.decoder_layer_count = decoder_layer_count
+        decoder_layer_count += 1
+
     def forward(self, args):
         hidden_states, attention_mask, position_ids, alibi = parse_args(args)
         # we can't distinguish
@@ -185,7 +221,19 @@ class LlamaDecoderLayerPipe(LlamaDecoderLayer):
                     super().forward, hidden_states, use_reentrant=self.config.recompute_use_reentrant
                 )
         else:
+            if self.config.fine_grained_log:
+                def backward_hook(grad):
+                    print_memory_usage(f"After LLaMa Model Decoder Layer:{self.decoder_layer_count} Backward")
+                    return grad
+                hidden_states.register_hook(backward_hook)
+                print_memory_usage(f"Before LLaMa Model Decoder Layer:{self.decoder_layer_count} Forward")
             hidden_states = super().forward(hidden_states, attention_mask=attention_mask, alibi=alibi)
+            if self.config.fine_grained_log:
+                def backward_hook(grad):
+                    print_memory_usage(f"Before LLaMa Model Decoder Layer:{self.decoder_layer_count} Backward")
+                    return grad
+                hidden_states.register_hook(backward_hook)
+                print_memory_usage(f"After LLaMa Model Decoder Layer:{self.decoder_layer_count} Forward")
 
         return return_args(hidden_states, attention_mask, position_ids, alibi)
 
@@ -238,6 +286,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         config.tensor_parallel_degree = tensor_parallel_degree
         config.tensor_parallel_rank = tensor_parallel_rank
 
+        print_memory_usage("Before LLaMa Init Model")
         self.add_sequential_layer(LayerDesc(LlamaEmbeddingPipe, config=config), "llama")
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
@@ -269,5 +318,6 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         )
         # You should call init here, since there is a  diamond inheritance problem
         self.apply(self._init_weights)
+        print_memory_usage("After LLaMa Init Model")
         # DON'T init PipelinePretrainedModel
         # PipelinePretrainedModel.__init__(self.super(), config=config)

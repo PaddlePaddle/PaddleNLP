@@ -98,6 +98,22 @@ class AutoTrainer(Trainer):
             meshes=self._get_meshes_for_loader(),
             shard_dims="dp",
         )
+        # def get_mesh(pp_idx=0):
+        #     mesh = fleet.auto.get_mesh()
+        #     if "pp" in mesh.dim_names:
+        #         mesh = mesh.get_mesh_with_dim("pp")[pp_idx]
+        #     return mesh
+        # if training_args.pipeline_parallel_degree == 1:
+        #     meshes = [get_mesh(0)]
+        # elif training_args.pipeline_parallel_degree > 1:
+        #     meshes = [get_mesh(0), get_mesh(-1)]
+
+        # dist_loader = dist.shard_dataloader(
+        #     dataloader=train_dataloader,
+        #     input_keys=["input_ids", "labels"],
+        #     meshes=meshes,
+        #     shard_dims="dp",
+        # )
         return dist_loader
 
     def _wrap_for_auto(self, model, train_dataloader):

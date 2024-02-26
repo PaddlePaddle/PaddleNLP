@@ -47,7 +47,6 @@ from paddlenlp.transformers.model_outputs import (
 )
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 from paddlenlp.utils.log import logger
-from paddlenlp.utils.tools import get_env_device
 
 from ..segment_parallel_utils import ReshardLayer
 from ..sequence_parallel_utils import (
@@ -64,14 +63,6 @@ from .configuration import (
 )
 
 try:
-    if get_env_device() == "npu":
-        import os
-
-        from paddle.base import core
-
-        for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
-            if lib.endswith(".so"):
-                paddle.utils.cpp_extension.extension_utils.load_op_meta_info_and_register_op(lib)
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
@@ -83,6 +74,12 @@ __all__ = [
     "LlamaPretrainingCriterion",
 ]
 
+def print_memory_usage(message=""):
+    mem_alloc = paddle.device.cuda.memory_allocated() / (2 ** 30)
+    max_mem_alloc = paddle.device.cuda.max_memory_allocated() / (2 ** 30)
+    mem_reserve = paddle.device.cuda.memory_reserved() / (2 ** 30)
+    max_mem_reserve = paddle.device.cuda.max_memory_reserved() / (2 ** 30)
+    print("============== {}: allocated: {} GB, max_allocated: {} GB, reserved: {} GB, max_reserved: {} GB,".format(message, mem_alloc, max_mem_alloc, mem_reserve, max_mem_reserve))
 
 def _get_interleave(n):
     def _get_interleave_power_of_2(n):
@@ -218,27 +215,13 @@ def scaled_dot_product_attention(
             if alibi is not None:
                 alibi = alibi.reshape([bsz, num_heads, 1, -1])
                 attention_mask = attention_mask.cast(alibi.dtype) + alibi
-            if get_env_device() == "npu":
-                attn_output = core.eager._run_custom_op(
-                    "flash_attention_npu",
-                    query_states,
-                    key_states,
-                    value_states,
-                    None,
-                    attention_mask,
-                    0.0,
-                    attention_mask is None,
-                    True,
-                    False,
-                )[0]
-            else:
-                attn_output = F.scaled_dot_product_attention(
-                    query_states,
-                    key_states,
-                    value_states,
-                    attn_mask=attention_mask,
-                    is_causal=attention_mask is None,
-                )
+            attn_output = F.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=attention_mask,
+                is_causal=attention_mask is None,
+            )
             attn_weights = None
 
         if reshard_layer is not None:
@@ -297,10 +280,12 @@ def scaled_dot_product_attention(
 
         attn_weights = attn_weights + attention_mask
         if not paddle.in_dynamic_mode():
-            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+            # attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32")
         else:
-            with paddle.amp.auto_cast(False):
-                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32")
+            # with paddle.amp.auto_cast(False):
+            #     attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
@@ -339,10 +324,7 @@ def _make_causal_mask(input_ids_shape, past_key_values_length):
     """
     batch_size, target_length = input_ids_shape  # target_length: seq_len
 
-    if get_env_device() == "npu":
-        mask = paddle.tril(paddle.ones((target_length, target_length))).astype("int32")
-    else:
-        mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
+    mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
 
     if past_key_values_length > 0:
         # [tgt_len, tgt_len + past_len]
@@ -359,10 +341,7 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     batch_size, src_length = mask.shape[0], mask.shape[-1]
     tgt_length = tgt_length if tgt_length is not None else src_length
 
-    if get_env_device() == "npu":
-        mask = mask[:, None, None, :].astype(dtype)
-    else:
-        mask = mask[:, None, None, :].astype("bool")
+    mask = mask[:, None, None, :].astype("bool")
     mask.stop_gradient = True
     expanded_mask = mask.expand([batch_size, 1, tgt_length, src_length])
 
@@ -391,8 +370,6 @@ class LlamaRMSNorm(nn.Layer):
 
     def forward(self, hidden_states):
         if self.config.use_fused_rms_norm:
-            if get_env_device() == "npu":
-                return core.eager._run_custom_op("rms_norm_npu", hidden_states, self.weight, self.variance_epsilon)[0]
             return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
 
         if paddle.in_dynamic_mode():
@@ -803,7 +780,8 @@ class LlamaAttention(nn.Layer):
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
 
-        if self.fuse_attention_qkv:
+        # if self.fuse_attention_qkv:
+        if True:
             mix_layer = self.qkv_proj(hidden_states)
             # NOTE for GQA attention fusion (compatible with MHA and MQA):
             # The weight for qkv_proj is in shape like [hidden_size, hidden_size + 2 * num_kv_heads * head_dim].
@@ -833,7 +811,10 @@ class LlamaAttention(nn.Layer):
                     split_axis=2,
                     concat_axis=1,
                 )
-                mix_layer = paddle.reshape_(
+                # mix_layer = paddle.reshape_(
+                #     mix_layer, [0, self.seq_length, -1, (self.num_key_value_groups + 2) * self.head_dim]
+                # )  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
+                mix_layer = paddle.reshape(
                     mix_layer, [0, self.seq_length, -1, (self.num_key_value_groups + 2) * self.head_dim]
                 )  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
             else:
@@ -924,19 +905,15 @@ class LlamaAttention(nn.Layer):
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-                if get_env_device() == "npu":
-                    query_states = core.eager._run_custom_op("fused_rope", query_states, cos, sin)[0]
-                    key_states = core.eager._run_custom_op("fused_rope", key_states, cos, sin)[0]
-                else:
-                    query_states, key_states, _ = fused_rotary_position_embedding(
-                        query_states,
-                        key_states,
-                        v=None,
-                        sin=sin,
-                        cos=cos,
-                        position_ids=position_ids,
-                        use_neox_rotary_style=False,
-                    )
+                query_states, key_states, _ = fused_rotary_position_embedding(
+                    query_states,
+                    key_states,
+                    v=None,
+                    sin=sin,
+                    cos=cos,
+                    position_ids=position_ids,
+                    use_neox_rotary_style=False,
+                )
             else:
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
@@ -1327,9 +1304,6 @@ class LlamaModel(LlamaPretrainedModel):
                     combined_attention_mask = _make_causal_mask(
                         input_shape, past_key_values_length=past_key_values_length
                     )
-                    if get_env_device() == "npu":
-                        expanded_attn_mask = expanded_attn_mask.astype("bool")
-                        combined_attention_mask = combined_attention_mask.astype("bool")
                     expanded_attn_mask = expanded_attn_mask & combined_attention_mask
             # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
             elif len(attention_mask.shape) == 3:
@@ -1340,13 +1314,7 @@ class LlamaModel(LlamaPretrainedModel):
         else:
             expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
         # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
-        if get_env_device() == "npu":
-            x = paddle.to_tensor(0.0, dtype="float16")
-            y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float16")
-            expanded_attn_mask = expanded_attn_mask.astype("float16")
-            expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
-        else:
-            expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
+        expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
         return expanded_attn_mask
 
     @paddle.jit.not_to_static
@@ -1426,7 +1394,21 @@ class LlamaModel(LlamaPretrainedModel):
             cache_length = paddle.shape(past_key_values[0][0])[1]
             seq_length_with_past += cache_length
         if inputs_embeds is None:
+            if self.config.fine_grained_log:
+                def backward_hook(grad):
+                    print_memory_usage("After LLaMa Model Embedding Backward")
+                    return grad
+                tmp = paddle.ones([1])
+                tmp.stop_gradient = False
+                tmp.register_hook(backward_hook)
+                print_memory_usage("Before LLaMa Model Embedding Forward")
             inputs_embeds = self.embed_tokens(input_ids)
+            if self.config.fine_grained_log:
+                print_memory_usage("After LLaMa Model Embedding Forward")
+                def backward_hook(grad):
+                    print_memory_usage("Before LLaMa Model Embedding Backward")
+                    return grad
+                inputs_embeds.register_hook(backward_hook)
 
         if self.sequence_parallel:
             # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
@@ -1458,9 +1440,22 @@ class LlamaModel(LlamaPretrainedModel):
         if position_ids is None:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
 
+        if self.config.fine_grained_log:
+            def backward_hook(grad):
+                print_memory_usage("After LLaMa Model Prepare Attention Mask Backward")
+                return grad
+            inputs_embeds.register_hook(backward_hook)
+        print_memory_usage("Before LLaMa Model Prepare Attention Mask Forward")
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
+        if self.config.fine_grained_log:
+            def backward_hook(grad):
+                print_memory_usage("Before LLaMa Model Prepare Attention Mask Backward")
+                return grad
+            inputs_embeds.register_hook(backward_hook)
+            print_memory_usage("After LLaMa Model Prepare Attention Mask Forward")
+
         if self.config.use_flash_attention:
             is_casual = is_casual_mask(attention_mask)
             if is_casual and alibi is None:
@@ -1473,6 +1468,12 @@ class LlamaModel(LlamaPretrainedModel):
         next_decoder_cache = () if use_cache else None
 
         for idx, (decoder_layer) in enumerate(self.layers):
+            if self.config.fine_grained_log:
+                def backward_hook(grad):
+                    print_memory_usage(f"After LLaMa Model Decoder Layer:{idx} Backward")
+                    return grad
+                hidden_states.register_hook(backward_hook)
+                print_memory_usage(f"Before LLaMa Model Decoder Layer:{idx} Forward")
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
             past_key_value = past_key_values[idx] if past_key_values is not None else None
@@ -1517,6 +1518,13 @@ class LlamaModel(LlamaPretrainedModel):
 
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
+            
+            if self.config.fine_grained_log:
+                def backward_hook(grad):
+                    print_memory_usage(f"Before LLaMa Model Decoder Layer:{idx} Backward")
+                    return grad
+                hidden_states.register_hook(backward_hook)
+                print_memory_usage(f"After LLaMa Model Decoder Layer:{idx} Forward")
 
         hidden_states = self.norm(hidden_states)
 
@@ -1638,9 +1646,11 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         super().__init__(config)
         self.config = config
 
+        print_memory_usage("After LLaMa Init Model")
         self.llama = LlamaModel(config)
         self.lm_head = LlamaLMHead(config)
         self.criterion = LlamaPretrainingCriterion(config)
+        print_memory_usage("After LLaMa Init Model")
 
     def get_input_embeddings(self):
         return self.llama.embed_tokens
@@ -1728,6 +1738,14 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         output_hidden_states=None,
         return_dict=None,
     ):
+        # global local_steps
+        def backward_hook(grad):
+            print_memory_usage("After LLaMa Model Backward")
+            return grad
+        tmp = paddle.ones([1])
+        tmp.stop_gradient = False
+        tmp.register_hook(backward_hook)
+        print_memory_usage("Before LLaMa Model Forward")
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -1753,20 +1771,56 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         )
 
+        if self.config.fine_grained_log:
+            def backward_hook(grad):
+                print_memory_usage("After LLaMa Model LM-Head Backward")
+                return grad
+            hidden_states.register_hook(backward_hook)
+            print_memory_usage("Before LLaMa Model LM-Head Forward")
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+        if self.config.fine_grained_log:
+            def backward_hook(grad):
+                print_memory_usage("Before LLaMa Model LM-Head Backward")
+                return grad
+            logits.register_hook(backward_hook)
+            print_memory_usage("After LLaMa Model LM-Head Forward")
 
         loss = None
         if labels is not None:
+            if self.config.fine_grained_log:
+                def backward_hook(grad):
+                    print_memory_usage("After LLaMa Model Criterion Backward")
+                    return grad
+                logits.register_hook(backward_hook)
+                print_memory_usage("Before LLaMa Model Criterion Forward")
             loss = self.criterion(logits, labels)
+            if self.config.fine_grained_log:
+                def backward_hook(grad):
+                    print_memory_usage("Before LLaMa Model Criterion Backward")
+                    return grad
+                loss.register_hook(backward_hook)
+                print_memory_usage("After LLaMa Model Criterion Forward")
 
         if not return_dict:
             output = (logits,) + outputs[1:]
+            def backward_hook(grad):
+                print_memory_usage("Before LLaMa Model Backward")
+                return grad
+            loss.register_hook(backward_hook)
+            print_memory_usage("After LLaMa Model Forward")
             return (loss,) + output if loss is not None else output
 
-        return CausalLMOutputWithCrossAttentions(
+        result = CausalLMOutputWithCrossAttentions(
             loss=loss,
             logits=logits,
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+
+        def backward_hook(grad):
+            print_memory_usage("Before LLaMa Model Backward")
+            return grad
+        logits.register_hook(backward_hook)
+        print_memory_usage("After LLaMa Model Forward")
+        return result

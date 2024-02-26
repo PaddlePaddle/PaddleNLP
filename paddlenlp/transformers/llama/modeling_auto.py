@@ -71,6 +71,13 @@ __all__ = [
     "LlamaPretrainingCriterion3DAuto",
 ]
 
+def print_memory_usage(message=""):
+    mem_alloc = paddle.device.cuda.memory_allocated() / (2 ** 30)
+    max_mem_alloc = paddle.device.cuda.max_memory_allocated() / (2 ** 30)
+    mem_reserve = paddle.device.cuda.memory_reserved() / (2 ** 30)
+    max_mem_reserve = paddle.device.cuda.max_memory_reserved() / (2 ** 30)
+    print("============== {}: allocated: {} GB, max_allocated: {} GB, reserved: {} GB, max_reserved: {} GB,".format(message, mem_alloc, max_mem_alloc, mem_reserve, max_mem_reserve))
+
 
 def get_mesh(pp_idx=0):
     mesh = fleet.auto.get_mesh()
@@ -92,6 +99,7 @@ def scaled_dot_product_attention(
     _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention:
+    # if True:
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
         version = paddle.version.full_version
@@ -153,7 +161,8 @@ def scaled_dot_product_attention(
             )
 
         attn_weights = attn_weights + attention_mask
-        attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+        # attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+        attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32")
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
@@ -255,7 +264,8 @@ class LlamaAttentionAuto(nn.Layer):
         self.max_position_embeddings = config.max_position_embeddings
         self.seq_length = config.seq_length
 
-        self.fuse_attention_qkv = config.fuse_attention_qkv
+        # self.fuse_attention_qkv = config.fuse_attention_qkv
+        self.fuse_attention_qkv = True
         if self.fuse_attention_qkv and config.num_attention_heads != config.num_key_value_heads:
             raise ValueError(
                 f"fuse_attention_qkv can't be True when num_attention_heads {config.num_attention_heads}!= num_key_value_heads {config.num_key_value_heads}"
@@ -269,7 +279,8 @@ class LlamaAttentionAuto(nn.Layer):
         self.recompute_granularity = config.recompute_granularity
         self.ipp = ipp
 
-        self.use_fused_rope = config.use_fused_rope
+        # self.use_fused_rope = config.use_fused_rope
+        self.use_fused_rope = True
         if self.use_fused_rope:
             if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
@@ -390,7 +401,8 @@ class LlamaAttentionAuto(nn.Layer):
         if self.fuse_attention_qkv:
             target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
             mix_layer = self.qkv_proj(hidden_states)
-            mix_layer = paddle.reshape_(mix_layer, target_shape)
+            # mix_layer = paddle.reshape_(mix_layer, target_shape)
+            mix_layer = paddle.reshape(mix_layer, target_shape)
             query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
         else:
             target_query_shape = [0, 0, self.num_heads, self.head_dim]
@@ -414,6 +426,14 @@ class LlamaAttentionAuto(nn.Layer):
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+                def backward_hook(grad):
+                    print(f"query_states grad shape: {grad.shape}")
+                    return grad
+                query_states.register_hook(backward_hook)
+                def backward_hook(grad):
+                    print(f"key_states grad shape: {grad.shape}")
+                    return grad
+                key_states.register_hook(backward_hook)
                 query_states, key_states, _ = fused_rotary_position_embedding(
                     query_states,
                     key_states,
@@ -423,6 +443,8 @@ class LlamaAttentionAuto(nn.Layer):
                     position_ids=position_ids,
                     use_neox_rotary_style=False,
                 )
+                print(f"query_states shape: {query_states.shape}")
+                print(f"key_states shape: {key_states.shape}")
             else:
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 # hack here, because elementwise infer spmd not support broadcast now
@@ -893,7 +915,22 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             seq_length_with_past += cache_length
 
         if inputs_embeds is None:
+            if self.config.fine_grained_log:
+                def backward_hook(grad):
+                    print_memory_usage("After LLaMa Model Embedding Backward")
+                    return grad
+                # inputs_embeds.register_hook(backward_hook)
+                tmp = paddle.ones([1])
+                tmp.stop_gradient = False
+                tmp.register_hook(backward_hook)
+                print_memory_usage("Before LLaMa Model Embedding Forward")
             inputs_embeds = self.embed_tokens(input_ids)
+            if self.config.fine_grained_log:
+                def backward_hook(grad):
+                    print_memory_usage("Before LLaMa Model Embedding Backward")
+                    return grad
+                inputs_embeds.register_hook(backward_hook)
+                print_memory_usage("After LLaMa Model Embedding Forward")
 
         # embed positions
         if attention_mask is None:
@@ -919,9 +956,17 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             # attention_mask in flash_attn is always None for pretrain
             attention_mask = None
         else:
+            if self.config.fine_grained_log:
+                print_memory_usage("Before LLaMa Model Prepare Attention Mask Forward")
             attention_mask = self._prepare_decoder_attention_mask(
                 attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
             )  # [bs, 1, seq_len, seq_len]
+            if self.config.fine_grained_log:
+                def backward_hook(grad):
+                    print_memory_usage("Before LLaMa Model Prepare Attention Mask Backward")
+                    return grad
+                inputs_embeds.register_hook(backward_hook)
+                print_memory_usage("After LLaMa Model Prepare Attention Mask Forward")
 
         hidden_states = inputs_embeds
         hidden_states = dist.reshard(hidden_states, get_mesh(), self.placements)
@@ -933,6 +978,12 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
         pre_ipp = None
         for idx, (decoder_layer) in enumerate(self.layers):
+            if self.config.fine_grained_log:
+                def backward_hook(grad):
+                    print_memory_usage(f"After LLaMa Model Decoder Layer:{idx} Backward")
+                    return grad
+                hidden_states.register_hook(backward_hook)
+                print_memory_usage(f"Before LLaMa Model Decoder Layer:{idx} Forward")
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
             past_key_value = past_key_values[idx] if past_key_values is not None else None
@@ -999,6 +1050,13 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
 
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
+
+            if self.config.fine_grained_log:
+                def backward_hook(grad):
+                    print_memory_usage(f"Before LLaMa Model Decoder Layer:{idx} Backward")
+                    return grad
+                hidden_states.register_hook(backward_hook)
+                print_memory_usage(f"After LLaMa Model Decoder Layer:{idx} Forward")
 
         hidden_states = self.norm(hidden_states)
 
@@ -1096,8 +1154,10 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
         super().__init__(config)
         self.config = config
 
+        print_memory_usage("Before LLaMa Init Model")
         self.llama = LlamaModelAuto(config)
         self.lm_head = LlamaLMHeadAuto(config)
+        print_memory_usage("After LLaMa Init Model")
 
     def get_input_embeddings(self):
         return self.llama.embed_tokens
@@ -1185,6 +1245,13 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
         output_hidden_states=None,
         return_dict=None,
     ):
+        def backward_hook(grad):
+            print_memory_usage("After LLaMa Model Backward")
+            return grad
+        tmp = paddle.ones([1])
+        tmp.stop_gradient = False
+        tmp.register_hook(backward_hook)
+        print_memory_usage("Before LLaMa Model Forward")
         input_ids.stop_gradient = True
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1219,8 +1286,20 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
             self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         )
 
+        if self.config.fine_grained_log:
+            def backward_hook(grad):
+                print_memory_usage("After LLaMa Model LM-Head Backward")
+                return grad
+            hidden_states.register_hook(backward_hook)
+            print_memory_usage("Before LLaMa Model LM-Head Forward")
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
-
+        if self.config.fine_grained_log:
+            def backward_hook(grad):
+                print_memory_usage("Before LLaMa Model LM-Head Backward")
+                return grad
+            logits.register_hook(backward_hook)
+            print_memory_usage("After LLaMa Model LM-Head Forward")
+        print_memory_usage("After LLaMa Model Forward")
         return logits
 
         # loss = None
