@@ -52,6 +52,7 @@
    大模型精调文档 <llm/finetune.md>
    大模型量化教程 <llm/quantization.md>
    大模型推理教程 <llm/inference.md>
+   大模型统一存储文档 <llm/unified_checkpoint.md>
    混合并行训练教程 <llm/llm_trainer.rst>
    模型权重转换教程 <llm/torch2paddle.md>
 
