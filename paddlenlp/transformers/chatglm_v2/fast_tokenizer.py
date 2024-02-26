@@ -67,7 +67,7 @@ class ChatGLMv2FastTokenizer(PretrainedFastTokenizer):
             `Tuple(str)`: Paths to the files saved.
         """
         if os.path.isdir(save_directory):
-            vocab_file = os.path.join(save_directory, self.vocab_files_names["vocab_file"])
+            vocab_file = os.path.join(save_directory, self.vocab_file)
         else:
             vocab_file = save_directory
 

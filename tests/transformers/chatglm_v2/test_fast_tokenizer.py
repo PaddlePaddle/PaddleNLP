@@ -88,3 +88,15 @@ def test_output_type(tokenizer_fast, setup_inputs):
     isinstance(
         tokenizer_fast.batch_encode(setup_inputs[:20], return_tensors="np", padding=True)["input_ids"], np.ndarray
     )
+
+
+def test_save_vocab(tokenizer_fast):
+    import tempfile
+
+    from sentencepiece import SentencePieceProcessor
+
+    temp_path = tempfile.mkdtemp()
+    save_vocab = tokenizer_fast.save_vocabulary(temp_path)
+    assert save_vocab[0].endswith("tokenizer.model")
+
+    assert SentencePieceProcessor(model_file=save_vocab[0]).vocab_size() == tokenizer_fast.vocab_size
