@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+from argparse import ArgumentTypeError
 from pathlib import Path
 from typing import Dict, Literal, Optional, Union
 
@@ -37,9 +38,22 @@ from .aistudio_hub_download import (
 from .bos_download import bos_download, bos_file_exists, bos_try_to_load_from_cache
 
 
+def strtobool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise ArgumentTypeError(
+            f"Truthy value expected: got {v} but expected one of yes/no, true/false, t/f, y/n, 1/0 (case insensitive)."
+        )
+
+
 def get_file(
     repo_id: str = None,
-    filenames: list = None,
+    filenames: Union[str, list] = None,
     subfolder: Optional[str] = None,
     repo_type: Optional[str] = None,
     revision: Optional[str] = None,
@@ -63,6 +77,9 @@ def get_file(
 ) -> str:
     assert repo_id is not None, "repo_id cannot be None"
     assert filenames is not None, "filenames cannot be None"
+
+    if isinstance(filenames, str):
+        filenames = [filenames]
 
     download_kwargs = dict(
         repo_id=repo_id,
@@ -90,7 +107,8 @@ def get_file(
 
     # 增加 modelscope 下载的选项
     from_modelscope = os.environ.get("from_modelscope", False)
-    if from_modelscope == "True":
+    from_modelscope = strtobool(from_modelscope)
+    if from_modelscope:
         for index, filename in enumerate(filenames):
             try:
                 return modelscope_download(repo_id, filename, revision, cache_dir, user_agent, local_files_only)

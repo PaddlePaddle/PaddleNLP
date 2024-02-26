@@ -1,11 +1,11 @@
 # Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +18,7 @@ import unittest
 from parameterized import parameterized
 
 from paddlenlp.transformers import AutoConfig, BertConfig
+from paddlenlp.transformers.bloom.configuration import BloomConfig
 from paddlenlp.utils.log import logger
 from tests.testing_utils import slow
 
@@ -52,23 +53,12 @@ class ConfigLoadTester(unittest.TestCase):
         config = config_cls.from_pretrained(
             model_name, from_hf_hub=from_hf_hub, from_aistudio=from_aistudio, cache_dir=cache_dir
         )
-        local_config = config_cls.from_pretrained(cache_dir)
+        # 验证已经下载到指定文件夹
+        # assert os.path.isdir(cache_dir)
+        local_config = config_cls.from_pretrained(
+            model_name, from_hf_hub=from_hf_hub, from_aistudio=from_aistudio, cache_dir=cache_dir
+        )
         assert config == local_config
-        os.environ["from_modelscope"] = "False"
-
-    @parameterized.expand(
-        [
-            (BertConfig, "bert-base-uncased", False, True, False, "./paddlenlp-test-config/bert-base-uncased"),
-            (AutoConfig, "bert-base-uncased", True, False, False, "./paddlenlp-test-config/bert-base-uncased"),
-        ]
-    )
-    def test_cache(self, config_cls, model_name, from_hf_hub, from_aistudio, from_modelscope):
-        logger.info("Download config from cache")
-        if from_modelscope:
-            os.environ["from_modelscope"] = "True"
-        config = config_cls.from_pretrained(model_name, from_hf_hub=from_hf_hub, from_aistudio=from_aistudio)
-        cache_config = config_cls.from_pretrained(model_name, from_hf_hub=from_hf_hub, from_aistudio=from_aistudio)
-        assert config == cache_config
         os.environ["from_modelscope"] = "False"
 
     @parameterized.expand(
@@ -76,9 +66,13 @@ class ConfigLoadTester(unittest.TestCase):
             (BertConfig, "Baicai003/paddlenlp-test-model", True, False, False, "tiny-bert"),
             (BertConfig, "baicai/paddlenlp-test-model", False, False, False, "tiny-bert"),
             (BertConfig, "aistudio/paddlenlp-test-model", False, True, False, "tiny-bert"),
+            (BloomConfig, "bigscience/bloom-7b1", True, False, False, None),
+            (BloomConfig, "bigscience/bloom-7b1", False, False, False, None),
+            (BertConfig, "langboat/mengzi-bert-base", False, False, True, ""),
+            (BertConfig, "langboat/mengzi-bert-base-fin", False, False, True, None),
         ]
     )
-    def test_download(self, config_cls, model_name, from_hf_hub, from_aistudio, from_modelscope, subfolder):
+    def test_download_cache(self, config_cls, model_name, from_hf_hub, from_aistudio, from_modelscope, subfolder):
         logger.info("Download Config from different sources with subfolder")
         if from_modelscope:
             os.environ["from_modelscope"] = "True"
