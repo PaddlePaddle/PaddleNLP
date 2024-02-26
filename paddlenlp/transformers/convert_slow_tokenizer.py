@@ -553,8 +553,7 @@ class LlamaConverter(SpmConverter):
         return vocab
 
     def unk_id(self, proto):
-        unk_id = 0
-        return unk_id
+        return 0
 
     def decoder(self, replacement, add_prefix_space):
         return decoders.Sequence(
@@ -609,16 +608,12 @@ class LlamaConverter(SpmConverter):
     def pre_tokenizer(self, replacement, add_prefix_space):
         return None
 
-    def post_processor(self):
-        # the processor is defined in the LlamaTokenizerFast class.
-        return None
-
 
 SLOW_TO_FAST_CONVERTERS = {
     "BertTokenizer": BertConverter,
     "ErnieTokenizer": ErnieConverter,
     "TinyBertTokenizer": TinyBertConverter,
-    # "ErnieMTokenizer": ErnieMConverter,
+    "ErnieMTokenizer": ErnieMConverter,
     "NystromformerTokenizer": NystromformerConverter,
     "DistilBertTokenizer": BertConverter,
     "AlbertEnglishTokenizer": AlbertConverter,

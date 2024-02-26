@@ -87,3 +87,15 @@ def test_output_type(tokenizer_fast, setup_inputs):
     isinstance(
         tokenizer_fast.batch_encode(setup_inputs[:20], return_tensors="np", padding=True)["input_ids"], np.ndarray
     )
+
+
+def test_save_vocab(tokenizer_fast):
+    import json
+    import tempfile
+
+    temp_path = tempfile.mkdtemp()
+    save_vocab = tokenizer_fast.save_vocabulary(temp_path)
+    assert save_vocab[0].endswith("vocab.json") and save_vocab[1].endswith("merges.txt")
+    with open(save_vocab[0], "r") as f:
+        vocab = json.loads(f.read())
+    assert len(vocab) == tokenizer_fast.vocab_size
