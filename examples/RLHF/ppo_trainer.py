@@ -490,7 +490,8 @@ def offload_tensor_to_cpu(tensor):
             cpu_tensor = tensor._copy_to(paddle.CPUPlace(), True)
             tensor.value().get_tensor()._share_data_with(cpu_tensor.value().get_tensor())
     else:
-        raise ValueError(f"Can't parse for type {type(tensor)}")
+        logger.warning(f"Can't parse for type {type(tensor)}")
+        return tensor
 
 
 def reload_tensor_to_gpu(tensor):
@@ -502,7 +503,8 @@ def reload_tensor_to_gpu(tensor):
             gpu_tensor = tensor._copy_to(paddle.CUDAPlace(global_dev_id), True)
             tensor.value().get_tensor()._share_data_with(gpu_tensor.value().get_tensor())
     else:
-        raise ValueError(f"Can't parse for type {type(tensor)}")
+        logger.warning(f"Can't parse for type {type(tensor)}")
+        return tensor
 
 
 def cleanup_tensor_space(tensor):
@@ -512,7 +514,8 @@ def cleanup_tensor_space(tensor):
     elif isinstance(tensor, paddle.Tensor):
         tensor._clear_data()
     else:
-        raise ValueError(f"Can't parse for type {type(tensor)}")
+        logger.warning(f"Can't parse for type {type(tensor)}")
+        return tensor
 
 
 def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
@@ -586,7 +589,7 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
                 # tp+pp -> single
                 raise ValueError("Not support yet.")
 
-        def create_send_recv_table(all_keys, train_keys, eval_keys):
+        def create_send_recv_table(train_keys, eval_keys):
             recv_table = []
             send_table = []
             if pp_group.rank == 0:
@@ -594,7 +597,7 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
                     recv_table.append((key, global_rank))
 
             for key in train_keys:
-                recv_table.append((key, global_rank))
+                send_table.append((key, global_rank))
 
             all_recv, all_send = [], []
             paddle.distributed.all_gather_object(all_recv, [recv_table], group=pp_group)
@@ -605,6 +608,7 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
             send_dict = {}
             for k, v in all_send:
                 send_dict[k] = v
+
             table = []
             for k, v in all_recv:
                 # key, send, recv
@@ -621,19 +625,27 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
         # tp+pp->tp
         if eval_tp_size > 1 and train_pp_size > 1:
             table = create_send_recv_table(train_state_dict.keys(), eval_state_dict.keys())
+            # print(table)
 
             for key, src_rank, dst_rank in table:
                 # Init tensor for model is cleaned
-                if global_rank == dst_rank and not eval_state_dict[key]._is_initialized():
+                # print(key, src_rank, dst_rank, eval_state_dict[key]._is_initialized())
+                # if key in train_state_dict:
+                #     print(train_state_dict[key]._is_initialized())
+
+                if not eval_state_dict[key]._is_initialized():
                     v = eval_state_dict[key]
                     t = paddle._C_ops.full_like(v, 0, v.dtype, paddle.CUDAPlace(global_dev_id))
                     v.get_tensor()._share_data_with(t.get_tensor())
 
-                if global_rank == src_rank:
-                    dist.stream.send(train_state_dict[key], dst=dst_rank)
+                if src_rank == dst_rank and global_rank == src_rank:
+                    eval_state_dict[key].copy_(train_state_dict[key], True)
+                else:
+                    if global_rank == src_rank:
+                        dist.stream.send(train_state_dict[key], dst=dst_rank)
 
-                if global_rank == dst_rank:
-                    dist.stream.recv(eval_state_dict[key], dst=dst_rank)
+                    if global_rank == dst_rank:
+                        dist.stream.recv(eval_state_dict[key], src=src_rank)
 
                 # Offload train model if need
                 if global_rank == src_rank and with_offload:
@@ -645,6 +657,7 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
                 offload_tensor_to_cpu(train_state_dict[key])
         for k, v in eval_state_dict.items():
             if not v._is_initialized():
+                # print(f"init {k}")
                 t = paddle._C_ops.full_like(v, 0, v.dtype, paddle.CUDAPlace(global_dev_id))
                 v.get_tensor()._share_data_with(t.get_tensor())
 
@@ -654,11 +667,13 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
             paddle.distributed.broadcast(tensor, src=0, group=None, sync_op=True)
     else:
         if sd_group.nranks > 1:
-            paddle.distributed.parallel.sync_params_buffers(eval_model, comm_group=sd_group, fuse_params=False)
+            if dp_group.rank <= 0:
+                paddle.distributed.parallel.sync_params_buffers(
+                    eval_model, comm_group=sd_group, src_rank=sd_group.ranks[0], fuse_params=False
+                )
         if dp_group.nranks > 1:
-            print(dp_group)
             paddle.distributed.parallel.sync_params_buffers(
-                eval_model, comm_group=dp_group, src_rank=dp_group.rank, fuse_params=False
+                eval_model, comm_group=dp_group, src_rank=dp_group.ranks[0], fuse_params=False
             )
 
 
@@ -1423,17 +1438,20 @@ class PPOTrainer(Trainer):
                 # generate batches
                 self.set_eval()
 
+                # self.optimizer.offload()
+                if self.eval_mode is not None and "optimizer" in self.args.offload_level:
+                    offload_tensor_to_cpu(self.policy_trainer.optimizer.state_dict())
+                    offload_tensor_to_cpu(self.value_trainer.optimizer.state_dict())
+
                 self.policy_trainer.export_evaluate_model(
                     self.policy_trainer.model,
                     self._policy_model_eval,
                     with_offload=self.args.offload_level is not None,
                 )
                 # todo: zhui
-                # self.optimizer.offload()
                 self.value_trainer.export_evaluate_model(
                     self.value_trainer.model, self._value_model_eval, with_offload=self.args.offload_level is not None
                 )
-
                 # self.reference_model.reload()
                 # self.reward_model.reload()
                 # reload_tensor_to_gpu(self.reference_model.state_dict())
@@ -2000,7 +2018,6 @@ class PPOTrainer(Trainer):
             reward_critic_model_in_use = self._value_model_eval
         else:
             reward_critic_model_in_use = self.reward_critic_model
-
 
         # pipe model outputs a logits tensor with LMHead, while non-pipe model
         # outputs a tuple with logits tensor as the only one element.

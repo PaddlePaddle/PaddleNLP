@@ -53,6 +53,6 @@
     "max_grad_norm": 1.0, 
     "adam_beta1": 0.9,
     "adam_beta2": 0.95,
-    "eval_mode": "",
-    "offload_level": ""
+    "eval_mode": "tensor_parallel",
+    "offload_level": "eval"
 }

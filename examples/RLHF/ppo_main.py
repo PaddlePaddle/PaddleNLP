@@ -16,9 +16,24 @@ import copy
 import os
 import sys
 
-os.environ["http_proxy"] = "http://10.162.37.16:8128"
-os.environ["https_proxy"] = "http://10.162.37.16:8128"
+# os.environ["http_proxy"] = "http://10.162.37.16:8128"
+# os.environ["https_proxy"] = "http://10.162.37.16:8128"
 os.environ["no_proxy"] = "localhost,bcebos.com"
+# launch would unset http_proxy
+# export https_proxy=http://172.19.57.45:3128
+
+# os.environ["http_proxy"] = "http://172.19.56.199:3128"
+# os.environ["https_proxy"] = "http://172.19.56.199:3128"
+
+# os.environ["http_proxy"] = "http://172.19.57.45:3128"
+# os.environ["https_proxy"] = "http://172.19.57.45:3128"
+
+# os.environ["http_proxy"] = "http://10.162.37.16:8128"
+# os.environ["https_proxy"] = "http://10.162.37.16:8128"
+# os.environ["no_proxy"] = "localhost,bcebos.com"
+
+# os.environ["http_proxy"] = "agent.baidu.com:8118"
+# os.environ["https_proxy"] = "agent.baidu.com:8118"
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, Tuple
@@ -30,18 +45,23 @@ from models.score_model import LlamaModelForScore  # noqa
 from ppo_trainer import PPOTrainer, cleanup_tensor_space, offload_tensor_to_cpu
 
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
-from paddlenlp.transformers import AutoConfig, AutoTokenizer, LlamaTokenizer
+from paddlenlp.transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    LlamaTokenizer,
+)
 from paddlenlp.utils.log import logger
 
 # launch would unset http_proxy
 # export https_proxy=http://172.19.57.45:3128
 # os.environ["http_proxy"] = "http://172.19.56.199:3128"
 # os.environ["https_proxy"] = "http://172.19.56.199:3128"
-# os.environ["http_proxy"] = "http://172.19.57.45:3128"
-# os.environ["https_proxy"] = "http://172.19.57.45:3128"
-os.environ["http_proxy"] = "http://10.162.37.16:8128"
-os.environ["https_proxy"] = "http://10.162.37.16:8128"
-os.environ["no_proxy"] = "localhost,bcebos.com"
+os.environ["http_proxy"] = "http://172.19.57.45:3128"
+os.environ["https_proxy"] = "http://172.19.57.45:3128"
+# os.environ["http_proxy"] = "http://10.162.37.16:8128"
+# os.environ["https_proxy"] = "http://10.162.37.16:8128"
+# os.environ["no_proxy"] = "localhost,bcebos.com"
 
 
 @dataclass
@@ -248,21 +268,17 @@ def main():
         dtype = "float32"
     training_args.max_length = data_args.max_length
 
+    model_class_lm, model_class_score = AutoModelForCausalLM, AutoModelForScore
     if training_args.pipeline_parallel_degree > 1:
-        global AutoModelForCausalLM, AutoModelForScore
         from models.model_pp import LlamaPolicyPipe, LlamaValuePipe
 
-        AutoModelForCausalLM = LlamaPolicyPipe
-        AutoModelForScore = LlamaValuePipe
+        model_class_lm = LlamaPolicyPipe
+        model_class_score = LlamaValuePipe
         extra_args = {
             "ptx_coeff": training_args.ptx_coeff,
             "clip_range_ratio": training_args.clip_range_ratio,
         }
     else:
-        from models import AutoModelForScore
-
-        from paddlenlp.transformers import AutoModelForCausalLM
-
         extra_args = {}
 
     # actor model
@@ -276,7 +292,9 @@ def main():
     if hasattr(model_config, "use_flash_attention"):
         model_config.use_flash_attention = model_args.use_flash_attention
 
-    actor_model = AutoModelForCausalLM.from_pretrained(
+    model_config.num_hidden_layers = 2
+
+    actor_model = model_class_lm.from_pretrained(
         model_args.actor_model_name_or_path,
         config=model_config,
         **extra_args,
@@ -293,7 +311,7 @@ def main():
         actor_eval_model = None
 
     # reference model
-    actor_reference_model = AutoModelForCausalLM.from_pretrained(
+    actor_reference_model = model_class_lm.from_pretrained(
         model_args.actor_model_name_or_path,
         config=model_config,
     )
@@ -311,7 +329,9 @@ def main():
     )
     if hasattr(model_config, "use_flash_attention"):
         model_config.use_flash_attention = model_args.use_flash_attention
-    reward_model = AutoModelForScore.from_pretrained(
+    model_config.num_hidden_layers = 2
+
+    reward_model = model_class_score.from_pretrained(
         model_args.reward_model_name_or_path,
         config=model_config,
         score_type="reward",
@@ -323,7 +343,7 @@ def main():
     # critic model
     if model_args.reward_critic_model_name_or_path is None:
         model_args.reward_critic_model_name_or_path = model_args.reward_model_name_or_path
-    reward_critic_model = AutoModelForScore.from_pretrained(
+    reward_critic_model = model_class_score.from_pretrained(
         model_args.reward_critic_model_name_or_path,
         config=model_config,
         score_type="critic",
@@ -342,80 +362,79 @@ def main():
     else:
         reward_critic_eval_model = None
 
-
-#         # actor model
-#         model_config = AutoConfig.from_pretrained(
-#             model_args.actor_model_name_or_path,
-#             tensor_parallel_output=False,
-#             tensor_parallel_degree=training_args.tensor_parallel_degree,
-#             tensor_parallel_rank=training_args.tensor_parallel_rank,
-#             dtype=dtype,
-#         )
-#         model_config.num_hidden_layers = 2
-#         if hasattr(model_config, "use_flash_attention"):
-#             model_config.use_flash_attention = model_args.use_flash_attention
-#         actor_model = AutoModelForCausalLM.from_pretrained(
-#             model_args.actor_model_name_or_path,
-#             config=model_config,
-#         )
-# 
-#         if training_args.eval_mode is not None:
-#             config = copy.deepcopy(actor_model.config)
-#             if training_args.eval_mode == "single":
-#                 config.tensor_parallel_degree = -1
-#                 config.tensor_parallel_rank = 0
-#             actor_eval_model = AutoModelForCausalLM.from_config(config)
-#         else:
-#             actor_eval_model = None
-# 
-#         # reference model
-#         actor_reference_model = AutoModelForCausalLM.from_pretrained(
-#             model_args.actor_model_name_or_path,
-#             config=model_config,
-#         )
-#         actor_tokenizer = AutoTokenizer.from_pretrained(
-#             model_args.actor_model_name_or_path, model_max_length=data_args.max_length, padding_side="left"
-#         )
-# 
-#         # reward model
-#         model_config = AutoConfig.from_pretrained(
-#             model_args.reward_model_name_or_path,
-#             tensor_parallel_output=False,
-#             tensor_parallel_degree=training_args.tensor_parallel_degree,
-#             tensor_parallel_rank=training_args.tensor_parallel_rank,
-#             dtype=dtype,
-#         )
-#         model_config.num_hidden_layers = 2
-#         if hasattr(model_config, "use_flash_attention"):
-#             model_config.use_flash_attention = model_args.use_flash_attention
-#         reward_model = AutoModelForScore.from_pretrained(
-#             model_args.reward_model_name_or_path,
-#             config=model_config,
-#             score_type="reward",
-#             do_normalize=training_args.normalize_reward,
-#         )
-#         reward_tokenizer = AutoTokenizer.from_pretrained(
-#             model_args.reward_model_name_or_path, model_max_length=data_args.max_length, padding_side="right"
-#         )
-# 
-#         # critic model
-#         if model_args.reward_critic_model_name_or_path is None:
-#             model_args.reward_critic_model_name_or_path = model_args.reward_model_name_or_path
-#         reward_critic_model = AutoModelForScore.from_pretrained(
-#             model_args.reward_critic_model_name_or_path, config=model_config, score_type="critic", do_normalize=False
-#         )
-#         reward_critic_tokenizer = AutoTokenizer.from_pretrained(
-#             model_args.reward_critic_model_name_or_path, model_max_length=data_args.max_length, padding_side="left"
-#         )
-# 
-#         if training_args.eval_mode is not None:
-#             config = copy.deepcopy(reward_critic_model.config)
-#             if training_args.eval_mode == "single":
-#                 config.tensor_parallel_degree = -1
-#                 config.tensor_parallel_rank = 0
-#             reward_critic_eval_model = AutoModelForScore.from_config(config)
-#         else:
-#             reward_critic_eval_model = None
+    #         # actor model
+    #         model_config = AutoConfig.from_pretrained(
+    #             model_args.actor_model_name_or_path,
+    #             tensor_parallel_output=False,
+    #             tensor_parallel_degree=training_args.tensor_parallel_degree,
+    #             tensor_parallel_rank=training_args.tensor_parallel_rank,
+    #             dtype=dtype,
+    #         )
+    #         model_config.num_hidden_layers = 2
+    #         if hasattr(model_config, "use_flash_attention"):
+    #             model_config.use_flash_attention = model_args.use_flash_attention
+    #         actor_model = AutoModelForCausalLM.from_pretrained(
+    #             model_args.actor_model_name_or_path,
+    #             config=model_config,
+    #         )
+    #
+    #         if training_args.eval_mode is not None:
+    #             config = copy.deepcopy(actor_model.config)
+    #             if training_args.eval_mode == "single":
+    #                 config.tensor_parallel_degree = -1
+    #                 config.tensor_parallel_rank = 0
+    #             actor_eval_model = AutoModelForCausalLM.from_config(config)
+    #         else:
+    #             actor_eval_model = None
+    #
+    #         # reference model
+    #         actor_reference_model = AutoModelForCausalLM.from_pretrained(
+    #             model_args.actor_model_name_or_path,
+    #             config=model_config,
+    #         )
+    #         actor_tokenizer = AutoTokenizer.from_pretrained(
+    #             model_args.actor_model_name_or_path, model_max_length=data_args.max_length, padding_side="left"
+    #         )
+    #
+    #         # reward model
+    #         model_config = AutoConfig.from_pretrained(
+    #             model_args.reward_model_name_or_path,
+    #             tensor_parallel_output=False,
+    #             tensor_parallel_degree=training_args.tensor_parallel_degree,
+    #             tensor_parallel_rank=training_args.tensor_parallel_rank,
+    #             dtype=dtype,
+    #         )
+    #         model_config.num_hidden_layers = 2
+    #         if hasattr(model_config, "use_flash_attention"):
+    #             model_config.use_flash_attention = model_args.use_flash_attention
+    #         reward_model = AutoModelForScore.from_pretrained(
+    #             model_args.reward_model_name_or_path,
+    #             config=model_config,
+    #             score_type="reward",
+    #             do_normalize=training_args.normalize_reward,
+    #         )
+    #         reward_tokenizer = AutoTokenizer.from_pretrained(
+    #             model_args.reward_model_name_or_path, model_max_length=data_args.max_length, padding_side="right"
+    #         )
+    #
+    #         # critic model
+    #         if model_args.reward_critic_model_name_or_path is None:
+    #             model_args.reward_critic_model_name_or_path = model_args.reward_model_name_or_path
+    #         reward_critic_model = AutoModelForScore.from_pretrained(
+    #             model_args.reward_critic_model_name_or_path, config=model_config, score_type="critic", do_normalize=False
+    #         )
+    #         reward_critic_tokenizer = AutoTokenizer.from_pretrained(
+    #             model_args.reward_critic_model_name_or_path, model_max_length=data_args.max_length, padding_side="left"
+    #         )
+    #
+    #         if training_args.eval_mode is not None:
+    #             config = copy.deepcopy(reward_critic_model.config)
+    #             if training_args.eval_mode == "single":
+    #                 config.tensor_parallel_degree = -1
+    #                 config.tensor_parallel_rank = 0
+    #             reward_critic_eval_model = AutoModelForScore.from_config(config)
+    #         else:
+    #             reward_critic_eval_model = None
 
     for tokenizer in [actor_tokenizer, reward_tokenizer, reward_critic_tokenizer]:
         if isinstance(tokenizer, LlamaTokenizer) and tokenizer.pad_token_id is None:
@@ -444,6 +463,7 @@ def main():
             cleanup_tensor_space(actor_eval_model.state_dict())
             cleanup_tensor_space(reward_critic_eval_model.state_dict())
         if "reward" in training_args.offload_level:
+            # if pp mode, should lazy offload
             offload_tensor_to_cpu(actor_reference_model.state_dict())
             offload_tensor_to_cpu(reward_model.state_dict())
 
