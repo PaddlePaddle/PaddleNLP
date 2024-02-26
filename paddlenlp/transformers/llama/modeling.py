@@ -34,6 +34,15 @@ try:
 except ImportError:
     fused_rotary_position_embedding = None
 
+try:
+    from paddle.incubate.nn.functional import swiglu
+except ImportError:
+
+    def swiglu(x, y=None):
+        if y is None:
+            x, y = paddle.chunk(x, chunks=2, axis=-1)
+        return F.silu(x) * y
+
 
 from paddle.utils import try_import
 
@@ -599,10 +608,10 @@ class LlamaMLP(nn.Layer):
 
     def forward(self, x):
         if self.fuse_attention_ffn:
-            gate_out, up_out = paddle.chunk(self.gate_up_fused_proj(x), chunks=2, axis=-1)
-            out = self.down_proj(F.silu(gate_out) * up_out)
+            x = swiglu(self.gate_up_fused_proj(x))
         else:
-            out = self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+            x = swiglu(self.gate_proj(x), self.up_proj(x))
+        out = self.down_proj(x)
         return out
 
 
@@ -923,20 +932,44 @@ class LlamaAttention(nn.Layer):
                 position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
+                batch_size, seq_length, num_heads, head_dim = query_states.shape
+                _, kv_seq_len, num_key_value_heads, _ = key_states.shape
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 if get_env_device() == "npu":
                     query_states = core.eager._run_custom_op("fused_rope", query_states, cos, sin)[0]
                     key_states = core.eager._run_custom_op("fused_rope", key_states, cos, sin)[0]
                 else:
-                    query_states, key_states, _ = fused_rotary_position_embedding(
-                        query_states,
-                        key_states,
-                        v=None,
-                        sin=sin,
-                        cos=cos,
-                        position_ids=position_ids,
-                        use_neox_rotary_style=False,
-                    )
+                    # paddle version > 2.6 or develop support q and k/v with different num_heads
+                    paddle_version = float(paddle.__version__[:3])
+                    if ((paddle_version != 0.0) and (paddle_version <= 2.6)) and (num_heads != num_key_value_heads):
+                        query_states, _, _ = fused_rotary_position_embedding(
+                            query_states,
+                            None,
+                            None,
+                            sin=sin,
+                            cos=cos,
+                            position_ids=position_ids,
+                            use_neox_rotary_style=False,
+                        )
+                        key_states, _, _ = fused_rotary_position_embedding(
+                            key_states,
+                            None,
+                            None,
+                            sin=sin,
+                            cos=cos,
+                            position_ids=position_ids,
+                            use_neox_rotary_style=False,
+                        )
+                    else:
+                        query_states, key_states, _ = fused_rotary_position_embedding(
+                            query_states,
+                            key_states,
+                            v=None,
+                            sin=sin,
+                            cos=cos,
+                            position_ids=position_ids,
+                            use_neox_rotary_style=False,
+                        )
             else:
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
@@ -955,8 +988,11 @@ class LlamaAttention(nn.Layer):
 
         # TODO(wj-Mcat): use broadcast strategy when n_kv_heads = 1
         # repeat k/v heads if n_kv_heads < n_heads
-        key_states = repeat_kv(key_states, self.num_key_value_groups)
-        value_states = repeat_kv(value_states, self.num_key_value_groups)
+        # paddle version > 2.6 or develop support flash-attn with gqa/mqa
+        paddle_version = float(paddle.__version__[:3])
+        if (paddle_version != 0.0) and (paddle_version <= 2.6):
+            key_states = repeat_kv(key_states, self.num_key_value_groups)
+            value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (

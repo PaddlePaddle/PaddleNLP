@@ -40,6 +40,11 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
 )
 from .utils.helper import distributed_file, distributed_isfile  # nested_truncate,
 
+try:
+    from ..quantization.quantization_linear import QuantizationLinear
+except:
+    QuantizationLinear = None
+
 MODEL_NAME = "model"
 OPTIMIZER_NAME = "optimizer"
 DIST_CKPT_PATH = "dist_ckpt"
@@ -112,12 +117,22 @@ class AutoTrainer(Trainer):
             self.optimizer = dist.shard_optimizer(self.optimizer)
             return model, dist_loader
 
-    def _wrap_amp_model(self):
+    def _wrap_amp_model(self, args, model):
         logger.info("Using half precision")
+        if args.to_static:
+            return
         self.enable_autocast_context_manager = True
         self.do_grad_scaling = True if self.args.fp16 else False
         self.amp_dtype = "float16" if self.args.fp16 else "bfloat16"
-        self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
+        self.scaler = dist.shard_scaler(paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss))
+        if self.args.fp16_opt_level == "O2":
+            paddle.amp.decorate(
+                models=model,
+                level=self.args.fp16_opt_level,
+                dtype=self.amp_dtype,
+                master_grad=self.args.amp_master_grad,
+                excluded_layers=QuantizationLinear,
+            )
 
     def _get_item_from_loss(self, loss):
         if isinstance(loss, paddle.Tensor):
