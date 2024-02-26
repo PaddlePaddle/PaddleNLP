@@ -110,7 +110,7 @@ FAST_TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("BertFastTokenizer", "bert"),
         ("ErnieFastTokenizer", "ernie"),
         ("TinyBertFastTokenizer", "tinybert"),
-        # ("ErnieMFastTokenizer", "ernie_m"),
+        ("ErnieMFastTokenizer", "ernie_m"),
         ("NystromformerFastTokenizer", "nystromformer"),
         ("DistilBertFastTokenizer", "distilbert"),
         ("AlbertEnglishFastTokenizer", "albert"),
@@ -201,7 +201,10 @@ class AutoTokenizer:
 
         if init_class:
             class_name = cls._name_mapping[init_class]
-            import_class = import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
+            if init_class.endswith("FastTokenizer"):
+                import_class = import_module(f"paddlenlp.transformers.{class_name}.fast_tokenizer")
+            else:
+                import_class = import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
             tokenizer_class = getattr(import_class, init_class)
             if use_fast:
                 fast_tokenizer_class = cls._get_fast_tokenizer_class(init_class, class_name)
