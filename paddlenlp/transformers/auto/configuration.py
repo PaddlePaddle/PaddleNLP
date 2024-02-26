@@ -171,12 +171,7 @@ class AutoConfig(PretrainedConfig):
             config = AutoConfig.from_pretrained("bert-base-uncased")
             config.save_pretrained('./bert-base-uncased')
         """
-        subfolder = kwargs.get("subfolder", "")
-        if subfolder is None:
-            subfolder = ""
-        from_aistudio = kwargs.pop("from_aistudio", False)
-        from_hf_hub = kwargs.pop("from_hf_hub", False)
-        cache_dir = kwargs.pop("cache_dir", None)
+
         # cache_dir = resolve_cache_dir(from_hf_hub=from_hf_hub, from_aistudio=from_aistudio, cache_dir=cache_dir)
 
         if not cls.name2class:
@@ -193,6 +188,13 @@ class AutoConfig(PretrainedConfig):
                 pretrained_model_name_or_path, *model_args, **kwargs
             )
 
+        subfolder = kwargs.get("subfolder", "")
+        if subfolder is None:
+            subfolder = ""
+        from_aistudio = kwargs.pop("from_aistudio", False)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        cache_dir = kwargs.pop("cache_dir", None)
+
         config_file = get_file(
             pretrained_model_name_or_path,
             [cls.config_file, cls.legacy_config_file],
@@ -201,7 +203,7 @@ class AutoConfig(PretrainedConfig):
             from_hf_hub=from_hf_hub,
             from_aistudio=from_aistudio,
         )
-        print(config_file)
+
         if os.path.exists(config_file):
             config_class = cls._get_config_class_from_config(pretrained_model_name_or_path, config_file)
             logger.info("We are using %s to load '%s'." % (config_class, pretrained_model_name_or_path))

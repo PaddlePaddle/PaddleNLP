@@ -744,10 +744,10 @@ class PretrainedConfig:
         # 0. init from pretrained_init_configuration
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             # which can be: dict or url
-            pretrained_model_name_or_path = cls.pretrained_init_configuration[pretrained_model_name_or_path]
+            pretrained_model_name_or_path_ = cls.pretrained_init_configuration[pretrained_model_name_or_path]
 
-            if isinstance(pretrained_model_name_or_path, dict):
-                return pretrained_model_name_or_path, kwargs
+            if isinstance(pretrained_model_name_or_path_, dict):
+                return pretrained_model_name_or_path_, kwargs
 
         configuration_file = kwargs.pop("_configuration_file", CONFIG_NAME)
         filenames = (
@@ -755,7 +755,6 @@ class PretrainedConfig:
             if configuration_file == CONFIG_NAME
             else [configuration_file, CONFIG_NAME, LEGACY_CONFIG_NAME]
         )
-
         resolved_config_file = get_file(
             pretrained_model_name_or_path,
             filenames,
