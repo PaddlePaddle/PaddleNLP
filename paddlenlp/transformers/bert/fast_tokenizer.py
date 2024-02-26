@@ -31,13 +31,17 @@ class BertFastTokenizer(PretrainedFastTokenizer):
     pretrained_resource_files_map.update(
         {
             "tokenizer_file": {
-                "bert-base-uncased": "fake/tokenizer.json",
-                "bert-large-uncased": "fake/tokenizer.json",
-                "bert-base-cased": "fake/tokenizer.json",
-                "bert-large-cased": "fake/tokenizer.json",
-                "bert-base-multilingual-uncased": "fake/tokenizer.json",
-                "bert-base-multilingual-cased": "fake/tokenizer.json",
-                "bert-base-chinese": "fake/tokenizer.json",
+                "bert-base-uncased": "https://huggingface.co/bert-base-uncased/resolve/main/tokenizer.json",
+                "bert-large-uncased": "https://huggingface.co/bert-large-uncased/resolve/main/tokenizer.json",
+                "bert-base-cased": "https://huggingface.co/bert-base-cased/resolve/main/tokenizer.json",
+                "bert-large-cased": "https://huggingface.co/bert-large-cased/resolve/main/tokenizer.json",
+                "bert-base-multilingual-uncased": (
+                    "https://huggingface.co/bert-base-multilingual-uncased/resolve/main/tokenizer.json"
+                ),
+                "bert-base-multilingual-cased": (
+                    "https://huggingface.co/bert-base-multilingual-cased/resolve/main/tokenizer.json"
+                ),
+                "bert-base-chinese": "https://huggingface.co/bert-base-chinese/resolve/main/tokenizer.json",
                 "bert-wwm-chinese": "fake/tokenizer.json",
                 "bert-wwm-ext-chinese": "fake/tokenizer.json",
                 "macbert-large-chinese": "fake/tokenizer.json",

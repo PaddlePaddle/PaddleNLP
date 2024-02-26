@@ -31,8 +31,8 @@ class DistilBertFastTokenizer(PretrainedFastTokenizer):
     pretrained_resource_files_map.update(
         {
             "tokenizer_file": {
-                "distilbert-base-uncased": "fake/tokenizer.json",
-                "distilbert-base-cased": "fake/tokenizer.json",
+                "distilbert-base-uncased": "https://huggingface.co/distilbert-base-uncased/resolve/main/tokenizer.json",
+                "distilbert-base-cased": "https://huggingface.co/distilbert-base-cased/resolve/main/tokenizer.json",
             }
         }
     )

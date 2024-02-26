@@ -32,14 +32,14 @@ class AlbertEnglishFastTokenizer(PretrainedFastTokenizer):
     pretrained_resource_files_map.update(
         {
             "tokenizer_file": {
-                "albert-base-v1": "fake/tokenizer.json",
-                "albert-large-v1": "fake/tokenizer.json",
-                "albert-xlarge-v1": "fake/tokenizer.json",
-                "albert-xxlarge-v1": "fake/tokenizer.json",
-                "albert-base-v2": "fake/tokenizer.json",
-                "albert-large-v2": "fake/tokenizer.json",
-                "albert-xlarge-v2": "fake/tokenizer.json",
-                "albert-xxlarge-v2": "fake/tokenizer.json",
+                "albert-base-v1": "https://huggingface.co/albert-base-v1/resolve/main/tokenizer.json",
+                "albert-large-v1": "https://huggingface.co/albert-large-v1/resolve/main/tokenizer.json",
+                "albert-xlarge-v1": "https://huggingface.co/albert-xlarge-v1/resolve/main/tokenizer.json",
+                "albert-xxlarge-v1": "https://huggingface.co/albert-xxlarge-v1/resolve/main/tokenizer.json",
+                "albert-base-v2": "https://huggingface.co/albert-base-v2/resolve/main/tokenizer.json",
+                "albert-large-v2": "https://huggingface.co/albert-large-v2/resolve/main/tokenizer.json",
+                "albert-xlarge-v2": "https://huggingface.co/albert-xlarge-v2/resolve/main/tokenizer.json",
+                "albert-xxlarge-v2": "https://huggingface.co/albert-xxlarge-v2/resolve/main/tokenizer.json",
             }
         }
     )
