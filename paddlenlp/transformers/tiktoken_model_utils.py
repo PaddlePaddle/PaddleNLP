@@ -15,11 +15,11 @@
 # limitations under the License.
 
 import base64
-from typing import Dict
+from typing import Dict, List
 
 
 # Generate hf tokenizer file https://github.com/openai/tiktoken/issues/60#issuecomment-1499977960
-def bpe(mergeable_ranks: Dict[bytes, int], token: bytes, max_rank=None) -> list[bytes]:
+def bpe(mergeable_ranks: Dict[bytes, int], token: bytes, max_rank=None) -> List[bytes]:
     parts = [bytes([b]) for b in token]
     while True:
         min_idx = None
