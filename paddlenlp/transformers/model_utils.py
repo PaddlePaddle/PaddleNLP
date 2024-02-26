@@ -1893,9 +1893,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             error_msgs = []
             mismatched_keys = []
 
+            resolved_archive_file_list = resolved_archive_file
             if len(resolved_archive_file) > 1:
                 resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
 
+            # NOTE: InferenceModel uses set_state_dict to convert and load weights
+            # which needs state_dict contains all weights.
+            merge_state_dict = {}
             for shard_file in resolved_archive_file:
                 pre_tensor_parallel_split = False
                 if (
@@ -1938,6 +1942,15 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         None, config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
                     )
                     logger.info("Converted state_dict to Tensor Parallel Format")
+
+                # NOTE: InferenceModel uses set_state_dict to convert and load weights
+                # which needs state_dict contains all weights.
+                if model_to_load.set_state_dict.__func__.__module__.startswith("paddlenlp.experimental.transformers"):
+                    if shard_file == resolved_archive_file_list[-1]:
+                        state_dict.update(merge_state_dict)
+                    else:
+                        merge_state_dict.update(state_dict)
+                        continue
 
                 if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
                     new_error_msgs = _load_state_dict_into_meta_model(
