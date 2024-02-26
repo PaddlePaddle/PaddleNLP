@@ -618,7 +618,7 @@ SLOW_TO_FAST_CONVERTERS = {
     "BertTokenizer": BertConverter,
     "ErnieTokenizer": ErnieConverter,
     "TinyBertTokenizer": TinyBertConverter,
-    "ErnieMTokenizer": ErnieMConverter,
+    # "ErnieMTokenizer": ErnieMConverter,
     "NystromformerTokenizer": NystromformerConverter,
     "DistilBertTokenizer": BertConverter,
     "AlbertEnglishTokenizer": AlbertConverter,
