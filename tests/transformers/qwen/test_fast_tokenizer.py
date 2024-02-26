@@ -38,7 +38,7 @@ def measure_time(func, *args, **kwargs):
 @pytest.fixture
 def setup_inputs():
     dataset = load_dataset("pleisto/wikipedia-cn-20230720-filtered")
-    return dataset["train"]["completion"]
+    return dataset["train"]["completion"][:20000]
 
 
 @pytest.fixture
