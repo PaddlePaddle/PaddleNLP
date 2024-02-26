@@ -89,6 +89,8 @@ class BertFastTokenizer(PretrainedFastTokenizer):
         )
 
         normalizer_state = json.loads(self.backend_tokenizer.normalizer.__getstate__())
+        if "normalizers" in normalizer_state:
+            normalizer_state = normalizer_state["normalizers"][0]
         if (
             normalizer_state.get("lowercase", do_lower_case) != do_lower_case
             or normalizer_state.get("strip_accents", strip_accents) != strip_accents

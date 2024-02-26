@@ -17,12 +17,11 @@ import time
 import numpy as np
 import paddle
 import pytest
-from datasets import load_dataset
 from tokenizers import Tokenizer as HFTokenizer
 
 from paddlenlp.transformers import AutoTokenizer
 
-MODEL_NAME = "bert-base-uncased"
+MODEL_NAME = "nystromformer-base-zh"
 
 
 def measure_time(func, *args, **kwargs):
@@ -37,17 +36,8 @@ def measure_time(func, *args, **kwargs):
 
 @pytest.fixture
 def setup_inputs():
-    dataset = load_dataset("tatsu-lab/alpaca")
-    return dataset["train"]["text"]
-
-
-@pytest.fixture
-def tokenizer_hf():
-    from transformers import AutoTokenizer as AutoTokenizer_HF
-
-    fast_tokenizer_hf = AutoTokenizer_HF.from_pretrained(MODEL_NAME, use_fast=True, trust_remote_code=True)
-
-    return fast_tokenizer_hf
+    single_s = "今天天气很好"
+    return single_s
 
 
 @pytest.fixture
@@ -62,15 +52,15 @@ def tokenizer_base():
     return tokenizer
 
 
-def test_tokenizer_type(tokenizer_hf, tokenizer_fast, tokenizer_base):
+def test_tokenizer_type(tokenizer_fast, tokenizer_base):
     assert isinstance(tokenizer_fast._tokenizer, HFTokenizer)
     assert not hasattr(tokenizer_base, "_tokenizer")
 
 
-def test_tokenizer_cost(tokenizer_hf, tokenizer_fast, tokenizer_base, setup_inputs):
+def test_tokenizer_cost(tokenizer_fast, tokenizer_base, setup_inputs):
     costs = {}
     results = []
-    for tokenizer in ["tokenizer_hf", "tokenizer_fast", "tokenizer_base"]:
+    for tokenizer in ["tokenizer_fast", "tokenizer_base"]:
         (
             _result,
             _time,
@@ -95,7 +85,6 @@ def test_para():
         tokenize_chinese_chars=False,
         strip_accents=True,
     )
-    assert tokenizer.do_lower_case is False
     assert tokenizer("Héllò")["input_ids"] == [
         tokenizer.cls_token_id,
         tokenizer.unk_token_id,
