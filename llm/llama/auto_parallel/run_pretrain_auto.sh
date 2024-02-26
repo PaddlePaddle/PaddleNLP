@@ -17,8 +17,6 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-export FLAGS_call_stack_level=3
-export FLAGS_use_cuda_managed_memory=true
 task_name="llama_auto_dp2mp2pp2"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
@@ -27,14 +25,20 @@ export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../../:$PYTHONPATH
 #ulimit -c unlimited
 #export GLOG_v=10
-export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
-export FLAGS_embedding_deterministic=1        
-export FLAGS_cudnn_deterministic=1
-export NVIDIA_TF32_OVERRIDE=0
-python3.8 -u  -m paddle.distributed.launch \
-    --gpus "0, 1,2,3,4,5,6,7" \
-    --log_dir "hand_3d" \
-    run_pretrain_3D_hand.py \
+
+# export FLAGS_call_stack_level=3
+# export FLAGS_use_cuda_managed_memory=true
+
+# export FLAGS_embedding_deterministic=1        
+# export FLAGS_cudnn_deterministic=1
+# export NVIDIA_TF32_OVERRIDE=0
+
+to_static=0  # 是否开启动转静训练
+
+python -u  -m paddle.distributed.launch \
+    --gpus "0,1,2,3,4,5,6,7" \
+    --log_dir "auto_3d" \
+    run_pretrain_auto.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
     --tokenizer_name_or_path "facebook/llama-7b" \
@@ -70,4 +74,6 @@ python3.8 -u  -m paddle.distributed.launch \
     --do_eval \
     --device "gpu" \
     --data_impl "mmap" \
+    --enable_auto_parallel 1 \
     --max_grad_norm 1.0 \
+    --to_static $to_static \

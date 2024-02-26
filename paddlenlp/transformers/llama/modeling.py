@@ -34,6 +34,15 @@ try:
 except ImportError:
     fused_rotary_position_embedding = None
 
+try:
+    from paddle.incubate.nn.functional import swiglu
+except ImportError:
+
+    def swiglu(x, y=None):
+        if y is None:
+            x, y = paddle.chunk(x, chunks=2, axis=-1)
+        return F.silu(x) * y
+
 
 from paddle.utils import try_import
 
@@ -47,6 +56,7 @@ from paddlenlp.transformers.model_outputs import (
 )
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.tools import get_env_device
 
 from ..segment_parallel_utils import ReshardLayer
 from ..sequence_parallel_utils import (
@@ -63,6 +73,14 @@ from .configuration import (
 )
 
 try:
+    if get_env_device() == "npu":
+        import os
+
+        from paddle.base import core
+
+        for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
+            if lib.endswith(".so"):
+                paddle.utils.cpp_extension.extension_utils.load_op_meta_info_and_register_op(lib)
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
@@ -209,13 +227,27 @@ def scaled_dot_product_attention(
             if alibi is not None:
                 alibi = alibi.reshape([bsz, num_heads, 1, -1])
                 attention_mask = attention_mask.cast(alibi.dtype) + alibi
-            attn_output = F.scaled_dot_product_attention(
-                query_states,
-                key_states,
-                value_states,
-                attn_mask=attention_mask,
-                is_causal=attention_mask is None,
-            )
+            if get_env_device() == "npu":
+                attn_output = core.eager._run_custom_op(
+                    "flash_attention_npu",
+                    query_states,
+                    key_states,
+                    value_states,
+                    None,
+                    attention_mask,
+                    0.0,
+                    attention_mask is None,
+                    True,
+                    False,
+                )[0]
+            else:
+                attn_output = F.scaled_dot_product_attention(
+                    query_states,
+                    key_states,
+                    value_states,
+                    attn_mask=attention_mask,
+                    is_causal=attention_mask is None,
+                )
             attn_weights = None
 
         if reshard_layer is not None:
@@ -316,7 +348,10 @@ def _make_causal_mask(input_ids_shape, past_key_values_length):
     """
     batch_size, target_length = input_ids_shape  # target_length: seq_len
 
-    mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
+    if get_env_device() == "npu":
+        mask = paddle.tril(paddle.ones((target_length, target_length))).astype("int32")
+    else:
+        mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
 
     if past_key_values_length > 0:
         # [tgt_len, tgt_len + past_len]
@@ -333,7 +368,10 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     batch_size, src_length = mask.shape[0], mask.shape[-1]
     tgt_length = tgt_length if tgt_length is not None else src_length
 
-    mask = mask[:, None, None, :].astype("bool")
+    if get_env_device() == "npu":
+        mask = mask[:, None, None, :].astype(dtype)
+    else:
+        mask = mask[:, None, None, :].astype("bool")
     mask.stop_gradient = True
     expanded_mask = mask.expand([batch_size, 1, tgt_length, src_length])
 
@@ -362,6 +400,8 @@ class LlamaRMSNorm(nn.Layer):
 
     def forward(self, hidden_states):
         if self.config.use_fused_rms_norm:
+            if get_env_device() == "npu":
+                return core.eager._run_custom_op("rms_norm_npu", hidden_states, self.weight, self.variance_epsilon)[0]
             return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
 
         if paddle.in_dynamic_mode():
@@ -568,10 +608,10 @@ class LlamaMLP(nn.Layer):
 
     def forward(self, x):
         if self.fuse_attention_ffn:
-            gate_out, up_out = paddle.chunk(self.gate_up_fused_proj(x), chunks=2, axis=-1)
-            out = self.down_proj(F.silu(gate_out) * up_out)
+            x = swiglu(self.gate_up_fused_proj(x))
         else:
-            out = self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+            x = swiglu(self.gate_proj(x), self.up_proj(x))
+        out = self.down_proj(x)
         return out
 
 
@@ -588,17 +628,15 @@ class LlamaAttention(nn.Layer):
         self.head_dim = self.hidden_size // config.num_attention_heads
 
         self.num_key_value_heads = config.num_key_value_heads
+        assert config.num_attention_heads // config.num_key_value_heads
         self.num_key_value_groups = config.num_attention_heads // config.num_key_value_heads
+        self.gqa_or_mqa = config.num_attention_heads != config.num_key_value_heads
 
         self.max_position_embeddings = config.max_position_embeddings
         self.seq_length = config.seq_length
         self.sequence_parallel = config.sequence_parallel
 
         self.fuse_attention_qkv = config.fuse_attention_qkv
-        if self.fuse_attention_qkv and config.num_attention_heads != config.num_key_value_heads:
-            raise ValueError(
-                f"fuse_attention_qkv can't be True when num_attention_heads {config.num_attention_heads}!= num_key_value_heads {config.num_key_value_heads}"
-            )
 
         self.kv_indices = None
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
@@ -615,6 +653,11 @@ class LlamaAttention(nn.Layer):
             if self.num_key_value_heads % config.tensor_parallel_degree == 0:
                 self.num_key_value_heads = self.num_key_value_heads // config.tensor_parallel_degree
             else:
+                if self.fuse_attention_qkv:
+                    # TODO(Yuang): support fusion for kv when kv heads cannot be divided by mp
+                    raise ValueError(
+                        f"fuse_attention_qkv can't be True when num_key_value_heads {config.num_key_value_heads} % tensor_parallel_degree {config.tensor_parallel_degree} != 0"
+                    )
                 logger.warning(
                     f"Get num_key_value_heads: {self.num_key_value_heads}, can't split to tensor_parallel_degree: {config.tensor_parallel_degree}, so we don't spilt key value weight."
                 )
@@ -644,7 +687,7 @@ class LlamaAttention(nn.Layer):
             if self.fuse_attention_qkv:
                 self.qkv_proj = ColumnParallelLinear(
                     self.hidden_size,
-                    3 * self.hidden_size,
+                    self.hidden_size + 2 * self.config.num_key_value_heads * self.head_dim,
                     has_bias=False,
                     gather_output=False,
                 )
@@ -684,7 +727,7 @@ class LlamaAttention(nn.Layer):
             if self.fuse_attention_qkv:
                 self.qkv_proj = nn.Linear(
                     self.hidden_size,
-                    3 * self.hidden_size,
+                    self.hidden_size + 2 * self.config.num_key_value_heads * self.head_dim,
                     bias_attr=False,
                 )
             else:
@@ -771,12 +814,27 @@ class LlamaAttention(nn.Layer):
 
         if self.fuse_attention_qkv:
             mix_layer = self.qkv_proj(hidden_states)
+            # NOTE for GQA attention fusion (compatible with MHA and MQA):
+            # The weight for qkv_proj is in shape like [hidden_size, hidden_size + 2 * num_kv_heads * head_dim].
+            # After the projection, the mix_layer is in shape like [b, s, hidden_size + 2 * num_kv_heads * head_dim].
+            # Reshape the mix_layer into a shape like [b, s, num_kv_heads, (num_groups + 2) * head_dim],
+            # where num_groups = num_q_heads // num_kv_heads.
+            # Split the mix_layer on the last axis into three sections [num_groups * head_dim, head_dim, head_dim]
+            # to represent the q, k and v respectively.
+            # The q is in the shape like [b, s, num_kv_heads, num_groups * head_dim].
+            # The k and v are in the shape like [b, s, num_kv_heads, head_dim].
+            # Under MHA, the q is ready for the following calculation since num_kv_heads == num_q_heads,
+            # But for the GQA or MQA, q should be reshaped into [b, s, num_q_heads, head_dim].
             if self.reshard_layer is not None:
                 if self.sequence_parallel:
                     assert self.seq_length % self.config.sep_parallel_degree == 0
                     mix_layer = paddle.reshape_(
                         mix_layer,
-                        [-1, self.seq_length // self.config.sep_parallel_degree, 3 * self.num_heads * self.head_dim],
+                        [
+                            -1,
+                            self.seq_length // self.config.sep_parallel_degree,
+                            self.num_heads * self.head_dim + 2 * self.num_key_value_heads * self.head_dim,
+                        ],
                     )
                 # [bs, seq_len / sep, num_head, head_dim] -> [bs, seq_len, num_head / sep, head_dim]
                 mix_layer = self.reshard_layer(
@@ -785,15 +843,26 @@ class LlamaAttention(nn.Layer):
                     concat_axis=1,
                 )
                 mix_layer = paddle.reshape_(
-                    mix_layer, [0, self.seq_length, -1, 3 * self.head_dim]
+                    mix_layer, [0, self.seq_length, -1, (self.num_key_value_groups + 2) * self.head_dim]
                 )  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
             else:
                 if self.sequence_parallel:
-                    target_shape = [-1, self.seq_length, self.num_heads, 3 * self.head_dim]
+                    target_shape = [
+                        -1,
+                        self.seq_length,
+                        self.num_key_value_heads,
+                        (self.num_key_value_groups + 2) * self.head_dim,
+                    ]
                 else:
-                    target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
+                    target_shape = [0, 0, self.num_key_value_heads, (self.num_key_value_groups + 2) * self.head_dim]
                 mix_layer = paddle.reshape_(mix_layer, target_shape)
-            query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
+            query_states, key_states, value_states = paddle.split(
+                mix_layer,
+                num_or_sections=[self.num_key_value_groups * self.head_dim, self.head_dim, self.head_dim],
+                axis=-1,
+            )
+            if self.gqa_or_mqa:
+                query_states = paddle.reshape_(query_states, [0, 0, self.num_heads, self.head_dim])
         else:
             query_states = self.q_proj(hidden_states)
             key_states = self.k_proj(hidden_states)
@@ -807,11 +876,19 @@ class LlamaAttention(nn.Layer):
                     )
                     key_states = paddle.reshape(
                         key_states,
-                        [-1, self.seq_length // self.config.sep_parallel_degree, self.num_heads * self.head_dim],
+                        [
+                            -1,
+                            self.seq_length // self.config.sep_parallel_degree,
+                            self.num_key_value_heads * self.head_dim,
+                        ],
                     )
                     value_states = paddle.reshape(
                         value_states,
-                        [-1, self.seq_length // self.config.sep_parallel_degree, self.num_heads * self.head_dim],
+                        [
+                            -1,
+                            self.seq_length // self.config.sep_parallel_degree,
+                            self.num_key_value_heads * self.head_dim,
+                        ],
                     )
                 query_states = self.reshard_layer(
                     query_states,
@@ -855,16 +932,44 @@ class LlamaAttention(nn.Layer):
                 position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
+                batch_size, seq_length, num_heads, head_dim = query_states.shape
+                _, kv_seq_len, num_key_value_heads, _ = key_states.shape
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-                query_states, key_states, _ = fused_rotary_position_embedding(
-                    query_states,
-                    key_states,
-                    v=None,
-                    sin=sin,
-                    cos=cos,
-                    position_ids=position_ids,
-                    use_neox_rotary_style=False,
-                )
+                if get_env_device() == "npu":
+                    query_states = core.eager._run_custom_op("fused_rope", query_states, cos, sin)[0]
+                    key_states = core.eager._run_custom_op("fused_rope", key_states, cos, sin)[0]
+                else:
+                    # paddle version > 2.6 or develop support q and k/v with different num_heads
+                    paddle_version = float(paddle.__version__[:3])
+                    if ((paddle_version != 0.0) and (paddle_version <= 2.6)) and (num_heads != num_key_value_heads):
+                        query_states, _, _ = fused_rotary_position_embedding(
+                            query_states,
+                            None,
+                            None,
+                            sin=sin,
+                            cos=cos,
+                            position_ids=position_ids,
+                            use_neox_rotary_style=False,
+                        )
+                        key_states, _, _ = fused_rotary_position_embedding(
+                            key_states,
+                            None,
+                            None,
+                            sin=sin,
+                            cos=cos,
+                            position_ids=position_ids,
+                            use_neox_rotary_style=False,
+                        )
+                    else:
+                        query_states, key_states, _ = fused_rotary_position_embedding(
+                            query_states,
+                            key_states,
+                            v=None,
+                            sin=sin,
+                            cos=cos,
+                            position_ids=position_ids,
+                            use_neox_rotary_style=False,
+                        )
             else:
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
@@ -883,8 +988,11 @@ class LlamaAttention(nn.Layer):
 
         # TODO(wj-Mcat): use broadcast strategy when n_kv_heads = 1
         # repeat k/v heads if n_kv_heads < n_heads
-        key_states = repeat_kv(key_states, self.num_key_value_groups)
-        value_states = repeat_kv(value_states, self.num_key_value_groups)
+        # paddle version > 2.6 or develop support flash-attn with gqa/mqa
+        paddle_version = float(paddle.__version__[:3])
+        if (paddle_version != 0.0) and (paddle_version <= 2.6):
+            key_states = repeat_kv(key_states, self.num_key_value_groups)
+            value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (
@@ -1255,6 +1363,9 @@ class LlamaModel(LlamaPretrainedModel):
                     combined_attention_mask = _make_causal_mask(
                         input_shape, past_key_values_length=past_key_values_length
                     )
+                    if get_env_device() == "npu":
+                        expanded_attn_mask = expanded_attn_mask.astype("bool")
+                        combined_attention_mask = combined_attention_mask.astype("bool")
                     expanded_attn_mask = expanded_attn_mask & combined_attention_mask
             # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
             elif len(attention_mask.shape) == 3:
@@ -1265,7 +1376,13 @@ class LlamaModel(LlamaPretrainedModel):
         else:
             expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
         # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
-        expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
+        if get_env_device() == "npu":
+            x = paddle.to_tensor(0.0, dtype="float16")
+            y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float16")
+            expanded_attn_mask = expanded_attn_mask.astype("float16")
+            expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
+        else:
+            expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
         return expanded_attn_mask
 
     @paddle.jit.not_to_static

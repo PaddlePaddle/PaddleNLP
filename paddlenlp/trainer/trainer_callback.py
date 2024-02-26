@@ -515,7 +515,7 @@ class ProgressCallback(TrainerCallback):
                 logs_str = ", ".join(f"{k}: {v}" for k, v in logs.items())
             else:
                 logs_str = str(logs)
-            self.training_bar.write(logs_str)
+            logger.info(logs_str)
 
     def on_train_end(self, args, state, control, **kwargs):
         if state.is_local_process_zero:
