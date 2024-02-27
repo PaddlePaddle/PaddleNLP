@@ -1510,6 +1510,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 from_aistudio=from_aistudio,
                 from_hf_hub=from_hf_hub,
             )
+            if resolved_vocab_files[file_id] is not None:
+                cache_dir = os.path.dirname(resolved_vocab_files[file_id])
             # if file_path is None or os.path.isfile(file_path):
             #     resolved_vocab_files[file_id] = file_path
             #     continue
@@ -1680,7 +1682,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             )
         # save all of related things into default root dir
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
-            tokenizer.save_pretrained(os.path.join(cache_dir, pretrained_model_name_or_path, subfolder))
+            # tokenizer.save_pretrained(os.path.join(cache_dir, pretrained_model_name_or_path, subfolder))
+            tokenizer.save_pretrained(cache_dir)
 
         if return_tokenizer_file_dir:
             return tokenizer, list(tokenizer_config_file_dir_list)[0]
