@@ -16,7 +16,7 @@ param="model_item=CE_autotuner_llama7b "
 param+="run_mode=pretrain "
 param+="device_num=N1C8 "
 param+="global_batch_size=8 "
-param+="autoconfig_json_file=autoconfig/llama7b_pretrain_buffer.json "
+param+="autoconfig_json_file=autoconfig/llama7b_pretrain.json "
 param+="modle_json_file=autoconfig/llama7b_pretrain_params.json "
 
 cd ./tests
