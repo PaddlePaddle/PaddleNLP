@@ -31,13 +31,15 @@ class ModelLoadTester(unittest.TestCase):
         config_2.pop("architectures", None)
         assert config_1 == config_2, "config not equal"
 
-    # 获得模型url，直接进行下载
+    # bulid-in的时候是获取到url从bos下载，所以只有一个下载源，而且一定是pd权重
     @parameterized.expand(
         [
-            (BertModel, "bert-base-uncased", False, True, False, True, None, "./model/bert-base-uncased"),
+            # 测试t5，指定不同的下载源（不会生效）
             (AutoModel, "t5-base", True, False, False, None, None, "./model/t5-base"),
-            (AutoModel, "t5-base", True, False, True, None, None, "./model/t5-base"),
-            (BertModel, "bert-base-uncased", False, True, False, False, None, "./model/bert-base-uncased"),
+            (T5Model, "t5-base", True, False, True, None, None, "./model/t5-base"),
+            # 测试bert，指定不同use_safetensors参数（不会生效）
+            (BertModel, "bert-base-uncased", False, True, False, True, None, "./model/bert-base-uncased"),
+            (AutoModel, "bert-base-uncased", False, True, False, False, None, "./model/bert-base-uncased"),
         ]
     )
     def test_bulid_in(
@@ -58,18 +60,11 @@ class ModelLoadTester(unittest.TestCase):
 
     @parameterized.expand(
         [
-            (T5Model, "t5-base", True, False, False, None, None, "./model/hf/t5-base"),
-            (AutoModel, "t5-base", True, False, False, False, None, "./model/hf/t5-base"),
-            (
-                AutoModel,
-                "Baicai003/paddlenlp-test-model",
-                True,
-                False,
-                False,
-                False,
-                "tiny-clip-one",
-                "./model/hf/t5-base",
-            ),
+            # hf情况下，use_safetensors默认、false、true的情况
+            (T5Model, "Baicai003/tiny-t5", True, False, False, None, None, "./model/hf/tiny-t5"),
+            (AutoModel, "Baicai003/tiny-t5", True, False, False, False, None, "./model/hf/tiny-t5"),
+            (AutoModel, "Baicai003/tiny-t5", True, False, False, True, None, "./model/hf/tiny-t5"),
+            # hf情况下，有subfloder，use_safetensors默认、false、true的情况
             (
                 CLIPTextModel,
                 "Baicai003/paddlenlp-test-model",
@@ -80,8 +75,41 @@ class ModelLoadTester(unittest.TestCase):
                 "tiny-clip-one",
                 "./model/hf/t5-base",
             ),
-            (CLIPTextModel, "baicai/tiny-clip", False, False, False, True, None, "./model/bos/tiny-clip"),
+            (
+                AutoModel,
+                "Baicai003/paddlenlp-test-model",
+                True,
+                False,
+                False,
+                False,
+                "tiny-clip-one",
+                "./model/hf/t5-base",
+            ),
+            (
+                AutoModel,
+                "Baicai003/paddlenlp-test-model",
+                True,
+                False,
+                False,
+                True,
+                "tiny-clip-one",
+                "./model/hf/t5-base",
+            ),
+            # bos情况下，use_safetensors默认、false、true的情况
+            (CLIPTextModel, "baicai/tiny-clip", False, False, False, None, None, "./model/bos/tiny-clip"),
             (AutoModel, "baicai/tiny-clip", False, False, False, False, None, "./model/bos/tiny-clip"),
+            (CLIPTextModel, "baicai/tiny-clip", False, False, False, True, None, "./model/bos/tiny-clip"),
+            # bos情况下，有subfloder，use_safetensors默认、false、true的情况
+            (
+                CLIPTextModel,
+                "baicai/paddlenlp-test-model",
+                False,
+                False,
+                False,
+                None,
+                "tiny-clip",
+                "./model/bos/tiny-clip",
+            ),
             (
                 AutoModel,
                 "baicai/paddlenlp-test-model",
@@ -102,8 +130,21 @@ class ModelLoadTester(unittest.TestCase):
                 "tiny-clip",
                 "./model/bos/tiny-clip",
             ),
-            (CLIPTextModel, "aistudio/tiny-clip", False, True, False, True, None, "./model/aistudio/tiny-clip"),
-            (AutoModel, "aistudio/tiny-clip", False, True, False, False, None, "./model/aistudio/tiny-clip"),
+            # aistudio情况下，use_safetensors默认、false、true的情况
+            (AutoModel, "aistudio/tiny-clip", False, True, False, None, None, "./model/aistudio/tiny-clip"),
+            (CLIPTextModel, "aistudio/tiny-clip", False, True, False, False, None, "./model/aistudio/tiny-clip"),
+            (AutoModel, "aistudio/tiny-clip", False, True, False, True, None, "./model/aistudio/tiny-clip"),
+            # aistudio情况下，有subfloder，use_safetensors默认、false、true的情况
+            (
+                CLIPTextModel,
+                "aistudio/paddlenlp-test-model",
+                False,
+                True,
+                False,
+                None,
+                "tiny-clip",
+                "./model/aistudio/tiny-clip",
+            ),
             (
                 AutoModel,
                 "aistudio/paddlenlp-test-model",
@@ -124,6 +165,7 @@ class ModelLoadTester(unittest.TestCase):
                 "tiny-clip",
                 "./model/aistudio/tiny-clip",
             ),
+            # modelscope情况下，use_safetensors默认、false、true的情况
             (
                 CLIPTextModel,
                 "xiaoguailin/clip-vit-large-patch14",
@@ -141,6 +183,16 @@ class ModelLoadTester(unittest.TestCase):
                 False,
                 True,
                 False,
+                None,
+                "./model/modelscope/clip-vit",
+            ),
+            (
+                CLIPTextModel,
+                "xiaoguailin/clip-vit-large-patch14",
+                False,
+                False,
+                True,
+                True,
                 None,
                 "./model/modelscope/clip-vit",
             ),
@@ -166,20 +218,34 @@ class ModelLoadTester(unittest.TestCase):
 
     @parameterized.expand(
         [
-            (T5Model, "t5-base", True, False, False, None, None),
-            (AutoModel, "t5-base", True, False, False, False, None),
-            (AutoModel, "Baicai003/paddlenlp-test-model", True, False, False, False, "tiny-clip-one"),
+            # hf情况下，use_safetensors默认、false、true的情况
+            (T5Model, "Baicai003/tiny-t5", True, False, False, None, None, "./model/hf/tiny-t5"),
+            (AutoModel, "Baicai003/tiny-t5", True, False, False, False, None, "./model/hf/tiny-t5"),
+            (AutoModel, "Baicai003/tiny-t5", True, False, False, True, None, "./model/hf/tiny-t5"),
+            # hf情况下，有subfolder，use_safetensors默认、false、true的情况
             (CLIPTextModel, "Baicai003/paddlenlp-test-model", True, False, False, None, "tiny-clip-one"),
+            (AutoModel, "Baicai003/paddlenlp-test-model", True, False, False, False, "tiny-clip-one"),
+            (CLIPTextModel, "Baicai003/paddlenlp-test-model", True, False, False, True, "tiny-clip-one"),
+            # bos情况下，use_safetensors默认、false、true的情况
+            (AutoModel, "baicai/tiny-clip", False, False, False, None, None),
             (CLIPTextModel, "baicai/tiny-clip", False, False, False, True, None),
             (AutoModel, "baicai/tiny-clip", False, False, False, False, None),
+            # bos情况下，有subfolder，use_safetensors默认、false、true的情况
+            (CLIPTextModel, "baicai/paddlenlp-test-model", False, False, False, None, "tiny-clip"),
             (AutoModel, "baicai/paddlenlp-test-model", False, False, False, False, "tiny-clip"),
             (CLIPTextModel, "baicai/paddlenlp-test-model", False, False, False, True, "tiny-clip"),
+            # aistudio情况下，use_safetensors默认、true和false的情况
+            (AutoModel, "aistudio/tiny-clip", False, True, False, None, None),
             (CLIPTextModel, "aistudio/tiny-clip", False, True, False, True, None),
             (AutoModel, "aistudio/tiny-clip", False, True, False, False, None),
+            #  aistudio情况下，有subfolder，use_safetensors默认、false、true的情况
+            (CLIPTextModel, "aistudio/paddlenlp-test-model", False, True, False, None, "tiny-clip"),
             (AutoModel, "aistudio/paddlenlp-test-model", False, True, False, False, "tiny-clip"),
             (CLIPTextModel, "aistudio/paddlenlp-test-model", False, True, False, True, "tiny-clip"),
+            # modelscope情况下，use_safetensors默认、true和false的情况
             (CLIPTextModel, "xiaoguailin/clip-vit-large-patch14", False, False, True, None, None),
             (AutoModel, "xiaoguailin/clip-vit-large-patch14", False, False, True, False, None),
+            (CLIPTextModel, "xiaoguailin/clip-vit-large-patch14", False, False, True, True, None),
         ]
     )
     def test_download_cache(
