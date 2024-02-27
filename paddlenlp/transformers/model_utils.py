@@ -2195,7 +2195,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
             elif resolved_archive_file.endswith(PADDLE_WEIGHTS_NAME) or resolved_archive_file.endswith(
                 PADDLE_WEIGHTS_INDEX_NAME
-            ):
+            ) or resolved_archive_file.endswith('.pdparams'):
                 print(f"file: {resolved_archive_file} is paddle weight.")
             else:
                 raise ValueError(f"Unexpected file: {resolved_archive_file} for weight conversion.")
