@@ -75,7 +75,7 @@ __all__ = [
 def get_mesh(pp_idx=0):
     mesh = fleet.auto.get_mesh()
     if "pp" in mesh.dim_names:
-        mesh = mesh.get_mesh_with_dim("pp")[pp_idx]
+        mesh = mesh.get_mesh_with_dim("pp", pp_idx)
     return mesh
 
 
