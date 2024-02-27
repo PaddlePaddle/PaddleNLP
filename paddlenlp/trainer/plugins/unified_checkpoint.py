@@ -43,12 +43,11 @@ from paddlenlp.transformers.utils import (
 from paddlenlp.utils.distributed import distributed_gather
 from paddlenlp.utils.env import (
     LORA_WEIGHTS_NAME,
-    PADDLE_LORA_WEIGHTS_INDEX_NAME,
     PADDLE_MASTER_WEIGHTS_INDEX_NAME,
     PADDLE_MASTER_WEIGHTS_NAME,
     PADDLE_OPTIMIZER_INDEX_NAME,
     PADDLE_OPTIMIZER_NAME,
-    PADDLE_PREFIX_WEIGHTS_INDEX_NAME,
+    PADDLE_PEFT_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
     PAST_KEY_VALUES_FILE_NAME,
@@ -158,10 +157,8 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
         )
 
         if sharded_index is not None:
-            if isinstance(model_to_save, LoRAModel):
-                index_name = SAFE_PEFT_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_LORA_WEIGHTS_INDEX_NAME
-            elif isinstance(model_to_save, PrefixModelForCausalLM):
-                index_name = SAFE_PEFT_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_PREFIX_WEIGHTS_INDEX_NAME
+            if isinstance(model_to_save, LoRAModel) or isinstance(model_to_save, PrefixModelForCausalLM):
+                index_name = SAFE_PEFT_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_PEFT_WEIGHTS_INDEX_NAME
             else:
                 index_name = SAFE_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_WEIGHTS_INDEX_NAME
             path = os.path.join(output_dir, index_name)
@@ -1950,10 +1947,8 @@ def select_model_weight_index(args, model, resume_from_checkpoint, safe_serializ
     """
 
     # find model weight index file
-    if isinstance(model, LoRAModel):
-        index_filename = SAFE_PEFT_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_LORA_WEIGHTS_INDEX_NAME
-    elif isinstance(model, PrefixModelForCausalLM):
-        index_filename = SAFE_PEFT_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_PREFIX_WEIGHTS_INDEX_NAME
+    if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
+        index_filename = SAFE_PEFT_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_PEFT_WEIGHTS_INDEX_NAME
     else:
         index_filename = SAFE_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_WEIGHTS_INDEX_NAME
 

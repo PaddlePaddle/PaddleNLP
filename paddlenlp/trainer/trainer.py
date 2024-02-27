@@ -93,9 +93,8 @@ from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
     LORA_WEIGHTS_NAME,
-    PADDLE_LORA_WEIGHTS_INDEX_NAME,
     PADDLE_MASTER_WEIGHTS_INDEX_NAME,
-    PADDLE_PREFIX_WEIGHTS_INDEX_NAME,
+    PADDLE_PEFT_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
     PREFIX_WEIGHTS_NAME,
@@ -3071,13 +3070,9 @@ class Trainer:
 
     def is_unified_checkpoint(self, resume_from_checkpoint, safe_serialization=True):
         is_unified_checkpoint_type = False
-        if isinstance(self.model, LoRAModel):
+        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
             weights_index_name = (
-                PADDLE_LORA_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_PEFT_WEIGHTS_INDEX_NAME
-            )
-        elif isinstance(self.model, PrefixModelForCausalLM):
-            weights_index_name = (
-                PADDLE_PREFIX_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_PEFT_WEIGHTS_INDEX_NAME
+                PADDLE_PEFT_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_PEFT_WEIGHTS_INDEX_NAME
             )
         else:
             weights_index_name = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME

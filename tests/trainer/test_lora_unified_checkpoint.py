@@ -127,6 +127,7 @@ class TestUnifiedCheckpointSingle(TestMultipleGpus):
     def rerun(self, train_args):
         self.run_1gpu(self.run_lora_file, **train_args)
 
+    @skip_for_none_ce_case
     def testDP1(self):
         remove_logs()
         remove_ckpt(lora_arguments["output_dir"])

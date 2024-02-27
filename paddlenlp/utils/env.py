@@ -74,11 +74,10 @@ GENERATION_CONFIG_NAME = "generation_config.json"
 
 LORA_CONFIG_NAME = "lora_config.json"
 LORA_WEIGHTS_NAME = "lora_model_state.pdparams"
-PADDLE_LORA_WEIGHTS_INDEX_NAME = "lora_model_state.pdparams.index.json"
 
 PREFIX_CONFIG_NAME = "prefix_config.json"
 PREFIX_WEIGHTS_NAME = "prefix_model_state.pdparams"
-PADDLE_PREFIX_WEIGHTS_INDEX_NAME = "prefix_model_state.pdparams.index.json"
+PADDLE_PEFT_WEIGHTS_INDEX_NAME = "peft_model.pdparams.index.json"
 
 PAST_KEY_VALUES_FILE_NAME = "pre_caches.npy"
 
