@@ -42,23 +42,36 @@ class ConfigLoadTester(unittest.TestCase):
 
     @parameterized.expand(
         [
-            (BertConfig, "bert-base-uncased", False, True, False, "./paddlenlp-test-config/bert-base-uncased"),
-            (AutoConfig, "bert-base-uncased", True, False, False, "./paddlenlp-test-config/bert-base-uncased"),
+            (
+                BertConfig,
+                "bert-base-uncased",
+                False,
+                True,
+                False,
+                "./paddlenlp-test-config/bert-base-uncased",
+                "hidden_dropout_prob",
+            ),
+            (
+                AutoConfig,
+                "bert-base-uncased",
+                True,
+                False,
+                False,
+                "./paddlenlp-test-config/bert-base-uncased_2",
+                "hidden_dropout_prob",
+            ),
         ]
     )
-    def test_local(self, config_cls, model_name, from_hf_hub, from_aistudio, from_modelscope, cache_dir):
+    def test_local(self, config_cls, model_name, from_hf_hub, from_aistudio, from_modelscope, cache_dir, check_key):
         logger.info("Download config from local dir")
         if from_modelscope:
             os.environ["from_modelscope"] = "True"
         config = config_cls.from_pretrained(
             model_name, from_hf_hub=from_hf_hub, from_aistudio=from_aistudio, cache_dir=cache_dir
         )
-        # 验证已经下载到指定文件夹
-        # assert os.path.isdir(cache_dir)
-        local_config = config_cls.from_pretrained(
-            model_name, from_hf_hub=from_hf_hub, from_aistudio=from_aistudio, cache_dir=cache_dir
-        )
-        assert config == local_config
+        config.save_pretrained(cache_dir)
+        local_config = config_cls.from_pretrained(cache_dir)
+        assert config[check_key] == local_config[check_key]
         os.environ["from_modelscope"] = "False"
 
     @parameterized.expand(

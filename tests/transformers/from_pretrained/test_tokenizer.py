@@ -1,70 +1,83 @@
-import unittest
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
-from paddlenlp.transformers import (
-    AutoTokenizer,
-    T5Tokenizer,
-)
+import unittest
+
+from parameterized import parameterized
+
+from paddlenlp.transformers import AutoTokenizer, T5Tokenizer
 from paddlenlp.utils.log import logger
 
 
 class TokenizerLoadTester(unittest.TestCase):
-    def test_tokenizer_load(self):
-        logger.info("Download Config from PaddleNLP from diffenent sources")
-        # 会从build-in加载，不会执行下载
-        t5_tokenizer = T5Tokenizer.from_pretrained("t5-small", from_hf_hub=True)
-        t5_tokenizer = AutoTokenizer.from_pretrained("t5-small", from_bos=True)
 
-        # 因为不在build-in列表中，所以会从aistudio下载
-        t5_tokenizer = AutoTokenizer.from_pretrained("aistudio/t5-small", from_aistudio=True)
+    # 这是内置的是下载哪些文件
+    @parameterized.expand(
+        [
+            (T5Tokenizer, "t5-small", True, False, False),
+            (AutoTokenizer, "t5-small", True, False, False),
+            (T5Tokenizer, "AI-ModelScope/t5-base", False, False, True),
+            (AutoTokenizer, "t5-small", False, False, False),
+        ]
+    )
+    def test_build_in(self, tokenizer_cls, model_name, from_hf_hub, from_aistudio, from_modelscope):
+        logger.info("Load tokenizer from build-in dict")
+        if from_modelscope:
+            os.environ["from_modelscope"] = "True"
+        tokenizer_cls.from_pretrained(model_name, from_hf_hub=from_hf_hub, from_aistudio=from_aistudio)
+        os.environ["from_modelscope"] = "False"
 
-        # 从modelscope下载tokenizer
-        os.environ['from_modelscope'] = 'True'
-        mengzi_t5_tokenizer = AutoTokenizer.from_pretrained("langboat/mengzi-t5-base")
-        os.environ['from_modelscope'] = 'False'
-
-        
-        logger.info("Download config from local dir, file existed")
-        # 将文件下载到本地
-        t5_tokenizer.save_pretrained("./paddlenlp-test-model/t5-small")
-        # 指定文件夹路径进行加载
-        t5_tokenizer = T5Tokenizer.from_pretrained("./paddlenlp-test-model/t5-small")
-        t5_tokenizer = AutoTokenizer.from_pretrained("./paddlenlp-test-model/t5-small")
-
-
-        logger.info("Download config from local dir with subfolder")
-        # 测试本地subfolder存在时的情况
-        t5_tokenizer = T5Tokenizer.from_pretrained("./paddlenlp-test-model", subfolder="t5-small")
-        t5_tokenizer = AutoTokenizer.from_pretrained("./paddlenlp-test-model", subfolder="t5-small")
-
-        # 测试本地没有要加载的文件夹
-        try:
-            t5_tokenizer = T5Tokenizer.from_pretrained("./paddlenlp-test-model/t5-small-2")
-        except:
-            logger.info("dir not existed")
-
-        
-        logger.info("Download Config from PaddleNLP from cache")
-        # 由于之前下载放置到了默认cache目录，所以会直接从cache加载
-        t5_tokenizer = AutoTokenizer.from_pretrained("aistudio/t5-small", from_aistudio=True)
-        t5_tokenizer = T5Tokenizer.from_pretrained("t5-small", from_hf_hub=True)
-        t5_tokenizer = AutoTokenizer.from_pretrained("t5-small", from_bos=True)
-        os.environ['from_modelscope'] = 'True'
-        mengzi_t5_tokenizer = AutoTokenizer.from_pretrained("langboat/mengzi-t5-base")
-        os.environ['from_modelscope'] = 'False'
-
-        
-        logger.info("Download Bert Config from PaddleNLP from different sources with subfolder")
-        # 测试从不同源头下载存在subfolder的情况
-        t5_tokenizer = T5Tokenizer.from_pretrained(
-            "Baicai003/paddlenlp-test-model", subfolder="t5-small", from_hf_hub=True
+    @parameterized.expand(
+        [
+            (T5Tokenizer, "t5-small", True, False, False, "./paddlenlp-test-tokenizer-hf"),
+            (AutoTokenizer, "aistudio/t5-small", False, True, False, "./paddlenlp-test-tokenizer-aistudio"),
+            (AutoTokenizer, "t5-small", False, False, False, "./paddlenlp-test-tokenizer-bos"),
+            (T5Tokenizer, "langboat/mengzi-t5-base", False, False, True, "./paddlenlp-test-tokenizer-modelscope"),
+        ]
+    )
+    def test_local(self, tokenizer_cls, model_name, from_hf_hub, from_aistudio, from_modelscope, cache_dir):
+        logger.info("Download tokenizer from local dir")
+        if from_modelscope:
+            os.environ["from_modelscope"] = "True"
+        tokenizer = tokenizer_cls.from_pretrained(
+            model_name, from_hf_hub=from_hf_hub, from_aistudio=from_aistudio, cache_dir=cache_dir
         )
-        t5_tokenizer = AutoTokenizer.from_pretrained(
-            "baicai/paddlenlp-test-model", subfolder="t5-small", from_bos=True
-        )
-        t5_tokenizer = AutoTokenizer.from_pretrained(
-            "aistudio/paddlenlp-test-model", subfolder="t5-small", from_aistudio=True
-        )
+        tokenizer.save_pretrained(cache_dir)
+        local_tokenizer = tokenizer_cls.from_pretrained(cache_dir)
+        assert tokenizer("PaddleNLP is a better project") == local_tokenizer("PaddleNLP is a better project")
+        os.environ["from_modelscope"] = "False"
 
-
-test = TokenizerLoadTester()
-test.test_tokenizer_load()
+    @parameterized.expand(
+        [
+            (T5Tokenizer, "Baicai003/paddlenlp-test-model", True, False, False, "t5-small"),
+            (T5Tokenizer, "aistudio/paddlenlp-test-model", False, True, False, "t5-small"),
+            (T5Tokenizer, "baicai/paddlenlp-test-model", False, False, False, "t5-small"),
+            (T5Tokenizer, "langboat/mengzi-t5-base", False, False, True, None),
+            (T5Tokenizer, "langboat/mengzi-t5-base-mt", False, False, True, ""),
+        ]
+    )
+    def test_download_cache(self, tokenizer_cls, model_name, from_hf_hub, from_aistudio, from_modelscope, subfolder):
+        logger.info("Download tokenizer from different sources with subfolder")
+        if from_modelscope:
+            os.environ["from_modelscope"] = "True"
+            assert subfolder is None or subfolder == ""
+        tokenizer = tokenizer_cls.from_pretrained(
+            model_name, subfolder=subfolder, from_hf_hub=from_hf_hub, from_aistudio=from_aistudio
+        )
+        auto_tokenizer = AutoTokenizer.from_pretrained(
+            model_name, subfolder=subfolder, from_hf_hub=from_hf_hub, from_aistudio=from_aistudio
+        )
+        assert tokenizer("PaddleNLP is a better project") == auto_tokenizer("PaddleNLP is a better project")
+        os.environ["from_modelscope"] = "False"
