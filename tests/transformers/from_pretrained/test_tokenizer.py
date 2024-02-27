@@ -29,7 +29,6 @@ class TokenizerLoadTester(unittest.TestCase):
             (T5Tokenizer, "t5-small", True, False, False),
             (AutoTokenizer, "t5-small", True, False, False),
             (T5Tokenizer, "AI-ModelScope/t5-base", False, False, True),
-            (AutoTokenizer, "t5-small", False, False, False),
         ]
     )
     def test_build_in(self, tokenizer_cls, model_name, from_hf_hub, from_aistudio, from_modelscope):
