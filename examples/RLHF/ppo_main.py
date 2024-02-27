@@ -18,19 +18,19 @@ import sys
 
 # os.environ["http_proxy"] = "http://10.162.37.16:8128"
 # os.environ["https_proxy"] = "http://10.162.37.16:8128"
-os.environ["no_proxy"] = "localhost,bcebos.com"
+# os.environ["no_proxy"] = "localhost,bcebos.com"
 # launch would unset http_proxy
 # export https_proxy=http://172.19.57.45:3128
 
-# os.environ["http_proxy"] = "http://172.19.56.199:3128"
-# os.environ["https_proxy"] = "http://172.19.56.199:3128"
+os.environ["http_proxy"] = "http://172.19.56.199:3128"
+os.environ["https_proxy"] = "http://172.19.56.199:3128"
 
 # os.environ["http_proxy"] = "http://172.19.57.45:3128"
 # os.environ["https_proxy"] = "http://172.19.57.45:3128"
 
 # os.environ["http_proxy"] = "http://10.162.37.16:8128"
 # os.environ["https_proxy"] = "http://10.162.37.16:8128"
-# os.environ["no_proxy"] = "localhost,bcebos.com"
+os.environ["no_proxy"] = "localhost,bcebos.com"
 
 # os.environ["http_proxy"] = "agent.baidu.com:8118"
 # os.environ["https_proxy"] = "agent.baidu.com:8118"
@@ -52,16 +52,6 @@ from paddlenlp.transformers import (
     LlamaTokenizer,
 )
 from paddlenlp.utils.log import logger
-
-# launch would unset http_proxy
-# export https_proxy=http://172.19.57.45:3128
-# os.environ["http_proxy"] = "http://172.19.56.199:3128"
-# os.environ["https_proxy"] = "http://172.19.56.199:3128"
-os.environ["http_proxy"] = "http://172.19.57.45:3128"
-os.environ["https_proxy"] = "http://172.19.57.45:3128"
-# os.environ["http_proxy"] = "http://10.162.37.16:8128"
-# os.environ["https_proxy"] = "http://10.162.37.16:8128"
-# os.environ["no_proxy"] = "localhost,bcebos.com"
 
 
 @dataclass
@@ -310,11 +300,22 @@ def main():
     else:
         actor_eval_model = None
 
-    # reference model
-    actor_reference_model = model_class_lm.from_pretrained(
-        model_args.actor_model_name_or_path,
-        config=model_config,
-    )
+    # todo reference model
+    if training_args.eval_mode is not None:
+        config = copy.deepcopy(model_config)
+        if training_args.eval_mode == "single":
+            config.tensor_parallel_degree = -1
+            config.tensor_parallel_rank = 0
+        actor_reference_model = AutoModelForCausalLM.from_pretrained(
+            model_args.actor_model_name_or_path,
+            config=config,
+        )
+    else:
+        actor_reference_model = model_class_lm.from_pretrained(
+            model_args.actor_model_name_or_path,
+            config=model_config,
+        )
+
     actor_tokenizer = AutoTokenizer.from_pretrained(
         model_args.actor_model_name_or_path, model_max_length=data_args.max_length, padding_side="left"
     )
@@ -330,13 +331,25 @@ def main():
     if hasattr(model_config, "use_flash_attention"):
         model_config.use_flash_attention = model_args.use_flash_attention
     model_config.num_hidden_layers = 2
-
-    reward_model = model_class_score.from_pretrained(
-        model_args.reward_model_name_or_path,
-        config=model_config,
-        score_type="reward",
-        do_normalize=training_args.normalize_reward,
-    )
+    # todo
+    if training_args.eval_mode is not None:
+        config = copy.deepcopy(model_config)
+        if training_args.eval_mode == "single":
+            config.tensor_parallel_degree = -1
+            config.tensor_parallel_rank = 0
+        reward_model = AutoModelForScore.from_pretrained(
+            model_args.reward_model_name_or_path,
+            config=config,
+            score_type="reward",
+            do_normalize=training_args.normalize_reward,
+        )
+    else:
+        reward_model = model_class_score.from_pretrained(
+            model_args.reward_model_name_or_path,
+            config=model_config,
+            score_type="reward",
+            do_normalize=training_args.normalize_reward,
+        )
     reward_tokenizer = AutoTokenizer.from_pretrained(
         model_args.reward_model_name_or_path, model_max_length=data_args.max_length, padding_side="right"
     )
