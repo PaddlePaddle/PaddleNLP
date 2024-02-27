@@ -270,15 +270,23 @@ def naive_fuse_merge_tp(weight_list, is_column=True, fuse_tensor_parts=2):
         axis = 0
 
     reorder = []
-    for item in weight_list:
-        reorder.extend(np.split(item, fuse_tensor_parts, axis=axis))
+    if isinstance(weight_list[0], np.ndarray):
+        for item in weight_list:
+            reorder.extend(np.split(item, fuse_tensor_parts, axis=axis))
+    else:
+        for item in weight_list:
+            reorder.extend(paddle.split(item, fuse_tensor_parts, axis=axis))
     # 0 1 2 3 -> 0 2 1 3
     index = (
         np.transpose(np.arange(len(reorder)).reshape([len(weight_list), fuse_tensor_parts]), [1, 0])
         .reshape(-1)
         .tolist()
     )
-    return np.concatenate([reorder[i] for i in index], axis=axis)
+
+    if isinstance(weight_list[0], np.ndarray):
+        return np.concatenate([reorder[i] for i in index], axis=axis)
+
+    return paddle.concat([reorder[i] for i in index], axis=axis)._copy_to(paddle.CPUPlace(), False)
 
 
 def naive_fuse_split_tp(
@@ -348,10 +356,17 @@ def normal_fuse_merge_tp(weight_list, is_column=True):
     Returns:
         weight (np.ndarray): the merged weight.
     """
+
     if is_column:
-        return np.concatenate(weight_list, axis=-1)
+        if isinstance(weight_list[0], np.ndarray):
+            return np.concatenate(weight_list, axis=-1)
+        else:
+            return paddle.concat(weight_list, axis=-1)._copy_to(paddle.CPUPlace(), False)
     else:
-        return np.concatenate(weight_list, axis=0)
+        if isinstance(weight_list[0], np.ndarray):
+            return np.concatenate(weight_list, axis=0)
+        else:
+            return paddle.concat(weight_list, axis=0)._copy_to(paddle.CPUPlace(), False)
 
 
 def normal_fuse_split_tp(weight, tensor_parallel_degree, tensor_parallel_rank=None, is_column=True):
@@ -372,19 +387,29 @@ def normal_fuse_split_tp(weight, tensor_parallel_degree, tensor_parallel_rank=No
     if "PySafeSlice" in str(type(weight)):
         size = weight.get_shape()[dim]
         block_size = size // tensor_parallel_degree
-        start = tensor_parallel_rank * block_size
-        stop = (tensor_parallel_rank + 1) * block_size
-        assert (
-            size % tensor_parallel_degree == 0
-        ), f"The choosen size {size} is not compatible with sharding on {tensor_parallel_degree} shards"
 
-        if dim == 0 or len(weight.get_shape()) == 1:
-            tensor = weight[start:stop]
-        elif dim == -1:
-            tensor = weight[:, start:stop]
+        if tensor_parallel_rank is None:
+            begin, end, step = 0, tensor_parallel_degree, 1
         else:
-            raise NotImplementedError("Let's make that generic when needed")
-        return tensor
+            begin, end, step = tensor_parallel_rank, tensor_parallel_rank + 1, 1
+
+        splited = []
+        for rank in range(begin, end, step):
+            start = rank * block_size
+            stop = (rank + 1) * block_size
+
+            if dim == 0 or len(weight.get_shape()) == 1:
+                tensor = weight[start:stop]
+            elif dim == -1:
+                tensor = weight[:, start:stop]
+            else:
+                raise NotImplementedError("Let's make that generic when needed")
+            if tensor_parallel_rank is not None:
+                return tensor
+
+            splited.append(tensor)
+
+        return splited
 
     size = weight.shape[dim]
     assert (
@@ -465,7 +490,14 @@ def splited_qkv_to_tensor_parallel_qkv(weight_list, num_attention_heads):
 
 
 def get_tensor_parallel_merge_func(tensor_parallel_degree, tensor_parallel_rank, num_attention_heads=None):
-    def fn(x, is_column=True, transpose=False, is_old_qkv=False, is_naive_2fuse=False, is_naive_3fuse=False):
+    def fn(
+        x,
+        is_column=True,
+        transpose=False,
+        is_old_qkv=False,
+        is_naive_2fuse=False,
+        is_naive_3fuse=False,
+    ):
         if x is None:
             return None
 
@@ -998,8 +1030,19 @@ class ConversionMixin:
         """
         # FIXME(wj-Mcat): add compatibility with downstream models
         name_mappings = cls._get_name_mappings(config)
-
-        state_dict = load_torch(weight_file)
+        if weight_file.endswith(".index.json"):
+            if ".safetensors." in weight_file:
+                files = [file for file in os.listdir(os.path.dirname(weight_file)) if file.startswith("model-")]
+            else:
+                files = [
+                    file for file in os.listdir(os.path.dirname(weight_file)) if file.startswith("pytorch_model-")
+                ]
+            state_dict = {}
+            for file in files:
+                sub_state_dict = load_torch(os.path.join(os.path.dirname(weight_file), file))
+                state_dict.update(sub_state_dict)
+        else:
+            state_dict = load_torch(weight_file)
 
         # 3. convert state_dict
         all_layer_names = set(state_dict.keys())

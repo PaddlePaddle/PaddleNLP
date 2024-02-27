@@ -4,7 +4,7 @@ protobuf==3.20.2
 regex
 attrdict==2.0.1
 easydict==1.10.0
-PyYAML==5.4.1
+PyYAML
 subword_nmt==0.3.7
 visualdl
 pandas
@@ -42,3 +42,5 @@ soundfile
 librosa
 gradio>=3.45.0
 tiktoken
+wget
+allure-pytest

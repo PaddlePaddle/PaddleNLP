@@ -55,9 +55,8 @@ class LoraTest(LLMTest, unittest.TestCase):
         paddle.set_default_dtype("float32")
 
         lora_config = load_test_config(self.config_path, "lora", self.model_dir)
-
-        lora_config["dataset_name_or_path"] = self.data_dir
         lora_config["output_dir"] = self.output_dir
+        lora_config["dataset_name_or_path"] = self.data_dir
 
         with argv_context_guard(lora_config):
             from finetune_generation import main
@@ -66,16 +65,95 @@ class LoraTest(LLMTest, unittest.TestCase):
 
         # merge weights
         merge_lora_weights_config = {
-            "model_name_or_path": lora_config["model_name_or_path"],
             "lora_path": lora_config["output_dir"],
-            "merge_model_path": lora_config["output_dir"],
+            "merge_lora_model_path": lora_config["output_dir"],
         }
         with argv_context_guard(merge_lora_weights_config):
             from merge_lora_params import merge
 
             merge()
 
-        if self.model_dir not in ["chatglm2", "qwen", "baichuan"]:
+        # TODO(wj-Mcat): disable chatglm2 test temporarily
+        if self.model_dir not in ["qwen", "baichuan", "chatglm2"]:
             self.run_predictor({"inference_model": True})
 
         self.run_predictor({"inference_model": False})
+
+
+# @parameterized_class(
+#     ["model_dir"],
+#     [
+#         ["llama"],
+#         ["qwen"],
+#     ],
+# )
+# class LoraChatTemplateTest(LLMTest, unittest.TestCase):
+#     config_path: str = "./tests/fixtures/llm/lora.yaml"
+#     model_dir: str = None
+
+#     def setUp(self) -> None:
+#         LLMTest.setUp(self)
+
+#         self.model_codes_dir = os.path.join(self.root_path, self.model_dir)
+#         sys.path.insert(0, self.model_codes_dir)
+
+#         self.rounds_data_dir = tempfile.mkdtemp()
+#         shutil.copyfile(
+#             os.path.join(self.data_dir, "train.json"),
+#             os.path.join(self.rounds_data_dir, "train.json"),
+#         )
+#         shutil.copyfile(
+#             os.path.join(self.data_dir, "dev.json"),
+#             os.path.join(self.rounds_data_dir, "dev.json"),
+#         )
+#         self.create_multi_turns_data(os.path.join(self.rounds_data_dir, "train.json"))
+#         self.create_multi_turns_data(os.path.join(self.rounds_data_dir, "dev.json"))
+
+#     def create_multi_turns_data(self, file: str):
+#         result = []
+#         with open(file, "r", encoding="utf-8") as f:
+#             for line in f:
+#                 data = json.loads(line)
+#                 data["src"] = [data["src"]] * 3
+#                 data["tgt"] = [data["tgt"]] * 3
+#                 result.append(data)
+
+#         with open(file, "w", encoding="utf-8") as f:
+#             for data in result:
+#                 line = json.dumps(line)
+#                 f.write(line + "\n")
+
+#     def tearDown(self) -> None:
+#         LLMTest.tearDown(self)
+#         sys.path.remove(self.model_codes_dir)
+
+#     def test_lora(self):
+#         self.disable_static()
+#         paddle.set_default_dtype("float32")
+
+#         lora_config = load_test_config(self.config_path, "lora", self.model_dir)
+
+#         lora_config["dataset_name_or_path"] = self.rounds_data_dir
+#         lora_config["chat_template"] = "./tests/fixtures/chat_template.json"
+#         lora_config["output_dir"] = self.output_dir
+
+#         with argv_context_guard(lora_config):
+#             from finetune_generation import main
+
+#             main()
+
+#         # merge weights
+#         merge_lora_weights_config = {
+#             "model_name_or_path": lora_config["model_name_or_path"],
+#             "lora_path": lora_config["output_dir"],
+#             "merge_model_path": lora_config["output_dir"],
+#         }
+#         with argv_context_guard(merge_lora_weights_config):
+#             from merge_lora_params import merge
+
+#             merge()
+
+#         if self.model_dir not in ["chatglm2", "qwen", "baichuan"]:
+#             self.run_predictor({"inference_model": True})
+
+#         self.run_predictor({"inference_model": False})

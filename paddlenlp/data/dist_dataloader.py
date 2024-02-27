@@ -16,7 +16,6 @@ import numpy as np
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
 _MAX_DATA_DIM = 64
@@ -58,7 +57,6 @@ class DistDataLoader(paddle.io.DataLoader):
 
         if dataset is None:
             dataset = DummyDataset()
-            batch_sampler = DistributedBatchSampler(dataset, 1)
             logger.info("rank has no data, use Dummpy dataset")
 
         super().__init__(dataset=dataset, batch_sampler=batch_sampler, collate_fn=collate_fn, num_workers=num_workers)
@@ -159,7 +157,7 @@ class DistDataLoader(paddle.io.DataLoader):
 
         # Broadcast data keys size.
         if self._data_keys_size is None:
-            if self.mp_group is not None and self.pp_rank == 0:
+            if self.mp_group.nranks > 1 and self.pp_rank == 0:
                 paddle.distributed.broadcast_object_list(data_keys_size, src=self.mp_src_rank, group=self.mp_group)
             if self._pp_data_group is not None:
                 paddle.distributed.broadcast_object_list(
@@ -172,7 +170,7 @@ class DistDataLoader(paddle.io.DataLoader):
 
         # Broadcast data keys name.
         if self._data_keys_list is None:
-            if self.mp_group is not None and self.pp_rank == 0:
+            if self.mp_group.nranks > 1 and self.pp_rank == 0:
                 paddle.distributed.broadcast_object_list(data_keys_list, src=self.mp_src_rank, group=self.mp_group)
             if self._pp_data_group is not None:
                 paddle.distributed.broadcast_object_list(
@@ -184,7 +182,7 @@ class DistDataLoader(paddle.io.DataLoader):
         if not self._need_data:
             data_list = [[None for i in range(keys_size)] for keys_size in self._data_keys_size]
 
-        if self.mp_group is not None and self.pp_rank == 0:
+        if self.mp_group.nranks > 1 and self.pp_rank == 0:
             for i, dtype in enumerate(self.dtype_list):
                 if self._data_keys_size[i] > 0:
                     data_list[i] = broadcast_data_list(

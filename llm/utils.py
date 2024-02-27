@@ -22,6 +22,7 @@ from typing import Dict, Optional
 import numpy as np
 import paddle
 import paddle.distributed as dist
+import paddle.incubate.multiprocessing as mp
 from paddle.distributed import fleet
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from sklearn.metrics import accuracy_score
@@ -29,7 +30,13 @@ from sklearn.metrics import accuracy_score
 from paddlenlp.datasets import InTokensIterableDataset
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
-from paddlenlp.transformers import LlamaForCausalLMPipe
+from paddlenlp.transformers import (
+    AutoTokenizer,
+    ChatGLMv2Tokenizer,
+    LlamaForCausalLMPipe,
+    PretrainedConfig,
+)
+from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -391,6 +398,7 @@ def dybatch_preprocess(
     architectures: str,
     top_p: float,
     temperature: float,
+    eos_token_id: int | list[list[int]],
     pre_caches_length: int = 0,
     benchmark: bool = False,
 ):
@@ -401,7 +409,14 @@ def dybatch_preprocess(
         position_ids = []
 
         for text in texts:
-            tokens = tokenizer(text, return_tensors="np", padding=True, max_length=src_length)
+            tokens = tokenizer(
+                text,
+                return_tensors="np",
+                padding=True,
+                max_length=src_length,
+                # if use chat_template, it will not add special_tokens
+                add_special_tokens=tokenizer.chat_template is None or isinstance(tokenizer, ChatGLMv2Tokenizer),
+            )
             input_ids.append(tokens["input_ids"][0])
             position_ids.append(tokens["position_ids"][0])
 
@@ -454,6 +469,7 @@ def dybatch_preprocess(
                 max_length=src_length,
                 return_attention_mask=False,
                 return_token_type_ids=False,
+                add_special_tokens=tokenizer.chat_template is None or isinstance(tokenizer, ChatGLMv2Tokenizer),
             )
             input_ids.append(tokens["input_ids"][0])
 
@@ -477,16 +493,12 @@ def dybatch_preprocess(
         0,
     ] * bs
     tgt_pos = np.array(tgt_pos).astype("int64")
-    inputs["eos_token_id"] = (
-        np.array(
-            [
-                tokenizer.eos_token_id,
-            ]
-            * bs
-        )
-        .reshape(-1, 1)
-        .astype("int64")
-    )
+
+    if isinstance(eos_token_id, int):
+        eos_token_id = [eos_token_id]
+
+    inputs["eos_token_id"] = np.array(eos_token_id * bs).reshape(-1, 1).astype("int64")
+
     inputs["top_p"] = (
         np.array(
             [
@@ -585,3 +597,128 @@ def load_real_time_tokens():
     os.system("rm -f ./real_time_save.temp_ids_rank_*")
     tokens = np.concatenate(tokens, axis=1)
     return tokens
+
+
+def init_chat_template(
+    tokenizer: PretrainedTokenizer, model_name_or_path: str, chat_template_file: Optional[str] = None
+):
+    """init chat template for the given tokenizer.
+
+        If is None, it will not use `chat_template.json`;
+        If is equal with `model_name_or_path`, it will use the default loading;
+        If is directory, it will find the `chat_template.json` under the directory;
+        If is file, it will load it.
+
+    Args:
+        tokenizer (PretrainedTokenizer): the instance of tokenizer
+        model_name_or_path (str): _description_
+        chat_template_file (Optional[str], optional): _description_. Defaults to None.
+    """
+    # 1. use the default chat_template file
+    if chat_template_file is None:
+        return
+
+    if str(chat_template_file).lower() == "none":
+        # delete the chat_template from tokenizer if not use chat_template.
+        # why do this: it will load the `chat_template.json` file by default
+        tokenizer.chat_template = None
+        return
+
+    # it will load the `chat_template.json` file by default, so do nothing
+    if chat_template_file == model_name_or_path:
+        if tokenizer.chat_template is None:
+            logger.warning(f"there is not `chat_template.json` file in the `{model_name_or_path}`")
+        return
+
+    if os.path.isdir(chat_template_file):
+        local_chat_template_file_path = os.path.join(chat_template_file, "chat_template.json")
+        if os.path.exists(local_chat_template_file_path):
+            chat_template_file = local_chat_template_file_path
+        else:
+            logger.warning(f"there is not `chat_template.json` file in the `{model_name_or_path}`")
+            return
+
+    if not os.path.exists(chat_template_file):
+        logger.warning(f"there is not `chat_template.json` file from path<`{model_name_or_path}`>")
+        return
+
+    logger.info(f"loading `chat_template.json` from `{chat_template_file}`")
+    tokenizer.init_chat_template(chat_template_file)
+
+
+def get_model_max_position_embeddings(config: PretrainedConfig) -> Optional[int]:
+    names = [
+        "max_position_embeddings",  # most of models
+        "max_sequence_length",  # GLM model
+        "seq_length",  # llama model
+    ]
+    for name in names:
+        max_length = config.get(name, None)
+        if max_length is not None:
+            return max_length
+    return None
+
+
+def get_default_max_decoding_length(config: PretrainedConfig, default: int = 1024) -> int:
+    """get the default max decoding length from config.
+
+    Args:
+        config (PretrainedConfig): the instance of PretrainedConfig
+        default (int): the default value of max decoding length
+
+    Returns:
+        int: the default max_length of decoding length
+    """
+    max_position_embeddings = get_model_max_position_embeddings(config)
+    if max_position_embeddings is None:
+        return default
+    return max_position_embeddings // 4
+
+
+def get_default_max_encoding_length(config: PretrainedConfig, default: int = 1024) -> int:
+    """get the default max encoding length from config.
+
+    Args:
+        config (PretrainedConfig): the instance of PretrainedConfig
+        default (int): the default value of max encoding length
+
+    Returns:
+        int: the default max_length of encoding length
+    """
+
+    max_position_embeddings = get_model_max_position_embeddings(config)
+    if max_position_embeddings is None:
+        return default
+    return max_position_embeddings // 4 * 3
+
+
+def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue):
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_name_or_path,
+    )
+
+    paddle.device.set_device("cpu")
+    outputs = []
+    output_tensor = tensor_queue.get(timeout=1)
+
+    logger.info("Start read result message")
+    logger.info(f"Current path is {os.getcwd()}")
+
+    from paddlenlp_ops import get_output
+
+    while True:
+        get_output(output_tensor, 0, True)
+        if output_tensor[0, 0] == -2:  # read none
+            continue
+        bsz = output_tensor[1, 0].numpy()
+        output_numpy = output_tensor[2 : bsz + 2].numpy()
+        output_numpy[output_numpy == -1] = 2
+        outputs.append(output_numpy)
+        if output_tensor[0, 0] == -1:
+            break
+    output = np.concatenate(outputs, axis=1).tolist()
+    seqs = tokenizer.batch_decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+    for i, seq in enumerate(seqs):
+        result_queue.put([i, seq])
+
+    logger.info("Finish read result message")

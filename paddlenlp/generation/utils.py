@@ -15,9 +15,11 @@
 from __future__ import annotations
 
 import copy
-from typing import Union
+import inspect
+from typing import Optional, Union
 
 import paddle
+import paddle.distributed as dist
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
@@ -26,7 +28,6 @@ from paddle.utils import map_structure
 
 from paddlenlp.transformers.model_outputs import ModelOutput
 from paddlenlp.transformers.utils import get_scale_by_dtype
-from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
 from .configuration_utils import DEFAULT_MAX_NEW_TOKENS, GenerationConfig
@@ -48,9 +49,6 @@ from .stopping_criteria import (
     validate_stopping_criteria,
 )
 from .streamers import BaseStreamer
-
-if is_paddlenlp_ops_available():
-    import paddlenlp_ops
 
 __all__ = [
     "GenerationMixin",
@@ -83,12 +81,6 @@ def get_unfinished_flag(
     """
     if isinstance(eos_token_id, int):
         unfinished_flag = paddle.logical_and(unfinished_flag, input_ids[:, -1:] != eos_token_id)
-    elif isinstance(eos_token_id[0], int):
-        eos_token_id_tensor = paddle.to_tensor([eos_token_id])
-        is_last_tokens_equal = paddle.all(
-            paddle.equal(input_ids[:, -len(eos_token_id) :], eos_token_id_tensor), axis=-1
-        ).unsqueeze(-1)
-        unfinished_flag = paddle.logical_and(unfinished_flag, ~is_last_tokens_equal)
     else:
         batch_unfinish_flag = None
         for batch_eos_token_id in eos_token_id:
@@ -607,6 +599,7 @@ class GenerationMixin(object):
         generation_config: GenerationConfig = None,
         stopping_criteria: StoppingCriteria = None,
         streamer: BaseStreamer = None,
+        synced_gpus: Optional[bool] = None,
         **kwargs,
     ):
         r"""
@@ -634,6 +627,10 @@ class GenerationMixin(object):
             streamer (`~streamer.BaseStreamer`, *optional*):
                 Streamer object that will be used to stream the generated sequences. Generated tokens are passed
                 through `streamer.put(token_ids)` and the streamer is responsible for any further processing.
+            synced_gpus (`bool`, *optional*):
+                Whether to continue running the while loop until max_length. Unless overridden this flag will be set to
+                `True` under DeepSpeed ZeRO Stage 3 multiple GPUs environment to avoid hanging if one GPU finished
+                generating before other GPUs. Otherwise it'll be set to `False`.
             kwargs (dict): It can be used to specify additional kwargs
                 passed to the model.
 
@@ -865,7 +862,6 @@ class GenerationMixin(object):
                 input_ids = self.prepare_decoder_input_ids_for_generation(
                     input_ids, decoder_start_token_id, bos_token_id
                 )
-
         # streamer
         if streamer is not None:
             # streamer couldn't support beam_search strategy
@@ -873,7 +869,6 @@ class GenerationMixin(object):
                 raise ValueError(
                     "`streamer` cannot be used with beam search (yet!). Make sure that `num_beams` is set to 1."
                 )
-            streamer.put(input_ids)
 
         if pad_token_id is None and eos_token_id is not None:
             print("Setting `pad_token_id` to `eos_token_id`:{} for " "open-end generation.".format(eos_token_id))
@@ -930,6 +925,8 @@ class GenerationMixin(object):
                 stopping_criteria=stopping_criteria,
                 streamer=streamer,
                 fast_ptq_sampling=generation_config.fast_ptq_sampling,
+                trunc_input=generation_config.trunc_input,
+                synced_gpus=synced_gpus,
                 **model_kwargs,
             )
 
@@ -951,6 +948,8 @@ class GenerationMixin(object):
                 stopping_criteria=stopping_criteria,
                 streamer=streamer,
                 fast_ptq_sampling=generation_config.fast_ptq_sampling,
+                trunc_input=generation_config.trunc_input,
+                synced_gpus=synced_gpus,
                 **model_kwargs,
             )
 
@@ -993,6 +992,8 @@ class GenerationMixin(object):
                     eos_token_id,
                     stopping_criteria=stopping_criteria,
                     fast_ptq_sampling=generation_config.fast_ptq_sampling,
+                    trunc_input=generation_config.trunc_input,
+                    synced_gpus=synced_gpus,
                     **model_kwargs,
                 )
             else:
@@ -1019,6 +1020,8 @@ class GenerationMixin(object):
                     eos_token_id,
                     stopping_criteria=stopping_criteria,
                     fast_ptq_sampling=generation_config.fast_ptq_sampling,
+                    trunc_input=generation_config.trunc_input,
+                    synced_gpus=synced_gpus,
                     **model_kwargs,
                 )
 
@@ -1032,6 +1035,8 @@ class GenerationMixin(object):
         stopping_criteria=None,
         streamer=None,
         fast_ptq_sampling=False,
+        trunc_input=True,
+        synced_gpus=False,
         **model_kwargs
     ):
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
@@ -1052,11 +1057,23 @@ class GenerationMixin(object):
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
         generate_end = False
         while True:
+            if synced_gpus:
+                # Under synced_gpus the `forward` call must continue until all gpus complete their sequence.
+                # The following logic allows an early break if all peers finished generating their sequence
+                this_peer_finished_flag = paddle.to_tensor(0.0 if generate_end else 1.0)
+                # send 0.0 if we finished, 1.0 otherwise
+                dist.all_reduce(this_peer_finished_flag, op=dist.ReduceOp.SUM)
+                # did all peers finish? the reduced sum will be 0.0 then
+                if this_peer_finished_flag.item() == 0.0:
+                    break
 
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
             outputs = self(**model_inputs)
+
+            if synced_gpus and generate_end:
+                continue  # don't waste resources running the code we don't need
 
             if isinstance(outputs, tuple):
                 logits = outputs[0]
@@ -1070,12 +1087,10 @@ class GenerationMixin(object):
 
             # pre-process distribution
             next_token_logits = self.adjust_logits_during_generation(next_token_logits)
-            next_tokens_scores = logits_processors(input_ids, next_token_logits)
+            probs = logits_processors(input_ids, next_token_logits)
             # greedy
-            probs = F.softmax(next_tokens_scores)
-            probs = paddle.log(probs)
             next_tokens = paddle.argmax(probs, axis=-1).unsqueeze(-1)
-            next_scores = paddle.index_sample(probs.astype("float32"), next_tokens)
+            next_scores = paddle.index_sample(probs, next_tokens)
 
             if eos_token_id is not None:
                 next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
@@ -1085,16 +1100,19 @@ class GenerationMixin(object):
 
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
             if streamer is not None:
-                streamer.put(next_tokens.cpu())
+                if self.config.tensor_parallel_rank == 0:
+                    streamer.put(next_tokens.cpu())
 
             if stopping_criteria(input_ids, scores):
                 generate_end = True
 
             if eos_token_id is not None:
                 unfinished_flag = get_unfinished_flag(input_ids, unfinished_flag, eos_token_id)
+                if not paddle.any(unfinished_flag):
+                    generate_end = True
 
             # Stop when there is a </s> in all sentences
-            if not paddle.any(unfinished_flag) or generate_end:
+            if generate_end and not synced_gpus:
                 break
 
             model_kwargs = self.update_model_kwargs_for_generation(
@@ -1106,7 +1124,7 @@ class GenerationMixin(object):
         if streamer is not None:
             streamer.end()
 
-        return input_ids[:, origin_len:], scores
+        return input_ids[:, origin_len:] if trunc_input else input_ids, scores
 
     def sample(
         self,
@@ -1122,6 +1140,8 @@ class GenerationMixin(object):
         stopping_criteria=None,
         streamer=None,
         fast_ptq_sampling=False,
+        trunc_input=True,
+        synced_gpus=False,
         **model_kwargs
     ):
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
@@ -1144,9 +1164,23 @@ class GenerationMixin(object):
 
         generate_end = False
         while True:
+            if synced_gpus:
+                # Under synced_gpus the `forward` call must continue until all gpus complete their sequence.
+                # The following logic allows an early break if all peers finished generating their sequence
+                this_peer_finished_flag = paddle.to_tensor(0.0 if generate_end else 1.0)
+                # send 0.0 if we finished, 1.0 otherwise
+                dist.all_reduce(this_peer_finished_flag, op=dist.ReduceOp.SUM)
+                # did all peers finish? the reduced sum will be 0.0 then
+                if this_peer_finished_flag.item() == 0.0:
+                    break
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
+            # NOTE: to decrease ref-count and clear outdate cache in-time
+            model_kwargs["cache"] = None
+            model_kwargs["past_key_values"] = None
             outputs = self(**model_inputs)
+            if synced_gpus and generate_end:
+                continue  # don't waste resources running the code we don't need
 
             if isinstance(outputs, tuple):
                 logits = outputs[0]
@@ -1173,15 +1207,32 @@ class GenerationMixin(object):
             if top_p is not None and top_p < 1.0:
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
 
-            # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
-            if probs.dtype == paddle.bfloat16 and top_k == 1:
-                probs = probs.astype("float32")
-                next_tokens = paddle.unsqueeze(paddle.argmax(probs, axis=-1), -1)
-            else:
-                next_tokens = paddle.multinomial(probs)
+            # multinomial already support fp16 and bf16 currently, fix issue: https://github.com/PaddlePaddle/Paddle/issues/51852
+            next_tokens = paddle.multinomial(probs)
+            # # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
+            # if probs.dtype == paddle.bfloat16 and top_k == 1:
+            #     probs = probs.astype("float32")
+            #     next_tokens = paddle.unsqueeze(paddle.argmax(probs, axis=-1), -1)
+            # else:
+            #     # next_tokens = paddle.multinomial(probs)
+            #     probs = probs.cpu()
+            #     from paddlenlp.transformers.utils import device_guard
+
+            #     with device_guard("cpu"):
+            #         next_tokens = paddle.multinomial(probs)
+            #     next_tokens = next_tokens.cuda()
 
             if self.config.tensor_parallel_degree > 1:
-                paddle.distributed.broadcast(next_tokens, 0)
+                # Maybe no need to broadcast if seed is set correclty.
+                from paddle.distributed import fleet
+
+                try:
+                    hcg = fleet.get_hybrid_communicate_group()
+                    group = hcg.get_model_parallel_group()
+                    src = group.get_model_parallel_group_src_rank()
+                except:
+                    group, src = None, 0
+                paddle.distributed.broadcast(next_tokens, src=src, group=group)
 
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
@@ -1193,16 +1244,19 @@ class GenerationMixin(object):
             cur_len += 1
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
             if streamer is not None:
-                streamer.put(next_tokens.cpu())
+                if self.config.tensor_parallel_rank == 0:
+                    streamer.put(next_tokens.cpu())
 
             if stopping_criteria(input_ids, scores):
                 generate_end = True
 
             if eos_token_id is not None:
                 unfinished_flag = get_unfinished_flag(input_ids, unfinished_flag, eos_token_id)
+                if not paddle.any(unfinished_flag):
+                    generate_end = True
 
             # Stop when there is a </s> in all sentences
-            if not paddle.any(unfinished_flag) or generate_end:
+            if generate_end and not synced_gpus:
                 break
 
             model_kwargs = self.update_model_kwargs_for_generation(
@@ -1214,13 +1268,16 @@ class GenerationMixin(object):
         if streamer is not None:
             streamer.end()
 
-        return input_ids[:, origin_len:], scores
+        return input_ids[:, origin_len:] if trunc_input else input_ids, scores
 
     def _get_model_inputs_spec(self, dtype: str):
-        return {
+        spec = {
             "input_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
             "attention_mask": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
         }
+        if "position_ids" in inspect.getfullargspec(self.forward).args:
+            spec["position_ids"] = paddle.static.InputSpec(shape=[None, None], dtype="int64")
+        return spec
 
     def to_static(self, path: str, config: dict):
         """export generation model to static
@@ -1327,7 +1384,6 @@ class GenerationMixin(object):
 
             # [batch_size, vocab_size]
             logits = logits[:, -1, :]
-            logits = paddle.cast(logits, "float32")
 
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
@@ -1340,12 +1396,8 @@ class GenerationMixin(object):
             # compute next_tokens
             if use_top_p:
                 logits = logits / temperature
-                if is_paddlenlp_ops_available():
-                    top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
-                    _, next_tokens = paddlenlp_ops.top_p_sampling(probs, top_ps_tensor, -1)
-                else:
-                    probs = TopPProcess(probs, top_p, min_tokens_to_keep)
-                    next_tokens = paddle.multinomial(probs)
+                top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
+                _, next_tokens = paddle.tensor.top_p_sampling(probs, top_ps_tensor)
             else:
                 probs = TopKProcess(probs, top_k, min_tokens_to_keep)
                 if top_k == 1:
@@ -1440,6 +1492,8 @@ class GenerationMixin(object):
         eos_token_id,
         stopping_criteria=None,
         fast_ptq_sampling=False,
+        trunc_input=True,
+        synced_gpus=False,
         **model_kwargs
     ):
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
@@ -1471,11 +1525,24 @@ class GenerationMixin(object):
         beam_scores[:, 1:] = get_scale_by_dtype(return_positive=False)
         beam_scores = paddle.reshape(beam_scores, [-1])
 
+        generate_end = False
         while True:
+            if synced_gpus:
+                # Under synced_gpus the `forward` call must continue until all gpus complete their sequence.
+                # The following logic allows an early break if all peers finished generating their sequence
+                this_peer_finished_flag = paddle.to_tensor(0.0 if generate_end else 1.0)
+                # send 0.0 if we finished, 1.0 otherwise
+                dist.all_reduce(this_peer_finished_flag, op=dist.ReduceOp.SUM)
+                # did all peers finish? the reduced sum will be 0.0 then
+                if this_peer_finished_flag.item() == 0.0:
+                    break
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
             outputs = self(**model_inputs)
+            if synced_gpus and generate_end:
+                cur_len = cur_len + 1
+                continue  # don't waste resources running the code we don't need
 
             if isinstance(outputs, tuple):
                 logits = outputs[0]
@@ -1553,7 +1620,10 @@ class GenerationMixin(object):
             )
 
             if beam_scorer.is_done or stopping_criteria(input_ids, beam_scores):
-                break
+                if not synced_gpus:
+                    break
+                else:
+                    generate_end = True
 
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
@@ -1576,7 +1646,7 @@ class GenerationMixin(object):
             pad_token_id=pad_token_id,
             eos_token_id=eos_token_id,
         )
-        return pred_ids[:, origin_len:], scores
+        return pred_ids[:, origin_len:] if trunc_input else input_ids, scores
 
     def group_beam_search(
         self,
@@ -1588,6 +1658,8 @@ class GenerationMixin(object):
         eos_token_id,
         stopping_criteria=None,
         fast_ptq_sampling=False,
+        trunc_input=True,
+        synced_gpus=False,
         **model_kwargs
     ):
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
@@ -1622,7 +1694,17 @@ class GenerationMixin(object):
         beam_scores[:, ::num_sub_beams] = 0
         beam_scores = paddle.reshape(beam_scores, [-1])
 
+        generate_end = False
         while True:
+            if synced_gpus:
+                # Under synced_gpus the `forward` call must continue until all gpus complete their sequence.
+                # The following logic allows an early break if all peers finished generating their sequence
+                this_peer_finished_flag = paddle.to_tensor(0.0 if generate_end else 1.0)
+                # send 0.0 if we finished, 1.0 otherwise
+                dist.all_reduce(this_peer_finished_flag, op=dist.ReduceOp.SUM)
+                # did all peers finish? the reduced sum will be 0.0 then
+                if this_peer_finished_flag.item() == 0.0:
+                    break
             # predicted tokens in cur_len step
             current_tokens = paddle.zeros(shape=[batch_size * num_beams], dtype=input_ids.dtype)
 
@@ -1631,6 +1713,9 @@ class GenerationMixin(object):
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
             outputs = self(**model_inputs)
+            if synced_gpus and generate_end:
+                cur_len = cur_len + 1
+                continue  # don't waste resources running the code we don't need
 
             for beam_group_idx in range(num_beam_groups):
                 group_start_idx = beam_group_idx * num_sub_beams
@@ -1708,7 +1793,10 @@ class GenerationMixin(object):
             cur_len += 1
 
             if beam_scorer.is_done or stopping_criteria(input_ids, beam_scores):
-                break
+                if not synced_gpus:
+                    break
+                else:
+                    generate_end = True
 
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
@@ -1735,4 +1823,4 @@ class GenerationMixin(object):
             pad_token_id=pad_token_id,
             eos_token_id=eos_token_id,
         )
-        return pred_ids[:, origin_len:], scores
+        return pred_ids[:, origin_len:] if trunc_input else input_ids, scores
