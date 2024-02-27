@@ -2193,9 +2193,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     # cache_dir=os.path.join(cache_dir, pretrained_model_name_or_path, subfolder),
                     cache_dir=convert_dir,
                 )
-            elif resolved_archive_file.endswith(PADDLE_WEIGHTS_NAME) or resolved_archive_file.endswith(
-                PADDLE_WEIGHTS_INDEX_NAME
-            ) or resolved_archive_file.endswith('.pdparams'):
+            elif (
+                resolved_archive_file.endswith(PADDLE_WEIGHTS_NAME)
+                or resolved_archive_file.endswith(PADDLE_WEIGHTS_INDEX_NAME)
+                or resolved_archive_file.endswith(".pdparams")
+            ):
                 print(f"file: {resolved_archive_file} is paddle weight.")
             else:
                 raise ValueError(f"Unexpected file: {resolved_archive_file} for weight conversion.")
