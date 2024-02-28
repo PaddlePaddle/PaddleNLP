@@ -17,7 +17,7 @@ import unittest
 
 from parameterized import parameterized
 
-from paddlenlp.transformers import AutoTokenizer, T5Tokenizer
+from paddlenlp.transformers import AutoTokenizer, RobertaBPETokenizer, T5Tokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -62,9 +62,13 @@ class TokenizerLoadTester(unittest.TestCase):
         [
             (T5Tokenizer, "Baicai003/paddlenlp-test-model", True, False, False, "t5-small"),
             (T5Tokenizer, "aistudio/paddlenlp-test-model", False, True, False, "t5-small"),
-            (T5Tokenizer, "baicai/paddlenlp-test-model", False, False, False, "t5-small"),
+            (AutoTokenizer, "baicai/paddlenlp-test-model", False, False, False, "t5-small"),
             (T5Tokenizer, "langboat/mengzi-t5-base", False, False, True, None),
             (T5Tokenizer, "langboat/mengzi-t5-base-mt", False, False, True, ""),
+            # roberta
+            (AutoTokenizer, "roberta-base", True, False, False, ""),
+            (AutoTokenizer, "roberta-base", False, False, False, ""),
+            (AutoTokenizer, "roberta-base", False, False, True, ""),
         ]
     )
     def test_download_cache(self, tokenizer_cls, model_name, from_hf_hub, from_aistudio, from_modelscope, subfolder):

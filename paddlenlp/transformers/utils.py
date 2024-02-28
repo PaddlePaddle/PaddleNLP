@@ -674,27 +674,7 @@ def get_checkpoint_shard_files(
                 from_aistudio=from_aistudio,
                 from_hf_hub=from_hf_hub,
             )
-            # if from_aistudio:
-            #     cached_filename = aistudio_download(
-            #         repo_id=pretrained_model_name_or_path,
-            #         filename=shard_filename,
-            #         subfolder=subfolder,
-            #         cache_dir=cache_dir,
-            #     )
-            # elif from_hf_hub:
-            #     cached_filename = hf_hub_download(
-            #         repo_id=pretrained_model_name_or_path,
-            #         filename=shard_filename,
-            #         subfolder=subfolder,
-            #         cache_dir=cache_dir,
-            #     )
-            # else:
-            #     cached_filename = paddlenlp_hub_download(
-            #         pretrained_model_name_or_path,
-            #         shard_filename,
-            #         subfolder=None if len(subfolder) == 0 else subfolder,
-            #         cache_dir=cache_dir,
-            #     )
+
         # We have already dealt with RepositoryNotFoundError and RevisionNotFoundError when getting the index, so
         # we don't have to catch them here.
         except EntryNotFoundError:

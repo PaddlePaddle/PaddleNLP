@@ -266,56 +266,6 @@ class FeatureExtractionMixin(object):
             from_hf_hub=from_hf_hub,
         )
 
-        # if os.path.isdir(pretrained_model_name_or_path):
-        #     resolved_feature_extractor_file = os.path.join(
-        #         pretrained_model_name_or_path, subfolder, FEATURE_EXTRACTOR_NAME
-        #     )
-        # elif os.path.isfile(pretrained_model_name_or_path):
-        #     resolved_feature_extractor_file = pretrained_model_name_or_path
-        #     is_local = True
-        # elif from_aistudio:
-        #     feature_extractor_file = FEATURE_EXTRACTOR_NAME
-        #     resolved_feature_extractor_file = aistudio_download(
-        #         repo_id=pretrained_model_name_or_path,
-        #         filename=feature_extractor_file,
-        #         cache_dir=cache_dir,
-        #         subfolder=subfolder,
-        #     )
-        # elif from_hf_hub:
-        #     feature_extractor_file = FEATURE_EXTRACTOR_NAME
-        #     resolved_feature_extractor_file = hf_hub_download(
-        #         repo_id=pretrained_model_name_or_path,
-        #         filename=feature_extractor_file,
-        #         cache_dir=cache_dir,
-        #         subfolder=subfolder,
-        #         library_name="PaddleNLP",
-        #         library_version=__version__,
-        #     )
-        # else:
-        #     # from pretrained_feature_extractor_file
-        #     if pretrained_model_name_or_path in cls.pretrained_feature_extractor_file:
-        #         feature_extractor_file = cls.pretrained_feature_extractor_file[pretrained_model_name_or_path]
-        #     else:
-        #         # Assuming from community-contributed pretrained models
-        #         url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME]
-        #         cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
-        #         if subfolder != "":
-        #             url_list.insert(2, subfolder)
-        #         feature_extractor_file = "/".join(url_list)
-        #     try:
-        #         resolved_feature_extractor_file = get_path_from_url_with_filelock(feature_extractor_file, cache_dir)
-        #     except EnvironmentError:
-        #         # Raise any environment error raise by `cached_file`. It will have a helpful error message adapted to
-        #         # the original exception.
-        #         raise
-        #     except Exception:
-        #         # For any other exception, we throw a generic error.
-        #         raise EnvironmentError(
-        #             f"Can't load feature extractor for '{pretrained_model_name_or_path}'. If you were trying to load"
-        #             " it from 'BOS', make sure you don't have a local directory with the"
-        #             f" same name. Otherwise, make sure '{pretrained_model_name_or_path}' is the correct path to a"
-        #             f" directory containing a {FEATURE_EXTRACTOR_NAME} file"
-        #         )
         try:
             # Load feature_extractor dict
             with open(resolved_feature_extractor_file, "r", encoding="utf-8") as reader:

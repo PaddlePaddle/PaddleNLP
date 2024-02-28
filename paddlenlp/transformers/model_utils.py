@@ -1462,30 +1462,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         is_sharded = False
         sharded_metadata = None
 
-        # -1. when it's from HF
-        # if from_hf_hub or convert_from_torch:
-        #     resolved_archive_file, is_sharded = resolve_weight_file_from_hf_hub(
-        #         pretrained_model_name_or_path,
-        #         cache_dir=cache_dir,
-        #         convert_from_torch=convert_from_torch,
-        #         subfolder=subfolder,
-        #         use_safetensors=use_safetensors,
-        #     )
-        #     # We'll need to download and cache each checkpoint shard if the checkpoint is sharded.
-        #     resolved_sharded_files = None
-        #     if is_sharded:
-        #         # resolved_archive_file becomes a list of files that point to the different checkpoint shards in this case.
-        #         resolved_sharded_files, sharded_metadata = get_checkpoint_shard_files(
-        #             pretrained_model_name_or_path,
-        #             resolved_archive_file,
-        #             from_aistudio=from_aistudio,
-        #             from_hf_hub=from_hf_hub,
-        #             cache_dir=cache_dir,
-        #             subfolder=subfolder,
-        #         )
-
-        #     return resolved_archive_file, resolved_sharded_files, sharded_metadata, is_sharded
-
         if pretrained_model_name_or_path is not None:
             # the following code use a lot of os.path.join, hence setting subfolder to empty str if None
             if subfolder is None:

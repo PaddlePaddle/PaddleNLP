@@ -327,17 +327,6 @@ class ErnieGenPretrainedModel(PretrainedModel):
                 from_hf_hub=from_hf_hub,
             )
 
-        # for file_id, file_path in resource_files.items():
-        #     path = os.path.join(default_root, file_path.split("/")[-1])
-        #     if file_path is None or os.path.isfile(file_path):
-        #         resolved_resource_files[file_id] = file_path
-        #     elif os.path.exists(path):
-        #         logger.info("Already cached %s" % path)
-        #         resolved_resource_files[file_id] = path
-        #     else:
-        #         logger.info("Downloading %s and saved to %s" % (file_path, default_root))
-        #         resolved_resource_files[file_id] = get_path_from_url(file_path, default_root)
-
         # Prepare model initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
         model_config_file = resolved_resource_files.pop("model_config_file", None)

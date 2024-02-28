@@ -1,57 +1,83 @@
-import unittest
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
+import unittest
+
+from parameterized import parameterized
+
 from paddlenlp.transformers import AutoProcessor, CLIPProcessor
 from paddlenlp.utils.log import logger
 from tests.testing_utils import slow
 
 
 class ProcessorLoadTester(unittest.TestCase):
-    # @slow
-    def test_clip_load(self):
-        logger.info("Download model from PaddleNLP BOS")
-        clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32", from_hf_hub=False)
-        clip_processor = AutoProcessor.from_pretrained("openai/clip-vit-base-patch32", from_hf_hub=False)
-
-        logger.info("Download model from local")
-        clip_processor.save_pretrained("./paddlenlp-test-model/clip-vit-base-patch32")
-        clip_processor = CLIPProcessor.from_pretrained("./paddlenlp-test-model/clip-vit-base-patch32")
-        clip_processor = AutoProcessor.from_pretrained("./paddlenlp-test-model/clip-vit-base-patch32")
-        logger.info("Download model from PaddleNLP BOS with subfolder")
-        clip_processor = CLIPProcessor.from_pretrained("./paddlenlp-test-model/", subfolder="clip-vit-base-patch32")
-        clip_processor = AutoProcessor.from_pretrained("./paddlenlp-test-model/", subfolder="clip-vit-base-patch32")
-
-        logger.info("Download model from PaddleNLP BOS with subfolder")
-        clip_processor = CLIPProcessor.from_pretrained(
-            "baicai/paddlenlp-test-model", subfolder="clip-vit-base-patch32", from_hf_hub=False
+    @parameterized.expand(
+        [
+            (AutoProcessor, "openai/clip-vit-base-patch32", True, False, False, "./model/hf", None),
+            (AutoProcessor, "aistudio/clip-vit-base-patch32", False, True, False, "./model/aistudio", None),
+            (CLIPProcessor, "openai/clip-vit-base-patch32", False, False, False, "./model/bos", None),
+            (AutoProcessor, "xiaoguailin/clip-vit-large-patch14", False, False, True, "./model/modelscope", None),
+            (
+                AutoProcessor,
+                "aistudio/paddlenlp-test-model",
+                False,
+                True,
+                False,
+                "./model/subfolder/aistudio",
+                "clip-vit-base-patch32",
+            ),
+            (
+                CLIPProcessor,
+                "baicai/paddlenlp-test-model",
+                False,
+                False,
+                False,
+                "./model/subfolder/bos",
+                "clip-vit-base-patch32",
+            ),
+        ]
+    )
+    def test_local(self, processor_cls, model_name, from_hf_hub, from_aistudio, from_modelscope, cache_dir, subfolder):
+        logger.info("Download Image processor from local dir")
+        if from_modelscope:
+            os.environ["from_modelscope"] = "True"
+        processor = processor_cls.from_pretrained(
+            model_name, from_hf_hub=from_hf_hub, from_aistudio=from_aistudio, cache_dir=cache_dir, subfolder=subfolder
         )
-        clip_processor = AutoProcessor.from_pretrained(
-            "baicai/paddlenlp-test-model", subfolder="clip-vit-base-patch32", from_hf_hub=False
+        processor.save_pretrained(cache_dir)
+        local_processor = processor_cls.from_pretrained(cache_dir)
+        os.environ["from_modelscope"] = "False"
+
+    @parameterized.expand(
+        [
+            (AutoProcessor, "openai/clip-vit-base-patch32", True, False, False, None),
+            (CLIPProcessor, "aistudio/clip-vit-base-patch32", False, True, False, None),
+            (AutoProcessor, "openai/clip-vit-base-patch32", False, False, False, None),
+            (AutoProcessor, "xiaoguailin/clip-vit-large-patch14", False, False, True, None),
+            (CLIPProcessor, "aistudio/paddlenlp-test-model", False, True, False, "clip-vit-base-patch32"),
+            (AutoProcessor, "baicai/paddlenlp-test-model", False, False, False, "clip-vit-base-patch32"),
+        ]
+    )
+    def test_download_cache(self, processor_cls, model_name, from_hf_hub, from_aistudio, from_modelscope, subfolder):
+        logger.info("Download Image processor from local dir")
+        if from_modelscope:
+            os.environ["from_modelscope"] = "True"
+        processor = processor_cls.from_pretrained(
+            model_name, from_hf_hub=from_hf_hub, from_aistudio=from_aistudio, subfolder=subfolder
         )
-
-
-        logger.info("Download model from HF HUB")
-        clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32", from_hf_hub=True)
-        clip_processor = AutoProcessor.from_pretrained("openai/clip-vit-base-patch32", from_hf_hub=True)
-
-
-        logger.info("Download model from aistudio")
-        clip_processor = CLIPProcessor.from_pretrained("aistudio/clip-vit-base-patch32", from_aistudio=True)
-        clip_processor = AutoProcessor.from_pretrained("aistudio/clip-vit-base-patch32", from_aistudio=True)
-
-        logger.info("Download model from aistudio with subfolder")
-        clip_processor = CLIPProcessor.from_pretrained(
-            "aistudio/paddlenlp-test-model", subfolder="clip-vit-base-patch32", from_aistudio=True
+        local_processor = processor_cls.from_pretrained(
+            model_name, from_hf_hub=from_hf_hub, from_aistudio=from_aistudio, subfolder=subfolder
         )
-        clip_processor = AutoProcessor.from_pretrained(
-            "aistudio/paddlenlp-test-model", subfolder="clip-vit-base-patch32", from_aistudio=True
-        )
-
-
-        logger.info("Download model from modelscope")
-        os.environ['from_modelscope'] = 'True'
-        clip_processor = CLIPProcessor.from_pretrained("xiaoguailin/clip-vit-large-patch14")
-        clip_processor = AutoProcessor.from_pretrained("xiaoguailin/clip-vit-large-patch14")
-
-
-test = ProcessorLoadTester()
-test.test_clip_load()
+        os.environ["from_modelscope"] = "False"

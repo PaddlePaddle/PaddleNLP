@@ -617,17 +617,6 @@ class RobertaTokenizer:
             )
             assert resolved_config_file is not None
 
-            # config_file = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file])
-            # default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
-            # try:
-            #     resolved_config_file = get_path_from_url(config_file, default_root)
-            # except RuntimeError as err:
-            #     logger.error(err)
-            #     raise RuntimeError(
-            #         f"Can't find load tokenizer_config_file for '{pretrained_model_name_or_path}'.\n"
-            #         f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-            #         "a correct model-identifier of community-contributed pretrained models.\n"
-            #     )
             with io.open(resolved_config_file, encoding="utf-8") as f:
                 init_kwargs = json.load(f)
 
