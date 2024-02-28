@@ -27,6 +27,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import tqdm
 from data import DummyDataset, PromptOnlyBatch
+from models.model_pp import make_position_ids
 from models.ppo_model_utils import RLHFPPOMixedLoss, RLHFValueLoss, create_loss
 from paddle.distributed import fleet
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
@@ -1056,6 +1057,9 @@ class PPOTrainer(Trainer):
                 seq = self.actor_model.generate(
                     input_ids=inputs["input_ids"],
                     attention_mask=inputs["attention_mask"],
+                    position_ids=inputs["position_ids"]
+                    if "position_ids" in inputs
+                    else make_position_ids(inputs["attention_mask"]),
                     generation_config=self.generation_config,
                     synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
                 )[0]
@@ -1625,10 +1629,13 @@ class PPOTrainer(Trainer):
             old_log_probs = old_log_probs[:, start:]
             old_reward_values = old_reward_values[:, start:]
             sequence_mask = sequence_mask[:, start:]
+            # position_ids is necessayr for left padding
+            position_ids = make_position_ids(attention_mask)
 
         policy_trainer_inputs = {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
+            "position_ids": position_ids,
             "old_log_probs": old_log_probs,
             "reward_advantages": reward_advantages,
             "sequence_mask": sequence_mask,
@@ -1641,6 +1648,7 @@ class PPOTrainer(Trainer):
         value_trainer_inputs = {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
+            "position_ids": position_ids,
             "old_reward_values": old_reward_values,
             "reward_returns": reward_returns,
             "sequence_mask": sequence_mask,
@@ -1704,11 +1712,18 @@ class PPOTrainer(Trainer):
     def rollout(self, prompt_only_batch: PromptOnlyBatch) -> List[Dict[str, Any]]:
         """Rollout a batch of experiences."""
         input_ids = prompt_only_batch["input_ids"]
+        attention_mask = prompt_only_batch["attention_mask"]
+        position_ids = (
+            prompt_only_batch["position_ids"]
+            if "position_ids" in prompt_only_batch
+            else make_position_ids(attention_mask)
+        )
         # NOTE: generation output of paddlenlp do not contain prompt, we should
         # change sequences here.
         sequences = self.actor_model.generate(
             input_ids=input_ids,
-            attention_mask=prompt_only_batch["attention_mask"],
+            attention_mask=attention_mask,
+            position_ids=position_ids,
             generation_config=self.generation_config,
             synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
         )[0]
@@ -1716,6 +1731,10 @@ class PPOTrainer(Trainer):
         # sequences = [self.load_sing_gen_data(as_batches=False, use_counter=False)["input_ids"]]
 
         return [
+            # TODO(guosheng): move post_rollout out to split_rl_micro_batches
+            # to allow infer model generate multi times consecutively and then
+            # convert weights, otherwise we have to convert weights multi times
+            # when need multi batch rollout data.
             self.post_rollout(
                 input_ids,
                 seq,
@@ -1752,12 +1771,14 @@ class PPOTrainer(Trainer):
             #     print(text)
             reward_seq = sequence
             reward_attention_mask = attention_mask
+        position_ids = make_position_ids(attention_mask)
 
         # pipe model outputs a logits tensor with LMHead, while non-pipe model
         # outputs a tuple with logits tensor as the only one element.
         logits = self.actor_model(
             sequence,
             attention_mask=attention_mask,
+            position_ids=position_ids,
             # return_dict=True,
         )  # .logits
         if not isinstance(logits, paddle.Tensor):
@@ -1765,6 +1786,7 @@ class PPOTrainer(Trainer):
         ref_logits = self.reference_model(
             sequence,
             attention_mask=attention_mask,
+            position_ids=position_ids,
             # return_dict=True,
         )  # .logits
         if not isinstance(ref_logits, paddle.Tensor):
@@ -1773,6 +1795,7 @@ class PPOTrainer(Trainer):
         reward_score = self.reward_model(
             reward_seq,
             attention_mask=reward_attention_mask,
+            position_ids=position_ids,
             # return_dict=True,
         )[
             1
@@ -1780,6 +1803,7 @@ class PPOTrainer(Trainer):
         reward_value = self.reward_critic_model(
             sequence,
             attention_mask=attention_mask,
+            position_ids=position_ids,
             # return_dict=True,
         )[
             0

@@ -240,6 +240,9 @@ class LlamaPolicyPipe(LlamaForCausalLMPipe):
         last_stage_keys = ["labels", "input_ids", "old_log_probs", "reward_advantages", "sequence_mask"]
 
         if type(inputs) is dict:
+            # for left padding, position_ids is nececessary
+            if "position_ids" not in inputs:
+                inputs["position_ids"] = make_position_ids(inputs["attention_mask"])
             # ppo-loss and ptx-loss need different labels, and data iter provides
             # corrensponding data, thus add the not provided fields here.
             # policy trian and infer has different inputs, infer uses position_ids.
@@ -256,6 +259,9 @@ class LlamaPolicyPipe(LlamaForCausalLMPipe):
             # for key in last_stage_keys:
             for key in first_stage_keys + last_stage_keys:
                 if key not in data:
+                    if key == "position_ids":
+                        data[key] = make_position_ids(data["attention_mask"])
+                        continue
                     data[key] = None
         # keys = list(inputs[0].keys())
         inputs_batch = {key: [data.get(key) for data in inputs] for key in first_stage_keys + last_stage_keys}
@@ -268,7 +274,7 @@ class LlamaPolicyPipe(LlamaForCausalLMPipe):
         # have same shape after padding, and each of them cannot pad only
         # according to its own max length which might be different since the
         # filed value is None for different batches/tasks.
-        src_tgt_keys = ["input_ids", "attention_mask", "labels"]
+        src_tgt_keys = ["input_ids", "attention_mask", "labels", "position_ids"]
         max_len = max([x.shape[-1] for x in inputs_batch["input_ids"]])
         pad_len = [max_len - x.shape[-1] for x in inputs_batch["input_ids"]]
         for key in src_tgt_keys:
@@ -370,10 +376,14 @@ class LlamaValuePipe(LlamaForCausalLMPipe):
                 get_expected_keys(inputs, last_stage_keys),
             ]
 
+        for data in inputs:
+            if "position_ids" not in data:
+                data["position_ids"] = make_position_ids(data["attention_mask"])
         # keys = list(inputs[0].keys())
         inputs_batch = {key: [data.get(key) for data in inputs] for key in first_stage_keys + last_stage_keys}
         # 1. For input_ids/attention_mask (prompt+target) padding:
-        src_tgt_keys = ["input_ids", "attention_mask"]
+        # src_tgt_keys = ["input_ids", "attention_mask"]
+        src_tgt_keys = ["input_ids", "attention_mask", "position_ids"]
         max_len = max([x.shape[-1] for x in inputs_batch["input_ids"]])
         pad_len = [max_len - x.shape[-1] for x in inputs_batch["input_ids"]]
         for key in src_tgt_keys:
@@ -386,10 +396,10 @@ class LlamaValuePipe(LlamaForCausalLMPipe):
             inputs_batch[key] = pad_batches_inputs(inputs_batch[key], padding_value, pad_len=pad_len)
         # for key, value in inputs_batch.items():
         #     inputs_batch[key] = pad_batches_inputs(value, padding_value=0)
-        if "position_ids" not in inputs:
-            inputs_batch["position_ids"] = [
-                make_position_ids(attention_mask) for attention_mask in inputs_batch["attention_mask"]
-            ]
+        # if "position_ids" not in inputs:
+        #     inputs_batch["position_ids"] = [
+        #         make_position_ids(attention_mask) for attention_mask in inputs_batch["attention_mask"]
+        #     ]
         return [
             get_expected_keys(inputs_batch, first_stage_keys),
             get_expected_keys(inputs_batch, last_stage_keys),
