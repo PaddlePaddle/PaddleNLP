@@ -1539,7 +1539,9 @@ function llama_dy2st_auto_bs8_fp16_DP2-MP2-PP2() {
         --per_device_train_batch_size 1 \
         --per_device_eval_batch_size 4 \
         --gradient_accumulation_steps 4 \
-        --use_flash_attention 0 \
+        --fuse_attention_qkv 1 \
+        --fuse_attention_ffn 0 \
+        --use_fused_rope 0 \
         --use_fused_rms_norm 0 \
         --fp16 1 \
         --fp16_opt_level "O2" \
@@ -1549,10 +1551,6 @@ function llama_dy2st_auto_bs8_fp16_DP2-MP2-PP2() {
         --tensor_parallel_degree 2 \
         --sharding_parallel_degree 1 \
         --use_flash_attention 0 \
-        --fuse_attention_qkv 1 \
-        --fuse_attention_ffn 0 \
-        --use_fused_rope 0 \
-        --use_fused_rms_norm 1 \
         --learning_rate 0.0001 \
         --min_learning_rate 0.00001 \
         --max_steps 10 \
