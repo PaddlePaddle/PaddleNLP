@@ -1517,6 +1517,9 @@ function llama_dy2st_auto_bs8_fp16_DP2-MP2-PP2() {
     export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=3
     export NVIDIA_TF32_OVERRIDE=0
+    # NOTE(lizhiyu): Enabling the PIR leads to error. After the staffs responsible for the PIR executor fix
+    # the bug, please enable this flag.
+    export FLAGS_enable_pir_in_executor=0
 
     task_name="llama_dy2st_auto_bs8_fp16_dp2mp2pp2"
     case_out_dir="output/$task_name"
