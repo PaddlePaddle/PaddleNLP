@@ -41,7 +41,7 @@ from ..model_outputs import (
     TokenClassifierOutput,
 )
 from ..model_utils import dy2st_nocheck_guard_context
-from ..sequence_parallel_utils import (
+from paddle.distributed.fleet.utils.sequence_parallel_utils import (
     ColumnSequenceParallelLinear,
     GatherOp,
     RowSequenceParallelLinear,

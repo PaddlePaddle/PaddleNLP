@@ -50,7 +50,7 @@ from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
 
 from ..segment_parallel_utils import ReshardLayer
-from ..sequence_parallel_utils import (
+from paddle.distributed.fleet.utils.sequence_parallel_utils  import (
     ColumnSequenceParallelLinear,
     GatherOp,
     RowSequenceParallelLinear,
