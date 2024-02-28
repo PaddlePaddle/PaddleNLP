@@ -225,7 +225,7 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
             continue
 
         pre_tensor_parallel_split = False
-        if shard_file.endswith(".safetensors") and model.config.tensor_parallel_degree > 1:
+        if shard_file.endswith(".pdtensors") and model.config.tensor_parallel_degree > 1:
             pre_tensor_parallel_split = True
             assert loaded_keys is not None, "loaded_keys is not None."
             tp_actions = model.get_tensor_parallel_convert_actions(model.config, loaded_keys, ignore_error=True)
@@ -463,7 +463,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
             if expected_keys.isdisjoint(sharded_metadata["file_map"][os.path.split(shard_file)[-1]]):
                 continue
 
-            if shard_file.endswith(".safetensors"):
+            if shard_file.endswith(".pdtensors"):
                 # assert model_keys is not None, "model_keys is None." TODO: correct the assert
                 if model.config.tensor_parallel_degree > 1:
                     tp_actions = model.get_tensor_parallel_convert_actions(model.config, model_keys, ignore_error=True)
@@ -906,8 +906,8 @@ def load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_chec
     with open(index_filename, "r") as f:
         index = json.loads(f.read())
 
-    # `file_keyname_mappings` indicates which keys each file contains. For example, {"model-00001-of-00002.safetensors": ["llama.embed_tokens.weight", "llama.layers.0.self_attn.q_proj.weight", ...]}
-    # `file_machine_mappings` indicates the machine where the files appear. For example, {"model-00001-of-00002.safetensors": [machine_0, machine_1], "model-00002-of-00002.safetensors": [machine_0]}
+    # `file_keyname_mappings` indicates which keys each file contains. For example, {"model-00001-of-00002.pdtensors": ["llama.embed_tokens.weight", "llama.layers.0.self_attn.q_proj.weight", ...]}
+    # `file_machine_mappings` indicates the machine where the files appear. For example, {"model-00001-of-00002.pdtensors": [machine_0, machine_1], "model-00002-of-00002.pdtensors": [machine_0]}
     file_keyname_mappings, file_machine_mappings = get_file_mappings(index, resume_from_checkpoint)
 
     logger.debug("Creating dispatch table for unified checkpoint load ...")
@@ -963,8 +963,8 @@ def load_unified_optimizer_dynamically(args, model, optimizer, resume_from_check
     with open(os.path.join(resume_from_checkpoint, index_filename), "r") as f:
         index = json.loads(f.read())
 
-    # `file_keyname_mappings` indicates which keys each file contains. For example, {"optimizer-00001-of-00002.safetensors": ["llama.embed_tokens.weight/moment1_0", "llama.layers.1.mlp.gate_proj.weight/moment1_0", ...]}
-    # `file_machine_mappings` indicates the machine where the files appear. For example, {"optimizer-00001-of-00002.safetensors": [machine_0, machine_1], "optimizer-00002-of-00002.safetensors": [machine_0]}
+    # `file_keyname_mappings` indicates which keys each file contains. For example, {"optimizer-00001-of-00002.pdtensors": ["llama.embed_tokens.weight/moment1_0", "llama.layers.1.mlp.gate_proj.weight/moment1_0", ...]}
+    # `file_machine_mappings` indicates the machine where the files appear. For example, {"optimizer-00001-of-00002.pdtensors": [machine_0, machine_1], "optimizer-00002-of-00002.pdtensors": [machine_0]}
     file_keyname_mappings, file_machine_mappings = get_file_mappings(index, resume_from_checkpoint)
 
     has_master_weights = index["master_weights"]
@@ -1235,8 +1235,8 @@ def get_sharded_file_name(args, file_name, is_optimizer=False):
             f"-{args.logical_process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.pdparams",
         )
         shard_file = shard_file.replace(
-            ".safetensors",
-            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.safetensors",
+            ".pdtensors",
+            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.pdtensors",
         )
     else:
         hcg = fleet.get_hybrid_communicate_group()
@@ -1245,8 +1245,8 @@ def get_sharded_file_name(args, file_name, is_optimizer=False):
             ".pdparams", f"-{args.logical_process_index + 1:05d}-of-{args.world_size//dp_group.nranks:05d}.pdparams"
         )
         shard_file = shard_file.replace(
-            ".safetensors",
-            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//dp_group.nranks:05d}.safetensors",
+            ".pdtensors",
+            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//dp_group.nranks:05d}.pdtensors",
         )
         shard_file = shard_file.replace(
             ".pdopt", f"-{args.logical_process_index + 1:05d}-of-{args.world_size//dp_group.nranks:05d}.pdopt"

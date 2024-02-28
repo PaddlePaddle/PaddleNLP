@@ -323,7 +323,7 @@ def load_state_dict(
     if tensor_parallel_split_mapping is None:
         tensor_parallel_split_mapping = {}
 
-    if checkpoint_file.endswith(".safetensors") and is_safetensors_available():
+    if checkpoint_file.endswith(".pdtensors") and is_safetensors_available():
         # Check format of the archive
         with safe_open(checkpoint_file, framework="np") as f:
             metadata = f.metadata()
@@ -1898,11 +1898,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             for shard_file in resolved_archive_file:
                 pre_tensor_parallel_split = False
-                if (
-                    shard_file.endswith(".safetensors")
-                    and config.tensor_parallel_degree > 1
-                    and "tp" not in shard_file
-                ):
+                if shard_file.endswith(".pdtensors") and config.tensor_parallel_degree > 1 and "tp" not in shard_file:
                     pre_tensor_parallel_split = True
                     assert loaded_keys is not None, "loaded_keys is not None."
                     tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
@@ -2203,7 +2199,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # 4. loading non-sharded ckpt from the state dict
             if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
                 state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
-            elif config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model.safetensors"):
+            elif config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model.pdtensors"):
                 with safe_open(resolved_archive_file, framework="np", device="cpu") as f:
                     loaded_keys = f.keys()
                 tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
@@ -2408,10 +2404,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             full_filename = os.path.join(save_directory, filename)
             # If we have a shard file that is not going to be replaced, we delete it, but only from the main process
             # in distributed settings to avoid race conditions.
-            weights_no_suffix = weights_name.replace(".pdparams", "").replace(".safetensors", "")
+            weights_no_suffix = weights_name.replace(".pdparams", "").replace(".pdtensors", "")
 
             # make sure that file to be deleted matches format of sharded file, e.g. paddle_model-00001-of-00005
-            filename_no_suffix = filename.replace(".pdparams", "").replace(".safetensors", "")
+            filename_no_suffix = filename.replace(".pdparams", "").replace(".pdtensors", "")
             reg = re.compile("(.*?)-\d{5}-of-\d{5}")
 
             if (
