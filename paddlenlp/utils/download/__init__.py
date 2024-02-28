@@ -26,7 +26,6 @@ from huggingface_hub.utils import (
     RepositoryNotFoundError,
     RevisionNotFoundError,
 )
-from modelscope.hub.file_download import model_file_download as modelscope_download
 from paddle import __version__
 from requests import HTTPError
 
@@ -106,13 +105,16 @@ def get_file(
     # log_filename = os.path.join(download_kwargs["subfolder"], filename)
 
     # 增加 modelscope 下载的选项
-    from_modelscope = os.environ.get("from_modelscope", False)
-    from_modelscope = strtobool(from_modelscope)
+    from_modelscope = strtobool(os.environ.get("from_modelscope", False))
     if from_modelscope:
         for index, filename in enumerate(filenames):
             try:
+                from modelscope.hub.file_download import (
+                    model_file_download as modelscope_download,
+                )
+
                 return modelscope_download(repo_id, filename, revision, cache_dir, user_agent, local_files_only)
-            except Exception as e:
+            except Exception:
                 if index < len(filenames):
                     continue
                 else:
