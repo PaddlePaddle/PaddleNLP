@@ -31,8 +31,9 @@ class CosineAnnealingWithWarmupDecay(LRScheduler):
         self.warmup_step = warmup_rate * decay_steps
         self.max_lr = max_lr
         self.min_lr = min_lr
-        self.increment = int(kwargs.get("global_batch_size", 0))
+        self.increment = 0
         super(CosineAnnealingWithWarmupDecay, self).__init__(max_lr, last_epoch, verbose)
+        self.increment = int(kwargs.get("global_batch_size", 0))
 
     def get_lr(self):
         if self.warmup_step > 0 and self.last_epoch <= self.warmup_step:

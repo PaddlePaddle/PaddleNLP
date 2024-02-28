@@ -143,7 +143,7 @@ if __name__ == "__main__":
         dataframe = pd.DataFrame(bs, columns=["image", "caption", "image_id"])
         table = pa.Table.from_pandas(dataframe)
 
-        if args.data_out_dir == "":
+        if args.data_out_dir is None:
             data_out_dir = os.path.join(args.data_dir, "arrow")
         else:
             data_out_dir = args.data_out_dir

@@ -17,12 +17,15 @@ import json
 import os
 import shutil
 from functools import lru_cache
+from typing import Dict, Optional, Union
 
 import jieba
+import numpy as np
 import sentencepiece as spm
 from paddle.utils import try_import
 
 from .. import AddedToken, PretrainedTokenizer
+from ..tokenizer_utils_base import BatchEncoding, EncodedInput, PaddingStrategy
 
 __all__ = [
     "GPTTokenizer",
@@ -32,7 +35,10 @@ __all__ = [
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "gpt-cpm-large-cn": 1024,
     "gpt-cpm-small-cn-distill": 1024,
+    "gpt3-175B-en": 1024,
+    "gpt3-89B-en": 1024,
     "gpt3-13B-en": 1024,
+    "gpt3-6.7B-en": 1024,
     "gpt3-1.3B-en": 1024,
     "gpt2-xl-en": 1024,
     "gpt2-large-en": 1024,
@@ -199,7 +205,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
             return [self._convert_token_to_id(token) for token in tokens]
     '''
 
-    def convert_ids_to_tokens(self, ids):
+    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
         """
         Converts a single index or a sequence of indices to a token or a
         sequence of tokens.
@@ -341,6 +347,7 @@ class GPTTokenizer(PretrainedTokenizer):
             "gpt3-175B-en": gpt_vocab_link,
             "gpt3-89B-en": gpt_vocab_link,
             "gpt3-13B-en": gpt_vocab_link,
+            "gpt3-6.7B-en": gpt_vocab_link,
             "gpt3-1.3B-en": gpt_vocab_link,
             "gpt2-xl-en": gpt_vocab_link,
             "gpt2-large-en": gpt_vocab_link,
@@ -352,6 +359,7 @@ class GPTTokenizer(PretrainedTokenizer):
             "gpt3-175B-en": gpt_merges_link,
             "gpt3-89B-en": gpt_merges_link,
             "gpt3-13B-en": gpt_merges_link,
+            "gpt3-6.7B-en": gpt_merges_link,
             "gpt3-1.3B-en": gpt_merges_link,
             "gpt2-xl-en": gpt_merges_link,
             "gpt2-large-en": gpt_merges_link,
@@ -364,6 +372,7 @@ class GPTTokenizer(PretrainedTokenizer):
         "gpt3-175B-en": {},
         "gpt3-89B-en": {},
         "gpt3-13B-en": {},
+        "gpt3-6.7B-en": {},
         "gpt3-1.3B-en": {},
         "gpt2-xl-en": {},
         "gpt2-large-en": {},
@@ -568,3 +577,61 @@ class GPTTokenizer(PretrainedTokenizer):
             return output
 
         return output + bos_token_ids + token_ids_1
+
+    def _pad(
+        self,
+        encoded_inputs: Union[Dict[str, EncodedInput], BatchEncoding],
+        max_length: Optional[int] = None,
+        padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
+        pad_to_multiple_of: Optional[int] = None,
+        return_attention_mask: Optional[bool] = None,
+    ) -> dict:
+        """
+        Pad encoded inputs (on left/right and up to predefined length or max length in the batch)
+
+        Args:
+            encoded_inputs:
+                Dictionary of tokenized inputs (`List[int]`) or batch of tokenized inputs (`List[List[int]]`).
+            max_length: maximum length of the returned list and optionally padding length (see below).
+                Will truncate by taking into account the special tokens.
+            padding_strategy: PaddingStrategy to use for padding.
+
+                - PaddingStrategy.LONGEST Pad to the longest sequence in the batch
+                - PaddingStrategy.MAX_LENGTH: Pad to the max length (default)
+                - PaddingStrategy.DO_NOT_PAD: Do not pad
+                The tokenizer padding sides are defined in self.padding_side:
+
+                    - 'left': pads on the left of the sequences
+                    - 'right': pads on the right of the sequences
+            pad_to_multiple_of: (optional) Integer if set will pad the sequence to a multiple of the provided value.
+                This is especially useful to enable the use of Tensor Core on NVIDIA hardware with compute capability
+                >= 7.5 (Volta).
+            return_attention_mask:
+                (optional) Set to False to avoid returning attention mask (default: set to model specifics)
+        """
+        # Load from model defaults
+
+        # attention_mask shape [1,seq_len,seq_len]
+        if "attention_mask" in encoded_inputs and len(np.shape(encoded_inputs["attention_mask"])) > 2:
+            attention_mask = encoded_inputs["attention_mask"]
+            encoded_inputs.pop("attention_mask")
+        else:
+            attention_mask = None
+
+        required_input = encoded_inputs[self.model_input_names[0]]
+        encoded_inputs = super()._pad(
+            encoded_inputs, max_length, padding_strategy, pad_to_multiple_of, return_attention_mask
+        )
+        if attention_mask is not None and len(np.shape(attention_mask)) > 2:
+            encoded_inputs["attention_mask"] = attention_mask
+            needs_to_be_padded = padding_strategy != PaddingStrategy.DO_NOT_PAD and len(required_input) != max_length
+            if needs_to_be_padded:
+                difference = max_length - len(required_input)
+                if "attention_mask" in encoded_inputs:
+                    encoded_inputs["attention_mask"] = np.pad(
+                        encoded_inputs["attention_mask"],
+                        pad_width=[(0, 0), (difference, 0), (difference, 0)],
+                        mode="constant",
+                        constant_values=0,
+                    )
+        return encoded_inputs

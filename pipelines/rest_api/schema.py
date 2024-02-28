@@ -87,6 +87,14 @@ class QueryResponse(BaseModel):
     debug: Optional[Dict] = Field(None, alias="_debug")
 
 
+class Chatfile_QueryResponse(BaseModel):
+    query: str
+    result: str
+    answers: List[AnswerSerialized] = []
+    documents: List[DocumentSerialized] = []
+    debug: Optional[Dict] = Field(None, alias="_debug")
+
+
 class DocumentRequest(BaseModel):
     meta: dict
     params: Optional[dict] = None

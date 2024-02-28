@@ -24,7 +24,7 @@ endif()
 
 INCLUDE(ExternalProject)
 
-set(CXX_STD "14" CACHE STRING "C++ standard")
+set(CXX_STD "17" CACHE STRING "C++ standard")
 
 option(ON_INFER         "Compiled with inference. "                                 OFF)
 option(WITH_GPU         "Compiled with GPU/CPU, default use CPU."                   ON)
@@ -248,8 +248,8 @@ set(CMAKE_C_FLAGS_DEBUG    "${CMAKE_C_FLAGS_DEBUG}    -Wall -O0")
 set(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG}  -Wall -O0")
 set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G -Xcompiler -Wall")
 
-set(CMAKE_CXX_STANDARD "${CXX_STD}")
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX17_STANDARD_COMPILE_OPTION "-std=c++{CXX_STD}")
+set(CMAKE_CXX17_EXTENSION_COMPILE_OPTION "-std=gnu++{CXX_STD}")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-extended-lambda")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --std=c++${CXX_STD}")
@@ -387,6 +387,8 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
 set(OPEN_ATTENTION_MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W\\WOpenMultiHeadAttention\\W[^)]\\{1,\\})/ /" {})
 
+set(RM_OLD_CUB_COMMAND rm -rf ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/cub)
+
 set(FT_PATCH_COMMAND
   printf \\n\\n > blank_lines
   && cp ${allocator_src} ${allocator_dst}
@@ -428,6 +430,7 @@ set(FT_PATCH_COMMAND
   && rm blank_lines
   && ${MUTE_COMMAND}
   && ${OPEN_ATTENTION_MUTE_COMMAND}
+  && ${RM_OLD_CUB_COMMAND}
 )
 
 # TODO(guosheng): Use UPDATE_COMMAND instead of PATCH_COMMAND to make cmake
@@ -445,7 +448,7 @@ ExternalProject_Add(
   UPDATE_COMMAND    ${FT_UPDATE_COMMAND}  # PATCH_COMMAND     ${FT_PATCH_COMMAND}
   BINARY_DIR        ${THIRD_PATH}/build/${THIRD_PARTY_NAME}
   INSTALL_COMMAND   ""
-  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DSM=${SM} -DBUILD_PD=ON -DBUILD_ENCODER=${WITH_ENCODER} -DPY_CMD=${PY_CMD} -DON_INFER=${ON_INFER} -DPADDLE_LIB=${PADDLE_LIB} -DWITH_MKL=${WITH_MKL} -DWITH_STATIC_LIB=${WITH_STATIC_LIB} -DBUILD_GPT=${WITH_PARALLEL} -DWITH_ONNXRUNTIME=${WITH_ONNXRUNTIME}
+  CMAKE_ARGS        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER} -DSM=${SM} -DBUILD_PD=ON -DBUILD_ENCODER=${WITH_ENCODER} -DPY_CMD=${PY_CMD} -DON_INFER=${ON_INFER} -DPADDLE_LIB=${PADDLE_LIB} -DWITH_MKL=${WITH_MKL} -DWITH_STATIC_LIB=${WITH_STATIC_LIB} -DBUILD_GPT=${WITH_PARALLEL} -DWITH_ONNXRUNTIME=${WITH_ONNXRUNTIME}
 )
 # -DBUILD_GPT=${WITH_GPT} 
 ExternalProject_Get_property(extern_${THIRD_PARTY_NAME} BINARY_DIR)

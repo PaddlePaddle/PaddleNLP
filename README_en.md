@@ -1,5 +1,5 @@
 
-[简体中文🀄](./README.MD) | **English🌎**
+[简体中文🀄](./README.md) | **English🌎**
 
 <p align="center"> <img src="https://user-images.githubusercontent.com/1371212/175816733-8ec25eb0-9af3-4380-9218-27c154518258.png" align="middle"  width="500" /> </p>
 
@@ -23,26 +23,31 @@
 
 ## News 📢
 
-* **2023.6.12: [Release of PaddleNLP v2.6rc](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0rc)**
-  * 🔨 LLM Tools：Introduces comprehensive examples of open-source LLM training and inference, including [Bloom](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/bloom), [ChatGLM](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/chatglm), [GLM](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/glm), [Llama](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/llama) and [OPT](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/opt). Added Tensor Parallel capability to [Trainer API](./docs/trainer.md) for distributed LLM trainin. Also released [Parameter-Efficient Finetuning](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/peft),which enables training LLMs on consumer hardware.
+* **2024.01.04 [PaddleNLP v2.7](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.7.0)**: The LLM experience is fully upgraded, and the tool chain LLM entrance is unified. Unify the implementation code of pre-training, fine-tuning, compression, inference and deployment to the `PaddleNLP/llm` directory. The new [LLM Toolchain Documentation](https://paddlenlp.readthedocs.io/zh/latest/llm/finetune.html) provides one-stop guidance for users from getting started with LLM to business deployment and launch. The full breakpoint storage mechanism Unified Checkpoint greatly improves the versatility of LLM storage. Efficient fine-tuning upgrade supports the simultaneous use of efficient fine-tuning + LoRA, and supports QLoRA and other algorithms.
 
-* **2023.1.12: [Release of PaddleNLP v2.5](<https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.5.0>)**
-
-    * 🔨 NLP Tools: [PPDiffusers](./ppdiffusers), our cross-modal diffusion model toolbox based on PaddlePaddle, has been released! It provides a complete training process for diffusion models, and supports FastDeploy inference acceleration and multi-hardware deployment (supports Ascend chips and Kunlun core deployment).
-    * 💎 Industrial Applications: Information extraction, text classification, sentiment analysis, and intelligent question answering have all been newly upgraded. New releases include document information extraction [UIE-X](./applications/information_extraction/document), unified text classification [UTC](./applications/zero_shot_text_classification), unified sentiment analysis [UIE-Senta](./applications/sentiment_analysis/unified_sentiment_extraction) , and [unsupervised QA application](./applications/question_answering/unsupervised_qa). At the same time, the [ERNIE 3.0 Tiny v2](./model_zoo/ernie-tiny) series of pretrained small models have been released, which are more effective with low-resource and foreign data. They provide open-source end-to-end deployment solutions such as model pruning, model quantization, FastDeploy inference acceleration, and edge-side deployment to reduce the difficulty of pretrained model deployment.
-    * 💪 Framework Upgrade: Pretrained model [parameter configuration unification](./paddlenlp/transformers/configuration_utils.py), saving and loading custom parameter configurations no longer requires additional development; [Trainer API](./docs/trainer.md) has added BF16 training, recompute recalculations, sharding, and other distributed capabilities. Large-scale pre-training model training can easily be accomplished through simple configuration. [Model Compression API](./docs/compression.md) supports quantization training, vocabulary compression, and other functions. The compressed model has smaller accuracy loss, and the memory consumption of model deployment is greatly reduced. [Data Augmentation API](./docs/dataaug.md) has been comprehensively upgraded to support three granularities of data augmentation strategy: character, word, and sentence, making it easy to customize data augmentation strategies.
-    * 🤝 Community: 🤗Huggingface hub officially supports PaddleNLP pretrained models, supporting PaddleNLP Model and Tokenizer downloads and uploads directly from the 🤗Huggingface hub. Everyone is welcome to try out PaddleNLP pretrained models on the 🤗Huggingface hub [here](https://huggingface.co/PaddlePaddle).
-
-* **September 6, 2022: [Release of PaddleNLP v2.4](<https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0>)**
-
-    * 🔨 NLP Tools: [NLP Pipeline System Pipelines](./pipelines) has been released, supporting the rapid construction of search engines and question-answering systems, and can be extended to support various NLP systems, making it easy, flexible, and efficient to solve NLP tasks like building blocks!
-    * 💎 Industrial Applications: A new [text classification full-process application solution](./applications/text_classification) has been added, covering various scenarios such as multi-classification, multi-label, and hierarchical classification, supporting small-sample learning and TrustAI trustworthy computing model training and tuning.
-    * 🍭 AIGC: The SOTA model [CodeGen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/code_generation/codegen) for code generation in various programming languages has been added.
-    * 💪 Framework Upgrade: [Automatic Model Compression API](./docs/compression.md) has been released, which automatically cuts and quantizes models, greatly reducing the threshold for using model compression technology. [Few-shot Prompt](./applications/text_classification/multi_class/few-shot) capability has been released, integrating classic algorithms such as PET, P-Tuning, and RGL.
+* **2023.08.15 [PaddleNLP v2.6](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0)**: Release [Full-process LLM toolchain](./llm) , covering all aspects of pre-training, fine-tuning, compression, inference and deployment, providing users with end-to-end LLM solutions and one-stop development experience; built-in [4D parallel distributed Trainer](./docs/trainer.md ), [Efficient fine-tuning algorithm LoRA/Prefix Tuning](./llm#33-lora), [Self-developed INT8/INT4 quantization algorithm](./llm#6-quantization), etc.; fully supports [LLaMA 1/2](./llm/llama), [BLOOM](.llm/bloom), [ChatGLM 1/2](./llm/chatglm), [GLM](./llm/glm), [OPT](./llm/opt) and other mainstream LLMs.
 
 
+## Installation
 
+### Prerequisites
 
+* python >= 3.7
+* paddlepaddle >= 2.6.0
+
+More information about PaddlePaddle installation please refer to [PaddlePaddle's Website](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html).
+
+### Python pip Installation
+
+```
+pip install --upgrade paddlenlp
+```
+
+or you can install the latest develop branch code with the following command:
+
+```shell
+pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+```
 
 
 ## Features
@@ -58,7 +63,7 @@
 
 ### Out-of-Box NLP Toolset
 
-Taskflow aims to provide off-the-shelf NLP pre-built task covering NLU and NLG technique, in the meanwhile with extreamly fast infernece satisfying industrial scenario.
+Taskflow aims to provide off-the-shelf NLP pre-built task covering NLU and NLG technique, in the meanwhile with extremely fast inference satisfying industrial scenario.
 
 ![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
@@ -114,7 +119,7 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 
 #### Wide-range NLP Task Support
 
-PaddleNLP provides rich examples covering mainstream NLP task to help developers accelerate problem solving. You can find our powerful transformer [Model Zoo](./model_zoo), and wide-range NLP application [exmaples](./examples) with detailed instructions.
+PaddleNLP provides rich examples covering mainstream NLP task to help developers accelerate problem solving. You can find our powerful transformer [Model Zoo](./model_zoo), and wide-range NLP application [examples](./examples) with detailed instructions.
 
 Also you can run our interactive [Notebook tutorial](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995) on AI Studio, a powerful platform with **FREE** computing resource.
 
@@ -169,9 +174,9 @@ For more pretrained model usage, please refer to [Transformer API Docs](./docs/m
 
 ### Industrial End-to-end System
 
-We provide high value scenarios including information extraction, semantic retrieval, questionn answering high-value.
+We provide high value scenarios including information extraction, semantic retrieval, question answering high-value.
 
-For more details industial cases please refer to [Applications](./applications).
+For more details industrial cases please refer to [Applications](./applications).
 
 
 #### 🔍 Neural Search System
@@ -231,7 +236,7 @@ AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 
 Set `use_fast=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FastTokenizer](./fast_tokenizer).
 
-#### ⚡ FastGeneration: High Perforance Generation Library
+#### ⚡ FastGeneration: High Performance Generation Library
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407831-914dced0-3a5a-40b8-8a65-ec82bf13e53c.gif" width="400">
@@ -257,30 +262,9 @@ Set `use_fast=True` to achieve 5x speedup for Transformer, GPT, BART, PLATO, Uni
 For more super large-scale model pre-training details please refer to [GPT-3](./examples/language_model/gpt-3).
 
 
-## Installation
-
-### Prerequisites
-
-* python >= 3.7
-* paddlepaddle >= 2.3
-
-More information about PaddlePaddle installation please refer to [PaddlePaddle's Website](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html).
-
-### Python pip Installation
-
-```
-pip install --upgrade paddlenlp
-```
-
-or you can install the latest develop branch code with the following command:
-
-```shell
-pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
-```
-
 ## Quick Start
 
-**Taskflow** aims to provide off-the-shelf NLP pre-built task covering NLU and NLG scenario, in the meanwhile with extreamly fast infernece satisfying industrial applications.
+**Taskflow** aims to provide off-the-shelf NLP pre-built task covering NLU and NLG scenario, in the meanwhile with extremely fast inference satisfying industrial applications.
 
 ```python
 from paddlenlp import Taskflow

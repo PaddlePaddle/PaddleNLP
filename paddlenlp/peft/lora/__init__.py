@@ -18,5 +18,6 @@ from .lora_layers import (
     ColumnParallelLoRAMergedLinear,
     LoRALinear,
     LoRAMergedLinear,
+    RowParallelLoRALinear,
 )
 from .lora_model import LoRAModel

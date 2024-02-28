@@ -13,6 +13,13 @@
 # limitations under the License.
 
 
+def process_optim_configs(config):
+    """
+    process optim configs for auto parallel
+    """
+    config["Optimizer"]["lr"]["decay_steps"] *= config["Global"]["global_batch_size"]
+
+
 def process_model_configs(config):
     """
     process model configs for auto parallel
@@ -52,5 +59,6 @@ def process_configs(config):
 
     process_model_configs(config)
     process_data_configs(config)
+    process_optim_configs(config)
 
     return config

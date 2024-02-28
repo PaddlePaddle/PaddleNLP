@@ -35,7 +35,6 @@ class DefaultConfig:
     min_length = 0
     max_length = 16
     decode_strategy = "greedy_search"
-    load_state_as_np = True
     use_faster = True
     use_fp16_decoding = True
     default_dtype = "float16" if use_faster and use_fp16_decoding else "float32"
@@ -64,9 +63,7 @@ paddle.set_device(generate_config.device)
 paddle.set_default_dtype(generate_config.default_dtype)
 
 tokenizer = CodeGenTokenizer.from_pretrained(generate_config.model_name_or_path)
-model = CodeGenForCausalLM.from_pretrained(
-    generate_config.model_name_or_path, load_state_as_np=generate_config.load_state_as_np
-)
+model = CodeGenForCausalLM.from_pretrained(generate_config.model_name_or_path)
 
 app = FastAPI()
 

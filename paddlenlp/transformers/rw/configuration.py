@@ -18,6 +18,7 @@ RW_PRETRAINED_INIT_CONFIGURATION = {
     "model_state": {
         "tiiuae/falcon-7b": "https://bj.bcebos.com/paddlenlp/models/community/tiiuae/falcon-7b/model_state.pdparams",
         "tiiuae/falcon-7b-instruct": "https://bj.bcebos.com/paddlenlp/models/community/tiiuae/falcon-7b-instruct/model_state.pdparams",
+        "OpenBuddy/openbuddy-falcon-7b-v5-fp16": "https://bj.bcebos.com/paddlenlp/models/community/OpenBuddy/openbuddy-falcon-7b-v5-fp16/model_state.pdparams",
     },
 }
 
@@ -50,7 +51,6 @@ class RWConfig(PretrainedConfig):
         bias=False,
         alibi=False,
         parallel_attn=False,
-        lm_shift_labels=True,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -72,7 +72,6 @@ class RWConfig(PretrainedConfig):
         self.alibi = alibi
         self.bias = bias
         self.parallel_attn = parallel_attn
-        self.lm_shift_labels = lm_shift_labels
 
         super().__init__(bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
 

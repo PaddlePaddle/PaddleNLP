@@ -37,13 +37,13 @@ def set_seed(seed):
 
 
 def do_generated_inputs(args):
-    if args.device == "gpu":
-        rank = dist.get_rank()
-        trainer_count = dist.get_world_size()
-    else:
+    if args.device == "cpu":
         rank = 0
         trainer_count = 1
         paddle.set_device("cpu")
+    else:
+        rank = dist.get_rank()
+        trainer_count = dist.get_world_size()
 
     if trainer_count > 1:
         dist.init_parallel_env()

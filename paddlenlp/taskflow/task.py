@@ -98,7 +98,7 @@ class Task(metaclass=abc.ABCMeta):
         """
 
     @abstractmethod
-    def _run_model(self, inputs):
+    def _run_model(self, inputs, **kwargs):
         """
         Run the task model from the outputs of the `_tokenize` function.
         """
@@ -246,7 +246,7 @@ class Task(metaclass=abc.ABCMeta):
             onnx_dir = os.path.join(self._task_path, "onnx", self.export_type)
 
         if not os.path.exists(onnx_dir):
-            os.mkdir(onnx_dir)
+            os.makedirs(onnx_dir, exist_ok=True)
         float_onnx_file = os.path.join(onnx_dir, "model.onnx")
         if not os.path.exists(float_onnx_file) or self._param_updated:
             onnx_model = paddle2onnx.command.c_paddle_to_onnx(
@@ -522,8 +522,8 @@ class Task(metaclass=abc.ABCMeta):
         """
         print("Examples:\n{}".format(self._usage))
 
-    def __call__(self, *args):
+    def __call__(self, *args, **kwargs):
         inputs = self._preprocess(*args)
-        outputs = self._run_model(inputs)
+        outputs = self._run_model(inputs, **kwargs)
         results = self._postprocess(outputs)
         return results

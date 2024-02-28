@@ -99,6 +99,7 @@ function _train(){
                -o Distributed.sharding.sharding_degree=${sharding_degree} \
                -o Distributed.sharding.sharding_stage=${sharding_stage} \
                -o Distributed.sharding.sharding_offload=${sharding_offload} \
+               -o Profiler_pretrain.memory_stats=True \
                -o Optimizer.lr.max_lr=1e-4 \
                -o Optimizer.lr.min_lr=1e-5 "
 
@@ -133,11 +134,6 @@ function _train(){
     esac
     cd ../
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
-    if [[ ${run_mode} =~ "DP1-MP1-PP8" || ${run_mode} =~ "DP1-MP2-PP4" ]]; then
-        # TDDO:nccl to 2.15
-        echo "export PADDLE_USE_FOUR_DIRECTIONS_P2P=True"
-        export PADDLE_USE_FOUR_DIRECTIONS_P2P=True
-    fi
     if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间
         ${train_cmd} > ${log_file} 2>&1
     else
@@ -150,8 +146,10 @@ function _train(){
     fi
     #kill -9 `ps -ef|grep 'python'|awk '{print $2}'`
     if [ ${device_num} != "N1C1" -a -d mylog ]; then
+        case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/model_zoo/gpt-3/benchmarks
+        cp -r ${case_path}/mylog/workerlog.* ./mylog/
         rm ${log_file}
-        cp mylog/workerlog.${workerlog_id} ${log_file}
+        cp ${case_path}/mylog/workerlog.${workerlog_id} ${log_file}
     fi
 }
 

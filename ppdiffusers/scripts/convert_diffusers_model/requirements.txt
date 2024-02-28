@@ -1,7 +1,0 @@
-ppdiffusers>0.9.0
-paddlenlp>=2.5.0
-paddlepaddle-gpu
-torch
-diffusers
-transformers
-omegaconf

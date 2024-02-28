@@ -48,11 +48,11 @@ python3 -m pip install paddlepaddle-gpu paddlenlp -i https://mirror.baidu.com/py
 3. 更多关于PaddleNLP安装的详细教程请查看[Installation](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
 
 
-### 安装FastTokenizers文本处理加速库（可选）
+### 安装FastTokenizer文本处理加速库（可选）
 
-推荐安装fast_tokenizer可以得到更极致的文本处理效率，进一步提升服务性能。
+> 重要提示：由于FastTokenizer长时间未得到维护，因此可能会遇到训练（基于Python实现的tokenizer）与部署（基于C++实现的tokenizer）阶段分词不一致的问题。为了确保稳定性和一致性，我们建议避免安装该库。
 
-在容器内安装 fast_tokenizer
+如果想要安装fast_tokenizer，以获得更高的文本处理效率，从而显著提升服务性能。您可以通过以下命令进行安装：
 ```shell
 python3 -m pip install fast-tokenizer-python
 ```

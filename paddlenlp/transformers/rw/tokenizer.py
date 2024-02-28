@@ -63,10 +63,12 @@ class RWTokenizer(GPTTokenizer):
         "vocab_file": {
             "falcon-7b": "https://bj.bcebos.com/paddlenlp/models/community/tiiuae/falcon-7b/vocab.json",
             "falcon-7b-instruct": "https://bj.bcebos.com/paddlenlp/models/community/tiiuae/falcon-7b-instruct/vocab.json",
+            "OpenBuddy/openbuddy-falcon-7b-v5-fp16": "https://bj.bcebos.com/paddlenlp/models/community/OpenBuddy/openbuddy-falcon-7b-v5-fp16/vocab.json",
         },
         "merges_file": {
             "falcon-7b": "https://bj.bcebos.com/paddlenlp/models/community/tiiuae/falcon-7b/merges.txt",
             "falcon-7b-instruct": "https://bj.bcebos.com/paddlenlp/models/community/tiiuae/falcon-7b-instruct/merges.txt",
+            "OpenBuddy/openbuddy-falcon-7b-v5-fp16": "https://bj.bcebos.com/paddlenlp/models/community/OpenBuddy/openbuddy-falcon-7b-v5-fp16/merges.txt",
         },
     }
     padding_side = "right"
@@ -78,4 +80,17 @@ class RWTokenizer(GPTTokenizer):
                 "vocabulary from a pretrained model please use "
                 "`tokenizer = RWTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`".format(vocab_file)
             )
+
+        self.spaces_between_special_tokens = kwargs.get("spaces_between_special_tokens", True)
         super().__init__(vocab_file, merges_file, **kwargs)
+
+    def decode(
+        self, token_ids, skip_special_tokens: bool = False, clean_up_tokenization_spaces: bool = True, **kwargs
+    ) -> str:
+        return super(RWTokenizer, self).decode(
+            token_ids=token_ids,
+            skip_special_tokens=skip_special_tokens,
+            clean_up_tokenization_spaces=clean_up_tokenization_spaces,
+            spaces_between_special_tokens=self.spaces_between_special_tokens,
+            **kwargs,
+        )

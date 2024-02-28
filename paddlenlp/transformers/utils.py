@@ -21,8 +21,10 @@ import inspect
 import os
 import re
 import shutil
+import sys
 import warnings
 from contextlib import ExitStack
+from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, ContextManager, List, Optional, Type, Union
 
@@ -53,6 +55,8 @@ from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.import_utils import import_module
 from paddlenlp.utils.log import logger
 
+from .aistudio_utils import aistudio_download
+
 HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
 
 
@@ -70,13 +74,13 @@ def convert_ndarray_dtype(np_array: np.ndarray, target_dtype: str) -> np.ndarray
     if source_dtype == "uint16" or target_dtype == "bfloat16":
         tensor = paddle.to_tensor(np_array)
         tensor = paddle.cast(tensor, target_dtype)
-        return tensor.numpy()
+        return tensor.cpu().numpy()
 
         # TODO(wj-Mcat): device_guard will slow the converting
         # with device_guard("cpu"):
         #     tensor = paddle.to_tensor(np_array)
         #     tensor = paddle.cast(tensor, target_dtype)
-        # return tensor.numpy()
+        # return tensor.cpu().numpy()
 
     if target_dtype == "bfloat16":
         target_dtype = "uint16"
@@ -139,7 +143,9 @@ def adapt_stale_fwd_patch(self, name, value):
         # NOTE(guosheng): In dygraph to static, `layer.forward` would be patched
         # by an instance of `StaticFunction`. And use string compare to avoid to
         # import fluid.
-        if type(value).__name__.endswith("StaticFunction"):
+        if type(value).__name__.endswith("StaticFunction") or self.forward.__class__.__name__.endswith(
+            "StaticFunction"
+        ):
             return value
         if hasattr(inspect, "getfullargspec"):
             (
@@ -281,31 +287,20 @@ def param_in_func(func, param_field: str) -> bool:
     return param_field in result[0]
 
 
-def resolve_cache_dir(pretrained_model_name_or_path: str, from_hf_hub: bool, cache_dir: Optional[str] = None) -> str:
+def resolve_cache_dir(from_hf_hub: bool, from_aistudio: bool, cache_dir: Optional[str] = None) -> str:
     """resolve cache dir for PretrainedModel and PretrainedConfig
 
     Args:
-        pretrained_model_name_or_path (str): the name or path of pretrained model
         from_hf_hub (bool): if load from huggingface hub
         cache_dir (str): cache_dir for models
     """
-    if os.path.isdir(pretrained_model_name_or_path):
-        return pretrained_model_name_or_path
-
-    # hf hub library takes care of appending the model name so we don't append the model name
+    if cache_dir is not None:
+        return cache_dir
+    if from_aistudio:
+        return None
     if from_hf_hub:
-        if cache_dir is not None:
-            return cache_dir
-        else:
-            return HF_CACHE_HOME
-    else:
-        if cache_dir is not None:
-            # since model_clas.from_pretrained calls config_clas.from_pretrained, the model_name may get appended twice
-            if cache_dir.endswith(pretrained_model_name_or_path):
-                return cache_dir
-            else:
-                return os.path.join(cache_dir, pretrained_model_name_or_path)
-        return os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        return HF_CACHE_HOME
+    return MODEL_HOME
 
 
 def find_transformer_model_type(model_class: Type) -> str:
@@ -403,8 +398,14 @@ def paddlenlp_hub_download(
     *,
     subfolder: Optional[str] = None,
     cache_dir: Union[str, Path, None] = None,
-    local_dir: Union[str, Path, None] = None,
+    pretrained_model_name_or_path: str = None,
 ) -> str:
+    if subfolder is None:
+        subfolder = ""
+    if pretrained_model_name_or_path is not None and is_url(repo_id):
+        cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
+    else:
+        cache_dir = os.path.join(cache_dir, repo_id, subfolder)
 
     # check in cache_dir
     weight_file_path = os.path.join(cache_dir, filename)
@@ -442,7 +443,10 @@ def paddlenlp_hub_download(
         return None
 
     # find in community repo
-    community_model_file_path = "/".join([COMMUNITY_MODEL_PREFIX, repo_id, filename])
+    url_list = [COMMUNITY_MODEL_PREFIX, repo_id, filename]
+    if subfolder != "":
+        url_list.insert(2, subfolder)
+    community_model_file_path = "/".join(url_list)
     assert is_url(community_model_file_path)
 
     # check wether the target file exist in the comunity bos server
@@ -465,9 +469,11 @@ def cached_file(
     filename: str,
     cache_dir: Optional[Union[str, os.PathLike]] = None,
     subfolder: str = "",
+    from_aistudio: bool = False,
     _raise_exceptions_for_missing_entries: bool = True,
     _raise_exceptions_for_connection_errors: bool = True,
-):
+    pretrained_model_name_or_path=None,
+) -> str:
     """
     Tries to locate a file in a local folder and repo, downloads and cache it if necessary.
     Args:
@@ -510,30 +516,40 @@ def cached_file(
                 return None
         return resolved_file
 
-    if cache_dir is None:
-        cache_dir = os.path.join(MODEL_HOME, ".cache")
-    if isinstance(cache_dir, Path):
+    if cache_dir is not None and isinstance(cache_dir, Path):
         cache_dir = str(cache_dir)
 
-    try:
-        # Load from URL or cache if already cached
-        # import pdb;pdb.set_trace()
-        resolved_file = paddlenlp_hub_download(
-            path_or_repo_id,
-            filename,
-            subfolder=None if len(subfolder) == 0 else subfolder,
-            # revision=revision,
-            cache_dir=cache_dir,
-        )
-    except HTTPError as err:
-        # First we try to see if we have a cached version (not up to date):
-        resolved_file = try_to_load_from_cache(path_or_repo_id, full_filename, cache_dir=cache_dir)
-        if resolved_file is not None and resolved_file != _CACHED_NO_EXIST:
-            return resolved_file
-        if not _raise_exceptions_for_connection_errors:
-            return None
+    if from_aistudio:
+        try:
+            resolved_file = aistudio_download(
+                repo_id=path_or_repo_id, filename=filename, subfolder=subfolder, cache_dir=cache_dir
+            )
+        except:
+            resolved_file = None
+    else:
+        # if cache_dir is None:
+        #     cache_dir = os.path.join(MODEL_HOME, ".cache")
+        try:
+            # Load from URL or cache if already cached
+            resolved_file = paddlenlp_hub_download(
+                path_or_repo_id,
+                filename,
+                subfolder=None if len(subfolder) == 0 else subfolder,
+                # revision=revision,
+                cache_dir=cache_dir,
+                pretrained_model_name_or_path=pretrained_model_name_or_path,
+            )
+        except HTTPError as err:
+            # First we try to see if we have a cached version (not up to date):
+            resolved_file = try_to_load_from_cache(path_or_repo_id, full_filename, cache_dir=cache_dir)
+            if resolved_file is not None and resolved_file != _CACHED_NO_EXIST:
+                return resolved_file
+            if not _raise_exceptions_for_connection_errors:
+                return None
 
-        raise EnvironmentError(f"There was a specific connection error when trying to load {path_or_repo_id}:\n{err}")
+            raise EnvironmentError(
+                f"There was a specific connection error when trying to load {path_or_repo_id}:\n{err}"
+            )
 
     return resolved_file
 
@@ -573,7 +589,7 @@ def cached_file_for_hf_hub(
         download_check(path_or_repo_id, full_filename, addition="from_hf_hub")
         resolved_file = hf_hub_download(
             repo_id=path_or_repo_id,
-            filename=full_filename,
+            filename=filename,
             cache_dir=cache_dir,
             subfolder=subfolder,
             library_name="PaddleNLP",
@@ -582,12 +598,17 @@ def cached_file_for_hf_hub(
         return resolved_file
     except Exception as e:
         print(e)
-        raise EnvironmentError(
-            f"{path_or_repo_id} is not a local folder and is not a valid model identifier "
-            "listed on 'https://huggingface.co/models'\nIf this is a private repository, make sure to "
+        msg = f"""
+            {path_or_repo_id} is not a local folder and is not a valid model identifier "
+            "listed on 'https://huggingface.co/models' If this is a private repository, make sure to "
             "pass a token having permission to this repo with `use_auth_token` or log in with "
-            "`huggingface-cli login` and pass `use_auth_token=True`."
-        )
+            "`huggingface-cli login` and pass `use_auth_token=True`.
+            """
+        if _raise_exceptions_for_missing_entries:
+            raise EnvironmentError(msg)
+        else:
+            logger.info(msg)
+            return None
 
 
 def get_checkpoint_shard_files(
@@ -595,6 +616,8 @@ def get_checkpoint_shard_files(
     index_filename,
     cache_dir=None,
     subfolder="",
+    from_aistudio=False,
+    from_hf_hub=False,
 ):
     """
     For a given model:
@@ -618,6 +641,12 @@ def get_checkpoint_shard_files(
     sharded_metadata["all_checkpoint_keys"] = list(index["weight_map"].keys())
     sharded_metadata["weight_map"] = index["weight_map"].copy()
 
+    file_map = {file: set() for file in shard_filenames}
+    for weight, file in index["weight_map"].items():
+        file_map[file].add(weight)
+
+    sharded_metadata["file_map"] = file_map
+
     # First, let's deal with local folder.
     if os.path.isdir(pretrained_model_name_or_path):
         shard_filenames = [os.path.join(pretrained_model_name_or_path, subfolder, f) for f in shard_filenames]
@@ -636,12 +665,27 @@ def get_checkpoint_shard_files(
     show_progress_bar = last_shard is None
     for shard_filename in tqdm.tqdm(shard_filenames, desc="Downloading shards", disable=not show_progress_bar):
         try:
-            cached_filename = paddlenlp_hub_download(
-                pretrained_model_name_or_path,
-                shard_filename,
-                subfolder=None if len(subfolder) == 0 else subfolder,
-                cache_dir=cache_dir,
-            )
+            if from_aistudio:
+                cached_filename = aistudio_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=shard_filename,
+                    subfolder=subfolder,
+                    cache_dir=cache_dir,
+                )
+            elif from_hf_hub:
+                cached_filename = hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=shard_filename,
+                    subfolder=subfolder,
+                    cache_dir=cache_dir,
+                )
+            else:
+                cached_filename = paddlenlp_hub_download(
+                    pretrained_model_name_or_path,
+                    shard_filename,
+                    subfolder=None if len(subfolder) == 0 else subfolder,
+                    cache_dir=cache_dir,
+                )
         # We have already dealt with RepositoryNotFoundError and RevisionNotFoundError when getting the index, so
         # we don't have to catch them here.
         except EntryNotFoundError:
@@ -683,6 +727,8 @@ def paddlenlp_load(path, map_location="cpu"):
         return paddle.load(path, return_numpy=True)
     else:
         with device_guard(map_location):
+            return paddle.load(path)
+            # TODO(zhonghui03): the following code has problems when hot start optimizer checkpoint.
             if map_location == "cpu":
                 from paddle.framework.io import (
                     _parse_every_object,
@@ -693,7 +739,7 @@ def paddlenlp_load(path, map_location="cpu"):
                 def _ndarray_to_tensor(obj, return_numpy=False):
                     if return_numpy:
                         return obj
-                    if paddle.fluid.framework.in_dygraph_mode():
+                    if paddle.in_dynamic_mode():
                         return paddle.Tensor(obj, zero_copy=True)
                     else:
                         return _to_LodTensor(obj)
@@ -785,3 +831,108 @@ def dtype_byte_size(dtype):
         raise ValueError(f"`dtype` is not a valid dtype: {dtype}.")
     bit_size = int(bit_search.groups()[0])
     return bit_size // 8
+
+
+def apply_print_resets(buf):
+    return re.sub(r"^.*\r", "", buf, 0, re.M)
+
+
+class CaptureStd:
+    """
+    Context manager to capture:
+
+        - stdout: replay it, clean it up and make it available via `obj.out`
+        - stderr: replay it and make it available via `obj.err`
+
+    Args:
+        out (`bool`, *optional*, defaults to `True`): Whether to capture stdout or not.
+        err (`bool`, *optional*, defaults to `True`): Whether to capture stderr or not.
+        replay (`bool`, *optional*, defaults to `True`): Whether to replay or not.
+            By default each captured stream gets replayed back on context's exit, so that one can see what the test was
+            doing. If this is a not wanted behavior and the captured data shouldn't be replayed, pass `replay=False` to
+            disable this feature.
+
+    Examples:
+
+    ```python
+    # to capture stdout only with auto-replay
+    with CaptureStdout() as cs:
+        print("Secret message")
+    assert "message" in cs.out
+
+    # to capture stderr only with auto-replay
+    import sys
+
+    with CaptureStderr() as cs:
+        print("Warning: ", file=sys.stderr)
+    assert "Warning" in cs.err
+
+    # to capture both streams with auto-replay
+    with CaptureStd() as cs:
+        print("Secret message")
+        print("Warning: ", file=sys.stderr)
+    assert "message" in cs.out
+    assert "Warning" in cs.err
+
+    # to capture just one of the streams, and not the other, with auto-replay
+    with CaptureStd(err=False) as cs:
+        print("Secret message")
+    assert "message" in cs.out
+    # but best use the stream-specific subclasses
+
+    # to capture without auto-replay
+    with CaptureStd(replay=False) as cs:
+        print("Secret message")
+    assert "message" in cs.out
+    ```"""
+
+    def __init__(self, out=True, err=True, replay=True):
+        self.replay = replay
+
+        if out:
+            self.out_buf = StringIO()
+            self.out = "error: CaptureStd context is unfinished yet, called too early"
+        else:
+            self.out_buf = None
+            self.out = "not capturing stdout"
+
+        if err:
+            self.err_buf = StringIO()
+            self.err = "error: CaptureStd context is unfinished yet, called too early"
+        else:
+            self.err_buf = None
+            self.err = "not capturing stderr"
+
+    def __enter__(self):
+        if self.out_buf:
+            self.out_old = sys.stdout
+            sys.stdout = self.out_buf
+
+        if self.err_buf:
+            self.err_old = sys.stderr
+            sys.stderr = self.err_buf
+
+        return self
+
+    def __exit__(self, *exc):
+        if self.out_buf:
+            sys.stdout = self.out_old
+            captured = self.out_buf.getvalue()
+            if self.replay:
+                sys.stdout.write(captured)
+            self.out = apply_print_resets(captured)
+
+        if self.err_buf:
+            sys.stderr = self.err_old
+            captured = self.err_buf.getvalue()
+            if self.replay:
+                sys.stderr.write(captured)
+            self.err = captured
+
+    def __repr__(self):
+        msg = ""
+        if self.out_buf:
+            msg += f"stdout: {self.out}\n"
+        if self.err_buf:
+            msg += f"stderr: {self.err}\n"
+        return msg

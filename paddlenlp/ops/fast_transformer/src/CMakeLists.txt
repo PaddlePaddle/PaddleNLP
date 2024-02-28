@@ -48,7 +48,7 @@ if(ON_INFER)
     message(FATAL_ERROR "please set DEMO with -DDEMO=demo_name")
   endif()
 
-  include_directories("${PADDLE_LIB}/")
+  include_directories("${PADDLE_LIB}/paddle/include")
   set(PADDLE_LIB_THIRD_PARTY_PATH "${PADDLE_LIB}/third_party/install/")
   include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}protobuf/include")
   include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}glog/include")
@@ -89,7 +89,7 @@ if(ON_INFER)
     if(WITH_MKL)
       set(FLAG_OPENMP "-fopenmp")
     endif()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 ${FLAG_OPENMP}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FLAG_OPENMP}")
   endif()
 
   if (USE_TENSORRT AND WITH_GPU)
@@ -124,7 +124,7 @@ if(ON_INFER)
       if(WIN32)
         set(MKLDNN_LIB ${MKLDNN_PATH}/lib/mkldnn.lib)
       else(WIN32)
-        set(MKLDNN_LIB ${MKLDNN_PATH}/lib/libmkldnn.so.0)
+        set(MKLDNN_LIB ${MKLDNN_PATH}/lib/libdnnl.so.3)
       endif(WIN32)
     endif()
   else()
@@ -279,22 +279,41 @@ else(ON_INFER)
     )
   endif()
 
-  if(EXISTS ${PY_LIB_DIR}/../fluid/libpaddle.so)
-    set(lib_link
-      -lpaddle
+  if(EXISTS ${PY_LIB_DIR}/../fluid/)
+    if(EXISTS ${PY_LIB_DIR}/../fluid/libpaddle.so)
+      set(lib_link
+        -lpaddle
+      )
+    elseif(EXISTS ${PY_LIB_DIR}/../fluid/core_avx.so)
+      set(lib_link
+        -l:core_avx.so
+      )
+    else()
+      set(lib_link
+        -l:core_noavx.so
+      )
+    endif()
+    link_directories(
+      ${PY_LIB_DIR}/../fluid/
     )
-  elseif(EXISTS ${PY_LIB_DIR}/../fluid/core_avx.so)
-    set(lib_link
-      -l:core_avx.so
-    )
-  else()
-    set(lib_link
-      -l:core_noavx.so
+  elseif(EXISTS ${PY_LIB_DIR}/../base/)
+    if(EXISTS ${PY_LIB_DIR}/../base/libpaddle.so)
+      set(lib_link
+        -lpaddle
+      )
+    elseif(EXISTS ${PY_LIB_DIR}/../base/core_avx.so)
+      set(lib_link
+        -l:core_avx.so
+      )
+    else()
+      set(lib_link
+        -l:core_noavx.so
+      )
+    endif()
+    link_directories(
+      ${PY_LIB_DIR}/../base/
     )
   endif()
-  link_directories(
-    ${PY_LIB_DIR}/../fluid/
-  )
 
   set(ft_lib_link
     -ldecoder -ldecoding -ltopk -lcuda_int8_kernels -lcuda_kernels -lonline_softmax_beamsearch -ltransformer_kernels -lattention_kernels -lencoder -lnccl_utils -lnvtx_utils

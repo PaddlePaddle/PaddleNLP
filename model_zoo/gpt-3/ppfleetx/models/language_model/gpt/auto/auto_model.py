@@ -24,9 +24,10 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.common_ops_import import convert_dtype
-from paddle.fluid import layers
+from paddle.base import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from ppfleetx.distributed.apis import auto_env
+from ppfleetx.utils.log import logger
 
 from ..dygraph.processor import (
     ForcedBOSTokenLogitsProcessor,
@@ -42,6 +43,40 @@ try:
 except:
     FusedDropoutAdd = None
 FusedDropoutAdd = None
+
+try:
+    from paddle.nn.functional.flash_attention import flash_attention
+except:
+    flash_attention = None
+
+try:
+    from paddle.jit.api import set_dynamic_shape
+except:
+    from paddle.jit.dy2static.utils_helper import set_dynamic_shape
+
+def shard_op_for_sequence_parallel_linear(tgt, mesh):
+    # FIXME Hack to shard op for module (linear)
+    # we only shard the second to the last op (matmul) leave the last op (elementwise_add) un-touched
+    last_op = tgt.block.ops[-2]
+    assert last_op.type in ["matmul", "matmul_v2"]
+    from paddle.distributed.auto_parallel.static.dist_context import get_default_distributed_context
+    from paddle.distributed.auto_parallel.static.dist_op import DistributedOperator
+    default_dist_ctx = get_default_distributed_context()
+    original_id = last_op.desc.original_id()
+    assert len(last_op.output_arg_names) == 1, "Output is more than one: [{}].".format(str(last_op))
+    assert original_id not in default_dist_ctx._dist_ops_for_program, "Op already has dist attribute."
+    
+    output_var_name = last_op.output_arg_names[0]
+    assert output_var_name != tgt.name, "out name: {}, output_var_name: {}".format(output_var_name, tgt.name)
+    dist_op = DistributedOperator(last_op)
+    output_tensor = dist_op.get_serial_output(output_var_name)
+    tensor_dist_attr = dist_op.dist_attr.get_output_dist_attr(output_var_name)
+    dims_mapping = [-1] * len(output_tensor.shape)
+    # NOTE explicitlly set the dims_mapping for DP since we could not distinguish with "Any" and "Replicated"
+    if auto_env.get_mesh().dp_dim is not None:
+        dims_mapping[1] = auto.static.utils.convert_to_dims_mapping([auto_env.get_mesh().dp_dim], mesh)[0]
+    tensor_dist_attr.dims_mapping = dims_mapping
+    tensor_dist_attr.mark_annotated("dims_mapping")
 
 
 def get_attr(layer, name):
@@ -77,7 +112,9 @@ class MultiHeadAttention(nn.Layer):
         scale_qk_coeff=1.0,
         use_recompute=False,
         recompute_granularity="full",
+        use_flash_attn=False,
         ipp=None,
+        sequence_parallel=False,
     ):
         super(MultiHeadAttention, self).__init__()
         self.embed_dim = embed_dim
@@ -91,6 +128,9 @@ class MultiHeadAttention(nn.Layer):
         self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
         self.ipp = ipp
+        self.use_flash_attn = use_flash_attn if flash_attention else None
+        self.sequence_parallel = sequence_parallel
+
 
         self.head_dim = embed_dim // num_heads
         assert self.head_dim * num_heads == self.embed_dim, "embed_dim[{}] must be divisible by num_heads[{}]".format(self.embed_dim, num_heads)
@@ -193,8 +233,32 @@ class MultiHeadAttention(nn.Layer):
             # incremental_state with initial value, mainly for usage like UniLM
             return self.Cache(key, value)
 
+    def _flash_attention(self, q, k, v, attn_mask=None):
+
+        # if sequence_parallel, the activation is [s, b, h], but flash attention lib need [b, s, h]
+        # we revert it to be [b, s, h] before 
+        if self.sequence_parallel:
+            perm = [1, 0, 2, 3]
+            q = tensor.transpose(x=q, perm=perm)
+            k = tensor.transpose(x=k, perm=perm)
+            v = tensor.transpose(x=v, perm=perm)
+
+        out, weights = flash_attention(
+            q, k, v, self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
+        )
+        out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
+
+        # and convert it back to [s, b, h] after
+        if self.sequence_parallel:
+            perm = [1, 0, 2]
+            out = tensor.transpose(x=out, perm=perm)
+
+        return (out, weights)
+
     def core_attn(self, q, k, v, attn_mask=None):
-        perm = [0, 2, 1, 3]
+        # input shape is [b, s, nhead, ndim] or [s, b, nhead, ndim] if sequence_parallel
+        # after transpose, [b, nhead, s, ndim] not matter sequence_parallel or not 
+        perm = [1, 2, 0, 3] if self.sequence_parallel else [0, 2, 1, 3]
         q = tensor.transpose(x=q, perm=perm)
         k = tensor.transpose(x=k, perm=perm)
         v = tensor.transpose(x=v, perm=perm)
@@ -218,7 +282,13 @@ class MultiHeadAttention(nn.Layer):
         out = paddle.matmul(weights, v)
 
         # combine heads
-        out = tensor.transpose(out, perm=[0, 2, 1, 3])
+        # before transpose, out is [b, nhead, s, ndim]
+        # after transpose, out need to be [b, s, nhead, ndim](not sp)  or  [s, b, nhead, ndim](not sp)
+        if self.sequence_parallel:
+            out = tensor.transpose(out, perm=[2, 0, 1, 3])
+        else:
+            out = tensor.transpose(out, perm=[0, 2, 1, 3])
+
         out = tensor.reshape(x=out, shape=[0, 0, -1])
 
         return out, weights
@@ -236,15 +306,24 @@ class MultiHeadAttention(nn.Layer):
         else:
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
 
-        if self.use_recompute and self.recompute_granularity == "core_attn":
-            out, weights = auto.recompute(self.core_attn)(q, k, v, attn_mask)
+        if self.use_flash_attn and attn_mask is None:
+            attn_func = self._flash_attention
         else:
-            out, weights = self.core_attn(q, k, v, attn_mask=attn_mask)
+            attn_func = self.core_attn
+
+        if self.use_recompute and self.recompute_granularity == "core_attn":
+            out, weights = auto.recompute(attn_func)(q, k, v, attn_mask)
+        else:
+            out, weights = attn_func(q, k, v, attn_mask=attn_mask)
 
         auto.shard_tensor(self.out_proj.weight, auto_env.get_mesh()[self.ipp], [auto_env.get_mesh().mp_dim, None])
 
         # project to output
         out = self.out_proj(out)
+
+        if self.sequence_parallel:
+            # FIXME Hack to shard op for module (linear)
+            shard_op_for_sequence_parallel_linear(out, auto_env.get_mesh()[self.ipp])    
 
         outs = [out]
         if self.need_weights:
@@ -267,6 +346,7 @@ class TransformerDecoder(nn.Layer):
         hidden_size=None,
         use_recompute=False,
         recompute_granularity="full",
+        sequence_parallel=False,
     ):
         super(TransformerDecoder, self).__init__()
 
@@ -279,6 +359,7 @@ class TransformerDecoder(nn.Layer):
             self.norm = nn.LayerNorm(hidden_size, epsilon=1e-5)
         elif norm is not None:
             raise ValueError("Only support LayerNorm")
+        self.sequence_parallel = sequence_parallel
 
     def forward(self, tgt, memory, tgt_mask=None, memory_mask=None, use_cache=False, cache=None):
         r"""
@@ -291,7 +372,17 @@ class TransformerDecoder(nn.Layer):
 
         for i, mod in enumerate(self.layers):
             ipp = mod.ipp
-            mod = auto.shard_op(mod, auto_env.get_mesh()[ipp])
+            # TODO(zhaoyingli) Annotation of SP and DP are conflict here!
+            # DP-PP required the input of Transformer Layer to be annotated as :
+            # auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().dp_dim, None, None])
+            # But the above annotation will cutoff the propagation of SP sharding when SP is used along.
+            # A better solution is to allow the DP sharding propagate across PP Mesh.  
+            if not self.sequence_parallel: 
+                auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().dp_dim, None, None])
+            elif auto_env.get_mesh().dp_dim is not None:
+                auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().sp_dim, auto_env.get_mesh().dp_dim, None])
+            else:
+                pass
 
             if cache is None:
                 if use_cache:
@@ -305,8 +396,6 @@ class TransformerDecoder(nn.Layer):
             else:
                 output, new_cache = mod(output, memory, tgt_mask=tgt_mask, use_cache=use_cache, cache=cache[i])
                 new_caches.append(new_cache)
-
-            auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().dp_dim, None, None])
 
         if self.norm is not None:
             output = self.norm(output)
@@ -351,8 +440,10 @@ class TransformerDecoderLayer(nn.Layer):
         scale_qk_coeff=1.0,
         use_recompute=False,
         recompute_granularity="full",
+        use_flash_attn=False,
         use_fused_dropout_add=True,
         ipp=None,
+        sequence_parallel=False,
     ):
         self._config = locals()
         self._config.pop("self")
@@ -365,6 +456,8 @@ class TransformerDecoderLayer(nn.Layer):
         self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
         self.ipp = ipp
+        self.sequence_parallel = sequence_parallel
+
         if not FusedDropoutAdd:
             self.use_fused_dropout_add = False
         else:
@@ -385,7 +478,9 @@ class TransformerDecoderLayer(nn.Layer):
             scale_qk_coeff=scale_qk_coeff,
             use_recompute=use_recompute,
             recompute_granularity=recompute_granularity,
+            use_flash_attn=use_flash_attn,
             ipp=ipp,
+            sequence_parallel=sequence_parallel,
         )
 
         self.linear1 = nn.Linear(d_model, dim_feedforward, weight_attrs[2], bias_attr=bias_attrs[2])
@@ -415,6 +510,11 @@ class TransformerDecoderLayer(nn.Layer):
         if self.normalize_before:
             tgt = self.norm1(tgt)
 
+        if self.sequence_parallel:
+            # NOTE since we don't support a semantic to distinguish with "Any" and "Replicated" in annotation 
+            # we need to annotate the "DP" expicitly here.
+            auto.shard_tensor(tgt, auto_env.get_mesh()[self.ipp], [None, auto_env.get_mesh().dp_dim, None])
+
         if use_cache is False:
             if self.use_recompute and self.recompute_granularity == "full_attn":
                 tgt = auto.recompute(self.self_attn)(tgt, None, None, tgt_mask, use_cache, cache)
@@ -422,6 +522,11 @@ class TransformerDecoderLayer(nn.Layer):
                 tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
         else:
             tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
+
+        if self.sequence_parallel:
+            # TODO(JZ-LIANG) make sure unsharded annotation would not be changed
+            auto.shard_tensor(tgt, auto_env.get_mesh()[self.ipp], [auto_env.get_mesh().sp_dim, auto_env.get_mesh().dp_dim, None])
+
         if not self.use_fused_dropout_add:
             tgt = residual + self.dropout1(tgt)
         else:
@@ -434,11 +539,27 @@ class TransformerDecoderLayer(nn.Layer):
         if self.normalize_before:
             tgt = self.norm2(tgt)
 
-        if not self.use_fused_dropout_add:
-            tgt = self.dropout2(self.linear2(self.activation(self.linear1(tgt))))
-            tgt = residual + tgt
+        if self.sequence_parallel:
+            # Enter TP Region
+            auto.shard_tensor(tgt, auto_env.get_mesh()[self.ipp], [None, auto_env.get_mesh().dp_dim, None])
+            tgt = self.linear2(self.activation(self.linear1(tgt)))
+            # NOTE shard_op to cut off the SP sharding propagation backward.
+            shard_op_for_sequence_parallel_linear(tgt, auto_env.get_mesh()[self.ipp])
+
+            # Enter SP Region
+            auto.shard_tensor(tgt, auto_env.get_mesh()[self.ipp], [auto_env.get_mesh().sp_dim, auto_env.get_mesh().dp_dim, None])
+            if not self.use_fused_dropout_add:
+                tgt = self.dropout2(tgt)
+                tgt = residual + tgt
+            else:
+                tgt = self.fused_dropout_add2(tgt, residual)
         else:
-            tgt = self.fused_dropout_add2(self.linear2(self.activation(self.linear1(tgt))), residual)
+            # Mixed SP and TP Region
+            if not self.use_fused_dropout_add:
+                tgt = self.dropout2(self.linear2(self.activation(self.linear1(tgt))))
+                tgt = residual + tgt
+            else:
+                tgt = self.fused_dropout_add2(self.linear2(self.activation(self.linear1(tgt))), residual)
 
         if not self.normalize_before:
             tgt = self.norm2(tgt)
@@ -464,8 +585,10 @@ class GPTEmbeddings(nn.Layer):
         type_vocab_size=16,
         initializer_range=0.02,
         freeze_embedding=False,
+        sequence_parallel=False,
     ):
         super(GPTEmbeddings, self).__init__()
+        self.sequence_parallel = sequence_parallel
         self.word_embeddings = nn.Embedding(
             vocab_size,
             hidden_size,
@@ -495,6 +618,15 @@ class GPTEmbeddings(nn.Layer):
         input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
         embeddings = input_embedings + position_embeddings
+
+        # [b, s, h] -> [s, b, h] 
+        if self.sequence_parallel:
+
+            auto.shard_tensor(embeddings, auto_env.get_mesh()[0], [auto_env.get_mesh().dp_dim, None, None]) # annotation to prevent unsharded propogation backward
+            embeddings = paddle.transpose(embeddings, perm=[1, 0, 2])
+            # TODO (JZ-LIANG) only constrain the sharding of seq axis propagate forward from here but not backward.
+            auto.shard_tensor(embeddings, auto_env.get_mesh()[0], [auto_env.get_mesh().sp_dim, auto_env.get_mesh().dp_dim, None])
+
         embeddings = self.dropout(embeddings)
         return embeddings
 
@@ -518,8 +650,10 @@ class GPTModelAuto(nn.Layer):
         scale_qk_by_layer_num=True,
         recompute_granularity="full",
         freeze_embedding=False,
+        use_flash_attn=False,
         fused_softmax_with_triangular=False,
         use_fused_dropout_add=True,
+        sequence_parallel=False,
     ):
 
         super(GPTModelAuto, self).__init__()
@@ -528,11 +662,19 @@ class GPTModelAuto(nn.Layer):
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
         self.fused_softmax_with_triangular = fused_softmax_with_triangular
+        self.sequence_parallel = sequence_parallel
 
         if not auto_env.get_mesh():
             raise RuntimeError(
                 "Please call auto_env.init_dist_env(config). AutoPrallel modeling need `mesh` to annotate distributed attribute."
             )
+
+        if use_flash_attn:
+            if flash_attention:
+                logger.info("Flash-attention enabled.")
+            else:
+                use_flash_attn = False
+                logger.warning("Flash-attention is not support in this Paddle version.")
 
         self.embeddings = GPTEmbeddings(
             vocab_size,
@@ -542,6 +684,7 @@ class GPTModelAuto(nn.Layer):
             type_vocab_size,
             self.initializer_range,
             freeze_embedding,
+            sequence_parallel=sequence_parallel,
         )
 
         layer_per_stage = num_layers // auto_env.get_mesh().pp_degree
@@ -571,7 +714,9 @@ class GPTModelAuto(nn.Layer):
                     use_recompute=use_recompute,
                     recompute_granularity=recompute_granularity,
                     use_fused_dropout_add=use_fused_dropout_add,
+                    use_flash_attn=use_flash_attn,
                     ipp=layer_to_pipe[i],
+                    sequence_parallel=sequence_parallel,
                 )
             )
 
@@ -582,6 +727,7 @@ class GPTModelAuto(nn.Layer):
             hidden_size=hidden_size,
             use_recompute=use_recompute,
             recompute_granularity=recompute_granularity,
+            sequence_parallel=sequence_parallel,
         )
 
     def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None):
@@ -627,7 +773,7 @@ class GPTModelAuto(nn.Layer):
             use_cache=use_cache,
             cache=cache,
         )
-
+        
         return encoder_outputs
 
 
@@ -644,6 +790,7 @@ class GPTForPretrainingAuto(nn.Layer):
     def __init__(self, gpt):
         super(GPTForPretrainingAuto, self).__init__()
         self.gpt = gpt
+        self.sequence_parallel = gpt.sequence_parallel
 
     def forward(
         self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
@@ -657,7 +804,15 @@ class GPTForPretrainingAuto(nn.Layer):
         else:
             encoder_outputs = outputs
 
-        x_dims_mapping = [auto_env.get_mesh().dp_dim] + [None] * (len(encoder_outputs.shape) - 1)
+        # FIXME should we force the encoder_outputs mesh is the last stage ? 
+        if self.sequence_parallel:
+            # NOTE Since Two Hard Rule Hack in Completion(line 464) and Reshard(line 1391) by @Aoyulong, the shard_tensor of op output 
+            # might be invalid in some cases. So we need to instead using shard_op for the input of next Op. 
+            # TODO Fix the above two hack in future.
+            # auto.shard_tensor(encoder_outputs, auto_env.get_mesh()[-1], [None, auto_env.get_mesh().dp_dim, None])
+            x_dims_mapping = [None, auto_env.get_mesh().dp_dim] + [None] * (len(encoder_outputs.shape) - 2)
+        else:
+            x_dims_mapping = [auto_env.get_mesh().dp_dim] + [None] * (len(encoder_outputs.shape) - 1)
         w_dims_mapping = [auto_env.get_mesh().mp_dim, None]
         matmul = auto.shard_op(paddle.matmul, auto_env.get_mesh()[-1], [x_dims_mapping, w_dims_mapping, None])
         logits = matmul(encoder_outputs, get_attr(self.gpt.embeddings.word_embeddings, "weight"), transpose_y=True)
@@ -673,9 +828,10 @@ class GPTPretrainingCriterionAuto(nn.Layer):
     Criterion for GPT. It calculates the final loss.
     """
 
-    def __init__(self):
+    def __init__(self, sequence_parallel=False):
         super(GPTPretrainingCriterionAuto, self).__init__()
         self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
+        self.sequence_parallel = sequence_parallel
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask):
         """
@@ -701,11 +857,15 @@ class GPTPretrainingCriterionAuto(nn.Layer):
         auto.shard_tensor(
             loss_mask, auto_env.get_mesh()[-1], [auto_env.get_mesh().dp_dim] + [None] * (len(loss_mask.shape) - 1)
         )
+        if self.sequence_parallel:
+            # [s, b, h] --> [b, s, h]
+            prediction_scores = prediction_scores.transpose([1, 0, 2])
 
         masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
 
         loss_mask = loss_mask.reshape([-1])
         masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
+
         loss = masked_lm_loss / loss_mask.sum()
         return loss
 
@@ -979,7 +1139,7 @@ class GPTForGenerationAuto(nn.Layer):
             x_dims_mapping = [auto_env.get_mesh().dp_dim] + [None] * (len(logits.shape) - 1)
             w_dims_mapping = [auto_env.get_mesh().mp_dim, None]
             matmul = auto.shard_op(paddle.matmul, auto_env.get_mesh()[-1], [x_dims_mapping, w_dims_mapping, None])
-            with paddle.fluid.name_scope("skip_quant"):
+            with paddle.base.name_scope("skip_quant"):
                 logits = matmul(logits, get_attr(self.gpt.embeddings.word_embeddings, "weight"), transpose_y=True)
 
             # [batch_size, vocab_size]
@@ -1051,7 +1211,7 @@ class GPTForGenerationAuto(nn.Layer):
 
         attn_mask = model_kwargs["attention_mask"]
         # make the shape of attention_mask = (-1, -1, -1, -1) in dy2static.
-        model_kwargs["attention_mask"] = paddle.reshape(attn_mask, paddle.shape(attn_mask))
+        set_dynamic_shape(model_kwargs["attention_mask"], [-1, -1, -1, -1])
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
         max_length = paddle.to_tensor(max_length)
         while cur_len < max_length:
@@ -1148,10 +1308,20 @@ class GPTForGenerationAuto(nn.Layer):
 
         if self.inference:
             # Note(ZhenyuLi): Avoid the synchronization caused by scale in dy2static
-            min_len = input_ids.shape[-1]
-            max_len = input_ids.shape[-1]
-            paddle.increment(min_len, min_length)
-            paddle.increment(max_len, max_length)
+            if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+                # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior
+                # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+                # removed after static graphs support inplace and stride.
+                with paddle.framework._no_check_dy2st_diff():
+                    min_len = input_ids.shape[-1]
+                    max_len = input_ids.shape[-1]
+                    paddle.increment(min_len, min_length)
+                    paddle.increment(max_len, max_length)
+            else:
+                min_len = input_ids.shape[-1]
+                max_len = input_ids.shape[-1]
+                paddle.increment(min_len, min_length)
+                paddle.increment(max_len, max_length)
         else:
             input_len = input_ids.shape[-1]
             max_len = max_length + input_len
@@ -1174,18 +1344,36 @@ class GPTForGenerationAuto(nn.Layer):
                 input_ids, model_kwargs = self.expand_inputs_for_generation(
                     input_ids, expand_size=num_return_sequences, **model_kwargs
                 )
-
-            ret = self.sample(
-                input_ids,
-                logits_processors,
-                max_len,
-                pad_token_id,
-                eos_token_id,
-                top_k,
-                top_p,
-                temperature,
-                **model_kwargs,
-            )
+            if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+                # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior
+                # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+                # removed after static graphs support inplace and stride.
+                with paddle.framework._no_check_dy2st_diff():
+                    ret = self.sample(
+                        input_ids,
+                        logits_processors,
+                        max_len,
+                        pad_token_id,
+                        eos_token_id,
+                        top_k,
+                        top_p,
+                        temperature,
+                        **model_kwargs,
+                    )
+            else:
+                ret = self.sample(
+                    input_ids,
+                    logits_processors,
+                    max_len,
+                    pad_token_id,
+                    eos_token_id,
+                    top_k,
+                    top_p,
+                    temperature,
+                    **model_kwargs,
+                )
         else:
             raise ValueError(f"Not support {decode_strategy} strategy yet!")
         return ret
+
+

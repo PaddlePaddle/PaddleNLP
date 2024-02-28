@@ -17,6 +17,11 @@ export nlp_dir=${PWD}
 export log_path=${nlp_dir}/model_logs
 export cudaid1=$2
 export cudaid2=$3
+export C_COMPILER_PATH=$(which gcc)
+export CXX_COMPILER_PATH=$(which g++)
+export CC=$(which gcc)
+export CXX=$(which g++)
+
 if [ ! -d "model_logs" ];then
     mkdir model_logs
 fi
@@ -120,6 +125,7 @@ export CUDA_VISIBLE_DEVICES=${cudaid2}
 # cd ${nlp_dir}/model_zoo/bert/
 # wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/bert.tar.gz
 # tar -xzvf bert.tar.gz
+python -c "import datasets;from datasets import load_dataset; train_dataset=load_dataset('glue', 'sst2', split='train')"
 cd ${nlp_dir}/model_zoo/bert/data/
 wget -q https://bj.bcebos.com/paddlenlp/models/transformers/bert/data/training_data.hdf5
 cd ../
@@ -228,113 +234,13 @@ time (python -u ./run_pretrain.py \
     --device gpu >${log_path}/electra_pretrain) >>${log_path}/electra_pretrain 2>&1
 print_info $? electra_pretrain
 }
-fast_gpt(){
-# FT
-cd ${nlp_dir}/
-export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-wget -q https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuAll-Centos-Gcc82-Cuda102-Cudnn81-Trt7234-Py38-Compile/latest/paddle_inference.tgz
-tar -zxf paddle_inference.tgz
-cd ${nlp_dir}/paddlenlp/ops
-export CC=/usr/local/gcc-8.2/bin/gcc
-export CXX=/usr/local/gcc-8.2/bin/g++
-#python
-mkdir build_gpt_so
-cd build_gpt_so/
-cmake ..  -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python -DWITH_GPT=ON
-make -j >${log_path}/GPT_python_FT >>${log_path}/gpt_python_FT 2>&1
-print_info $? gpt_python_FT
-cd ../
-#c++
-mkdir build_gpt_cc
-cd build_gpt_cc/
-cmake ..  -DWITH_GPT=ON -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=${nlp_dir}/paddle_inference/ -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/gpt.cc -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
-make -j >${log_path}/GPT_C_FT >>${log_path}/gpt_C_FT 2>&1
-print_info $? gpt_C_FT
-#depoly python
-cd ${nlp_dir}/model_zoo/gpt/fast_gpt/
-python infer.py \
-    --model_name_or_path gpt2-medium-en \
-    --batch_size 1 \
-    --topk 4 \
-    --topp 0.0 \
-    --max_length 32 \
-    --start_token "<|endoftext|>" \
-    --end_token "<|endoftext|>" \
-    --temperature 1.0  >${log_path}/gpt_deploy_P_FT >>${log_path}/gpt_deploy_P_FT 2>&1
-print_info $? gpt_deploy_P_FT
-#depoly C++
-python export_model.py \
-    --model_name_or_path gpt2-medium-en \
-    --decoding_lib ${nlp_dir}/paddlenlp/ops/build_gpt_so/lib/libdecoding_op.so \
-    --topk 4 \
-    --topp 0.0 \
-    --max_out_len 32 \
-    --temperature 1.0 \
-    --inference_model_dir ./infer_model/
-mv infer_model/ ${nlp_dir}/paddlenlp/ops/build_gpt_cc/bin/
-cd ${nlp_dir}/paddlenlp/ops/build_gpt_cc/bin/
-./gpt -batch_size 1 -gpu_id 0 -model_dir ./infer_model -vocab_file ./infer_model/vocab.txt -start_token "<|endoftext|>" -end_token "<|endoftext|>"  >${log_path}/gpt_deploy_C_FT >>${log_path}/gpt_deploy_C_FT 2>&1
-print_info $? gpt_deploy_C_FT
-}
-# 8 gpt
-gpt(){
 
-# TODO(wj-Mcat): revert the gpt run_pretrain.py code, remove it later.
-
-cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
-sed -i "s/python3/python/g" Makefile
-sed -i "s/python-config/python3.7m-config/g" Makefile
-#pretrain
-cd ${nlp_dir}/model_zoo/gpt/
-mkdir pre_data
-cd ./pre_data
-wget -q https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
-wget -q https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
-cd ../
-time (python -m paddle.distributed.launch run_pretrain.py \
-    --model_type gpt \
-    --model_name_or_path gpt2-en \
-    --input_dir "./pre_data"\
-    --output_dir "output"\
-    --weight_decay 0.01\
-    --grad_clip 1.0\
-    --max_steps 2\
-    --save_steps 2\
-    --decay_steps 320000\
-    --warmup_rate 0.01\
-    --micro_batch_size 2 \
-    --device gpu >${log_path}/gpt_pretrain) >>${log_path}/gpt_pretrain 2>&1
-print_info $? gpt_pretrain
-time (
-python export_model.py --model_type=gpt \
-    --model_path=gpt2-medium-en \
-    --output_path=./infer_model/model >${log_path}/gpt_export) >>${log_path}/gpt_export 2>&1
-print_info $? gpt_export
-time (
-python deploy/python/inference.py \
-    --model_type gpt \
-    --model_path ./infer_model/model >${log_path}/gpt_p_depoly) >>${log_path}/gpt_p_depoly 2>&1
-print_info $? gpt_p_depoly
-
-echo 'run gpt test with pytest'
-cd ${nlp_dir}
-python -m pytest ./tests/model_zoo/test_gpt.py >${log_path}/gpt >>${log_path}/gpt 2>&1
-print_info $? gpt
-
-# fast_gpt
-cd ${nlp_dir}/fast_generation/samples
-python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
-print_info $? fast_generation_gpt
-}
 # 9 ernie
 ernie(){
 #data process
-cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
-sed -i "s/python3/python/g" Makefile
-sed -i "s/python-config/python3.7m-config/g" Makefile
-export CUDA_VISIBLE_DEVICES=${cudaid2}
 cd ${nlp_dir}/model_zoo/ernie-1.0/
-mkdir data && cd data
+mkdir data
+cd ./data
 wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_ids.npy
 wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_idx.npz
 cd ../
@@ -515,49 +421,6 @@ time (python -u deploy/python/predict.py \
     --max_seq_length 384 >${log_path}/squad_predict) >>${log_path}/squad_predict 2>&1
 print_info $? squad_predict
 }
-# 14 tinybert
-tinybert() {
-export CUDA_VISIBLE_DEVICES=${cudaid1}
-cd ${nlp_dir}/model_zoo/tinybert/
-cp -r /ssd1/paddlenlp/download/tinybert/pretrained_models/ ./
-#中间层蒸馏
-time (python task_distill.py \
-    --model_type tinybert \
-    --student_model_name_or_path tinybert-6l-768d-v2 \
-    --task_name SST-2 \
-    --intermediate_distill \
-    --max_seq_length 64 \
-    --batch_size 32   \
-    --T 1 \
-    --teacher_model_type bert \
-    --teacher_path ./pretrained_models/SST-2/best_model_610/ \
-    --learning_rate 5e-5 \
-    --num_train_epochs 1 \
-    --max_steps 1 \
-    --logging_steps 1 \
-    --save_steps 1 \
-    --output_dir ./mid/SST-2/ \
-    --device gpu >${log_path}/tinybert_midslim) >>${log_path}/tinybert_midslim 2>&1
-print_info $? tinybert_midslim
-#预测层蒸馏
-time (python task_distill.py \
-    --model_type tinybert \
-    --student_model_name_or_path ./mid/SST-2/intermediate_distill_model_final.pdparams \
-    --task_name SST-2 \
-    --max_seq_length 64 \
-    --batch_size 32   \
-    --T 1 \
-    --teacher_model_type bert \
-    --teacher_path ./pretrained_models/SST-2/best_model_610/  \
-    --learning_rate 3e-5 \
-    --num_train_epochs 1 \
-    --logging_steps 1 \
-    --max_steps 1 \
-    --save_steps 1 \
-    --output_dir ./ped/SST-2/ \
-    --device gpu >${log_path}/tinybert_predslim) >>${log_path}/tinybert_predslim 2>&1
-print_info $? tinybert_predslim
-}
 # 15 lexical_analysis
 lexical_analysis(){
 export CUDA_VISIBLE_DEVICES=${cudaid2}
@@ -720,44 +583,34 @@ time (
     --embedding_name w2v.google_news.target.word-word.dim300.en >${log_path}/distilbert_teacher_train) >>${log_path}/distilbert_teacher_train 2>&1
 print_info $? distilbert_teacher_train
 }
-# 21 stacl
-stacl() {
-cd ${nlp_dir}/examples/simultaneous_translation/stacl/
-cp -r /ssd1/paddlenlp/download/stacl/* ./
-export CUDA_VISIBLE_DEVICES=${cudaid2}
-time (sed -i "s/save_step: 10000/save_step: 1/g" config/transformer.yaml
-sed -i "s/p print_step: 100/print_step: 1/g" config/transformer.yaml
-sed -i "s/epoch: 30/epoch: 1/g" config/transformer.yaml
-sed -i "s/max_iter: None/max_iter: 3/g" config/transformer.yaml
-sed -i "s/batch_size: 4096/batch_size: 500/g" config/transformer.yaml
-python -m paddle.distributed.launch train.py --config ./config/transformer.yaml  >${log_path}/stacl_wk-1) >>${log_path}/stacl_wk-1 2>&1
-print_info $? stacl_wk-1
-
-time (sed -i "s/batch_size: 500/batch_size: 100/g" config/transformer.yaml
-sed -i 's#init_from_params: "trained_models/step_final/"#init_from_params: "./trained_models/step_1/"#g' config/transformer.yaml
-python predict.py --config ./config/transformer.yaml >${log_path}/stacl_predict) >>${log_path}/stacl_predict 2>&1
-print_info $? stacl_predict
-}
 fast_transformer(){
 # FT
 cd ${nlp_dir}/
 export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-wget -q https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuAll-Centos-Gcc82-Cuda102-Cudnn81-Trt7234-Py38-Compile/latest/paddle_inference.tgz
+wget -q https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-TagBuild-Infer-Linux-Gpu-Cuda120-Cudnn89-Trt86-Mkl-Avx-Gcc122/latest/paddle_inference.tgz
 tar -zxf paddle_inference.tgz
-export CC=/usr/local/gcc-8.2/bin/gcc
-export CXX=/usr/local/gcc-8.2/bin/g++
 cd ${nlp_dir}/paddlenlp/ops
 #python op
 mkdir build_tr_so
 cd build_tr_so/
-cmake ..  -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python
+cmake ..  -DCMAKE_BUILD_TYPE=Release \
+-DCMAKE_C_COMPILER=${C_COMPILER_PATH} \
+-DCMAKE_CXX_COMPILER=${CXX_COMPILER_PATH} \
+-DPY_CMD=python \
+-DPADDLE_LIB=${nlp_dir}/paddle_inference \
+-DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/transformer_e2e.cc \
+-DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
 make -j >${log_path}/transformer_python_FT >>${log_path}/transformer_python_FT 2>&1
 print_info $? transformer_python_FT
 cd ../
 #C++ op
 mkdir build_tr_cc
 cd build_tr_cc/
-cmake .. -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=${nlp_dir}/paddle_inference -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
+cmake .. -DCMAKE_BUILD_TYPE=Release \
+-DCMAKE_C_COMPILER=${C_COMPILER_PATH} \
+-DCMAKE_CXX_COMPILER=${CXX_COMPILER_PATH} \
+-DPADDLE_LIB=${nlp_dir}/paddle_inference -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/transformer_e2e.cc \
+-DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
 make -j >${log_path}/transformer_C_FT >>${log_path}/transformer_C_FT 2>&1
 print_info $? transformer_C_FT
 #deploy python
@@ -855,14 +708,6 @@ p-tuning(){
 path="examples/few_shot/p-tuning"
 python scripts/regression/ci_normal_case.py ${path}
 }
-#24 simbert
-simbert(){
-cd ${nlp_dir}/examples/text_matching/simbert/
-cp -r /ssd1/paddlenlp/download/simbert/dev.tsv ./
-time (
-python predict.py --input_file ./dev.tsv >${log_path}/simbert) >>${log_path}/simbert 2>&1
-print_info $? simbert
-}
 #25 ernie-doc
 ernie-doc(){
 cd ${nlp_dir}/model_zoo/ernie-doc/
@@ -897,16 +742,6 @@ time (sed -i 's/batch_size: 8/batch_size: 1/g' configs/enwik8.yaml
 sed -i 's#init_from_params: "./trained_models/step_final/"#init_from_params: "./trained_models/step_3/"#g' configs/enwik8.yaml
 python eval.py --config ./configs/enwik8.yaml >${log_path}/transformer-xl_eval_enwik8) >>${log_path}/transformer-xl_eval_enwik8 2>&1
 print_info $? transformer-xl_eval_enwik8
-}
-#27 pointer_summarizer
-pointer_summarizer() {
-cd ${nlp_dir}/examples/text_summarization/pointer_summarizer/
-cp -r /ssd1/paddlenlp/download/pointer_summarizer/* ./
-export CUDA_VISIBLE_DEVICES=${cudaid1}
-time (sed -i 's/max_iterations = 100000/max_iterations = 5/g' config.py
-sed -i 's/if iter % 5000 == 0 or iter == 1000:/if iter % 5 == 0 :/g' train.py
-python train.py >${log_path}/pointer_summarizer_train) >>${log_path}/pointer_summarizer_train 2>&1
-print_info $? pointer_summarizer_train
 }
 #28 question_matching
 question_matching() {
@@ -1132,27 +967,20 @@ print_info $? taskflow_unittest
 python -m pytest scripts/regression/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
 print_info $? taskflow
 }
-transformers(){
-echo ' RUN all transformers unittest'
-cd ${nlp_dir}/tests/transformers/
-for apicase in `ls`;do
-    if [[ ${apicase##*.} == "py" ]];then
-            continue
-    else
-        cd ${nlp_dir}
-        python -m pytest tests/transformers/${apicase}/test_*.py  >${nlp_dir}/unittest_logs/${apicase}_unittest.log 2>&1
-        print_info $? tests ${apicase}_unittest
-    fi
-done
+llm(){
+cd ${nlp_dir}/csrc
+echo "build paddlenlp_op"
+python setup_cuda.py install
+
+echo ' Testing all LLMs '
+cd ${nlp_dir}
+python -m pytest tests/llm/test_*.py --alluredir=result >${log_path}/llm >>${log_path}/llm 2>&1
+print_info $? llm
 }
 fast_generation(){
-
-export CC=/usr/local/gcc-8.2/bin/gcc
-export CXX=/usr/local/gcc-8.2/bin/g++
-
 cd ${nlp_dir}/fast_generation/samples
-python codegen_sample.py >${log_path}/fast_generation_codegen >>${log_path}/fast_generation_codegen 2>&1
-print_info $? fast_generation_codegen
+# python codegen_sample.py >${log_path}/fast_generation_codegen >>${log_path}/fast_generation_codegen 2>&1
+# print_info $? fast_generation_codegen
 
 python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
 print_info $? fast_generation_gpt
@@ -1273,58 +1101,15 @@ ernie_health(){
     ernie-health
 }
 
-gpt-3() {
-    bash ${nlp_dir}/scripts/regression/ci_gpt-3.sh
-    print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'`
-}
-llama(){
-    cd ${nlp_dir}/examples/language_model/llama/
-    # lora tuning 
-    python -u  -m paddle.distributed.fleet.launch finetune_generation.py \
-        --output_dir ./checkpoints/ \
-        --per_device_train_batch_size 2 \
-        --gradient_accumulation_steps 2 \
-        --per_device_eval_batch_size 4 \
-        --model_name_or_path facebook/tiny-random-llama  \
-        --task_name squad \
-        --warmup_steps 30 \
-        --logging_steps 1 \
-        --max_steps 1 \
-        --save_steps 1 \
-        --evaluation_strategy epoch \
-        --save_strategy epoch \
-        --src_length 1024 \
-        --tgt_length 1024 \
-        --fp16 \
-        --fp16_opt_level O2 \
-        --do_train \
-        --disable_tqdm True \
-        --load_best_model_at_end True \
-        --metric_for_best_model accuracy \
-        --eval_with_do_generation False \
-        --recompute \
-        --save_total_limit 1 \
-        --overwrite_output_dir  >${log_path}/llama_finetune>>${log_path}/llama_finetune 2>&1
-    print_info $? llama_finetune
-}
-bloom(){
-cd ${nlp_dir}examples/language_model/bloom
-python -m paddle.distributed.launch finetune_generation.py \
-    --model_name_or_path bigscience/bloom-560m \
-    --task_name_or_path "dureader_qg" \
-    --output_dir ./checkpoints/bloom-560m \
-    --per_device_train_batch_size 2 \
-    --gradient_accumulation_steps 2 \
-    --per_device_eval_batch_size 4 \
-    --logging_steps 1 \
-    --max_steps 1 \
-    --save_steps 1 \
-    --evaluation_strategy epoch \
-    --save_strategy epoch \
-    --tensor_parallel_degree 2 \
-    --recompute \
-    --save_total_limit 1 \
-    --scale_loss 32768 \
-    --overwrite_output_dir
+segment_parallel_utils(){
+cd ${nlp_dir}
+echo "test segment_parallel_utils, cudaid1:${cudaid1}, cudaid2:${cudaid2}"
+if [[ ${cudaid1} != ${cudaid2} ]]; then
+    time (python -m paddle.distributed.launch tests/transformers/test_segment_parallel_utils.py >${log_path}/segment_parallel_utils) >>${log_path}/segment_parallel_utils 2>&1
+    print_info $? segment_parallel_utils
+else
+    echo "only one gpu:${cudaid1} is set, skip test"
+fi
+
 }
 $1

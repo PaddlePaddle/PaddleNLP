@@ -25,6 +25,7 @@ class PrefixConfig:
     prefix_dropout: float = field(default=0.0, metadata={"help": "Prefix projection dropout"})
     num_prefix_tokens: Optional[int] = field(default=None, metadata={"help": "Number of prefix tokens"})
     num_attention_heads: Optional[int] = field(default=None, metadata={"help": "Number of attention heads"})
+    multi_query_group_num: Optional[int] = field(default=None, metadata={"help": "Number of Multi-Query Groups."})
     num_hidden_layers: Optional[int] = field(default=None, metadata={"help": "Number of transformer hidden layers"})
     hidden_size: Optional[int] = field(
         default=None, metadata={"help": "The hidden embedding dimension of the transformer model"}

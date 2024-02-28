@@ -22,7 +22,7 @@ limitations under the License. */
 #include <sstream>
 #include <vector>
 
-#include "fastertransformer/cuda/cub/cub.cuh"
+
 #include "fusion_force_decoding_op.h"
 #include "pd_traits.h"
 

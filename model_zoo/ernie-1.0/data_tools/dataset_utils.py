@@ -15,19 +15,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Most of the code here has been copied from:
-#   https://github.com/google-research/albert/blob/master/create_pretraining_data.py
-# with some modifications.
-
 import collections
 import math
 import os
 import re
 import time
-from itertools import accumulate
 
 import numpy as np
 import paddle
+
+from paddlenlp.data.indexed_dataset import get_indexed_dataset_
+
+# Most of the code here has been copied from:
+#   https://github.com/google-research/albert/blob/master/create_pretraining_data.py
+# with some modifications.
 
 
 def get_local_rank():
@@ -35,12 +36,10 @@ def get_local_rank():
 
 
 print_rank_0 = print
-
 COMPILED = False
 DSET_TYPE_BERT = "standard_bert"
 DSET_TYPE_T5 = "t5"
 DSET_TYPE_ERNIE = "ernie"
-
 DSET_TYPES = [DSET_TYPE_BERT, DSET_TYPE_T5, DSET_TYPE_ERNIE]
 
 
@@ -150,86 +149,6 @@ def get_datasets_weights_and_num_samples(data_prefix, train_valid_test_num_sampl
         )
 
     return prefixes, weights, datasets_train_valid_test_num_samples
-
-
-class MMapIndexedDataset(paddle.io.Dataset):
-    def __init__(self, path, skip_warmup=False):
-        super().__init__()
-
-        self._path = path
-
-        # All documment ids, extend as 1-D array.
-
-        for suffix in ["_ids.npy", "_idx.npz"]:
-            if not os.path.isfile(path + suffix):
-                raise ValueError("File Not found, %s" % (path + suffix))
-
-        self._token_ids = np.load(path + "_ids.npy", mmap_mode="r", allow_pickle=True)
-        process_data = np.load(path + "_idx.npz")
-        self._sizes = process_data["lens"]
-        self._pointers = np.empty(len(self._sizes) + 1, dtype=np.int64)
-        self._pointers[0] = 0
-        np.cumsum(self._sizes, out=self._pointers[1:])
-        self._doc_idx = process_data["docs"]
-
-    def __getstate__(self):
-        return self._path
-
-    def __len__(self):
-        return len(self._sizes)
-
-    # @lru_cache(maxsize=8)
-    def __getitem__(self, idx):
-        if isinstance(idx, int):
-            size = self._sizes[idx]
-            ptr = self._pointers[idx]
-            np_array = self._token_ids[ptr : ptr + size]
-            return np_array
-
-        elif isinstance(idx, slice):
-            start, stop, step = idx.indices(len(self))
-            if step != 1:
-                raise ValueError("Slices into indexed_dataset must be contiguous")
-            ptr = self._pointers[start]
-            sizes = self._sizes[idx]
-            offsets = list(accumulate(sizes))
-            total_size = sum(sizes)
-            np_array = self._token_ids[ptr : ptr + total_size]
-            sents = np.split(np_array, offsets[:-1])
-            return sents
-
-    def get(self, idx, offset=0, length=None):
-        """Retrieves a single item from the dataset with the option to only
-        return a portion of the item.
-
-        get(idx) is the same as [idx] but get() does not support slicing.
-        """
-        size = self._sizes[idx]
-        ptr = self._pointers[idx]
-
-        if length is None:
-            length = size - offset
-        ptr += offset
-        np_array = self._token_ids[ptr : ptr + length]
-        return np_array
-
-    @property
-    def sizes(self):
-        return self._sizes
-
-    @property
-    def doc_idx(self):
-        return self._doc_idx
-
-    def get_doc_idx(self):
-        return self._doc_idx
-
-    def set_doc_idx(self, doc_idx_):
-        self._doc_idx = doc_idx_
-
-
-def make_indexed_dataset(data_prefix, data_impl=None, skip_warmup=False):
-    return MMapIndexedDataset(data_prefix)
 
 
 def get_a_and_b_segments(sample, np_rng):
@@ -682,7 +601,7 @@ def _build_train_valid_test_datasets(
         raise ValueError("Invalid dataset_type: ", dataset_type)
 
     # Indexed dataset.
-    indexed_dataset = get_indexed_dataset_(data_prefix, None, skip_warmup)
+    indexed_dataset = get_indexed_dataset_(data_prefix, args.data_impl, skip_warmup)
 
     # Get start and end indices of train/valid/train into doc-idx
     # Note that doc-idx is desinged to be num-docs + 1 so we can
@@ -782,22 +701,6 @@ def _build_train_valid_test_datasets(
     test_dataset = build_dataset(2, "test")
 
     return (train_dataset, valid_dataset, test_dataset)
-
-
-def get_indexed_dataset_(data_prefix, data_impl, skip_warmup):
-
-    print_rank_0(" > building dataset index ...")
-
-    start_time = time.time()
-    indexed_dataset = make_indexed_dataset(data_prefix, data_impl, skip_warmup)
-    assert indexed_dataset.sizes.shape[0] == indexed_dataset.doc_idx[-1]
-    print_rank_0(" > finished creating indexed dataset in {:4f} " "seconds".format(time.time() - start_time))
-
-    print_rank_0(" > indexed dataset stats:")
-    print_rank_0("    number of documents: {}".format(indexed_dataset.doc_idx.shape[0] - 1))
-    print_rank_0("    number of sentences: {}".format(indexed_dataset.sizes.shape[0]))
-
-    return indexed_dataset
 
 
 def get_train_valid_test_split_(splits_string, size):

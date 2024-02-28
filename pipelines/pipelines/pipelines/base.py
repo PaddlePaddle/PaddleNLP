@@ -441,7 +441,8 @@ class Pipeline(BasePipeline):
             predecessors = set(nx.ancestors(self.graph, node_id))
             if predecessors.isdisjoint(set(queue.keys())):  # only execute if predecessor nodes are executed
                 try:
-                    logger.debug(f"Running node `{node_id}` with input `{node_input}`")
+                    if debug:
+                        logger.debug(f"Running node `{node_id}` with input `{node_input}`")
                     node_output, stream_id = self.graph.nodes[node_id]["component"]._dispatch_run(**node_input)
                 except Exception as e:
                     tb = traceback.format_exc()

@@ -20,6 +20,8 @@
 **PPDiffusers**是一款支持多种模态（如文本图像跨模态、图像、语音）扩散模型（Diffusion Model）训练和推理的国产化工具箱，依托于[**PaddlePaddle**](https://www.paddlepaddle.org.cn/)框架和[**PaddleNLP**](https://github.com/PaddlePaddle/PaddleNLP)自然语言处理开发库。
 
 ## News 📢
+* 🔥 **2023.07.25 PPDiffusers 现已迁至 [PaddleMIX](https://github.com/PaddlePaddle/PaddleMIX)，后续更新迭代将于 PaddleMIX 进行。PaddleMIX 是基于飞桨的跨模态大模型开发套件，我们将一如既往的提供优质内容，围绕跨模态前沿技术更充分的发挥飞桨大模型技术先进性，打造高效开发使用跨模态大模型及应用的基础设施。感谢大家关注，欢迎大家使用 PaddleMIX。**
+
 * 🔥 **2023.06.20 发布 0.16.1 版本，新增[T2I-Adapter](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/t2i-adapter)，支持训练与推理；ControlNet升级，支持[reference only推理](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/community#controlnet-reference-only)；新增[WebUIStableDiffusionPipeline](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/community#automatic1111-webui-stable-diffusion)，
 支持通过prompt的方式动态加载lora、textual_inversion权重；
 新增[StableDiffusionHiresFixPipeline](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/community#stable-diffusion-with-high-resolution-fixing)，支持高分辨率修复；

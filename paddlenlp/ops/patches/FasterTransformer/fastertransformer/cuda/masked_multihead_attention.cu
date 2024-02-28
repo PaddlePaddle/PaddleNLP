@@ -19,7 +19,7 @@
 #include "masked_multihead_attention_utils.h"
 #include <assert.h>
 #include <float.h>
-
+#include <stdexcept>
 //#define MMHA_USE_HMMA_FOR_REDUCTION
 
 // Below are knobs to extend FP32 accumulation for higher FP16 accuracy

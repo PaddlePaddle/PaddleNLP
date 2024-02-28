@@ -1,0 +1,128 @@
+version: '1.1.0'
+components:    # define all the building-blocks for Pipeline
+  - name: DocumentStore
+    type: ElasticsearchDocumentStore  # consider using Milvus2DocumentStore or WeaviateDocumentStore for scaling to large number of documents
+    params:
+      host: localhost
+      port: 8200
+      index: esg_example
+      embedding_dim: 768
+  - name: Retriever
+    type: DensePassageRetriever
+    params:
+      document_store: DocumentStore    # params can reference other components defined in the YAML
+      top_k: 30
+      query_embedding_model: moka-ai/m3e-base
+      passage_embedding_model: moka-ai/m3e-base
+      embed_title: False
+      max_seq_len_query: 64
+      max_seq_len_passage: 256
+      batch_size: 16
+      embed_title: False
+      pooling_mode: mean_tokens
+  - name: Ranker       # custom-name for the component; helpful for visualization & debugging
+    type: ErnieRanker    # pipelines Class name for the component
+    params:
+      model_name_or_path: rocketqa-zh-dureader-cross-encoder
+      top_k: 3
+  - name: TextFileConverter
+    type: TextConverter
+  - name: PDFFileConverter
+    type: PDFToTextConverter
+  - name: DocxFileConverter
+    type: DocxTotxtConverter
+  - name: MarkdownFileConverter
+    type: MarkdownRawTextConverter
+  - name: ImageFileConverter
+    type: ImageToTextConverter
+  - name: DocxSplitter
+    type: SpacyTextSplitter
+    params:
+      filters: ["\n"]
+      chunk_size: 300
+  - name: MarkdownSplitter
+    type: MarkdownHeaderTextSplitter
+    params:
+      chunk_size: 300
+      return_each_line: False
+      filters: ["\n"]
+  - name: TextSplitter
+    type: CharacterTextSplitter
+    params:
+      separator: "\f"
+      chunk_size: 300
+      chunk_overlap: 0
+      filters: ["\n"]
+  - name: PDFSplitter
+    type: CharacterTextSplitter
+    params:
+      separator: "\f"
+      chunk_size: 300
+      chunk_overlap: 0
+      filters: ["\n"]
+  - name: ImageSplitter
+    type: CharacterTextSplitter
+    params:
+      separator: "\f"
+      chunk_size: 300
+      chunk_overlap: 0
+      filters: ["\n"]
+  - name: FileTypeClassifier
+    type: FileTypeClassifier
+  - name: Template
+    type: LLMPromptTemplate
+    params: 
+      template: 背景：{documents} 问题：{query}
+  - name: TruncateHistory
+    type: TruncatedConversationHistory
+    params:
+      max_length: 256
+  - name: ErnieBot
+    type: ErnieBot
+    params: 
+      api_key: 
+      secret_key: # the api_key and secret_key are from ERNIE-Bot
+
+pipelines:
+  - name: query  
+    type: Query
+    nodes:
+      - name: Retriever
+        inputs: [Query]
+      - name: Ranker
+        inputs: [Retriever]
+      - name: Template
+        inputs: [Ranker]
+      - name: TruncateHistory
+        inputs: [Template]
+      - name: ErnieBot
+        inputs: [TruncateHistory]
+  - name: indexing
+    type: Indexing
+    nodes:
+      - name: FileTypeClassifier
+        inputs: [File]
+      - name: TextFileConverter
+        inputs: [FileTypeClassifier.output_1]
+      - name: PDFFileConverter
+        inputs: [FileTypeClassifier.output_2]
+      - name: MarkdownFileConverter
+        inputs: [FileTypeClassifier.output_3]
+      - name: DocxFileConverter
+        inputs: [FileTypeClassifier.output_4]
+      - name: ImageFileConverter
+        inputs: [FileTypeClassifier.output_6]
+      - name: TextSplitter
+        inputs: [TextFileConverter]
+      - name: PDFSplitter
+        inputs: [PDFFileConverter]
+      - name: MarkdownSplitter
+        inputs: [MarkdownFileConverter]
+      - name: DocxSplitter
+        inputs: [DocxFileConverter]
+      - name: ImageSplitter
+        inputs: [ImageFileConverter]
+      - name: Retriever
+        inputs: [TextSplitter, PDFSplitter,DocxSplitter,MarkdownSplitter,ImageFileConverter]
+      - name: DocumentStore
+        inputs: [Retriever]

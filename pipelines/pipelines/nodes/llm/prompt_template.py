@@ -15,7 +15,7 @@
 from pipelines.nodes.base import BaseComponent
 
 
-class PromptTemplate(BaseComponent):
+class LLMPromptTemplate(BaseComponent):
     outgoing_edges = 1
 
     def __init__(self, template):

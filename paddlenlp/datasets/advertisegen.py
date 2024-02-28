@@ -1,4 +1,5 @@
 # Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -64,5 +65,11 @@ class AdvertiseGen(DatasetBuilder):
                     continue
                 json_data = json.loads(line)
 
-                yield {"source": json_data["content"], "target": json_data.get("summary", ""), "id": data_id}
+                yield {
+                    "source": json_data["content"],
+                    "src": json_data["content"],
+                    "target": json_data.get("summary", ""),
+                    "tgt": json_data.get("summary", ""),
+                    "id": data_id,
+                }
                 data_id += 1

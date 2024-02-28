@@ -13,10 +13,17 @@
 # limitations under the License.
 
 import os
+import random
+from collections import namedtuple
 
 import numpy as np
 import paddle
+import paddle.distributed as dist
 import paddle.distributed.auto_parallel as auto
+
+from paddlenlp.ops import Topology
+from paddlenlp.trainer.trainer_utils import _get_distributed_seeds
+from ppfleetx.utils.log import logger
 
 _mesh = None
 
@@ -72,6 +79,11 @@ class Mesh:
     def mp_degree(self):
         return self._mp_degree
 
+    # TODO(JZ-LIANG) Support SP as an independent mesh axis
+    @property
+    def sp_degree(self):
+        return self._mp_degree
+
     @property
     def pp_degree(self):
         return self._pp_degree
@@ -82,6 +94,11 @@ class Mesh:
 
     @property
     def mp_dim(self):
+        return self._mp_dim
+
+    # TODO(JZ-LIANG) Support SP as an independent mesh axis
+    @property
+    def sp_dim(self):
         return self._mp_dim
 
     def __getitem__(self, idx):
@@ -103,3 +120,35 @@ def init_dist_env(config):
 
 def get_local_rank():
     return int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+
+
+def set_seed(seed):
+    topo = None
+    if dist.get_world_size() > 1:
+
+        topo = Topology(
+            dist.get_rank(), 
+            dist.get_world_size(),
+            dp_degree=_mesh.dp_degree, 
+            pp_degree=_mesh.pp_degree,
+            mp_degree=_mesh.mp_degree,
+            sharding_degree=1, # auto_parallel's sharding is not orthogonal with dp, mp and pp
+        )
+
+    global_seed, local_seed, random_seed = _get_distributed_seeds(seed, topo)
+
+    # NOTE: add (1024 + world_size) to seed for CI cases
+    global_seed = global_seed + 1024 + paddle.distributed.get_world_size()
+    local_seed = local_seed + 1024 + paddle.distributed.get_world_size()
+
+    paddle.seed(global_seed)
+    random.seed(random_seed)
+    np.random.seed(random_seed)
+
+    logger.info("The global seed is set to {}, local seed is set to {} and "
+                "random seed is set to {}.".format(global_seed, local_seed, random_seed))
+
+    global _seed
+    global _dp_seed
+    _seed = seed
+    _dp_seed = global_seed

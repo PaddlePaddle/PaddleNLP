@@ -92,8 +92,7 @@ function _train(){
     model_config="gpt2-medium-en"
     [ ${mp_degree} -lt 8 ] && model_config="gpt2-small-en"
     if [ "fp16" = ${fp_item} ]; then use_pure_fp16=True; fi
-    train_cmd="--model_type gpt \
-                --model_name_or_path ${model_config} \
+    train_cmd="--model_name_or_path ${model_config} \
                 --input_dir ./data\
                 --output_dir output\
                 --weight_decay 0.01\

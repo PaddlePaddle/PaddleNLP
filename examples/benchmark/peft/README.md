@@ -4,7 +4,7 @@
 
 - 硬件: A100-80G with NVLink, 具体卡数见表
 - Torch环境: 见torch/requirements.txt
-- FP16配置: torch 使用 cuda amp fp16, paddle 使用 fp16 O2 opt level
+- FP16配置: torch 使用 cuda amp fp16, paddle 使用 fp16 O2 opt level, intokens 设置为 1024, 并开启了flash attention
 
 ### Bloom
 
@@ -12,9 +12,9 @@
 
 | Model         | Method   | Num GPUs | Batch Size | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | **Speedup** |
 |---------------|----------|----------|------------|--------------|---------------------------|-------------|--------------------------|---------|
-| Bloomz-7b1-mt | LoRA     | 1        | 4          |              | 2293.46                   |             | 1980.32                  | **16%**    |
-| Bloomz-7b1-mt | Finetune | 4        | 8          | MP 4         | 2873.13                   | ZeRO 3      | 1702.00                  | **69%**    |
-| Bloomz-7b1-mt | Finetune | 4        | 16         | MP 4         | 2853.83                   | ZeRO 3      | 2849.90                  | **0%**     |
+| Bloomz-7b1-mt | LoRA     | 1        | 4          |              | 4097.03                   |             | 1980.32                  | **107%**    |
+| Bloomz-7b1-mt | Finetune | 4        | 8          | MP 4         | 4136.69                   | ZeRO 3      | 1702.00                  | **143%**    |
+| Bloomz-7b1-mt | Finetune | 4        | 16         | MP 4         | 4359.72                   | ZeRO 3      | 2849.90                  | **53%**     |
 
 ###### 多卡分布式实验记录
 
@@ -22,12 +22,12 @@
 
 | Model          | Setup           | Paddle Effective Tokens /s | Torch Effective Tokens /s  |  Speedup  |
 |----------------|-----------------|----------------------------|----------------------------|-----------|
-| Bloomz-7b1-mt  | bsz 8 MP4     |       2873.13           |         N/A                |   N/A     |
-| Bloomz-7b1-mt  | bsz 8 ZeRO 3  |       N/A               |     1702.00                |   N/A     |
-| Bloomz-7b1-mt  | bsz 8 ZeRO 2  |      2172.40            |     1891.16                |   15%     |
-| Bloomz-7b1-mt  | bsz 16 MP4    |      2853.83            |         N/A                |   N/A     |
-| Bloomz-7b1-mt  | bsz 16 ZeRO 3 |      N/A                |      2849.90               |   N/A     |
-| Bloomz-7b1-mt  | bsz 16 ZeRO 2 |    2604.56 (accumulations 2) |  2719.92              |   -4%     |
+| Bloomz-7b1-mt  | bsz 8 MP4       |       7421.09              |         N/A                |   N/A     |
+| Bloomz-7b1-mt  | bsz 8 ZeRO 3    |       6063.23              |     1702.00                |   256%    |
+| Bloomz-7b1-mt  | bsz 8 ZeRO 2    |      5191.47               |     1891.16                |   175%    |
+| Bloomz-7b1-mt  | bsz 16 MP4      |      8214.55               |         N/A                |   N/A     |
+| Bloomz-7b1-mt  | bsz 16 ZeRO 3   |      5822.23               |      2849.90               |   104     |
+| Bloomz-7b1-mt  | bsz 16 ZeRO 2   |    5572.13                 |     2719.92                |   105%    |
 
 
 ### Llama
@@ -36,13 +36,14 @@
 
 | Model     | Method   | Num GPUs | Batch Size  | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
 |-----------|----------|----------|-------------|--------------|---------------------------|-------------|--------------------------|---------|
-| Llama-7b  | LoRA     | 1        | 4           |              |  1986.63                  |             | 1895.90                  |  **5%**  |
-| Llama-13b | LoRA     | 1        | 8           | recompute    |  838.78                   | gradient ckpt |    768.26              |  **9%**  |
-| Llama-7b  | Finetune | 4        | 8           | MP4          |  2213.46                  | ZeRO 2      | 1621.52                  |  **36%**  |
-| Llama-7b  | Finetune | 4        | 16          | sharding 2   |  2804.19                  | ZeRO 2      | 2465.55                  |  **14%**  |
-| Llama-13b | Finetune | 4        | 8           | MP4 recompute|  1651.50                  | ZeRO 3      | 736.19                   |  **124%**  |
-| Llama-65b | LoRA     | 4        | 8           | MP4 recompute|  474.36                   | gradient ckpt, bits 4, max_memory_MB 50000, qlora        | 327.75          |  **45%** |
-| Llama-65b | LoRA     | 4        | 16          | MP4 recompute|  452.20                   | gradient ckpt, bits 4, max_memory_MB 50000, qlora        | 405.90          |  **11%** |
+| Llama-7b  | LoRA     | 1        | 4           |              |  4406.23                  |             | 1895.90                  |  **132%**  |
+| Llama-13b | LoRA     | 1        | 4           |              |  1975.94                  |             |    1101.85              |  **79%**  |
+| Llama-13b | LoRA     | 1        | 8           | recompute    |  1869.60                  | gradient ckpt |    768.26              |  **143%**  |
+| Llama-7b  | Finetune | 4        | 8           | MP4          |  3275.90                  | ZeRO 2      | 1621.52                  |  **102%**  |
+| Llama-7b  | Finetune | 4        | 16          | sharding 2   |  6798.72                 | ZeRO 2      | 2465.55                  |  **176%**  |
+| Llama-13b | Finetune | 4        | 8           | MP4 recompute|  1938.19                  | ZeRO 3      | 736.19                   |  **127%**  |
+| Llama-65b | LoRA     | 4        | 8           | MP4 recompute|  840.57                   | gradient ckpt, bits 4, max_memory_MB 50000, qlora        | 327.75          |  **156%** |
+| Llama-65b | LoRA     | 4        | 16          | MP4 recompute|  993.38                   | gradient ckpt, bits 4, max_memory_MB 50000, qlora        | 405.90          |  **122%** |
 
 
 ###### 多卡分布式实验记录
@@ -51,24 +52,24 @@
 
 | Model     | Setup         | Paddle Effective Tokens /s | Torch Effective Tokens /s  |  Speedup  |
 |-----------|---------------|----------------------------|----------------------------|-----------|
-| LLaMA-7b  | bsz 8 MP4     | **2213.46**                |  N/A                       | N/A       |
-| LLaMA-7b  | bsz 8 ZeRO 3  | 1256.82                    |  1177.93                   | 7%       |
-| LLaMA-7b  | bsz 8 ZeRO 2  | 1781.27                    |  1621.52                   | 10%       |
-| LLaMA-7b  | bsz 16 (8*2) MP4 | 2630.30                 |  N/A                       | N/A       |
-| LLaMA-7b  | bsz 16 ZeRO 3 | 2115.58                    |  2268.16                   | -7%       |
-| LLaMA-7b  | bsz 16 ZeRO 2 | **2804.19**                |  2465.55                   | 14%       |
-| LLaMA-13b | bsz 8 MP4 recompute |  **1651.50**         |  N/A                       | N/A       |
-| LLaMA-13b | bsz 8 ZeRO 3  | 747.17                     |  736.19                    | 1%        |
-| LLaMA-13b | bsz 8 ZeRO 2  | OOM                        |  OOM                       | N/A       |
+| LLaMA-7b  | bsz 8 MP4     | **3841.61**                |  N/A                       | N/A       |
+| LLaMA-7b  | bsz 8 ZeRO 3  | 4189.43                    |  1177.93                   | 256%       |
+| LLaMA-7b  | bsz 8 ZeRO 2  | 4611.10                    |  1621.52                   | 184%       |
+| LLaMA-7b  | bsz 16 (4*4) MP4 | 4829.47                 |  N/A                       | N/A       |
+| LLaMA-7b  | bsz 16 ZeRO 3 | 4048.61                    |  2268.16                   | 78%       |
+| LLaMA-7b  | bsz 16 ZeRO 2 | **3463.45**                |  2465.55                   | 40%       |
+| LLaMA-13b | bsz 8 MP4 recompute |  **2509.50**         |  N/A                       | N/A       |
+| LLaMA-13b | bsz 8 ZeRO 3  | 1867.99                    |  736.19                    | 154%        |
+| LLaMA-13b | bsz 8 ZeRO 2  | 1201.75                    |  OOM                       | N/A       |
 
 
 ### ChatGLM
 
 | Model         | Method   | Num GPUs | Batch Size | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
 |---------------|----------|----------|------------|--------------|---------------------------|-------------|--------------------------|---------|
-| chatglm-6b    | LoRA     | 1        | 4          |              |        2654.73            |             |       1866.48            | **42%**    |
-| chatglm-6b    | Finetune | 4        | 8          |   MP 4       |        3109.83            |   ZeRO 2    |       2124.17            | **46%**    |
-| chatglm-6b    | Finetune | 4        | 16         |   MP 4       |        3569.95            |   ZeRO 3    |       3191.35            | **12%**    |
+| chatglm-6b    | LoRA     | 1        | 4          |              |        4216.76            |             |       1866.48            | **126%**    |
+| chatglm-6b    | Finetune | 4        | 8          |   MP 4       |        3799.78            |   ZeRO 2    |       2124.17            | **79%**    |
+| chatglm-6b    | Finetune | 4        | 16         |   MP 4       |        5720.21            |   ZeRO 3    |       3191.35            | **79%**    |
 
 
 ###### 多卡分布式实验记录
@@ -77,13 +78,20 @@
 
 | Model     | Setup           | Paddle Effective Tokens /s | Torch Effective Tokens /s  |  Speedup  |
 |-----------|-----------------|----------------------------|----------------------------|-----------|
-| chatglm-6b  | bsz 8 MP4     |  3109.83                   |         N/A                |   N/A     |
-| chatglm-6b  | bsz 8 ZeRO 3  |    N/A                     |         1840.99            |   N/A     |
-| chatglm-6b  | bsz 8 ZeRO 2  |    2457.88                 |         2124.17            |   16%     |
-| chatglm-6b  | bsz 16 MP4    |    3549.68                 |         N/A                |   N/A     |
-| chatglm-6b  | bsz 16 ZeRO 3 |    N/A                     |         3184.26            |   N/A     |
-| chatglm-6b  | bsz 16 ZeRO 2 |    3462.83                 |         3151.07            |   10%     |
+| chatglm-6b  | bsz 8 MP4     |  4564.94                   |         N/A                |   N/A     |
+| chatglm-6b  | bsz 8 ZeRO 3  |    6480.36                 |         1840.99            |   252%    |
+| chatglm-6b  | bsz 8 ZeRO 2  |    4707.74                 |         2124.17            |   122%     |
+| chatglm-6b  | bsz 16 MP4    |    4972.21                 |         N/A                |   N/A     |
+| chatglm-6b  | bsz 16 ZeRO 3 |    5282.28                 |         3184.26            |   66%     |
+| chatglm-6b  | bsz 16 ZeRO 2 |    5751.00                 |         3151.07            |   83%     |
 
-### TODOs
 
-- Enable Flash Attention
+### GPT 3
+
+| Model         | Method   | Num GPUs | Batch Size | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
+|---------------|----------|----------|------------|--------------|---------------------------|-------------|--------------------------|---------|
+| gpt3-6.7b     | LoRA     | 1        | 4          |              |        3450.06            |             |       1186.74            | **191%**|
+| gpt3-13b      | LoRA     | 1        | 4          |              |        2008.40            |             |       969.60             | **107%**|
+| gpt3-6.7b     | Finetune | 4        | 8          |   MP 4       |        3301.49            |   ZeRO 2    |       1441.65            | **129%**|
+| gpt3-13b      | Finetune | 4        | 8          |   MP 4       |        1890.38            |   ZeRO 2    |       783.26             | **141%**|
+| gpt3-6.7b     | Finetune | 4        | 16         |   MP 4       |        4666.19            |   ZeRO 3    |       1756.42            | **166%**|

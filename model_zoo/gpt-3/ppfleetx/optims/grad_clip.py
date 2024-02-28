@@ -15,7 +15,7 @@
 import paddle
 import paddle.distributed.fleet as fleet
 from paddle.distributed import collective
-from paddle.fluid import core, layers
-from paddle.fluid.dygraph import base as imperative_base
+from paddle.base import core, layers
+from paddle.base.dygraph import base as imperative_base
 from paddle.nn.clip import ClipGradBase, ClipGradByGlobalNorm, _squared_l2_norm
 from ppfleetx.distributed.apis import env

@@ -189,6 +189,7 @@ curl -X POST -k http://localhost:8896/query -H 'Content-Type: application/json' 
 
 #### 3.4.5 启动Streamlit WebUI前端
 ```bash
+pip install streamlit==1.11.1
 # 配置模型服务地址
 export API_ENDPOINT=http://127.0.0.1:8896
 # 在指定端口 8502 启动 WebUI

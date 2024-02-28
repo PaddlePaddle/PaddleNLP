@@ -41,7 +41,11 @@ class TestMarkdownRawTextConverter(unittest.TestCase):
         file_path = os.path.join(fixtures_path, "example_markdown.md")
         converter = MarkdownRawTextConverter()
         expected_result = [
-            "# Heading level 1\n## Heading level 2\nI really like using Markdown.\n\nFirst item\nSecond item\nThird item\nFourth item\n"
+            {
+                "content": "# Heading level 1\n## Heading level 2\nI really like using Markdown.\n\nFirst item\nSecond item\nThird item\nFourth item\n",
+                "content_type": "text",
+                "meta": None,
+            }
         ]
         result = converter.convert(file_path)
         self.assertEqual(expected_result, result)

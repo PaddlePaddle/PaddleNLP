@@ -17,4 +17,5 @@ from pipelines.nodes.preprocessor.preprocessor import PreProcessor
 from pipelines.nodes.preprocessor.text_splitter import (
     CharacterTextSplitter,
     RecursiveCharacterTextSplitter,
+    SpacyTextSplitter,
 )

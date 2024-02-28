@@ -20,9 +20,15 @@ import paddle
 from paddlenlp.peft.prefix import (
     PrefixConfig,
     PrefixModelForCausalLM,
+    chatglm_postprocess_past_key_value,
     llama_postprocess_past_key_value,
 )
-from paddlenlp.transformers import LlamaConfig, LlamaForCausalLM
+from paddlenlp.transformers import (
+    ChatGLMv2Config,
+    ChatGLMv2ForCausalLM,
+    LlamaConfig,
+    LlamaForCausalLM,
+)
 
 
 class TestPrefixModel(unittest.TestCase):
@@ -77,14 +83,27 @@ class TestPrefixModel(unittest.TestCase):
             self.assertEqual(loaded_results[0].shape, [1, 20, self.config.vocab_size])
             self.assertTrue(paddle.allclose(original_results[0], loaded_results[0]))
 
+    def test_prefix_model_attention_mask(self):
+        inputs = {
+            "input_ids": paddle.randint(100, 200, [1, 20]),
+            "attention_mask": paddle.ones([1, 20]),
+            "position_ids": paddle.arange(20).unsqueeze(0),
+        }
+        logits_2d = self.prefix_model(**inputs)[0]
+        inputs["attention_mask"] = paddle.tril(paddle.ones([1, 20, 20]))
+        logits_3d = self.prefix_model(**inputs)[0]
+        inputs["attention_mask"] = paddle.tril(paddle.ones([1, 1, 20, 20]))
+        logits_4d = self.prefix_model(**inputs)[0]
+        self.assertTrue(paddle.allclose(logits_2d, logits_3d))
+        self.assertTrue(paddle.allclose(logits_3d, logits_4d))
+
     def test_prefix_model_generate(self):
         inputs = {
             "input_ids": paddle.randint(100, 200, [1, 20]),
             "attention_mask": paddle.ones([1, 20]),
-            "token_type_ids": paddle.zeros([1, 20]),
             "position_ids": paddle.arange(20).unsqueeze(0),
         }
-        result = self.prefix_model.generate(
+        self.prefix_model.generate(
             **inputs,
             max_length=5,
             decode_strategy="sampling",
@@ -93,4 +112,75 @@ class TestPrefixModel(unittest.TestCase):
             top_p=1.0,
             repetition_penalty=1.0,
         )
-        self.assertEqual(result[0].shape, [1, 5])
+
+
+class TestPrefixModelMultiQuery(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.config = ChatGLMv2Config(
+            vocab_size=200,
+            hidden_size=32,
+            intermediate_size=86,
+            num_hidden_layers=1,
+            num_attention_heads=4,
+            multi_query_group_num=2,
+            kv_channels=8,
+            dtype="float32",
+        )
+
+        cls.model = ChatGLMv2ForCausalLM(cls.config)
+        cls.prefix_config = PrefixConfig(
+            num_prefix_tokens=2,
+            num_attention_heads=cls.model.config.num_attention_heads,
+            multi_query_group_num=cls.model.config.multi_query_group_num,
+            num_hidden_layers=cls.model.config.num_hidden_layers,
+            hidden_size=cls.model.config.hidden_size,
+            prefix_projection_hidden_size=cls.model.config.hidden_size,
+            dtype="float32",
+        )
+        cls.prefix_model = PrefixModelForCausalLM(
+            model=cls.model,
+            prefix_config=cls.prefix_config,
+            postprocess_past_key_value=chatglm_postprocess_past_key_value,
+        )
+
+    def test_prefix_config(self):
+        with TemporaryDirectory() as tempdir:
+            self.prefix_config.save_pretrained(tempdir)
+            loaded_prefix_config = PrefixConfig.from_pretrained(tempdir)
+            self.assertEqual(self.prefix_config, loaded_prefix_config)
+
+    def test_prefix_model_save_load(self):
+        with TemporaryDirectory() as tempdir:
+            input_ids = paddle.randint(100, 200, [1, 20])
+            self.prefix_model.eval()
+            self.prefix_model.save_pretrained(tempdir)
+            loaded_prefix_model = PrefixModelForCausalLM.from_pretrained(
+                self.model, tempdir, chatglm_postprocess_past_key_value
+            )
+            loaded_prefix_model.eval()
+
+            original_results = self.prefix_model(input_ids)
+            loaded_results = loaded_prefix_model(input_ids)
+
+            self.assertIsNotNone(original_results)
+            self.assertEqual(original_results[0].shape, [1, 20, self.config.vocab_size])
+            self.assertIsNotNone(loaded_results)
+            self.assertEqual(loaded_results[0].shape, [1, 20, self.config.vocab_size])
+            self.assertTrue(paddle.allclose(original_results[0], loaded_results[0]))
+
+    def test_prefix_model_generate(self):
+        inputs = {
+            "input_ids": paddle.randint(100, 200, [1, 20]),
+            "attention_mask": paddle.ones([1, 20]),
+            "position_ids": paddle.arange(20).unsqueeze(0),
+        }
+        self.prefix_model.generate(
+            **inputs,
+            max_length=5,
+            decode_strategy="sampling",
+            temperature=1.0,
+            top_k=1,
+            top_p=1.0,
+            repetition_penalty=1.0,
+        )

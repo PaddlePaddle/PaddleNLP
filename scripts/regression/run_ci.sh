@@ -29,17 +29,16 @@ declare -A Normal_dic
 declare -A all_P0case_dic
 declare -A Build_list
 all_P0case_dic=(["waybill_ie"]=3 ["msra_ner"]=15 ["glue"]=2 ["bert"]=2 ["skep"]=10 ["bigbird"]=2 ["electra"]=2  ["gpt"]=2 ["ernie-1.0"]=2 ["xlnet"]=2 \
-["ofa"]=2 ["albert"]=2   ["SQuAD"]=20 ["tinybert"]=5 ["lexical_analysis"]=5 ["seq2seq"]=5 ["word_embedding"]=5 \
-["ernie-ctm"]=5 ["distilbert"]=5  ["stacl"]=5 ["transformer"]=5 ["pet"]=5 ["efl"]=5 ["p-tuning"]=5 ["simbert"]=5 ["ernie-doc"]=20 ["transformer-xl"]=5 \
-["pointer_summarizer"]=5 ["question_matching"]=5 ["ernie-csc"]=5 ["nptag"]=5 ["ernie-m"]=5 ["taskflow"]=5 ["clue"]=5 ["textcnn"]=5 \
-["fast_generation"]=10 ["ernie-3.0"]=5 ["ernie-layout"]=5 ["uie"]=5 ["ernie-health"]=5 ["llama"]=5 \
-["ernie"]=2 ["ernie_m"]=5 ["ernie_layout"]=5 ["ernie_csc"]=5 ["ernie_ctm"]=5 ["ernie_doc"]=20 ["ernie_health"]=5 ["gpt-3"]=5)
+["ofa"]=2 ["albert"]=2   ["SQuAD"]=20 ["lexical_analysis"]=5 ["seq2seq"]=5 ["word_embedding"]=5 \
+["ernie-ctm"]=5 ["distilbert"]=5  ["transformer"]=5 ["pet"]=5 ["efl"]=5 ["p-tuning"]=5 ["ernie-doc"]=20 ["transformer-xl"]=5 \
+["question_matching"]=5 ["ernie-csc"]=5 ["nptag"]=5 ["ernie-m"]=5 ["taskflow"]=5 ["clue"]=5 ["textcnn"]=5 \
+["fast_generation"]=10 ["ernie-3.0"]=5 ["ernie-layout"]=5 ["uie"]=5 ["ernie-health"]=5 ["llm"]=5 \
+["ernie"]=2 ["ernie_m"]=5 ["ernie_layout"]=5 ["ernie_csc"]=5 ["ernie_ctm"]=5 ["ernie_doc"]=20 ["ernie_health"]=5 ["segment_parallel_utils"]=5)
 ####################################
 # Insatll paddlepaddle-gpu
 install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
     python -m pip install --user -r scripts/regression/requirements_ci.txt
-    python -m pip install -r requirements-dev.txt
     python -m pip uninstall paddlepaddle -y
     python -m pip install --user ${paddle};
     python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
@@ -96,7 +95,7 @@ for line in `cat scripts/regression/model_list.txt`;do
 done
 cd ${nlp_dir}
 get_diff_TO_P0case(){
-for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
+for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
     arr_file_name=(${file_name//// })
     dir1=${arr_file_name[0]}
     dir2=${arr_file_name[1]}
@@ -107,6 +106,8 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
         continue
     elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
         continue
+    elif [[ "${AGILE_COMPILE_BRANCH}" == "refactor-training-loop" ]];then
+        P0case_list[${#P0case_list[*]}]=gpt
     elif [[ ${dir1} =~ "scripts" ]];then # API 升级
         if [[ ${dir2} =~ "should_deploy" ]];then # 针对发版mini test
             P0case_list[${#P0case_list[*]}]=transformer
@@ -117,12 +118,14 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
         elif [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
             P0case_list[${#P0case_list[*]}]=${dir2}
         elif [[ ${dir2} =~ "transformers" ]];then
-            # P0case_list[${#P0case_list[*]}]=transformers
+            P0case_list[${#P0case_list[*]}]=llm
             if [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
                 P0case_list[${#P0case_list[*]}]=${dir3}
             fi
         elif [[ ${dir2} =~ "taskflow" ]];then
             P0case_list[${#P0case_list[*]}]=taskflow
+        elif [[ ${dir3} =~ "transformers" ]];then
+            P0case_list[${#P0case_list[*]}]=llm
         elif [[ ${dir3} =~ "fast_transformer" ]] || [[ ${dir4} =~ "FasterTransformer" ]] ;then
              P0case_list[${#P0case_list[*]}]=fast_generation
         fi
@@ -146,6 +149,8 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
         #     P0case_list[${#P0case_list[*]}]=${dir2}
         #     Normal_dic[${dir2}]="${dir1}/${dir2}/"
         fi
+    elif [[ ${dir1} =~ "llm" ]];then # 模型升级
+        P0case_list[${#P0case_list[*]}]=llm
     elif [[ ${dir1} =~ "tests" ]];then # 新增单测
         if [[ ${dir2} =~ "transformers" ]] ;then
             if [[ ${dir3##*.} == "py" ]];then
@@ -157,6 +162,8 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
             fi
         elif [[ ${dir2} =~ "taskflow" ]] ;then
             APIcase_list[${#APIcase_list[*]}]=${dir2}
+        elif [[ ${dir2} =~ "llm" ]] ;then
+            P0case_list[${#P0case_list[*]}]=${dir2}
         fi
     elif [[ ${dir1} =~ "pipelines" ]];then # 影响编包
         Build_list[${dir1}]=${dir1}
@@ -205,7 +212,7 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
         echo "instal_nlp_pr"
         python -m pip install  dist/p****.whl
     fi
-    pip list
+    python -m pip list
     echo -e "\033[35m =======CI Check P0case========= \033[0m"
     echo -e "\033[35m ---- P0case_list length: ${#P0case_list[*]}, cases: ${P0case_list[*]} \033[0m"
     set +e
@@ -269,6 +276,11 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     else
         echo -e "\033[32m ---- Unittest Success \033[0m"
     fi
+    cd ${nlp_dir}
+    echo -e "\033[35m ---- Genrate Allure Report  \033[0m"
+    cp scripts/regression/gen_allure_report.py ./
+    python gen_allure_report.py
+    echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
     ####################################
     # run coverage
     # cd ${nlp_dir}/tests/

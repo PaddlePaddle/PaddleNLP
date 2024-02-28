@@ -18,14 +18,10 @@ Ths copyright of pytorch/pytorch is a BSD-style license, as found in the LICENSE
 """
 
 import math
-import warnings
 
 import numpy as np
 import paddle
 import paddle.nn as nn
-from paddle.fluid import core
-from paddle.fluid.core import VarDesc
-from paddle.fluid.framework import convert_np_dtype_to_dtype_
 
 __all__ = [
     "uniform_",
@@ -307,54 +303,6 @@ def reset_initialized_parameter(model, include_self=True):
                 _no_grad_fill_(m.bias, 0)
 
 
-def _transform(t, device, dtype, blocking):
-    if device is None:
-        device = t.place
-    if dtype is None:
-        dtype = t.dtype
-
-    if type(dtype) is not VarDesc.VarType:
-        dtype = convert_np_dtype_to_dtype_(dtype)
-
-    # 1. gpu place need to determine whether the memory is sufficient for allocation:
-    if t.place.is_gpu_place():
-        # for gpu, minimum memory allocation unit is 256 bytes.
-        size_dtype = core.size_of_dtype(dtype)
-        # Note(zhangbo): Paddle GPU minimum memory allocation unit is 256 bytes, waiting_alloc_memory will comput ‘t’ occupied memory space.
-        # Coefficient 1.2 is used to avoid OOM that may occur in this critical state when the memory is just enough.
-        waiting_alloc_memory = ((np.prod(t.shape) * size_dtype) / 256 + 1) * 256 * 1.2
-        gpu_memory_available = core.gpu_memory_available()
-        if gpu_memory_available < waiting_alloc_memory:
-            # Copy param / Tensor to cpu
-            t_used = t._copy_to(paddle.CPUPlace(), blocking)  # k-v type will error
-            # Release mem of t
-            t.value().get_tensor()._clear()
-        else:
-            t_used = t
-    else:
-        t_used = t
-
-    # 2. cast param / Tensor to dtype
-    if dtype is not None and dtype != t_used.dtype:
-        with paddle.fluid.framework._dygraph_place_guard(place=t_used.place):
-            t_casted = t_used.cast(dtype=dtype)
-    else:
-        t_casted = t_used
-
-    # 3. Copy casted cpu param / Tensor to device
-    if device is not None and not t_casted.place._equals(device):
-        new_t = t_casted._copy_to(device, blocking)
-    else:
-        new_t = t_casted
-
-    # 4. share Tensor to origin param / Tensor
-    dst_tensor = t.value().get_tensor()
-    src_tensor = new_t.value().get_tensor()
-    dst_tensor._share_data_with(src_tensor)
-
-    return t
-
-
 def to(
     self,
     device=None,
@@ -382,40 +330,7 @@ def to(
 
     """
 
-    if device is None and dtype is None and blocking is None:
+    if floating_only and (not paddle.is_floating_point(self)):
         return self
-
-    if device is not None:
-        if isinstance(device, str):
-            device = paddle.device._convert_to_place(device)
-        elif isinstance(
-            device,
-            (
-                core.CPUPlace,
-                core.CUDAPlace,
-                core.CUDAPinnedPlace,
-                core.XPUPlace,
-            ),
-        ):
-            pass
-        else:
-            raise ValueError(
-                "device value error, must be str, paddle.CPUPlace(), paddle.CUDAPlace(), paddle.CUDAPinnedPlace() or paddle.XPUPlace(), but the type of device is "
-                + type(device).__name__
-            )
-
-    if blocking is None:
-        blocking = True
-    else:
-        assert isinstance(blocking, bool), "blocking value error, must be the True, False or None"
-
-    def transform(t, device, dtype, blocking):
-        if floating_only and (not paddle.is_floating_point(t)):
-            return t
-        return _transform(t, device, dtype, blocking)
-
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=UserWarning)
-        transform(self, device, dtype, blocking)
-
+    paddle.Tensor._to(self, device, dtype, blocking)
     return self

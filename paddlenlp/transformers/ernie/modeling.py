@@ -19,7 +19,9 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
-from paddle.fluid.dygraph.base import in_declarative_mode
+
+# TODO(guosheng): update this workaround import for in_declarative_mode
+from paddle.nn.layer.layers import in_declarative_mode
 
 from ...layers import Linear as TransposedLinear
 from ...utils.env import CONFIG_NAME
@@ -186,7 +188,7 @@ class ErnieModel(ErniePretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -213,9 +215,7 @@ class ErnieModel(ErniePretrainedModel):
             weight_attr=weight_attr,
             normalize_before=False,
         )
-        self.encoder = nn.TransformerEncoder(
-            encoder_layer, config.num_hidden_layers, enable_recompute=config.enable_recompute
-        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
         self.pooler = ErniePooler(config, weight_attr)
 
     def get_input_embeddings(self):
@@ -1353,9 +1353,17 @@ class UTC(ErniePretrainedModel):
 
         option_logits = paddle.matmul(q.unsqueeze(1), k, transpose_y=True).squeeze(1)
         option_logits = option_logits / self.predict_size**0.5
-        for index, logit in enumerate(option_logits):
-            option_logits[index] -= (1 - (omask_positions[index] > 0).astype("float32")) * 1e12
 
+        if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+            # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior
+            # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+            # removed after static graphs support inplace and stride.
+            with paddle.framework._no_check_dy2st_diff():
+                for index, logit in enumerate(option_logits):
+                    option_logits[index] -= (1 - (omask_positions[index] > 0).astype("float32")) * 1e12
+        else:
+            for index, logit in enumerate(option_logits):
+                option_logits[index] -= (1 - (omask_positions[index] > 0).astype("float32")) * 1e12
         loss = None
         if not return_dict:
             output = (option_logits,)

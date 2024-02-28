@@ -11,10 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import os
-from typing import Dict, List, Optional, Union
+import re
+from typing import Any, Dict, List, Optional, Union
 
+import numpy as np
 from sentencepiece import SentencePieceProcessor
 
 from .. import PretrainedTokenizer
@@ -34,7 +37,18 @@ class SPTokenizer:
         self.pad_id: int = self.sp_model.unk_id()
         assert self.sp_model.vocab_size() == self.sp_model.get_piece_size()
 
-        special_tokens = ["[MASK]", "[gMASK]", "[sMASK]", "sop", "eop"]
+        special_tokens = [
+            "[MASK]",
+            "[gMASK]",
+            "[sMASK]",
+            "sop",
+            "eop",
+            "<|system|>",
+            "<|user|>",
+            "<|assistant|>",
+            "<|observation|>",
+        ]
+
         self.special_tokens = {}
         self.index_special_tokens = {}
         for token in special_tokens:
@@ -42,8 +56,24 @@ class SPTokenizer:
             self.index_special_tokens[self.n_words] = token
             self.n_words += 1
 
-    def tokenize(self, s: str):
-        return self.sp_model.EncodeAsPieces(s)
+        # add eos/pad/unk token to special_token_expression
+        all_special_tokens = list(self.special_tokens.keys()) + ["</s>", "<unk>"]
+        self.special_token_expression = "|".join([re.escape(token) for token in all_special_tokens])
+
+    def tokenize(self, s: str, encode_special_tokens=False):
+        if encode_special_tokens:
+            last_index = 0
+            t = []
+            for match in re.finditer(self.special_token_expression, s):
+                if last_index < match.start():
+                    t.extend(self.sp_model.EncodeAsPieces(s[last_index : match.start()]))
+                t.append(s[match.start() : match.end()])
+                last_index = match.end()
+            if last_index < len(s):
+                t.extend(self.sp_model.EncodeAsPieces(s[last_index:]))
+            return t
+        else:
+            return self.sp_model.EncodeAsPieces(s)
 
     def encode(self, s: str, bos: bool = False, eos: bool = False) -> List[int]:
         assert type(s) is str
@@ -83,7 +113,8 @@ class ChatGLMv2Tokenizer(PretrainedTokenizer):
         }
     }
 
-    def __init__(self, vocab_file, padding_side="left", **kwargs):
+    # always encode special tokens, eg: </s>, [gMASK], [MASK] ...
+    def __init__(self, vocab_file, padding_side="left", encode_special_tokens=True, **kwargs):
         super().__init__(padding_side=padding_side, **kwargs)
         self.name = "ChatGLMv2Tokenizer"
 
@@ -92,8 +123,10 @@ class ChatGLMv2Tokenizer(PretrainedTokenizer):
         self.special_tokens = {
             "<bos>": self.tokenizer.bos_id,
             "<eos>": self.tokenizer.eos_id,
+            "<unk>": self.tokenizer.pad_id,
             "<pad>": self.tokenizer.pad_id,
         }
+        self.encode_special_tokens = encode_special_tokens
 
     def get_command(self, token):
         if token in self.special_tokens:
@@ -128,7 +161,7 @@ class ChatGLMv2Tokenizer(PretrainedTokenizer):
         return vocab
 
     def _tokenize(self, text, **kwargs):
-        return self.tokenizer.tokenize(text)
+        return self.tokenizer.tokenize(text, encode_special_tokens=self.encode_special_tokens)
 
     def _convert_token_to_id(self, token):
         """Converts a token (str) in an id using the vocab."""
@@ -261,9 +294,29 @@ class ChatGLMv2Tokenizer(PretrainedTokenizer):
             difference = max_length - len(required_input)
 
             if "attention_mask" in encoded_inputs:
-                encoded_inputs["attention_mask"] = [0] * difference + encoded_inputs["attention_mask"]
+                # 3D/4D attention mask
+                if len(np.shape(encoded_inputs["attention_mask"])) > 2:
+                    encoded_inputs["attention_mask"] = np.pad(
+                        encoded_inputs["attention_mask"],
+                        pad_width=[(0, 0), (difference, 0), (difference, 0)],
+                        mode="constant",
+                        constant_values=0,
+                    )
+                # 2D attention mask
+                else:
+                    encoded_inputs["attention_mask"] = [0] * difference + encoded_inputs["attention_mask"]
             if "position_ids" in encoded_inputs:
                 encoded_inputs["position_ids"] = [0] * difference + encoded_inputs["position_ids"]
             encoded_inputs[self.model_input_names[0]] = [self.pad_token_id] * difference + required_input
 
         return encoded_inputs
+
+    def encode_chat_inputs(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}):
+        # encode system
+        result = super().encode_chat_inputs(conversations, context_data=context_data)
+        if "system" in result:
+            result["system"] = self.get_prefix_tokens() + result["system"]
+        else:
+            result["conversations"][0][0] = self.get_prefix_tokens() + result["conversations"][0][0]
+
+        return result

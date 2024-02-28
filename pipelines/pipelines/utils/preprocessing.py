@@ -12,11 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import functools
 import logging
+import multiprocessing
+import os
 import re
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
+from pipelines.nodes.base import BaseComponent
 from pipelines.nodes.file_converter import (
     BaseConverter,
     DocxToTextConverter,
@@ -25,8 +29,94 @@ from pipelines.nodes.file_converter import (
     PDFToTextConverter,
     TextConverter,
 )
+from pipelines.nodes.file_converter.docx import DocxTotxtConverter
+from pipelines.nodes.file_converter.markdown import MarkdownRawTextConverter
+from pipelines.nodes.preprocessor.text_splitter import (
+    CharacterTextSplitter,
+    MarkdownHeaderTextSplitter,
+    SpacyTextSplitter,
+)
 
 logger = logging.getLogger(__name__)
+import copy
+
+
+def document_rough_split(document_list, max_token=4500):
+    document_index_rough = []
+    for item in document_list:
+        if len(item["content"]) < max_token or "\n" in item:
+            document_index_rough.append(item)
+        else:
+            all_token = len(item["content"])
+            token_index = [i for i in range(0, all_token + 1, max_token)]
+            if all_token > token_index[-1]:
+                token_index.append(all_token)
+            token_index_combine = [item["content"][start:end] for start, end in zip(token_index, token_index[1:])]
+            for txt in token_index_combine:
+                txt_split = copy.deepcopy(item)
+                txt_split["content"] = txt
+                document_index_rough.append(txt_split)
+    return document_index_rough
+
+
+def split_document(document_index, all_document, splitter, split_paragraphs: bool, clean_func, path, split_answers):
+    start = document_index[0]
+    end = document_index[1]
+    documents = []
+    for item in all_document[start:end]:
+        text = item["content"]
+        if clean_func:
+            text = clean_func(text)
+        if split_paragraphs is True:
+            text_splits = splitter.split_text(text)
+            for txt in text_splits:
+                if not txt.strip():  # skip empty paragraphs
+                    continue
+                if split_answers:
+                    query, answer = txt.split("\t")
+                    meta_data = {"name": path.name, "answer": answer}
+                    # Add image list parsed from docx into meta
+                    if item["meta"] is not None and "images" in item["meta"]:
+                        meta_data["images"] = item["meta"]["images"]
+                    documents.append({"content": query, "meta": meta_data})
+                else:
+                    meta_data = {
+                        "name": path.name,
+                    }
+                    # Add image list parsed from docx into meta
+                    if item["meta"] is not None and "images" in item["meta"]:
+                        meta_data["images"] = item["meta"]["images"]
+                    documents.append({"content": txt, "meta": meta_data})
+        else:
+            documents.append({"content": text, "meta": item["meta"] if "meta" in item else {"name": path.name}})
+    return documents
+
+
+def run_process(
+    document_combination_index,
+    list_documents,
+    splitter,
+    process_num,
+    split_paragraphs,
+    clean_func,
+    path,
+    split_answers,
+):
+    process_num = min(os.cpu_count(), process_num)
+    pool = multiprocessing.Pool(process_num)
+    split_document_c = functools.partial(
+        split_document,
+        all_document=list_documents,
+        splitter=splitter,
+        split_paragraphs=split_paragraphs,
+        clean_func=clean_func,
+        path=path,
+        split_answers=split_answers,
+    )
+    result = pool.map_async(split_document_c, document_combination_index)
+    pool.close()
+    pool.join()
+    return result.get()
 
 
 def convert_files_to_dicts(
@@ -35,6 +125,7 @@ def convert_files_to_dicts(
     split_paragraphs: bool = False,
     split_answers: bool = False,
     encoding: Optional[str] = None,
+    process_num: int = 20,
 ) -> List[dict]:
     """
     Convert all files(.txt, .pdf, .docx) in the sub-directories of the given path to Python dicts that can be written to a
@@ -62,7 +153,6 @@ def convert_files_to_dicts(
                 "Skipped file {0} as type {1} is not supported here. "
                 "See pipelines.file_converter for support of more file types".format(path, file_suffix)
             )
-
     # No need to initialize converter if file type not present
     for file_suffix in suffix2paths.keys():
         if file_suffix == ".pdf":
@@ -75,12 +165,9 @@ def convert_files_to_dicts(
             suffix2converter[file_suffix] = ImageToTextConverter()
         if file_suffix == ".md":
             suffix2converter[file_suffix] = MarkdownConverter()
-
     documents = []
     for suffix, paths in suffix2paths.items():
         for path in paths:
-            if encoding is None and suffix == ".pdf":
-                encoding = "Latin1"
             logger.info("Converting {}".format(path))
             list_documents = suffix2converter[suffix].convert(
                 file_path=path,
@@ -89,7 +176,6 @@ def convert_files_to_dicts(
             )  # PDFToTextConverter, TextConverter, ImageToTextConverter and DocxToTextConverter return a list containing a single dict
             for document in list_documents:
                 text = document["content"]
-
                 if clean_func:
                     text = clean_func(text)
 
@@ -117,6 +203,151 @@ def convert_files_to_dicts(
                     documents.append(
                         {"content": text, "meta": document["meta"] if "meta" in document else {"name": path.name}}
                     )
+    return documents
+
+
+def convert_files_to_dicts_splitter(
+    dir_path: str,
+    clean_func: Optional[Callable] = None,
+    split_paragraphs: bool = False,
+    split_answers: bool = False,
+    encoding: Optional[str] = None,
+    separator: str = "\n",
+    filters: list = ["\n"],
+    chunk_size: int = 300,
+    chunk_overlap: int = 0,
+    language: str = "chinese",
+    process_num: int = 10,
+) -> List[dict]:
+    """
+    Convert all files(.txt, .pdf, .docx) in the sub-directories of the given path to Python dicts that can be written to a
+    Document Store.
+
+    :param dir_path: path for the documents to be written to the DocumentStore
+    :param clean_func: a custom cleaning function that gets applied to each doc (input: str, output:str)
+    :param split_paragraphs: split text in paragraphs.
+    :param split_answers: split text into two columns, including question column, answer column.
+    :param encoding: character encoding to use when converting pdf documents.
+    """
+    file_paths = [p for p in Path(dir_path).glob("**/*")]
+    allowed_suffixes = [".pdf", ".txt", ".docx", ".png", ".jpg", ".md"]
+    suffix2converter: Dict[str, BaseConverter] = {}
+
+    suffix2paths: Dict[str, List[Path]] = {}
+    suffix2splitter: Dict[str, BaseComponent] = {}
+    for path in file_paths:
+        file_suffix = path.suffix.lower()
+        if file_suffix in allowed_suffixes:
+            if file_suffix not in suffix2paths:
+                suffix2paths[file_suffix] = []
+            suffix2paths[file_suffix].append(path)
+        elif not path.is_dir():
+            logger.warning(
+                "Skipped file {0} as type {1} is not supported here. "
+                "See pipelines.file_converter for support of more file types".format(path, file_suffix)
+            )
+
+    headers_to_split_on = [
+        ("#", "Header 1"),
+        ("##", "Header 2"),
+        ("###", "Header 3"),
+        ("####", "Header 4"),
+        ("#####", "Header 5"),
+        ("######", "Header 6"),
+    ]
+    markdown_splitter = MarkdownHeaderTextSplitter(
+        separator=separator,
+        chunk_size=chunk_size,
+        headers_to_split_on=headers_to_split_on,
+        return_each_line=True,
+        filters=filters,
+    )
+    if language == "chinese":
+        docx_splitter = SpacyTextSplitter(
+            separator=separator, filters=filters, chunk_size=chunk_size, chunk_overlap=chunk_overlap
+        )
+        pdf_splitter = SpacyTextSplitter(
+            separator=separator, chunk_size=chunk_size, chunk_overlap=chunk_overlap, filters=filters
+        )
+    else:
+        docx_splitter = SpacyTextSplitter(
+            separator=separator,
+            filters=filters,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            pipeline="en_core_web_sm",
+        )
+        pdf_splitter = SpacyTextSplitter(
+            separator=separator,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            filters=filters,
+            pipeline="en_core_web_sm",
+        )
+    text_splitter = CharacterTextSplitter(
+        separator=separator, chunk_size=chunk_size, chunk_overlap=chunk_overlap, filters=filters
+    )
+
+    imgage_splitter = CharacterTextSplitter(
+        separator=separator, chunk_size=chunk_size, chunk_overlap=chunk_overlap, filters=filters
+    )
+    documents = []
+    # No need to initialize converter if file type not present
+    for file_suffix in suffix2paths.keys():
+        if file_suffix == ".pdf":
+            suffix2converter[file_suffix] = PDFToTextConverter()
+            suffix2splitter[file_suffix] = pdf_splitter
+        if file_suffix == ".txt":
+            suffix2converter[file_suffix] = TextConverter()
+            suffix2splitter[file_suffix] = text_splitter
+        if file_suffix == ".docx":
+            suffix2converter[file_suffix] = DocxTotxtConverter()
+            suffix2splitter[file_suffix] = docx_splitter
+        if file_suffix == ".png" or file_suffix == ".jpg":
+            suffix2converter[file_suffix] = ImageToTextConverter()
+            suffix2splitter[file_suffix] = imgage_splitter
+        if file_suffix == ".md":
+            suffix2converter[file_suffix] = MarkdownRawTextConverter()
+            suffix2splitter[file_suffix] = markdown_splitter
+    for suffix, paths in suffix2paths.items():
+        for path in paths:
+            logger.info("Converting {}".format(path))
+            list_documents = suffix2converter[suffix].convert(
+                file_path=path,
+                meta=None,
+                encoding=encoding,
+                language=language,
+            )
+            list_documents = document_rough_split(list_documents)
+            document_number = len(list_documents)
+            split_len = document_number // process_num
+            if split_len == 0:
+                split_len = document_number
+            document_list = [i for i in range(0, document_number, split_len)]
+            if document_number > document_list[-1]:
+                document_list.append(document_number)
+            document_combination_index = [(start, end) for start, end in zip(document_list, document_list[1:])]
+            document_mul = run_process(
+                document_combination_index=document_combination_index,
+                list_documents=list_documents,
+                splitter=suffix2splitter[suffix],
+                process_num=process_num,
+                split_paragraphs=split_paragraphs,
+                clean_func=clean_func,
+                path=path,
+                split_answers=split_answers,
+            )
+            for item in document_mul:
+                documents.extend(item)
+    if filters is not None and len(filters) > 0:
+        documents = clean(documents, filters)
+    return documents
+
+
+def clean(documents: List[dict], filters):
+    for special_character in filters:
+        for doc in documents:
+            doc["content"] = doc["content"].replace(special_character, "")
     return documents
 
 

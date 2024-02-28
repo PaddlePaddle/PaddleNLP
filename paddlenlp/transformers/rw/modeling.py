@@ -870,21 +870,7 @@ class RWForCausalLM(RWPreTrainedModel):
 
         loss = None
         if labels is not None:
-            if self.config.lm_shift_labels:
-                # Shift so that tokens < n predict n
-                shift_logits = lm_logits[..., :-1, :]
-                shift_labels = labels[..., 1:]
-            else:
-                shift_logits = lm_logits
-                shift_labels = labels
-
-            batch_size, seq_length, vocab_size = shift_logits.shape
-            # Flatten the tokens
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(
-                shift_logits.reshape([batch_size * seq_length, vocab_size]),
-                shift_labels.reshape([batch_size * seq_length]),
-            )
+            loss = nn.functional.cross_entropy(lm_logits, labels)
 
         if not return_dict:
             output = (lm_logits,) + transformer_outputs[1:]
