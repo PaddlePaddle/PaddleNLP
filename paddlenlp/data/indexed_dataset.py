@@ -580,12 +580,10 @@ class MMapIndexedDatasetBuilder(object):
         if tgt_len < 0:
             # If tgt_len < 0, the all text will be calcluate loss
             loss_mask = [0] * bos_len + [1] * (total_sentence_len - bos_len - eos_len) + [0] * eos_len
-            print(loss_mask, len(loss_mask))
         else:
             # The tgt_len >=0, only target text will ben calcluate loss
             src_len = total_sentence_len - tgt_len - bos_len - eos_len
             loss_mask = [0] * bos_len + [0] * src_len + [1] * tgt_len + [0] * eos_len
-            print(loss_mask, len(loss_mask))
         # Split the loss mask with the sentence_lens
         loss_mask_lst = self.split_list_variable_size(loss_mask, sentence_lens)
         for loss_mask in loss_mask_lst:
