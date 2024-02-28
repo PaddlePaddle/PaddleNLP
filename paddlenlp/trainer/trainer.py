@@ -38,7 +38,6 @@ import paddle
 import paddle.amp.auto_cast as autocast
 import paddle.distributed as dist
 import paddle.nn as nn
-import paddle.profiler as profiler
 from packaging import version
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
@@ -1065,6 +1064,8 @@ class Trainer:
                     self.callback_handler.on_optimizer_end(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
                     )
+
+                    # paddle.device.cuda.empty_cache()
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
