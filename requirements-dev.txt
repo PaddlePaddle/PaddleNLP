@@ -20,3 +20,4 @@ tiktoken
 visualdl
 wandb
 tensorboard
+modelscope
