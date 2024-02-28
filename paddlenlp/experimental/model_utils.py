@@ -116,13 +116,6 @@ class FasterPretrainedModel(PretrainedModel):
                     resource_files[file_id] = full_file_name
             resource_files["model_config_file"] = os.path.join(pretrained_model_name_or_path, cls.model_config_file)
         else:
-            # Assuming from community-contributed pretrained models
-            # for file_id, file_name in cls.resource_files_names.items():
-            #     full_file_name = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, file_name])
-            #     resource_files[file_id] = full_file_name
-            # resource_files["model_config_file"] = "/".join(
-            #     [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
-            # )
             for file_id, file_name in cls.resource_files_names.items():
                 resource_files[file_id] = file_name
 
@@ -140,26 +133,6 @@ class FasterPretrainedModel(PretrainedModel):
                 from_aistudio=from_aistudio,
                 from_hf_hub=from_hf_hub,
             )
-            # if file_path is None or os.path.isfile(file_path):
-            #     resolved_resource_files[file_id] = file_path
-            #     continue
-            # path = os.path.join(default_root, file_path.split("/")[-1])
-            # if os.path.exists(path):
-            #     logger.info("Already cached %s" % path)
-            #     resolved_resource_files[file_id] = path
-            # else:
-            #     logger.info("Downloading %s and saved to %s" % (file_path, default_root))
-            #     try:
-            #         resolved_resource_files[file_id] = get_path_from_url(file_path, default_root)
-            #     except RuntimeError as err:
-            #         logger.error(err)
-            #         raise RuntimeError(
-            #             f"Can't load weights for '{pretrained_model_name_or_path}'.\n"
-            #             f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-            #             "- a correct model-identifier of built-in pretrained models,\n"
-            #             "- or a correct model-identifier of community-contributed pretrained models,\n"
-            #             "- or the correct path to a directory containing relevant modeling files(model_weights and model_config).\n"
-            #         )
 
         # Prepare model initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
