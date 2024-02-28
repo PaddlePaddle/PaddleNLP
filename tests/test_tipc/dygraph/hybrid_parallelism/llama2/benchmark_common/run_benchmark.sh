@@ -22,7 +22,7 @@ function _set_params(){
     device_num=${device_num:-"N1C8"}
     global_batch_size=${global_batch_size:-64}
     fp_item="bf16"
-    model_type=${model_type:-"llama2_7b"}
+    MODEL_TYPE=${model_type:-"llama2_7b"}
 
     ip_lists=($(echo $TRAINER_INSTANCES | tr ',' ' '))
     master_ip=${ip_lists[0]}
@@ -87,27 +87,28 @@ function _train(){
     N1C1) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0 \
             ${autoconfig_args} --log_dir log_${MODEL_TYPE} run_pretrain.py \
-            ./pretrain-${MODEL_TYPE}-auto_tuner.json"
+            ./auto_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}-auto_tuner.json"
         ;;
     N1C8) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             ${autoconfig_args} --log_dir log_${MODEL_TYPE} run_pretrain.py \
-            ./pretrain-${MODEL_TYPE}-auto_tuner.json"
+            ./auto_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}-auto_tuner.json"
         ;;
     N2C16|N4C32) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --master etcd://$master_ip:2379 --nnodes $nnodes:$nnodes \
             ${autoconfig_args} --log_dir log_${MODEL_TYPE} run_pretrain.py \
-            ./pretrain-${MODEL_TYPE}-auto_tuner.json"
+            ./auto_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}-auto_tuner.json"
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             ${autoconfig_args} --log_dir log_${MODEL_TYPE} run_pretrain.py \
-            ./pretrain-${MODEL_TYPE}-auto_tuner.json"
+            ./auto_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}-auto_tuner.json"
         ;;
     esac
     cd ../llm/llama
-    rm -rf ./auto_config_${MODEL_TYPE}/GBS32_*
+    rm -rf ./auto_config_${MODEL_TYPE}/*GBS*
+    rm -rf ./auto_config_${MODEL_TYPE}/*auto_tuner.log
     rm -rf ./auto_config_${MODEL_TYPE}/*csv
     rm -rf ./auto_config_${MODEL_TYPE}/best_*
     rm -rf log_${MODEL_TYPE}
