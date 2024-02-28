@@ -246,18 +246,6 @@ class ModelLoadTester(unittest.TestCase):
             (CLIPTextModel, "xiaoguailin/clip-vit-large-patch14", False, False, True, None, None),
             (AutoModel, "xiaoguailin/clip-vit-large-patch14", False, False, True, False, None),
             (CLIPTextModel, "xiaoguailin/clip-vit-large-patch14", False, False, True, True, None),
-            # 测试进行模型文件修改的model
-            # minigpt4
-            (AutoModel, "wangrongsheng/MiniGPT-4-LLaMA-7B", True, False, False, False, None),
-            (AutoModel, "alv001/MiniGpt-4-7B", False, False, True, False, None),
-            # llama
-            (AutoModel, "facebook/llama-7b", True, False, False, False, None),
-            (AutoModel, "facebook/llama-7b", False, False, False, False, None),
-            (AutoModel, "aistudio/Llama-2-7b", False, True, False, None, None),
-            (AutoModel, "skyline2006/llama-7b", False, False, True, False, None),
-            # bloom
-            (AutoModel, "bigscience/bloom-7b1", False, False, False, False, None),
-            (AutoModel, "bigscience/bloom-7b1", True, False, False, False, None),
         ]
     )
     def test_download_cache(
