@@ -50,7 +50,7 @@ function llama_case_list_auto() {
     llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
     llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
 
-    llama_dygraph2static_auto_bs8_fp16_DP2-MP2-PP2
+    llama_dy2st_auto_bs8_fp16_DP2-MP2-PP2
 
     llama_static_auto_recompute_bs8_fp32_DP1-MP1-PP1
     llama_static_auto_recompute_bs16_fp32_DP2-MP1-PP1
@@ -1512,13 +1512,13 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     echo "=========== $FUNCNAME run  end ==========="
 }
 
-function llama_dygraph2static_auto_bs8_fp16_DP2-MP2-PP2() {
+function llama_dy2st_auto_bs8_fp16_DP2-MP2-PP2() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=3
     export NVIDIA_TF32_OVERRIDE=0
 
-    task_name="llama_auto_bs8_fp16_dp2mp2pp2"
+    task_name="llama_dy2st_auto_bs8_fp16_dp2mp2pp2"
     case_out_dir="output/$task_name"
     case_log_dir="output/$task_name""_log"
     rm -rf $case_out_dir
@@ -1548,6 +1548,11 @@ function llama_dygraph2static_auto_bs8_fp16_DP2-MP2-PP2() {
         --pipeline_parallel_degree 2 \
         --tensor_parallel_degree 2 \
         --sharding_parallel_degree 1 \
+        --use_flash_attention 0 \
+        --fuse_attention_qkv 1 \
+        --fuse_attention_ffn 0 \
+        --use_fused_rope 0 \
+        --use_fused_rms_norm 1 \
         --learning_rate 0.0001 \
         --min_learning_rate 0.00001 \
         --max_steps 10 \
