@@ -129,6 +129,7 @@ class ModelArgument:
 
     # prefix tuning related parameters
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
+    prefix_path: str = field(default=None, metadata={"help": "Initialize prefix state dict."})
     num_prefix_tokens: int = field(default=128, metadata={"help": "Number of prefix tokens"})
 
     from_aistudio: bool = field(default=False, metadata={"help": "Whether to load model from aistudio"})
