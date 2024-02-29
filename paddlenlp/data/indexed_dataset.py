@@ -565,27 +565,7 @@ class MMapIndexedDatasetBuilder(object):
         self._sizes = []
         self._doc_idx = [0]
 
-    def split_list_variable_size(self, lst, sizes):
-        """Split the list as the different size"""
-        start = 0
-        sublists = []
-        for size in sizes:
-            end = start + size
-            sublists.append(lst[start:end])
-            start = end
-        return sublists
-
-    def flush_loss_mask_item(self, sentence_lens, tgt_len, bos_len, eos_len):
-        total_sentence_len = sum(sentence_lens)
-        if tgt_len < 0:
-            # If tgt_len < 0, the all text will be calcluate loss
-            loss_mask = [0] * bos_len + [1] * (total_sentence_len - bos_len - eos_len) + [0] * eos_len
-        else:
-            # The tgt_len >=0, only target text will ben calcluate loss
-            src_len = total_sentence_len - tgt_len - bos_len - eos_len
-            loss_mask = [0] * bos_len + [0] * src_len + [1] * tgt_len + [0] * eos_len
-        # Split the loss mask with the sentence_lens
-        loss_mask_lst = self.split_list_variable_size(loss_mask, sentence_lens)
+    def flush_loss_mask_item(self, loss_mask_lst):
         for loss_mask in loss_mask_lst:
             tensor = np.array(loss_mask, dtype=np.uint8)
             self._loss_mask_file.write(tensor.tobytes(order="C"))
