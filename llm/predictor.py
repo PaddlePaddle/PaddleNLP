@@ -135,11 +135,6 @@ class PredictorArgument:
         },
     )
 
-    speculative_decoding: bool = field(
-        default=False,
-        metadata={
-            "help": "Whether to use speculative decoding. If set as `True`, the model will predict a next token with probability."
-        })
 
     @property
     def total_max_length(self):
@@ -732,22 +727,6 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
         )
         return None
 
-    @paddle.no_grad()
-    def speculative_sampling(self, inputs: dict[str, paddle.Tensor], assistant_model):
-        for key in inputs.keys():
-            if paddle.is_tensor(inputs[key]):
-                continue
-            if isinstance(inputs[key], list):
-                if paddle.is_tensor(inputs[key]):
-                    continue
-                inputs[key] = [paddle.to_tensor(item) for item in inputs[key]]
-            else:
-                inputs[key] = paddle.to_tensor(inputs[key])
-
-        inputs["cache_kvs"] = self.cache_kvs
-
-        output_ids = self.model.assisted_decoding(inputs["input_ids"], assistant_model=assistant_model, **inputs)
-        return output_ids
 
 
 class BlockInferencePredictorMixin:
@@ -1333,7 +1312,6 @@ def create_predictor(
                 elif predictor_args.block_attn:
                     config.max_seq_len = predictor_args.total_max_length
                     config.block_size = predictor_args.block_size
-                    config.speculative_decoding = predictor_args.speculative_decoding
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMBlockInferenceModel as LlamaInferenceModel,
                     )
@@ -1344,18 +1322,6 @@ def create_predictor(
                         dtype=predictor_args.dtype,
                         tensor_parallel_degree=tensor_parallel_degree,
                         tensor_parallel_rank=tensor_parallel_rank,
-                    )
-                elif predictor_args.speculative_decoding:
-                    config.max_seq_len = predictor_args.total_max_length
-                    config.gamma = predictor_args.gamma
-                    config.speculative_decoding = predictor_args.speculative_decoding
-                    from paddlenlp.experimental.transformers import (
-                        LlamaForCausalLMSpecuInferenceModel as LlamaInferenceModel,
-                    )
-                    model = LlamaInferenceModel.from_pretrained(
-                        predictor_args.model_name_or_path,
-                        config=config,
-                        dtype=predictor_args.dtype,
                     )
                 else:
                     from paddlenlp.experimental.transformers import (

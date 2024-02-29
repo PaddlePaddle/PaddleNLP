@@ -864,7 +864,7 @@ class FusedMultiTransformerBase(Layer):
         kwargs["input_ids"] = input_ids
 
         out = self.post_process(**kwargs)
-        print("-------!!!generated a new token!!!--------")
+        # print("-------!!!generated a new token!!!--------")
         return out, caches
 
 
@@ -1398,6 +1398,85 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             quant_min_bound=self.config.quant_min_bound,
         )[0]
 
+        out_linear_out = self.compute_out_linear(fmha_out, i)
+
+        return out_linear_out
+
+    def post_process(self, **kwargs):
+        multi_block_output = kwargs.get("multi_block_output", None)
+        cum_offsets = kwargs.get("cum_offsets", None)
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
+        max_input_length = kwargs.get("max_input_length", -1)
+
+        out = rebuild_padding_v2(multi_block_output, cum_offsets, seq_lens_decoder, seq_lens_encoder, max_input_length)
+
+        return out
+
+class FusedSpecuMultiTransformer(FusedMultiTransformerBase):
+    def __init__(self, config: FusedMultiTransformerConfig):
+        super().__init__(config)
+
+    def compute_attn(
+        self,
+        time_step,
+        qkv_out,
+        padding_offset,
+        seq_lens,
+        input_ids,
+        rotary_embs,
+        rotary_emb_dims,
+        caches,
+        pre_caches,
+        pre_caches_length,
+        attn_mask,
+        i,
+        **kwargs,
+    ):
+        hidden_size = caches[2 * i].shape[1] * caches[2 * i].shape[3]
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
+        cu_seqlens_q = kwargs.get("cu_seqlens_q", None)
+        cu_seqlens_k = kwargs.get("cu_seqlens_k", None)
+        # prefill stage
+        if cu_seqlens_q == cu_seqlens_k:
+            cur_seq_len = seq_lens_encoder[0][0]
+        else:
+            cur_seq_len = seq_lens_decoder[0][0]
+        fmha_out, qkv_out_specu, _, _ = paddle.incubate.nn.functional.speculative_decoding_multihead_attention(
+            qkv_out,
+            caches[2 * i],
+            caches[2 * i + 1],
+            kwargs.get("seq_lens_encoder", None),
+            kwargs.get("seq_lens_decoder", None),
+            kwargs.get("seq_lens_this_time", None),
+            kwargs.get("padding_offsets", None),
+            kwargs.get("cum_offsets", None),
+            kwargs.get("cu_seqlens_q", None),
+            kwargs.get("cu_seqlens_k", None),
+            pre_caches[2 * i] if pre_caches is not None else None,  # pre_key_cache
+            pre_caches[2 * i + 1] if pre_caches is not None else None,  # pre_value_cache
+            attn_mask,
+            None,  # qkv_bias
+            None, # token_num_in_cache
+            kwargs.get("max_input_length", -1), # max_seq_len
+            self.use_neox_rotary_style,
+        )
+
+        # 更新 cache
+        # qkv_out_specu: (cur_token_num, 3*hidden_dim)
+        # caches[2*i]: (bsz, num_heads, max_seqlen, head_dim)
+        k = qkv_out_specu[:, hidden_size:2*hidden_size]
+        v = qkv_out_specu[:, 2*hidden_size:]
+
+        # prefill stage
+        if cu_seqlens_q == cu_seqlens_k:
+            caches[2 * i][:, :, :cur_seq_len, :] = k.reshape(caches[2 * i][:, :, :cur_seq_len, :].shape)
+            caches[2 * i + 1][:, :, :cur_seq_len, :] = v.reshape(caches[2 * i + 1][:, :, :cur_seq_len, :].shape)
+        # decode stage
+        else:
+            caches[2 * i][:, :, cur_seq_len, :] = k.reshape(caches[2 * i][:, :, cur_seq_len, :].shape)
+            caches[2 * i + 1][:, :, cur_seq_len, :] = v.reshape(caches[2 * i + 1][:, :, cur_seq_len, :].shape)
         out_linear_out = self.compute_out_linear(fmha_out, i)
 
         return out_linear_out
