@@ -1070,8 +1070,6 @@ class MixtralModel(MixtralPretrainedModel):
         )
         self.norm = MixtralRMSNorm(config)
 
-        self.gradient_checkpointing = False
-
     def get_input_embeddings(self):
         return self.embed_tokens
 
