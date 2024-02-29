@@ -22,6 +22,7 @@
 
     "task_limit": 2000,
     "max_time_per_task": 120,
+    "max_search_time": 900,
     "schedule_mode": "performance",
 
     "model_cfg": {
@@ -78,7 +79,12 @@
         "recompute_granularity": [
             "./auto_config_llama2_7b/pretrain-llama2_7b-auto_tuner.json",
             "recompute_granularity"
-        ]
+        ],
+        "autotuner_benchmark": [
+            "./auto_config_llama2_7b/pretrain-llama2_7b-auto_tuner.json",
+            "autotuner_benchmark",
+            0
+          ]
     },
 
     "metric_cfg": {
