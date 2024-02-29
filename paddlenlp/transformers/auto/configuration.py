@@ -20,21 +20,11 @@ import os
 from collections import defaultdict
 from typing import Dict, List, Type
 
-from huggingface_hub import hf_hub_download
-
-from ... import __version__
 from ...utils.download import get_file
-from ...utils.downloader import (
-    COMMUNITY_MODEL_PREFIX,
-    get_path_from_url_with_filelock,
-    url_file_exists,
-)
 from ...utils.import_utils import import_module
 from ...utils.log import logger
-from ..aistudio_utils import aistudio_download
 from ..configuration_utils import PretrainedConfig
 from ..model_utils import PretrainedModel
-from ..utils import resolve_cache_dir
 
 __all__ = [
     "AutoConfig",

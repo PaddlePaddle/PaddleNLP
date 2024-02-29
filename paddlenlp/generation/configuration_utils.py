@@ -24,19 +24,11 @@ from paddle.common_ops_import import convert_dtype
 
 from paddlenlp import __version__
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
-from paddlenlp.transformers.utils import resolve_cache_dir
 from paddlenlp.utils.download import get_file
 from paddlenlp.utils.log import logger
 
-from ..transformers.aistudio_utils import aistudio_download
 from ..utils import GENERATION_CONFIG_NAME
-from ..utils.downloader import (
-    COMMUNITY_MODEL_PREFIX,
-    get_path_from_url_with_filelock,
-    hf_file_exists,
-    is_url,
-    url_file_exists,
-)
+from ..utils.downloader import hf_file_exists
 
 DEFAULT_MAX_NEW_TOKENS = 20
 

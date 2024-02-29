@@ -58,7 +58,7 @@ from .tokenizer_utils_base import (
     TextInputPair,
     TruncationStrategy,
 )
-from .utils import InitTrackerMeta, fn_args_to_dict, resolve_cache_dir
+from .utils import InitTrackerMeta, fn_args_to_dict
 
 __all__ = [
     "PretrainedTokenizer",

@@ -152,7 +152,10 @@ def get_file(
             log_endpoint = "BOS"
             download_kwargs["url"] = filenames[0]
             download_kwargs["repo_id"] = repo_id
-            download_kwargs["filename"] = None
+            if filenames[0].split("/")[-1].endswith("pdparams"):
+                download_kwargs["filename"] = "model_state.pdparams"
+            else:
+                download_kwargs["filename"] = None
             cached_file = bos_download(
                 **download_kwargs,
             )

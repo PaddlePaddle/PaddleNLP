@@ -19,7 +19,6 @@ from parameterized import parameterized
 
 from paddlenlp.transformers import AutoImageProcessor, CLIPImageProcessor
 from paddlenlp.utils.log import logger
-from tests.testing_utils import slow
 
 
 class ImageProcessorLoadTester(unittest.TestCase):
@@ -59,7 +58,7 @@ class ImageProcessorLoadTester(unittest.TestCase):
             model_name, from_hf_hub=from_hf_hub, from_aistudio=from_aistudio, cache_dir=cache_dir, subfolder=subfolder
         )
         image_processor.save_pretrained(cache_dir)
-        local_image_processor = image_processor_cls.from_pretrained(cache_dir)
+        image_processor_cls.from_pretrained(cache_dir)
         os.environ["from_modelscope"] = "False"
 
     @parameterized.expand(
@@ -78,10 +77,10 @@ class ImageProcessorLoadTester(unittest.TestCase):
         logger.info("Download Image processor from local dir")
         if from_modelscope:
             os.environ["from_modelscope"] = "True"
-        image_processor = image_processor_cls.from_pretrained(
+        image_processor_cls.from_pretrained(
             model_name, from_hf_hub=from_hf_hub, from_aistudio=from_aistudio, subfolder=subfolder
         )
-        local_image_processor = image_processor_cls.from_pretrained(
+        image_processor_cls.from_pretrained(
             model_name, from_hf_hub=from_hf_hub, from_aistudio=from_aistudio, subfolder=subfolder
         )
         os.environ["from_modelscope"] = "False"

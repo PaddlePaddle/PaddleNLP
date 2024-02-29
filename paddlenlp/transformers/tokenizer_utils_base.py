@@ -33,24 +33,15 @@ import paddle
 from huggingface_hub import (
     create_repo,
     get_hf_file_metadata,
-    hf_hub_download,
     hf_hub_url,
     repo_type_and_id_from_hf_id,
     upload_folder,
 )
 from huggingface_hub.utils import EntryNotFoundError
-from paddle import __version__
 
 from ..utils.download import get_file
-from ..utils.downloader import (
-    COMMUNITY_MODEL_PREFIX,
-    get_path_from_url_with_filelock,
-    url_file_exists,
-)
 from ..utils.env import CHAT_TEMPLATE_CONFIG_NAME, TOKENIZER_CONFIG_NAME
 from ..utils.log import logger
-from .aistudio_utils import aistudio_download
-from .utils import resolve_cache_dir
 
 
 @dataclass(frozen=True, eq=True)

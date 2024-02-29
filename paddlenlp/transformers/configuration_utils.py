@@ -35,15 +35,8 @@ from .. import __version__
 from ..quantization.quantization_config import QuantizationConfig
 from ..utils import CONFIG_NAME, LEGACY_CONFIG_NAME
 from ..utils.download import get_file
-from ..utils.downloader import (
-    COMMUNITY_MODEL_PREFIX,
-    get_path_from_url_with_filelock,
-    hf_file_exists,
-    url_file_exists,
-)
+from ..utils.downloader import hf_file_exists
 from ..utils.log import logger
-from .aistudio_utils import aistudio_download
-from .utils import resolve_cache_dir
 
 _re_configuration_file = re.compile(r"config\.(.*)\.json")
 
@@ -703,8 +696,6 @@ class PretrainedConfig:
         """
         original_kwargs = copy.deepcopy(kwargs)
         cache_dir = kwargs.pop("cache_dir", None)
-        from_hf_hub = kwargs.get("from_hf_hub", False)
-        from_aistudio = kwargs.get("from_aistudio", False)
         subfolder = kwargs.get("subfolder", "")
         if subfolder is None:
             subfolder = ""

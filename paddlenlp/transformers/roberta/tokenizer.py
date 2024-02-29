@@ -21,9 +21,6 @@ from paddle.utils import try_import
 
 from paddlenlp.utils.download import get_file
 
-from ...utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
-from ...utils.env import MODEL_HOME
-from ...utils.log import logger
 from .. import (
     AddedToken,
     BasicTokenizer,

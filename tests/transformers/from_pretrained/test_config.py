@@ -20,7 +20,6 @@ from parameterized import parameterized
 from paddlenlp.transformers import AutoConfig, BertConfig
 from paddlenlp.transformers.bloom.configuration import BloomConfig
 from paddlenlp.utils.log import logger
-from tests.testing_utils import slow
 
 
 class ConfigLoadTester(unittest.TestCase):

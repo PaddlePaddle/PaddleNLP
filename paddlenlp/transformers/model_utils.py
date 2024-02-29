@@ -51,7 +51,6 @@ from paddle.nn import Embedding, Layer
 from paddle.utils.download import is_url as is_remote_url
 from tqdm.auto import tqdm
 
-from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from paddlenlp.utils.env import (
     CONFIG_NAME,
     LEGACY_CONFIG_NAME,
@@ -73,7 +72,6 @@ from .utils import (  # convert_ndarray_dtype,
     ContextManagers,
     InitTrackerMeta,
     adapt_stale_fwd_patch,
-    cached_file,
     cached_file_for_hf_hub,
     convert_file_size_to_int,
     dtype_byte_size,
@@ -82,7 +80,6 @@ from .utils import (  # convert_ndarray_dtype,
     is_paddle_support_lazy_init,
     is_safetensors_available,
     paddlenlp_load,
-    resolve_cache_dir,
     weight_name_suffix,
 )
 
@@ -1580,7 +1577,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         f" {pretrained_model_name_or_path}."
                     )
             elif is_remote_url(pretrained_model_name_or_path):
-                filename = pretrained_model_name_or_path
                 resolved_archive_file = get_file(
                     pretrained_model_name_or_path,
                     pretrained_model_name_or_path,

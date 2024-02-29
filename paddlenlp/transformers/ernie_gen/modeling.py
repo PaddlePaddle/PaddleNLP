@@ -20,7 +20,6 @@ import paddle
 import six
 from paddle import nn
 from paddle.nn import functional as F
-from paddle.utils.download import get_path_from_url
 
 from paddlenlp.transformers import (
     BertPretrainedModel,
@@ -29,7 +28,6 @@ from paddlenlp.transformers import (
     RobertaPretrainedModel,
 )
 from paddlenlp.utils.download import get_file
-from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
 from .. import PretrainedModel, register_base_model

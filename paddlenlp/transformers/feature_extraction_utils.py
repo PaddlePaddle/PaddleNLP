@@ -22,16 +22,11 @@ from typing import Any, Dict, Optional, Tuple, Union
 
 import numpy as np
 import paddle
-from huggingface_hub import hf_hub_download
 
 from paddlenlp.utils.download import get_file
 
-from .. import __version__
-from ..utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
 from ..utils.log import logger
-from .aistudio_utils import aistudio_download
 from .tokenizer_utils_base import TensorType
-from .utils import resolve_cache_dir
 
 FEATURE_EXTRACTOR_NAME = "preprocessor_config.json"
 

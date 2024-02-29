@@ -17,7 +17,7 @@
 
 import copy
 import os
-from typing import Optional, Union
+from typing import Union
 
 from ...utils.log import logger
 from ..configuration_utils import (

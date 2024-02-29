@@ -17,7 +17,7 @@ import unittest
 
 from parameterized import parameterized
 
-from paddlenlp.transformers import AutoTokenizer, RobertaBPETokenizer, T5Tokenizer
+from paddlenlp.transformers import AutoTokenizer, T5Tokenizer
 from paddlenlp.utils.log import logger
 
 

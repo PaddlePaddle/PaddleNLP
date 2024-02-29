@@ -27,8 +27,6 @@ from paddlenlp.transformers import PretrainedModel
 from paddlenlp.utils.download import get_file
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
-from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
-from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
 __all__ = ["FasterPretrainedModel", "ActScalesLoader", "WeightScalesLoader"]

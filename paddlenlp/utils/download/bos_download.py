@@ -166,9 +166,6 @@ def bos_download(
     **kwargs,
 ):
     if url is not None:
-        assert url.startswith(ENDPOINT) or url.startswith(
-            ENDPOINT_v2
-        ), f"URL must start with {ENDPOINT} or {ENDPOINT_v2}"
         if repo_id is None:
             if url.startswith(ENDPOINT):
                 repo_id = "/".join(url[len(ENDPOINT) + 1 :].split("/")[:-1])
