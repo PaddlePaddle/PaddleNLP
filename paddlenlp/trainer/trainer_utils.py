@@ -328,7 +328,7 @@ def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_lengt
         samples_per_second = num_samples / runtime
         if seq_length is not None:
             tokens_per_second_per_device = samples_per_second * seq_length / paddle.distributed.get_world_size()
-            result[f"{split}_tokens(tokens/sec/device)"] = round(tokens_per_second_per_device, 4)
+            result[f"{split}_tokens_per_second_per_device)"] = round(tokens_per_second_per_device, 4)
         else:
             result[f"{split}_samples_per_second"] = round(samples_per_second, 4)
     if num_steps is not None:
