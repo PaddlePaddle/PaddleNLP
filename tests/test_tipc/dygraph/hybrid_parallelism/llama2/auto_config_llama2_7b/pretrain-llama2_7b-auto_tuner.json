@@ -25,7 +25,7 @@
     "min_learning_rate": 3e-06,
     "warmup_steps": 30,
     "logging_steps": 1,
-    "max_steps": 2,
+    "max_steps": 50,
     "save_steps": 5000,
     "eval_steps": 1000,
     "weight_decay": 0.01,
@@ -46,6 +46,5 @@
     "distributed_dataloader": 1,
     "recompute_granularity": "full",
     "save_total_limit": 2,
-    "device": "gpu",
-    "autotuner_benchmark": 1
+    "device": "gpu"
   }
