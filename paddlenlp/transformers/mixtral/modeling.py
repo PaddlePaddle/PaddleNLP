@@ -101,41 +101,42 @@ def load_balancing_loss_func(gate_logits, num_experts, top_k=2, attention_mask=N
         selected_experts, num_classes=num_experts
     )  # [num_hidden_layers X batch_size X sequence_length, top_k, num_experts]
 
-    if attention_mask is None:
+    if attention_mask is None or len(attention_mask.shape) == 4:
+        # Only intokens strategy has 4-D attention_mask, we currently do not support excluding padding tokens.
         # Compute the percentage of tokens routed to each experts
         tokens_per_expert = paddle.mean(expert_mask.astype("float32"), axis=0)
 
         # Compute the average probability of routing to these experts
         router_prob_per_expert = paddle.mean(routing_weights, axis=0)
     else:
-        # TODO(daisiming): attention_mask 这块有地方需要确认，例如 SFT、LoRA 时候的 attention_mask 是否合适。
+        # Exclude the load balancing loss of padding tokens.
+        if len(attention_mask.shape) == 2:
+            batch_size, sequence_length = attention_mask.shape
+            num_hidden_layers = concatenated_gate_logits.shape[0] // (batch_size * sequence_length)
 
-        batch_size, sequence_length = attention_mask.shape
-        num_hidden_layers = concatenated_gate_logits.shape[0] // (batch_size * sequence_length)
+            # Compute the mask that masks all padding tokens as 0 with the same shape of expert_mask
+            expert_attention_mask = (
+                attention_mask[None, :, :, None, None]
+                .expand((num_hidden_layers, batch_size, sequence_length, top_k, num_experts))
+                .reshape([-1, top_k, num_experts])
+            )  # [num_hidden_layers * batch_size * sequence_length, top_k, num_experts]
 
-        # Compute the mask that masks all padding tokens as 0 with the same shape of expert_mask
-        expert_attention_mask = (
-            attention_mask[None, :, :, None, None]
-            .expand((num_hidden_layers, batch_size, sequence_length, 2, num_experts))
-            .reshape([-1, 2, num_experts])
-        )
+            # Compute the percentage of tokens routed to each experts
+            tokens_per_expert = paddle.sum(expert_mask.astype("float32") * expert_attention_mask, axis=0) / paddle.sum(
+                expert_attention_mask, axis=0
+            )
 
-        # Compute the percentage of tokens routed to each experts
-        tokens_per_expert = paddle.sum(expert_mask.astype("float32") * expert_attention_mask, axis=0) / paddle.sum(
-            expert_attention_mask, axis=0
-        )
+            # Compute the mask that masks all padding tokens as 0 with the same shape of tokens_per_expert
+            router_per_expert_attention_mask = (
+                attention_mask[None, :, :, None]
+                .expand((num_hidden_layers, batch_size, sequence_length, num_experts))
+                .reshape([-1, num_experts])
+            )
 
-        # Compute the mask that masks all padding tokens as 0 with the same shape of tokens_per_expert
-        router_per_expert_attention_mask = (
-            attention_mask[None, :, :, None]
-            .expand((num_hidden_layers, batch_size, sequence_length, num_experts))
-            .reshape(-1, num_experts)
-        )
-
-        # Compute the average probability of routing to these experts
-        router_prob_per_expert = paddle.sum(routing_weights * router_per_expert_attention_mask, axis=0) / paddle.sum(
-            router_per_expert_attention_mask, axis=0
-        )
+            # Compute the average probability of routing to these experts
+            router_prob_per_expert = paddle.sum(
+                routing_weights * router_per_expert_attention_mask, axis=0
+            ) / paddle.sum(router_per_expert_attention_mask, axis=0)
 
     overall_loss = paddle.sum(tokens_per_expert * router_prob_per_expert.unsqueeze(0))
     return overall_loss * num_experts
@@ -1393,7 +1394,13 @@ class MixtralForCausalLM(MixtralPretrainedModel):
         return self.mixtral
 
     def prepare_inputs_for_generation(
-        self, input_ids, use_cache=False, past_key_values=None, inputs_embeds=None, **kwargs
+        self,
+        input_ids,
+        use_cache=False,
+        past_key_values=None,
+        inputs_embeds=None,
+        output_router_logits=False,
+        **kwargs
     ):
         batch_size, seq_length = input_ids.shape
         position_ids = kwargs.get("position_ids", paddle.arange(seq_length).expand((batch_size, seq_length)))
@@ -1414,6 +1421,7 @@ class MixtralForCausalLM(MixtralPretrainedModel):
                 "past_key_values": past_key_values,
                 "use_cache": use_cache,
                 "attention_mask": attention_mask,
+                "output_router_logits": output_router_logits,
             }
         )
         return model_inputs

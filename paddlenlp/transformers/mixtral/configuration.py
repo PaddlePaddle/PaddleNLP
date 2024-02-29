@@ -129,7 +129,7 @@ class MixtralConfig(PretrainedConfig):
         tensor_parallel_output=True,
         sequence_parallel=False,
         fuse_sequence_parallel_allreduce=False,
-        pad_token_id=None,
+        pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
         tie_word_embeddings=False,
