@@ -1501,8 +1501,11 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 from_aistudio=from_aistudio,
                 from_hf_hub=from_hf_hub,
             )
+
+        for file_id, file_path in resolved_vocab_files.items():
             if resolved_vocab_files[file_id] is not None:
                 cache_dir = os.path.dirname(resolved_vocab_files[file_id])
+                break
 
         tokenizer_config_file_dir_list = set()
         for k, v in resolved_vocab_files.items():
