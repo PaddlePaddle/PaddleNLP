@@ -92,7 +92,7 @@ class AutoTrainer(Trainer):
         def _get_mesh(pp_idx=0):
             return self.global_mesh.get_mesh_with_dim("pp")[pp_idx]
 
-        # Note(lizhiyu): If the values returned by `DataLoader` have the format `[images, labels]`,
+        # Note(lizhiyu): If the values returned by `DataLoader` don't have the format `[images, labels]`,
         # error may occurs here.
         meshes = []
         meshes.append(_get_mesh(0))
