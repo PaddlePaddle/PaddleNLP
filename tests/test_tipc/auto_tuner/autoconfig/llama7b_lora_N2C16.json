@@ -12,7 +12,7 @@
   "micro_batch_size": "auto",
   "mode": "LoRA",
   "model_cfg": {
-    "global_batch_size": 8,
+    "global_batch_size": 16,
     "hidden_size": 4096,
     "num_attention_heads": 32,
     "num_layers": 28,
