@@ -1598,10 +1598,19 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     from_hf_hub=from_hf_hub,
                 )
             else:
-                if use_safetensors is not False:
+                if use_safetensors is True:
                     filenames = [
                         _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant),
                         _add_variant(SAFE_WEIGHTS_NAME, variant),
+                    ]
+                elif use_safetensors is None:
+                    filenames = [
+                        _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant),
+                        _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant),
+                        _add_variant(PYTORCH_WEIGHTS_INDEX_NAME, variant),
+                        _add_variant(SAFE_WEIGHTS_NAME, variant),
+                        _add_variant(PADDLE_WEIGHTS_NAME, variant),
+                        _add_variant(PYTORCH_WEIGHTS_NAME, variant),
                     ]
                 else:
                     filenames = [
