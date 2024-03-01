@@ -60,7 +60,7 @@ class ModelArguments:
         default=80, metadata={"help": "The maximum total of masked tokens in input sequence"}
     )
 
-    to_static: strtobool = field(default=False, metadata={"help": "Enable training under @to_static."})
+    # to_static: strtobool = field(default=False, metadata={"help": "Enable training under @to_static."})
     profiler_options: str = field(
         default=None,
         metadata={"help": "Whether to use FusedTransformerEncoderLayer to replace a TransformerEncoderLayer or not."},
