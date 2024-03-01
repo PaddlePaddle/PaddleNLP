@@ -1093,7 +1093,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2() {
         --data_impl "mmap" \
         --enable_auto_parallel 1 \
         >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $case_log_dir/workerlog.2 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    loss=`cat $case_log_dir/workerlog.4 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
@@ -1161,7 +1161,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
         --data_impl "mmap" \
         --enable_auto_parallel 1 \
         >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $case_log_dir/workerlog.3 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    loss=`cat $case_log_dir/workerlog.4 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
@@ -1230,7 +1230,7 @@ function llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
         --data_impl "mmap" \
         --enable_auto_parallel 1 \
         >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $case_log_dir/workerlog.3 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    loss=`cat $case_log_dir/workerlog.4 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
