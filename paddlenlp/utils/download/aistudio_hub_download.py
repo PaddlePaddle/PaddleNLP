@@ -246,8 +246,8 @@ def get_aistudio_file_metadata(
 
     # Return
     return AistudioBosFileMetadata(
-        commit_hash=res["sha"],
-        etag=_normalize_etag(res["last_commit_sha"]),
+        commit_hash=res["last_commit_sha"],
+        etag=_normalize_etag(res["sha"]),
         location=res["git_url"],
         size=res["size"],
     )
