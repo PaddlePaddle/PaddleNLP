@@ -168,6 +168,8 @@ class LlamaConfig(PretrainedConfig):
         alibi=False,
         rope_scaling_factor=1.0,
         rope_scaling_type=None,
+        transformer_engine_backend: str = None,
+        use_fp8: bool = False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -207,6 +209,8 @@ class LlamaConfig(PretrainedConfig):
         self.use_fused_rope = use_fused_rope
         self.rope_scaling_factor = rope_scaling_factor
         self.rope_scaling_type = rope_scaling_type
+        self.transformer_engine_backend = transformer_engine_backend
+        self.use_fp8 = use_fp8
 
         super().__init__(
             pad_token_id=pad_token_id,

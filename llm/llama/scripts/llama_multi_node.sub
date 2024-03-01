@@ -1,0 +1,77 @@
+#!/bin/bash
+
+#SBATCH -A <account>  # change to your account
+#SBATCH -p <partition>  # change to your partition
+#SBATCH -t 04:00:00
+#SBATCH -J "paddle_te_benchmark"
+#SBATCH --exclusive
+#SBATCH --mem=0
+#SBATCH --overcommit
+#SBATCH --parsable
+
+
+set -x
+
+WORK_DIR="<path/to/my/workspace>"  # change to you workspace
+WORK_DIR_C=/workspace
+DS_DIR="<path/to/my/dataset/llama_openwebtext>"  # change to your dataset
+DS_DIR_C=/dataset
+
+LLAMA_SCRIPT_PATH="PaddleNLP/llm/llama/scripts"
+SCRIPT_DIR="${WORK_DIR}/${LLAMA_SCRIPT_PATH}"
+SCRIPT_DIR_C="${WORK_DIR_C}/${LLAMA_SCRIPT_PATH}"
+
+CONTAINER="<image_name>"  # change to your container with TE and PaddleNLP installed
+CONTAINER_NAME="te_test"
+MOUNTS="--container-mounts=$WORK_DIR:$WORK_DIR_C,$DS_DIR:$DS_DIR_C"
+EXPORTS="--export=ALL"
+
+
+MBS=${MBS:=2}
+TP_SIZE=${TP_SIZE:=2}
+PP_SIZE=${PP_SIZE:=1}
+VP_SIZE=${VP_SIZE:=1}
+GA_SIZE=${GA_SIZE:=1}
+FSDP_SIZE=${FSDP_SIZE:=1}
+MAX_SEQLEN=${MAX_SEQLEN:=4096}
+SP=${SP:="false"}
+SHARDING_STAGE=${SHARDING_STAGE:="stage2"}
+BACKEND=${BACKEND:="te"}
+PREC=${PREC:="bf16"}
+RECOMPUTE=${RECOMPUTE:="none"}
+RESUME_STEP=${RESUME_STEP:="none"}
+INIT_WEIGHT=${INIT_WEIGHT:="none"}
+NSYS=${NSYS:="false"}
+MODEL_NAME=${MODEL_NAME:="meta-llama/Llama-2-7b"}
+TOKENIZER_NAME=${TOKENIZER_NAME:="meta-llama/Llama-2-7b"}
+
+IP_CMD="hostname -i"
+IP_STR=$(srun -pmix --ntasks="$(( SLURM_JOB_NUM_NODES))"  bash -c "${IP_CMD}")
+IP_STR=$(echo $IP_STR | sed 's/ /,/g')
+echo $IP_STR
+
+export GPUS_PER_NODE=${1:-8}
+export BASE_SCRIPT=${2:-"llama_single_node_interactive.sh"}
+
+NUM_GPUS=$((GPUS_PER_NODE * SLURM_JOB_NUM_NODES ))
+DP_SIZE=`expr ${NUM_GPUS} / ${TP_SIZE} / ${FSDP_SIZE} / ${PP_SIZE}`
+
+EXP_NAME="${MODEL_NAME}_SEQLEN${MAX_SEQLEN}_N${SLURM_JOB_NUM_NODES}_MBS${MBS}_DP${DP_SIZE}_TP${TP_SIZE}_VP${VP_SIZE}_GA${GA_SIZE}_FSDP${FSDP_SIZE}_PP${PP_SIZE}_SP${SP}_${RECOMPUTE}_RESUME_AT_${RESUME_STEP}_${BACKEND}_${PREC}_${NSYS}_${SLURM_JOB_ID}"
+
+read -r -d '' cmd <<EOF
+cd ${SCRIPT_DIR_C}
+EXP_NAME=${EXP_NAME} IP_STR=${IP_STR} bash $BASE_SCRIPT ${MODEL_NAME} ${TOKENIZER_NAME} ${MBS} ${FSDP_SIZE} ${TP_SIZE} ${PP_SIZE} ${VP_SIZE} ${GA_SIZE} ${SP} ${MAX_SEQLEN} ${SHARDING_STAGE} ${BACKEND} ${PREC} ${RECOMPUTE} ${RESUME_STEP} ${INIT_WEIGHT} ${NSYS}
+EOF
+
+# create run specific output directory for ease of analysis
+FOLDER="${WORK_DIR}/outputs/${EXP_NAME}"
+mkdir -p ${FOLDER}
+
+
+# redirect both stdout and stderr in the same file for ease of analysis
+OUTFILE="${FOLDER}/output-%t.txt"
+
+
+echo $cmd
+srun -pmix --ntasks-per-node=1 -o $OUTFILE -e $OUTFILE --container-image="$CONTAINER" $MOUNTS $EXPORTS --container-name=$CONTAINER_NAME bash -c "${cmd}"
+set +x

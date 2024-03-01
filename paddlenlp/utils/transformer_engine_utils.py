@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -53,6 +53,13 @@ class TransformerEngineHelper:
         return _IS_TRANSFORMER_ENGINE_INSTALLED
 
     @staticmethod
+    def get_rope_layer():
+        assert (
+            TransformerEngineHelper.is_installed()
+        ), "TransformerEngine is not installed. Please install it first or disable it."
+        return te.RotaryPositionEmbedding
+
+    @staticmethod
     def get_transformer_layer():
         assert (
             TransformerEngineHelper.is_installed()
@@ -72,7 +79,10 @@ class TransformerEngineHelper:
             TransformerEngineHelper.is_installed()
         ), "TransformerEngine is not installed. Please install it first or disable it."
 
-        hcg = fleet.get_hybrid_communicate_group()
+        try:
+            hcg = fleet.get_hybrid_communicate_group()
+        except:
+            return None
         use_pp = hcg.get_pipe_parallel_world_size() > 1
         if not use_pp:
             return None
