@@ -35,6 +35,9 @@ function _set_params(){
 
     fp_item="bf16"
     workerlog_id=0
+    ip_lists=($(echo $TRAINER_INSTANCES | tr ',' ' '))
+    master_ip=${ip_lists[0]}
+    nnodes=${nnodes:-1}
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -74,28 +77,30 @@ function _train(){
         log_file=${train_log_file}
     fi
 
-    if [ ${PADDLE_TRAINER_ID} ]
-    then
-        PADDLE_RANK_OPTION=" --rank ${PADDLE_TRAINER_ID}"
-    else
-        PADDLE_RANK_OPTION=""
-    fi
     # 以下为通用执行命令，无特殊可不用修改
     case ${device_num} in
     N1C1) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --gpus=0 ${PADDLE_RANK_OPTION}\
+        train_cmd="python -m paddle.distributed.launch --gpus=0 \
             --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
         ;;
-    N1C8|N2C16) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
+    N1C8) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
+        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
+        ;;
+    N2C16) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
+        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
+            --auto_tuner_json ${autoconfig_json_file} --master etcd://$master_ip:2379 --nnodes $nnodes:$nnodes \
+            run_pretrain.py ${modle_json_file}"
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
+        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
         ;;
     esac
     cd ../llm/llama
+    if [[ ${model_item} =~ "resume" ]];then
+        cp $PWD/autoconfig/resume.csv $PWD/autoconfig/llama7b_pretrain_history.csv
+    fi
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     python -c "import paddlenlp"
     if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间
@@ -108,21 +113,52 @@ function _train(){
     else
         echo -e "${model_name}, SUCCESS" >> ${log_file}
     fi
-    bash autoconfig/check.sh ${autoconfig_json_file} >> ${log_file} 2>&1
-    if [ $? -ne 0 ];then
-        echo -e "auto_tuner, FAIL" >> ${log_file}
+    if [[ ${model_item} =~ "resume" ]];then 
+        bash autoconfig/check_resume.sh $PWD/autoconfig/resume.csv $PWD/autoconfig/llama7b_pretrain_history.csv >> ${log_file} 2>&1
+        if [ $? -ne 0 ];then
+            echo -e "auto_tuner_resume, FAIL" >> ${log_file}
+            sed '/ips/d' "$log_file" > "$log_file.tmp"
+            mv "$log_file.tmp" "$log_file"
+        else
+            echo -e "auto_tuner_resume, SUCCESS" >> ${log_file}
+        fi
     else
-        echo -e "auto_tuner, SUCCESS" >> ${log_file}
+        bash autoconfig/check.sh ${autoconfig_json_file} >> ${log_file} 2>&1
+        if [ $? -ne 0 ];then
+            echo -e "auto_tuner, FAIL" >> ${log_file}
+        else
+            echo -e "auto_tuner, SUCCESS" >> ${log_file}
+        fi
+    fi
+    if [[ ${model_item} =~ "buffer" ]];then
+        bash autoconfig/check_mem_usage.sh ${autoconfig_json_file} >> ${log_file} 2>&1
+        if [ $? -ne 0 ];then
+            echo -e "${model_name}, mem_usage buffer check FAIL" >> ${log_file}
+            sed '/ips/d' "$log_file" > "$log_file.tmp"
+            mv "$log_file.tmp" "$log_file" 
+        else
+            echo -e "${model_name}, mem_usage buffer check SUCCESS" >> ${log_file}
+        fi
     fi
     #kill -9 `ps -ef|grep 'python'|awk '{print $2}'`
     if [ ${device_num} != "N1C1" -a -d ./autoconfig/best_cfg ]; then
         case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/tests/mylog
         cp -r ${case_path}/autoconfig/best_cfg/workerlog.* ./mylog/
         cp -r ${case_path}/autoconfig/*.csv $(dirname "$log_file")
+    else
+        sed '/ips/d' "$log_file" > "$log_file.tmp"
+        mv "$log_file.tmp" "$log_file" 
     fi
 }
 
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
+unset PADDLE_ELASTIC_JOB_ID
+unset PADDLE_TRAINER_ENDPOINTS
+unset DISTRIBUTED_TRAINER_ENDPOINTS
+unset FLAGS_START_PORT
+unset PADDLE_ELASTIC_TIMEOUT
+unset PADDLE_TRAINERS_NUM
+unset PADDLE_TRAINER_ID
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@
 #_train       # 如果只产出训练log,不解析,可取消注释
