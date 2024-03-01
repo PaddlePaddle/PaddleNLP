@@ -19,7 +19,11 @@ import unittest
 
 from parameterized import parameterized_class
 
-from tests.testing_utils import argv_context_guard, load_test_config
+from tests.testing_utils import (
+    argv_context_guard,
+    load_test_config,
+    skip_for_none_ce_case,
+)
 
 from .testing_utils import LLMTest
 
@@ -50,6 +54,7 @@ class PrefixTuningTest(LLMTest, unittest.TestCase):
         LLMTest.tearDown(self)
         sys.path.remove(self.model_codes_dir)
 
+    @skip_for_none_ce_case
     def test_prefix_tuning(self):
         prefix_tuning_config = load_test_config(self.config_path, "prefix_tuning", self.model_dir)
 
