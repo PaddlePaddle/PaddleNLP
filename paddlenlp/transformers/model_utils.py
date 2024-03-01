@@ -2256,20 +2256,19 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     if "quant_weight" in key:
                         quantization_linear_list.append(key[:-13])
 
-        model, missing_keys, unexpected_keys, mismatched_keys = model, [], [], []
-        # model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
-        #     model=model,
-        #     state_dict=state_dict,
-        #     loaded_keys=loaded_state_dict_keys,
-        #     resolved_archive_file=resolved_sharded_files if is_sharded else resolved_archive_file,
-        #     pretrained_model_name_or_path=pretrained_model_name_or_path,
-        #     config=config,
-        #     ignore_mismatched_sizes=ignore_mismatched_sizes,
-        #     low_cpu_mem_usage=low_cpu_mem_usage,
-        #     dtype=dtype,
-        #     keep_in_fp32_modules=keep_in_fp32_modules,
-        #     quantization_linear_list=quantization_linear_list,
-        # )
+        model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
+            model=model,
+            state_dict=state_dict,
+            loaded_keys=loaded_state_dict_keys,
+            resolved_archive_file=resolved_sharded_files if is_sharded else resolved_archive_file,
+            pretrained_model_name_or_path=pretrained_model_name_or_path,
+            config=config,
+            ignore_mismatched_sizes=ignore_mismatched_sizes,
+            low_cpu_mem_usage=low_cpu_mem_usage,
+            dtype=dtype,
+            keep_in_fp32_modules=keep_in_fp32_modules,
+            quantization_linear_list=quantization_linear_list,
+        )
 
         # load generation_config.json
         if model.can_generate() and pretrained_model_name_or_path is not None:

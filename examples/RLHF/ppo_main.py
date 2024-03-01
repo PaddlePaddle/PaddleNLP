@@ -22,14 +22,14 @@ import sys
 # launch would unset http_proxy
 # export https_proxy=http://172.19.57.45:3128
 
-os.environ["http_proxy"] = "http://172.19.56.199:3128"
-os.environ["https_proxy"] = "http://172.19.56.199:3128"
+# os.environ["http_proxy"] = "http://172.19.56.199:3128"
+# os.environ["https_proxy"] = "http://172.19.56.199:3128"
 
 # os.environ["http_proxy"] = "http://172.19.57.45:3128"
 # os.environ["https_proxy"] = "http://172.19.57.45:3128"
 
-# os.environ["http_proxy"] = "http://10.162.37.16:8128"
-# os.environ["https_proxy"] = "http://10.162.37.16:8128"
+os.environ["http_proxy"] = "http://10.162.37.16:8128"
+os.environ["https_proxy"] = "http://10.162.37.16:8128"
 os.environ["no_proxy"] = "localhost,bcebos.com"
 
 # os.environ["http_proxy"] = "agent.baidu.com:8118"
@@ -282,7 +282,7 @@ def main():
     if hasattr(model_config, "use_flash_attention"):
         model_config.use_flash_attention = model_args.use_flash_attention
 
-    model_config.num_hidden_layers = 2
+    # model_config.num_hidden_layers = 2
 
     actor_model = model_class_lm.from_pretrained(
         model_args.actor_model_name_or_path,
@@ -297,6 +297,7 @@ def main():
             config.tensor_parallel_degree = -1
             config.tensor_parallel_rank = 0
         actor_eval_model = AutoModelForCausalLM.from_config(config)
+        # actor_eval_model = AutoModelForCausalLM.from_pretrained(model_args.actor_model_name_or_path, config=config)
     else:
         actor_eval_model = None
 
@@ -330,7 +331,7 @@ def main():
     )
     if hasattr(model_config, "use_flash_attention"):
         model_config.use_flash_attention = model_args.use_flash_attention
-    model_config.num_hidden_layers = 2
+    # model_config.num_hidden_layers = 2
     # todo
     if training_args.eval_mode is not None:
         config = copy.deepcopy(model_config)
@@ -372,6 +373,9 @@ def main():
             config.tensor_parallel_degree = -1
             config.tensor_parallel_rank = 0
         reward_critic_eval_model = AutoModelForScore.from_config(config)
+        # reward_critic_eval_model =  AutoModelForScore.from_pretrained(
+        #     model_args.reward_critic_model_name_or_path,config=model_config
+        # )
     else:
         reward_critic_eval_model = None
 

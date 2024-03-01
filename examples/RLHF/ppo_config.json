@@ -7,7 +7,7 @@
     "_actor_model_name_or_path": "facebook/llama-7b",
     "_reward_model_name_or_path": "facebook/llama-7b",
     "output_dir": "./ppo-sd14pp2-test",
-    "max_length": 512,
+    "max_length": 100,
     "temperature": 1.0,
     "num_return_sequences":1,
     "repetition_penalty": 1.0,

@@ -564,6 +564,7 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
     with_offload = kwargs.pop("with_offload", False)
     train_tp_size = max(train_model.config.tensor_parallel_degree, 1)
     eval_tp_size = max(eval_model.config.tensor_parallel_degree, 1)
+    eval_tp_rank = max(eval_model.config.tensor_parallel_rank, 0)
 
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
@@ -715,8 +716,15 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
                 eval_model, comm_group=dp_group, src_rank=dp_group.ranks[0], fuse_params=False
             )
 
-    group_nums = self.args.logical_process_index // eval_tp_size
+    old_dp_workers = self.args.world_size // (max(sd_group.nranks, 1) * max(dp_group.nranks, 1))
+    group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
 
+    gp = create_data_trans_group(global_rank, group_nums)
+
+    return gp
+
+
+def create_data_trans_group(global_rank, group_nums):
     all_split_table = []
     paddle.distributed.all_gather_object(all_split_table, [(global_rank, group_nums)])
     all_split_table = flatten_list(all_split_table)
@@ -737,8 +745,8 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
         if global_rank in ranks:
             group = gp
 
-    print("all_split_table:", all_split_table)
-    print("export", group)
+    # print("all_split_table:", all_split_table)
+    print("export_group", group)
     return group
 
 
@@ -1533,10 +1541,12 @@ class PPOTrainer(Trainer):
                     self._policy_model_eval,
                     with_offload=self.args.offload_level is not None,
                 )
-                # todo: zhui
+                # gp = create_data_trans_group(self.args.logical_process_index, paddle.distributed.get_rank(), self._policy_model_eval.config.tensor_parallel_degree)
+                # # todo: zhui
                 self.value_trainer.export_evaluate_model(
                     self.value_trainer.model, self._value_model_eval, with_offload=self.args.offload_level is not None
                 )
+
                 # self.reference_model.reload()
                 # self.reward_model.reload()
                 # reload_tensor_to_gpu(self.reference_model.state_dict())
@@ -2098,11 +2108,9 @@ class PPOTrainer(Trainer):
             reward_seq = sequence = reward_tokenize_output["input_ids"]
             reward_attention_mask = attention_mask = reward_tokenize_output["attention_mask"]
         else:
-            # for text in self.tokenizer.batch_decode(
-            #     sequence,
-            #     skip_special_tokens=True
-            # ):
-            #     print(text)
+            # actor_model_in_use gen
+            for text in self.tokenizer.batch_decode(sequence, skip_special_tokens=True):
+                print(text)
             reward_seq = sequence
             reward_attention_mask = attention_mask
 
