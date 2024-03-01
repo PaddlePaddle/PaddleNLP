@@ -80,29 +80,34 @@ function _train(){
     #     export CUDA_DEVICE_MAX_CONNECTIONS=1
     # fi
 
-    autoconfig_args="--auto_tuner_json ./auto_config_${MODEL_TYPE}/${MODEL_TYPE}_pretrain_autoconfig.json"
+    if [ ${run_mode} ~= "autotuner" ]; then
+        autoconfig_args="--auto_tuner_json ./auto_config_${MODEL_TYPE}/${MODEL_TYPE}_pretrain_autoconfig.json"
+    else
+        # todo 新建并使用autotuner获取的top1参数配置文件 llama2_7b_pretrain_top.json
+        autoconfig_args=""
+    fi
 
     # 以下为通用执行命令，无特殊可不用修改
     case ${device_num} in
     N1C1) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0 \
-            ${autoconfig_args} --log_dir log_${MODEL_TYPE} run_pretrain.py \
+            ${autoconfig_args} --log_dir mylog run_pretrain.py \
             ./auto_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}-auto_tuner.json"
         ;;
     N1C8) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
-            ${autoconfig_args} --log_dir log_${MODEL_TYPE} run_pretrain.py \
+            ${autoconfig_args} --log_dir mylog run_pretrain.py \
             ./auto_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}-auto_tuner.json"
         ;;
     N2C16|N4C32) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --master etcd://$master_ip:2379 --nnodes $nnodes:$nnodes \
-            ${autoconfig_args} --log_dir log_${MODEL_TYPE} run_pretrain.py \
+            ${autoconfig_args} --log_dir mylog run_pretrain.py \
             ./auto_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}-auto_tuner.json"
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
-            ${autoconfig_args} --log_dir log_${MODEL_TYPE} run_pretrain.py \
+            ${autoconfig_args} --log_dir mylog run_pretrain.py \
             ./auto_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}-auto_tuner.json"
         ;;
     esac
@@ -111,8 +116,7 @@ function _train(){
     rm -rf ./auto_config_${MODEL_TYPE}/*auto_tuner.log
     rm -rf ./auto_config_${MODEL_TYPE}/*csv
     rm -rf ./auto_config_${MODEL_TYPE}/best_*
-    rm -rf log_${MODEL_TYPE}
-    rm -rf checkpoints
+    rm -rf mylog && rm -rf checkpoints
     
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     ${train_cmd} > ${log_file} 2>&1

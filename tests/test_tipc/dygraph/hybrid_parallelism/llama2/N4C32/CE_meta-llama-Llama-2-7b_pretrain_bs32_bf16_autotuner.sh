@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-param="model_item=meta-llama-Llama-2-7b_pretrain "
-param+="run_mode=DP32 "
+param="model_item=CE_meta-llama-Llama-2-7b_pretrain "
+param+="run_mode=autotuner "
 param+="device_num=N4C32 "
 param+="global_batch_size=32 "
 param+="model_type=llama2_7b "

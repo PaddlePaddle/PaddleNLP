@@ -22,6 +22,13 @@ python setup.py install
 cd ../../../llm/llama
 python -m pip install tool_helpers
 
+# download data
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
+mkdir data
+mv llama_openwebtext_100k_ids.npy ./data
+mv llama_openwebtext_100k_idx.npz ./data
+
 # install etcd
 pip install httpx etcd3 protobuf==3.20.0 --force-reinstall
 ip_lists=($(echo $TRAINER_INSTANCES | tr ',' ' '))
@@ -42,10 +49,3 @@ fi
 # mv autoconfig
 rm -rf auto_config_*
 cp -r ../../tests/test_tipc/dygraph/hybrid_parallelism/llama2/auto_config_* ./
-
-# download data
-wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
-wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
-mkdir data
-mv llama_openwebtext_100k_ids.npy ./data
-mv llama_openwebtext_100k_idx.npz ./data
