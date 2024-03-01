@@ -143,7 +143,7 @@ def get_file(
         cache_file_name = bos_aistudio_hf_try_to_load_from_cache(
             repo_id, filename, cache_dir, subfolder, revision, repo_type, from_bos, from_aistudio, from_hf_hub
         )
-        if cache_file_name is not None:
+        if cache_file_name is not None and not isinstance(cache_file_name, object):
             return cache_file_name
 
     # download file from different origins
