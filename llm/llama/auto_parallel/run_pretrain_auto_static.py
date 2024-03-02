@@ -14,37 +14,56 @@
 """
 GPT/Llama auto parallel pretraining scripts.
 """
+import contextlib
 import os
 import random
 import sys
+import time
 import types
-from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import List, Optional
 
 import numpy as np
 import paddle
 import paddle.distributed as dist
-from paddle.autograd import PyLayer
-from paddle.distributed import fleet
-from paddle.io import DataLoader, DistributedBatchSampler
+import paddle.distributed.auto_parallel as auto
+from paddle.base.data_feeder import convert_uint16_to_float
+from paddle.profiler.utils import job_schedule_profiler_range
+
+from paddlenlp.ops import Topology
+from paddlenlp.trainer import (
+    PdArgumentParser,
+    Trainer,
+    TrainingArguments,
+    get_last_checkpoint,
+    speed_metrics,
+)
+from paddlenlp.trainer.trainer_utils import (
+    PREFIX_CHECKPOINT_DIR,
+    _get_distributed_seeds,
+)
+from paddlenlp.transformers import (
+    AutoTokenizer,
+    CosineAnnealingWithWarmupDecay,
+    LinearAnnealingWithWarmupDecay,
+    LlamaConfig,
+    LlamaForCausalLMAuto,
+)
+from paddlenlp.utils.log import logger
+
+MODEL_CLASSES = {
+    "llama": (
+        LlamaConfig,
+        LlamaForCausalLMAuto,
+    ),
+}
+
 
 from paddlenlp.data.causal_dataset import (
     build_train_valid_test_datasets,
     check_data_split,
     print_rank_0,
 )
-from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
-from paddlenlp.trainer.utils.reshard import NodeModelState, all_gather_state_dict
-from paddlenlp.transformers import (
-    AutoConfig,
-    AutoModelForCausalLM,
-    AutoModelForCausalLMPipe,
-    AutoTokenizer,
-    CosineAnnealingWithWarmupDecay,
-    LinearAnnealingWithWarmupDecay,
-)
-from paddlenlp.utils.log import logger
 
 
 def add_start_docstrings(*docstr):
@@ -53,6 +72,18 @@ def add_start_docstrings(*docstr):
         return fn
 
     return docstring_decorator
+
+
+@contextlib.contextmanager
+def exec_mode_guard():
+    origin_mode = "dynamic" if paddle.in_dynamic_mode() else "static"
+    try:
+        yield
+    finally:
+        if origin_mode == "dynamic":
+            paddle.disable_static()
+        else:
+            paddle.enable_static()
 
 
 @dataclass
@@ -68,13 +99,39 @@ class PreTrainingArguments(TrainingArguments):
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
         },
     )
-    enable_linear_fused_grad_add: bool = field(
+    fused_linear_param_grad_add: bool = field(
         default=False,
         metadata={
-            "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
+            "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
         },
     )
-    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
+    job_schedule_profiler_start: int = field(
+        default=-1,
+        metadata={"help": "The step to start job_schedule_profiler."},
+    )
+    job_schedule_profiler_end: int = field(
+        default=-1,
+        metadata={"help": "The step to end job_schedule_profiler."},
+    )
+    pipeline_schedule_mode: str = field(
+        default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
+    )
+    sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
+    refined_ops_patterns: Optional[List[str]] = field(
+        default=None, metadata={"help": "The pattern of refined recompute."}
+    )
+    virtual_pipeline_seg_method: str = field(
+        default="LlamaDecoderLayerAuto", metadata={"help": "The seg method of spliting pp layer for virtual pipeline."}
+    )
+
+    def __post_init__(self):
+        super().__post_init__()
+        assert self.enable_auto_parallel
+        if self.fused_linear_param_grad_add:
+            fused_passes = self.strategy.fused_passes
+            fused_passes.enable = True
+            fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
+        logger.info(self.strategy)
 
 
 @dataclass
@@ -131,6 +188,21 @@ class ModelArguments:
 
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
+    )
+    vocab_size: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": ".Vocabulary size of the Llama model. Defines the number of different tokens that can be represented by the `inputs_ids`"
+        },
+    )
+    hidden_size: Optional[int] = field(default=None, metadata={"help": "Dimension of the hidden representations."})
+    intermediate_size: Optional[int] = field(default=None, metadata={"help": "Dimension of the MLP representations."})
+    num_hidden_layers: Optional[int] = field(
+        default=None, metadata={"help": "Number of hidden layers in the Transformer encoder."}
+    )
+    num_attention_heads: Optional[int] = field(
+        default=None,
+        metadata={"help": "Number of attention heads for each attention layer in the Transformer encoder."},
     )
     use_flash_attention: bool = field(
         default=False,
@@ -291,11 +363,7 @@ def get_train_data_file(args):
 
 
 def create_optimizer(model, lr_scheduler, training_args):
-    decay_parameters = [
-        p.name
-        for n, p in model.named_parameters()
-        if (not any(nd in n for nd in ["bias", "norm"])) or "llama.norm.weight" in n
-    ]
+    decay_parameters = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
 
     def apply_decay_param_fun(x):
         return x in decay_parameters
@@ -343,59 +411,32 @@ def init_seed(seed: int = 1234, args=None):
         random.seed(seed)
         np.random.seed(seed)
         paddle.seed(seed)
+    else:
+        assert not args.use_hybrid_parallel and args.enable_auto_parallel
+        if dist.get_world_size() > 1:
+            topo = Topology(
+                dist.get_rank(),
+                dist.get_world_size(),
+                dp_degree=args.data_parallel_degree,
+                pp_degree=args.pipeline_parallel_degree,
+                mp_degree=args.tensor_parallel_degree,
+                sharding_degree=1,  # auto_parallel's sharding is not orthogonal with dp, mp and pp
+            )
 
-    if args is not None:
-        if args.use_hybrid_parallel:
-            from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+            global_seed, local_seed, random_seed = _get_distributed_seeds(args.seed, topo)
 
-            random.seed(args.seed + args.dataset_rank)
-            np.random.seed(args.seed + args.dataset_rank)
-            paddle.seed(args.seed + args.dataset_rank)
+            paddle.seed(local_seed)
+            random.seed(random_seed)
+            np.random.seed(random_seed)
 
-            # local_seed/ global_seed is used to control dropout in ModelParallel
-            local_seed = args.seed + 59999 + args.tensor_parallel_rank * 10 + args.pipeline_parallel_rank * 1000
-            global_seed = args.seed + 100003 + args.dataset_rank
-            tracker = get_rng_state_tracker()
-
-            if "global_seed" not in tracker.states_:
-                tracker.add("global_seed", global_seed)
-            if "local_seed" not in tracker.states_:
-                tracker.add("local_seed", local_seed)
+            logger.info(
+                "The global seed is set to {}, local seed is set to {} and "
+                "random seed is set to {}.".format(global_seed, local_seed, random_seed)
+            )
         else:
             random.seed(args.seed)
             np.random.seed(args.seed)
             paddle.seed(args.seed)
-
-
-def get_mesh(pp_idx=0):
-    mesh = fleet.auto.get_mesh()
-    if "pp" in mesh.dim_names:
-        mesh = mesh.get_mesh_with_dim("pp")[pp_idx]
-    return mesh
-
-
-def _prepare_pipeline_inputs_func(inputs):
-    first_stage_keys = ["input_ids", "attention_mask", "position_ids"]
-    last_stage_keys = ["labels"]
-
-    def get_expected_keys(inputs, keys):
-        ret = tuple([inputs.pop(k) for k in keys if k in inputs])
-        if len(ret) == 1:
-            ret = ret[0]
-        return ret
-
-    if type(inputs) is dict or type(inputs) is OrderedDict:
-        return [
-            get_expected_keys(inputs, first_stage_keys),
-            get_expected_keys(inputs, last_stage_keys),
-        ]
-
-    keys = list(inputs[0].keys())
-    inputs_batch = {key: [data.pop(key) for data in inputs] for key in keys}
-    return [
-        get_expected_keys(inputs_batch, first_stage_keys),
-        get_expected_keys(inputs_batch, last_stage_keys),
-    ]
 
 
 def main():
@@ -404,11 +445,6 @@ def main():
         model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
-    if training_args.enable_linear_fused_grad_add:
-        from fused_layers import mock_layers
-
-        mock_layers()
 
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
@@ -420,14 +456,6 @@ def main():
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
-        strategy = fleet.DistributedStrategy()
-        strategy.hybrid_configs = {
-            "dp_degree": training_args.data_parallel_degree,
-            "mp_degree": training_args.tensor_parallel_degree,
-            "pp_degree": training_args.pipeline_parallel_degree,
-            "sharding_degree": 1,
-        }
-        fleet.init(is_collective=True, strategy=strategy)
 
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
@@ -442,8 +470,26 @@ def main():
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
 
+    # Detecting last checkpoint.
+    last_checkpoint = None
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
+        last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        # if last_checkpoint is None and len(
+        #         os.listdir(training_args.output_dir)) > 1:
+        #     raise ValueError(
+        #         f"Output directory ({training_args.output_dir}) already exists and is not empty. "
+        #         "Use --overwrite_output_dir to overcome.")
+        if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
+            logger.info(
+                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+            )
+
+    config_class, model_class = MODEL_CLASSES[model_args.model_type]
+
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
-    config = AutoConfig.from_pretrained(model_args.model_name_or_path)
+
+    config = config_class.from_pretrained(model_args.model_name_or_path)
 
     config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
@@ -456,6 +502,18 @@ def main():
 
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
+
+    config.vocab_size = model_args.vocab_size if model_args.vocab_size is not None else config.vocab_size
+    config.hidden_size = model_args.hidden_size if model_args.hidden_size is not None else config.hidden_size
+    config.intermediate_size = (
+        model_args.intermediate_size if model_args.intermediate_size is not None else config.intermediate_size
+    )
+    config.num_hidden_layers = (
+        model_args.num_hidden_layers if model_args.num_hidden_layers is not None else config.num_hidden_layers
+    )
+    config.num_attention_heads = (
+        model_args.num_attention_heads if model_args.num_attention_heads is not None else config.num_attention_heads
+    )
 
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
@@ -474,30 +532,30 @@ def main():
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
 
+    if training_args.strategy.pipeline.enable and config.virtual_pp_degree > 1:
+        pipeline = training_args.strategy.pipeline
+        pipeline.vpp_degree = config.virtual_pp_degree
+        pipeline.vpp_seg_method = training_args.virtual_pipeline_seg_method
+
     print("Final pre-training config:", config)
 
     # Set the dtype for loading model
-    dtype = "float32"
-    if training_args.fp16_opt_level == "O2":
-        if training_args.fp16:
-            dtype = "float16"
-        if training_args.bf16:
-            dtype = "bfloat16"
+    # dtype = "float32"
+    # if training_args.fp16_opt_level == "O2":
+    #     if training_args.fp16:
+    #         dtype = "float16"
+    #     if training_args.bf16:
+    #         dtype = "bfloat16"
 
-    model_class = AutoModelForCausalLM
-    if training_args.pipeline_parallel_degree > 1:
-        model_class = AutoModelForCausalLMPipe
+    model = model_class._from_config(config)
 
-    if model_args.continue_training:
-        model = model_class.from_pretrained(
-            model_args.model_name_or_path,
-            config=config,
-            dtype=dtype,
-        )
-    else:
-        model = model_class.from_config(config, dtype=dtype)
+    if training_args.recompute:
 
-    print("====type===", type(model))
+        def fn(layer):
+            if hasattr(layer, "enable_recompute") and (layer.enable_recompute is False or layer.enable_recompute == 0):
+                layer.enable_recompute = True
+
+        model.apply(fn)
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
@@ -533,41 +591,50 @@ def main():
 
     optimizer = create_optimizer(model, lr_scheduler, training_args)
 
-    model = fleet.distributed_model(model)
-    optimizer = fleet.distributed_optimizer(optimizer)
-    # skip grad sync
-    load_model(model)
-    assert optimizer._dp_enable
-    # hack for align with auto
-    # optimizer._dp_enable = False
-
-    def loss_func(loss):
+    def loss_func(loss, outputs):
         return loss
-        # hcg = fleet.get_hybrid_communicate_group()
-        # group = hcg.get_data_parallel_group()
-        # return LossMean.apply(loss, group)
+
+    total_train_batch_size_per_acc_step = (
+        training_args.per_device_train_batch_size * training_args.data_parallel_degree
+    )
+    total_train_batch_size = total_train_batch_size_per_acc_step * training_args.gradient_accumulation_steps
 
     print_config(training_args)
 
-    # create sampler and dataloader
-    # each rank read (training_args.per_device_train_batch_size * training_args.data_parallel_degree) samples
-    print(
-        "dp_rank: ", dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree)
-    )
-    train_sampler = DistributedBatchSampler(
-        train_dataset,
-        batch_size=training_args.per_device_train_batch_size,
-        shuffle=False,
-        num_replicas=training_args.data_parallel_degree,
-        rank=dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree),
-        drop_last=training_args.dataloader_drop_last,
+    engine = auto.Engine(model, loss_func, optimizer, strategy=training_args.strategy)
+
+    checkpoint = None
+    if training_args.resume_from_checkpoint is not None:
+        checkpoint = training_args.resume_from_checkpoint
+    elif last_checkpoint is not None:
+        checkpoint = last_checkpoint
+
+    if checkpoint:
+        logger.info(f"Starting training from resume_from_checkpoint : {checkpoint}")
+        engine.load(os.path.join(checkpoint, "auto"))
+
+    engine.prepare(
+        [
+            paddle.static.InputSpec(
+                shape=[total_train_batch_size, data_args.max_seq_length], dtype="int64", name="input_ids"
+            ),
+            paddle.static.InputSpec(
+                shape=[total_train_batch_size, data_args.max_seq_length], dtype="int64", name="labels"
+            ),
+        ],
+        mode="train",
     )
 
-    train_dataloader = DataLoader(
-        train_dataset,
-        batch_sampler=train_sampler,
+    pp_degree = training_args.pipeline_parallel_degree
+
+    train_dataloader = engine.dataloader(
+        dataset=train_dataset,
+        batch_size=total_train_batch_size_per_acc_step if pp_degree == 1 else total_train_batch_size,
+        steps_per_epoch=training_args.max_steps,
+        epochs=training_args.num_train_epochs,
         collate_fn=data_collator,
         num_workers=training_args.dataloader_num_workers,
+        mode="train",
     )
 
     num_update_steps_per_epoch = len(train_dataloader) // training_args.gradient_accumulation_steps
@@ -576,237 +643,80 @@ def main():
         training_args.max_steps % num_update_steps_per_epoch > 0
     )
 
-    global_step = 1
-    pp_data_buffer = []
-    load_model(model)
-    model.train()
-    model._prepare_pipeline_inputs_func = _prepare_pipeline_inputs_func
+    global_step = 0
+    global_step_last_logged = 0
+    start_time_last_logged = time.time()
+    tr_loss = float(0)
+
+    job_schedule_profiler_start = training_args.job_schedule_profiler_start
+    job_schedule_profiler_end = training_args.job_schedule_profiler_end
+
+    local_batches = []
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
-            input_ids, labels = inputs["input_ids"], inputs["labels"]
-            print(f"===> input_ids:  {input_ids._md5sum()}")
-            print(f"===> labels:  {labels._md5sum()}")
-            pp_data_buffer.append(inputs)
-            if len(pp_data_buffer) < training_args.gradient_accumulation_steps:
+            local_batches.append(inputs)
+            if pp_degree == 1 and len(local_batches) < training_args.gradient_accumulation_steps:
                 continue
+            elif pp_degree > 1:
+                local_batches = inputs
 
-            pp_inputs = model._prepare_pipeline_inputs_func(pp_data_buffer)
-            model.micro_batch_size = training_args.per_device_train_batch_size
-            model.accumulate_steps = training_args.gradient_accumulation_steps
+            with job_schedule_profiler_range(step, job_schedule_profiler_start, job_schedule_profiler_end) as status:
+                engine.enable_job_schedule_profiler = status
 
-            pp_inputs = model._prepare_training(pp_inputs, optimizer, lr_scheduler)
+            for micro_batch in local_batches:
+                outs = engine.run(micro_batch, mode="train")
 
-            loss = model.forward_backward_pipeline(pp_inputs)
-            # hack for align with auto
-            # sync_grad(model)
-            # print_grad(model)
-            optimizer.step()
-            # print_param(model)
-            lr_scheduler.step()
-            optimizer.clear_grad()
+                if "loss" in outs:
+                    if outs["loss"].dtype == np.uint16:
+                        tr_loss_step = np.sum(convert_uint16_to_float(outs["loss"]))
+                    else:
+                        tr_loss_step = np.sum(outs["loss"])
+                else:
+                    tr_loss_step = float(0)
 
-            print(f"global_step {global_step}; loss {loss.item()}; ls {optimizer.get_lr()}")
-            pp_data_buffer.clear()
+                if training_args.gradient_accumulation_steps > 1:
+                    tr_loss_step /= training_args.gradient_accumulation_steps
 
-            if global_step >= 1:
-                # save_model(model)
-                sys.exit(0)
+                tr_loss += tr_loss_step
+
+            local_batches = []
+
+            if lr_scheduler is not None:
+                engine.optimizer._learning_rate.step()
 
             global_step += 1
+            if global_step % training_args.logging_steps == 0:
+                num_steps = global_step - global_step_last_logged
+                logs = {}
+                logs["loss"] = round(tr_loss / num_steps, 8)
+                logs["learning_rate"] = float("{0:.3e}".format(engine.optimizer.get_lr()))
+                logs["global_step"] = int(global_step)
+                logs.update(
+                    speed_metrics(
+                        split="interval",
+                        start_time=start_time_last_logged,
+                        num_samples=total_train_batch_size * num_steps,
+                        num_steps=num_steps,
+                    )
+                )
+                logger.info(", ".join(f"{k}: {v}" for k, v in logs.items()))
 
+                global_step_last_logged = global_step
+                start_time_last_logged = time.time()
+                tr_loss = float(0)
 
-def save_model(model):
-    hcg = fleet.get_hybrid_communicate_group()
-    dp_rank = hcg.get_data_parallel_rank()
-    mp_degree = hcg.get_model_parallel_world_size()
-    mp_rank = hcg.get_model_parallel_rank()
-    pp_rank = hcg.get_stage_id()
-    if dp_rank > 0:
-        return
-    state_dict = model.state_dict()
-    for (k, v) in state_dict.items():
-        print(f"{k}=>{v.name} {v.shape}")
-    paddle.save(state_dict, f"hand/pp{pp_rank:02d}mp{mp_rank:02d}.pdparams")
-    group = hcg.get_model_parallel_group()
+            if training_args.save_steps > 0 and global_step % training_args.save_steps == 0:
+                paddle.device.cuda.synchronize()
+                checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{global_step}"
+                run_dir = training_args.output_dir
+                output_dir = os.path.join(run_dir, checkpoint_folder)
+                os.makedirs(output_dir, exist_ok=True)
+                logger.info(f"Saving model checkpoint to {output_dir}")
+                prefix_path = os.path.join(output_dir, "auto")
+                engine.save(prefix_path, training=True)
 
-    # evenly ditribute param
-    node_model_state = NodeModelState()
-    node_model_state.add_weights(state_dict, mp_rank)
-
-    def merge_func(k, v):
-        assert len(v) == mp_degree
-        tensor_list = [e[1] for e in v]
-        return merge_mp_tensor_list(k, tensor_list)
-
-    node_model_state = node_model_state.even_distribute(group)
-    node_model_state = node_model_state.collapse_key().merge_items(merge_func)
-
-    def filter_func(name):
-        return True
-
-    all_state_dict = all_gather_state_dict(node_model_state.model_weights, filter_func, group)
-    if mp_rank > 0:
-        return
-    paddle.save(all_state_dict, f"hand/pp{pp_rank:02d}.pdparams")
-    group = hcg.get_pipe_parallel_group()
-    all_state_dict = all_gather_state_dict(all_state_dict, filter_func, group)
-    if pp_rank > 0:
-        return
-    paddle.save(all_state_dict, "hand/all.pdparams")
-
-
-def merge_tensor(tensor_list, fuse_num, axis):
-    if fuse_num > 1:
-        part_list = [paddle.split(e, num_or_sections=fuse_num, axis=axis) for e in tensor_list]
-        fuse_list = [paddle.concat(x=e, axis=axis) for e in zip(*part_list)]
-        return paddle.concat(x=fuse_list, axis=axis)
-    else:
-        return paddle.concat(x=tensor_list, axis=axis)
-
-
-def load_model(model):
-    hcg = fleet.get_hybrid_communicate_group()
-    mp_rank = hcg.get_model_parallel_rank()
-    pp_rank = hcg.get_stage_id()
-    state_dict = paddle.load(f"hand/pp{pp_rank:02d}mp{mp_rank:02d}.pdparams")
-    model.set_state_dict(state_dict)
-
-
-class LossMean(PyLayer):
-    @staticmethod
-    def forward(ctx, inp, group):
-        with paddle.no_grad():
-            inps = []
-            paddle.distributed.all_gather(inps, inp, group=group)
-            return (inps[0] + inps[1]) / 2.0
-
-    @staticmethod
-    def backward(ctx, grad):
-        return grad
-
-
-def sync_grad(model):
-    model_state_dict = model.state_dict()
-    name_mapping = {v.name: k for (k, v) in model_state_dict.items()}
-    for p in model.parameters():
-        assert p.name in name_mapping
-        grad = p.grad
-        reduce_dp(grad)
-
-
-def print_grad(model):
-    model_state_dict = model.state_dict()
-    name_mapping = {v.name: k for (k, v) in model_state_dict.items()}
-    for p in model.parameters():
-        assert p.name in name_mapping
-        grad = p.grad
-        grad = merge_mp(name_mapping[p.name], grad)
-        print(f"{name_mapping[p.name]} {p.name}_grad shape: {grad.shape} md5sum: {grad._md5sum()}")
-
-
-def print_param(model):
-    model_state_dict = model.state_dict()
-    name_mapping = {v.name: k for (k, v) in model_state_dict.items()}
-    for p in model.parameters():
-        tmp = merge_mp(name_mapping[p.name], p)
-        print(f"{name_mapping[p.name]} {p.name} shape: {tmp.shape} md5sum: {tmp._md5sum()}")
-
-
-def merge_mp(k, input):
-    hcg = fleet.get_hybrid_communicate_group()
-    mp_degree = hcg.get_model_parallel_world_size()
-    if mp_degree <= 1:
-        return input
-    else:
-        group = hcg.get_model_parallel_group()
-        with paddle.no_grad():
-            inps = []
-            paddle.distributed.all_gather(inps, input, group=group)
-            return merge_mp_tensor_list(k, inps)
-
-
-def concat_dp(input):
-    hcg = fleet.get_hybrid_communicate_group()
-    dp_degree = hcg.get_data_parallel_world_size()
-    if dp_degree <= 1:
-        return input
-    else:
-        group = hcg.get_data_parallel_group()
-        return concat(input, 0, group)
-
-
-def concat(input, axis, group):
-    with paddle.no_grad():
-        inps = []
-        paddle.distributed.all_gather(inps, input, group=group)
-        return paddle.concat(x=inps, axis=axis)
-
-
-def reduce_dp(input):
-    hcg = fleet.get_hybrid_communicate_group()
-    dp_degree = hcg.get_data_parallel_world_size()
-    if dp_degree <= 1:
-        return input
-    else:
-        group = hcg.get_data_parallel_group()
-        with paddle.no_grad():
-            paddle.distributed.all_reduce(input, group=group)
-            return input
-
-
-def map_structure_name(k):
-    if "_layers.llama" in k:
-        return k
-    hcg = fleet.get_hybrid_communicate_group()
-    pp_degree = hcg.get_pipe_parallel_world_size()
-    if pp_degree < 2:
-        return k
-    fs = k.split(".")
-    idx = int(fs[1])
-    if idx == 0:
-        return "_layers.llama.embed_tokens.weight"
-    if idx == 33:
-        return "_layers.llama.norm.weight"
-    if idx == 34:
-        return "_layers.lm_head.weight"
-    else:
-        return f"_layers.llama.layers.{idx-1}." + ".".join(fs[2:])
-
-
-def merge_mp_tensor_list(k, tensor_list):
-    # merge by col
-    k = map_structure_name(k)
-    if "self_attn.qkv_proj.weight" in k:
-        return merge_tensor(tensor_list, 3, 1)
-    elif "self_attn.qkv_proj.bias" in k:
-        return merge_tensor(tensor_list, 3, 0)
-    elif "self_attn.q_proj.weight" in k:
-        return merge_tensor(tensor_list, 1, 1)
-    elif "self_attn.k_proj.weight" in k:
-        return merge_tensor(tensor_list, 1, 1)
-    elif "self_attn.v_proj.weight" in k:
-        return merge_tensor(tensor_list, 1, 1)
-    elif "mlp.up_gate_proj.weight" in k:
-        return merge_tensor(tensor_list, 2, 1)
-    elif "mlp.up_proj.weight" in k:
-        return merge_tensor(tensor_list, 1, 1)
-    elif "mlp.gate_proj.weight" in k:
-        return merge_tensor(tensor_list, 1, 1)
-    elif "lm_head.weight" in k:
-        return merge_tensor(tensor_list, 1, 1)
-    elif "mlp.up_gate_proj.bias" in k:
-        return merge_tensor(tensor_list, 2, 0)
-    # merge by row
-    elif "self_attn.o_proj.weight" in k:
-        return merge_tensor(tensor_list, 1, 0)
-    elif "mlp.down_proj.weight" in k:
-        return merge_tensor(tensor_list, 1, 0)
-    elif "embed_tokens.weight" in k:
-        return merge_tensor(tensor_list, 1, 0)
-    else:
-        assert "norm" in k, k
-        # duplicate
-        return tensor_list[0]
+            if global_step >= training_args.max_steps:
+                break
 
 
 if __name__ == "__main__":

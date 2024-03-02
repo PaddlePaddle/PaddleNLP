@@ -18,37 +18,33 @@ import os
 import random
 import sys
 import types
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import List, Optional
 
 import numpy as np
 import paddle
 import paddle.distributed as dist
+from paddle.autograd import PyLayer
 from paddle.distributed import fleet
 from paddle.io import DataLoader, DistributedBatchSampler
-
-from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
-from paddlenlp.transformers import (
-    AutoTokenizer,
-    CosineAnnealingWithWarmupDecay,
-    LinearAnnealingWithWarmupDecay,
-    LlamaConfig,
-    LlamaForCausalLM3DAuto,
-)
-from paddlenlp.utils.log import logger
-
-MODEL_CLASSES = {
-    "llama": (LlamaConfig, LlamaForCausalLM3DAuto),
-}
-
-
-from collections import OrderedDict
 
 from paddlenlp.data.causal_dataset import (
     build_train_valid_test_datasets,
     check_data_split,
     print_rank_0,
 )
+from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
+from paddlenlp.trainer.utils.reshard import NodeModelState, all_gather_state_dict
+from paddlenlp.transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoModelForCausalLMPipe,
+    AutoTokenizer,
+    CosineAnnealingWithWarmupDecay,
+    LinearAnnealingWithWarmupDecay,
+)
+from paddlenlp.utils.log import logger
 
 
 def add_start_docstrings(*docstr):
@@ -77,11 +73,6 @@ class PreTrainingArguments(TrainingArguments):
         metadata={
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
-    )
-    parallel_mode: str = field(default="hybrid", metadata={"help": ""})
-
-    pipeline_schedule_mode: str = field(
-        default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
     )
 
 
@@ -139,21 +130,6 @@ class ModelArguments:
 
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
-    )
-    vocab_size: Optional[int] = field(
-        default=None,
-        metadata={
-            "help": ".Vocabulary size of the Llama model. Defines the number of different tokens that can be represented by the `inputs_ids`"
-        },
-    )
-    hidden_size: Optional[int] = field(default=None, metadata={"help": "Dimension of the hidden representations."})
-    intermediate_size: Optional[int] = field(default=None, metadata={"help": "Dimension of the MLP representations."})
-    num_hidden_layers: Optional[int] = field(
-        default=None, metadata={"help": "Number of hidden layers in the Transformer encoder."}
-    )
-    num_attention_heads: Optional[int] = field(
-        default=None,
-        metadata={"help": "Number of attention heads for each attention layer in the Transformer encoder."},
     )
     use_flash_attention: bool = field(
         default=False,
@@ -244,7 +220,6 @@ def create_pretrained_dataset(
         print_rank_0("    test:       {}".format(train_val_test_num_samples[2]))
 
     # Build the datasets.
-    print("====data seed====", training_args.seed)
     train_dataset, valid_dataset, test_dataset = build_train_valid_test_datasets(
         data_prefix=data_file,
         data_impl=data_args.data_impl,
@@ -318,7 +293,7 @@ def create_optimizer(model, lr_scheduler, training_args):
     decay_parameters = [
         p.name
         for n, p in model.named_parameters()
-        if (not any(nd in n for nd in ["bias", "norm"])) or n == "llama.norm.weight"
+        if (not any(nd in n for nd in ["bias", "norm"])) or "llama.norm.weight" in n
     ]
 
     def apply_decay_param_fun(x):
@@ -398,10 +373,28 @@ def get_mesh(pp_idx=0):
     return mesh
 
 
-def shard_fn(layer, mesh_idx, placements):
-    paran_name = layer.weight.name
-    layer.weight = dist.shard_tensor(layer.weight, get_mesh(mesh_idx), placements)
-    layer.weight.name = paran_name
+def _prepare_pipeline_inputs_func(inputs):
+    first_stage_keys = ["input_ids", "attention_mask", "position_ids"]
+    last_stage_keys = ["labels"]
+
+    def get_expected_keys(inputs, keys):
+        ret = tuple([inputs.pop(k) for k in keys if k in inputs])
+        if len(ret) == 1:
+            ret = ret[0]
+        return ret
+
+    if type(inputs) is dict or type(inputs) is OrderedDict:
+        return [
+            get_expected_keys(inputs, first_stage_keys),
+            get_expected_keys(inputs, last_stage_keys),
+        ]
+
+    keys = list(inputs[0].keys())
+    inputs_batch = {key: [data.pop(key) for data in inputs] for key in keys}
+    return [
+        get_expected_keys(inputs_batch, first_stage_keys),
+        get_expected_keys(inputs_batch, last_stage_keys),
+    ]
 
 
 def main():
@@ -426,6 +419,14 @@ def main():
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
+        strategy = fleet.DistributedStrategy()
+        strategy.hybrid_configs = {
+            "dp_degree": training_args.data_parallel_degree,
+            "mp_degree": training_args.tensor_parallel_degree,
+            "pp_degree": training_args.pipeline_parallel_degree,
+            "sharding_degree": 1,
+        }
+        fleet.init(is_collective=True, strategy=strategy)
 
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
@@ -440,11 +441,8 @@ def main():
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
 
-    config_class, model_class = MODEL_CLASSES[model_args.model_type]
-
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
-
-    config = config_class.from_pretrained(model_args.model_name_or_path)
+    config = AutoConfig.from_pretrained(model_args.model_name_or_path)
 
     config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
@@ -457,17 +455,6 @@ def main():
 
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
-
-    config.hidden_size = model_args.hidden_size if model_args.hidden_size is not None else config.hidden_size
-    config.intermediate_size = (
-        model_args.intermediate_size if model_args.intermediate_size is not None else config.intermediate_size
-    )
-    config.num_hidden_layers = (
-        model_args.num_hidden_layers if model_args.num_hidden_layers is not None else config.num_hidden_layers
-    )
-    config.num_attention_heads = (
-        model_args.num_attention_heads if model_args.num_attention_heads is not None else config.num_attention_heads
-    )
 
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
@@ -496,11 +483,21 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
-    print("======M M M M======", model_class)
-    model = model_class._from_config(config, dtype=dtype)
-    # load model
-    # load_model(model)
-    shard_model(model)
+    model_class = AutoModelForCausalLM
+    if training_args.pipeline_parallel_degree > 1:
+        model_class = AutoModelForCausalLMPipe
+
+    if model_args.continue_training:
+        model = model_class.from_pretrained(
+            model_args.model_name_or_path,
+            config=config,
+            dtype=dtype,
+        )
+    else:
+        model = model_class.from_config(config, dtype=dtype)
+
+    print("====type===", type(model))
+
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
@@ -535,8 +532,19 @@ def main():
 
     optimizer = create_optimizer(model, lr_scheduler, training_args)
 
-    def loss_func(loss, outputs):
+    model = fleet.distributed_model(model)
+    optimizer = fleet.distributed_optimizer(optimizer)
+    # skip grad sync
+    load_model(model)
+    assert optimizer._dp_enable
+    # hack for align with auto
+    # optimizer._dp_enable = False
+
+    def loss_func(loss):
         return loss
+        # hcg = fleet.get_hybrid_communicate_group()
+        # group = hcg.get_data_parallel_group()
+        # return LossMean.apply(loss, group)
 
     print_config(training_args)
 
@@ -544,9 +552,6 @@ def main():
     # each rank read (training_args.per_device_train_batch_size * training_args.data_parallel_degree) samples
     print(
         "dp_rank: ", dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree)
-    )
-    print(
-        f"===> worldsize = {training_args.per_device_train_batch_size}  rank: {dist.get_rank() // (training_args.pipeline_parallel_degree * training_args.tensor_parallel_degree)}"
     )
     train_sampler = DistributedBatchSampler(
         train_dataset,
@@ -571,121 +576,121 @@ def main():
     )
 
     global_step = 1
-    tr_loss = float(0)
-
-    # hack: create dp group for distributed input data to align dygraph parallel loss.
-    dp_group = None
-    global_mesh = fleet.auto.get_mesh().get_mesh_with_dim("pp").mesh
-    mesh_shape = global_mesh.shape
-    for id in range(mesh_shape[0]):
-        pp_mesh = global_mesh[id]
-        for i in range(pp_mesh.shape[-1]):
-            ranks = pp_mesh[:, i]
-            print("dp ranks: ", ranks)
-            group = dist.new_group(ranks)
-            if dist.get_rank() in ranks:
-                dp_group = group
-    assert dp_group is not None
-
+    pp_data_buffer = []
+    load_model(model)
     model.train()
-    optimizer = dist.shard_optimizer(optimizer)
+    model._prepare_pipeline_inputs_func = _prepare_pipeline_inputs_func
     for epoch_idx in range(num_train_epochs):
         for step, inputs in enumerate(train_dataloader):
             input_ids, labels = inputs["input_ids"], inputs["labels"]
+            print(f"===> input_ids:  {input_ids._md5sum()}")
+            print(f"===> labels:  {labels._md5sum()}")
+            pp_data_buffer.append(inputs)
+            if len(pp_data_buffer) < training_args.gradient_accumulation_steps:
+                continue
 
-            input_id = input_ids[0][0].numpy()
-            label = labels[0][0].numpy()
+            pp_inputs = model._prepare_pipeline_inputs_func(pp_data_buffer)
+            model.micro_batch_size = training_args.per_device_train_batch_size
+            model.accumulate_steps = training_args.gradient_accumulation_steps
 
-            # hack for align dygraph parallel.
-            if dp_group is not None:
-                cur_rank = dist.get_rank()
-                res = []
-                dist.all_gather(res, paddle.Tensor(input_ids, place=paddle.CUDAPlace(cur_rank)), group=dp_group)
-                input_ids = paddle.concat(res)
-                input_ids = dist.shard_tensor(input_ids, get_mesh(), [dist.Shard(0), dist.Replicate()])
+            pp_inputs = model._prepare_training(pp_inputs, optimizer, lr_scheduler)
 
-                res = []
-                dist.all_gather(res, paddle.Tensor(labels, place=paddle.CUDAPlace(cur_rank)), group=dp_group)
-                labels = paddle.concat(res)
-                labels = dist.shard_tensor(labels, get_mesh(-1), [dist.Shard(0), dist.Replicate()])
+            loss = model.forward_backward_pipeline(pp_inputs)
+            # hack for align with auto
+            # sync_grad(model)
+            # print_grad(model)
+            optimizer.step()
+            # print_param(model)
+            lr_scheduler.step()
+            optimizer.clear_grad()
 
-            res = model(input_ids, labels=labels)
+            print(f"global_step {global_step}; loss {loss.item()}; ls {optimizer.get_lr()}")
+            pp_data_buffer.clear()
 
-            # add criterion in the future.
-            tr_loss_step = res[0]
-
-            if training_args.gradient_accumulation_steps > 1:
-                tr_loss_step /= training_args.gradient_accumulation_steps
-
-            # do backward every micro step.
-            tr_loss_step.backward()
-            tr_loss += tr_loss_step
-
-            if global_step % training_args.gradient_accumulation_steps == 0:
-                # print_grad(model)
-                optimizer.step()
-                lr_scheduler.step()
-                # print_param(model)
-                optimizer.clear_grad()
-                print(
-                    f"global_step {global_step // training_args.gradient_accumulation_steps};input id {input_id}; label {label}; loss {tr_loss.numpy()}  lr: {optimizer.get_lr()}"
-                )
-                tr_loss = 0
-
-            if global_step // training_args.gradient_accumulation_steps >= training_args.max_steps:
-                break
+            if global_step >= 1:
+                # save_model(model)
+                sys.exit(0)
 
             global_step += 1
 
 
-def shard_model(model):
-    pp_stage = 0
-    for name, layer in model.named_sublayers(include_self=False):
-        if hasattr(layer, "ipp"):
-            pp_stage = layer.ipp
-        # print(f"name {name},pp_stage {pp_stage}==>", type(layer))
-        if "embed_tokens" in name:
-            # embedding only support column split now. it will update in the future
-            shard_fn(layer, 0, [dist.Replicate(), dist.Shard(1)])
-        for n in [
-            "self_attn.q_proj",
-            "self_attn.k_proj",
-            "self_attn.v_proj",
-            "self_attn.qkv_proj",
-            "gate_proj",
-            "up_proj",
-            "gate_up_fused_proj",
-        ]:
-            if n in name:
-                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(1)])
-                break
-        for n in ["self_attn.o_proj", "down_proj"]:
-            if n in name:
-                shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(0)])
-                break
-        if "lm_head" in name:
-            shard_fn(layer, -1, [dist.Replicate(), dist.Shard(1)])
+def save_model(model):
+    hcg = fleet.get_hybrid_communicate_group()
+    dp_rank = hcg.get_data_parallel_rank()
+    mp_degree = hcg.get_model_parallel_world_size()
+    mp_rank = hcg.get_model_parallel_rank()
+    pp_rank = hcg.get_stage_id()
+    if dp_rank > 0:
+        return
+    state_dict = model.state_dict()
+    for (k, v) in state_dict.items():
+        print(f"{k}=>{v.name} {v.shape}")
+    paddle.save(state_dict, f"hand/pp{pp_rank:02d}mp{mp_rank:02d}.pdparams")
+    group = hcg.get_model_parallel_group()
+
+    # evenly ditribute param
+    node_model_state = NodeModelState()
+    node_model_state.add_weights(state_dict, mp_rank)
+
+    def merge_func(k, v):
+        assert len(v) == mp_degree
+        tensor_list = [e[1] for e in v]
+        return merge_mp_tensor_list(k, tensor_list)
+
+    node_model_state = node_model_state.even_distribute(group)
+    node_model_state = node_model_state.collapse_key().merge_items(merge_func)
+
+    def filter_func(name):
+        return True
+
+    all_state_dict = all_gather_state_dict(node_model_state.model_weights, filter_func, group)
+    if mp_rank > 0:
+        return
+    paddle.save(all_state_dict, f"hand/pp{pp_rank:02d}.pdparams")
+    group = hcg.get_pipe_parallel_group()
+    all_state_dict = all_gather_state_dict(all_state_dict, filter_func, group)
+    if pp_rank > 0:
+        return
+    paddle.save(all_state_dict, "hand/all.pdparams")
+
+
+def merge_tensor(tensor_list, fuse_num, axis):
+    if fuse_num > 1:
+        part_list = [paddle.split(e, num_or_sections=fuse_num, axis=axis) for e in tensor_list]
+        fuse_list = [paddle.concat(x=e, axis=axis) for e in zip(*part_list)]
+        return paddle.concat(x=fuse_list, axis=axis)
+    else:
+        return paddle.concat(x=tensor_list, axis=axis)
 
 
 def load_model(model):
-    model_state_dict = model.state_dict()
-    state_dict = paddle.load("hand/all.pdparams")
-    tmp = OrderedDict()
-    (tmp, state_dict) = (state_dict, tmp)
-    for (k, v) in tmp.items():
-        k = map_structure_name(k)
-        state_dict[k] = v
+    hcg = fleet.get_hybrid_communicate_group()
+    mp_rank = hcg.get_model_parallel_rank()
+    pp_rank = hcg.get_stage_id()
+    state_dict = paddle.load(f"hand/pp{pp_rank:02d}mp{mp_rank:02d}.pdparams")
     model.set_state_dict(state_dict)
-    assert len(model_state_dict) == len(state_dict), f"{len(model_state_dict)} vs {len(state_dict)}"
-    """
-    print("=======model_state_dict=======")
-    for (k,v) in model_state_dict.items():
-        print(f"{k}=>{v.shape}")
-    """
-    print("=======state_dict=======")
-    for (k, v) in state_dict.items():
-        assert k in model_state_dict
-        print(f"{k}=>{v.shape}")
+
+
+class LossMean(PyLayer):
+    @staticmethod
+    def forward(ctx, inp, group):
+        with paddle.no_grad():
+            inps = []
+            paddle.distributed.all_gather(inps, inp, group=group)
+            return (inps[0] + inps[1]) / 2.0
+
+    @staticmethod
+    def backward(ctx, grad):
+        return grad
+
+
+def sync_grad(model):
+    model_state_dict = model.state_dict()
+    name_mapping = {v.name: k for (k, v) in model_state_dict.items()}
+    for p in model.parameters():
+        assert p.name in name_mapping
+        grad = p.grad
+        reduce_dp(grad)
 
 
 def print_grad(model):
@@ -693,30 +698,114 @@ def print_grad(model):
     name_mapping = {v.name: k for (k, v) in model_state_dict.items()}
     for p in model.parameters():
         assert p.name in name_mapping
-        if p.grad is not None:
-            print(f"{name_mapping[p.name]} {p.name}_grad shape: {p.grad.shape} md5sum: {p.grad._md5sum()}")
+        grad = p.grad
+        grad = merge_mp(name_mapping[p.name], grad)
+        print(f"{name_mapping[p.name]} {p.name}_grad shape: {grad.shape} md5sum: {grad._md5sum()}")
 
 
 def print_param(model):
     model_state_dict = model.state_dict()
     name_mapping = {v.name: k for (k, v) in model_state_dict.items()}
     for p in model.parameters():
-        assert p.name in name_mapping
-        if p.grad is not None:
-            print(f"{name_mapping[p.name]} {p.name} shape: {p.shape} md5sum: {p._md5sum()}")
+        tmp = merge_mp(name_mapping[p.name], p)
+        print(f"{name_mapping[p.name]} {p.name} shape: {tmp.shape} md5sum: {tmp._md5sum()}")
+
+
+def merge_mp(k, input):
+    hcg = fleet.get_hybrid_communicate_group()
+    mp_degree = hcg.get_model_parallel_world_size()
+    if mp_degree <= 1:
+        return input
+    else:
+        group = hcg.get_model_parallel_group()
+        with paddle.no_grad():
+            inps = []
+            paddle.distributed.all_gather(inps, input, group=group)
+            return merge_mp_tensor_list(k, inps)
+
+
+def concat_dp(input):
+    hcg = fleet.get_hybrid_communicate_group()
+    dp_degree = hcg.get_data_parallel_world_size()
+    if dp_degree <= 1:
+        return input
+    else:
+        group = hcg.get_data_parallel_group()
+        return concat(input, 0, group)
+
+
+def concat(input, axis, group):
+    with paddle.no_grad():
+        inps = []
+        paddle.distributed.all_gather(inps, input, group=group)
+        return paddle.concat(x=inps, axis=axis)
+
+
+def reduce_dp(input):
+    hcg = fleet.get_hybrid_communicate_group()
+    dp_degree = hcg.get_data_parallel_world_size()
+    if dp_degree <= 1:
+        return input
+    else:
+        group = hcg.get_data_parallel_group()
+        with paddle.no_grad():
+            paddle.distributed.all_reduce(input, group=group)
+            return input
 
 
 def map_structure_name(k):
+    if "_layers.llama" in k:
+        return k
+    hcg = fleet.get_hybrid_communicate_group()
+    pp_degree = hcg.get_pipe_parallel_world_size()
+    if pp_degree < 2:
+        return k
     fs = k.split(".")
     idx = int(fs[1])
     if idx == 0:
-        return "llama.embed_tokens.weight"
+        return "_layers.llama.embed_tokens.weight"
     if idx == 33:
-        return "llama.norm.weight"
+        return "_layers.llama.norm.weight"
     if idx == 34:
-        return "lm_head.weight"
+        return "_layers.lm_head.weight"
     else:
-        return f"llama.layers.{idx-1}." + ".".join(fs[2:])
+        return f"_layers.llama.layers.{idx-1}." + ".".join(fs[2:])
+
+
+def merge_mp_tensor_list(k, tensor_list):
+    # merge by col
+    k = map_structure_name(k)
+    if "self_attn.qkv_proj.weight" in k:
+        return merge_tensor(tensor_list, 3, 1)
+    elif "self_attn.qkv_proj.bias" in k:
+        return merge_tensor(tensor_list, 3, 0)
+    elif "self_attn.q_proj.weight" in k:
+        return merge_tensor(tensor_list, 1, 1)
+    elif "self_attn.k_proj.weight" in k:
+        return merge_tensor(tensor_list, 1, 1)
+    elif "self_attn.v_proj.weight" in k:
+        return merge_tensor(tensor_list, 1, 1)
+    elif "mlp.up_gate_proj.weight" in k:
+        return merge_tensor(tensor_list, 2, 1)
+    elif "mlp.up_proj.weight" in k:
+        return merge_tensor(tensor_list, 1, 1)
+    elif "mlp.gate_proj.weight" in k:
+        return merge_tensor(tensor_list, 1, 1)
+    elif "lm_head.weight" in k:
+        return merge_tensor(tensor_list, 1, 1)
+    elif "mlp.up_gate_proj.bias" in k:
+        return merge_tensor(tensor_list, 2, 0)
+    # merge by row
+    elif "self_attn.o_proj.weight" in k:
+        return merge_tensor(tensor_list, 1, 0)
+    elif "mlp.down_proj.weight" in k:
+        return merge_tensor(tensor_list, 1, 0)
+    elif "embed_tokens.weight" in k:
+        return merge_tensor(tensor_list, 1, 0)
+    else:
+        assert "norm" in k, k
+        # duplicate
+        return tensor_list[0]
 
 
 if __name__ == "__main__":

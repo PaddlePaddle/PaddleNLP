@@ -44,11 +44,11 @@ def get_convert_example(model):
 
     if base_model_prefix == "chatglm":
         return convert_example_chatglm
-    elif base_model_prefix in ["chatglm_v2", "llama", "bloom", "opt", "qwen"]:
+    elif base_model_prefix in ["chatglm_v2", "llama", "bloom", "opt", "qwen", "mixtral"]:
         return convert_example_common
     else:
         raise ValueError(
-            f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama."
+            f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama, qwen, mixtral"
         )
 
 
@@ -107,7 +107,7 @@ def tokenize_rounds_example(tokenizer, example, data_args):
     # 0. prepare data
     context_data = example.get("context", {})
     context_data["is_training"] = True
-    
+
     example["src"] = example["src"] if isinstance(example["src"], list) else [example["src"]]
     example["tgt"] = example["tgt"] if isinstance(example["tgt"], list) else [example["tgt"]]
 
