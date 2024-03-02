@@ -25,7 +25,7 @@ export PARALLEL_CROSS_ENTROPY=true
 export FLAGS_call_stack_level=2
 export PYTHONPATH=../../../:$PYTHONPATH
 python -u -m paddle.distributed.launch \
-    --gpus "0,1,2,3" \
+    --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "output/$task_name""_log" \
     run_pretrain_auto_static.py \
     --model_type "llama" \
@@ -43,10 +43,10 @@ python -u -m paddle.distributed.launch \
     --fp16 0 \
     --fp16_opt_level "O2"  \
     --scale_loss 1024 \
-    --tensor_parallel_degree 1 \
+    --tensor_parallel_degree 2 \
     --pipeline_parallel_degree 2 \
-    --virtual_pp_degree 1 \
-    --pipeline_schedule_mode "1F1B" \
+    --virtual_pp_degree 2 \
+    --pipeline_schedule_mode "VPP" \
     --sharding_parallel_degree 2 \
     --sharding "stage2" \
     --learning_rate 0.0001 \
@@ -68,7 +68,6 @@ python -u -m paddle.distributed.launch \
     --do_eval \
     --device "gpu" \
     --data_impl "mmap" \
-    --enable_auto_parallel 1 \
-    --dp_gradient_sync_after_accumulate 1 \
+    --enable_auto_parallel 1
 
     # --resume_from_checkpoint "output/llama_auto_serial/checkpoint-2" \
