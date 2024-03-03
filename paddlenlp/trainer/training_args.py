@@ -224,6 +224,9 @@ class TrainingArguments:
               disable_partial_send_recv, optmize send speed for tensor parallel.
               enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
               enable_dp_comm_overlap, fuse data parallel gradient communication.
+              enable_overlap_p2p_comm, overlap p2p communication with computation.
+              enable_clear_every_step_cache, clear every step cache for pipeline parallel.
+
         sharding_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
             following config is support:
@@ -527,6 +530,8 @@ class TrainingArguments:
                 "disable_partial_send_recv, optmize send speed for tensor parallel.\n"
                 "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
                 "enable_dp_comm_overlap, fuse data parallel gradient communication. \n"
+                "enable_overlap_p2p_comm, overlap p2p communication with computation. \n"
+                "enable_clear_every_step_cache, clear cache every step. \n"
             )
         },
     )
@@ -813,6 +818,8 @@ class TrainingArguments:
                                 "enable_dp_comm_overlap",
                                 "enable_timer",
                                 "enable_release_grads",
+                                "enable_overlap_p2p_comm",
+                                "enable_clear_every_step_cache",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -838,6 +845,12 @@ class TrainingArguments:
                         and self.sharding_parallel_degree > 1,
                         "enable_timer": "enable_timer" in pipeline_parallel_config,
                         "release_gradients": "enable_release_grads" in pipeline_parallel_config,
+                        "overlap_p2p_comm": False
+                        if "enable_overlap_p2p_comm" not in pipeline_parallel_config
+                        else True,
+                        "clear_every_step_cache": False
+                        if "enable_clear_every_step_cache" not in pipeline_parallel_config
+                        else True,
                     }
 
                     if self.do_eval:
