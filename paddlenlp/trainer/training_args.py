@@ -965,7 +965,7 @@ class TrainingArguments:
             # TODO use paddle.distributed.is_initialized() after paddle 2.4rc
             if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized():
                 strategy = fleet.DistributedStrategy()
-                assert self.data_parallel_config is None, "data_parallle_config is not supported in hybrid parallel"
+                assert self.data_parallel_config == "", "data_parallle_config is not supported in hybrid parallel"
                 if self.pipeline_parallel_degree > 1:
                     pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
                     for x in pipeline_parallel_config:
