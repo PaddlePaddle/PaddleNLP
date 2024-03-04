@@ -360,6 +360,7 @@ class StaticGraphPredictor(BasePredictor):
             inference_config.disable_gpu()
         inference_config.disable_glog_info()
         inference_config.enable_new_executor()
+        inference_config.enable_new_ir()
 
         with static_mode_guard():
             self.predictor = paddle.inference.create_predictor(inference_config)
