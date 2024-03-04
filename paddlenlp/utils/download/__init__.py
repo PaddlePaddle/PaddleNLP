@@ -115,7 +115,7 @@ def get_file(
 
                 return modelscope_download(repo_id, filename, revision, cache_dir, user_agent, local_files_only)
             except Exception:
-                if index < len(filenames):
+                if index < len(filenames) - 1:
                     continue
                 else:
                     raise FileNotFoundError(f"please make sure one of the {filenames} under the repo {repo_id}")
@@ -128,12 +128,9 @@ def get_file(
         for index, filename in enumerate(filenames):
             if os.path.exists(os.path.join(repo_id, download_kwargs["subfolder"], filename)):
                 if not os.path.isfile(os.path.join(repo_id, download_kwargs["subfolder"], filename)):
-                    raise EnvironmentError(
-                        f"{repo_id} does not appear to have file named {filename}. Checkout "
-                        f"'https://huggingface.co/{repo_id}/' for available files."
-                    )
+                    raise EnvironmentError(f"{repo_id} does not appear to have file named {filename}.")
                 return os.path.join(repo_id, download_kwargs["subfolder"], filename)
-            elif index < len(filenames):
+            elif index < len(filenames) - 1:
                 continue
             else:
                 raise FileNotFoundError(f"please make sure one of the {filenames} under the dir {repo_id}")
