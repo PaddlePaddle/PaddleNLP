@@ -679,7 +679,7 @@ class CompatibleIndexedDataset(paddle.io.Dataset):
             length = size - offset
         ptr += offset
         np_array = self._token_ids[ptr : ptr + length]
-        return np_array
+        return np_array, None
 
     @property
     def sizes(self):
