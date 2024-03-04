@@ -32,6 +32,16 @@ try:
 except ImportError:
     fused_rotary_position_embedding = None
 
+try:
+    from paddle.incubate.nn.functional import swiglu
+except ImportError:
+
+    def swiglu(x, y=None):
+        if y is None:
+            x, y = paddle.chunk(x, chunks=2, axis=-1)
+        return F.silu(x) * y
+
+
 from paddlenlp.transformers.conversion_utils import (
     StateDictNameMapping,
     init_name_mappings,
@@ -228,10 +238,10 @@ class LlamaMLPAuto(nn.Layer):
 
     def forward(self, x):
         if self.fuse_attention_ffn:
-            gate_out, up_out = paddle.chunk(self.gate_up_fused_proj(x), chunks=2, axis=-1)
-            out = self.down_proj(F.silu(gate_out) * up_out)
+            x = swiglu(self.gate_up_fused_proj(x))
         else:
-            out = self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+            x = swiglu(self.gate_proj(x), self.up_proj(x))
+        out = self.down_proj(x)
         return out
 
 

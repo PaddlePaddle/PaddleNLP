@@ -547,16 +547,16 @@ def main():
 
     print("Final pre-training config:", config)
 
-    # Set the dtype for loading model
-    dtype = "float32"
-    if training_args.fp16_opt_level == "O2":
-        if training_args.fp16:
-            dtype = "float16"
-        if training_args.bf16:
-            dtype = "bfloat16"
+    # # Set the dtype for loading model
+    # dtype = "float32"
+    # if training_args.fp16_opt_level == "O2":
+    #     if training_args.fp16:
+    #         dtype = "float16"
+    #     if training_args.bf16:
+    #         dtype = "bfloat16"
 
     with paddle.LazyGuard():
-        model = model_class.from_config(config, dtype=dtype)
+        model = model_class.from_config(config, dtype="float32")
         criterion = criterion_class(config)
 
     for param in model.parameters():
