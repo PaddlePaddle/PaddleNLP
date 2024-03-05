@@ -1193,7 +1193,7 @@ class TrainingArguments:
                 if "enable_allreduce_avg_in_gradinent_scale" in data_parallel_config:
                     strategy.gradient_scale_using_allreduce_avg = True
                 if "gradient_sync_after_accumulate" in data_parallel_config:
-                    strategy.gradient_sync_after_accumulate = True
+                    strategy.dp_optimization.gradient_sync_after_accumulate = True
 
             # navie-pp: pipeline_parallel_degree > 1 and gradient_accumulation_steps == 1
             if self.pipeline_parallel_degree > 1:
