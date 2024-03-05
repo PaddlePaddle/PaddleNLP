@@ -16,6 +16,7 @@ param="model_item=CE_meta-llama-Llama-2-7b_pretrain "
 param+="run_mode=autotuner "
 param+="device_num=N4C32 "
 param+="global_batch_size=32 "
+param+="nnodes=4 "
 param+="model_type=llama2_7b "
 
 cd ./tests
