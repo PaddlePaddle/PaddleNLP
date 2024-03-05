@@ -198,8 +198,9 @@ class AutoTokenizer:
         init_class = init_kwargs.pop("init_class", None)
         if init_class is None:
             init_class = init_kwargs.pop("tokenizer_class", None)
-
         if init_class:
+            if "Fast" in init_class:
+                init_class = init_class.replace("Fast", "")
             class_name = cls._name_mapping[init_class]
             if init_class.endswith("FastTokenizer"):
                 import_class = import_module(f"paddlenlp.transformers.{class_name}.fast_tokenizer")
