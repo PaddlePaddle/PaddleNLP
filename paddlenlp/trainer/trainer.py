@@ -1031,7 +1031,11 @@ class Trainer:
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
                         scale_after = self.scaler._scale
-                        optimizer_was_run = not self.scaler._cache_founf_inf
+                        # Compatible with paddlepaddle 2.6.0 using typo word.
+                        if hasattr(self.scaler, "_cache_founf_inf"):
+                            optimizer_was_run = not self.scaler._cache_founf_inf
+                        else:
+                            optimizer_was_run = not self.scaler._cache_found_inf
                         if not optimizer_was_run:
                             scale_before_value = scale_before.cpu().numpy()
                             scale_after_value = scale_after.cpu().numpy()
