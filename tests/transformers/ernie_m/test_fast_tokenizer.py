@@ -44,7 +44,7 @@ def setup_inputs():
 
 @pytest.fixture
 def tokenizer_fast():
-    fast_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True)
+    fast_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True, from_slow=True)
     return fast_tokenizer
 
 
@@ -68,7 +68,6 @@ def test_tokenizer_cost(tokenizer_fast, setup_inputs):
     assert tokenizer_fast.decode(results[0]) == f"[CLS] {setup_inputs}[SEP]"
 
 
-def test_output_type(setup_inputs):
-    tokenizer_fast = AutoTokenizer.from_pretrained(temp_path)
+def test_output_type(setup_inputs, tokenizer_fast):
     isinstance(tokenizer_fast.encode(setup_inputs[0], return_tensors="pd")["input_ids"], paddle.Tensor)
     isinstance(tokenizer_fast.encode(setup_inputs[0], return_tensors="np")["input_ids"], np.ndarray)
