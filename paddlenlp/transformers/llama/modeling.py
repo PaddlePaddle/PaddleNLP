@@ -34,6 +34,15 @@ try:
 except ImportError:
     fused_rotary_position_embedding = None
 
+try:
+    from paddle.incubate.nn.functional import swiglu
+except ImportError:
+
+    def swiglu(x, y=None):
+        if y is None:
+            x, y = paddle.chunk(x, chunks=2, axis=-1)
+        return F.silu(x) * y
+
 
 from paddle.utils import try_import
 
@@ -47,6 +56,7 @@ from paddlenlp.transformers.model_outputs import (
 )
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.tools import get_env_device
 
 from ..segment_parallel_utils import ReshardLayer
 from ..sequence_parallel_utils import (
@@ -63,6 +73,14 @@ from .configuration import (
 )
 
 try:
+    if get_env_device() == "npu":
+        import os
+
+        from paddle.base import core
+
+        for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
+            if lib.endswith(".so"):
+                paddle.utils.cpp_extension.extension_utils.load_op_meta_info_and_register_op(lib)
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
@@ -209,13 +227,27 @@ def scaled_dot_product_attention(
             if alibi is not None:
                 alibi = alibi.reshape([bsz, num_heads, 1, -1])
                 attention_mask = attention_mask.cast(alibi.dtype) + alibi
-            attn_output = F.scaled_dot_product_attention(
-                query_states,
-                key_states,
-                value_states,
-                attn_mask=attention_mask,
-                is_causal=attention_mask is None,
-            )
+            if get_env_device() == "npu":
+                attn_output = core.eager._run_custom_op(
+                    "flash_attention_npu",
+                    query_states,
+                    key_states,
+                    value_states,
+                    None,
+                    attention_mask,
+                    0.0,
+                    attention_mask is None,
+                    True,
+                    False,
+                )[0]
+            else:
+                attn_output = F.scaled_dot_product_attention(
+                    query_states,
+                    key_states,
+                    value_states,
+                    attn_mask=attention_mask,
+                    is_causal=attention_mask is None,
+                )
             attn_weights = None
 
         if reshard_layer is not None:
@@ -316,7 +348,10 @@ def _make_causal_mask(input_ids_shape, past_key_values_length):
     """
     batch_size, target_length = input_ids_shape  # target_length: seq_len
 
-    mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
+    if get_env_device() == "npu":
+        mask = paddle.tril(paddle.ones((target_length, target_length))).astype("int32")
+    else:
+        mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
 
     if past_key_values_length > 0:
         # [tgt_len, tgt_len + past_len]
@@ -333,7 +368,10 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     batch_size, src_length = mask.shape[0], mask.shape[-1]
     tgt_length = tgt_length if tgt_length is not None else src_length
 
-    mask = mask[:, None, None, :].astype("bool")
+    if get_env_device() == "npu":
+        mask = mask[:, None, None, :].astype(dtype)
+    else:
+        mask = mask[:, None, None, :].astype("bool")
     mask.stop_gradient = True
     expanded_mask = mask.expand([batch_size, 1, tgt_length, src_length])
 
@@ -362,6 +400,8 @@ class LlamaRMSNorm(nn.Layer):
 
     def forward(self, hidden_states):
         if self.config.use_fused_rms_norm:
+            if get_env_device() == "npu":
+                return core.eager._run_custom_op("rms_norm_npu", hidden_states, self.weight, self.variance_epsilon)[0]
             return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
 
         if paddle.in_dynamic_mode():
@@ -568,10 +608,10 @@ class LlamaMLP(nn.Layer):
 
     def forward(self, x):
         if self.fuse_attention_ffn:
-            gate_out, up_out = paddle.chunk(self.gate_up_fused_proj(x), chunks=2, axis=-1)
-            out = self.down_proj(F.silu(gate_out) * up_out)
+            x = swiglu(self.gate_up_fused_proj(x))
         else:
-            out = self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+            x = swiglu(self.gate_proj(x), self.up_proj(x))
+        out = self.down_proj(x)
         return out
 
 
@@ -892,16 +932,44 @@ class LlamaAttention(nn.Layer):
                 position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
+                batch_size, seq_length, num_heads, head_dim = query_states.shape
+                _, kv_seq_len, num_key_value_heads, _ = key_states.shape
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-                query_states, key_states, _ = fused_rotary_position_embedding(
-                    query_states,
-                    key_states,
-                    v=None,
-                    sin=sin,
-                    cos=cos,
-                    position_ids=position_ids,
-                    use_neox_rotary_style=False,
-                )
+                if get_env_device() == "npu":
+                    query_states = core.eager._run_custom_op("fused_rope", query_states, cos, sin)[0]
+                    key_states = core.eager._run_custom_op("fused_rope", key_states, cos, sin)[0]
+                else:
+                    # paddle version > 2.6 or develop support q and k/v with different num_heads
+                    paddle_version = float(paddle.__version__[:3])
+                    if ((paddle_version != 0.0) and (paddle_version <= 2.6)) and (num_heads != num_key_value_heads):
+                        query_states, _, _ = fused_rotary_position_embedding(
+                            query_states,
+                            None,
+                            None,
+                            sin=sin,
+                            cos=cos,
+                            position_ids=position_ids,
+                            use_neox_rotary_style=False,
+                        )
+                        key_states, _, _ = fused_rotary_position_embedding(
+                            key_states,
+                            None,
+                            None,
+                            sin=sin,
+                            cos=cos,
+                            position_ids=position_ids,
+                            use_neox_rotary_style=False,
+                        )
+                    else:
+                        query_states, key_states, _ = fused_rotary_position_embedding(
+                            query_states,
+                            key_states,
+                            v=None,
+                            sin=sin,
+                            cos=cos,
+                            position_ids=position_ids,
+                            use_neox_rotary_style=False,
+                        )
             else:
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
@@ -920,8 +988,11 @@ class LlamaAttention(nn.Layer):
 
         # TODO(wj-Mcat): use broadcast strategy when n_kv_heads = 1
         # repeat k/v heads if n_kv_heads < n_heads
-        key_states = repeat_kv(key_states, self.num_key_value_groups)
-        value_states = repeat_kv(value_states, self.num_key_value_groups)
+        # paddle version > 2.6 or develop support flash-attn with gqa/mqa
+        paddle_version = float(paddle.__version__[:3])
+        if (paddle_version != 0.0) and (paddle_version <= 2.6):
+            key_states = repeat_kv(key_states, self.num_key_value_groups)
+            value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (
@@ -1292,6 +1363,9 @@ class LlamaModel(LlamaPretrainedModel):
                     combined_attention_mask = _make_causal_mask(
                         input_shape, past_key_values_length=past_key_values_length
                     )
+                    if get_env_device() == "npu":
+                        expanded_attn_mask = expanded_attn_mask.astype("bool")
+                        combined_attention_mask = combined_attention_mask.astype("bool")
                     expanded_attn_mask = expanded_attn_mask & combined_attention_mask
             # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
             elif len(attention_mask.shape) == 3:
@@ -1302,7 +1376,13 @@ class LlamaModel(LlamaPretrainedModel):
         else:
             expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
         # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
-        expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
+        if get_env_device() == "npu":
+            x = paddle.to_tensor(0.0, dtype="float16")
+            y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float16")
+            expanded_attn_mask = expanded_attn_mask.astype("float16")
+            expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
+        else:
+            expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
         return expanded_attn_mask
 
     @paddle.jit.not_to_static

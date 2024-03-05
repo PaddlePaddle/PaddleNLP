@@ -32,6 +32,16 @@ try:
 except ImportError:
     fused_rotary_position_embedding = None
 
+try:
+    from paddle.incubate.nn.functional import swiglu
+except ImportError:
+
+    def swiglu(x, y=None):
+        if y is None:
+            x, y = paddle.chunk(x, chunks=2, axis=-1)
+        return F.silu(x) * y
+
+
 from paddlenlp.transformers.conversion_utils import (
     StateDictNameMapping,
     init_name_mappings,
@@ -153,7 +163,8 @@ def scaled_dot_product_attention(
             )
 
         attn_weights = attn_weights + attention_mask
-        attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+        with paddle.amp.auto_cast(False):
+            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
@@ -177,10 +188,7 @@ class LlamaRMSNormAuto(nn.Layer):
         if self.config.use_fused_rms_norm:
             return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
 
-        if paddle.in_dynamic_mode():
-            variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
-            hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
-        else:
+        with paddle.amp.auto_cast(False):
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
             hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
 
@@ -230,10 +238,10 @@ class LlamaMLPAuto(nn.Layer):
 
     def forward(self, x):
         if self.fuse_attention_ffn:
-            gate_out, up_out = paddle.chunk(self.gate_up_fused_proj(x), chunks=2, axis=-1)
-            out = self.down_proj(F.silu(gate_out) * up_out)
+            x = swiglu(self.gate_up_fused_proj(x))
         else:
-            out = self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+            x = swiglu(self.gate_proj(x), self.up_proj(x))
+        out = self.down_proj(x)
         return out
 
 
@@ -1050,20 +1058,21 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
         masked_lm_labels = dist.reshard(masked_lm_labels, get_mesh(-1), [dist.Replicate(), dist.Replicate()])
 
         # Force entropy same kernel
-        if isinstance(prediction_scores, paddle.Tensor):
-            masked_lm_loss = self.loss_func(
-                prediction_scores.astype("float32")._use_gpudnn(False),
-                masked_lm_labels.unsqueeze(2),
-            )
-        else:
+        with paddle.amp.auto_cast(False):
+            if isinstance(prediction_scores, paddle.Tensor):
+                masked_lm_loss = self.loss_func(
+                    prediction_scores.astype("float32")._use_gpudnn(False),
+                    masked_lm_labels.unsqueeze(2),
+                )
+            else:
 
-            masked_lm_loss = self.loss_func(
-                prediction_scores.astype("float32"),
-                masked_lm_labels.unsqueeze(2),
-            )
+                masked_lm_loss = self.loss_func(
+                    prediction_scores.astype("float32"),
+                    masked_lm_labels.unsqueeze(2),
+                )
 
-        masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
-        loss = paddle.mean(masked_lm_loss)
+            masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
+            loss = paddle.mean(masked_lm_loss)
         return loss
 
 

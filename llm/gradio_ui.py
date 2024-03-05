@@ -109,7 +109,6 @@ def launch(args, default_params: dict = {}):
 
         data = {
             "context": utterance,
-            "history": json.dumps(context),
             "top_k": top_k,
             "top_p": top_p,
             "temperature": temperature,
@@ -118,6 +117,9 @@ def launch(args, default_params: dict = {}):
             "src_length": src_length,
             "min_length": 1,
         }
+        if len(context) > 2:
+            data["history"] = json.dumps(context[:-2])
+
         res = requests.post(f"http://0.0.0.0:{args.flask_port}/api/chat", json=data, stream=True)
         for index, line in enumerate(res.iter_lines()):
             result = json.loads(line)
