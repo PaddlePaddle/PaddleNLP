@@ -104,22 +104,6 @@ def get_file(
     log_endpoint = "N/A"
     # log_filename = os.path.join(download_kwargs["subfolder"], filename)
 
-    # 增加 modelscope 下载的选项
-    from_modelscope = strtobool(os.environ.get("from_modelscope", False))
-    if from_modelscope:
-        for index, filename in enumerate(filenames):
-            try:
-                from modelscope.hub.file_download import (
-                    model_file_download as modelscope_download,
-                )
-
-                return modelscope_download(repo_id, filename, revision, cache_dir, user_agent, local_files_only)
-            except Exception:
-                if index < len(filenames) - 1:
-                    continue
-                else:
-                    raise FileNotFoundError(f"please make sure one of the {filenames} under the repo {repo_id}")
-
     # return file path from local file, eg: /cache/path/model_config.json
     if os.path.isfile(repo_id):
         return repo_id
@@ -143,6 +127,8 @@ def get_file(
         if cache_file_name is not None and not isinstance(cache_file_name, object):
             return cache_file_name
 
+    from_modelscope = strtobool(os.environ.get("from_modelscope", False))
+
     # download file from different origins
     try:
         if filenames[0].startswith("http://") or filenames[0].startswith("https://"):
@@ -157,6 +143,21 @@ def get_file(
                 **download_kwargs,
             )
             return cached_file
+
+        elif from_modelscope:
+            for index, filename in enumerate(filenames):
+                try:
+                    from modelscope.hub.file_download import (
+                        model_file_download as modelscope_download,
+                    )
+
+                    return modelscope_download(repo_id, filename, revision, cache_dir, user_agent, local_files_only)
+                except Exception:
+                    if index < len(filenames) - 1:
+                        continue
+                    else:
+                        print(f"please make sure one of the {filenames} under the repo {repo_id}")
+                        return None
 
         elif from_aistudio:
             log_endpoint = "Aistudio Hub"
