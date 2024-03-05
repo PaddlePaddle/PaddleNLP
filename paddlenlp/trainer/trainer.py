@@ -1968,7 +1968,17 @@ class Trainer:
         outputs = model(**inputs)
 
         if self.criterion is not None:
-            loss = self.criterion(outputs, labels)
+
+            def to_list(value):
+                if value is None:
+                    return value
+                if isinstance(value, (list, tuple)):
+                    return list(value)
+                return [value]
+
+            criterion_inputs = to_list(outputs)
+            criterion_labels = to_list(labels)
+            loss = self.criterion(*(criterion_inputs + criterion_labels))
             outputs = (loss, outputs)
 
         # Save past state if it exists
