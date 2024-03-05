@@ -13,3 +13,4 @@ h5py
 deploy
 ray
 loguru
+data
