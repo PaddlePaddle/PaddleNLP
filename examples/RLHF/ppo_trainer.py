@@ -17,6 +17,7 @@ import inspect
 import itertools
 import math
 import os
+import sys
 import time
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -550,11 +551,88 @@ def data_group_merge(tensors, group):
     elif isinstance(tensors, paddle.Tensor):
         tensor_list = []
         print("Mergeing ", tensors)
-        paddle.distributed.all_gather(tensor_list, tensors, group=group)
+        # paddle.distributed.all_gather(tensor_list, tensors, group=group)
+        all_gather_nd(tensor_list, tensors, group=group)
         return paddle.concat(tensor_list)
     else:
         logger.warning(f"Can't parse for type {type(tensors)}")
         return tensors
+
+
+# https://stackoverflow.com/questions/12594148/skipping-execution-of-with-block
+class SkipWithBlock(Exception):
+    pass
+
+
+class SkipContextManager:
+    def __init__(self, skip):
+        self.skip = skip
+
+    def __enter__(self):
+        if self.skip:
+            sys.settrace(lambda *args, **keys: None)
+            frame = sys._getframe(1)
+            frame.f_trace = self.trace
+
+    def trace(self, frame, event, arg):
+        raise SkipWithBlock()
+
+    def __exit__(self, type, value, traceback):
+        if type is None:
+            return  # No exception
+        if issubclass(type, SkipWithBlock):
+            return True  # Suppress special SkipWithBlock exception
+
+
+# with SkipContextManager(skip=True):
+#     print('In the with block')  # Won't be called
+# print('Out of the with block')
+
+# with SkipContextManager(skip=tp_group.rank!=0):
+#     print('In the with block')  # Won't be called
+# dist.barrier()
+
+
+def all_gather_nd(tensor_list, tensor, group=None):
+    """
+    Gathers tensor arrays of different lengths in a list.
+    The length dimension is 0. This supports any number of extra dimensions in the tensors.
+    All the other dimensions should be equal between the tensors.
+
+    Args:
+        tensor (Tensor): Tensor to be broadcast from current process.
+
+    Returns:
+        (Tensor): output list of tensors that can be of different sizes
+    """
+    world_size = group.nranks
+    local_size = paddle.to_tensor(tensor.shape, place=tensor.place)
+    all_sizes = [paddle.zeros_like(local_size) for _ in range(world_size)]
+    dist.all_gather(all_sizes, local_size, group=group)
+
+    # max_length = max(size[0] for size in all_sizes)
+
+    # length_diff = max_length.item() - local_size[0].item()
+    # if length_diff:
+    #     pad_size = (length_diff, *tensor.size()[1:])
+    #     padding = paddle.zeros(pad_size, place=tensor.place(), dtype=tensor.dtype)
+    #     tensor = padle.concat((tensor, padding))
+
+    max_length = max(size[-1] for size in all_sizes)
+
+    length_diff = max_length.item() - local_size[-1].item()
+    if length_diff:
+        pad_size = (*tensor.shape[:-1], length_diff)
+        padding = paddle.zeros(pad_size, dtype=tensor.dtype)
+        tensor = paddle.concat([tensor, padding], axis=-1)
+
+    all_tensors_padded = []
+    dist.all_gather(all_tensors_padded, tensor, group=group)
+    # all_tensors = []
+    for tensor_, size in zip(all_tensors_padded, all_sizes):
+        pass
+        tensor_list.append(tensor_[..., : size[-1]])
+    return tensor_list
 
 
 def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
