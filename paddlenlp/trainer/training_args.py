@@ -763,10 +763,6 @@ class TrainingArguments:
         default=False,
         metadata={"help": "whether to run distributed training in auto parallel mode"},
     )
-    dp_gradient_sync_after_accumulate: Optional[bool] = field(
-        default=False,
-        metadata={"help": "Whether to sync gradient after gradient merge"},
-    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -1214,7 +1210,6 @@ class TrainingArguments:
                 gradient_merge.enable = True
                 gradient_merge.k_steps = self.gradient_accumulation_steps
                 gradient_merge.avg = True
-                gradient_merge.dp_gradient_sync_after_accumulate = self.dp_gradient_sync_after_accumulate
 
             if self.tensor_parallel_degree > 1:
                 mp_optimization = strategy.mp_optimization
