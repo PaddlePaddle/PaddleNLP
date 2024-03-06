@@ -446,7 +446,7 @@ class BackboneMixin:
 _re_layer_prefix = re.compile(r"\.(\d+)\.")
 
 
-def _partion_for_pipeline_mode(keys):
+def _partition_for_pipeline_mode(keys):
     # the keys should be sort in networks order
     # TODO maybe handle tie_weight ?
     def layer_prefix(key):
@@ -458,19 +458,19 @@ def _partion_for_pipeline_mode(keys):
     keys = list(keys)
     start_idx = -1
     prefix_str = None
-    parttion_map = {}
+    partition_map = {}
     for k in keys:
         prefix = layer_prefix(k)
         if prefix != prefix_str:
             prefix_str = prefix
             start_idx += 1
-        parttion_map[k] = start_idx
+        partition_map[k] = start_idx
 
-    # if only one parttion, we don't parttion it
+    # if only one partition, we don't partition it
     if start_idx < 1:
         return {keys[i]: i for i in range(len(keys))}
 
-    return parttion_map
+    return partition_map
 
 
 def shard_checkpoint(
@@ -490,7 +490,7 @@ def shard_checkpoint(
 
     <Tip warning={true}>
 
-    If one of the model's weight is bigger that `max_sahrd_size`, it will end up in its own sub-checkpoint which will
+    If one of the model's weight is bigger that `max_shard_size`, it will end up in its own sub-checkpoint which will
     have a size greater than `max_shard_size`.
 
     </Tip>
@@ -537,11 +537,11 @@ def shard_checkpoint(
         sharded_state_dicts.append(current_block)
 
     if shard_format == "pipeline":
-        parttion_map = _partion_for_pipeline_mode(state_dict.keys())
-        partition_num = max(parttion_map.values())
+        partition_map = _partition_for_pipeline_mode(state_dict.keys())
+        partition_num = max(partition_map.values())
 
         for index in range(partition_num + 1):
-            weight_names = [k for k, v in parttion_map.items() if v == index]
+            weight_names = [k for k, v in partition_map.items() if v == index]
             weight_size = sum(
                 state_dict[key].numel().item() * dtype_byte_size(state_dict[key].dtype) for key in weight_names
             )
@@ -741,7 +741,7 @@ def _convert_state_dict_dtype_and_shape(state_dict, model_to_load):
         if key in state_dict:
             if isinstance(state_dict[key], np.ndarray):
                 raise ValueError(
-                    "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, plase convert numpy.ndarray to paddle.Tensor"
+                    "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, please convert numpy.ndarray to paddle.Tensor"
                 )
             # confirm parameter cast is executed on the same device as model
             # TODO: cast(FP32 -> FP16) has diff on different devices, need to fix it
@@ -1162,7 +1162,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         output_embeddings.bias.set_value(new_bias)
 
     def resize_position_embeddings(self, new_num_position_embeddings: int):
-        """resize position embedding, this method should be overrited overwrited by downstream models
+        """resize position embedding, this method should be overwritten by downstream models
 
         Args:
             new_num_position_embeddings (int): the new position size
@@ -1443,7 +1443,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             return the weight file
 
         2. when it is model-name:
-            2.1 check default `MODEL_HOME` + `model-mame` + model_state.pdparams
+            2.1 check default `MODEL_HOME` + `model-name` + model_state.pdparams
             2.2 get the url from `pretrained_resource_files_map`, and set it to `pretrained_model_name_or_path`
 
         3. when it is local dir:
@@ -1853,7 +1853,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             return mismatched_keys
 
         if state_dict is not None:
-            # DONT Hold tensor parallel here, only hold afer load state dict.
+            # DONT Hold tensor parallel here, only hold after load state dict.
             # Whole checkpoint
             # For model parallel if FastGeneration
             # To avoid recursive import temporarily.
@@ -1920,7 +1920,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         dtype,
                     )
 
-                # Mistmatched keys contains tuples key/shape1/shape2 of weights in the checkpoint that have a shape not
+                # Mismatched keys contains tuples key/shape1/shape2 of weights in the checkpoint that have a shape not
                 # matching the weights in the model.
                 mismatched_keys += _find_mismatched_keys(
                     state_dict,
@@ -2042,7 +2042,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 initialization. If the keyword is in `__init__` argument names of
                 base model, update argument values of the base model; else update
                 argument values of derived model.
-            load_state_as_np (bool, optional): The weights read in can be choosed
+            load_state_as_np (bool, optional): The weights read in can be chosen
                 to place on CPU or GPU though the model is on the default device.
                 If `True`, load the model weights as `numpy.ndarray` on CPU.
                 Otherwise, weights would be loaded as tensors on the default
@@ -2093,14 +2093,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         model_kwargs = kwargs
 
-        # from_hf_hub defalut enable convert_from_torch
+        # from_hf_hub default enable convert_from_torch
         if from_hf_hub and convert_from_torch is None:
             logger.warning(
                 "If you are attempting to load weights from Hugging Face Hub and want to disable the default behavior of considering torch weights,"
                 " you can set ·convert_from_torch=False·. By default, `convert_from_torch` is set to `True`. "
             )
             convert_from_torch = True
-        # convert_from_torch defalut is False
+        # convert_from_torch default is False
         if convert_from_torch is None:
             convert_from_torch = False
 
