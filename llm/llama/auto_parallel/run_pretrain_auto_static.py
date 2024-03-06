@@ -547,7 +547,7 @@ def main():
     #     if training_args.bf16:
     #         dtype = "bfloat16"
 
-    model = model_class._from_config(config)
+    model = model_class._from_config(config, dtype="float32")
 
     if training_args.recompute:
 
