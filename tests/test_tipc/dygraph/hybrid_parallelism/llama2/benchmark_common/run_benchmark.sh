@@ -67,7 +67,7 @@ function _train(){
 
     echo "current CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}, model_name=${model_name}, device_num=${device_num}, is profiling=${profiling}"
 
-    if [ ${profiling} = "true" ];then
+    if [ ${profiling} == "true" ];then
         add_options="--profiler_options=\"batch_range=[10,20];state=GPU;tracer_option=Default;profile_path=model.profile\""
         log_file=${profiling_log_file}
     else
@@ -80,7 +80,7 @@ function _train(){
     #     export CUDA_DEVICE_MAX_CONNECTIONS=1
     # fi
 
-    if [ ${run_mode} ~= "autotuner" ]; then
+    if [ ${run_mode} == "autotuner" ]; then
         autoconfig_args="--auto_tuner_json ./auto_config_${MODEL_TYPE}/${MODEL_TYPE}_pretrain_autoconfig.json"
     else
         # todo 新建并使用autotuner获取的top1参数配置文件 llama2_7b_pretrain_top.json
