@@ -2280,6 +2280,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     from_hf_hub=from_hf_hub,
                     from_aistudio=from_aistudio,
                     subfolder=subfolder,
+                    from_aistudio=from_aistudio,
                     **kwargs,
                 )
             except OSError:
