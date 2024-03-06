@@ -1,4 +1,4 @@
-paddlepaddle==2.5.0rc1
+paddlepaddle==2.5.1
 paddleocr<2.7
 pre-commit
 pytest
@@ -6,6 +6,7 @@ parameterized
 pytest-cov
 regex
 pytest-xdist
+pytest-timeout
 fast_tokenizer_python
 emoji
 ftfy
@@ -15,3 +16,7 @@ soundfile
 librosa
 numpy==1.23.5
 rouge
+tiktoken
+visualdl
+wandb
+tensorboard

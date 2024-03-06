@@ -37,7 +37,7 @@ function _set_params(){
     base_batch_size=$global_batch_size
     use_recompute=${11:-"False"}    # (可选)是否打开recompute
     verbose=${12:-"3"}         # (可选)是否打印性能数据
-    logging_freq=${13:-"100000"} # (可选)loss打印频率
+    logging_freq=${13:-"1"} # (可选)loss打印频率
     sharding_degree=${14:-"1"}      # (可选)
     sharding_stage=${15:-"1"}       # (可选)sharding case
     
@@ -122,12 +122,13 @@ function _train(){
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
             tools/auto.py -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_1.3B_dp8.yaml \
             ${train_cmd}"
-        workerlog_id_1=4
-        workerlog_id_2=6
+        workerlog_id_1=3
+        workerlog_id_2=7
         ;;
     *) echo "choose run_mode "; exit 1;
     esac
     cd ../
+    unset CUDA_MODULE_LOADING # fleet executor + CUDA_MODULE_LOADING=LAZY 容易hang
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间
         ${train_cmd} > ${log_file} 2>&1
@@ -148,8 +149,8 @@ function _train(){
 }
 
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
-unset CUDA_MODULE_LOADING # fleet executor + CUDA_MODULE_LOADING=LAZY 容易hang
-
+sed -i "s/100:/1:/g" ${BENCHMARK_ROOT}/scripts/analysis.py 
+sed -i "s/100)/1)/g" ${BENCHMARK_ROOT}/scripts/analysis.py 
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@
 #_train       # 如果只产出训练log,不解析,可取消注释

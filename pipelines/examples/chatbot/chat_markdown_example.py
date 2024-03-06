@@ -49,6 +49,7 @@ parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'n
 parser.add_argument('--title_split', default=False, type=bool, help='the markdown file is split by titles')
 parser.add_argument("--api_key", default=None, type=str, help="The API Key.")
 parser.add_argument("--secret_key", default=None, type=str, help="The secret key.")
+parser.add_argument('--indexing', default=False, type=bool, help='Whether indexing is enabled.')
 args = parser.parse_args()
 # yapf: enable
 
@@ -97,13 +98,15 @@ def chat_markdown_tutorial():
         text_splitter = CharacterTextSplitter(
             separator="\n", chunk_size=args.chunk_size, chunk_overlap=0, filters=["\n"]
         )
-    indexing_pipeline = Pipeline()
-    indexing_pipeline.add_node(component=markdown_converter, name="MarkdownConverter", inputs=["File"])
-    indexing_pipeline.add_node(component=text_splitter, name="Splitter", inputs=["MarkdownConverter"])
-    indexing_pipeline.add_node(component=retriever, name="Retriever", inputs=["Splitter"])
-    indexing_pipeline.add_node(component=document_store, name="DocumentStore", inputs=["Retriever"])
-    files = glob.glob(args.file_paths + "/**/*.md", recursive=True)
-    indexing_pipeline.run(file_paths=files)
+
+    if args.indexing:
+        indexing_pipeline = Pipeline()
+        indexing_pipeline.add_node(component=markdown_converter, name="MarkdownConverter", inputs=["File"])
+        indexing_pipeline.add_node(component=text_splitter, name="Splitter", inputs=["MarkdownConverter"])
+        indexing_pipeline.add_node(component=retriever, name="Retriever", inputs=["Splitter"])
+        indexing_pipeline.add_node(component=document_store, name="DocumentStore", inputs=["Retriever"])
+        files = glob.glob(args.file_paths + "/**/*.md", recursive=True)
+        indexing_pipeline.run(file_paths=files)
 
     # Query Markdowns
     ernie_bot = ErnieBot(api_key=args.api_key, secret_key=args.secret_key)

@@ -78,6 +78,9 @@ def main():
     if "llama" in model_args.model_name_or_path:
         tokenizer = LlamaTokenizer.from_pretrained(model_args.model_name_or_path, use_fast=False)
         tokenizer.pad_token_id = 0
+    elif model_args.model_name_or_path in ["cerebras/Cerebras-GPT-13B", "stanford-crfm/levanter-gpt2-7B"]:
+        tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, use_fast=False)
+        tokenizer.pad_token_id = 0
     else:
         tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
 
@@ -121,6 +124,11 @@ def main():
                     bnb_4bit_quant_type=model_args.quant_type,
                 ),
             )
+        elif model_args.model_name_or_path in ["cerebras/Cerebras-GPT-13B", "stanford-crfm/levanter-gpt2-7B"]:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_args.model_name_or_path,
+                torch_dtype=torch.float16,
+            )
         else:
             model = AutoModelForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
@@ -129,6 +137,13 @@ def main():
     if model_args.lora:
         if "llama" in model_args.model_name_or_path:
             target_modules = ["q_proj", "k_proj", "v_proj"]
+        elif model_args.model_name_or_path in ["cerebras/Cerebras-GPT-13B", "stanford-crfm/levanter-gpt2-7B"]:
+            target_modules = [
+                ".*c_attn.*",
+                ".*q_attn.*",
+                ".*c_proj.*",
+                ".*c_fc.*",
+            ]
         else:
             target_modules = ["query_key_value"]
         peft_config = LoraConfig(

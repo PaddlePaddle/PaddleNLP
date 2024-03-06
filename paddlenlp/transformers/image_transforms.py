@@ -127,7 +127,7 @@ def to_pil_image(
 
     # Convert all tensors to numpy arrays before converting to PIL image
     if is_paddle_tensor(image):
-        image = image.numpy()
+        image = image.cpu().numpy()
     elif not isinstance(image, np.ndarray):
         raise ValueError("Input image type not supported: {}".format(type(image)))
 

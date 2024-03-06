@@ -58,6 +58,10 @@ class AutoTokenizerTest(unittest.TestCase):
             self.assertIsInstance(t1, paddlenlp.transformers.BertTokenizer)
         self.assertIsInstance(t2, paddlenlp.transformers.BertTokenizer)
 
+    def test_from_aistudio(self):
+        tokenizer = AutoTokenizer.from_pretrained("PaddleNLP/tiny-random-bert", from_aistudio=True)
+        self.assertIsInstance(tokenizer, paddlenlp.transformers.BertTokenizer)
+
     def test_from_pretrained_cache_dir(self):
         model_name = "__internal_testing__/tiny-random-bert"
         with tempfile.TemporaryDirectory() as tempdir:

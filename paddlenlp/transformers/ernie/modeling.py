@@ -19,7 +19,9 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
-from paddle.fluid.dygraph.base import in_declarative_mode
+
+# TODO(guosheng): update this workaround import for in_declarative_mode
+from paddle.nn.layer.layers import in_declarative_mode
 
 from ...layers import Linear as TransposedLinear
 from ...utils.env import CONFIG_NAME
@@ -186,7 +188,7 @@ class ErnieModel(ErniePretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:

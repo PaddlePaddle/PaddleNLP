@@ -71,7 +71,7 @@ class ErnieRanker(BaseRanker):
 
         self.devices, _ = initialize_device_settings(use_cuda=use_gpu, multi_gpu=True)
 
-        print("Loading Parameters from:{}".format(model_name_or_path))
+        logger.info("Loading Parameters from:{}".format(model_name_or_path))
         self.embed_title = embed_title
         self.progress_bar = progress_bar
         self.batch_size = batch_size

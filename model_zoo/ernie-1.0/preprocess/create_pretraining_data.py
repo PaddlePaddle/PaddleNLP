@@ -25,6 +25,7 @@ from tqdm import tqdm
 
 import paddlenlp.transformers as tfs
 from paddlenlp.data import indexed_dataset
+from paddlenlp.utils.log import logger
 
 try:
     import nltk
@@ -103,6 +104,9 @@ def get_args():
     group.add_argument("--log_interval", type=int, default=100, help="Interval between progress updates")
     group.add_argument("--workers", type=int, default=1, help="Number of worker processes to launch")
     group.add_argument("--max_doc_num", type=int, default=sys.maxsize, help="Number of worker processes to launch")
+    group.add_argument(
+        "--max_repeated_len", type=int, default=100, help="The maximum length of the repeated characters to keep"
+    )
 
     args = parser.parse_args()
     return args
@@ -277,8 +281,24 @@ class Converter(object):
 
         Converter.process = process
 
+    def remove_repeated_chars(text, max_repeated_len=100):
+        """
+        Removes repeated characters from the given text, where the length of
+        the repeated characters is greater than or equal to the specified length.
+
+        Args:
+            text (str): The input text from which to remove repeated characters.
+            length (int, optional): The minimum length of the repeated characters. Defaults to 15.
+
+        Returns:
+            str: The modified text with the repeated characters removed.
+        """
+        pattern = r"(.)\1{" + str(max_repeated_len) + ",}"
+        return re.sub(pattern, r"\1", text)
+
     def encode(self, json_line):
         text = json.loads(json_line)[self.args.json_key]
+        text = Converter.remove_repeated_chars(text, self.args.max_repeated_len)
         doc_ids = []
         for sentence in Converter.splitter.tokenize(text):
             sentence_ids = Converter.process(sentence.strip())
@@ -286,7 +306,14 @@ class Converter(object):
                 doc_ids.append(sentence_ids)
 
         if len(doc_ids) > 0 and self.args.append_eos:
-            doc_ids[-1].append(Converter.tokenizer.eos_token_id)
+            if Converter.tokenizer.eos_token_id is None:
+                logger.warning(
+                    "{}: eos_token_id is not set, ".format(self.args.tokenizer_name)
+                    + "please set other tokenizer "
+                    + "or config eos_token_id or unset append_eos."
+                )
+            else:
+                doc_ids[-1].append(Converter.tokenizer.eos_token_id)
 
         return doc_ids, len(text.encode("utf-8"))
 

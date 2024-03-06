@@ -405,7 +405,6 @@ class DataCollatorForSeq2Seq:
             return_tensors=return_tensors,
             return_attention_mask=self.return_attention_mask,
         )
-
         # prepare decoder_input_ids
         if (
             labels is not None
@@ -493,7 +492,7 @@ def tolist(x):
     if isinstance(x, list):
         return x
     elif hasattr(x, "numpy"):  # Checks for TF tensors without needing the import
-        x = x.numpy()
+        x = x.cpu().numpy()
     return x.tolist()
 
 

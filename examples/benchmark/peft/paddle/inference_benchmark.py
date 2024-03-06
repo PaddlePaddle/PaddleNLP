@@ -67,8 +67,6 @@ if __name__ == "__main__":
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name_or_path,
-        load_state_as_np=True,
-        low_cpu_mem_usage=True,
     )
     if model.base_model_prefix == "llama":
         tokenizer.pad_token = tokenizer.unk_token

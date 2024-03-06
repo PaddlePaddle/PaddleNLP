@@ -142,7 +142,8 @@ def scaled_dot_product_attention(
     query_states, key_states, value_states, attention_mask, output_attentions, config, is_causal=True
 ):
 
-    bsz, q_len, num_heads, head_dim = query_states.shape
+    bsz, q_len, num_heads, _ = paddle.shape(query_states)
+    head_dim = config.hidden_size // config.num_attention_heads
     _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention is not None:
@@ -251,7 +252,12 @@ class FusedLayerNorm(nn.Layer):
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(1.0),
         )
-        self.bias = paddle.create_parameter(shape=[self.hidden_size], dtype=paddle.get_default_dtype(), is_bias=True)
+        self.bias = paddle.create_parameter(
+            shape=[self.hidden_size],
+            dtype=paddle.get_default_dtype(),
+            is_bias=True,
+            default_initializer=nn.initializer.Constant(0.0),
+        )
         self.variance_epsilon = config.layer_norm_eps
 
     def forward(self, hidden_states):
@@ -332,6 +338,8 @@ class RotaryEmbedding(nn.Layer):
         # q_embed = (q * cos) + (rotate_half(q) * sin)
         # k_embed = (k * cos) + (rotate_half(k) * sin)
 
+        cos = paddle.cast(cos, q.dtype)
+        sin = paddle.cast(sin, q.dtype)
         q_embed = paddle.add(paddle.multiply(q, cos), paddle.multiply(cls.rotate_half(q), sin))
         k_embed = paddle.add(paddle.multiply(k, cos), paddle.multiply(cls.rotate_half(k), sin))
         return q_embed, k_embed
@@ -538,7 +546,7 @@ class Ernie35Attention(nn.Layer):
                 attention_mask,
                 position_ids,
                 output_attentions,
-                use_reentrant=False,
+                use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
             attn_output, attn_weights, past_key_value = _rope_attn(

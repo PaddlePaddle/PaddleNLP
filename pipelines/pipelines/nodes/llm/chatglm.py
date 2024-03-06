@@ -50,12 +50,14 @@ class ChatGLMBot(BaseComponent):
         result = self.chatglm(query)
         return result
 
-    def run(self, query, stream=False):
+    def run(self, query, stream=False, **kwargs):
         """
         Using the chatbot to generate the answers
         :param query: The user's input/query to be sent to the chatGLM.
         :param stream: Whether to use streaming mode when making the request. Currently not in use. Defaults to False.
         """
-        logger.info(query)
+        debug = kwargs.get("debug", False)
+        if debug:
+            logger.debug(f"Query: {query}")
         result = self.predict(query=query, stream=stream)
         return result, "output_1"

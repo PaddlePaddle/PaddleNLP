@@ -22,7 +22,7 @@ from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients_with_group,
 )
-from paddle.fluid import core
+from paddle.framework import core
 from paddle.nn import functional as F
 from paddle.nn.layer.layers import Layer
 
@@ -65,7 +65,9 @@ def all_gather(input):
     output_shape = input.shape
     output_shape[0] = output_shape[0] * parallelism
     output = paddle.empty(shape=output_shape, dtype=input.dtype)
-    group.process_group.all_gather(input, output).wait()
+    # sync between calc_stream and comm_stream will increase execution time
+    # thus use_calc_stream=False
+    dist.stream.all_gather(output, input, group=group, sync_op=True, use_calc_stream=False)
     return output
 
 
@@ -306,9 +308,9 @@ class ColumnSequenceParallelLinear(Layer):
                     "Please set fuse_matmul_bias=False or use paddle compiled "
                     "with cuda 11.6 or higher."
                 )
-                from paddle.incubate.nn.functional import fused_linear
+            from paddle.incubate.nn.functional import fused_linear
 
-                self.linear = fused_linear
+            self.linear = fused_linear
 
     def forward(self, x):
         # sequence parallelism is same as model parallelism

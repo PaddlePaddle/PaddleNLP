@@ -26,7 +26,6 @@ from paddle.distributed.fleet.meta_parallel import (
     SharedLayerDesc,
     get_rng_state_tracker,
 )
-from paddle.fluid import layers
 from paddle.incubate.distributed.models import moe
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
@@ -217,12 +216,8 @@ class MultiHeadAttention(nn.Layer):
             k, v = self.compute_kv(key, value)
             return self.StaticCache(k, v)
         elif value is None:  # incremental_state
-            k = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_heads, 0, self.head_dim], dtype=key.dtype, value=0
-            )
-            v = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_heads, 0, self.head_dim], dtype=key.dtype, value=0
-            )
+            k = paddle.full(shape=[key.shape[0], self.num_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0)
+            v = paddle.full(shape=[key.shape[0], self.num_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0)
             return self.Cache(k, v)
         else:
             # incremental_state with initial value, mainly for usage like UniLM

@@ -28,7 +28,7 @@
 #ifdef HOST
 #undef HOST
 #endif
-#include "fastertransformer/cuda/cub/cub.cuh"
+
 #include "fastertransformer/gpt.h"
 #include "fastertransformer/utils/common.h"
 

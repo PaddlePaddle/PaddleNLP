@@ -114,6 +114,7 @@ def _expand_2d_mask(mask: Tensor, tgt_length: int) -> Tensor:
     batch_size, src_length = mask.shape[0], mask.shape[-1]
     tgt_length = tgt_length if tgt_length is not None else src_length
 
+    mask.stop_gradient = True
     return mask.unsqueeze(axis=[1, 2]).expand([batch_size, 1, tgt_length, src_length])
 
 
@@ -136,7 +137,7 @@ def build_alibi_tensor(attention_mask: Tensor, num_heads: int, dtype) -> Tensor:
     """
     # _, seq_length = attention_mask.shape[0], attention_mask.shape[-1]
     closest_power_of_2 = 2 ** math.floor(math.log2(num_heads))
-    base = paddle.to_tensor(2 ** (-(2 ** -(math.log2(closest_power_of_2) - 3))), dtype=paddle.float32)
+    base = paddle.full([], 2 ** (-(2 ** -(math.log2(closest_power_of_2) - 3))), dtype=paddle.float32)
     powers = paddle.arange(1, 1 + closest_power_of_2, dtype=paddle.float32)
     slopes = paddle.pow(base, powers)
 
@@ -378,74 +379,105 @@ class BloomAttention(nn.Layer):
 
         batch_size, q_length, _, _ = query_layer.shape
 
-        query_layer = query_layer.transpose([0, 2, 1, 3]).reshape(
-            [batch_size * self.num_heads, q_length, self.head_dim]
-        )
-        key_layer = key_layer.transpose([0, 2, 3, 1]).reshape([batch_size * self.num_heads, self.head_dim, q_length])
-        value_layer = value_layer.transpose([0, 2, 1, 3]).reshape(
-            [batch_size * self.num_heads, q_length, self.head_dim]
-        )
         if layer_past is not None:
             past_key, past_value = layer_past
             # concatenate along seq_length dimension:
-            #  - key: [batch_size * self.num_heads, head_dim, kv_length]
-            #  - value: [batch_size * self.num_heads, kv_length, head_dim]
-            key_layer = paddle.concat((past_key, key_layer), axis=2)
+            #  - key: [batch_size, kv_length, self.num_heads, head_dim]
+            #  - value: [batch_size, kv_length, self.num_heads, head_dim]
+            key_layer = paddle.concat((past_key, key_layer), axis=1)
             value_layer = paddle.concat((past_value, value_layer), axis=1)
-
-        _, _, kv_length = key_layer.shape
 
         if use_cache is True:
             present = (key_layer, value_layer)
         else:
             present = None
 
-        # [batch_size * num_heads, q_length, kv_length]
-        # we use `Tensor.baddbmm` instead of `paddle.baddbmm` as the latter isn't supported by TorchScript v1.11
-        attention_scores = baddbmm(
-            alibi, batch1=query_layer, batch2=key_layer, beta=self.beta, alpha=self.inv_norm_factor
-        )
+        version = paddle.version.full_version
+        version_check = True
+        if self.config.use_flash_attention and version != "0.0.0" and version <= "2.5.2":
+            logger.warning(
+                "PaddlePaddle version 2.5.3 or higher is required, please upgrade your PaddlePaddle to 2.5.3 or other higher version."
+            )
+            version_check = False
+        if self.config.use_flash_attention and version_check:
+            query_states, key_states, value_states = query_layer, key_layer, value_layer
 
-        # change view to [batch_size, num_heads, q_length, kv_length]
-        # attention_scores = matmul_result.reshape([batch_size, self.num_heads, q_length, kv_length])
+            attention_mask = attention_mask.cast(alibi.dtype) + alibi
+            attention_mask = attention_mask.reshape(
+                [query_states.shape[0], -1, attention_mask.shape[-2], attention_mask.shape[-1]]
+            )
+            attn_output = F.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=attention_mask,
+                dropout_p=self.config.attention_dropout,
+                training=self.training,
+                is_causal=False,
+            )
+            attn_weights = None
+            # [batch_size, seq_len, num_heads, head_dim] = > [batch_size, seq_len, hidden_size]
+            attn_output = attn_output.reshape([attn_output.shape[0], attn_output.shape[1], -1])
+            output_tensor = self.dense(attn_output)
 
-        # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
-        input_dtype = query_layer.dtype
-        # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
-        if input_dtype != paddle.float32:
-            attention_scores = paddle.cast(attention_scores, paddle.float32)
-            attn_weights = attention_scores + attention_mask
-            attention_probs = paddle.cast(F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype)
         else:
-            attn_weights = attention_scores + attention_mask
-            attention_probs = F.softmax(attn_weights, axis=-1)
+            query_layer = query_layer.transpose([0, 2, 1, 3])
+            key_layer = key_layer.transpose([0, 2, 3, 1])
+            value_layer = value_layer.transpose([0, 2, 1, 3])
+            _, _, _, kv_length = key_layer.shape
 
-        # [batch_size, num_heads, q_length, kv_length]
-        attention_probs = self.attention_dropout(attention_probs)
+            query_layer = query_layer.reshape([batch_size * self.num_heads, q_length, self.head_dim])
+            key_layer = key_layer.reshape([batch_size * self.num_heads, self.head_dim, kv_length])
+            value_layer = value_layer.reshape([batch_size * self.num_heads, kv_length, self.head_dim])
 
-        if head_mask is not None:
-            attention_probs = attention_probs * head_mask
+            # [batch_size * num_heads, q_length, kv_length]
+            # alibi:[batch_size * num_heads, q_length, kv_length]
+            # we use `Tensor.baddbmm` instead of `paddle.baddbmm` as the latter isn't supported by TorchScript v1.11
+            attention_scores = baddbmm(
+                alibi, batch1=query_layer, batch2=key_layer, beta=self.beta, alpha=self.inv_norm_factor
+            )
+            # change view to [batch_size, num_heads, q_length, kv_length]
+            # attention_scores = matmul_result.reshape([batch_size, self.num_heads, q_length, kv_length])
 
-        # change view [batch_size x num_heads, q_length, kv_length]
-        attention_probs_reshaped = attention_probs.reshape([batch_size * self.num_heads, q_length, kv_length])
-
-        # matmul: [batch_size * num_heads, q_length, head_dim]
-        context_layer = paddle.matmul(attention_probs_reshaped, value_layer)
-
-        # change view [batch_size, num_heads, q_length, head_dim]
-        context_layer = self._merge_heads(context_layer)
-
-        # aggregate results across tp ranks. See here: https://github.com/pypaddle/pypaddle/issues/76232
-        if self.pretraining_tp > 1 and self.slow_but_exact:
-            slices = self.hidden_size / self.pretraining_tp
-            output_tensor = paddle.zeros_like(context_layer)
-            for i in range(self.pretraining_tp):
-                output_tensor = output_tensor + F.linear(
-                    context_layer[:, :, int(i * slices) : int((i + 1) * slices)],
-                    self.dense.weight[:, int(i * slices) : int((i + 1) * slices)],
+            # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
+            input_dtype = query_layer.dtype
+            # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
+            if input_dtype != paddle.float32:
+                attention_scores = paddle.cast(attention_scores, paddle.float32)
+                attn_weights = attention_scores + attention_mask
+                attention_probs = paddle.cast(
+                    F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype
                 )
-        else:
-            output_tensor = self.dense(context_layer)
+            else:
+                attn_weights = attention_scores + attention_mask
+                attention_probs = F.softmax(attn_weights, axis=-1)
+
+            # [batch_size, num_heads, q_length, kv_length]
+            attention_probs = self.attention_dropout(attention_probs)
+
+            if head_mask is not None:
+                attention_probs = attention_probs * head_mask
+
+            # change view [batch_size x num_heads, q_length, kv_length]
+            attention_probs_reshaped = attention_probs.reshape([batch_size * self.num_heads, q_length, kv_length])
+
+            # matmul: [batch_size * num_heads, q_length, head_dim]
+            context_layer = paddle.matmul(attention_probs_reshaped, value_layer)
+
+            # change view [batch_size, num_heads, q_length, head_dim]
+            context_layer = self._merge_heads(context_layer)
+
+            # aggregate results across tp ranks. See here: https://github.com/pypaddle/pypaddle/issues/76232
+            if self.pretraining_tp > 1 and self.slow_but_exact:
+                slices = self.hidden_size / self.pretraining_tp
+                output_tensor = paddle.zeros_like(context_layer)
+                for i in range(self.pretraining_tp):
+                    output_tensor = output_tensor + F.linear(
+                        context_layer[:, :, int(i * slices) : int((i + 1) * slices)],
+                        self.dense.weight[:, int(i * slices) : int((i + 1) * slices)],
+                    )
+            else:
+                output_tensor = self.dense(context_layer)
 
         output_tensor = dropout_add(output_tensor, residual, self.hidden_dropout, self.training)
 
@@ -762,6 +794,7 @@ class BloomModel(BloomPreTrainedModel):
 
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
+        self.config = config
         self.embed_dim = config.hidden_size
         self.n_head = config.n_head
 
@@ -792,7 +825,7 @@ class BloomModel(BloomPreTrainedModel):
         return self.word_embeddings
 
     def _prepare_attn_mask(
-        self, attention_mask: Tensor, input_shape: Tuple[int, int], past_key_values_length: int, num_heads: int, dtype
+        self, attention_mask: Tensor, input_shape: Tuple[int, int], past_key_values_length: int, num_heads: int
     ) -> Tensor:
         # create causal mask
         # [batch_size, seq_length] -> [batch_size, 1, tgt_length, src_length]
@@ -816,8 +849,9 @@ class BloomModel(BloomPreTrainedModel):
 
         mask_shape = expanded_attn_mask.shape
         expanded_attn_mask = expanded_attn_mask.expand([mask_shape[0], num_heads, mask_shape[2], mask_shape[3]])
-        zero = paddle.zeros(expanded_attn_mask.shape, dtype=dtype)
-        neg_inf = paddle.full(expanded_attn_mask.shape, paddle.finfo(dtype).min, dtype=dtype)
+        # Attention score will be cast to float32 in the following calculation, therefore we set attention_mask dtype as float32
+        zero = paddle.zeros(expanded_attn_mask.shape, dtype=paddle.float32)
+        neg_inf = paddle.full(expanded_attn_mask.shape, paddle.finfo(paddle.float32).min, dtype=paddle.float32)
         expanded_attn_mask = paddle.where(expanded_attn_mask, zero, neg_inf)
         batch_size, num_heads, sq_len, kv_len = expanded_attn_mask.shape
         return expanded_attn_mask.reshape([batch_size * num_heads, sq_len, kv_len])
@@ -844,7 +878,7 @@ class BloomModel(BloomPreTrainedModel):
             use_cache,
             output_attentions,
             alibi,
-            use_reentrant=False,
+            use_reentrant=self.config.recompute_use_reentrant,
         )
         return hidden_states
 
@@ -901,14 +935,13 @@ class BloomModel(BloomPreTrainedModel):
         seq_length_with_past = seq_length
         past_key_values_length = 0
         if past_key_values[0] is not None:
-            past_key_values_length = past_key_values[0][0].shape[2]
+            past_key_values_length = past_key_values[0][0].shape[1]
             seq_length_with_past = seq_length_with_past + past_key_values_length
 
         if attention_mask is None:
             attention_mask = paddle.ones([batch_size, seq_length_with_past], dtype="bool")
         elif attention_mask.dtype != paddle.bool:
             attention_mask = paddle.cast(attention_mask, "bool")
-
         if len(attention_mask.shape) > 2:
             _attention_mask = paddle.ones([batch_size, seq_length_with_past], dtype="bool")
             alibi = build_alibi_tensor(_attention_mask, self.config.n_head, dtype=hidden_states.dtype)
@@ -926,7 +959,6 @@ class BloomModel(BloomPreTrainedModel):
                 input_shape=(batch_size, seq_length),
                 past_key_values_length=past_key_values_length,
                 num_heads=block_size,
-                dtype=hidden_states.dtype,
             )
         else:
             alibi = alibi.reshape([batch_size * self.config.n_head, 1, seq_length_with_past])
@@ -935,7 +967,6 @@ class BloomModel(BloomPreTrainedModel):
                 input_shape=(batch_size, seq_length),
                 past_key_values_length=past_key_values_length,
                 num_heads=self.config.n_head,
-                dtype=hidden_states.dtype,
             )
 
         for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
@@ -1085,7 +1116,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
         self.lm_head = BloomLMHead(config, self.bloom.word_embeddings.weight)
         self.criterion = BloomPretrainingCriterion(
             tensor_parallel_degree=config.tensor_parallel_degree,
-            tensor_parallel_output=True,
+            tensor_parallel_output=config.tensor_parallel_output,
         )
 
     def get_output_embeddings(self):
@@ -1112,9 +1143,16 @@ class BloomForCausalLM(BloomPreTrainedModel):
             # update attention mask
             if "attention_mask" in model_kwargs:
                 attention_mask = model_kwargs["attention_mask"]
-                model_kwargs["attention_mask"] = paddle.concat(
-                    [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype="int64")], axis=-1
-                )
+                if len(attention_mask.shape) == 2:
+                    model_kwargs["attention_mask"] = paddle.concat(
+                        [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)],
+                        axis=-1,
+                    )
+                elif len(attention_mask.shape) == 4:
+                    model_kwargs["attention_mask"] = paddle.concat(
+                        [attention_mask, paddle.ones([*attention_mask.shape[:3], 1], dtype=attention_mask.dtype)],
+                        axis=-1,
+                    )[:, :, -1:, :]
         # update role_ids
         if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
             role_ids = model_kwargs["role_ids"]
@@ -1175,16 +1213,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
 
         loss = None
         if labels is not None:
-            if self.config.lm_shift_labels:
-                # Shift so that tokens < n predict n
-                shift_logits = lm_logits[..., :-1, :]
-                shift_labels = labels[..., 1:]
-            else:
-                shift_logits = lm_logits
-                shift_labels = labels
-
-            # Flatten the tokens
-            loss = self.criterion(shift_logits, shift_labels)
+            loss = self.criterion(lm_logits, labels)
 
         if not return_dict:
             output = (lm_logits,) + transformer_outputs[1:]

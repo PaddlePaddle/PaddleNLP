@@ -18,7 +18,7 @@ import sys
 PADDLENLP_STABLE_VERSION = "PADDLENLP_STABLE_VERSION"
 
 
-__version__ = "2.6.0rc.post"
+__version__ = "2.7.1.post"
 if os.getenv(PADDLENLP_STABLE_VERSION):
     __version__ = __version__.replace(".post", "")
 
@@ -44,10 +44,12 @@ from . import (
     ops,
     peft,
     prompt,
+    quantization,
     seq2vec,
     trainer,
     transformers,
     utils,
+    version,
 )
 from .server import SimpleServer
 from .taskflow import Taskflow

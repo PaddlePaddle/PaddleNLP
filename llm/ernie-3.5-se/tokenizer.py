@@ -28,6 +28,7 @@ class Ernie35Tokenizer(PretrainedTokenizer):
     resource_files_names = {
         "vocab_file": "sentencepiece.bpe.model",
     }
+    padding_side = "left"
 
     def __init__(
         self,

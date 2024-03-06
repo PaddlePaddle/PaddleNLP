@@ -20,9 +20,8 @@ from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 import sentencepiece as spm
 
-from paddlenlp.transformers import PretrainedTokenizer
-from paddlenlp.utils.log import logger
-
+from ...utils.log import logger
+from .. import PretrainedTokenizer
 from ..tokenizer_utils_base import BatchEncoding, EncodedInput, PaddingStrategy
 
 __all__ = ["LlamaTokenizer"]
@@ -52,6 +51,7 @@ class LlamaTokenizer(PretrainedTokenizer):
         "facebook/llama-30b": {},
         "facebook/llama-65b": {},
     }
+    padding_side = "left"
 
     def __init__(
         self,

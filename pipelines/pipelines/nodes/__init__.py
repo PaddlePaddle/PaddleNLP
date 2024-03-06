@@ -41,6 +41,7 @@ from pipelines.nodes.preprocessor import (
     CharacterTextSplitter,
     PreProcessor,
     RecursiveCharacterTextSplitter,
+    SpacyTextSplitter,
 )
 from pipelines.nodes.prompt import PromptModel, PromptNode, Shaper
 from pipelines.nodes.question_generator import QuestionGenerator
@@ -50,6 +51,7 @@ from pipelines.nodes.retriever import (
     BaseRetriever,
     BM25Retriever,
     DensePassageRetriever,
+    EmbeddingRetriever,
     MultiModalRetriever,
     WebRetriever,
 )

@@ -40,7 +40,7 @@ def perf_pd(args):
     place = "gpu"
     place = paddle.set_device(place)
     tokenizer = PegasusChineseTokenizer.from_pretrained(args.model_name_or_path)
-    model = PegasusForConditionalGeneration.from_pretrained(args.model_name_or_path, load_state_as_np=True)
+    model = PegasusForConditionalGeneration.from_pretrained(args.model_name_or_path)
     model.eval()
     load_mem = query_by_id(args.gpu_id)
     input_ids_np = [np.random.choice(range(len(tokenizer.vocab)), args.input_len) for _ in range(args.batch_size)]

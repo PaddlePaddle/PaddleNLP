@@ -161,10 +161,10 @@ python ./fast_transformer/sample/decoding_sample.py --config ./fast_transformer/
 
 ``` python
 from paddlenlp.ops import FasterGPT
-from paddlenlp.transformers import GPTModel, GPTForPretraining
+from paddlenlp.transformers import GPTModel, GPTForCausalLM
 
 MODEL_CLASSES = {
-    "gpt2-medium-en": (GPTForPretraining, GPTTokenizer),
+    "gpt2-medium-en": (GPTForCausalLM, GPTTokenizer),
 }
 
 model_class, tokenizer_class = MODEL_CLASSES[args.model_name]

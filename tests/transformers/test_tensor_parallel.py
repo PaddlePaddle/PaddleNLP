@@ -96,7 +96,7 @@ def _test_llama():
 
     config = LlamaConfig()
     config = prepare_config(config)
-    model = LlamaForCausalLM._from_config(config)
+    model = LlamaForCausalLM.from_config(config)
     common_test_merge(model, LlamaForCausalLM)
 
 
@@ -105,7 +105,7 @@ def _test_chatglm():
 
     config = ChatGLMConfig()
     config = prepare_config(config)
-    model = ChatGLMForCausalLM._from_config(config)
+    model = ChatGLMForCausalLM.from_config(config)
     common_test_merge(model, ChatGLMForCausalLM)
 
 
@@ -114,7 +114,7 @@ def _test_bloom():
 
     config = BloomConfig()
     config = prepare_config(config)
-    model = BloomForCausalLM._from_config(config)
+    model = BloomForCausalLM.from_config(config)
     common_test_merge(model, BloomForCausalLM)
 
 

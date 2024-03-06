@@ -25,6 +25,7 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
+from paddle.utils import map_structure
 
 from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
@@ -97,10 +98,8 @@ class RotaryEmbeddings(nn.Layer):
     def __init__(self, hidden_size, base=10000.0, position_encoding_2d=True):
         super().__init__()
         self.default_dtype = paddle.get_default_dtype()
-        inv_freq = 1.0 / (base ** (paddle.arange(0, hidden_size, 2).astype("float32") / hidden_size))
-        inv_freq = inv_freq.astype(self.default_dtype)
+        self.inv_freq = 1.0 / (base ** (paddle.arange(0, hidden_size, 2).astype("float32") / hidden_size))
         self.position_encoding_2d = position_encoding_2d
-        self.register_buffer("inv_freq", inv_freq)
         self.max_seq_len_cached = -1
         self.cos_cached = None
         self.sin_cached = None
@@ -112,35 +111,33 @@ class RotaryEmbeddings(nn.Layer):
         return paddle.stack([cos, sin], axis=0)
 
     def forward(self, position_ids):
+
         seq_len = position_ids.max() + 1
+        # seq_len = position_ids.shape[-1]
+
         if self.max_seq_len_cached < 0 or seq_len > self.max_seq_len_cached:
             self.max_seq_len_cached = seq_len
 
             # x.shape = [b, s, n, h/n/2]
             # TODO(duanyanhui): npu arange kernel don't support fp16, and
             # it can't be fallbacked to cpu. It will be fixed in future.
-            if paddle.get_device().split(":")[0] == "npu":
-                t = paddle.arange(start=0, end=seq_len, dtype="float32")
-                t = t.cast(self.inv_freq.dtype)
-            else:
-                t = paddle.arange(start=0, end=seq_len, dtype=self.inv_freq.dtype)
+            t = paddle.arange(start=0, end=seq_len, dtype="float32")
             # [s, h/n/2]
-            # TODO: Failed for fp16 when converting to static graph.
             freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
-            freqs = freqs.cast(self.default_dtype)
             # [s, h/n]
             emb = paddle.concat([freqs, freqs], axis=-1)
-            if self.default_dtype == paddle.bfloat16:
-                emb = emb.cast("float32")
             # [s, 1, h/n]
-            cos_cached = emb.cos().unsqueeze(1)
-            sin_cached = emb.sin().unsqueeze(1)
+            cos_cached = emb.cos().unsqueeze(1).cast(self.default_dtype)
+            sin_cached = emb.sin().unsqueeze(1).cast(self.default_dtype)
 
-            if self.default_dtype == paddle.bfloat16:
-                cos_cached = cos_cached.astype(self.default_dtype)
-                sin_cached = sin_cached.astype(self.default_dtype)
-
-            self.cos_cached, self.sin_cached = cos_cached, sin_cached
+            if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+                # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
+                # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+                # removed after static graphs support inplace and stride.
+                with paddle.framework._no_check_dy2st_diff():
+                    self.cos_cached, self.sin_cached = cos_cached, sin_cached
+            else:
+                self.cos_cached, self.sin_cached = cos_cached, sin_cached
 
         cos, sin = self.cos_cached[:seq_len, ...], self.sin_cached[:seq_len, ...]
         if self.position_encoding_2d:
@@ -255,66 +252,93 @@ class ChatGLMAttention(nn.Layer):
             k_layer = paddle.concat([cache_k, k_layer], axis=0)
             v_layer = paddle.concat([cache_v, v_layer], axis=0)
 
-        seq_length, batch_size, num_heads, hidden_size = k_layer.shape
-
         cache_kv = None
         if use_cache:
             cache_kv = (k_layer, v_layer)
+        version = paddle.version.full_version
+        version_check = True
+        if self.config.use_flash_attention and version != "0.0.0" and version <= "2.5.2":
+            logger.warning(
+                "PaddlePaddle version 2.5.3 or higher is required, please upgrade your PaddlePaddle to 2.5.3 or other higher version."
+            )
+            version_check = False
+        if self.config.use_flash_attention and version_check:
+            # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
+            # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
+            # [s, b, n, h/n] = > [batch_size, seq_len, num_heads, head_dim]
+            q_layer = paddle.transpose(q_layer, [1, 0, 2, 3])
+            k_layer = paddle.transpose(k_layer, [1, 0, 2, 3])
+            v_layer = paddle.transpose(v_layer, [1, 0, 2, 3])
+            query_states, key_states, value_states = q_layer, k_layer, v_layer
 
-        attention_scale_coeff = float(layer_id) + 1.0
-        if self.attention_scale:
-            # [s, b, n, h/n]
-            q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
-            q_layer = q_layer.astype(self.default_dtype)
+            attn_output = F.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=attention_mask,
+                is_causal=False,
+            )
+            attn_weights = None
+            # [batch_size, seq_len, num_heads, head_dim] => [ batch_size, seq_len, hidden_size]
+            attn_output = paddle.reshape(attn_output, [attn_output.shape[0], attn_output.shape[1], -1])
+            # [ batch_size, seq_len, hidden_size] = > [ seq_len, batch_size, hidden_size]
+            attn_output = paddle.transpose(attn_output, [1, 0, 2])
+            attn_output = self.dense(attn_output)
 
-        # [b, n, s, s]
-        output_shape = [q_layer.shape[1], q_layer.shape[2], q_layer.shape[0], k_layer.shape[0]]
-
-        # [s, b * n, h/n]
-        q_layer = q_layer.reshape([output_shape[2], output_shape[0] * output_shape[1], -1])
-        k_layer = k_layer.reshape([output_shape[3], output_shape[0] * output_shape[1], -1])
-
-        # [b * n , s, s] = matmul([b * n, s, h/n],  [b * n, h/n, s])
-        attention_scores = paddle.matmul(q_layer.transpose([1, 0, 2]), k_layer.transpose([1, 2, 0]))
-        # [b, n, s, s]
-        attention_scores = attention_scores.reshape(output_shape)
-
-        if self.scale_mask_softmax:
-            self.scale_mask_softmax.scale = attention_scale_coeff
-            attention_probs = self.scale_mask_softmax(attention_scores, attention_mask)
+            output, attention_probs = attn_output, attn_weights
         else:
-            if not (attention_mask == 0).all():
-                # attention_mask = attention_mask.astype(attention_scores.dtype)
-                # attention_scores = paddle.multiply(attention_scores, 1.0 - attention_mask)
-                # attention_scores = attention_scores + (-10000.0) * attention_mask
-                attention_scores = paddle.where(
-                    attention_mask > 0, paddle.full_like(attention_scores, -10000.0), attention_scores
-                )
-            attention_scores = attention_scores.astype("float32")
-            attention_scores = attention_scores * attention_scale_coeff
-            attention_probs = F.softmax(attention_scores, axis=-1)
-            attention_probs = attention_probs.astype(self.default_dtype)
-            v_layer = v_layer.astype(self.default_dtype)
 
-        # [b, n, s, h/n]
-        output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]
-        # [s, b * n, h/n]
-        v_layer = v_layer.reshape([v_layer.shape[0], output_shape[0] * output_shape[1], -1])
-        # [b * n, s, s]
-        attention_probs = attention_probs.reshape([output_shape[0] * output_shape[1], output_shape[2], -1])
+            seq_length, batch_size, num_heads, hidden_size = k_layer.shape
 
-        # [b * n, s, h/n]
-        context_layer = paddle.bmm(attention_probs, v_layer.transpose([1, 0, 2]))
-        context_layer = context_layer.reshape(output_shape)
+            attention_scale_coeff = float(layer_id) + 1.0
+            if self.attention_scale:
+                # [s, b, n, h/n]
+                q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
+                q_layer = q_layer.astype(self.default_dtype)
 
-        # [s, b, n, h/n]
-        context_layer = context_layer.transpose([2, 0, 1, 3])
+            # [b, n, s, s]
+            output_shape = [q_layer.shape[1], q_layer.shape[2], q_layer.shape[0], k_layer.shape[0]]
 
-        # [s, b, h]
-        new_context_shape = context_layer.shape[:-2] + [self.num_attention_heads * self.attention_head_size]
-        context_layer = context_layer.reshape(new_context_shape)
+            # [s, b * n, h/n]
+            q_layer = q_layer.reshape([output_shape[2], output_shape[0] * output_shape[1], -1])
+            k_layer = k_layer.reshape([output_shape[3], output_shape[0] * output_shape[1], -1])
 
-        output = self.dense(context_layer)
+            # [b * n , s, s] = matmul([b * n, s, h/n],  [b * n, h/n, s])
+            attention_scores = paddle.matmul(q_layer.transpose([1, 0, 2]), k_layer.transpose([1, 2, 0]))
+            # [b, n, s, s]
+            attention_scores = attention_scores.reshape(output_shape)
+
+            if self.scale_mask_softmax:
+                self.scale_mask_softmax.scale = attention_scale_coeff
+                attention_probs = self.scale_mask_softmax(attention_scores, attention_mask)
+            else:
+                attention_scores = attention_scores.astype("float32")
+                attention_scores = attention_scores * attention_scale_coeff
+                attention_scores = attention_scores + attention_mask
+
+                attention_probs = F.softmax(attention_scores, axis=-1)
+                attention_probs = attention_probs.astype(self.default_dtype)
+                v_layer = v_layer.astype(self.default_dtype)
+
+            # [b, n, s, h/n]
+            output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]
+            # [s, b * n, h/n]
+            v_layer = v_layer.reshape([v_layer.shape[0], output_shape[0] * output_shape[1], -1])
+            # [b * n, s, s]
+            attention_probs = attention_probs.reshape([output_shape[0] * output_shape[1], output_shape[2], -1])
+
+            # [b * n, s, h/n]
+            context_layer = paddle.bmm(attention_probs, v_layer.transpose([1, 0, 2]))
+            context_layer = context_layer.reshape(output_shape)
+
+            # [s, b, n, h/n]
+            context_layer = context_layer.transpose([2, 0, 1, 3])
+
+            # [s, b, h]
+            new_context_shape = context_layer.shape[:-2] + [self.num_attention_heads * self.attention_head_size]
+            context_layer = context_layer.reshape(new_context_shape)
+
+            output = self.dense(context_layer)
 
         return output, cache_kv, attention_probs
 
@@ -493,7 +517,7 @@ class ChatGLMStack(nn.Layer):
             use_cache,
             cache,
             rotary_embeds,
-            use_reentrant=False,
+            use_reentrant=self.config.recompute_use_reentrant,
         )
         return hidden_states
 
@@ -529,16 +553,19 @@ class ChatGLMStack(nn.Layer):
             else:
                 cache = tuple([None] * len(self.layers))
 
+        # this branch is deprecated
         if self.config.pre_seq_len is not None and attention_mask is not None:
             prefix_attention_mask = paddle.ones([batch_size, 1, input_ids.shape[-1], self.config.pre_seq_len])
             prefix_attention_mask = (prefix_attention_mask < 0.5).astype("int64")
             attention_mask = paddle.concat((prefix_attention_mask, attention_mask), axis=3)
 
+        zero = paddle.zeros(attention_mask.shape, dtype=inputs_embeds.dtype)
+        neg_inf = paddle.full_like(attention_mask, paddle.finfo(inputs_embeds.dtype).min, dtype=inputs_embeds.dtype)
+        attention_mask = paddle.where(attention_mask, zero, neg_inf)
+
         hidden_states = inputs_embeds
 
         current_caches = [] if use_cache else None
-        if attention_mask is None:
-            attention_mask = paddle.zeros([1, 1]).astype("int64")
 
         for i, layer in enumerate(self.layers):
             cache_i = cache[i]
@@ -584,24 +611,12 @@ class ChatGLMPretrainedModel(PretrainedModel):
     model_config_file = CONFIG_NAME
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = CHATGLM_PRETRAINED_RESOURCE_FILES_MAP
-    _keys_to_ignore_on_load_missing = [r"transformer.layers.*.attention.rotary_embeddings.inv_freq"]
-    _keys_to_ignore_on_load_unexpected = [r"transformer.layers.*.attention.rotary_emb.inv_freq"]
+    _keys_to_ignore_on_load_missing = [r"transformer.rotary_embeddings.inv_freq", r"lm_head.decoder_weight"]
+    _keys_to_ignore_on_load_unexpected = [r"transformer.rotary_emb.inv_freq"]
 
     def init_weights(self, layer):
         """Initialization hook"""
         return None
-
-    def get_masks(self, input_ids):
-        batch_size, seq_length = input_ids.shape
-        context_lengths = []
-        for seq in input_ids:
-            context_lengths.append(paddle.where(seq == self.config.bos_token_id)[0][0])
-        attention_mask = paddle.tril(paddle.ones([batch_size, seq_length, seq_length]))
-        for i, context_length in enumerate(context_lengths):
-            attention_mask[i, :, :context_length] = 1
-        attention_mask = attention_mask.unsqueeze(1)
-        attention_mask = (attention_mask < 0.5).astype("int64")
-        return attention_mask
 
     def get_position_ids(self, input_ids, mask_positions, use_gmasks=None):
         batch_size, seq_length = input_ids.shape
@@ -611,6 +626,7 @@ class ChatGLMPretrainedModel(PretrainedModel):
         context_lengths = []
         for seq in input_ids:
             context_lengths.append(paddle.where(seq == self.config.bos_token_id)[0][0])
+
         if self.config.position_encoding_2d:
             position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
             for i, context_length in enumerate(context_lengths):
@@ -633,6 +649,13 @@ class ChatGLMPretrainedModel(PretrainedModel):
                     position_ids[context_length:] = mask_positions[i]
 
         return position_ids
+
+    def _get_model_inputs_spec(self, dtype: str):
+        return {
+            "input_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            "attention_mask": paddle.static.InputSpec(shape=[None, None, None, None], dtype="int64"),
+            "position_ids": paddle.static.InputSpec(shape=[None, 2, None], dtype="int64"),
+        }
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):
@@ -682,7 +705,7 @@ class ChatGLMModel(ChatGLMPretrainedModel):
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
     """
     _keys_to_ignore_on_load_unexpected = [r"transformer.layers.*.attention.rotary_emb.inv_freq", r"lm_head.weight"]
@@ -713,8 +736,10 @@ class ChatGLMModel(ChatGLMPretrainedModel):
             assert position_ids is not None, "`position_ids` must be explicitly specified when input_ids is None."
             assert attention_mask is not None, "`attention_mask` must be explicitly specified when input_ids is None."
 
-        if attention_mask is None:
-            attention_mask = self.get_masks(input_ids)
+        if attention_mask is None or len(attention_mask.shape) != 4:
+            raise ValueError(f"attention mask should'nt be None or has size other than 4Dim. Found {attention_mask}")
+
+        attention_mask = attention_mask.astype("bool")
 
         if position_ids is None:
             MASK, gMASK = self.config.mask_token_id, self.config.gmask_token_id
@@ -763,7 +788,7 @@ class ChatGLMHead(nn.Layer):
 
 
 class ChatGLMForCausalLM(ChatGLMPretrainedModel):
-    _keys_to_ignore_on_save = [r"lm_head.weight"]
+    _keys_to_ignore_on_save = [r"lm_head.decoder_weight"]
     _tied_weights_keys = ["lm_head.weight"]
 
     def __init__(self, config: ChatGLMConfig):
@@ -793,10 +818,9 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
 
         if cache is not None or past_key_values is not None:
             last_token = input_ids[:, -1].unsqueeze(-1)
-            if attention_mask is not None and attention_mask.dtype == paddle.int64:
-                attention_mask = attention_mask[:, :, -1:]
-            else:
-                attention_mask = self.get_masks(input_ids)[:, :, -1:]
+
+            attention_mask = attention_mask[:, :, -1:]
+
             if position_ids is not None:
                 position_ids = position_ids[..., -1:]
             else:
@@ -804,6 +828,7 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
                     context_lengths = []
                     for seq in input_ids:
                         context_lengths.append(paddle.where(seq == self.config.bos_token_id)[0][0])
+
                     context_lengths = paddle.to_tensor(context_lengths, dtype="int64")
                     block_position_ids = seq_length - context_lengths
                     position_ids = paddle.concat(
@@ -820,14 +845,8 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
                 "position_ids": position_ids,
                 "use_cache": True,
                 "attention_mask": attention_mask,
-                **kwargs,
             }
         else:
-            if attention_mask is not None and attention_mask.dtype != paddle.int64:
-                logger.warning(f"The dtype of attention mask ({attention_mask.dtype}) is not int64")
-                attention_mask = None
-            if attention_mask is None:
-                attention_mask = self.get_masks(input_ids)
             if position_ids is None:
                 position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, use_gmasks=use_gmasks)
 
@@ -837,8 +856,11 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
                 "position_ids": position_ids,
                 "use_cache": True,
                 "attention_mask": attention_mask,
-                **kwargs,
             }
+
+    def reorder_cache(self, cache: paddle.Tensor, beam_idx):
+        cache = map_structure(lambda x: paddle.index_select(x, beam_idx, axis=1), cache)
+        return cache
 
     def update_model_kwargs_for_generation(
         self,
@@ -853,12 +875,12 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
         # update attention mask
         if "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]
-            if attention_mask is not None and attention_mask.dtype == paddle.int64:
+            if attention_mask is not None:
                 attention_mask = paddle.concat(
-                    [attention_mask, paddle.ones([*attention_mask.shape[:3], 1], attention_mask.dtype)], axis=3
+                    [attention_mask, paddle.zeros([*attention_mask.shape[:3], 1], attention_mask.dtype)], axis=3
                 )
                 new_attention_mask = attention_mask[:, :, -1:].clone()
-                new_attention_mask[..., -1] = 0
+                new_attention_mask[..., -1] = 1
                 model_kwargs["attention_mask"] = paddle.concat([attention_mask, new_attention_mask], axis=2)
 
         # update position ids
@@ -894,33 +916,16 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
         hidden_states = transformer_outputs.last_hidden_state if return_dict else transformer_outputs[0]
 
         lm_logits = self.lm_head(hidden_states)
-        lm_logits = lm_logits.transpose([1, 0, 2])
+        lm_logits = lm_logits.transpose([1, 0, 2]).astype("float32")
         loss = None
         if labels is not None:
-            """
-            for p, l in zip(lm_logits[..., :-1, :].argmax(axis=-1), labels[..., 1:]):
-                print("prediction")
-                print(self.tokenizer.decode(p[l != -100].tolist()))
-                print("labels")
-                print(self.tokenizer.decode(l[l != -100].tolist()))
-            """
-
-            if self.config.lm_shift_labels:
-                shift_logits = lm_logits[..., :-1, :]
-                shift_logits = shift_logits.reshape([-1, shift_logits.shape[-1]])
-                shift_logits = shift_logits.astype("float32")
-                shift_labels = labels[..., 1:].reshape([-1])
-            else:
-                shift_logits = lm_logits
-                shift_labels = labels
-
             if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
                 self.parallel_loss_func = fleet.meta_parallel.ParallelCrossEntropy()
-                shift_logits = shift_logits[shift_labels != -100]
-                shift_labels = shift_labels[shift_labels != -100]
-                loss = self.parallel_loss_func(shift_logits, shift_labels).mean()
+                filtered_logits = lm_logits[labels != -100]
+                filtered_labels = labels[labels != -100]
+                loss = self.parallel_loss_func(filtered_logits, filtered_labels).mean()
             else:
-                loss = nn.functional.cross_entropy(shift_logits, shift_labels, ignore_index=-100)
+                loss = nn.functional.cross_entropy(lm_logits, labels, ignore_index=-100)
             loss = loss.astype(lm_logits.dtype)
 
         if not return_dict:

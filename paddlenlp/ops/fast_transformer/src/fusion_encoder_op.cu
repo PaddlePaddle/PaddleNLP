@@ -24,7 +24,7 @@ limitations under the License. */
 
 #include "cublas_handle.h"
 #include "fastertransformer/bert_encoder_transformer.h"
-#include "fastertransformer/cuda/cub/cub.cuh"
+
 #include "fastertransformer/cuda/cuda_kernels.h"
 #include "fastertransformer/standard_encoder.h"
 #include "fusion_encoder_op.h"
@@ -91,7 +91,7 @@ std::vector<paddle::Tensor> encoder_kernel(
 
   if (normalize_before == false) {
     typedef BertEncoderTransformerTraits<traits_::OpType,
-                                        cuda::OpenMultiHeadAttention>
+                                        fastertransformer::cuda::OpenMultiHeadAttention>
         EncoderTraits_;
 
     // Post-Normalization
@@ -202,7 +202,7 @@ std::vector<paddle::Tensor> encoder_kernel(
     delete allocator_;
     delete encoder;
   } else {
-    typedef OpenEncoderTraits<traits_::OpType, cuda::OpenMultiHeadAttention>
+    typedef OpenEncoderTraits<traits_::OpType, fastertransformer::cuda::OpenMultiHeadAttention>
         OpenEncoderTraits_;
 
     // Pre-Normalization

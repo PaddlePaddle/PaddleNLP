@@ -356,6 +356,8 @@ def _transformer_encoder_fwd(
     )
 
 
+_transformer_encoder_fwd.__name__ = "forward"
+_transformer_encoder_layer_fwd.__name__ = "forward"
 # patches of paddle.nn.Transformer to get all hidden_states and attentions
 paddle.nn.TransformerEncoderLayer.forward = _transformer_encoder_layer_fwd
 paddle.nn.TransformerDecoderLayer.forward = _transformer_decoder_layer_fwd
@@ -1425,3 +1427,94 @@ class Seq2SeqSpectrogramOutput(ModelOutput):
     encoder_last_hidden_state: Optional[paddle.Tensor] = None
     encoder_hidden_states: Optional[Tuple[paddle.Tensor]] = None
     encoder_attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class MoEModelOutputWithPast(ModelOutput):
+    """
+    Base class for model's outputs, with potential hidden states and attentions.
+
+    Args:
+        last_hidden_state (`paddle.Tensor` of shape `(batch_size, sequence_length, hidden_size)`):
+            Sequence of hidden-states at the output of the last layer of the model.
+        past_key_values (`tuple(tuple(paddle.Tensor))`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
+            Tuple of `tuple(paddle.Tensor)` of length `config.n_layers`, with each tuple having 2 tensors of shape
+            `(batch_size, num_heads, sequence_length, embed_size_per_head)`) and optionally if
+            `config.is_encoder_decoder=True` 2 additional tensors of shape `(batch_size, num_heads,
+            encoder_sequence_length, embed_size_per_head)`.
+
+            Contains pre-computed hidden-states (key and values in the self-attention blocks and optionally if
+            `config.is_encoder_decoder=True` in the cross-attention blocks) that can be used (see `past_key_values`
+            input) to speed up sequential decoding.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+        router_logits (`tuple(paddle.Tensor)`, *optional*, returned when `output_router_probs=True` and `config.add_router_probs=True` is passed or when `config.output_router_probs=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, sequence_length, num_experts)`.
+
+            Raw router logtis (post-softmax) that are computed by MoE routers, these terms are used to compute the auxiliary
+            loss for Mixture of Experts models.
+    """
+
+    last_hidden_state: paddle.Tensor = None
+    past_key_values: Optional[Tuple[Tuple[paddle.Tensor]]] = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+    router_logits: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class MoECausalLMOutputWithPast(ModelOutput):
+    """
+    Base class for causal language model (or autoregressive) with mixture of experts outputs.
+
+    Args:
+        loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
+            Language modeling loss (for next-token prediction).
+
+        logits (`paddle.Tensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
+            Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+
+        aux_loss (`paddle.Tensor`, *optional*, returned when `labels` is provided):
+            aux_loss for the sparse modules.
+
+        router_logits (`tuple(paddle.Tensor)`, *optional*, returned when `output_router_probs=True` and `config.add_router_probs=True` is passed or when `config.output_router_probs=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, sequence_length, num_experts)`.
+
+            Raw router logtis (post-softmax) that are computed by MoE routers, these terms are used to compute the auxiliary
+            loss for Mixture of Experts models.
+
+        past_key_values (`tuple(tuple(paddle.Tensor))`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
+            Tuple of `tuple(paddle.Tensor)` of length `config.n_layers`, with each tuple having 2 tensors of shape
+            `(batch_size, num_heads, sequence_length, embed_size_per_head)`)
+
+            Contains pre-computed hidden-states (key and values in the self-attention blocks) that can be used (see
+            `past_key_values` input) to speed up sequential decoding.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    aux_loss: Optional[paddle.Tensor] = None
+    logits: paddle.Tensor = None
+    past_key_values: Optional[Tuple[Tuple[paddle.Tensor]]] = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+    router_logits: Optional[Tuple[paddle.Tensor]] = None

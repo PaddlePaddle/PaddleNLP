@@ -15,7 +15,7 @@
 #include <pthread.h>
 #include <algorithm>
 #include <atomic>
-#include <codecvt>
+#include <string>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -30,6 +30,7 @@
 #endif
 
 #include "helper.h"
+#include "utf8.h"
 
 #include <sys/time.h>
 #include <unistd.h>
@@ -58,7 +59,6 @@ const int BOS_IDX = 50256;
 const int EOS_IDX = 50256;
 const int PAD_IDX = 50256;
 const int MAX_LENGTH = 256;
-std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> convert;
 
 int batch_size = 1;
 int gpu_id = 0;
@@ -186,7 +186,7 @@ public:
     std::string line;
     int k = 0;
     while (std::getline(fin, line)) {
-      std::u32string tmp = convert.from_bytes(line);
+      std::u32string tmp = utf8::utf8to32(line);
       word2num_dict[tmp] = k;
       num2word_dict[k] = tmp;
       k += 1;
@@ -314,8 +314,8 @@ int main(int argc, char** argv) {
 
   paddle::inference::Main(batch_size,
                           gpu_id,
-                          convert.from_bytes(FLAGS_start_token),
-                          convert.from_bytes(FLAGS_end_token));
+                          utf8::utf8to32(FLAGS_start_token),
+                          utf8::utf8to32(FLAGS_end_token));
 
   return 0;
 }

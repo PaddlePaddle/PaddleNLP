@@ -120,6 +120,10 @@ class DataArguments:
         default=3,
         metadata={"help": "Max N Grams"},
     )
+    data_impl: str = field(
+        default="mmap",
+        metadata={"help": "mmap/lazy format converted from preprocessed data."},
+    )
 
 
 @dataclass
@@ -183,12 +187,13 @@ def create_pretrained_dataset(
 
     def print_dataset(data, mode="train"):
         logger.info(f"Sample data for {mode} mode")
-        # text_enc, text_dec, labels, loss_mask, truncated, enc_mask, dec_mask, enc_dec_mask = data
-        # print("line 195 t5 run pretain trainer", text_enc)
-        print(data)
-        print(tokenizer.convert_ids_to_tokens(token for token in list(data["text_enc"])))
-        print(tokenizer.convert_ids_to_tokens(token for token in list(data["text_dec"])))
-        # print(tokenizer.convert_ids_to_tokens(token for token in list(data["labels"])))
+        text_enc, text_dec = data["text_enc"], data["text_dec"]
+        if tokenizer.pad_token_id in text_enc:
+            text_enc = text_enc[0 : list(text_enc).index(tokenizer.pad_token_id)]
+        logger.info(tokenizer._decode(text_enc))
+        if tokenizer.pad_token_id in text_dec:
+            text_dec = text_dec[0 : list(text_dec).index(tokenizer.pad_token_id)]
+        logger.info(tokenizer._decode(text_dec))
 
     print_dataset(train_ds[0], "train")
     print_dataset(valid_ds[0], "valid")
@@ -224,9 +229,10 @@ def get_train_data_file(args):
         files = [
             os.path.join(args.input_dir, f)
             for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz" in str(f))
+            if (os.path.isfile(os.path.join(args.input_dir, f)) and ("_idx.npz" in str(f) or ".idx" in str(f)))
         ]
         files = [x.replace("_idx.npz", "") for x in files]
+        files = [x.replace(".idx", "") for x in files]
 
         if len(files) > 1:
             ret = []

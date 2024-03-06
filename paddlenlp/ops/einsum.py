@@ -197,7 +197,7 @@ def einsum(equation, *operands):
     first_ell_idx = 0
     for i, term in enumerate(operand_eqns):
         ell_char_count = 0
-        operand_rank = int(operands[i].rank().numpy())
+        operand_rank = int(operands[i].rank().cpu().numpy())
         curr_num_ell_idxes = operand_rank - len(term) + 3
         dims_in_terms = 0
         curr_operand_idxes = []

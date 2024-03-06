@@ -369,7 +369,6 @@ def main():
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
         logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
 
-    config.lm_shift_labels = False
     config.use_flash_attention = model_args.use_flash_attention
     config.fuse_ln = model_args.use_fused_ln
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
@@ -395,11 +394,10 @@ def main():
             model_args.model_name_or_path,
             config=config,
             dtype=dtype,
-            load_state_as_np=True,
             use_progressive_seq_len=True,
         )
     else:
-        model = model_class._from_config(config, dtype=dtype)
+        model = model_class.from_config(config, dtype=dtype)
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:

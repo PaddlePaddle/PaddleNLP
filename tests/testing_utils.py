@@ -16,7 +16,9 @@ from __future__ import annotations
 import copy
 import gc
 import inspect
+import json
 import os
+import subprocess
 import sys
 import unittest
 from collections.abc import Mapping
@@ -24,10 +26,11 @@ from contextlib import contextmanager
 
 import numpy as np
 import paddle
+import paddle.distributed.fleet as fleet
 import yaml
 
 from paddlenlp.trainer.argparser import strtobool
-from paddlenlp.utils.import_utils import is_package_available
+from paddlenlp.utils.import_utils import is_package_available, is_paddle_available
 
 __all__ = ["get_vocab_list", "stable_softmax", "cross_entropy"]
 
@@ -298,7 +301,7 @@ def is_slow_test() -> bool:
     return os.getenv("RUN_SLOW_TEST") is not None
 
 
-def load_test_config(config_file: str, key: str) -> dict | None:
+def load_test_config(config_file: str, key: str, sub_key: str = None) -> dict | None:
     """parse config file to argv
 
     Args:
@@ -312,12 +315,26 @@ def load_test_config(config_file: str, key: str) -> dict | None:
     assert key in config, f"<{key}> should be the top key in configuration file"
     config = config[key]
 
-    sub_key = "slow" if is_slow_test() else "default"
+    mode_key = "slow" if is_slow_test() else "default"
 
-    if sub_key not in config:
+    if mode_key not in config:
         return None
 
-    config = config[sub_key]
+    # 2. load base common config
+    base_config = config.get("base", {})
+
+    config = config.get(mode_key, {})
+    config.update(base_config)
+
+    # 3. load sub key config
+    sub_config = config.get(sub_key, {})
+    config.update(sub_config)
+
+    # remove dict value
+    for key in list(config.keys()):
+        if isinstance(config[key], dict):
+            config.pop(key)
+
     return config
 
 
@@ -356,3 +373,149 @@ def argv_context_guard(config: dict):
     sys.argv = argv
     yield
     sys.argv = old_argv
+
+
+def update_params(json_file: str, params: dict):
+    """update params in json file
+
+    Args:
+        json_file (str): the path of json file
+        params (dict): the parameters need to update
+    """
+    with open(json_file, "r") as f:
+        data = json.load(f)
+        data.update(params)
+    with open(json_file, "w") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+class SubprocessCallException(Exception):
+    pass
+
+
+def run_command(command: list[str], return_stdout=False):
+    """
+    Runs `command` with `subprocess.check_output` and will potentially return the `stdout`. Will also properly capture
+    if an error occured while running `command`
+    """
+    try:
+        output = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
+        if return_stdout:
+            if hasattr(output, "decode"):
+                output = output.decode("utf-8")
+            return output
+    except subprocess.CalledProcessError as e:
+        raise SubprocessCallException(
+            f"Command `{' '.join(command)}` failed with the following error:\n\n{e.output.decode()}"
+        ) from e
+
+
+def skip_for_none_ce_case(test_case):
+    """
+    There are too many test case, we need skip for none CE envirmonet.
+    """
+    import os
+
+    ce_env = strtobool(os.getenv("CE_TEST_ENV", "0"))
+    if not ce_env:
+        return unittest.skip("test skip for NONE CE case. If you want run this ci, please export CE_TEST_ENV=1 ")(
+            test_case
+        )
+
+    return test_case
+
+
+def require_paddle_multi_gpu(test_case):
+    """
+    Decorator marking a test that requires a multi-GPU setup (in PaddlePaddle). These tests are skipped on a machine without
+    multiple GPUs.
+
+    To run *only* the multi_gpu tests, assuming all test names contain multi_gpu: $ pytest -sv ./tests -k "multi_gpu"
+    """
+    if not is_paddle_available():
+        return unittest.skip("test requires PaddlePaddle")(test_case)
+
+    import paddle
+
+    return unittest.skipUnless(paddle.device.cuda.device_count() > 1, "test requires multiple GPUs")(test_case)
+
+
+def require_paddle_non_multi_gpu(test_case):
+    """
+    Decorator marking a test that requires 0 or 1 GPU setup (in PaddlePaddle).
+    """
+    if not is_paddle_available():
+        return unittest.skip("test requires PaddlePaddle")(test_case)
+
+    import paddle
+
+    return unittest.skipUnless(paddle.device.cuda.device_count() < 2, "test requires 0 or 1 GPU")(test_case)
+
+
+def require_paddle_at_least_2_gpu(test_case):
+    """
+    Decorator marking a test that requires >= 2 GPU setup (in PaddlePaddle).
+    """
+    if not is_paddle_available():
+        return unittest.skip("test requires PaddlePaddle")(test_case)
+
+    import paddle
+
+    return unittest.skipUnless(paddle.device.cuda.device_count() >= 2, "test requires at least 2 GPUs")(test_case)
+
+
+def require_paddle_at_least_8_gpu(test_case):
+    """
+    Decorator marking a test that requires >= 8 GPU setup (in PaddlePaddle).
+    """
+    if not is_paddle_available():
+        return unittest.skip("test requires PaddlePaddle")(test_case)
+
+    import paddle
+
+    return unittest.skipUnless(paddle.device.cuda.device_count() >= 8, "test requires at least 8 GPUs")(test_case)
+
+
+def require_paddle_up_to_2_gpus(test_case):
+    """
+    Decorator marking a test that requires 0 or 1 or 2 GPU setup (in PaddlePaddle).
+    """
+    if not is_paddle_available():
+        return unittest.skip("test requires PaddlePaddle")(test_case)
+
+    import paddle
+
+    return unittest.skipUnless(paddle.device.cuda.device_count() < 3, "test requires 0 or 1 or 2 GPUs")(test_case)
+
+
+def require_gpu(min_gpus: int = 1):
+    def actual_decorator(func):
+        gpu_count = paddle.device.cuda.device_count()
+
+        if gpu_count < min_gpus:
+            return unittest.skip(f"test requires {min_gpus} GPUs")(func)
+
+        def wrapper(*args, **kwargs):
+            result = func(*args, **kwargs)
+            return result
+
+        return wrapper
+
+    return actual_decorator
+
+
+class GPUsTesting(unittest.TestCase):
+    def init_dist_env(self, config: dict = {}):
+        world_size = paddle.distributed.get_world_size()
+        strategy = fleet.DistributedStrategy()
+        hybrid_configs = {
+            "dp_degree": 1,
+            "mp_degree": world_size,
+            "pp_degree": 1,
+            "sharding_degree": 1,
+        }
+        hybrid_configs.update(config)
+        strategy.hybrid_configs = hybrid_configs
+
+        fleet.init(is_collective=True, strategy=strategy)
+        fleet.get_hybrid_communicate_group()

@@ -14,7 +14,11 @@
 
 import argparse
 
-from pipelines.document_stores import ElasticsearchDocumentStore, MilvusDocumentStore
+from pipelines.document_stores import (
+    BaiduElasticsearchDocumentStore,
+    ElasticsearchDocumentStore,
+    MilvusDocumentStore,
+)
 from pipelines.nodes import DensePassageRetriever
 from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http, launch_es
 from pipelines.utils.preprocessing import convert_files_to_dicts_splitter
@@ -30,7 +34,9 @@ data_dict = {
 parser = argparse.ArgumentParser()
 parser.add_argument("--index_name", default="baike_cities", type=str, help="The index name of the ANN search engine")
 parser.add_argument("--doc_dir", default="data/baike/", type=str, help="The doc path of the corpus")
-parser.add_argument("--search_engine", choices=["elastic", "milvus"], default="elastic", help="The type of ANN search engine.")
+parser.add_argument('--username', type=str, default="", help='Username of ANN search engine')
+parser.add_argument('--password', type=str, default="", help='Password of ANN search engine')
+parser.add_argument("--search_engine", choices=["elastic", "milvus", 'bes'], default="elastic", help="The type of ANN search engine.")
 parser.add_argument("--host", type=str, default="127.0.0.1", help="host ip of ANN search engine")
 parser.add_argument("--port", type=str, default="9200", help="port of ANN search engine")
 parser.add_argument("--embedding_dim", default=768, type=int, help="The embedding_dim of index")
@@ -51,6 +57,9 @@ parser.add_argument('--separator', type=str, default='\n', help="Use symbols to 
 parser.add_argument('--filters', type=list, default=['\n'], help="Filter special symbols")
 parser.add_argument('--language', type=str, default='chinese', help="the language of files")
 parser.add_argument('--pooling_mode', choices=['max_tokens', 'mean_tokens', 'mean_sqrt_len_tokens', 'cls_token'], default='cls_token', help='the type of sentence embedding')
+parser.add_argument("--es_chunk_size", default=500, type=int, help="Number of docs in one chunk sent to es")
+parser.add_argument("--es_thread_count", default=32, type=int, help="Size of the threadpool to use for the bulk requests")
+parser.add_argument("--es_queue_size", default=32, type=int, help="Size of the task queue between the main thread (producing chunks to send) and the processing threads.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -66,13 +75,30 @@ def offline_ann(index_name, doc_dir):
             index_param={"M": 16, "efConstruction": 50},
             index_type="HNSW",
         )
+    elif args.search_engine == "bes":
+
+        document_store = BaiduElasticsearchDocumentStore(
+            host=args.host,
+            port=args.port,
+            username=args.username,
+            password=args.password,
+            embedding_dim=args.embedding_dim,
+            similarity="dot_prod",
+            vector_type="bpack_vector",
+            search_fields=["content", "meta"],
+            index=args.index_name,
+            chunk_size=args.es_chunk_size,
+            thread_count=args.es_thread_count,
+            queue_size=args.es_queue_size,
+        )
+
     else:
         launch_es()
         document_store = ElasticsearchDocumentStore(
             host=args.host,
             port=args.port,
-            username="",
-            password="",
+            username=args.username,
+            password=args.password,
             embedding_dim=args.embedding_dim,
             index=index_name,
             search_fields=args.search_fields,  # 当使用了多路召回并且搜索字段设置了除content的其他字段，构建索引时其他字段也需要设置，例如：['content', 'name']。
@@ -128,6 +154,23 @@ def delete_data(index_name):
             index_param={"M": 16, "efConstruction": 50},
             index_type="HNSW",
         )
+    elif args.search_engine == "bes":
+
+        document_store = BaiduElasticsearchDocumentStore(
+            host=args.host,
+            port=args.port,
+            username=args.username,
+            password=args.password,
+            embedding_dim=args.embedding_dim,
+            similarity="dot_prod",
+            vector_type="bpack_vector",
+            search_fields=["content", "meta"],
+            index=args.index_name,
+            chunk_size=args.es_chunk_size,
+            thread_count=args.es_thread_count,
+            queue_size=args.es_queue_size,
+        )
+
     else:
         document_store = ElasticsearchDocumentStore(
             host=args.host,
