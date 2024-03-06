@@ -2433,7 +2433,6 @@ class PipelinePretrainedModel(PretrainedModel):
             self._pp_to_single_mapping = None
 
     def __init__(self, config, *args, **kwargs):
-        # raise ValueError("PipelinePretrainedModel init")
         self.__init_hook__()
         super().__init__(config, *args, **kwargs)
 
