@@ -1262,12 +1262,16 @@ class Trainer:
                 self.args.train_batch_size * self.args.gradient_accumulation_steps * self.args.dataset_world_size
             )
             num_steps = self.state.global_step - self._globalstep_last_logged
+            seq_length = None
+            if getattr(self, "is_pretraining", False) and hasattr(self.model, "config"):
+                seq_length = getattr(self.model.config, "seq_length", None)
             logs.update(
                 speed_metrics(
                     "interval",
                     self._globalstep_last_start_time,
                     num_samples=total_train_batch_size * num_steps,
                     num_steps=num_steps,
+                    seq_length=seq_length,
                 )
             )
 
@@ -1968,17 +1972,7 @@ class Trainer:
         outputs = model(**inputs)
 
         if self.criterion is not None:
-
-            def to_list(value):
-                if value is None:
-                    return value
-                if isinstance(value, (list, tuple)):
-                    return list(value)
-                return [value]
-
-            criterion_inputs = to_list(outputs)
-            criterion_labels = to_list(labels)
-            loss = self.criterion(*(criterion_inputs + criterion_labels))
+            loss = self.criterion(outputs, labels)
             outputs = (loss, outputs)
 
         # Save past state if it exists
