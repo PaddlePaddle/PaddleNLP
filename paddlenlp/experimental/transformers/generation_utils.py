@@ -268,63 +268,7 @@ class GenerationInferenceModel(GenerationMixin):
         model_kwargs["next_tokens"] = next_tokens
         return model_kwargs
 
-    def _speculative_sampling(
-        candidate_input_ids,
-        candidate_logits,
-        candidate_length,
-        new_logits,
-        last_assistant_token_is_eos,
-        max_matches,
-    ):
-        """
-        Applies sampling as in the speculative decoding paper (https://arxiv.org/pdf/2211.17192.pdf, algorithm 1). Returns
-        the selected tokens, as well as the number of candidate matches.
 
-        NOTE: Unless otherwise stated, the variable names match those in the paper.
-        """
-        new_candidate_input_ids = candidate_input_ids[:, -candidate_length:]
-        # Gets the probabilities from the logits. q_i and p_i denote the assistant and model probabilities of the tokens
-        # selected by the assistant, respectively.
-        q = candidate_logits.softmax(dim=-1)
-        q_i = q[:, paddle.arange(candidate_length), new_candidate_input_ids].squeeze(0, 1)
-        p = new_logits.softmax(dim=-1)
-        p_i = p[:, paddle.arange(candidate_length), new_candidate_input_ids].squeeze(0, 1)
-        probability_ratio = p_i / q_i
-
-        # When probability_ratio > 1 (i.e. q_i(x) < p_i(x), or "assistant probability of the candidate token is smaller
-        # than the model probability for the same token"), keep the token. Otherwise reject with p = 1 - probability_ratio
-        # (= keep with p = probability_ratio). Keep all the tokens until the first rejection
-        r_i = paddle.rand(probability_ratio.shape)
-        is_accepted = r_i <= probability_ratio
-        n_matches = ((~is_accepted).cumsum(dim=-1) < 1).sum()  # this is `n` in algorithm 1
-
-        # Ensure we don't generate beyond max_len or an EOS token (not in algorithm 1, but needed for correct behavior)
-        if last_assistant_token_is_eos and n_matches == candidate_length:
-            # Output length is assumed to be `n_matches + 1`. Since we won't generate another token with the target model
-            # due to acceptance on EOS we fix `n_matches`
-            n_matches -= 1
-            valid_tokens = new_candidate_input_ids[:, : n_matches + 1]
-        else:
-            n_matches = min(n_matches, max_matches)
-
-            # Next token selection: if there is a rejection, adjust the distribution from the main model before sampling.
-            gamma = min(candidate_logits.shape[1], max_matches)
-            p_n_plus_1 = p[:, n_matches, :]
-            if n_matches < gamma:
-                q_n_plus_1 = q[:, n_matches, :]
-                p_prime = paddle.clip((p_n_plus_1 - q_n_plus_1), min=0)
-                p_prime.div_(p_prime.sum())
-            else:
-                p_prime = p_n_plus_1
-            t = paddle.multinomial(p_prime, num_samples=1).squeeze(1)[None, :]
-
-            # The selected tokens include the matches (if any) plus the next sampled tokens
-            if n_matches > 0:
-                valid_tokens = paddle.concat((new_candidate_input_ids[:, :n_matches], t), dim=-1)
-            else:
-                valid_tokens = t
-
-        return valid_tokens, n_matches
 
     def assisted_decoding(
         self,
@@ -340,6 +284,7 @@ class GenerationInferenceModel(GenerationMixin):
         gamma=5, # the max token_num assistant model generate one stage
         **model_kwargs,
     ):
+        print("--------inital input_ids's shape: ", input_ids.shape)
         logits_processor = logits_processor if logits_processor is not None else LogitsProcessorList()
         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
         pad_token_id = pad_token_id if pad_token_id is not None else self.generation_config.pad_token_id
@@ -351,6 +296,7 @@ class GenerationInferenceModel(GenerationMixin):
         step_idx_ori = paddle.full(shape=[1], dtype="int64", fill_value=1)
         batch = input_ids.shape[0] if input_ids is not None else inputs_embeds.shape[0]
         target_model_inputs["all_input_ids"] = input_ids
+        assistant_model_inputs["all_input_ids"] = input_ids
 
         eos_token_id = target_model_inputs.pop("eos_token_id", None)
         inputs_embeds = target_model_inputs.pop("inputs_embeds", None)
@@ -360,13 +306,14 @@ class GenerationInferenceModel(GenerationMixin):
         assistant_model_attention_mask = assistant_model_inputs.get("attention_mask", None)
 
 
-        def update_model_kwargs_for_generation(self, cache, just_decoder, eos_token_id, model_kwargs):
+        def update_model_kwargs_for_generation(cache, just_decoder, eos_token_id, model_kwargs):
             if cache is None:
                 model_kwargs["step_idx"] = paddle.where(
                     model_kwargs["seq_len_encoder"] == 0,
                     model_kwargs["step_idx"],
                     model_kwargs["step_idx"] + 1,
                 )
+
             else:
                 model_kwargs["step_idx"] = paddle.where(
                     model_kwargs["stop_flags"],
@@ -375,51 +322,14 @@ class GenerationInferenceModel(GenerationMixin):
                 )
             length_cond = paddle.greater_equal(model_kwargs["step_idx"], model_kwargs["max_dec_len"])
             model_kwargs["stop_flags"] = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
-            if cache is None:
-                next_tokens = paddle.where(just_decoder, paddle.full_like(next_tokens, -1), next_tokens)
-            next_tokens, model_kwargs["stop_flags"] = set_stop_value_multi_ends(
-                next_tokens, model_kwargs["stop_flags"], eos_token_id, 2
-            )  # multi ends
 
             if cache is None:
-                # encoder's generation
-                model_kwargs["tgt_ids"] = paddle.where(just_decoder, model_kwargs["tgt_ids"], next_tokens)
-                if self.config["position_encoding_2d"] and self.config.position_encoding_2d is True:
-                    tgt_pos = model_kwargs["tgt_pos"]
-                    new_position_id = tgt_pos[:, 0, :].clone()
-                    new_block_id = tgt_pos[:, 1, :].clone()
-                    new_block_id = new_block_id + 1
-
-                    model_kwargs["tgt_pos"] = paddle.concat(
-                        [new_position_id.unsqueeze(1), new_block_id.unsqueeze(1)], axis=1
-                    )
-                else:
-                    model_kwargs["tgt_pos"] = paddle.where(
-                        just_decoder, model_kwargs["tgt_pos"], model_kwargs["tgt_pos"] + 1
-                    )
                 model_kwargs["seq_len_decoder"] = paddle.where(
                     model_kwargs["stop_flags"],
                     model_kwargs["seq_len_decoder"] - model_kwargs["seq_len_decoder"],
                     model_kwargs["seq_len_decoder"],
                 )
             else:
-                model_kwargs["tgt_ids"] = next_tokens
-                if self.config["position_encoding_2d"] and self.config.position_encoding_2d is True:
-                    tgt_pos = model_kwargs["tgt_pos"]
-                    new_position_id = tgt_pos[:, 0, :].clone()
-                    new_block_id = tgt_pos[:, 1, :].clone()
-                    new_block_id = new_block_id + 1
-
-                    model_kwargs["tgt_pos"] = paddle.concat(
-                        [new_position_id.unsqueeze(1), new_block_id.unsqueeze(1)], axis=1
-                    )
-                else:
-                    model_kwargs["tgt_pos"] = paddle.where(
-                        model_kwargs["stop_flags"],
-                        model_kwargs["tgt_pos"],
-                        model_kwargs["tgt_pos"] + 1,
-                    )
-
                 model_kwargs["seq_len_decoder"] = paddle.where(
                     model_kwargs["stop_flags"],
                     model_kwargs["seq_len_decoder"],
@@ -432,12 +342,33 @@ class GenerationInferenceModel(GenerationMixin):
                     model_kwargs["seq_len_decoder"],
                 )
             return model_kwargs
+
+
+        def update_target_model_kwargs_for_generation(cache, gamma, model_kwargs):
+            if cache is None:
+                model_kwargs["step_idx"] = paddle.where(
+                    model_kwargs["seq_len_encoder"] == 0,
+                    model_kwargs["step_idx"],
+                    model_kwargs["step_idx"] + 1,
+                )
+            else:
+                model_kwargs["step_idx"] = paddle.where(
+                    model_kwargs["stop_flags"],
+                    model_kwargs["step_idx"],
+                    model_kwargs["step_idx"] + 1,
+                )
+                model_kwargs["seq_len_decoder"] += gamma
+            length_cond = paddle.greater_equal(model_kwargs["step_idx"], model_kwargs["max_dec_len"])
+            model_kwargs["stop_flags"] = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
+
+            return model_kwargs
+
         def _forward_(model, input_ids, cache_kvs, **args):
             # cache_kvs is never empty because it is passed as a parameter in def sample.
             model_inputs = model.prepare_inputs_for_generation(input_ids, cache_kvs, **args)
             return model(**model_inputs)
 
-        def _post_process_(outputs, step_idx_ori, model_kwargs):
+        def _post_process_(outputs, step_idx_ori, is_target_model, model_kwargs):
             cache = model_kwargs.get("cache", None)
             just_decoder = model_kwargs["seq_len_encoder"] == 0
             if cache is None:  # first decoder
@@ -470,14 +401,18 @@ class GenerationInferenceModel(GenerationMixin):
                 eos_token_id,
             )
 
-            model_kwargs = update_model_kwargs_for_generation(
-                cache, just_decoder, eos_token_id, model_kwargs
+            if is_target_model:
+                model_kwargs = update_target_model_kwargs_for_generation(
+                    cache, gamma, model_kwargs
             )
+            else:
+                model_kwargs = update_model_kwargs_for_generation(
+                    cache, just_decoder, eos_token_id, model_kwargs
+                )
 
             return logits
 
-
-        eos_token_id_tensor = paddle.to_tensor(eos_token_id).to(input_ids.device) if eos_token_id is not None else None
+        eos_token_id_tensor = paddle.to_tensor(eos_token_id) if eos_token_id is not None else None
         max_len = stopping_criteria[0].max_length
         while True:
             # Assistant: main logic start
@@ -496,33 +431,34 @@ class GenerationInferenceModel(GenerationMixin):
                 assistant_model_logits = _post_process_(
                     _forward_(assistant_model, input_ids, assistant_model_cache_kvs, **assistant_model_inputs),
                     step_idx_ori,
-                    model_kwargs,
-                )
+                    False, # is_target_model
+                    assistant_model_inputs,
+                ) # assistant_model_logits: [bsz, vocab_size]
                 # gives it a value, means we will entered into decoder phase.
                 assistant_model_inputs["cache"] = 0
                 step_idx_ori += 1
 
                 assistant_model_logits = paddle.cast(assistant_model_logits, paddle.float32)
                 # 因为投机采样小模型需要输出 gamma 个 token 的 logits，所以需要在 seq_len 维度进行拼接
-                if assistant_model_output_logits is None:
+                if assistant_model_output_logits is None: # assistant_model_output_logits: [bsz, seq_len, vocab_size]
                     assistant_model_output_logits = assistant_model_logits
                     # 原来是 [bsz, vocab_size] -> [bsz, 1, vocab_size] (添加一个 seq_len 维度)
                     assistant_model_output_logits = assistant_model_output_logits[:, None, :]
                 else:
-                    assistant_model_output_logits = paddle.concat((assistant_model_output_logits, assistant_model_logits), axis=1)
+                    assistant_model_output_logits = paddle.concat((assistant_model_output_logits, assistant_model_logits[:,None]), axis=1)
                 # 1.2. greedily select the next candidate token
-                if len(logits_processor) > 0:
-                    assistant_model_output_logits[:, -1, :] = logits_processor(
-                        candidate_input_ids, assistant_model_output_logits[:, -1, :]
-                    )
-                new_token = assistant_model_logits[:, -1, :].argmax(dim=-1)
+   
+                assistant_model_output_logits[:, -1, :] = logits_processor(
+                    candidate_input_ids, assistant_model_output_logits[:, -1, :]
+                )
+                new_token = assistant_model_logits.argmax(axis=-1)
                 candidate_input_ids = paddle.concat((candidate_input_ids, new_token[:, None]), axis=-1) # new_token[:, None] 会给 new_token 增加一个维度,[2,3]->[2,1,3]
                 candidate_logits = assistant_model_output_logits
                 # 1.3. stop assistant generation on EOS
                 if eos_token_id_tensor is not None:
                     last_assistant_token_is_eos = new_token.tile(eos_token_id_tensor.shape[0], 1)
                     last_assistant_token_is_eos = (
-                        ~last_assistant_token_is_eos.ne(eos_token_id_tensor.unsqueeze(1)).prod(dim=0).bool()
+                        ~last_assistant_token_is_eos.not_equal(eos_token_id_tensor.unsqueeze(1)).to(paddle.bool)
                     )
                     if last_assistant_token_is_eos:
                         break
@@ -538,48 +474,67 @@ class GenerationInferenceModel(GenerationMixin):
             # 2.1. Run a forward pass on the candidate sequence
             # 👉 大模型推理
             step_idx_ori = paddle.full(shape=[1], dtype="int64", fill_value=1)
+            print("-------candidate_input_ids's shape: ", candidate_input_ids.shape)
+
+            target_model_inputs["seq_lens_this_time"][0] = candidate_input_ids.shape[1]
+
+            if target_model_inputs.get("cache") is None:
+                target_model_input = candidate_input_ids
+            else:
+                print("you got here5")
+                target_model_input = candidate_input_ids[:, -gamma:]
+                target_model_inputs["seq_lens_this_time"][0] = gamma
+
             target_model_outputs_logits = _post_process_(
-                _forward_(self, candidate_input_ids, target_model_cache_kvs, **target_model_inputs),
+                _forward_(self, target_model_input, target_model_cache_kvs, **target_model_inputs),
                 step_idx_ori,
-                model_kwargs,
+                True, # is_target_model
+                target_model_inputs,
             )
+            target_model_inputs["cache"] = 0
+            print("!!!!!target model generated logits!!!!!!")
             
             # 2.2. Process the new logits
             new_logits = target_model_outputs_logits[:, -candidate_length - 1 :]  # excludes the input prompt if present
-            if len(logits_processor) > 0:
-                for i in range(candidate_length):
-                    new_logits[:, i, :] = logits_processor(candidate_input_ids[:, : cur_len + i], new_logits[:, i, :])
-            if len(logits_warper) > 0:
-                for i in range(candidate_length):
-                    new_logits[:, i, :] = logits_warper(candidate_input_ids[:, : cur_len + i], new_logits[:, i, :])
+            print("-------new_logits's shape: ", new_logits.shape)
+
+            for i in range(candidate_length):
+                new_logits[:, i] = logits_processor(candidate_input_ids[:, : cur_len + i], new_logits[:, i])
+            # if len(logits_warper) > 0:
+            #     for i in range(candidate_length):
+            #         new_logits[:, i, :] = logits_warper(candidate_input_ids[:, : cur_len + i], new_logits[:, i, :])
 
             # 3. Obtain the next tokens from the original model logits.
             max_matches = max_len - cur_len - 1
-            valid_tokens, n_matches = self._speculative_sampling(
-                candidate_input_ids,
-                candidate_logits,
-                candidate_length,
-                new_logits,
-                last_assistant_token_is_eos,
-                max_matches,
-            )
-
+            valid_tokens = new_token[:,None]
+            n_matches = gamma
+            # valid_tokens, n_matches = _speculative_sampling(
+            #     candidate_input_ids,
+            #     candidate_logits,
+            #     candidate_length,
+            #     new_logits,
+            #     last_assistant_token_is_eos,
+            #     max_matches,
+            # )
+            # print("------valid_tokens: ", valid_tokens)
             # 4. Update variables according to the number of matching assistant tokens. Remember: the token generated
             # by the model after the last candidate match is also valid, as it is generated from a correct sequence.
             # Because of this last token, assisted generation search reduces to a normal greedy search/sample if there
             # is no match.
 
             # 4.1. Get the valid continuation, after the matching tokens
-            input_ids = paddle.concat((input_ids, valid_tokens), dim=-1)
+            # input_ids = paddle.concat((input_ids, valid_tokens), axis=-1)
+            input_ids = candidate_input_ids
             cur_len = input_ids.shape[-1]
-            valid_tokens_num = valid_tokens.shape[-1]
 
             # 小模型 cache_kvs 擦除
-            assistant_model_cache_kvs[:, :, :, cur_len - (gamma -  valid_tokens_num):, :] = 0
-            assistant_model_attention_mask[:, :, :, cur_len - (gamma -  valid_tokens_num):, :] = 0
+            # assistant_model_cache_kvs: [n_layer, 2, bsz, n_head, max_seq_len, d_head]
+            for i in range(len(assistant_model_cache_kvs)):
+                assistant_model_cache_kvs[i][:, :, :, cur_len - (gamma -  n_matches):, :] = 0
+            # assistant_model_attention_mask[:, :, :, cur_len - (gamma -  valid_tokens_num):, :] = 0
 
             # stop if we exceed the maximum length
-            if input_ids.shape[-1] >= max_len:
+            if input_ids.shape[-1] >= 60:
                 break
 
         return input_ids
@@ -1025,3 +980,64 @@ class GenerationBlockInferenceModel(GenerationMixin):
         )
 
         return next_tokens
+
+
+def _speculative_sampling(
+    candidate_input_ids,
+    candidate_logits,
+    candidate_length,
+    new_logits,
+    last_assistant_token_is_eos,
+    max_matches,
+):
+    """
+    Applies sampling as in the speculative decoding paper (https://arxiv.org/pdf/2211.17192.pdf, algorithm 1). Returns
+    the selected tokens, as well as the number of candidate matches.
+
+    NOTE: Unless otherwise stated, the variable names match those in the paper.
+    """
+    new_candidate_input_ids = candidate_input_ids[:, -candidate_length:]
+    # Gets the probabilities from the logits. q_i and p_i denote the assistant and model probabilities of the tokens
+    # selected by the assistant, respectively.
+    q = F.softmax(candidate_logits, axis=-1)
+    # q: [bsz, seq_len, vocab_size]
+    q_i = q[:, -candidate_length:, new_candidate_input_ids].squeeze()
+    p = F.softmax(new_logits, axis=-1)
+    # p: [bsz, gamma+1, vocab_size]
+    p_i = p[:, -candidate_length:, new_candidate_input_ids].squeeze()
+    probability_ratio = p_i / q_i
+
+    # When probability_ratio > 1 (i.e. q_i(x) < p_i(x), or "assistant probability of the candidate token is smaller
+    # than the model probability for the same token"), keep the token. Otherwise reject with p = 1 - probability_ratio
+    # (= keep with p = probability_ratio). Keep all the tokens until the first rejection
+    r_i = paddle.rand(probability_ratio.shape)
+    is_accepted = r_i <= probability_ratio
+    n_matches = ((~is_accepted).astype("int64").cumsum(axis=-1) < 1).sum()  # this is `n` in algorithm 1
+
+    # Ensure we don't generate beyond max_len or an EOS token (not in algorithm 1, but needed for correct behavior)
+    if last_assistant_token_is_eos and n_matches == candidate_length:
+        # Output length is assumed to be `n_matches + 1`. Since we won't generate another token with the target model
+        # due to acceptance on EOS we fix `n_matches`
+        n_matches -= 1
+        valid_tokens = new_candidate_input_ids[:, : n_matches + 1]
+    else:
+        n_matches = min(n_matches, max_matches)
+
+        # Next token selection: if there is a rejection, adjust the distribution from the main model before sampling.
+        gamma = min(candidate_logits.shape[1], max_matches)
+        p_n_plus_1 = p[:, n_matches]
+        if n_matches < gamma:
+            q_n_plus_1 = q[:, n_matches]
+            p_prime = paddle.clip((p_n_plus_1 - q_n_plus_1), min=0)
+            p_prime = paddle.divide(p_prime, p_prime.sum())
+        else:
+            p_prime = p_n_plus_1
+        t = paddle.multinomial(p_prime, num_samples=1).squeeze(1)[None, :]
+
+        # The selected tokens include the matches (if any) plus the next sampled tokens
+        if n_matches > 0:
+            valid_tokens = paddle.concat((new_candidate_input_ids[:, :n_matches], t), axis=-1)
+        else:
+            valid_tokens = t
+
+    return valid_tokens, n_matches

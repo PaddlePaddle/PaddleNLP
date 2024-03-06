@@ -1,13 +1,12 @@
-import argparse
 from paddlenlp.transformers import (
     AutoConfig,
-    AutoModelForCausalLM,
     AutoTokenizer,
-    ChatGLMv2Tokenizer,
     LlamaTokenizer,
-    PretrainedModel,
     PretrainedTokenizer,
 )
+from dataclasses import dataclass, field
+from paddlenlp.generation import StoppingCriteriaList, MaxLengthCriteria
+
 from paddlenlp.generation import GenerationConfig, LogitsProcessorList
 from utils import (
     dybatch_preprocess,
@@ -24,34 +23,81 @@ from utils import (
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
-import paddle
 from paddlenlp.utils.log import logger
 from paddlenlp.trainer import PdArgumentParser
 from predictor import init_dist_env, InferencePredictorMixin, BasePredictor, PredictorArgument, ModelArgument, get_ptq_multicards_num, batchfy_text
 from utils import init_chat_template
+import paddle
 
-# def parse_arguments():
-#     parser = argparse.ArgumentParser(description='args for main.py')
+@dataclass
+class PredictorArgument:
+    model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
+    assistant_model_name_or_path: str = field(default="meta-llama/Llama-2-7b-chat", metadata={"help": "The directory of model."})
+    model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
+    src_length: int = field(default=None, metadata={"help": "The max length of source text."})
+    max_length: int = field(default=None, metadata={"help": "the max length for decoding."})
+    gamma: int = field(default=5, metadata={"help": "gamma parameter for speculative sampling"})
+    max_length: int = field(default=None, metadata={"help": "the max length for decoding."})
+    top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
+    top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
+    temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
+    repetition_penalty: float = field(default=1.0, metadata={"help": "repetition penalty parameter for generation"})
+    device: str = field(default="gpu", metadata={"help": "Device"})
+    dtype: str = field(default=None, metadata={"help": "Model dtype"})
+    lora_path: str = field(default=None, metadata={"help": "The directory of LoRA parameters. Default to None"})
+    export_precache: bool = field(default=False, metadata={"help": "whether use prefix weight to do infer"})
+    prefix_path: str = field(
+        default=None, metadata={"help": "The directory of Prefix Tuning parameters. Default to None"}
+    )
+    decode_strategy: str = field(
+        default="sampling",
+        metadata={
+            "help": "the decoding strategy of generation, which should be one of ['sampling', 'greedy_search', 'beam_search']. Default to sampling"
+        },
+    )
+    use_flash_attention: bool = field(
+        default=False,
+        metadata={"help": "Whether to use flash attention"},
+    )
+    mode: str = field(
+        default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
+    )
+    inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
+    quant_type: str = field(
+        default=None,
+        metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"},
+    )
 
-#     parser.add_argument('--input', type=str, default="Any recommendations for my holidays in Abu Dhabi?")
-#     parser.add_argument('--device', type=str, default="gpu")
-#     parser.add_argument('--dtype', type=str, default="float16")
-#     parser.add_argument('--batch_size', type=int, default=1)
-#     parser.add_argument('--model_name_or_path', type=str, default="meta-llama/Llama-2-7b-chat")
-#     parser.add_argument('--approx_model_name', type=str, default="meta-llama/Llama-2-7b-chat")
-#     parser.add_argument('--target_model_name', type=str, default="meta-llama/Llama-2-7b-chat")
-#     parser.add_argument('--src_length', type=int, default=None)
-#     parser.add_argument('--max_length', type=int, default=None)
-#     parser.add_argument('--quant_type', type=str, default=None)
-#     parser.add_argument('--chat_template', type=str, default=None)
-#     parser.add_argument('--verbose', '-v', action='store_true', default=False, help='enable verbose mode')
-#     parser.add_argument('--benchmark', '-b', action='store_true', default=False, help='show benchmark results.')
-#     parser.add_argument('--profiling', '-p', action='store_true', default=False, help='collect torch profiler results.')
-#     parser.add_argument('--max_tokens', '-M', type=int, default=20, help='max token number generated.')
-#     parser.add_argument('--gamma', '-g', type=int, default=4, help='guess time.')
-#     args = parser.parse_args()
-#     return args
+    batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
+    benchmark: bool = field(
+        default=False,
+        metadata={
+            "help": "If benchmark set as `True`, we will force model decode to max_length, which is helpful to compute throughput. "
+        },
+    )
+    cachekv_int8: bool = field(
+        default=False,
+        metadata={"help": "If cachekv_int8 set as `True`, cache kv would be quantized to int8 dynamically. "},
+    )
+    chat_template: str = field(
+        default=None,
+        metadata={
+            "help": "the path of `chat_template.json` file to handle multi-rounds conversation. "
+            "If is None(do not set --chat_template argument), it will use the default `chat_template.json`;"
+            "If is equal with `model_name_or_path`, it will use the default loading; "
+            "If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
+            "If is none string, it will not use chat_template.json."
+        },
+    )
 
+
+    @property
+    def total_max_length(self):
+        return self.src_length + self.max_length
+
+    @property
+    def use_cachekv_int8(self):
+        return "dynamic" if self.cachekv_int8 else "None"
 
 
 
@@ -69,10 +115,71 @@ class SpeculativeSamplingPredictor(InferencePredictorMixin, BasePredictor):
         InferencePredictorMixin.__init__(self, config, tokenizer)
         self.model = model
         self.assistant_model = assistant_model
-        self.assistant_cache_kvs_shape = assistant_model.get_cache_kvs_shape(
-                                            assistant_model.config, 
-                                            config.batch_size, config.total_max_length)
-        self.assistant_model_cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.assistant_modelcache_kvs_shape]
+        self.assistant_model_cache_kvs_shape = self.cache_kvs_shape
+        self.assistant_model_cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.assistant_model_cache_kvs_shape]
+        self.gamma = config.gamma
+
+    def prepare_inputs_target_model(
+        self,
+        input_ids=None,
+        temperature=None,
+        top_p=None,
+        eos_token_id=None,
+        src_mask=None,
+        penalty_score=None,
+        frequency_score=None,
+        presence_score=None,
+        next_tokens=None,
+        is_block_step=None,
+        seq_lens_this_time=None,  # update
+        seq_lens_encoder=None,  # update
+        seq_lens_decoder=None,  # update
+        step_idx=None,
+        stop_flags=None,
+        rope_emb=None,
+        min_length=None,
+        max_length=None,
+        stop_nums=None,
+        bad_tokens=None,
+        not_need_stop=None,
+        block_tables=None,
+        pre_ids=None,
+        pre_caches=None,
+        cache_kvs=[],
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
+        tgt_mask=None,
+        **model_kwargs,
+    ):
+        model_kwargs["penalty_score"] = penalty_score
+        model_kwargs["frequency_score"] = frequency_score
+        model_kwargs["presence_score"] = presence_score
+        model_kwargs["seq_lens_this_time"] = seq_lens_this_time
+        model_kwargs["seq_lens_encoder"] = seq_lens_encoder
+        model_kwargs["seq_lens_decoder"] = seq_lens_decoder
+        model_kwargs["step_idx"] = step_idx
+        model_kwargs["stop_flags"] = stop_flags
+        model_kwargs["min_dec_len"] = min_length
+        model_kwargs["max_dec_len"] = max_length
+        model_kwargs["stop_nums"] = stop_nums
+        model_kwargs["rope_emb"] = rope_emb
+        model_kwargs["bad_tokens"] = bad_tokens
+        model_kwargs["block_tables"] = block_tables
+        model_kwargs["pre_ids"] = pre_ids
+        model_kwargs["not_need_stop"] = not_need_stop
+        model_kwargs["caches"] = cache_kvs
+        model_kwargs["k_quant_scales"] = k_quant_scales
+        model_kwargs["v_quant_scales"] = v_quant_scales
+        model_kwargs["k_dequant_scales"] = k_dequant_scales
+        model_kwargs["v_dequant_scales"] = v_dequant_scales
+        model_kwargs["pre_caches"] = pre_caches
+        model_kwargs["next_tokens"] = next_tokens
+        model_kwargs["is_block_step"] = is_block_step
+        model_kwargs["src_mask"] = src_mask
+        model_kwargs["tgt_mask"] = tgt_mask
+        return input_ids, model_kwargs
 
     def prepare_inputs(
         self,
@@ -87,6 +194,7 @@ class SpeculativeSamplingPredictor(InferencePredictorMixin, BasePredictor):
         temperature=None,
         top_p=None,
         eos_token_id=None,
+        seq_len_this_time=None,
         seq_len_encoder=None,
         seq_len_decoder=None,
         step_idx=None,
@@ -126,7 +234,7 @@ class SpeculativeSamplingPredictor(InferencePredictorMixin, BasePredictor):
         model_kwargs["temperature"] = temperature
         model_kwargs["inputs_embeds"] = inputs_embeds
         return input_ids, model_kwargs
-    
+
 
     @paddle.no_grad()
     def _infer(self, inputs):
@@ -141,17 +249,29 @@ class SpeculativeSamplingPredictor(InferencePredictorMixin, BasePredictor):
                 inputs[key] = paddle.to_tensor(inputs[key])
 
         inputs["cache_kvs"] = self.cache_kvs
+        inputs["seq_lens_this_time"] = paddle.full(shape=[1 # bsz 
+            , 1], fill_value=0, dtype="int32")
+
         input_ids, model_inuts = self.prepare_inputs(**inputs)
         assistant_model_inputs = model_inuts.copy()
         assistant_model_inputs["cache_kvs"] = self.assistant_model_cache_kvs
-        self.model.assisted_decoding(
+        stop_criter = StoppingCriteriaList([
+                MaxLengthCriteria(max_length=20),
+            ])
+        output_ids = self.model.assisted_decoding(
             input_ids,
             model_inuts,
             assistant_model_inputs,
-            self.assistant_model
+            self.assistant_model,
+            stopping_criteria=stop_criter
         )
-        return None
+        return output_ids
 
+    def _postprocess(self, predictions):
+        decoded_predictions = self.tokenizer.batch_decode(
+            predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False
+        )
+        return decoded_predictions
 
 def create_predictor(
     predictor_args: PredictorArgument,
@@ -235,19 +355,21 @@ def create_predictor(
         # Turn on GEMM int8 kernel tuning
         paddle.base.core.enable_autotune()
         paddle.base.core.update_autotune_status()
-    
-    from paddlenlp.experimental.transformers import (
-        LlamaForCausalLMInferenceModel as LlamaInferenceModel,
-    )
 
-    model = LlamaInferenceModel.from_pretrained(
+    from paddlenlp.experimental.transformers import LlamaForCausalLMSpecuInferenceModel
+    config.gamma = predictor_args.gamma
+    config.max_seq_len = predictor_args.total_max_length
+
+    model = LlamaForCausalLMSpecuInferenceModel.from_pretrained(
         predictor_args.model_name_or_path,
         config=config,
         dtype=predictor_args.dtype,
     )
     model.eval()
 
-    assistant_model = LlamaInferenceModel.from_pretrained(
+    from paddlenlp.experimental.transformers import LlamaForCausalLMInferenceModel
+
+    assistant_model = LlamaForCausalLMInferenceModel.from_pretrained(
         predictor_args.assistant_model_name_or_path,
         config=config,
         dtype=predictor_args.dtype,
@@ -260,17 +382,15 @@ def create_predictor(
 
 
 if __name__ == '__main__':
-    # args = parse_arguments()
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
-    predictor_args.assistant_model_name_or_path = "meta-llama/Llama-2-7b-chat"
     paddle.set_device(predictor_args.device)
     paddle.set_default_dtype(predictor_args.dtype)
 
     predictor = create_predictor(predictor_args, model_args)
 
-    source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
-    target_texts = ["", ""]
+    source_texts = ["你好，请问你是谁?"]
+    target_texts = [""]
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
 
