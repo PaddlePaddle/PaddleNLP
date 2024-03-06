@@ -1062,6 +1062,7 @@ class ConversionMixin:
 
         model_weight_file = os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)
         paddle.save(state_dict, model_weight_file)
+
         return state_dict
 
     @classmethod
