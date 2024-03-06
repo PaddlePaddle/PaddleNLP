@@ -256,6 +256,7 @@ class TrainingArguments:
               enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation
               enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed
               enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap.
+              enable_stage2_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner sharding accumute step. instead of div accumute step on loss directly.
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -621,6 +622,7 @@ class TrainingArguments:
                 "enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation\n"
                 "enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed\n"
                 "enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap"
+                "enable_stage2_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner sharding accumute step. instead of div accumute step on loss directly.\n"
             )
         },
     )
@@ -991,6 +993,7 @@ class TrainingArguments:
                         # "delay_scale_loss": True, Fix ME
                     }
                     logger.info(f"PP configs:{strategy.pipeline_configs}, use master_grad: {self.amp_master_grad}")
+
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
                         "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config
@@ -1115,11 +1118,12 @@ class TrainingArguments:
                                 "enable_stage1_tensor_fusion",
                                 "enable_stage1_overlap",
                                 "enable_stage2_overlap",
+                                "enable_stage2_delay_scale_loss",
                                 "split_param",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, "
-                                    f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap."
+                                    f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap, enable_stage2_delay_scale_loss."
                                 )
                     try:
                         if "split_param" in sharding_parallel_config:
@@ -1150,6 +1154,14 @@ class TrainingArguments:
                         assert (
                             ShardingOption.SHARD_GRAD_OP in self.sharding
                         ), f"enable_stage2_overlap expects sharding=stage2, but got {self.sharding}."
+                        assert self.logging_steps > 1, (
+                            "The logging_steps should be greater than 1 for stage2 overlap, "
+                            f"but got logging_steps={self.logging_steps}."
+                        )
+                    if "enable_stage2_delay_scale_loss" in sharding_parallel_config:
+                        assert (
+                            ShardingOption.SHARD_GRAD_OP in self.sharding
+                        ), f"enable_stage2_delay_scale_loss expects sharding=stage2, but got {self.sharding}."
                         assert self.logging_steps > 1, (
                             "The logging_steps should be greater than 1 for stage2 overlap, "
                             f"but got logging_steps={self.logging_steps}."

@@ -1021,6 +1021,18 @@ class Trainer:
                                 elif p.grad is not None:
                                     p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
 
+                    # sharding stage2 dp and stage2
+                    if self.sharding and ShardingOption.SHARD_GRAD_OP in self.args.sharding:
+                        sharding_parallel_config = set(self.args.sharding_parallel_config.split(" "))
+                        enable_stage_delay_scale_loss = "enable_stage2_delay_scale_loss" in sharding_parallel_config
+                        if enable_stage_delay_scale_loss:
+                            for p in model._layers.parameters():
+                                with paddle.no_grad():
+                                    if hasattr(p, "main_grad") and p.main_grad is not None:
+                                        assert p.grad is None
+                                        p.main_grad.scale_(1.0 / self.args.gradient_accumulation_steps)
+                                    elif p.grad is not None:
+                                        p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
                     # Optimizer step
                     self.callback_handler.on_optimizer_begin(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
@@ -2024,8 +2036,19 @@ class Trainer:
         model.train()
         inputs = self._prepare_inputs(inputs)
 
+        is_sharding_stage2 = self.sharding and ShardingOption.SHARD_GRAD_OP in self.args.sharding
+        scale_loss = True
+        # Scale_loss will never be called when 'stage2' and 'enable_stage2_delay_scale_loss' are both true.
+        if is_sharding_stage2:
+            sharding_parallel_config = set(self.args.sharding_parallel_config.split(" "))
+            enable_stage_delay_scale_loss = "enable_stage2_delay_scale_loss" in sharding_parallel_config
+            scale_loss = not enable_stage_delay_scale_loss
+
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
+            # add delay_scale_loss for sharding stage1
+            if scale_loss:
+                loss = loss / self.args.gradient_accumulation_steps
 
         if self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = loss / self.args.gradient_accumulation_steps
