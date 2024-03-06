@@ -27,3 +27,4 @@ deploy
 ray
 loguru
 data
+wget
