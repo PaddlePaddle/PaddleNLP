@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
 import copy
 import inspect
 import itertools
@@ -31,7 +32,7 @@ from models.model_pp import make_position_ids
 from models.ppo_model_utils import RLHFPPOMixedLoss, RLHFValueLoss, create_loss
 from paddle.distributed import fleet
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
-from paddle.utils import map_structure
+from paddle.utils import map_structure, try_import
 from rich.console import Console
 from rich.table import Table
 
@@ -62,6 +63,7 @@ from paddlenlp.trainer.trainer import (
 from paddlenlp.transformers import BatchEncoding, PretrainedModel, PretrainedTokenizer
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.model_outputs import ModelOutput
+from paddlenlp.transformers.model_utils import dtype_guard
 from paddlenlp.transformers.tokenizer_utils_base import (
     PaddingStrategy,
     TruncationStrategy,
@@ -800,6 +802,382 @@ class PipeEvalModel(GenerationMixin):
         return model_inputs
 
 
+import types
+
+from predictor import DygraphInferencePredictor, InferencePredictorMixin
+
+
+class Timer:
+    def __init__(self, name):
+        self.name = name
+        self.tic_time = None
+        self.run_times = 0
+
+    def tic(self):
+        self.tic_time = time.time()
+
+    def toc(self):
+        self.run_times += time.time() - self.tic_time
+
+
+class Predictor(DygraphInferencePredictor):
+    def __init__(self, config, model: PretrainedModel = None, tokenizer: PretrainedTokenizer = None):
+        self.model_config = model.config
+        self.config = config
+        self.tokenizer = tokenizer
+        self.model = model
+        self.is_available = False
+        self._weights_mapping = None
+        # use multi stream to load weights
+        # self._stream_num = 4
+        # self._streams = []
+        # for i in range(self._stream_num):
+        #     stream = paddle.device.cuda.Stream()
+        #     self._streams.append(stream)
+        # self._param_counter = 0
+        # print("=" * 20, "cache shape", self.cache_kvs_shape, list(self.__dict__.keys()))
+        # exit(0)
+
+    @staticmethod
+    def create_predictor(trainer):
+        from predictor import (
+            PdArgumentParser,
+            PredictorArgument,
+            get_model_max_position_embeddings,
+        )
+
+        # create infer model
+        # NOTE:infer model use static name param_attr to create and cannot be
+        # created multiple times.
+        def create_infer_model(model, dtype, set_state=False):
+            # patches for inference model to make FuseMT adapt
+            import paddlenlp_ops
+
+            # should patch before infer model import
+            paddlenlp_ops.save_with_output = lambda *args, **kwargs: None
+            # TODO(guosheng): update the custom op code directly.
+            ori_set_ends = paddlenlp_ops.set_stop_value_multi_ends
+
+            def _set_ends(topk_ids, stop_flags, end_ids, mode):
+                # infer model uses eos_token_id to pad and discriminate ending,
+                # patch to use pad_token_id to pad to unify with non-infer model.
+                topk_ids_out, stop_flags_out = ori_set_ends(topk_ids, stop_flags, end_ids, mode)
+                if trainer.tokenizer.pad_token_id != trainer.tokenizer.eos_token_id:
+                    topk_ids_out = paddle.where(stop_flags, trainer.tokenizer.pad_token_id, topk_ids_out)
+                return topk_ids_out, stop_flags_out
+
+            paddlenlp_ops.set_stop_value_multi_ends = _set_ends
+            from models.infer_model_utils import _update_model_kwargs
+
+            import paddlenlp.experimental.transformers as infer_transformers
+
+            config = copy.deepcopy(model.config)
+            hcg = fleet.get_hybrid_communicate_group()  # may differ with training
+            config.tensor_parallel_degree = hcg.get_model_parallel_world_size()
+            config.tensor_parallel_rank = hcg.get_model_parallel_rank()
+            config.weight_only_quant_bits = -1
+            config.quant_type = None
+            config.use_cachekv_int8 = False
+            config.single_card_ptq = True
+            infer_model_cls = getattr(infer_transformers, model.__class__.__name__ + "InferenceModel")
+            with dtype_guard(dtype):
+                infer_model = infer_model_cls(config)
+            # apply patches
+            infer_model.update_model_kwargs_for_generation = types.MethodType(_update_model_kwargs, infer_model)
+            if set_state:
+                state_dict = {}
+                for k, v in model.state_dict().items():
+                    # state_dict[k] = np.from_dlpack(paddle.utils.dlpack.to_dlpack(v))
+                    state_dict[k] = v.numpy()
+                infer_model.set_state_dict(state_dict)
+            return infer_model
+
+        # to avoid oom, clear param of infer_model imediately
+        ori_creat_param = paddle.nn.Layer.create_parameter
+
+        def _create_param(self, *args, **kwargs):
+            param = ori_creat_param(self, *args, **kwargs)
+            param._clear_data()
+            return param
+
+        paddle.nn.Layer.create_parameter = _create_param
+        infer_model = create_infer_model(trainer.model, dtype=trainer.amp_dtype)
+        paddle.nn.Layer.create_parameter = ori_creat_param
+
+        # create predictor
+        parser = PdArgumentParser((PredictorArgument,))
+        predictor_args = parser.parse_dict(
+            {
+                "src_length": get_model_max_position_embeddings(  # can be changed dynamically by predictor.input_length
+                    trainer.model.config
+                ),
+                "max_length": trainer.args.max_length,
+                "dtype": trainer.amp_dtype,
+                "batch_size": trainer.args.per_device_train_batch_size,
+                # infer model do not support top_k, and differ with non-infer model
+                # generation which gets default top_K=50 using generation_config.top_k
+                "top_p": 0.8,
+                # trainer.args.top_p,
+                "temperature": trainer.args.temperature,
+                "repetition_penalty": trainer.args.repetition_penalty,
+            }
+        )[0]
+        policy_predictor = Predictor(predictor_args, model=infer_model, tokenizer=trainer.tokenizer)
+        return policy_predictor
+
+    def _create_caches(self):
+        """inputs can be reused among multiple predictions, such as cache"""
+        if hasattr(self, "cache_kvs_shape"):  # has created cache
+            input_length = getattr(self, "input_length", 0)
+            if input_length <= self.config.src_length:  # reuse cahce
+                return
+            else:  # create longer cache
+                self._clear_caches()
+        self.config.src_length = getattr(self, "input_length", self.config.src_length)
+        if not hasattr(self, "_buffer_attrs"):
+            pre_attrs = set(self.__dict__.keys())
+        self.cache_kvs_shape = self.model.get_cache_kvs_shape(
+            self.model_config, self.config.batch_size, self.config.total_max_length
+        )
+        # TODO: remove GenerationConfig.from_pretrained
+        InferencePredictorMixin.__init__(self, self.config, self.tokenizer)
+        if not hasattr(self, "_buffer_attrs"):
+            self._buffer_attrs = set(self.__dict__.keys()) - pre_attrs
+
+    def _clear_caches(self):
+        # del or offload
+        for attr in self._buffer_attrs:
+            delattr(self, attr)
+
+    def disable(self, model, onload_model=True):
+        # clear caches
+        self._clear_caches()
+        # clear params
+        for _, param in self.model.state_dict().items():
+            param._clear_data()
+        if onload_model:
+            model.to(paddle.device.get_device())
+        self.is_available = False
+
+    def enable(self, model, offload_model=True):
+        if self.is_available:
+            return
+        # set params
+        self.set_state_dict(model, offload_model)
+        self.is_available = True
+
+    @paddle.no_grad()
+    def set_state_dict(self, model, offload_model=True):
+        offload_place = paddle.CUDAPinnedPlace()
+        state_dict = {}
+        for k, v in model.state_dict().items():
+            # maybe use dlpack or some other zero-copy methods
+            state_dict[k] = v  # .numpy()
+            # state_dict[k] = v.to(offload_place)
+        # self.model.set_state_dict(state_dict)
+        # return
+
+        if getattr(self, "_weights_mapping", None) is None:
+            self._weights_mapping = self.model.get_weights_mapping()
+        convert_timer = Timer("cpu-convert")
+        set_timer = Timer("cpu-convert")
+        set_timer.tic()
+        # import nvtx
+
+        # set_rng = nvtx.start_range(message=f"set_state_dict", color="yellow")
+
+        for k, v in self._weights_mapping.items():
+            # with paddle.device.cuda.stream_guard(
+            #         self._streams[self._param_counter % self._stream_num]):
+            with contextlib.nullcontext():
+                # set_param_rng = nvtx.start_range(message=f"set_param",
+                #                                  color="green")
+                param, (convert_fun, args) = k, v
+                args = [state_dict[name] for name in args]
+                # maybe use thread pool to speedup cpu convert
+                # value = paddle.to_tensor(convert_fun(*args))
+                convert_timer.tic()
+                # with device_guard("cpu"):
+                # op with pinmemory input tensors get gpu output tensor
+                value = convert_fun(*args)
+                if offload_model:
+                    for arg in args:
+                        # shared params no need to offload
+                        if value is not arg:
+                            arg.to(offload_place, blocking=False)
+                convert_timer.toc()
+                if not isinstance(value, paddle.Tensor):
+                    param.set_value(value)
+                elif isinstance(value.place, paddle.CUDAPlace):
+                    # param.get_tensor()._share_data_with(value)
+                    value._share_buffer_to(param)
+                else:
+                    param.copy_(value, False)
+                # nvtx.end_range(set_param_rng)
+            # self._param_counter += 1
+        paddle.device.cuda.synchronize()
+        set_timer.toc()
+        # nvtx.end_range(set_rng)
+        print("=" * 20, "cpu-convert time", convert_timer.run_times, set_timer.run_times)
+        # exit(0)
+        # print("=" * 20, "lm_head.weight", self.model.lm_head.weight)
+        # print("=" * 20, "llama.embed_tokens.weight",
+        #       self.model.llama.embed_tokens.weight)
+        # print("=" * 20, "llama.transformer_block.qkv_weights",
+        #       self.model.llama.transformer_block.qkv_weights[0])
+        # print("=" * 20, "llama.transformer_block.ffn1_weights",
+        #       self.model.llama.transformer_block.ffn1_weights[0])
+        # print("=" * 20, "llama.transformer_block.linear_weights",
+        #       self.model.llama.transformer_block.linear_weights[0])
+
+    def _preprocess(self, source):
+        # make cache when infer happens to get actual shape to save memory
+        self._create_caches()
+        return super()._preprocess(source)
+
+    @paddle.no_grad()
+    def _infer(self, inputs):
+        for key in inputs.keys():
+            if paddle.is_tensor(inputs[key]):
+                continue
+            if isinstance(inputs[key], list):
+                if paddle.is_tensor(inputs[key]):
+                    continue
+                inputs[key] = [paddle.to_tensor(item) for item in inputs[key]]
+            else:
+                inputs[key] = paddle.to_tensor(inputs[key])
+
+        inputs["cache_kvs"] = self.cache_kvs
+        print("=" * 20, "infer input_ids", inputs["input_ids"])
+        return self.model.generate(**inputs)
+
+    def _postprocess(self, predictions):
+        return predictions
+
+
+policy_predictor: Predictor = None
+
+
+def check_memory_usage(msg=""):
+    import paddle
+
+    max_memory_allocated_size = paddle.device.cuda.max_memory_allocated() / (1024 * 1024 * 1024)
+    max_memory_reserved_size = paddle.device.cuda.max_memory_reserved() / (1024 * 1024 * 1024)
+    memory_allocated_size = paddle.device.cuda.memory_allocated() / (1024 * 1024 * 1024)
+    memory_reserved_size = paddle.device.cuda.memory_reserved() / (1024 * 1024 * 1024)
+    mem = {
+        f"{msg}_max_memory_allocated_size": max_memory_allocated_size,
+        f"{msg}_max_memory_reserved_size": max_memory_reserved_size,
+        f"{msg}_memory_allocated_size": memory_allocated_size,
+        f"{msg}_memory_reserved_size": memory_reserved_size,
+    }
+    print(mem)
+
+
+@contextmanager
+def infer_guard(trainer, offload_model=True):
+    try:
+        try_import("paddlenlp_ops")
+    except:
+        yield
+        return
+    check_memory_usage("before infer generation")
+    global policy_predictor
+    # offload training params before infer model creation
+    model = trainer.model
+    import time
+
+    # start_time = time.time()
+    # model.to(paddle.CUDAPinnedPlace())
+    # print("=" * 20, "offload time", time.time() - start_time)
+    start_time = time.time()
+    if policy_predictor is None:
+        policy_predictor = Predictor.create_predictor(trainer)
+    if not policy_predictor.is_available:
+        policy_predictor.enable(model, offload_model=offload_model)
+    print("=" * 20, "create infer time", time.time() - start_time)
+    # TODO(guosheng): patch for dist.all_recude to use tp group, fix it later
+    import paddle.distributed as dist
+
+    ori_all_reduce = dist.all_reduce
+    ori_broadcast = dist.broadcast
+    hcg = fleet.get_hybrid_communicate_group()
+    dist.all_reduce = lambda x: ori_all_reduce(x, group=hcg.get_model_parallel_group())
+    dist.broadcast = lambda x, rank: ori_broadcast(
+        x, src=hcg.get_model_parallel_group_src_rank(), group=hcg.get_model_parallel_group()
+    )
+    check_memory_usage("begin infer generation")
+    yield
+    dist.all_reduce = ori_all_reduce
+    dist.broadcast = ori_broadcast
+    print("=" * 20, "infer generation finished")
+    import sys
+
+    print("=" * 20, "predictor refcount", sys.getrefcount(policy_predictor))
+    # policy_predictor = None
+    # policy_predictor.model = None
+    policy_predictor.disable(model, onload_model=offload_model)
+    # start_time = time.time()
+    # model.to(paddle.device.get_device())
+    # print("=" * 20, "onload time", time.time() - start_time)
+    check_memory_usage("end infer generation")
+
+
+class InferEvalModel:
+    """For faster generation, not support PipelineParallel yet."""
+
+    def __init__(self, trainer: Trainer):
+        self.model: PretrainedModel = trainer.model
+        self.tokenizer: PretrainedTokenizer = trainer.tokenizer
+
+    def eval(self):
+        self.model.eval()
+
+    def train(self):
+        self.model.train()
+
+    def __call__(self, *args, **kwargs):
+        # assert model is on GPU
+        assert policy_predictor is None or not policy_predictor.is_available
+        return self.model(*args, **kwargs)
+
+    def generate(self, *args, **kwargs):
+        if policy_predictor is None or not policy_predictor.is_available:
+            return self.model.generate(*args, **kwargs)
+
+        arg_dict = inspect.signature(self.model.generate).bind(*args, **kwargs).arguments
+        input_ids = arg_dict["input_ids"]
+        generation_config = arg_dict["generation_config"]
+        # convert text and tokenize again to convert left padding to right padding
+        # remove this if inputs is right padding
+        print("=" * 20, "raw input_ids", input_ids)
+        # TODO(guosheng): allow to use right padding to infer directly
+        prompts = self.tokenizer.batch_decode(input_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+        print("=" * 20, "prompts", prompts)
+        # decoded prompts has been applied with chat_template
+        # NOTE(guosheng): Whether to add special token should be checked, None
+        # chat_template would not add special token in predictor, since it assumes
+        # chat_template includes special tokens. While Beaver dataset tokenization
+        # does not use chat_template, it uses hard coded template which excludes
+        # special tokens.
+        with guard_set_args(
+            policy_predictor.tokenizer,
+            {
+                # predictor use right padding for infer model by default
+                # "padding_side": "right",
+                # "chat_template": None
+            },
+        ):
+            policy_predictor.input_length = input_ids.shape[-1]
+            outputs = policy_predictor.predict(prompts)
+        outputs = (outputs[0][:, input_ids.shape[-1] :],) if generation_config.trunc_input else (outputs[0],)
+        if self.tokenizer.padding_side == "left":
+            # convert back to left padding inputs
+            outputs[0][:, : input_ids.shape[-1]] = input_ids
+        print("=" * 20, "infer output_ids", outputs[0])
+        return outputs
+
+
 class PPOTrainer(Trainer):
     def __init__(
         self,
@@ -1008,7 +1386,9 @@ class PPOTrainer(Trainer):
             model = PipeEvalModel(self.policy_trainer)
             self._actor_model = model
         else:
-            model = self.policy_trainer.model
+            # model = self.policy_trainer.model
+            model = InferEvalModel(self.policy_trainer)
+            self._actor_model = model
         return model
 
     @property
@@ -1736,13 +2116,15 @@ class PPOTrainer(Trainer):
         )
         # NOTE: generation output of paddlenlp do not contain prompt, we should
         # change sequences here.
-        sequences = self.actor_model.generate(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            generation_config=self.generation_config,
-            synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
-        )[0]
+        with infer_guard(self.policy_trainer):
+            # with contextlib.nullcontext():
+            sequences = self.actor_model.generate(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                generation_config=self.generation_config,
+                synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
+            )[0]
         sequences = sequences.reshape([input_ids.shape[0], self.args.num_return_sequences, -1]).transpose([1, 0, 2])
         # sequences = [self.load_sing_gen_data(as_batches=False, use_counter=False)["input_ids"]]
 
@@ -1780,11 +2162,8 @@ class PPOTrainer(Trainer):
             reward_seq = sequence = reward_tokenize_output["input_ids"]
             reward_attention_mask = attention_mask = reward_tokenize_output["attention_mask"]
         else:
-            # for text in self.tokenizer.batch_decode(
-            #     sequence,
-            #     skip_special_tokens=True
-            # ):
-            #     print(text)
+            for text in self.tokenizer.batch_decode(sequence, skip_special_tokens=True):
+                print(text)
             reward_seq = sequence
             reward_attention_mask = attention_mask
         # position_ids is necessary for non-right padding
