@@ -34,7 +34,7 @@ from huggingface_hub.utils import EntryNotFoundError
 from .. import __version__
 from ..quantization.quantization_config import QuantizationConfig
 from ..utils import CONFIG_NAME, LEGACY_CONFIG_NAME
-from ..utils.download import get_file
+from ..utils.download import resolve_file_path
 from ..utils.downloader import hf_file_exists
 from ..utils.log import logger
 
@@ -700,7 +700,6 @@ class PretrainedConfig:
         if subfolder is None:
             subfolder = ""
 
-        # cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
         kwargs["cache_dir"] = cache_dir
         kwargs["subfolder"] = subfolder
 
@@ -746,7 +745,7 @@ class PretrainedConfig:
             if configuration_file == CONFIG_NAME
             else [configuration_file, CONFIG_NAME, LEGACY_CONFIG_NAME]
         )
-        resolved_config_file = get_file(
+        resolved_config_file = resolve_file_path(
             pretrained_model_name_or_path,
             filenames,
             subfolder,

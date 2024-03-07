@@ -24,7 +24,7 @@ from paddle.common_ops_import import convert_dtype
 
 from paddlenlp import __version__
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
-from paddlenlp.utils.download import get_file
+from paddlenlp.utils.download import resolve_file_path
 from paddlenlp.utils.log import logger
 
 from ..utils import GENERATION_CONFIG_NAME
@@ -406,9 +406,7 @@ class GenerationConfig:
         if subfolder is None:
             subfolder = ""
 
-        # cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
-
-        resolved_config_file = get_file(
+        resolved_config_file = resolve_file_path(
             pretrained_model_name_or_path,
             [config_file_name],
             subfolder,

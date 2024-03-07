@@ -55,7 +55,7 @@ from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.import_utils import import_module
 from paddlenlp.utils.log import logger
 
-from ..utils.download import get_file
+from ..utils.download import resolve_file_path
 from .aistudio_utils import aistudio_download
 
 HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
@@ -666,7 +666,7 @@ def get_checkpoint_shard_files(
     show_progress_bar = last_shard is None
     for shard_filename in tqdm.tqdm(shard_filenames, desc="Downloading shards", disable=not show_progress_bar):
         try:
-            cached_filename = get_file(
+            cached_filename = resolve_file_path(
                 pretrained_model_name_or_path,
                 [shard_filename],
                 subfolder,

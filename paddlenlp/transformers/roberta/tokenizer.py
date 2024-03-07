@@ -19,7 +19,7 @@ import os
 
 from paddle.utils import try_import
 
-from paddlenlp.utils.download import get_file
+from paddlenlp.utils.download import resolve_file_path
 
 from .. import (
     AddedToken,
@@ -603,7 +603,7 @@ class RobertaTokenizer:
             from_aistudio = kwargs.pop("from_aistudio", False)
             from_hf_hub = kwargs.pop("from_hf_hub", False)
 
-            resolved_config_file = get_file(
+            resolved_config_file = resolve_file_path(
                 pretrained_model_name_or_path,
                 [cls.tokenizer_config_file],
                 subfolder,

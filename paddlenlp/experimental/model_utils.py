@@ -24,7 +24,7 @@ import paddle
 from paddle.framework import core
 
 from paddlenlp.transformers import PretrainedModel
-from paddlenlp.utils.download import get_file
+from paddlenlp.utils.download import resolve_file_path
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddlenlp.utils.log import logger
@@ -123,7 +123,7 @@ class FasterPretrainedModel(PretrainedModel):
             if file_path is None or os.path.isfile(file_path):
                 resolved_resource_files[file_id] = file_path
                 continue
-            resolved_resource_files[file_id] = get_file(
+            resolved_resource_files[file_id] = resolve_file_path(
                 pretrained_model_name_or_path,
                 [file_path],
                 subfolder,

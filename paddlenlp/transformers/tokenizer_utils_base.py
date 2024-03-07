@@ -39,7 +39,7 @@ from huggingface_hub import (
 )
 from huggingface_hub.utils import EntryNotFoundError
 
-from ..utils.download import get_file
+from ..utils.download import resolve_file_path
 from ..utils.env import CHAT_TEMPLATE_CONFIG_NAME, TOKENIZER_CONFIG_NAME
 from ..utils.log import logger
 
@@ -1451,7 +1451,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         if subfolder is None:
             subfolder = ""
 
-        # cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
         vocab_files = {}
         init_configuration = {}
 
@@ -1493,7 +1492,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             if file_path is None or os.path.isfile(file_path):
                 resolved_vocab_files[file_id] = file_path
                 continue
-            resolved_vocab_files[file_id] = get_file(
+            resolved_vocab_files[file_id] = resolve_file_path(
                 pretrained_model_name_or_path,
                 [file_path],
                 subfolder,

@@ -19,7 +19,7 @@ import json
 import os
 from collections import OrderedDict
 
-from ...utils.download import get_file
+from ...utils.download import resolve_file_path
 from ...utils.import_utils import import_module
 from ...utils.log import logger
 
@@ -137,7 +137,6 @@ class AutoImageProcessor:
             subfolder = ""
         from_aistudio = kwargs.get("from_aistudio", False)
         from_hf_hub = kwargs.get("from_hf_hub", False)
-        # cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
         kwargs["subfolder"] = subfolder
         kwargs["cache_dir"] = cache_dir
 
@@ -159,7 +158,7 @@ class AutoImageProcessor:
                             pretrained_model_name_or_path, *model_args, **kwargs
                         )
 
-        config_file = get_file(
+        config_file = resolve_file_path(
             pretrained_model_name_or_path,
             [cls.image_processor_config_file],
             subfolder,

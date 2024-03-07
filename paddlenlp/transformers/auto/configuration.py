@@ -20,7 +20,7 @@ import os
 from collections import defaultdict
 from typing import Dict, List, Type
 
-from ...utils.download import get_file
+from ...utils.download import resolve_file_path
 from ...utils.import_utils import import_module
 from ...utils.log import logger
 from ..configuration_utils import PretrainedConfig
@@ -162,8 +162,6 @@ class AutoConfig(PretrainedConfig):
             config.save_pretrained('./bert-base-uncased')
         """
 
-        # cache_dir = resolve_cache_dir(from_hf_hub=from_hf_hub, from_aistudio=from_aistudio, cache_dir=cache_dir)
-
         if not cls.name2class:
             cls.name2class = {}
             for model_classes in cls.MAPPING_NAMES.values():
@@ -185,7 +183,7 @@ class AutoConfig(PretrainedConfig):
         from_hf_hub = kwargs.pop("from_hf_hub", False)
         cache_dir = kwargs.pop("cache_dir", None)
 
-        config_file = get_file(
+        config_file = resolve_file_path(
             pretrained_model_name_or_path,
             [cls.config_file, cls.legacy_config_file],
             subfolder,

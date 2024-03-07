@@ -50,7 +50,7 @@ def strtobool(v):
         )
 
 
-def get_file(
+def resolve_file_path(
     repo_id: str = None,
     filenames: Union[str, list] = None,
     subfolder: Optional[str] = None,
@@ -74,6 +74,30 @@ def get_file(
     from_hf_hub: bool = False,
     from_bos: bool = True,
 ) -> str:
+    """
+    This is a general download function, mainly called by the from_pretrained function.
+
+    It supports downloading files from four different download sources, including BOS, AiStudio,
+    HuggingFace Hub and ModelScope.
+
+    If you want to download a file from ModelScope, you need to set os.environ["from_modelscope"] = "True"
+
+    Args:
+        repo_id('str'): A path to a folder containing the file, a path of the file, a url or repo name.
+        filenames('str' or list): Name of the file to be downloaded. If it is a str, the file will be downloaded directly,
+            if it is a list, it will try to download the file in turn, and when one exists, it will be returned directly.
+        subfolder('str'): Some repos will exist subfolder.
+        repo_type('str'): The default is model.
+        cache_dir('str' or Path): Where to save or load the file after downloading.
+        url('str'): If it is not None, then it will be downloaded from BOS.
+        from_aistudio('bool'): If this value is true, it will be downloaded from aistudio.
+        from_hf_hub('bool'): If this value is true, it will be downloaded from hf hub.
+        from_bos('bool'): If this value is true, it will be downloaded from bos (default).
+
+
+    Returns:
+        cached_file('str'): The path of file or None.
+    """
     assert repo_id is not None, "repo_id cannot be None"
     assert filenames is not None, "filenames cannot be None"
 

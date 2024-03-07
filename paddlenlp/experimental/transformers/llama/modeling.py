@@ -1121,8 +1121,6 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         convert_from_torch = kwargs.pop("convert_from_torch", None)
         cache_dir = kwargs.pop("cache_dir", None)
 
-        # cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
-
         init_contexts = []
         with ContextManagers(init_contexts):
             model = cls(config)

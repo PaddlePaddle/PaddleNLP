@@ -65,7 +65,7 @@ from paddlenlp.utils.log import logger
 
 from ..generation import GenerationConfig, GenerationMixin
 from ..utils import device_guard
-from ..utils.download import get_file
+from ..utils.download import resolve_file_path
 from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
 from .utils import (  # convert_ndarray_dtype,
@@ -1577,7 +1577,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         f" {pretrained_model_name_or_path}."
                     )
             elif is_remote_url(pretrained_model_name_or_path):
-                resolved_archive_file = get_file(
+                resolved_archive_file = resolve_file_path(
                     pretrained_model_name_or_path,
                     pretrained_model_name_or_path,
                     subfolder,
@@ -1589,7 +1589,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             elif pretrained_model_name_or_path in cls.pretrained_init_configuration:
                 # fetch the weight url from the `pretrained_resource_files_map`
                 resource_file_url = cls.pretrained_resource_files_map["model_state"][pretrained_model_name_or_path]
-                resolved_archive_file = get_file(
+                resolved_archive_file = resolve_file_path(
                     pretrained_model_name_or_path,
                     [resource_file_url],
                     subfolder,
@@ -1619,7 +1619,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         _add_variant(PYTORCH_WEIGHTS_INDEX_NAME, variant),
                         _add_variant(PYTORCH_WEIGHTS_NAME, variant),
                     ]
-                resolved_archive_file = get_file(
+                resolved_archive_file = resolve_file_path(
                     pretrained_model_name_or_path,
                     filenames,
                     subfolder,
@@ -2081,7 +2081,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if convert_from_torch is None:
             convert_from_torch = False
 
-        # cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
         # 1. get the PretrainedConfig to init model
         if not isinstance(config, PretrainedConfig):
             config_path = config if config is not None else pretrained_model_name_or_path

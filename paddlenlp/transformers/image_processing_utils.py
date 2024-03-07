@@ -31,7 +31,7 @@ from huggingface_hub import (
 )
 from huggingface_hub.utils import EntryNotFoundError
 
-from ..utils.download import get_file
+from ..utils.download import resolve_file_path
 from ..utils.log import logger
 from .feature_extraction_utils import BatchFeature as BaseBatchFeature
 
@@ -319,11 +319,10 @@ class ImageProcessingMixin(object):
         subfolder = kwargs.pop("subfolder", "")
         if subfolder is None:
             subfolder = ""
-        # cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         is_local = os.path.isdir(pretrained_model_name_or_path)
-        resolved_image_processor_file = get_file(
+        resolved_image_processor_file = resolve_file_path(
             pretrained_model_name_or_path,
             [IMAGE_PROCESSOR_NAME],
             subfolder,

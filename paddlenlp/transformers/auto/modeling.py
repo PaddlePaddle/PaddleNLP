@@ -18,7 +18,7 @@ import json
 import os
 from collections import OrderedDict
 
-from ...utils.download import get_file
+from ...utils.download import resolve_file_path
 from ...utils.log import logger
 from .. import *  # noqa
 from ..configuration_utils import is_standard_config
@@ -272,7 +272,6 @@ class _BaseAutoModelClass:
         subfolder = kwargs.get("subfolder", "")
         if subfolder is None:
             subfolder = ""
-        # cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
         kwargs["cache_dir"] = cache_dir
         kwargs["subfolder"] = subfolder
         all_model_names = []
@@ -312,7 +311,7 @@ class _BaseAutoModelClass:
                         logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
                         return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
-        config_file = get_file(
+        config_file = resolve_file_path(
             pretrained_model_name_or_path,
             [cls.model_config_file, cls.legacy_model_config_file],
             subfolder,
