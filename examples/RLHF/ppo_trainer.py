@@ -553,11 +553,25 @@ def data_group_merge(tensors, group):
         tensor_list = []
         print("Mergeing ", tensors)
         # paddle.distributed.all_gather(tensor_list, tensors, group=group)
-        all_gather_nd(tensor_list, tensors, group=group)
+        all_gather_nd(tensor_list, tensors, group=group, padded=True)
         return paddle.concat(tensor_list)
     else:
         logger.warning(f"Can't parse for type {type(tensors)}")
         return tensors
+
+
+def repad_rl_batches(batches, input_lengths):
+    if "position_ids" in batches:
+        v = batches["position_ids"]
+        for x in range(v.shape[0]):
+            v[x, input_lengths[x] :] = 1
+        batches["position_ids"] = v
+    for key in list(batches.keys()):
+        if batches[key].shape == input_lengths.shape:
+            print(key)
+            batches[key] = batches[key].mean()
+
+    return batches
 
 
 # https://stackoverflow.com/questions/12594148/skipping-execution-of-with-block
@@ -594,7 +608,7 @@ class SkipContextManager:
 # dist.barrier()
 
 
-def all_gather_nd(tensor_list, tensor, group=None):
+def all_gather_nd(tensor_list, tensor, group=None, padded=False):
     """
     Gathers tensor arrays of different lengths in a list.
     The length dimension is 0. This supports any number of extra dimensions in the tensors.
@@ -606,6 +620,11 @@ def all_gather_nd(tensor_list, tensor, group=None):
     Returns:
         (Tensor): output list of tensors that can be of different sizes
     """
+    if len(tensor.shape) == 0:
+        tensor = tensor.reshape([1])
+        dist.all_gather(tensor_list, tensor, group=group)
+        return tensor_list
+
     world_size = group.nranks
     local_size = paddle.to_tensor(tensor.shape, place=tensor.place)
     all_sizes = [paddle.zeros_like(local_size) for _ in range(world_size)]
@@ -630,8 +649,11 @@ def all_gather_nd(tensor_list, tensor, group=None):
     all_tensors_padded = []
     dist.all_gather(all_tensors_padded, tensor, group=group)
     # all_tensors = []
+    if padded:
+        tensor_list.extend(all_tensors_padded)
+        return all_tensors_padded
+
     for tensor_, size in zip(all_tensors_padded, all_sizes):
-        pass
         tensor_list.append(tensor_[..., : size[-1]])
     return tensor_list
 
@@ -1654,7 +1676,15 @@ class PPOTrainer(Trainer):
 
                 print("rl_batches =", rl_batches)
                 # todo, merge data
-                rl_batches = data_group_merge(rl_batches, group=gp)
+                if gp is not None:
+                    input_ids_length = rl_batches[0]["input_ids"].shape[-1]
+                    rl_batches[0]["input_ids_length"] = paddle.to_tensor(
+                        [input_ids_length] * rl_batches[0]["input_ids"].shape[0], dtype="int64"
+                    )
+                    rl_batches = data_group_merge(rl_batches, group=gp)
+                    input_ids_length_batchs = rl_batches[0].pop("input_ids_length")
+                    rl_batches[0] = repad_rl_batches(rl_batches[0], input_ids_length_batchs)
+
                 paddle.device.cuda.empty_cache()
 
                 # # 数据造好, 开始训练
