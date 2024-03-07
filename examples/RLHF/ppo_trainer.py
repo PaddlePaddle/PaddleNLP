@@ -29,6 +29,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import tqdm
 from data import DummyDataset, PromptOnlyBatch
+from models.model_pp import make_position_ids
 from models.ppo_model_utils import RLHFPPOMixedLoss, RLHFValueLoss, create_loss
 from paddle.distributed import fleet
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
@@ -1433,6 +1434,9 @@ class PPOTrainer(Trainer):
                 seq = self.actor_model.generate(
                     input_ids=inputs["input_ids"],
                     attention_mask=inputs["attention_mask"],
+                    position_ids=inputs["position_ids"]
+                    if "position_ids" in inputs
+                    else make_position_ids(inputs["attention_mask"]),
                     generation_config=self.generation_config,
                     synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
                 )[0]
@@ -2001,6 +2005,7 @@ class PPOTrainer(Trainer):
         rewards: paddle.Tensor,
         sequence_mask: paddle.Tensor,
         start: int,
+        use_tgt_len_return: bool = True,
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         """Compute advantages and returns using Generalized Advantage Estimation (GAE)."""
         # Modified from https://github.com/CarperAI/trlx/blob/main/trlx/models/modeling_ppo.py
@@ -2009,6 +2014,16 @@ class PPOTrainer(Trainer):
         values = values * sequence_mask
         rewards = rewards * sequence_mask
         length = rewards.shape[-1]
+        if use_tgt_len_return and start > 0:
+            # consistent with Beaver
+            # values length is src+tgt-1, start is src-1, return length is tgt
+            pass
+        elif use_tgt_len_return:
+            # values length is tgt, start is 0, return length is tgt
+            assert start == 0
+        else:
+            # values length is src+tgt-1, start is src-1, return length is src+tgt-1
+            pass
         for t in reversed(range(start, length)):  # pylint: disable=invalid-name
             next_values = values[:, t + 1] if t < length - 1 else 0.0
             delta = rewards[:, t] + self.gamma * next_values - values[:, t]
@@ -2016,9 +2031,14 @@ class PPOTrainer(Trainer):
             advantages_reversed.append(last_gae_lambda)
         advantages = paddle.stack(advantages_reversed[::-1], axis=1)
         returns = advantages + values[:, start:]
+        if not use_tgt_len_return:
+            advantages = paddle.concat(
+                [paddle.zeros([advantages.shape[0], start], dtype=advantages.dtype), advantages], -1
+            )
+            returns = paddle.concat([paddle.zeros([returns.shape[0], start], dtype=returns.dtype), returns], -1)
         return advantages.detach(), returns
 
-    def rl_step(self, rl_batch: Dict[str, paddle.Tensor], **kwargs) -> Dict[str, Any]:
+    def _rl_step(self, rl_batch: Dict[str, paddle.Tensor], **kwargs) -> Dict[str, Any]:
         prompt = rl_batch["prompt"]
         old_log_probs = rl_batch["log_probs"]
         ref_log_probs = rl_batch["ref_log_probs"]
@@ -2058,10 +2078,13 @@ class PPOTrainer(Trainer):
             old_log_probs = old_log_probs[:, start:]
             old_reward_values = old_reward_values[:, start:]
             sequence_mask = sequence_mask[:, start:]
+            # position_ids is necessayr for left padding
+            position_ids = make_position_ids(attention_mask)
 
         policy_trainer_inputs = {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
+            "position_ids": position_ids,
             "old_log_probs": old_log_probs,
             "reward_advantages": reward_advantages,
             "sequence_mask": sequence_mask,
@@ -2074,6 +2097,7 @@ class PPOTrainer(Trainer):
         value_trainer_inputs = {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
+            "position_ids": position_ids,
             "old_reward_values": old_reward_values,
             "reward_returns": reward_returns,
             "sequence_mask": sequence_mask,
@@ -2138,6 +2162,12 @@ class PPOTrainer(Trainer):
     def rollout(self, prompt_only_batch: PromptOnlyBatch) -> List[Dict[str, Any]]:
         """Rollout a batch of experiences."""
         input_ids = prompt_only_batch["input_ids"]
+        attention_mask = prompt_only_batch["attention_mask"]
+        position_ids = (
+            prompt_only_batch["position_ids"]
+            if "position_ids" in prompt_only_batch
+            else make_position_ids(attention_mask)
+        )
         # NOTE: generation output of paddlenlp do not contain prompt, we should
         # change sequences here.
 
@@ -2149,7 +2179,8 @@ class PPOTrainer(Trainer):
 
         sequences = actor_model_in_use.generate(
             input_ids=input_ids,
-            attention_mask=prompt_only_batch["attention_mask"],
+            attention_mask=attention_mask,
+            position_ids=position_ids,
             generation_config=self.generation_config,
             synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
         )[0]
@@ -2157,6 +2188,10 @@ class PPOTrainer(Trainer):
         # sequences = [self.load_sing_gen_data(as_batches=False, use_counter=False)["input_ids"]]
 
         return [
+            # TODO(guosheng): move post_rollout out to split_rl_micro_batches
+            # to allow infer model generate multi times consecutively and then
+            # convert weights, otherwise we have to convert weights multi times
+            # when need multi batch rollout data.
             self.post_rollout(
                 input_ids,
                 seq,
@@ -2191,6 +2226,11 @@ class PPOTrainer(Trainer):
                 print(text)
             reward_seq = sequence
             reward_attention_mask = attention_mask
+        # position_ids is necessary for non-right padding
+        # If using right padding source + left padding target, make padding positions
+        # in source be 0, since reward model use position_ids plus with padding size
+        # (number of 0s) in source to calculate end offsets.
+        position_ids = make_position_ids(attention_mask)
 
         # todo, fixme zhui, self.actor_model forward
         if self._policy_model_eval is not None:
@@ -2209,6 +2249,7 @@ class PPOTrainer(Trainer):
         logits = actor_model_in_use(
             sequence,
             attention_mask=attention_mask,
+            position_ids=position_ids,
             # return_dict=True,
         )  # .logits
         logger.error("Get Here 1.0!!")
@@ -2217,6 +2258,7 @@ class PPOTrainer(Trainer):
         ref_logits = self.reference_model(
             sequence,
             attention_mask=attention_mask,
+            position_ids=position_ids,
             # return_dict=True,
         )  # .logits
         logger.error("Get Here 2.0!!")
@@ -2226,6 +2268,7 @@ class PPOTrainer(Trainer):
         reward_score = self.reward_model(
             reward_seq,
             attention_mask=reward_attention_mask,
+            position_ids=position_ids,
             # return_dict=True,
         )[
             1
@@ -2235,6 +2278,7 @@ class PPOTrainer(Trainer):
         reward_value = reward_critic_model_in_use(
             sequence,
             attention_mask=attention_mask,
+            position_ids=position_ids,
             # return_dict=True,
         )[
             0
@@ -2246,15 +2290,141 @@ class PPOTrainer(Trainer):
         reward_value = reward_value[:, :-1]
         log_probs = gather_log_probabilities(logits[:, :-1], sequence[:, 1:])
         ref_log_probs = gather_log_probabilities(ref_logits[:, :-1], sequence[:, 1:])
-        return {
+        rollout_data = {
             "prompt": prompt,
             "input_ids": sequence,
+            "position_ids": position_ids,
             "attention_mask": attention_mask,
             "rewards": reward_score,
             "reward_values": reward_value,
             "log_probs": log_probs,
             "ref_log_probs": ref_log_probs,
         }
+        rollout_data = self.normalize_data(rollout_data, use_tgt_len_value=False)
+        return rollout_data
+
+    @paddle.no_grad()
+    def normalize_data(
+        self,
+        rl_batch: Dict[str, paddle.Tensor],
+        use_tgt_len_value: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        data dispatch comm among devices needs padding, while the lengths of
+        all data fields are different and related, and it's hard to pad.
+        """
+        prompt = rl_batch["prompt"]  # length: src
+        attention_mask = rl_batch["attention_mask"]  # length: src + tgt
+        old_log_probs = rl_batch["log_probs"]  # length: src + tgt -1
+        ref_log_probs = rl_batch["ref_log_probs"]  # length: src + tgt -1
+        rewards = rl_batch["rewards"]  # length: 1
+        old_reward_values = rl_batch["reward_values"]  # length: src + tgt -1
+
+        # Beaver uses label data with target length, while we do not slice from
+        # inputs and use label data with target length:
+        # 1. Sometimes we cannot use label data with target length, mostly because
+        # it is hard to pad acorss batches. Think in some cases one batch might
+        # have the longest prompt+target length but the shortest target lengh, which
+        # might cause mismatch between inputs with prompt+target length and labels
+        # with target length. Padding acorss batches is needed in PP and data comm.
+        # 2. Additionally, when using flash_attn with casual mask and right padding
+        # we cannot use label data with target length.
+        start = prompt.shape[-1] - 1
+        # sequence_mask is for label masking, make source be masked out
+        # clone to avoid to change attention_mask
+        sequence_mask = attention_mask[:, 1:].clone()  # length: src + tgt -1
+        sequence_mask[:, :start] = False
+        if use_tgt_len_value:
+            ref_log_probs = ref_log_probs[:, start:]
+            old_log_probs = old_log_probs[:, start:]
+            old_reward_values = old_reward_values[:, start:]
+            sequence_mask = sequence_mask[:, start:]
+        old_rewards = self.add_kl_divergence_regularization(
+            None,  # prompt,
+            old_log_probs,
+            ref_log_probs,
+            rewards,
+            sequence_mask,
+        )  # length: tgt if use_tgt_len_value src + tgt -1
+        reward_advantages, reward_returns = self.get_advantages_and_returns(
+            old_reward_values,
+            old_rewards,
+            sequence_mask,
+            start=0 if use_tgt_len_value else start,
+            use_tgt_len_return=use_tgt_len_value,
+        )  # length: tgt if use_tgt_len_value src + tgt -1
+        # metric
+        kl_divergence = ((old_log_probs - ref_log_probs) * sequence_mask).sum(axis=-1).mean()
+        mean_generated_length = sequence_mask.cast(paddle.float32).sum(axis=-1).mean()
+        max_generated_length = sequence_mask.cast(paddle.float32).sum(axis=-1).max()
+        rewards = rewards.mean()
+        rl_batch.update(
+            {
+                "log_probs": old_log_probs,
+                "reward_values": old_reward_values,
+                "reward_advantages": reward_advantages,
+                "reward_returns": reward_returns,
+                "sequence_mask": sequence_mask,
+                "kl_divergence": kl_divergence,
+                "rewards": rewards,
+                "mean_generated_length": mean_generated_length,
+                "max_generated_length": max_generated_length,
+            }
+        )
+        # pop out to reduce data dispatch comm overhead
+        rl_batch.pop("prompt")
+        rl_batch.pop("ref_log_probs")
+        return rl_batch
+
+    def rl_step(self, rl_batch: Dict[str, paddle.Tensor], **kwargs) -> Dict[str, Any]:
+        # inputs shared by policy and value trainer
+        input_ids = rl_batch["input_ids"]  # length: src+tgt
+        attention_mask = rl_batch["attention_mask"]  # length: src+tgt
+        position_ids = rl_batch["position_ids"]  # length: src+tgt
+        sequence_mask = rl_batch["sequence_mask"]  # length: src+tgt(-1)
+        # inputs used by policy trainer
+        old_log_probs = rl_batch["log_probs"]  # length: src+tgt(-1)
+        reward_advantages = rl_batch["reward_advantages"]  # length: src+tgt(-1)
+        # inputs used by value trainer
+        old_reward_values = rl_batch["reward_values"]  # length: src+tgt(-1)
+        reward_returns = rl_batch["reward_returns"]  # length: src+tgt(-1)
+        # metrics. Now it depends on sequence_mask instead of prompt length and
+        # thus would not be bothered by prompt padding, maybe move these metrics
+        # calculation to here
+        rewards = rl_batch["rewards"]
+        kl_divergence = rl_batch["kl_divergence"]
+        mean_generated_length = rl_batch["mean_generated_length"]
+        max_generated_length = rl_batch["max_generated_length"]
+
+        policy_trainer_inputs = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "position_ids": position_ids,
+            "old_log_probs": old_log_probs,
+            "reward_advantages": reward_advantages,
+            "sequence_mask": sequence_mask,
+        }
+        kwargs = self.policy_trainer.full_training_step(policy_trainer_inputs, **kwargs)
+
+        value_trainer_inputs = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "position_ids": position_ids,
+            "old_reward_values": old_reward_values,
+            "reward_returns": reward_returns,
+            "sequence_mask": sequence_mask,
+        }
+        kwargs = self.value_trainer.full_training_step(value_trainer_inputs, **kwargs)
+        return {
+            "train/actor_loss": kwargs["actor_loss"],
+            "train/reward_critic_loss": kwargs["reward_critic_loss"],
+            "train/reward": rewards,
+            "train/kl_divergence": kl_divergence,
+            "train/mean_generated_length": mean_generated_length,
+            "train/max_generated_length": max_generated_length,
+            "train/actor_lr": self.policy_trainer._get_learning_rate(),
+            "train/reward_critic_lr": self.value_trainer._get_learning_rate(),
+        }, kwargs
 
     # @paddle.no_grad()
     # def post_rollout(

@@ -123,10 +123,22 @@ class RLHFPPOLoss(nn.Layer):
         # batches of accumulation steps, they just need to pad as prompt+target
         # fields such as input_ids.
         log_probs = gather_log_probabilities(logits[:, :-1], input_ids[:, 1:])
-        if start is not None:
-            old_log_probs = old_log_probs[:, start:]
-            sequence_mask = sequence_mask[:, start:]
-        log_probs = log_probs[:, -old_log_probs.shape[1] :]
+        if log_probs.shape[1] == old_log_probs.shape[1]:
+            # labels (old_log_probs, reward_advantages, sequence_mask) has
+            # src+tgt-1 length, valid length is determined by sequence_mask
+            pass
+        elif log_probs.shape[1] < old_log_probs.shape[1]:
+            # labels (old_log_probs, reward_advantages, sequence_mask) has
+            # src+tgt length and the last one is a padding to be consistent
+            # with input_ids
+            assert log_probs.shape[1] == old_log_probs.shape[1] - 1
+            log_probs = paddle.concat([log_probs, paddle.zeros([log_probs.shape[0], 1], dtype=log_probs.dtype)], -1)
+        else:
+            # labels (old_log_probs, reward_advantages, sequence_mask) has tgt length
+            log_probs = log_probs[:, -old_log_probs.shape[1] :]
+        # if start is not None:
+        #     old_log_probs = old_log_probs[:, start:]
+        #     sequence_mask = sequence_mask[:, start:]
         actor_loss = self.actor_loss_fn(
             log_probs,
             old_log_probs,
@@ -197,12 +209,28 @@ class RLHFValueLoss(nn.Layer):
     ):
         # old_reward_values, reward_returns, sequence_mask = label_info
         reward_values = reward_values if isinstance(reward_values, paddle.Tensor) else reward_values[0]
+        reward_values = reward_values.squeeze(axis=-1)[:, :-1]
+        if reward_values.shape[1] == old_reward_values.shape[1]:
+            # labels (old_reward_values, reward_returns, sequence_mask) has
+            # src+tgt-1 length, valid length is determined by sequence_mask
+            pass
+        elif reward_values.shape[1] < old_reward_values.shape[1]:
+            # labels (old_reward_values, reward_returns, sequence_mask) has
+            # src+tgt length and the last one is a padding to be consistent
+            # with input_ids
+            assert reward_values.shape[1] == old_reward_values.shape[1] - 1
+            reward_values = paddle.concat(
+                [reward_values, paddle.zeros([reward_values.shape[0], 1], dtype=reward_values.dtype)], -1
+            )
+        else:
+            # labels (old_reward_values, reward_returns, sequence_mask) has
+            # tgt length
+            reward_values = reward_values[:, -old_reward_values.shape[1] :]
         # if start is not None:
         #     old_reward_values = old_reward_values[:, start:]
         #     sequence_mask = sequence_mask[:, start:]
-        reward_values = reward_values.squeeze(axis=-1)[:, :-1]
         reward_critic_loss = self.critic_loss_fn(
-            reward_values[:, -old_reward_values.shape[1] :],
+            reward_values,
             old_reward_values,
             reward_returns,
             sequence_mask,
