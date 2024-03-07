@@ -20,6 +20,8 @@
 #pragma once
 
 #include <cassert>
+#include <stdint.h>
+#include <stdio.h>
 
 #include <cuda_bf16.h>  // NOLINT
 #include <cuda_fp16.h>  // NOLINT
@@ -332,6 +334,13 @@ struct Vec {
   };
 
   Alias_type data;
+
+  inline __device__ void init(Elt_type value) {
+#pragma unroll
+    for (int it = 0; it < NUM_ELT; it++) {
+      this->data.elt[it] = value;
+    }    
+  }
 
   template <typename S>
   inline __device__ void to(Vec<S, NUM_ELT> &other) {  // NOLINT
