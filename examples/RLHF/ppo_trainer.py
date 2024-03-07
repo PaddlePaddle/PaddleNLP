@@ -531,7 +531,7 @@ def data_group_split(tensors, group):
             new_dict[k] = data_group_split(v, group)
         return new_dict
     elif isinstance(tensors, paddle.Tensor):
-        print("Spliting ", tensors.shape, tensors.dtype)
+        # print("Spliting ", tensors.shape, tensors.dtype)
         return tensors.split(group.nranks)[group.rank]
     else:
         logger.warning(f"Can't parse for type {type(tensors)}")
@@ -551,7 +551,7 @@ def data_group_merge(tensors, group):
         return new_dict
     elif isinstance(tensors, paddle.Tensor):
         tensor_list = []
-        print("Mergeing ", tensors.shape, tensors.dtype)
+        # print("Mergeing ", tensors.shape, tensors.dtype)
         # paddle.distributed.all_gather(tensor_list, tensors, group=group)
         all_gather_nd(tensor_list, tensors, group=group, padded=True)
         return paddle.concat(tensor_list)
@@ -568,7 +568,7 @@ def repad_rl_batches(batches, input_lengths):
         batches["position_ids"] = v
     for key in list(batches.keys()):
         if batches[key].shape[0] != input_lengths.shape[0]:
-            print("set mean", key, batches[key])
+            # print("set mean", key, batches[key])
             batches[key] = batches[key].mean()
 
     return batches
@@ -678,7 +678,7 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
     train_state_dict = train_model.state_dict()
     eval_state_dict = eval_model.state_dict()
 
-    print(sd_group)
+    # print(sd_group)
 
     if dp_group.rank <= 0 and sd_group.rank <= 0:
         train_pp_size = pp_group.nranks
@@ -820,7 +820,7 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
     old_dp_workers = self.args.world_size // (max(sd_group.nranks, 1) * max(dp_group.nranks, 1))
     group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
 
-    if self._policy_model_eval_group is None:
+    if not hasattr(self, "_policy_model_eval_group") or self._policy_model_eval_group is None:
         self._policy_model_eval_group = create_data_trans_group(global_rank, group_nums)
 
     return None
@@ -848,7 +848,7 @@ def create_data_trans_group(global_rank, group_nums):
             group = gp
 
     # print("all_split_table:", all_split_table)
-    print("export_group", group)
+    # print("export_group", group)
     return group
 
 
@@ -1224,7 +1224,6 @@ class PPOTrainer(Trainer):
 
         (policy_model, reference_model, reward_model, value_model, policy_model_eval, value_model_eval) = model
         self._policy_model_eval = policy_model_eval
-        self._policy_model_eval_group = None
         self._value_model_eval = value_model_eval
 
         # policy_tokenizer and value_tokenizer should be same
@@ -1647,7 +1646,7 @@ class PPOTrainer(Trainer):
                     self._policy_model_eval,
                     with_offload=self.args.offload_level is not None,
                 )
-                gp = self._policy_model_eval_group
+                gp = self.policy_trainer._policy_model_eval_group
                 # gp = create_data_trans_group(self.args.logical_process_index, paddle.distributed.get_rank(), self._policy_model_eval.config.tensor_parallel_degree)
                 # # todo: zhui
                 self.value_trainer.export_evaluate_model(
@@ -1661,23 +1660,23 @@ class PPOTrainer(Trainer):
 
                 # todo, split prompt_only_batch
                 # pp2tp2dp2 -> dp4tp2 prompt_only_batch
-                print("create gp", gp)
+                # print("create gp", gp)
                 prompt_only_batch = data_group_split(prompt_only_batch, group=gp)
-                print("prompt_only_batch =", prompt_only_batch)
+                # print("prompt_only_batch =", prompt_only_batch)
                 # 生成数据
                 rl_batches = self.split_rl_micro_batches(prompt_only_batch)
                 # rl_batches = self.load_sing_gen_data(as_batches=True,
                 #                                      use_counter=True)
                 if self.use_ptx:
                     ptx_batch = data_group_split(ptx_batch, group=gp)
-                    print("ptx_batch =", ptx_batch)
+                    # print("ptx_batch =", ptx_batch)
                     ptx_batches = self.split_ptx_micro_batches(ptx_batch)
-                    print("ptx_batchs =", ptx_batches)
+                    # print("ptx_batchs =", ptx_batches)
                     ptx_batches = data_group_merge(ptx_batches, group=gp)
                 else:
                     ptx_batches = [None for _ in range(len(rl_batches))]
 
-                print("rl_batches =", rl_batches)
+                # print("rl_batches =", rl_batches)
                 # todo, merge data
                 if gp is not None:
                     input_ids_length = rl_batches[0]["input_ids"].shape[-1]
