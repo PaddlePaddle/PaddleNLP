@@ -70,11 +70,20 @@ __global__ __launch_bounds__(Ktraits::THREADS_PER_CTA) void ln_fwd_kernel(
   Wvec gamma[LDGS];
   Wvec beta[LDGS];
   index_t idx = c;
+  if (params.bias) {
 #pragma unroll
-  for (int it = 0; it < LDGS; it++) {
-    gamma[it].load_from(params.scale, idx);
-    beta[it].load_from(params.bias, idx);
-    idx += VEC_COLS_PER_LDG;
+    for (int it = 0; it < LDGS; it++) {
+      gamma[it].load_from(params.scale, idx);
+      beta[it].load_from(params.bias, idx);
+      idx += VEC_COLS_PER_LDG;
+    }
+  } else {
+#pragma unroll
+    for (int it = 0; it < LDGS; it++) {
+      gamma[it].load_from(params.scale, idx);
+      beta[it].init(0.);
+      idx += VEC_COLS_PER_LDG;
+    }
   }
 
   constexpr compute_t rn = 1.f / compute_t(Ktraits::COLS);
@@ -100,7 +109,7 @@ __global__ __launch_bounds__(Ktraits::THREADS_PER_CTA) void ln_fwd_kernel(
     compute_t mu = layer_norm::Get<0>::of<stats_t, compute_t>(s);
     compute_t m2 = layer_norm::Get<1>::of<stats_t, compute_t>(s);
 
-    if (bidn == 0 && warp_n == 0 && lane == 0) {
+    if (mu_ptr && bidn == 0 && warp_n == 0 && lane == 0) {
       mu_ptr[row] = mu;
     }
 
