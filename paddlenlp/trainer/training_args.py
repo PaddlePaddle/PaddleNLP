@@ -1352,27 +1352,31 @@ class TrainingArguments:
             self.unified_checkpoint = False
 
         if self.unified_checkpoint:
-            unified_checkpoint_config = set(self.unified_checkpoint_config.split(" "))
-            for x in unified_checkpoint_config:
-                if len(x) > 0:
-                    if x not in [
+            if self.ignore_save_lr_and_optim:
+                self.unified_checkpoint_config = ""
+                logger.info("Setting unified_checkpoint_config to empty for using ignore_save_lr_and_optim.")
+            else:
+                unified_checkpoint_config = set(self.unified_checkpoint_config.split(" "))
+                for x in unified_checkpoint_config:
+                    if len(x) > 0:
+                        if x not in [
+                            "skip_save_model_weight",
+                            "master_weight_compatible",
+                            "async_save",
+                            "enable_all_options",
+                        ]:
+                            raise ValueError(
+                                f"Found unknown unified_checkpoint config {x}, accpet config is skip_save_model_weight, "
+                                + "master_weight_compatible, async_save, enable_all_options."
+                            )
+                if "enable_all_options" in unified_checkpoint_config:
+                    self.unified_checkpoint_config = [
                         "skip_save_model_weight",
                         "master_weight_compatible",
-                        "async_save",
-                        "enable_all_options",
-                    ]:
-                        raise ValueError(
-                            f"Found unknown unified_checkpoint config {x}, accpet config is skip_save_model_weight, "
-                            + "master_weight_compatible, async_save, enable_all_options."
-                        )
-            if "enable_all_options" in unified_checkpoint_config:
-                self.unified_checkpoint_config = [
-                    "skip_save_model_weight",
-                    "master_weight_compatible",
-                    # "async_save",
-                ]
-            else:
-                self.unified_checkpoint_config = self.unified_checkpoint_config.split(" ")
+                        # "async_save",
+                    ]
+                else:
+                    self.unified_checkpoint_config = self.unified_checkpoint_config.split(" ")
 
         if self.report_to is None:
             logger.info(
