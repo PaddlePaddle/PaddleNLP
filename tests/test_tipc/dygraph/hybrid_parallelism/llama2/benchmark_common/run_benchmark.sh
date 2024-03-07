@@ -32,9 +32,9 @@ function _set_params(){
     base_batch_size=${global_batch_size}
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递
     model_repo="PaddleNLP"          # (必选) 模型套件的名字
-    speed_unit="tokens/s"         # (必选)速度指标单位
+    speed_unit=","         # (必选)速度指标单位
     skip_steps=0                  # (必选)解析日志，跳过模型前几个性能不稳定的step
-    keyword="ips:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
+    keyword="interval_samples_per_second:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
 
     # 以下为通用执行命令，无特殊可不用修改
@@ -81,33 +81,46 @@ function _train(){
     # fi
 
     if [ ${run_mode} == "autotuner" ]; then
+        unset PADDLE_ELASTIC_JOB_ID
+        unset PADDLE_TRAINER_ENDPOINTS
+        unset DISTRIBUTED_TRAINER_ENDPOINTS
+        unset FLAGS_START_PORT
+        unset PADDLE_ELASTIC_TIMEOUT
+        unset PADDLE_TRAINERS_NUM
+        unset PADDLE_TRAINER_ID
         autoconfig_args="--auto_tuner_json ./auto_config_${MODEL_TYPE}/${MODEL_TYPE}_pretrain_autoconfig.json"
     else
-        # todo 新建并使用autotuner获取的top1参数配置文件 llama2_7b_pretrain_top.json
         autoconfig_args=""
+    fi
+    
+    if [ ${PADDLE_TRAINER_ID} ]; then
+        PADDLE_RANK_OPTION=" --rank ${PADDLE_TRAINER_ID}"
+    else
+        PADDLE_RANK_OPTION=""
+    fi
+
+    if [ "$autoconfig_args" != "" ]; then
+        distributed_args="--master etcd://$master_ip:2379 --nnodes $nnodes:$nnodes"
+    else
+        distributed_args="--master ${master}:36677 --nnodes $nnodes ${PADDLE_RANK_OPTION} --run_mode=collective"
     fi
 
     # 以下为通用执行命令，无特殊可不用修改
     case ${device_num} in
-    N1C1) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
-        train_cmd="python -u -m paddle.distributed.launch --gpus=0 \
-            ${autoconfig_args} --log_dir mylog run_pretrain.py \
-            ./auto_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}-auto_tuner.json"
-        ;;
     N1C8) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
+            --nnodes 1 --nproc_per_node 8 \
             ${autoconfig_args} --log_dir mylog run_pretrain.py \
             ./auto_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}-auto_tuner.json"
         ;;
-    N2C16|N4C32) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
+    N4C32) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
-            --master etcd://$master_ip:2379 --nnodes $nnodes:$nnodes \
-            ${autoconfig_args} --log_dir mylog run_pretrain.py \
+            ${distributed_args} ${autoconfig_args} --log_dir mylog run_pretrain.py \
             ./auto_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}-auto_tuner.json"
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
-            ${autoconfig_args} --log_dir mylog run_pretrain.py \
+             ${distributed_args} ${autoconfig_args} --log_dir mylog run_pretrain.py \
             ./auto_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}-auto_tuner.json"
         ;;
     esac
@@ -131,19 +144,15 @@ function _train(){
         case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/tests/mylog
         cp -r ${case_path}/autoconfig/best_cfg/workerlog.* ./mylog/
         cp -r ${case_path}/autoconfig/*.csv $(dirname "$log_file")
+    else
+        case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/tests/mylog
+        cp -r ${case_path}/mylog/workerlog.* ./mylog/
     fi
 }
 
 export FLAGS_selected_gpus="0,1,2,3,4,5,6,7"
 export NCCL_IB_DISABLE=0
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
-unset PADDLE_ELASTIC_JOB_ID
-unset PADDLE_TRAINER_ENDPOINTS
-unset DISTRIBUTED_TRAINER_ENDPOINTS
-unset FLAGS_START_PORT
-unset PADDLE_ELASTIC_TIMEOUT
-unset PADDLE_TRAINERS_NUM
-unset PADDLE_TRAINER_ID
 
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@
