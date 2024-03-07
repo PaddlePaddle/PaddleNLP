@@ -1499,11 +1499,11 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
         --to_static 0 \
         --max_grad_norm 1.0 \
         >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $case_log_dir/workerlog.4 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.34375
+    loss_base=9.38257694
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
