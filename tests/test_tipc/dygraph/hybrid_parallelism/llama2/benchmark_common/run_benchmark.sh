@@ -102,7 +102,7 @@ function _train(){
     if [ "$autoconfig_args" != "" ]; then
         distributed_args="--master etcd://$master_ip:2379 --nnodes $nnodes:$nnodes"
     else
-        distributed_args="--master ${master}:36677 --nnodes $nnodes ${PADDLE_RANK_OPTION} --run_mode=collective"
+        distributed_args="--master $master_ip:36677 --nnodes $nnodes ${PADDLE_RANK_OPTION} --run_mode=collective"
     fi
 
     # 以下为通用执行命令，无特殊可不用修改
