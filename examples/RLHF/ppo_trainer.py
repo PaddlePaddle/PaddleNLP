@@ -531,7 +531,7 @@ def data_group_split(tensors, group):
             new_dict[k] = data_group_split(v, group)
         return new_dict
     elif isinstance(tensors, paddle.Tensor):
-        print("Spliting ", tensors)
+        print("Spliting ", tensors.shape, tensors.dtype)
         return tensors.split(group.nranks)[group.rank]
     else:
         logger.warning(f"Can't parse for type {type(tensors)}")
@@ -551,7 +551,7 @@ def data_group_merge(tensors, group):
         return new_dict
     elif isinstance(tensors, paddle.Tensor):
         tensor_list = []
-        print("Mergeing ", tensors)
+        print("Mergeing ", tensors.shape, tensors.dtype)
         # paddle.distributed.all_gather(tensor_list, tensors, group=group)
         all_gather_nd(tensor_list, tensors, group=group, padded=True)
         return paddle.concat(tensor_list)
@@ -567,8 +567,8 @@ def repad_rl_batches(batches, input_lengths):
             v[x, input_lengths[x] :] = 1
         batches["position_ids"] = v
     for key in list(batches.keys()):
-        if batches[key].shape == input_lengths.shape:
-            print(key)
+        if batches[key].shape[0] != input_lengths.shape[0]:
+            print("set mean", key, batches[key])
             batches[key] = batches[key].mean()
 
     return batches
@@ -820,9 +820,10 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
     old_dp_workers = self.args.world_size // (max(sd_group.nranks, 1) * max(dp_group.nranks, 1))
     group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
 
-    gp = create_data_trans_group(global_rank, group_nums)
+    if self._policy_model_eval_group is None:
+        self._policy_model_eval_group = create_data_trans_group(global_rank, group_nums)
 
-    return gp
+    return None
 
 
 def create_data_trans_group(global_rank, group_nums):
@@ -1223,6 +1224,7 @@ class PPOTrainer(Trainer):
 
         (policy_model, reference_model, reward_model, value_model, policy_model_eval, value_model_eval) = model
         self._policy_model_eval = policy_model_eval
+        self._policy_model_eval_group = None
         self._value_model_eval = value_model_eval
 
         # policy_tokenizer and value_tokenizer should be same
@@ -1640,11 +1642,12 @@ class PPOTrainer(Trainer):
                     offload_tensor_to_cpu(self.policy_trainer.optimizer.state_dict())
                     offload_tensor_to_cpu(self.value_trainer.optimizer.state_dict())
 
-                gp = self.policy_trainer.export_evaluate_model(
+                self.policy_trainer.export_evaluate_model(
                     self.policy_trainer.model,
                     self._policy_model_eval,
                     with_offload=self.args.offload_level is not None,
                 )
+                gp = self._policy_model_eval_group
                 # gp = create_data_trans_group(self.args.logical_process_index, paddle.distributed.get_rank(), self._policy_model_eval.config.tensor_parallel_degree)
                 # # todo: zhui
                 self.value_trainer.export_evaluate_model(
