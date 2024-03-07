@@ -1898,11 +1898,7 @@ class PPOTrainer(Trainer):
             start=0 if use_tgt_len_value else start,
             use_tgt_len_return=use_tgt_len_value,
         )  # length: tgt if use_tgt_len_value src + tgt -1
-        # metric
-        kl_divergence = ((old_log_probs - ref_log_probs) * sequence_mask).sum(axis=-1).mean()
-        mean_generated_length = sequence_mask.cast(paddle.float32).sum(axis=-1).mean()
-        max_generated_length = sequence_mask.cast(paddle.float32).sum(axis=-1).max()
-        rewards = rewards.mean()
+
         rl_batch.update(
             {
                 "log_probs": old_log_probs,
@@ -1910,15 +1906,12 @@ class PPOTrainer(Trainer):
                 "reward_advantages": reward_advantages,
                 "reward_returns": reward_returns,
                 "sequence_mask": sequence_mask,
-                "kl_divergence": kl_divergence,
+                "ref_log_probs": ref_log_probs,
                 "rewards": rewards,
-                "mean_generated_length": mean_generated_length,
-                "max_generated_length": max_generated_length,
             }
         )
         # pop out to reduce data dispatch comm overhead
         rl_batch.pop("prompt")
-        rl_batch.pop("ref_log_probs")
         return rl_batch
 
     def rl_step(self, rl_batch: Dict[str, paddle.Tensor], **kwargs) -> Dict[str, Any]:
@@ -1933,13 +1926,6 @@ class PPOTrainer(Trainer):
         # inputs used by value trainer
         old_reward_values = rl_batch["reward_values"]  # length: src+tgt(-1)
         reward_returns = rl_batch["reward_returns"]  # length: src+tgt(-1)
-        # metrics. Now it depends on sequence_mask instead of prompt length and
-        # thus would not be bothered by prompt padding, maybe move these metrics
-        # calculation to here
-        rewards = rl_batch["rewards"]
-        kl_divergence = rl_batch["kl_divergence"]
-        mean_generated_length = rl_batch["mean_generated_length"]
-        max_generated_length = rl_batch["max_generated_length"]
 
         policy_trainer_inputs = {
             "input_ids": input_ids,
@@ -1960,6 +1946,15 @@ class PPOTrainer(Trainer):
             "sequence_mask": sequence_mask,
         }
         kwargs = self.value_trainer.full_training_step(value_trainer_inputs, **kwargs)
+
+        # metric
+        rewards = rl_batch["rewards"]
+        rewards = rewards.mean()
+        ref_log_probs = rl_batch["ref_log_probs"]
+        kl_divergence = ((old_log_probs - ref_log_probs) * sequence_mask).sum(axis=-1).mean()
+        mean_generated_length = sequence_mask.cast(paddle.float32).sum(axis=-1).mean()
+        max_generated_length = sequence_mask.cast(paddle.float32).sum(axis=-1).max()
+
         return {
             "train/actor_loss": kwargs["actor_loss"],
             "train/reward_critic_loss": kwargs["reward_critic_loss"],
