@@ -110,7 +110,7 @@ class TestUnifiedCheckpointSingle(TestMultipleGpus):
         os.environ.update(environment_variables)
 
         file_ = "https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz"
-        input_dir = "unified_checkpoint/lora_input/"  # unified_checkpoint/lora/data
+        input_dir = "unified_checkpoint/peft_input/"
         os.makedirs(input_dir, exist_ok=True)
         file_path = os.path.join(input_dir, "AdvertiseGen.tar.gz")
         if not os.path.exists(file_path):
@@ -158,7 +158,7 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
         os.environ.update(environment_variables)
 
         file_ = "https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz"
-        input_dir = "unified_checkpoint/peft_input/"  # unified_checkpoint/lora/data
+        input_dir = "unified_checkpoint/peft_input/"
         os.makedirs(input_dir, exist_ok=True)
         file_path = os.path.join(input_dir, "AdvertiseGen.tar.gz")
         if not os.path.exists(file_path):
