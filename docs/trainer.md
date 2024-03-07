@@ -552,6 +552,16 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                           enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
                           enable_dp_comm_overlap, fuse data parallel gradient communication.
 
+  --data_parallel_config
+                        对于数据并行,一些选项会影响训练性能,这里将一些选项配置集中管理,以str形式传入配置.
+                        支持如下选项:
+                            enable_allreduce_avg_in_gradinent_scale : 在数据并行中, 替换`allreduce_sum + scale`模式为`allreduce_avg`, 以提高性能. 仅支持auto模式.
+                            gradient_sync_after_accumulate : 在数据并行中, 支持梯度累积后再进行同步, 以提高性能, 但会增加显存占用.
+
+                        Some additional configs which affect data parallel performance, we provide some option to config it.
+                        following config is support:
+                            enable_allreduce_avg_in_gradinent_scale, it replace `allreduce_sum + scale` pattern with `allreduce_avg` when scale gradient in data_parallel, which improve the performance. ONLY supported for auto mode now.
+                            gradient_sync_after_accumulate, it supports gradient sync after accumulate in data_parallel, which improve the performance but will increase the gpu memory usage.
 
   --recompute
                         是否使用重计算训练。可以节省显存。
