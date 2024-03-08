@@ -150,9 +150,20 @@ def main():
             from_aistudio=model_args.from_aistudio,
             quantization_config=quantization_config,
         )
+        model_config.alibi = False #alibi/rope
+        model_config.use_long_strategies = False
+        
+        model_config.long_sequence_strategy_type = "EmbeddingStrategies" #AttentionStrategies#EmbeddingStrategies
+        model_config.long_sequence_strategy_name = "RotaryEmbedding"#"NTKScalingRotaryEmbedding"  #RotaryEmbedding#LinearScalingRotaryEmbedding#v#AttentionWithLinearBias
+                                                                                #"DynamicNTKScalingRotaryEmbedding"
+        model_config.max_position_embeddings = data_args.max_length# model_config.max_sequence_length#
+        if model_config.alibi:
+            model_config.long_sequence_init_args = {}
+        else:
+            model_config.long_sequence_init_args ={"dim": int(model_config.hidden_size / model_config.num_attention_heads) 
+            ,"max_position_embeddings":model_config.max_position_embeddings,"base":10000,"scaling_factor":1,"model_type":model_type,"position_encoding_2d":position_encoding_2d}
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
-
         if not training_args.autotuner_benchmark:
             model = AutoModelForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
@@ -191,7 +202,6 @@ def main():
 
     if isinstance(tokenizer, LlamaTokenizer):
         tokenizer.pad_token_id = tokenizer.eos_token_id
-
     if data_args.dataset_name_or_path is None:
         raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
     elif (

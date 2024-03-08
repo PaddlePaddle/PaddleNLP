@@ -36,6 +36,8 @@ from ..model_outputs import (
 )
 from .configuration import CHATGLM_PRETRAINED_RESOURCE_FILES_MAP, ChatGLMConfig
 
+from paddlenlp.transformers.LongSequenceStrategies import LongSequenceStrategies
+
 __all__ = [
     "ChatGLMModel",
     "ChatGLMPretrainedModel",
@@ -442,12 +444,19 @@ class ChatGLMStack(nn.Layer):
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
         self.num_attention_heads = config.num_attention_heads
-        self.rotary_embeddings = RotaryEmbeddings(
-            self.hidden_size // (self.num_attention_heads * 2)
-            if self.position_encoding_2d
-            else self.hidden_size // self.num_attention_heads,
-            base=10000.0,
-        )
+
+        if config.use_long_strategies:
+            print("I am chatglm new rotary_emb")
+            self.rotary_embeddings = LongSequenceStrategies.build_long_sequence_strategy(config.long_sequence_strategy_type , config.long_sequence_strategy_name , **config.long_sequence_init_args)
+
+        else:
+            print("I am chatglm old rotary_emb")
+            self.rotary_embeddings = RotaryEmbeddings(
+                self.hidden_size // (self.num_attention_heads * 2)
+                if self.position_encoding_2d
+                else self.hidden_size // self.num_attention_heads,
+                base=10000.0,
+            )
         # self.embedding_dropout = nn.Dropout(config.embedding_dropout_prob)
 
         if self.config.tensor_parallel_degree > 1:
@@ -544,8 +553,19 @@ class ChatGLMStack(nn.Layer):
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
         inputs_embeds = inputs_embeds.transpose([1, 0, 2])
-
-        rotary_embeds = self.rotary_embeddings(position_ids)
+        if self.config.use_long_strategies:  
+            rotary_embeds = self.rotary_embeddings(position_ids,seq_len=int(position_ids.max() + 1))
+            cos,sin = self.rotary_embeddings(position_ids,seq_len=int(position_ids.max() + 1))
+            
+            cos = cos[:, None, :]
+            sin = sin[:, None, :]            
+            block_position_ids = position_ids[:, 1, :].transpose([1, 0])
+            position_ids = position_ids[:, 0, :].transpose([1, 0]) 
+            block_rotary_embeds =  paddle.stack([cos.squeeze(1)[block_position_ids].unsqueeze(2),sin.squeeze(1)[block_position_ids].unsqueeze(2)])      
+            position_rotary_embeds = paddle.stack([cos.squeeze(1)[position_ids].unsqueeze(2),sin.squeeze(1)[position_ids].unsqueeze(2)])    
+            rotary_embeds = paddle.stack([position_rotary_embeds, block_rotary_embeds], axis=0)   
+        else:
+            rotary_embeds = self.rotary_embeddings(position_ids)
 
         if cache is None:
             if self.config.pre_seq_len is not None:

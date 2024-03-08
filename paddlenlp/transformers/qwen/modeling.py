@@ -36,6 +36,8 @@ from ...utils.converter import StateDictNameMapping, init_name_mappings
 from ..model_outputs import ModelOutput
 from .configuration import QWenConfig
 
+from paddlenlp.transformers.LongSequenceStrategies import LongSequenceStrategies
+
 __all__ = [
     "QWenBlock",
     "QWenForCausalLM",
@@ -145,7 +147,10 @@ class QWenAttention(nn.Layer):
             assert config.rotary_pct < 1
             self.rotary_ndims = int(self.hidden_size_per_attention_head * config.rotary_pct)
         dim = self.rotary_ndims if self.rotary_ndims is not None else self.hidden_size_per_attention_head
-        self.rotary_emb = RotaryEmbedding(dim, base=config.rotary_emb_base)
+        if config.use_long_strategies:
+            self.rotary_emb = LongSequenceStrategies.build_long_sequence_strategy(config.long_sequence_strategy_type , config.long_sequence_strategy_name , **config.long_sequence_init_args)
+        else:
+            self.rotary_emb = RotaryEmbedding(dim, base=config.rotary_emb_base)
 
         self.use_dynamic_ntk = config.use_dynamic_ntk
         self.use_logn_attn = config.use_logn_attn
@@ -255,7 +260,10 @@ class QWenAttention(nn.Layer):
             self._ntk_cached = ntk_alpha
         else:
             ntk_alpha = self._ntk_cached
-        rotary_pos_emb = self.rotary_emb(value, kv_seq_len, ntk_alpha=ntk_alpha)
+        if self.config.use_long_strategies:
+            rotary_pos_emb = self.rotary_emb(value, seq_len=kv_seq_len)
+        else:
+            rotary_pos_emb = self.rotary_emb(value, kv_seq_len, ntk_alpha=ntk_alpha)
 
         if rotary_pos_emb is not None:
             if isinstance(rotary_pos_emb, tuple):
