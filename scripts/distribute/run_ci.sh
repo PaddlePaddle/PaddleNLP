@@ -59,7 +59,7 @@ install_paddlenlp(){
 get_diff_TO_case(){
 cd ${nlp_dir}
 export FLAGS_paddlenlp=0
-for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+for file_name in `git diff --numstat origin upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
     arr_file_name=(${file_name//// })
     dir1=${arr_file_name[0]}
     dir2=${arr_file_name[1]}
