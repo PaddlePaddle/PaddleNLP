@@ -30,7 +30,7 @@ class QWenFastTokenizer(PretrainedFastTokenizer):
     pretrained_resource_files_map.update(
         {
             "tokenizer_file": {
-                "qwen/qwen-7b": "fake/tokenizer.json",
+                "qwen/qwen-7b": "https://bj.bcebos.com/paddlenlp/models/community/qwen/qwen-7b/tokenizer.json",
             },
         }
     )

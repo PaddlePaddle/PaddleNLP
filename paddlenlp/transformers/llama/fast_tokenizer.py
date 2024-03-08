@@ -30,6 +30,19 @@ class LlamaFastTokenizer(PretrainedFastTokenizer):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     slow_tokenizer_class = LlamaTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
+    pretrained_resource_files_map.update(
+        {
+            "tokenizer_file": {
+                "facebook/llama-7b": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/tokenizer.json",
+                "__internal_testing__/micro-random-llama": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/tokenizer.json",
+                "__internal_testing__/tiny-random-llama": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/tokenizer.json",
+                "facebook/llama-7b": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/tokenizer.json",
+                "facebook/llama-13b": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/tokenizer.json",
+                "facebook/llama-30b": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/tokenizer.json",
+                "facebook/llama-65b": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/tokenizer.json",
+            },
+        }
+    )
     pretrained_init_configuration = slow_tokenizer_class.pretrained_init_configuration
     padding_side = "left"
     model_input_names = ["input_ids", "attention_mask"]

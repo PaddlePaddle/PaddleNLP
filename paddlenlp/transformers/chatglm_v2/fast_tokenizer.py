@@ -29,6 +29,13 @@ class ChatGLMv2FastTokenizer(PretrainedFastTokenizer):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     slow_tokenizer_class = ChatGLMv2Tokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
+    pretrained_resource_files_map.update(
+        {
+            "tokenizer_file": {
+                "THUDM/chatglm2-6b": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/chatglm2-6b/tokenizer.json",
+            },
+        }
+    )
     pretrained_init_configuration = slow_tokenizer_class.pretrained_init_configuration
     model_input_names = ["input_ids", "attention_mask", "position_ids"]
     padding_side = "left"

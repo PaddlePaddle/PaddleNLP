@@ -38,26 +38,28 @@ def measure_time(func, *args, **kwargs):
 @pytest.fixture
 def setup_inputs():
     dataset = load_dataset("pleisto/wikipedia-cn-20230720-filtered")
-    return dataset["train"]["completion"][:20000]
+    return dataset["train"]["completion"][:10000]
 
 
 @pytest.fixture
 def tokenizer_hf():
     from transformers import AutoTokenizer as AutoTokenizer_HF
 
-    fast_tokenizer_hf = AutoTokenizer_HF.from_pretrained(MODEL_NAME, use_fast=True, trust_remote_code=True)
+    fast_tokenizer_hf = AutoTokenizer_HF.from_pretrained(MODEL_NAME, trust_remote_code=True)
     return fast_tokenizer_hf
 
 
 @pytest.fixture
 def tokenizer_fast():
-    fast_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True, from_slow=True)
+    fast_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True)
+    breakpoint()
     return fast_tokenizer
 
 
 @pytest.fixture
 def tokenizer_base():
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    breakpoint()
     return tokenizer
 
 

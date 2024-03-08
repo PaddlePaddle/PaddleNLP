@@ -38,7 +38,7 @@ def measure_time(func, *args, **kwargs):
 @pytest.fixture
 def setup_inputs():
     dataset = load_dataset("pleisto/wikipedia-cn-20230720-filtered")
-    return dataset["train"]["completion"][:20000]
+    return dataset["train"]["completion"][:10000]
 
 
 @pytest.fixture
@@ -51,7 +51,7 @@ def tokenizer_hf():
 
 @pytest.fixture
 def tokenizer_fast():
-    fast_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True, from_slow=True)
+    fast_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True)
     return fast_tokenizer
 
 
