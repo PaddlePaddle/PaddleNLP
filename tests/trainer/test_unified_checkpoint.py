@@ -86,6 +86,7 @@ pretrain_arguments = {
     "do_predict": "false",
     "disable_tqdm": "true",
     "recompute": 0,
+    "report_to": "visualdl",
     "unified_checkpoint": 1,
     "distributed_dataloader": 0,
     "recompute_granularity": "full",
