@@ -67,6 +67,7 @@ lora_arguments = {
     "lora": "true",
     "zero_padding": "false",
     "use_flash_attention": "false",
+    "report_to": "visualdl",
     "unified_checkpoint": 1,
 }
 
