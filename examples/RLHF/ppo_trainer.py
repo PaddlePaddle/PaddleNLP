@@ -791,6 +791,11 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
                 # Offload train model if need
                 if global_rank == src_rank and with_offload:
                     offload_tensor_to_cpu(train_state_dict[key])
+
+        if pp_group.nranks > 1:
+            paddle.distributed.parallel.sync_params_buffers(
+                eval_model, comm_group=pp_group, src_rank=pp_group.ranks[0], fuse_params=False
+            )
     else:
         # 其他 DP rank 的state dict, 适配 offload 和初始化
         if with_offload:
@@ -816,6 +821,10 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
             paddle.distributed.parallel.sync_params_buffers(
                 eval_model, comm_group=dp_group, src_rank=dp_group.ranks[0], fuse_params=False
             )
+    # paddle.save(eval_state_dict, f"./tmp/eval_{sd_group.rank}_tp_{eval_tp_rank}_pp_{pp_group.rank}.pdparams")
+    # paddle.save(train_state_dict, f"./tmp/train_{sd_group.rank}_tp_{tp_group.rank}_pp_{pp_group.rank}.pdparams")
+    # paddle.distributed.barrier()
+    # exit(-1)
 
     old_dp_workers = self.args.world_size // (max(sd_group.nranks, 1) * max(dp_group.nranks, 1))
     group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
