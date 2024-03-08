@@ -531,7 +531,6 @@ def data_group_split(tensors, group):
             new_dict[k] = data_group_split(v, group)
         return new_dict
     elif isinstance(tensors, paddle.Tensor):
-        # print("Spliting ", tensors.shape, tensors.dtype)
         return tensors.split(group.nranks)[group.rank]
     else:
         logger.warning(f"Can't parse for type {type(tensors)}")
@@ -551,8 +550,6 @@ def data_group_merge(tensors, group):
         return new_dict
     elif isinstance(tensors, paddle.Tensor):
         tensor_list = []
-        # print("Mergeing ", tensors.shape, tensors.dtype)
-        # paddle.distributed.all_gather(tensor_list, tensors, group=group)
         all_gather_nd(tensor_list, tensors, group=group, padded=True)
         return paddle.concat(tensor_list)
     else:
@@ -568,7 +565,6 @@ def repad_rl_batches(batches, input_lengths):
         batches["position_ids"] = v
     for key in list(batches.keys()):
         if batches[key].shape[0] != input_lengths.shape[0]:
-            # print("set mean", key, batches[key])
             batches[key] = batches[key].mean()
 
     return batches
@@ -597,15 +593,6 @@ class SkipContextManager:
             return  # No exception
         if issubclass(type, SkipWithBlock):
             return True  # Suppress special SkipWithBlock exception
-
-
-# with SkipContextManager(skip=True):
-#     print('In the with block')  # Won't be called
-# print('Out of the with block')
-
-# with SkipContextManager(skip=tp_group.rank!=0):
-#     print('In the with block')  # Won't be called
-# dist.barrier()
 
 
 def all_gather_nd(tensor_list, tensor, group=None, padded=False):
@@ -678,8 +665,6 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
     train_state_dict = train_model.state_dict()
     eval_state_dict = eval_model.state_dict()
 
-    # print(sd_group)
-
     if dp_group.rank <= 0 and sd_group.rank <= 0:
         train_pp_size = pp_group.nranks
         if eval_tp_size > 1 and train_tp_size != eval_tp_size:
@@ -700,22 +685,17 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
                     ignore_error=False,
                 )
 
-                # print(tp_actions.keys())
-
                 is_dst = global_rank == 0
                 for key in eval_state_dict.keys():
-                    # print(f"get key {key}")
                     tensor = train_state_dict[key]
                     if key in tp_actions:
                         ret = distributed_gather(tensor, dst=0, group=tp_group, offload=False)
                         action = tp_actions.pop(key)
                         tensor = action(ret) if is_dst else None
-                        # print(f"merge {key}")
                     else:
                         tensor = tensor._copy_to(paddle.CPUPlace(), False) if is_dst else None
 
                     if tensor is not None:
-                        # print(tensor.shape)
                         eval_state_dict[key].set_value(tensor)
 
                     if not eval_state_dict[key]._is_initialized():
@@ -766,14 +746,9 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
         # tp+pp->tp
         if eval_tp_size > 1 and train_pp_size > 1:
             table = create_send_recv_table(train_state_dict.keys(), eval_state_dict.keys())
-            # print(table)
 
             for key, src_rank, dst_rank in table:
                 # Init tensor for model is cleaned
-                # print(key, src_rank, dst_rank, eval_state_dict[key]._is_initialized())
-                # if key in train_state_dict:
-                #     print(train_state_dict[key]._is_initialized())
-
                 if not eval_state_dict[key]._is_initialized():
                     v = eval_state_dict[key]
                     t = paddle._C_ops.full_like(v, 0, v.dtype, paddle.CUDAPlace(global_dev_id))
@@ -803,7 +778,6 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
                 offload_tensor_to_cpu(train_state_dict[key])
         for k, v in eval_state_dict.items():
             if not v._is_initialized():
-                # print(f"init {k}")
                 t = paddle._C_ops.full_like(v, 0, v.dtype, paddle.CUDAPlace(global_dev_id))
                 v.get_tensor()._share_data_with(t.get_tensor())
 
@@ -856,8 +830,6 @@ def create_data_trans_group(global_rank, group_nums):
         if global_rank in ranks:
             group = gp
 
-    # print("all_split_table:", all_split_table)
-    # print("export_group", group)
     return group
 
 
@@ -1673,23 +1645,18 @@ class PPOTrainer(Trainer):
 
                 # todo, split prompt_only_batch
                 # pp2tp2dp2 -> dp4tp2 prompt_only_batch
-                # print("create gp", gp)
                 prompt_only_batch = data_group_split(prompt_only_batch, group=gp)
-                # print("prompt_only_batch =", prompt_only_batch)
                 # 生成数据
                 rl_batches = self.split_rl_micro_batches(prompt_only_batch)
                 # rl_batches = self.load_sing_gen_data(as_batches=True,
                 #                                      use_counter=True)
                 if self.use_ptx:
                     ptx_batch = data_group_split(ptx_batch, group=gp)
-                    # print("ptx_batch =", ptx_batch)
                     ptx_batches = self.split_ptx_micro_batches(ptx_batch)
-                    # print("ptx_batchs =", ptx_batches)
                     ptx_batches = data_group_merge(ptx_batches, group=gp)
                 else:
                     ptx_batches = [None for _ in range(len(rl_batches))]
 
-                # print("rl_batches =", rl_batches)
                 # todo, merge data
                 if gp is not None:
                     input_ids_length = rl_batches[0]["input_ids"].shape[-1]
@@ -2288,7 +2255,6 @@ class PPOTrainer(Trainer):
         else:
             reward_critic_model_in_use = self.reward_critic_model
 
-        logger.error("Get Here!!")
         # pipe model outputs a logits tensor with LMHead, while non-pipe model
         # outputs a tuple with logits tensor as the only one element.
         logits = actor_model_in_use(
@@ -2297,7 +2263,6 @@ class PPOTrainer(Trainer):
             position_ids=position_ids,
             # return_dict=True,
         )  # .logits
-        logger.error("Get Here 1.0!!")
         if not isinstance(logits, paddle.Tensor):
             logits = logits[0]
         ref_logits = self.reference_model(
@@ -2306,7 +2271,6 @@ class PPOTrainer(Trainer):
             position_ids=position_ids,
             # return_dict=True,
         )  # .logits
-        logger.error("Get Here 2.0!!")
         if not isinstance(ref_logits, paddle.Tensor):
             ref_logits = ref_logits[0]
 
