@@ -1286,7 +1286,7 @@ class PPOTrainer(Trainer):
                 },
             ):
 
-                assert args.pipeline_parallel_degree == 1, "error"
+                # assert args.pipeline_parallel_degree == 1, "error"
                 self.reference_trainer = Trainer(
                     reference_model,
                     criterion,
@@ -1301,7 +1301,7 @@ class PPOTrainer(Trainer):
                     preprocess_logits_for_metrics,
                 )
 
-                assert args.pipeline_parallel_degree == 1, "error"
+                # assert args.pipeline_parallel_degree == 1, "error"
                 self.reward_trainer = Trainer(
                     reward_model,
                     criterion,
@@ -1646,7 +1646,11 @@ class PPOTrainer(Trainer):
                     self._policy_model_eval,
                     with_offload=self.args.offload_level is not None,
                 )
-                gp = self.policy_trainer._policy_model_eval_group
+                gp = (
+                    self.policy_trainer._policy_model_eval_group
+                    if hasattr(self.policy_trainer, "_policy_model_eval_group")
+                    else None
+                )
                 # gp = create_data_trans_group(self.args.logical_process_index, paddle.distributed.get_rank(), self._policy_model_eval.config.tensor_parallel_degree)
                 # # todo: zhui
                 self.value_trainer.export_evaluate_model(
