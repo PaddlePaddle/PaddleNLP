@@ -52,14 +52,12 @@ def tokenizer_hf():
 @pytest.fixture
 def tokenizer_fast():
     fast_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True)
-    breakpoint()
     return fast_tokenizer
 
 
 @pytest.fixture
 def tokenizer_base():
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    breakpoint()
     return tokenizer
 
 
