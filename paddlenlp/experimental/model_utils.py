@@ -24,10 +24,9 @@ import paddle
 from paddle.framework import core
 
 from paddlenlp.transformers import PretrainedModel
+from paddlenlp.utils.download import resolve_file_path
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
-from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
-from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
 __all__ = ["FasterPretrainedModel", "ActScalesLoader", "WeightScalesLoader"]
@@ -96,6 +95,11 @@ class FasterPretrainedModel(PretrainedModel):
         pretrained_models = list(cls.pretrained_init_configuration.keys())
         resource_files = {}
         init_configuration = {}
+        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+        cache_dir = kwargs.pop("cache_dir", None)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        from_aistudio = kwargs.pop("from_aistudio", False)
+        subfolder = kwargs.pop("subfolder", "")
 
         # From built-in pretrained models
         if pretrained_model_name_or_path in pretrained_models:
@@ -106,40 +110,27 @@ class FasterPretrainedModel(PretrainedModel):
         elif os.path.isdir(pretrained_model_name_or_path):
             for file_id, file_name in cls.resource_files_names.items():
                 full_file_name = os.path.join(pretrained_model_name_or_path, file_name)
-                resource_files[file_id] = full_file_name
+                if os.path.isfile(full_file_name):
+                    resource_files[file_id] = full_file_name
             resource_files["model_config_file"] = os.path.join(pretrained_model_name_or_path, cls.model_config_file)
         else:
-            # Assuming from community-contributed pretrained models
             for file_id, file_name in cls.resource_files_names.items():
-                full_file_name = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, file_name])
-                resource_files[file_id] = full_file_name
-            resource_files["model_config_file"] = "/".join(
-                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
-            )
+                resource_files[file_id] = file_name
 
-        default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        # default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_resource_files = {}
         for file_id, file_path in resource_files.items():
             if file_path is None or os.path.isfile(file_path):
                 resolved_resource_files[file_id] = file_path
                 continue
-            path = os.path.join(default_root, file_path.split("/")[-1])
-            if os.path.exists(path):
-                logger.info("Already cached %s" % path)
-                resolved_resource_files[file_id] = path
-            else:
-                logger.info("Downloading %s and saved to %s" % (file_path, default_root))
-                try:
-                    resolved_resource_files[file_id] = get_path_from_url(file_path, default_root)
-                except RuntimeError as err:
-                    logger.error(err)
-                    raise RuntimeError(
-                        f"Can't load weights for '{pretrained_model_name_or_path}'.\n"
-                        f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-                        "- a correct model-identifier of built-in pretrained models,\n"
-                        "- or a correct model-identifier of community-contributed pretrained models,\n"
-                        "- or the correct path to a directory containing relevant modeling files(model_weights and model_config).\n"
-                    )
+            resolved_resource_files[file_id] = resolve_file_path(
+                pretrained_model_name_or_path,
+                [file_path],
+                subfolder,
+                cache_dir=cache_dir,
+                from_aistudio=from_aistudio,
+                from_hf_hub=from_hf_hub,
+            )
 
         # Prepare model initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
