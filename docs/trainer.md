@@ -556,7 +556,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         对于数据并行,一些选项会影响训练性能,这里将一些选项配置集中管理,以str形式传入配置.
                         支持如下选项:
                             enable_allreduce_avg_in_gradinent_scale : 在数据并行中, 替换`allreduce_sum + scale`模式为`allreduce_avg`, 以提高性能. 仅支持auto模式.
-                            gradient_sync_after_accumulate : 在数据并行中, 将梯度同步移动到梯度累积之后的`optimize`阶段, 减少同步的次数以提高性能, 但会增加显存占用.
+                            gradient_sync_after_accumulate : 当梯度累积开启时, 将梯度同步操作从backward阶段移动到optimizer阶段, 以减少同步次数, 提高性能, 但会增加显存占用. 仅支持auto模式.
 
                         Some additional configs which affect data parallel performance, we provide some option to config it.
                         following config is support:
