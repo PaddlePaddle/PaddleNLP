@@ -234,6 +234,7 @@ class TrainingArguments:
             Some additional configs which affect data parallel performance, we provide some option to config it.
             following config is support:
               enable_allreduce_avg_in_gradinent_scale, it replace `allreduce_sum + scale` pattern with `allreduce_avg` when scale gradient in data_parallel, which improve the performance. ONLY supported for auto mode now.
+              gradient_sync_after_accumulate, move gradient sync operations from backward into optimizer step when gradient accumulate enabling, which reduce the sync times to improve performance, but will increase the memory usage. ONLY supported for auto mode now.
         tensor_parallel_config (`str`, *optional*)(
             Some additional configs which affect model parallel performance, we provide some option to config it.
             following config is support:
@@ -582,6 +583,7 @@ class TrainingArguments:
                 "Some additional configs which affect data parallel performance, we provide some option to config it."
                 "following config is support:\n"
                 "enable_allreduce_avg_in_gradinent_scale, it replace `allreduce_sum + scale` pattern with `allreduce_avg` when scale gradient in data_parallel, which improve the performance. ONLY supported for auto mode now. \n"
+                "gradient_sync_after_accumulate, move gradient sync operations from backward into optimizer step when gradient accumulate enabling, which reduce the sync times to improve performance, but will increase the memory usage. ONLY supported for auto mode now. \n"
             )
         },
     )
@@ -1184,12 +1186,14 @@ class TrainingArguments:
                 data_parallel_config = set(self.data_parallel_config.split(" "))
                 for x in data_parallel_config:
                     if len(x) > 0:
-                        if x not in ["enable_allreduce_avg_in_gradinent_scale"]:
+                        if x not in ["enable_allreduce_avg_in_gradinent_scale", "gradient_sync_after_accumulate"]:
                             raise ValueError(
                                 f"Found unknown data parallel config {x}, accpet config is enable_allreduce_avg_in_gradinent_scale."
                             )
                 if "enable_allreduce_avg_in_gradinent_scale" in data_parallel_config:
                     strategy.gradient_scale_using_allreduce_avg = True
+                if "gradient_sync_after_accumulate" in data_parallel_config:
+                    strategy.dp_optimization.gradient_sync_after_accumulate = True
 
             # navie-pp: pipeline_parallel_degree > 1 and gradient_accumulation_steps == 1
             if self.pipeline_parallel_degree > 1 and self.gradient_accumulation_steps > 1:
