@@ -60,6 +60,7 @@ class TestWandbCallback(unittest.TestCase):
                 self.assertEqual(wandbcallback._wandb.run.summary["train/learning_rate"], log["learning_rate"])
                 self.assertEqual(wandbcallback._wandb.run.summary["train/global_step"], log["global_step"])
         wandbcallback.on_train_end(args, state, control, model=model)
+        wandbcallback._wandb.finish()
         os.environ.pop("WANDB_LOG_MODEL", None)
         os.environ.pop("WANDB_MODE", None)
         shutil.rmtree(output_dir)

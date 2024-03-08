@@ -34,15 +34,9 @@ from huggingface_hub.utils import EntryNotFoundError
 from .. import __version__
 from ..quantization.quantization_config import QuantizationConfig
 from ..utils import CONFIG_NAME, LEGACY_CONFIG_NAME
-from ..utils.downloader import (
-    COMMUNITY_MODEL_PREFIX,
-    get_path_from_url_with_filelock,
-    hf_file_exists,
-    url_file_exists,
-)
+from ..utils.download import resolve_file_path
+from ..utils.downloader import hf_file_exists
 from ..utils.log import logger
-from .aistudio_utils import aistudio_download
-from .utils import resolve_cache_dir
 
 _re_configuration_file = re.compile(r"config\.(.*)\.json")
 
@@ -702,13 +696,10 @@ class PretrainedConfig:
         """
         original_kwargs = copy.deepcopy(kwargs)
         cache_dir = kwargs.pop("cache_dir", None)
-        from_hf_hub = kwargs.get("from_hf_hub", False)
-        from_aistudio = kwargs.get("from_aistudio", False)
         subfolder = kwargs.get("subfolder", "")
         if subfolder is None:
             subfolder = ""
 
-        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
         kwargs["cache_dir"] = cache_dir
         kwargs["subfolder"] = subfolder
 
@@ -743,67 +734,26 @@ class PretrainedConfig:
         # 0. init from pretrained_init_configuration
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             # which can be: dict or url
-            pretrained_model_name_or_path = cls.pretrained_init_configuration[pretrained_model_name_or_path]
+            pretrained_model_name_or_path_ = cls.pretrained_init_configuration[pretrained_model_name_or_path]
 
-            if isinstance(pretrained_model_name_or_path, dict):
-                return pretrained_model_name_or_path, kwargs
+            if isinstance(pretrained_model_name_or_path_, dict):
+                return pretrained_model_name_or_path_, kwargs
 
-        # 1. get the configuration file from local file, eg: /cache/path/model_config.json
-        if os.path.isfile(pretrained_model_name_or_path):
-            resolved_config_file = pretrained_model_name_or_path
-        # 2. get the configuration file from local dir with default name, eg: /local/path
-        elif os.path.isdir(pretrained_model_name_or_path):
-            configuration_file = kwargs.pop("_configuration_file", CONFIG_NAME)
-            configuration_file = os.path.join(pretrained_model_name_or_path, subfolder, configuration_file)
-            if os.path.exists(configuration_file):
-                resolved_config_file = configuration_file
-            else:
-                # try to detect old-school config file
-                configuration_file = os.path.join(pretrained_model_name_or_path, subfolder, LEGACY_CONFIG_NAME)
-                if os.path.exists(configuration_file):
-                    resolved_config_file = configuration_file
-                else:
-                    raise FileNotFoundError(
-                        "please make sure there is `model_config.json` under the dir, or you can pass the `_configuration_file` "
-                        "param into `from_pretarined` method to specific the configuration file name"
-                    )  # 4. load it as the community resource file
-        # 3. get the configuration file from aistudio
-        elif from_aistudio:
-            resolved_config_file = aistudio_download(
-                repo_id=pretrained_model_name_or_path,
-                filename=CONFIG_NAME,
-                subfolder=subfolder,
-                cache_dir=cache_dir,
-            )
-        # 4. get the configuration file from HF HUB
-        elif from_hf_hub:
-            resolved_config_file = resolve_hf_config_path(
-                repo_id=pretrained_model_name_or_path, cache_dir=cache_dir, subfolder=subfolder
-            )
-        else:
-            url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, CONFIG_NAME]
-            legacy_url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, LEGACY_CONFIG_NAME]
-            cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
-            if subfolder != "":
-                url_list.insert(2, subfolder)
-                legacy_url_list.insert(2, subfolder)
-            community_url = "/".join(url_list)
-            legacy_community_url = "/".join(legacy_url_list)
-
-            if url_file_exists(community_url):
-                resolved_config_file = get_path_from_url_with_filelock(
-                    community_url,
-                    cache_dir,
-                    check_exist=not force_download,
-                )
-            elif url_file_exists(legacy_community_url):
-                resolved_config_file = get_path_from_url_with_filelock(
-                    legacy_community_url,
-                    cache_dir,
-                    check_exist=not force_download,
-                )
-            else:
-                raise FileNotFoundError(f"configuration file<{CONFIG_NAME}> or <{LEGACY_CONFIG_NAME}> not found")
+        configuration_file = kwargs.pop("_configuration_file", CONFIG_NAME)
+        filenames = (
+            [configuration_file, LEGACY_CONFIG_NAME]
+            if configuration_file == CONFIG_NAME
+            else [configuration_file, CONFIG_NAME, LEGACY_CONFIG_NAME]
+        )
+        resolved_config_file = resolve_file_path(
+            pretrained_model_name_or_path,
+            filenames,
+            subfolder,
+            cache_dir=cache_dir,
+            force_download=force_download,
+            from_aistudio=from_aistudio,
+            from_hf_hub=from_hf_hub,
+        )
 
         try:
             logger.info(f"Loading configuration file {resolved_config_file}")
