@@ -21,17 +21,17 @@
     },
 
     "task_limit": 2000,
-    "max_time_per_task": 120,
+    "max_time_per_task": 180,
     "schedule_mode": "performance",
 
     "model_cfg": {
-        "hidden_size": 4096,
+        "hidden_size": 8192,
         "global_batch_size": 32, 
-        "num_layers": 32, 
-        "num_attention_heads": 32, 
+        "num_layers": 80, 
+        "num_attention_heads": 64, 
         "max_sequence_length": 4096,
         "vocab_size": 32000,
-        "intermediate_size": 11008
+        "intermediate_size": 28672
     },
 
     "run_cmd": {
