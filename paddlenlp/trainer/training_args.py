@@ -583,7 +583,7 @@ class TrainingArguments:
                 "Some additional configs which affect data parallel performance, we provide some option to config it."
                 "following config is support:\n"
                 "enable_allreduce_avg_in_gradinent_scale, it replace `allreduce_sum + scale` pattern with `allreduce_avg` when scale gradient in data_parallel, which improve the performance. ONLY supported for auto mode now. \n"
-                "gradient_sync_after_accumulate, it supports gradient sync after accumulate in data_parallel, which improve the performance but will increase the gpu memory usage. \n"
+                "gradient_sync_after_accumulate, move gradient sync operations from backward into optimizer step when gradient accumulate enabling, which reduce the sync times to improve performance, but will increase the memory usage. ONLY supported for auto mode now. \n"
             )
         },
     )
