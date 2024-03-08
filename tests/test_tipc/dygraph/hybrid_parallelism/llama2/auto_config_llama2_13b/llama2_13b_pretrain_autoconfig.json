@@ -13,10 +13,10 @@
     "search_algo":{
         "name": "grid",
         "sharding_overlap": {
-            "sharding_mp": ["./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json", "sharding_parallel_config",  "split_param enable_stage1_tensor_fusion enable_stage1_overlap", "pipeline_parallel_config", ""],
-            "sharding_pp": ["./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json", "pipeline_parallel_config", "enable_delay_scale_loss enable_sharding_comm_overlap enable_release_grads", "sharding_parallel_config", "split_param enable_stage1_tensor_fusion enable_stage1_overlap"],
-            "sharding_mp_pp": ["./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json", "pipeline_parallel_config", "enable_delay_scale_loss enable_sharding_comm_overlap enable_release_grads disable_partial_send_recv", "sharding_parallel_config", "split_param enable_stage1_tensor_fusion enable_stage1_overlap"],
-            "no_overlap": ["./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json", "pipeline_parallel_config", "enable_delay_scale_loss enable_release_grads disable_partial_send_recv", "sharding_parallel_config", "split_param enable_stage1_tensor_fusion"]
+            "sharding_mp": ["./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json", "sharding_parallel_config",  "split_param  enable_stage1_overlap", "pipeline_parallel_config", ""],
+            "sharding_pp": ["./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json", "pipeline_parallel_config", "enable_delay_scale_loss enable_sharding_comm_overlap enable_release_grads", "sharding_parallel_config", "split_param  enable_stage1_overlap"],
+            "sharding_mp_pp": ["./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json", "pipeline_parallel_config", "enable_delay_scale_loss enable_sharding_comm_overlap enable_release_grads disable_partial_send_recv", "sharding_parallel_config", "split_param  enable_stage1_overlap"],
+            "no_overlap": ["./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json", "pipeline_parallel_config", "enable_delay_scale_loss enable_release_grads disable_partial_send_recv", "sharding_parallel_config", "split_param "]
         }
     },
 
