@@ -29,6 +29,193 @@ from paddle.nn.quant import weight_only_linear
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
+from triton_ops import triton_wint8
+
+
+import triton
+import triton.language as tl
+
+# @triton.autotune(
+# 	configs=[
+#         #triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 16, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 64, 'GROUP_SIZE_M': 1}, num_stages=4, num_warps=4),
+#         #triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 16, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 1}, num_stages=4, num_warps=4),
+#         #triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 16, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 64, 'GROUP_SIZE_M': 1}, num_stages=4, num_warps=4),
+#         #triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 16, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 64, 'GROUP_SIZE_M': 1}, num_stages=4, num_warps=4),
+#         #triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 16, 'BLOCK_SIZE_N': 256, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 1}, num_stages=4, num_warps=8),
+#         triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 16, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 64, 'GROUP_SIZE_M': 1}, num_stages=4, num_warps=4),
+
+# 		#triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE_M': 8}, num_stages=4, num_warps=4),
+# 		#triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE_M': 8}, num_stages=4, num_warps=4),
+# 		#triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 64, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE_M': 8}, num_stages=4, num_warps=4),
+# 		#triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=8),
+# 		#triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 64, 'BLOCK_SIZE_K': 64, 'GROUP_SIZE_M': 8}, num_stages=3, num_warps=8),
+# 		#triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=4),
+# 		#triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 256, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=4),
+#         #triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 256, 'GROUP_SIZE_M': 16}, num_stages=2, num_warps=4),
+#         #triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 512, 'GROUP_SIZE_M': 16}, num_stages=2, num_warps=4),
+# 		# triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE_M': 8}, num_stages=4, num_warps=4),
+# 		# triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE_M': 8}, num_stages=4, num_warps=4),
+# 		# triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 64, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE_M': 8}, num_stages=4, num_warps=4),
+# 		# triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=8),
+# 		# triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 64, 'BLOCK_SIZE_K': 64, 'GROUP_SIZE_M': 8}, num_stages=3, num_warps=8),
+# 		# triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=4),
+# 		# triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 256, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=4),
+#         # triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 256, 'GROUP_SIZE_M': 16}, num_stages=2, num_warps=4),
+#         # triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 512, 'GROUP_SIZE_M': 16}, num_stages=2, num_warps=4),
+#         # triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE_M': 8}, num_stages=4, num_warps=4),
+# 		# triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE_M': 8}, num_stages=4, num_warps=4),
+# 		# triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE_M': 8}, num_stages=4, num_warps=4),
+# 		# triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=8),
+# 		# triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 64, 'GROUP_SIZE_M': 8}, num_stages=3, num_warps=8),
+# 		# triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=4),
+# 		# triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 256, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=4),
+#         # triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 256, 'GROUP_SIZE_M': 16}, num_stages=2, num_warps=4),
+#         # triton.Config({'SPLIT_K': 1, 'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 512, 'GROUP_SIZE_M': 16}, num_stages=2, num_warps=4),
+# 		# triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE_M': 8}, num_stages=4, num_warps=4),
+# 		# triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE_M': 8}, num_stages=4, num_warps=4),
+# 		# triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE_M': 8}, num_stages=4, num_warps=4),
+# 		# triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=8),
+# 		# triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 64, 'GROUP_SIZE_M': 8}, num_stages=3, num_warps=8),
+# 		# triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=4),
+# 		# triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 256, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=4),
+#         # triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 256, 'GROUP_SIZE_M': 16}, num_stages=2, num_warps=4),
+#         # triton.Config({'SPLIT_K': 2, 'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 16, 'BLOCK_SIZE_K': 512, 'GROUP_SIZE_M': 16}, num_stages=2, num_warps=4),
+
+#  ],
+# 	key=['M', 'N', 'K'],
+#     reset_to_zero=['c_ptr']
+# )
+@triton.jit
+def wint8_kernel(
+    a_ptr, b_ptr, c_ptr,
+    bs_ptr, bias_ptr,
+    M, N, K,
+    stride_am, stride_ak,
+    stride_bk, stride_bn,
+    stride_cm, stride_cn,
+    BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
+    GROUP_SIZE_M: tl.constexpr, SPLIT_K: tl.constexpr
+    ):
+    """
+    assert K % (BLOCK_SIZE_K * SPLIT_K) == 0
+    """
+
+    pid = tl.program_id(axis=0)
+    pid_sp_k = tl.program_id(axis=1)
+    num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)
+    num_pid_n = tl.cdiv(N, BLOCK_SIZE_N)
+    num_pid_k = tl.cdiv(K, BLOCK_SIZE_K)
+    num_pid_in_group = GROUP_SIZE_M * num_pid_n
+    group_id = pid // num_pid_in_group
+    first_pid_m = group_id * GROUP_SIZE_M
+    group_size_m = min(num_pid_m - first_pid_m, GROUP_SIZE_M)
+    pid_m = first_pid_m + (pid % group_size_m)
+    pid_n = (pid % num_pid_in_group) // group_size_m    
+    offs_am = (pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)) % M
+    #offs_am = (pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M))
+    offs_bn = (pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)) % N
+    
+    offs_k = pid_sp_k * BLOCK_SIZE_K + tl.arange(0, BLOCK_SIZE_K)
+    # 下面这个offs_k是传统的split-k
+    # offs_k = pid_sp_k * (K // SPLIT_K) + tl.arange(0, BLOCK_SIZE_K)
+    
+    offs_k = tl.max_contiguous(tl.multiple_of(offs_k, BLOCK_SIZE_K), BLOCK_SIZE_K)
+    
+
+    a_ptrs = a_ptr + offs_am[:, None] * stride_am + offs_k[None, :] * stride_ak
+    b_ptrs = b_ptr + offs_k[:, None] * stride_bk + offs_bn[None, :] * stride_bn
+
+    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)
+
+    # magic_number = (0x00006400)
+    # magic_number = magic_number.to(tl.uint16)
+
+    for k in range(0, tl.cdiv(K, BLOCK_SIZE_K * SPLIT_K)):
+        
+        #a = tl.load(a_ptrs, mask=offs_am[:, None] < M, other=0.0)
+        a = tl.load(a_ptrs)
+        b = tl.load(b_ptrs)
+        fp_b = b.to(tl.float16)
+
+        bs_ptrs = bs_ptr + offs_bn[None, :]
+        bs = tl.load(bs_ptrs)
+        fp_b = fp_b * bs
+
+        # fp_b = b | magic_number
+        # fp_b = int_b.to(tl.float16, bitcast=True)
+        # fp_b = int_b - 1152
+        
+        accumulator += tl.dot(a, fp_b)
+        # Advance the ptrs to the next K block.
+        a_ptrs += BLOCK_SIZE_K * SPLIT_K * stride_ak
+        b_ptrs += BLOCK_SIZE_K * SPLIT_K * stride_bk
+        
+        #a_ptrs += BLOCK_SIZE_K * stride_ak
+        #b_ptrs += BLOCK_SIZE_K * stride_bk
+    
+    # only let the first block do epilogue
+    if bias_ptr and pid_sp_k == 0:
+        bias_ptrs = bias_ptr + offs_bn
+        bias = tl.load(bias_ptrs)
+        accumulator += bias[None,:]
+    
+    # bs_ptrs = bs_ptr + (offs_bn[None, :])
+    # bs = tl.load(bs_ptrs)
+    # accumulator = (accumulator * bs)
+
+    c = accumulator.to(tl.float16)
+
+    # -----------------------------------------------------------
+    # Write back the block of the output matrix C with masks.
+    offs_cm = pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)
+    offs_cn = pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)
+    c_ptrs = c_ptr + stride_cm * offs_cm[:, None] + stride_cn * offs_cn[None, :]
+    c_mask = (offs_cm[:, None] < M) & (offs_cn[None, :] < N)
+    
+    if SPLIT_K == 1:
+        tl.store(c_ptrs, c, mask=c_mask)
+    else:
+        tl.atomic_add(c_ptrs, c, mask=c_mask)
+
+
+def matmul_dequantize_int8_s2(x, 
+                              qweight, 
+                              scales, 
+                              bias = None, 
+                              bool_trans_w = True):
+    """
+    """
+    M, K = x.shape
+    assert x.is_contiguous(), ""
+    assert qweight.is_contiguous(), ""
+
+    if bool_trans_w:
+        N = qweight.shape[0]
+        stride_bk = 1
+        stride_bn = K
+    else:
+        N = qweight.shape[1]
+        N = qweight.shape[0]
+        stride_bk = N
+        stride_bn = 1
+
+    output = paddle.zeros((M, N), dtype=paddle.float16) 
+    
+    grid = lambda META: (
+        triton.cdiv(M, META['BLOCK_SIZE_M']) * triton.cdiv(N, META['BLOCK_SIZE_N']),
+        META['SPLIT_K'],
+    )
+
+    wint8_kernel[grid](
+        x, qweight, output,
+        scales,  bias,
+        M, N, K,
+        K, 1,  # A矩阵永远是行rowmajor
+        stride_bk, stride_bn,
+        N, 1,  # C矩阵永远是rowmajor
+    )
+    return output
+
 if is_paddlenlp_ops_available():
     from paddlenlp_ops import (
         dequant_int8,
@@ -967,6 +1154,8 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
     def init_weight_shape(self, config):
         super().init_weight_shape(config)
 
+        self.qkv_weight_shape = [(self.num_heads + 2 * self.kv_num_heads) * self.head_dim, self.embed_dim]
+
         self.linear_weight_shape = [self.embed_dim, self.num_heads * self.head_dim]
         self.ffn1_weight_shape = (
             [self.dim_feedforward * 2, self.embed_dim]
@@ -975,6 +1164,13 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
         )
         self.ffn2_weight_shape = [self.embed_dim, self.dim_feedforward]
 
+        # def haha(a):
+        #     return [a[1], a[0]]
+        # self.qkv_weight_shape = haha(self.qkv_weight_shape)
+        # self.linear_weight_shape = haha(self.linear_weight_shape)
+        # self.ffn1_weight_shape = haha(self.ffn1_weight_shape)
+        # self.ffn2_weight_shape = haha(self.ffn2_weight_shape)
+
         if config.weight_only_quant_bits == 4:
             self.qkv_weight_shape[0] //= 2
             self.linear_weight_shape[0] //= 2
@@ -982,6 +1178,17 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             self.ffn2_weight_shape[0] //= 2
 
     def compute_qkv_linear(self, ln_out, i):
+
+        if (isinstance(ln_out, tuple)):
+            tmp = ln_out[0].shape[-1]
+            ln_out = ln_out[0].reshape([-1,tmp])
+        else:
+            tmp = ln_out.shape[-1]
+            ln_out = ln_out.reshape([-1,tmp])
+        #a = matmul_dequantize_int8_s2(ln_out, self.qkv_weights[i], self.qkv_weights_scale[i], self.qkv_biases[i])
+        a = triton_wint8(ln_out, self.qkv_weights[i], self.qkv_weights_scale[i], self.qkv_biases[i], bool_trans_w=True, with_bias=True)
+        return a
+
         return weight_only_linear(
             ln_out,
             weight=self.qkv_weights[i],
@@ -991,6 +1198,12 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
         )
 
     def compute_out_linear(self, fmha_out, i):
+
+        #a = matmul_dequantize_int8_s2(fmha_out, self.linear_weights[i], self.linear_weights_scale[i])
+        a = triton_wint8(fmha_out, self.linear_weights[i], self.linear_weights_scale[i], None, bool_trans_w=True, with_bias=False)
+        return a
+
+
         return weight_only_linear(
             fmha_out,
             weight=self.linear_weights[i],
@@ -999,6 +1212,11 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
         )
 
     def compute_ffn1(self, tmp_out, i):
+
+        #a = matmul_dequantize_int8_s2(tmp_out, self.ffn1_weights[i], self.ffn1_weights_scale[i])
+        a = triton_wint8(tmp_out, self.ffn1_weights[i], self.ffn1_weights_scale[i], None, bool_trans_w=True, with_bias=False)
+        return a
+
         return weight_only_linear(
             tmp_out,
             weight=self.ffn1_weights[i],
@@ -1007,6 +1225,11 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
         )
 
     def compute_ffn2(self, ffn1_out, i):
+
+        #a = matmul_dequantize_int8_s2(ffn1_out, self.ffn2_weights[i], self.ffn2_weights_scale[i])
+        a = triton_wint8(ffn1_out, self.ffn2_weights[i], self.ffn2_weights_scale[i], None, bool_trans_w=True, with_bias=False)
+        return a
+
         return weight_only_linear(
             ffn1_out,
             weight=self.ffn2_weights[i],
@@ -1488,3 +1711,71 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
         out_linear_out = self.compute_out_linear(fmha_out, i)
 
         return out_linear_out
+
+
+if __name__ == '__main__':
+
+    M = 4
+    K = 4096*4
+    N = 4096
+    activation = paddle.randn((M, K), dtype=paddle.float16)
+    original_weight = paddle.randn((K, N), dtype=paddle.float16)
+    from paddle.nn.quant import weight_quantize
+    perm_qweight, scale = weight_quantize(original_weight, algo="weight_only_int8")
+    bias = paddle.rand((N,), dtype=paddle.float16) * 10
+
+    no_perum_qweight = original_weight / scale.reshape([1, N])
+    no_perum_qweight = paddle.round(no_perum_qweight)
+    no_perum_qweight = paddle.clip(no_perum_qweight, min=-127, max=127)
+    no_perum_qweight = no_perum_qweight.astype("int8")
+
+    for i in range(100):
+        paddle_output = weight_only_linear(activation, 
+                                        perm_qweight,
+                                        bias,
+                                        scale,
+                                        "int8",)
+
+    # 下面是triton的计算代码
+    no_perum_qweight = no_perum_qweight.transpose([1,0]).contiguous()
+
+    import datetime
+    import time
+
+    warm_up_times = 5
+    repeat_times = 10
+
+    for i in range(100):
+        triton_output = matmul_dequantize_int8_s2(
+            activation,
+            no_perum_qweight,
+            scale,
+            bias, bool_trans_w=True)
+
+    paddle.device.cuda.synchronize()
+    starttime = datetime.datetime.now()
+    
+    for i in range(100):
+        triton_output = matmul_dequantize_int8_s2(
+            activation,
+            no_perum_qweight,
+            scale,
+            bias, bool_trans_w=True)
+    
+    paddle.device.cuda.synchronize()
+    endtime = datetime.datetime.now()
+    duringtime = endtime - starttime
+    time_ms = duringtime.seconds * 1000 + duringtime.microseconds / 1000.0
+    print("The whoel end to end time : ", time_ms, "ms")
+
+    no_perum_qweight = no_perum_qweight.transpose([1,0]).contiguous()
+
+    a = no_perum_qweight.astype("float16") * scale.reshape([1, N])
+    baseline = paddle.matmul(activation, a)
+    baseline += bias
+
+    print("triton_output", paddle.max(paddle.abs(triton_output - baseline)))
+    #print("triton_output", triton_output)
+    #print("baseline", baseline)
+
+
