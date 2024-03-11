@@ -196,7 +196,6 @@ class FusedMultiTransformerConfig:
         kv_num_heads=-1,
         use_dynamic_cachekv_quant=True,
         rank_id=-1,
-        tensor_parallel_degree=1,
     ):
         self.embed_dim = embed_dim
         self.num_heads = num_heads
@@ -255,7 +254,6 @@ class FusedMultiTransformerConfig:
         self.rank_id = rank_id
         self.trans_qkvw = trans_qkvw
         self.ring_id = ring_id
-        self.tensor_parallel_degree = tensor_parallel_degree
 
 
 class FusedMultiTransformerBase(Layer):
@@ -370,7 +368,7 @@ class FusedMultiTransformerBase(Layer):
             qkv_bias = None
             if qkv_bias_attr:
                 qkv_bias = self.create_parameter(
-                    shape=[(self.num_heads + 2 * self.kv_num_heads) * self.head_dim // config.tensor_parallel_degree],
+                    shape=[(self.num_heads + 2 * self.kv_num_heads) * self.head_dim],
                     attr=qkv_bias_attr,
                     dtype=self._dtype,
                     is_bias=True,
@@ -548,20 +546,20 @@ class FusedMultiTransformerBase(Layer):
 
     def init_weight_shape(self, config):
         self.qkv_weight_shape = (
-            [(self.num_heads + 2 * self.kv_num_heads) * self.head_dim // config.tensor_parallel_degree, self.embed_dim]
+            [(self.num_heads + 2 * self.kv_num_heads) * self.head_dim, self.embed_dim]
             if config.trans_qkvw
             else [
-                (self.num_heads + 2 * self.kv_num_heads) * self.head_dim // config.tensor_parallel_degree,
+                (self.num_heads + 2 * self.kv_num_heads) * self.head_dim,
                 self.embed_dim,
             ]
         )
-        self.linear_weight_shape = [self.num_heads * self.head_dim // config.tensor_parallel_degree, self.embed_dim]
+        self.linear_weight_shape = [self.num_heads * self.head_dim, self.embed_dim]
         self.ffn1_weight_shape = (
-            [self.embed_dim, self.dim_feedforward * 2 // config.tensor_parallel_degree]
+            [self.embed_dim, self.dim_feedforward * 2]
             if self.activation.endswith("glu")
-            else [self.embed_dim, self.dim_feedforward // config.tensor_parallel_degree]
+            else [self.embed_dim, self.dim_feedforward]
         )
-        self.ffn2_weight_shape = [self.dim_feedforward // config.tensor_parallel_degree, self.embed_dim]
+        self.ffn2_weight_shape = [self.dim_feedforward, self.embed_dim]
 
     def get_weight_create_dype(self):
         return self._dtype

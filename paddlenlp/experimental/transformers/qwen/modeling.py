@@ -163,7 +163,7 @@ class QWenInferenceModel(QWenPretrainedModel):
             weight_only_quant_bits=self.weight_only_quant_bits,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
-            nranks=1,
+            nranks=config.tensor_parallel_degree,
             ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
@@ -180,7 +180,6 @@ class QWenInferenceModel(QWenPretrainedModel):
             norm_type="rmsnorm",
             use_neox_rotary_style=True,
             rank_id=config.tensor_parallel_rank,
-            tensor_parallel_degree=config.tensor_parallel_degree,
         )
 
         if self.use_weight_only:
@@ -206,6 +205,7 @@ class QWenInferenceModel(QWenPretrainedModel):
         ln_f_weight = paddle.to_tensor(state_dict["qwen.ln_f.weight"], dtype=self.ln_f.weight.dtype)
         self.wte.weight.set_value(wte_weight)
         self.ln_f.weight.set_value(ln_f_weight)
+        head_size = self.hidden_size // self.num_attention_heads
 
         for idx in range(self.num_layers):
             ln_scale = paddle.to_tensor(
@@ -215,7 +215,13 @@ class QWenInferenceModel(QWenPretrainedModel):
 
             qkv_weight = paddle.to_tensor(
                 state_dict["qwen.h.{}.attn.c_attn.weight".format(idx)].transpose([1, 0]), dtype=dtype
+            ).reshape(
+                [
+                    3 * (self.num_attention_heads // self.config.tensor_parallel_degree) * (head_size),
+                    self.hidden_size,
+                ]
             )
+
             if self.use_weight_only:
                 qkv_weight = paddle.transpose(qkv_weight, perm=[1, 0])
                 qkv_quanted_weight, qkv_weight_scale = weight_quantize(qkv_weight, algo=self.quant_type)
