@@ -1018,8 +1018,6 @@ class TrainingArguments:
                         "overlap_p2p_comm": "enable_overlap_p2p_comm" in pipeline_parallel_config,
                         "clear_every_step_cache": "enable_clear_every_step_cache" in pipeline_parallel_config,
                     }
-                    if dygraph_pp_configs["dp_comm_overlap"]:
-                        raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
 
                     if self.do_eval:
                         if (
