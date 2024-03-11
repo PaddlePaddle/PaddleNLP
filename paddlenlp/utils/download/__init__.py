@@ -17,6 +17,7 @@ from argparse import ArgumentTypeError
 from pathlib import Path
 from typing import Dict, Literal, Optional, Union
 
+from huggingface_hub import _CACHED_NO_EXIST
 from huggingface_hub import file_exists as hf_hub_file_exists
 from huggingface_hub import hf_hub_download
 from huggingface_hub import try_to_load_from_cache as hf_hub_try_to_load_from_cache
@@ -148,9 +149,10 @@ def resolve_file_path(
         cache_file_name = bos_aistudio_hf_try_to_load_from_cache(
             repo_id, filename, cache_dir, subfolder, revision, repo_type, from_bos, from_aistudio, from_hf_hub
         )
+        if from_hf_hub and cache_file_name is _CACHED_NO_EXIST:
+            cache_file_name = None
         if cache_file_name is not None:
-            if ((from_aistudio or from_hf_hub) and not isinstance(cache_file_name, object)) or from_bos:
-                return cache_file_name
+            return cache_file_name
 
     from_modelscope = strtobool(os.environ.get("from_modelscope", False))
 
