@@ -323,19 +323,19 @@ class GenerationInferenceModel(GenerationMixin):
             length_cond = paddle.greater_equal(model_kwargs["step_idx"], model_kwargs["max_dec_len"])
             model_kwargs["stop_flags"] = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
 
-            if cache is None:
+            model_kwargs["seq_len_decoder"] = paddle.where(
+                model_kwargs["stop_flags"],
+                model_kwargs["seq_len_decoder"],
+                model_kwargs["seq_len_decoder"] + 1,
+            )
+
+            if cache is not None:
                 model_kwargs["seq_len_decoder"] = paddle.where(
                     model_kwargs["stop_flags"],
                     model_kwargs["seq_len_decoder"] - model_kwargs["seq_len_decoder"],
                     model_kwargs["seq_len_decoder"],
                 )
             else:
-                model_kwargs["seq_len_decoder"] = paddle.where(
-                    model_kwargs["stop_flags"],
-                    model_kwargs["seq_len_decoder"],
-                    model_kwargs["seq_len_decoder"] + 1,
-                )
-
                 model_kwargs["seq_len_decoder"] = paddle.where(
                     model_kwargs["stop_flags"],
                     model_kwargs["seq_len_decoder"] - model_kwargs["seq_len_decoder"],
@@ -386,25 +386,25 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs["stop_flags"],
             )
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
-
             logits = paddle.cast(logits, paddle.float32)
             logits = logits_processor(model_kwargs["all_input_ids"], logits, decoding_step=step_idx_ori)
 
-            logits = get_token_penalty_multi_scores(
-                model_kwargs["pre_ids"],
-                logits,
-                model_kwargs["penalty_score"],
-                model_kwargs["frequency_score"],
-                model_kwargs["presence_score"],
-                step_idx,
-                model_kwargs["min_dec_len"],
-                eos_token_id,
-            )
+            # logits = get_token_penalty_multi_scores(
+            #     model_kwargs["pre_ids"],
+            #     logits,
+            #     model_kwargs["penalty_score"],
+            #     model_kwargs["frequency_score"],
+            #     model_kwargs["presence_score"],
+            #     step_idx,
+            #     model_kwargs["min_dec_len"],
+            #     eos_token_id,
+            # )
 
             if is_target_model:
                 model_kwargs = update_target_model_kwargs_for_generation(
                     cache, gamma, model_kwargs
             )
+                model_kwargs["cache"] = 0
             else:
                 model_kwargs = update_model_kwargs_for_generation(
                     cache, just_decoder, eos_token_id, model_kwargs
@@ -424,10 +424,14 @@ class GenerationInferenceModel(GenerationMixin):
             candidate_input_ids = input_ids
             
             assistant_model_output_logits = None
+            if assistant_model_inputs.get("cache", None) is not None:
+                assistant_model_inputs["seq_len_decoder"] -= remove_seq_len_decoder_num
             # 👉 小模型推理
             for _ in range(int(gamma)):
                 # 1.1. use the assistant model to obtain the next candidate logits
-                #TODO(Wanglongzhi2001): 添加 kv_cache 擦除机制
+                print("assistant_model's seq_len_encoder: ",assistant_model_inputs["seq_len_encoder"])
+                print("assistant_model's seq_len_decoder: ",assistant_model_inputs["seq_len_decoder"])
+
                 assistant_model_logits = _post_process_(
                     _forward_(assistant_model, input_ids, assistant_model_cache_kvs, **assistant_model_inputs),
                     step_idx_ori,
@@ -476,14 +480,21 @@ class GenerationInferenceModel(GenerationMixin):
             step_idx_ori = paddle.full(shape=[1], dtype="int64", fill_value=1)
             print("-------candidate_input_ids's shape: ", candidate_input_ids.shape)
 
-            target_model_inputs["seq_lens_this_time"][0] = candidate_input_ids.shape[1]
-
             if target_model_inputs.get("cache") is None:
                 target_model_input = candidate_input_ids
+                target_model_inputs["seq_len_encoder"][0] = candidate_input_ids.shape[1]
+                target_model_inputs["seq_len_decoder"][0] = target_model_inputs["seq_len_encoder"][0]
+
+                target_model_inputs["seq_lens_this_time"][0] = candidate_input_ids.shape[1]
             else:
-                print("you got here5")
                 target_model_input = candidate_input_ids[:, -gamma:]
+                target_model_inputs["seq_len_encoder"][0] = 0
+                target_model_inputs["seq_len_decoder"][0] = candidate_input_ids.shape[1]
                 target_model_inputs["seq_lens_this_time"][0] = gamma
+
+            print("target_model's seq_len_encoder: ",target_model_inputs["seq_len_encoder"])
+            print("target_model's seq_len_decoder: ",target_model_inputs["seq_len_decoder"])
+            print("target_model's seq_lens_this_time: ",target_model_inputs["seq_lens_this_time"])
 
             target_model_outputs_logits = _post_process_(
                 _forward_(self, target_model_input, target_model_cache_kvs, **target_model_inputs),
@@ -491,50 +502,51 @@ class GenerationInferenceModel(GenerationMixin):
                 True, # is_target_model
                 target_model_inputs,
             )
-            target_model_inputs["cache"] = 0
+            # [seq_len, vocab_size] -> [bsz, seq_len, vocab_size]
+            target_model_outputs_logits = target_model_outputs_logits[None, :]
             print("!!!!!target model generated logits!!!!!!")
             
             # 2.2. Process the new logits
-            new_logits = target_model_outputs_logits[:, -candidate_length - 1 :]  # excludes the input prompt if present
+            new_logits = target_model_outputs_logits[:, -candidate_length - 1 :, :]  # excludes the input prompt if present
             print("-------new_logits's shape: ", new_logits.shape)
 
             for i in range(candidate_length):
-                new_logits[:, i] = logits_processor(candidate_input_ids[:, : cur_len + i], new_logits[:, i])
+                new_logits[:, i, :] = logits_processor(candidate_input_ids[:, : cur_len + i], new_logits[:, i])
             # if len(logits_warper) > 0:
             #     for i in range(candidate_length):
             #         new_logits[:, i, :] = logits_warper(candidate_input_ids[:, : cur_len + i], new_logits[:, i, :])
 
             # 3. Obtain the next tokens from the original model logits.
             max_matches = max_len - cur_len - 1
-            valid_tokens = new_token[:,None]
-            n_matches = gamma
-            # valid_tokens, n_matches = _speculative_sampling(
-            #     candidate_input_ids,
-            #     candidate_logits,
-            #     candidate_length,
-            #     new_logits,
-            #     last_assistant_token_is_eos,
-            #     max_matches,
-            # )
-            # print("------valid_tokens: ", valid_tokens)
+            # valid_tokens = new_token[:,None]
+            # n_matches = gamma
+            valid_tokens, n_matches = _speculative_sampling(
+                candidate_input_ids,
+                candidate_logits,
+                candidate_length,
+                new_logits,
+                last_assistant_token_is_eos,
+                max_matches,
+            )
+
             # 4. Update variables according to the number of matching assistant tokens. Remember: the token generated
             # by the model after the last candidate match is also valid, as it is generated from a correct sequence.
             # Because of this last token, assisted generation search reduces to a normal greedy search/sample if there
             # is no match.
 
             # 4.1. Get the valid continuation, after the matching tokens
-            # input_ids = paddle.concat((input_ids, valid_tokens), axis=-1)
-            input_ids = candidate_input_ids
+            input_ids = paddle.concat((input_ids, valid_tokens), axis=-1)
+            remove_seq_len_decoder_num = gamma - valid_tokens.shape[-1]
+            print("remove_seq_len_decoder_num: ", remove_seq_len_decoder_num)
             cur_len = input_ids.shape[-1]
 
             # 小模型 cache_kvs 擦除
             # assistant_model_cache_kvs: [n_layer, 2, bsz, n_head, max_seq_len, d_head]
             for i in range(len(assistant_model_cache_kvs)):
                 assistant_model_cache_kvs[i][:, :, :, cur_len - (gamma -  n_matches):, :] = 0
-            # assistant_model_attention_mask[:, :, :, cur_len - (gamma -  valid_tokens_num):, :] = 0
 
             # stop if we exceed the maximum length
-            if input_ids.shape[-1] >= 60:
+            if input_ids.shape[-1] >= max_len:
                 break
 
         return input_ids
@@ -1004,7 +1016,7 @@ def _speculative_sampling(
     q_i = q[:, -candidate_length:, new_candidate_input_ids].squeeze()
     p = F.softmax(new_logits, axis=-1)
     # p: [bsz, gamma+1, vocab_size]
-    p_i = p[:, -candidate_length:, new_candidate_input_ids].squeeze()
+    p_i = p[:, :candidate_length, new_candidate_input_ids].squeeze()
     probability_ratio = p_i / q_i
 
     # When probability_ratio > 1 (i.e. q_i(x) < p_i(x), or "assistant probability of the candidate token is smaller
@@ -1024,15 +1036,15 @@ def _speculative_sampling(
         n_matches = min(n_matches, max_matches)
 
         # Next token selection: if there is a rejection, adjust the distribution from the main model before sampling.
-        gamma = min(candidate_logits.shape[1], max_matches)
-        p_n_plus_1 = p[:, n_matches]
+        gamma = min(candidate_length, max_matches)
+        p_n_plus_1 = p[:, n_matches, :]
         if n_matches < gamma:
-            q_n_plus_1 = q[:, n_matches]
+            q_n_plus_1 = q[:, n_matches, :]
             p_prime = paddle.clip((p_n_plus_1 - q_n_plus_1), min=0)
             p_prime = paddle.divide(p_prime, p_prime.sum())
         else:
             p_prime = p_n_plus_1
-        t = paddle.multinomial(p_prime, num_samples=1).squeeze(1)[None, :]
+        t = paddle.multinomial(p_prime, num_samples=1)
 
         # The selected tokens include the matches (if any) plus the next sampled tokens
         if n_matches > 0:

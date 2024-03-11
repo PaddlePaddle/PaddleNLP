@@ -37,6 +37,7 @@ if is_paddlenlp_ops_available():
         quant_int8,
         rebuild_padding,
         rebuild_padding_v2,
+        rebuild_padding_specu,
         transpose_remove_padding,
         write_cache_kv,
     )
@@ -1770,20 +1771,16 @@ class FusedSpecuMultiTransformer(Layer):
         cu_seqlens_k = kwargs.get("cu_seqlens_k", None)
         cache = kwargs.get("cache", None)
         gamma = kwargs.get("gamma", None)
-        print("--------cu_seqlens_q: ",cu_seqlens_q)
-        print("--------cu_seqlens_k: ",cu_seqlens_k)
         # prefill stage
         if cache is None:
-            # seq_lens_encoder[0][0] += gamma
-            # seq_lens_decoder[0][0] += gamma
-            cur_seq_len = seq_lens_encoder[0][0] + gamma
+            cur_seq_len = seq_lens_encoder[0][0]
             token_num_in_cache = 0
         else:
             cur_seq_len = seq_lens_decoder[0][0]
+            cu_seqlens_k[1] = cur_seq_len + gamma
             token_num_in_cache = cur_seq_len - gamma
-        print("-----------seq_lens_this_time: ", kwargs.get("seq_lens_this_time", None))
-        print("-----------seq_lens_encoder: ", seq_lens_encoder)
-        print("-----------seq_lens_decoder: ", seq_lens_decoder)
+            print("--------cu_seqlens_q: ", cu_seqlens_q)
+            print("--------cu_seqlens_k: ", cu_seqlens_k)
 
         # qkv_out: [bsz, 3*token_num*hidden_dim]
         fmha_out, qkv_out_specu, _, _ = paddle.incubate.nn.functional.speculative_decoding_multihead_attention(
@@ -1812,7 +1809,6 @@ class FusedSpecuMultiTransformer(Layer):
         # k: [seq_len, hidden_dim]
         k = qkv_out_specu[:, hidden_size:2*hidden_size]
         v = qkv_out_specu[:, 2*hidden_size:]
-        print("-----cur_seq_len: ", cur_seq_len)
         # prefill stage
         if cache is None:
             cache_k[:, :, :cur_seq_len, :] = k.reshape(cache_k[:, :, :cur_seq_len, :].shape)
@@ -1877,13 +1873,16 @@ class FusedSpecuMultiTransformer(Layer):
         pass
 
     def post_process(self, **kwargs):
+        time_step = kwargs.get("time_step", None)
         multi_block_output = kwargs.get("multi_block_output", None)
         cum_offsets = kwargs.get("cum_offsets", None)
-        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
-        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
-        max_input_length = kwargs.get("max_input_length", -1)
+        seq_lens = kwargs.get("seq_lens", None)
+        input_ids = kwargs.get("input_ids", None)
 
-        out = rebuild_padding_v2(multi_block_output, cum_offsets, seq_lens_decoder, seq_lens_encoder, max_input_length)
+        if time_step is None:
+            out = rebuild_padding(multi_block_output, cum_offsets, seq_lens, input_ids)
+        else:
+            out = multi_block_output
 
         return out
 
@@ -1996,9 +1995,9 @@ class FusedSpecuMultiTransformer(Layer):
         kwargs["seq_lens"] = seq_lens
         kwargs["input_ids"] = input_ids
 
-        out = self.post_process(**kwargs)
-        # print("-------!!!generated a new token!!!--------")
-        return out, caches
+        # out = self.post_process(**kwargs)
+        # # print("-------!!!generated a new token!!!--------")
+        return tmp_out, caches
 
 class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMultiTransformerWeightOnly):
     def __init__(self, config: FusedMultiTransformerConfig):
