@@ -43,7 +43,6 @@ from paddlenlp.transformers.model_outputs import (
     CausalLMOutputWithCrossAttentions,
 )
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
-from paddlenlp.utils.log import logger
 
 from ..segment_parallel_utils import ReshardLayer
 from ..sequence_parallel_utils import (
@@ -154,7 +153,9 @@ def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
     return hidden_states.reshape([batch, slen, num_key_value_heads * n_rep, head_dim])
 
 
-def parallel_matmul(x: Tensor, y: paddle.base.framework.EagerParamBase, tensor_parallel_output=True):
+def parallel_matmul(
+    x: Tensor, y: paddle.base.framework.EagerParamBase, tensor_parallel_output=True, transpose_y=False
+):
     is_fleet_init = True
     tensor_parallel_degree = 1
     try:
@@ -172,7 +173,7 @@ def parallel_matmul(x: Tensor, y: paddle.base.framework.EagerParamBase, tensor_p
     if is_fleet_init and tensor_parallel_degree > 1 and y_is_distributed:
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
         input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
-        logits = paddle.matmul(input_parallel, y, transpose_y=False)
+        logits = paddle.matmul(input_parallel, y, transpose_y=transpose_y)
 
         if tensor_parallel_output:
             return logits
@@ -180,7 +181,7 @@ def parallel_matmul(x: Tensor, y: paddle.base.framework.EagerParamBase, tensor_p
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
 
     else:
-        logits = paddle.matmul(x, y, transpose_y=False)
+        logits = paddle.matmul(x, y, transpose_y=transpose_y)
         return logits
 
 
@@ -493,9 +494,6 @@ class GemmaAttention(nn.Layer):
             if self.num_key_value_heads % config.tensor_parallel_degree == 0:
                 self.num_key_value_heads = self.num_key_value_heads // config.tensor_parallel_degree
             else:
-                logger.warning(
-                    f"Get num_key_value_heads: {self.num_key_value_heads}, can't split to tensor_parallel_degree: {config.tensor_parallel_degree}, so we don't spilt key value weight."
-                )
                 self.kv_indices = paddle.to_tensor(
                     assign_kv_heads(self.num_key_value_heads, config.tensor_parallel_degree)[
                         config.tensor_parallel_rank
@@ -928,7 +926,7 @@ class GemmaPretrainedModel(PretrainedModel):
 
             base_actions = {
                 # Column Linear
-                "lm_head.weight": partial(fn, is_column=True),
+                "lm_head.weight": partial(fn, is_column=not config.tie_word_embeddings),
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
@@ -1351,7 +1349,7 @@ class GemmaLMHead(nn.Layer):
             vocab_size = config.vocab_size
 
         self.weight = self.create_parameter(
-            shape=[config.hidden_size, vocab_size],
+            shape=[vocab_size, config.hidden_size] if config.tie_word_embeddings else [config.hidden_size, vocab_size],
             dtype=paddle.get_default_dtype(),
         )
         # breakpoint()
@@ -1372,7 +1370,12 @@ class GemmaLMHead(nn.Layer):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
-        logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
+        logits = parallel_matmul(
+            hidden_states,
+            self.weight,
+            tensor_parallel_output=tensor_parallel_output,
+            transpose_y=self.config.tie_word_embeddings,
+        )
         return logits
 
 
@@ -1386,8 +1389,13 @@ class GemmaForCausalLM(GemmaPretrainedModel):
         self.gemma = GemmaModel(config)
         self.criterion = GemmaPretrainingCriterion(config)
 
+        self.tie_weights()
+
     def get_input_embeddings(self):
         return self.gemma.embed_tokens
+
+    def get_output_embeddings(self):
+        return self.lm_head
 
     def set_input_embeddings(self, value):
         self.gemma.embed_tokens = value
