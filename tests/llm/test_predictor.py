@@ -35,6 +35,7 @@ from paddlenlp.utils.downloader import (
     get_path_from_url_with_filelock,
     url_file_exists,
 )
+from tests.parallel_launch import TestMultipleGpus
 from tests.testing_utils import GPUsTesting, require_gpu
 
 from .testing_utils import LLMTest, argv_context_guard, load_test_config
@@ -329,7 +330,7 @@ class GPUsPredictorTest(LLMTest, GPUsTesting, unittest.TestCase):
         self.assertGreaterEqual(count / len(result_0), 0.4)
 
 
-class QWenVLTest(LLMTest, unittest.TestCase):
+class QWenVLTest(LLMTest, unittest.TestCase, TestMultipleGpus):
     config_path: str = "./tests/fixtures/llm/predictor.yaml"
     model_name_or_path: str = "__internal_testing__/tiny-fused-qwen"
     model_class = QWenForCausalLM
@@ -432,3 +433,15 @@ class QWenVLTest(LLMTest, unittest.TestCase):
             from export_model import main
 
             main()
+
+    def test_export_twocards(self):
+        self.export_file = "llm/export_model.py"
+        self.multicard_export_args = {}
+        self.multicard_export_args["model_name_or_path"] = self.model_name_or_path
+        self.multicard_export_args["output_path"] = self.output_dir
+        self.multicard_export_args["dtype"] = "float16"
+        self.multicard_export_args["inference_model"] = True
+        self.multicard_export_args["model_prefix"] = "qwen"
+        self.multicard_export_args["model_type"] = "qwen-img2txt"
+
+        self.run_n1c2(self.export_file, **self.multicard_export_args)
