@@ -106,11 +106,14 @@ def filter_sharded_params(state_dict, optimizer, sharding_group):
 
         optimizer = unwrap_optimizer(optimizer, DygraphShardingOptimizer)
         for (k, v) in state_dict.items():
-            assert v.name in optimizer._param2rank
-            sharded_rank = optimizer._param2rank[v.name]
-            if sharded_rank != sharding_rank:
-                continue
-            filtered_state_dict[k] = v
+            if v.name in optimizer._param2rank:
+                sharded_rank = optimizer._param2rank[v.name]
+                if sharded_rank != sharding_rank:
+                    continue
+                filtered_state_dict[k] = v
+            else:
+                if sharing_rank == 0:
+                    filtered_state_dict[k] = v
     else:
         from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
             DygraphShardingOptimizerV2,
@@ -118,11 +121,16 @@ def filter_sharded_params(state_dict, optimizer, sharding_group):
 
         optimizer = unwrap_optimizer(optimizer, DygraphShardingOptimizerV2)
         parameters = optimizer._parameter_list
+        all_parameters = [p.name for p in parameters]
         filtered_parameters = [p.name for (i, p) in enumerate(parameters) if i % sharding_world_size == sharding_rank]
         filtered_parameters = set(filtered_parameters)
+
         for (k, v) in state_dict.items():
             if v.name in filtered_parameters:
                 filtered_state_dict[k] = v
+            else:
+                if v.name not in all_parameters and sharding_rank == 0:
+                    filtered_state_dict[k] = v
 
     return filtered_state_dict
 
@@ -1535,7 +1543,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             )
             logger.info(
                 "param_names_in_master_weights len:{}, bf16 state_dict_to_save len:{}, :{}".format(
-                    len(param_names_in_master_weights), len(state_dict_to_save), state_dict_to_save
+                    len(param_names_in_master_weights), len(state_dict_to_save), state_dict_to_save.keys()
                 )
             )
 
