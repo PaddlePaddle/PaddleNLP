@@ -25,19 +25,15 @@ import numpy as np
 from huggingface_hub import (
     create_repo,
     get_hf_file_metadata,
-    hf_hub_download,
     hf_hub_url,
     repo_type_and_id_from_hf_id,
     upload_folder,
 )
 from huggingface_hub.utils import EntryNotFoundError
 
-from .. import __version__
-from ..utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
+from ..utils.download import resolve_file_path
 from ..utils.log import logger
-from .aistudio_utils import aistudio_download
 from .feature_extraction_utils import BatchFeature as BaseBatchFeature
-from .utils import resolve_cache_dir
 
 IMAGE_PROCESSOR_NAME = "preprocessor_config.json"
 
@@ -323,57 +319,17 @@ class ImageProcessingMixin(object):
         subfolder = kwargs.pop("subfolder", "")
         if subfolder is None:
             subfolder = ""
-        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         is_local = os.path.isdir(pretrained_model_name_or_path)
-        if os.path.isdir(pretrained_model_name_or_path):
-            resolved_image_processor_file = os.path.join(
-                pretrained_model_name_or_path, subfolder, IMAGE_PROCESSOR_NAME
-            )
-        elif os.path.isfile(pretrained_model_name_or_path):
-            resolved_image_processor_file = pretrained_model_name_or_path
-            is_local = True
-        elif from_aistudio:
-            image_processor_file = IMAGE_PROCESSOR_NAME
-            resolved_image_processor_file = aistudio_download(
-                repo_id=pretrained_model_name_or_path,
-                filename=image_processor_file,
-                cache_dir=cache_dir,
-                subfolder=subfolder,
-            )
-        elif from_hf_hub:
-            image_processor_file = IMAGE_PROCESSOR_NAME
-            resolved_image_processor_file = hf_hub_download(
-                repo_id=pretrained_model_name_or_path,
-                filename=image_processor_file,
-                cache_dir=cache_dir,
-                subfolder=subfolder,
-                library_name="PaddleNLP",
-                library_version=__version__,
-            )
-        else:
-            # Assuming from community-contributed pretrained models
-            url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, IMAGE_PROCESSOR_NAME]
-            cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
-            if subfolder != "":
-                url_list.insert(2, subfolder)
-            image_processor_file = "/".join(url_list)
-            try:
-                # Load from local folder or from cache or download from model Hub and cache
-                resolved_image_processor_file = get_path_from_url_with_filelock(image_processor_file, cache_dir)
-            except EnvironmentError:
-                # Raise any environment error raise by `cached_file`. It will have a helpful error message adapted to
-                # the original exception.
-                raise
-            except Exception:
-                # For any other exception, we throw a generic error.
-                raise EnvironmentError(
-                    f"Can't load image processor for '{pretrained_model_name_or_path}'. If you were trying to load"
-                    " it from 'BOS', make sure you don't have a local directory with the"
-                    f" same name. Otherwise, make sure '{pretrained_model_name_or_path}' is the correct path to a"
-                    f" directory containing a {IMAGE_PROCESSOR_NAME} file"
-                )
+        resolved_image_processor_file = resolve_file_path(
+            pretrained_model_name_or_path,
+            [IMAGE_PROCESSOR_NAME],
+            subfolder,
+            cache_dir=cache_dir,
+            from_hf_hub=from_hf_hub,
+            from_aistudio=from_aistudio,
+        )
 
         try:
             # Load image_processor dict
