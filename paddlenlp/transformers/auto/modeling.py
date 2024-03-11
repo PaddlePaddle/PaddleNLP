@@ -319,8 +319,7 @@ class _BaseAutoModelClass:
             from_hf_hub=from_hf_hub,
             from_aistudio=from_aistudio,
         )
-        assert config_file is not None
-        if os.path.exists(config_file):
+        if config_file is not None and os.path.exists(config_file):
             model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, config_file)
             logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
             return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)

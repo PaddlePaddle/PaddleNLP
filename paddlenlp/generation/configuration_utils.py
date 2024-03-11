@@ -415,7 +415,9 @@ class GenerationConfig:
             from_aistudio=from_aistudio,
             from_hf_hub=from_hf_hub,
         )
-        assert resolved_config_file is not None
+        assert (
+            resolved_config_file is not None
+        ), f"please make sure {config_file_name} under {pretrained_model_name_or_path}"
         try:
             logger.info(f"Loading configuration file {resolved_config_file}")
             # Load config dict
