@@ -330,7 +330,8 @@ class GPUsPredictorTest(LLMTest, GPUsTesting, unittest.TestCase):
         self.assertGreaterEqual(count / len(result_0), 0.4)
 
 
-class QWenVLTest(LLMTest, unittest.TestCase, TestMultipleGpus):
+# TestMultipleGpus already inherits from unittest.
+class QWenVLTest(LLMTest, TestMultipleGpus):
     config_path: str = "./tests/fixtures/llm/predictor.yaml"
     model_name_or_path: str = "__internal_testing__/tiny-fused-qwen"
     model_class = QWenForCausalLM
