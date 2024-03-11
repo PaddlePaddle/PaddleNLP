@@ -97,3 +97,16 @@ def test_para():
         tokenizer.unk_token_id,
         tokenizer.sep_token_id,
     ]  # do_lower_case
+
+
+def test_save_vocab(tokenizer_fast):
+    import tempfile
+
+    temp_path = tempfile.mkdtemp()
+    save_vocab = tokenizer_fast.save_vocabulary(temp_path)
+
+    assert save_vocab[0].endswith("vocab.txt")
+    vocab = []
+    with open(save_vocab[0], "r") as f:
+        vocab = f.readlines()
+    assert len(vocab) == tokenizer_fast.vocab_size
