@@ -200,6 +200,7 @@ from .xlm.configuration import *
 from .gau_alpha.modeling import *
 from .gau_alpha.tokenizer import *
 from .gau_alpha.configuration import *
+from .gemma import *
 from .roformerv2.modeling import *
 from .roformerv2.tokenizer import *
 from .roformerv2.configuration import *
