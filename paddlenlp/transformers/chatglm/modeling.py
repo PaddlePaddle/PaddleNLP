@@ -554,15 +554,12 @@ class ChatGLMStack(nn.Layer):
             inputs_embeds = self.word_embeddings(input_ids)
         inputs_embeds = inputs_embeds.transpose([1, 0, 2])
         if self.config.use_long_strategies:  
-            rotary_embeds = self.rotary_embeddings(position_ids,seq_len=int(position_ids.max() + 1))
-            cos,sin = self.rotary_embeddings(position_ids,seq_len=int(position_ids.max() + 1))
-            
-            cos = cos[:, None, :]
-            sin = sin[:, None, :]            
+            rotary_embeds = self.rotary_embeddings(seq_len=int(position_ids.max() + 1))
+            cos,sin = self.rotary_embeddings(seq_len=int(position_ids.max() + 1))         
             block_position_ids = position_ids[:, 1, :].transpose([1, 0])
             position_ids = position_ids[:, 0, :].transpose([1, 0]) 
-            block_rotary_embeds =  paddle.stack([cos.squeeze(1)[block_position_ids].unsqueeze(2),sin.squeeze(1)[block_position_ids].unsqueeze(2)])      
-            position_rotary_embeds = paddle.stack([cos.squeeze(1)[position_ids].unsqueeze(2),sin.squeeze(1)[position_ids].unsqueeze(2)])    
+            block_rotary_embeds =  paddle.stack([cos[block_position_ids].unsqueeze(2),sin[block_position_ids].unsqueeze(2)])      
+            position_rotary_embeds = paddle.stack([cos[position_ids].unsqueeze(2),sin[position_ids].unsqueeze(2)])    
             rotary_embeds = paddle.stack([position_rotary_embeds, block_rotary_embeds], axis=0)   
         else:
             rotary_embeds = self.rotary_embeddings(position_ids)

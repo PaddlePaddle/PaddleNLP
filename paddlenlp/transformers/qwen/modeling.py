@@ -261,9 +261,12 @@ class QWenAttention(nn.Layer):
         else:
             ntk_alpha = self._ntk_cached
         if self.config.use_long_strategies:
-            rotary_pos_emb = self.rotary_emb(value, seq_len=kv_seq_len)
+            cos,sin = self.rotary_emb(seq_len=kv_seq_len,ntk_alpha=ntk_alpha)
+            rotary_pos_emb =(cos[None, :, None, :] , sin[None, :, None, :])
         else:
+
             rotary_pos_emb = self.rotary_emb(value, kv_seq_len, ntk_alpha=ntk_alpha)
+
 
         if rotary_pos_emb is not None:
             if isinstance(rotary_pos_emb, tuple):

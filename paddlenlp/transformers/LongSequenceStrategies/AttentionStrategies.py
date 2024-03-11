@@ -1,6 +1,9 @@
 from paddle import Tensor, nn
 import paddle
 import math
+__all__ = [
+    "AttentionWithLinearBias"
+]
 class AttentionWithLinearBias(nn.Layer):
     '''
     init_args:bool_attention_mask,num_heads,dtype,tensor_parallel_degree

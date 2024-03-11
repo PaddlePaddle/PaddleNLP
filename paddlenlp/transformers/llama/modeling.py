@@ -979,11 +979,14 @@ class LlamaAttention(nn.Layer):
                             use_neox_rotary_style=False,
                         )
             else:
-                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 if self.config.use_long_strategies:
+                    cos, sin = self.rotary_emb(seq_len=kv_seq_len)
                     cos = cos[None, :, None, :]
                     sin = sin[None, :, None, :]
                     cos,sin = (cos.cast(value_states.dtype) if cos.dtype != value_states.dtype else cos, sin.cast(value_statesx.dtype) if sin.dtype != value_states.dtype else sin)
+                else:
+                    cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
         # [bs, seq_len, num_head, head_dim]
