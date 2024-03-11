@@ -180,7 +180,7 @@ class QWenInferenceModel(QWenPretrainedModel):
             norm_type="rmsnorm",
             use_neox_rotary_style=True,
             rank_id=config.tensor_parallel_rank,
-            tensor_parallel_degree=config.tensor_parallel_degree
+            tensor_parallel_degree=config.tensor_parallel_degree,
         )
 
         if self.use_weight_only:
@@ -206,8 +206,7 @@ class QWenInferenceModel(QWenPretrainedModel):
         ln_f_weight = paddle.to_tensor(state_dict["qwen.ln_f.weight"], dtype=self.ln_f.weight.dtype)
         self.wte.weight.set_value(wte_weight)
         self.ln_f.weight.set_value(ln_f_weight)
-        head_size = self.hidden_size // self.num_attention_heads
-        
+
         for idx in range(self.num_layers):
             ln_scale = paddle.to_tensor(
                 state_dict["qwen.h.{}.ln_1.weight".format(idx)], dtype=self.transformer_block.ln_scales[idx].dtype
