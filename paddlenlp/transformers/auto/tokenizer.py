@@ -319,7 +319,7 @@ class AutoTokenizer:
             from_hf_hub=from_hf_hub,
             from_aistudio=from_aistudio,
         )
-
+        assert config_file is not None
         if os.path.exists(config_file):
             tokenizer_class = cls._get_tokenizer_class_from_config(
                 pretrained_model_name_or_path, config_file, use_fast
