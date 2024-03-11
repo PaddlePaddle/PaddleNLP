@@ -330,7 +330,7 @@ class ImageProcessingMixin(object):
             from_hf_hub=from_hf_hub,
             from_aistudio=from_aistudio,
         )
-
+        assert resolved_image_processor_file is not None
         try:
             # Load image_processor dict
             with open(resolved_image_processor_file, "r", encoding="utf-8") as reader:

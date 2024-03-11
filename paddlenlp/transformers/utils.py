@@ -674,7 +674,7 @@ def get_checkpoint_shard_files(
                 from_aistudio=from_aistudio,
                 from_hf_hub=from_hf_hub,
             )
-
+            assert cached_filename is not None
         # We have already dealt with RepositoryNotFoundError and RevisionNotFoundError when getting the index, so
         # we don't have to catch them here.
         except EntryNotFoundError:

@@ -176,6 +176,7 @@ class AutoProcessor:
             from_hf_hub=from_hf_hub,
             from_aistudio=from_aistudio,
         )
+        assert config_file is not None
         if os.path.exists(config_file):
             processor_class = cls._get_processor_class_from_config(
                 pretrained_model_name_or_path,

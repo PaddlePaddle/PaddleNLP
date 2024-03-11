@@ -259,7 +259,7 @@ class FeatureExtractionMixin(object):
             from_aistudio=from_aistudio,
             from_hf_hub=from_hf_hub,
         )
-
+        assert resolved_feature_extractor_file is not None
         try:
             # Load feature_extractor dict
             with open(resolved_feature_extractor_file, "r", encoding="utf-8") as reader:

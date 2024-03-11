@@ -415,7 +415,7 @@ class GenerationConfig:
             from_aistudio=from_aistudio,
             from_hf_hub=from_hf_hub,
         )
-
+        assert resolved_config_file is not None
         try:
             logger.info(f"Loading configuration file {resolved_config_file}")
             # Load config dict
