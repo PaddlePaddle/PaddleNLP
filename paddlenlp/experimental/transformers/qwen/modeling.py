@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import paddle
 from paddle import nn
+from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
 from paddlenlp_ops import fused_get_rotary_embedding, get_padding_offset
 
@@ -85,7 +86,26 @@ class QWenInferenceModel(QWenPretrainedModel):
                 self.quant_type
             )
 
-        self.wte = nn.Embedding(self.vocab_size, self.hidden_size)
+        if config.tensor_parallel_degree > 1:
+            self.wte = fleet.meta_parallel.VocabParallelEmbedding(
+                self.vocab_size,
+                self.hidden_size,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+            )
+        else:
+            self.wte = nn.Embedding(
+                self.vocab_size,
+                self.hidden_size,
+            )
+
+        # get ring_id
+        ring_id = -1
+        try:
+            hcg = fleet.get_hybrid_communicate_group()
+            model_parallel_group = hcg.get_model_parallel_group()
+            ring_id = model_parallel_group.id
+        except:
+            pass
 
         ln_scale_attrs = [paddle.ParamAttr(name="fuseqwen.{}.ln_scale".format(i)) for i in range(self.num_layers)]
         qkv_weight_attrs = [
@@ -144,7 +164,7 @@ class QWenInferenceModel(QWenPretrainedModel):
             activation="swiglu",
             num_layers=config.num_hidden_layers,
             nranks=1,
-            ring_id=-1,
+            ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
             qkv_weight_scale_attrs=qkv_weight_scale_attrs,
@@ -159,6 +179,8 @@ class QWenInferenceModel(QWenPretrainedModel):
             epsilon=self.layer_norm_epsilon,
             norm_type="rmsnorm",
             use_neox_rotary_style=True,
+            rank_id=config.tensor_parallel_rank,
+            tensor_parallel_degree=config.tensor_parallel_degree
         )
 
         if self.use_weight_only:
@@ -184,7 +206,8 @@ class QWenInferenceModel(QWenPretrainedModel):
         ln_f_weight = paddle.to_tensor(state_dict["qwen.ln_f.weight"], dtype=self.ln_f.weight.dtype)
         self.wte.weight.set_value(wte_weight)
         self.ln_f.weight.set_value(ln_f_weight)
-
+        head_size = self.hidden_size // self.num_attention_heads
+        
         for idx in range(self.num_layers):
             ln_scale = paddle.to_tensor(
                 state_dict["qwen.h.{}.ln_1.weight".format(idx)], dtype=self.transformer_block.ln_scales[idx].dtype

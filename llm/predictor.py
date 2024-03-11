@@ -1414,6 +1414,8 @@ def create_predictor(
                     predictor_args.model_name_or_path,
                     config=config,
                     dtype=predictor_args.dtype,
+                    tensor_parallel_degree=tensor_parallel_degree,
+                    tensor_parallel_rank=tensor_parallel_rank,
                 )
                 model.eval()
             else:
