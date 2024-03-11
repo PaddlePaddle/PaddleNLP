@@ -1913,14 +1913,24 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 ):
                     pre_tensor_parallel_split = True
                     assert loaded_keys is not None, "loaded_keys is not None."
+
+                    print(f"\n\n>>>>>>>>>>>>>> 1: pop掉get_tensor_parallel_convert_actions中qkv相关的key")
+                    pass
+
                     tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
-                        
+
+                import pdb; pdb.set_trace()
                 # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
+                print(f"\n\n>>>>>>>>>>>>>> 2: load weight tensors without tensor-parallel action on qkv/gate_up tensors")
                 state_dict = load_state_dict(  # debug: branch-5(6.5) load from sharding files // low_cpu_memory(state_dict is None)
                     shard_file,
                     tp_actions if pre_tensor_parallel_split else None,
                     None if config.quantization_config.is_weight_quantize() else set(expected_keys),
                 )
+
+                print(f"\n\n>>>>>>>>>>>>>> 3: apply qkv/gate_up fuse action and tensor-parallel action sequentially")
+                pass
+
                 if config.quantization_config.is_weight_quantize():
                     state_dict = convert_to_quantize_state_dict(  # debug: sub-branch quantize
                         state_dict,
