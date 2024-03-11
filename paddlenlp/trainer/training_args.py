@@ -1006,18 +1006,25 @@ class TrainingArguments:
 
                     using_comm_overlap = (
                         "enable_sharding_comm_overlap" in pipeline_parallel_config
-                        and self.sharding_parallel_degree > 1
-                    ) or ("enable_dp_comm_overlap" in pipeline_parallel_config and self.data_parallel_degree > 1)
+                        or "enable_dp_comm_overlap" in pipeline_parallel_config
+                    )
+                    enable_dp_comm_overlap = using_comm_overlap and self.data_parallel_degree > 1
+                    enable_sharding_comm_overlap = using_comm_overlap and self.sharding_parallel_degree > 1
+                    assert not (
+                        enable_dp_comm_overlap and enable_sharding_comm_overlap
+                    ), "dp_comm_overlap and sharding_comm_overlap cannot be enabled at the same time"
 
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
-                        "dp_comm_overlap": using_comm_overlap,
-                        "sharding_comm_overlap": using_comm_overlap,
+                        "dp_comm_overlap": enable_dp_comm_overlap,
+                        "sharding_comm_overlap": enable_sharding_comm_overlap,
                         "enable_timer": "enable_timer" in pipeline_parallel_config,
                         "release_gradients": "enable_release_grads" in pipeline_parallel_config,
                         "overlap_p2p_comm": "enable_overlap_p2p_comm" in pipeline_parallel_config,
                         "clear_every_step_cache": "enable_clear_every_step_cache" in pipeline_parallel_config,
                     }
+                    if dygraph_pp_configs["dp_comm_overlap"]:
+                        raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
 
                     if self.do_eval:
                         if (
