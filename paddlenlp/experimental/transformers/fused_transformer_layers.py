@@ -257,6 +257,7 @@ class FusedMultiTransformerConfig:
         self.ring_id = ring_id
         self.tensor_parallel_degree = tensor_parallel_degree
 
+
 class FusedMultiTransformerBase(Layer):
     def __init__(self, config: FusedMultiTransformerConfig):
         super().__init__()
@@ -369,8 +370,7 @@ class FusedMultiTransformerBase(Layer):
             qkv_bias = None
             if qkv_bias_attr:
                 qkv_bias = self.create_parameter(
-                    shape=[(self.num_heads + 2 * self.kv_num_heads) * self.head_dim // 
-                                config.tensor_parallel_degree],
+                    shape=[(self.num_heads + 2 * self.kv_num_heads) * self.head_dim // config.tensor_parallel_degree],
                     attr=qkv_bias_attr,
                     dtype=self._dtype,
                     is_bias=True,
@@ -548,16 +548,14 @@ class FusedMultiTransformerBase(Layer):
 
     def init_weight_shape(self, config):
         self.qkv_weight_shape = (
-            [(self.num_heads + 2 * self.kv_num_heads) * self.head_dim // 
-                    config.tensor_parallel_degree, 
-                self.embed_dim]
+            [(self.num_heads + 2 * self.kv_num_heads) * self.head_dim // config.tensor_parallel_degree, self.embed_dim]
             if config.trans_qkvw
-            else [(self.num_heads + 2 * self.kv_num_heads) * self.head_dim // 
-                    config.tensor_parallel_degree,
-                 self.embed_dim]
+            else [
+                (self.num_heads + 2 * self.kv_num_heads) * self.head_dim // config.tensor_parallel_degree,
+                self.embed_dim,
+            ]
         )
-        self.linear_weight_shape = [self.num_heads * self.head_dim // config.tensor_parallel_degree, 
-                                    self.embed_dim]
+        self.linear_weight_shape = [self.num_heads * self.head_dim // config.tensor_parallel_degree, self.embed_dim]
         self.ffn1_weight_shape = (
             [self.embed_dim, self.dim_feedforward * 2 // config.tensor_parallel_degree]
             if self.activation.endswith("glu")
