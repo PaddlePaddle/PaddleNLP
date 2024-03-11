@@ -2426,20 +2426,26 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
 
 class PipelinePretrainedModel(PretrainedModel):
-    _sequential_layers = []
-    _single_to_pp_mapping = None
-    _pp_to_single_mapping = None
+    def __init_hook__(self):
+        if not hasattr(self, "_sequential_layers"):
+            self._sequential_layers = []
+            self._single_to_pp_mapping = None
+            self._pp_to_single_mapping = None
 
     def __init__(self, config, *args, **kwargs):
+        self.__init_hook__()
         super().__init__(config, *args, **kwargs)
 
     def add_sequential_layer(self, layer_desc, name_prefix=""):
+        self.__init_hook__()
         self._sequential_layers.append({"layer": layer_desc, "name_prefix": name_prefix})
 
     def get_sequential_layers(self):
+        self.__init_hook__()
         return [x["layer"] for x in self._sequential_layers]
 
     def get_sequential_name_prefixes(self):
+        self.__init_hook__()
         return {str(index): x["name_prefix"] for index, x in enumerate(self._sequential_layers)}
 
     def _set_pipeline_name_mapping(self, mappings=None):
