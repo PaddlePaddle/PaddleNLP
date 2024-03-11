@@ -256,7 +256,6 @@ def scaled_dot_product_attention(
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
-        # breakpoint()
         # matmul and devide by sqrt(head_dim)
         attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
         # then add alibi bias
@@ -592,7 +591,6 @@ class GemmaAttention(nn.Layer):
             self.reshard_layer = ReshardLayer()
 
         self.config = config
-        # breakpoint()
 
     def forward(
         self,
@@ -655,7 +653,7 @@ class GemmaAttention(nn.Layer):
             query_states = query_states.reshape(shape=target_query_shape)
             key_states = key_states.reshape(shape=target_key_value_shape)
             value_states = value_states.reshape(shape=target_key_value_shape)
-        # breakpoint()
+
         kv_seq_len = key_states.shape[-3]
 
         if past_key_value is not None:
@@ -698,7 +696,6 @@ class GemmaAttention(nn.Layer):
             # repeat k/v heads if n_kv_heads < n_heads
             key_states = repeat_kv(key_states, self.num_key_value_groups)
             value_states = repeat_kv(value_states, self.num_key_value_groups)
-            # breakpoint()
 
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (
@@ -1025,7 +1022,6 @@ class GemmaModel(GemmaPretrainedModel):
 
     def __init__(self, config: GemmaConfig):
         super().__init__(config)
-        # breakpoint()
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
         self.sequence_parallel = config.sequence_parallel
@@ -1352,8 +1348,7 @@ class GemmaLMHead(nn.Layer):
             shape=[vocab_size, config.hidden_size] if config.tie_word_embeddings else [config.hidden_size, vocab_size],
             dtype=paddle.get_default_dtype(),
         )
-        # breakpoint()
-        # Must set distributed attr for Tensor Parallel !
+
         self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
         if self.weight.is_distributed:
             self.weight.split_axis = 1
