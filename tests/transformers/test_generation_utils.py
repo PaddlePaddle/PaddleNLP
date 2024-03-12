@@ -1124,6 +1124,24 @@ class GenerationUtilsTestCase(unittest.TestCase):
         self.assertEqual(decoded_ids, [520, 8, 9, 59, 124])
 
 
+class TinyRandomGenerationTest(unittest.TestCase):
+    def test_generation_config_min_new_tokens_warning(self):
+
+        with self.assertLogs("PaddleNLP", level="WARNING") as log_info:
+            GenerationConfig(min_new_token=10)
+            self.assertTrue(any(["<min_new_token> field is deprecated." in item for item in log_info.output]))
+
+    def test_min_new_tokens(self):
+        article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
+
+        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/micro-random-llama")
+        model = AutoModelForCausalLM.from_pretrained("__internal_testing__/micro-random-llama")
+        input_ids = paddle.to_tensor(tokenizer(article)["input_ids"]).unsqueeze([0])
+        attention_mask = paddle.ones_like(input_ids)
+        result = model.generate(input_ids, attention_mask=attention_mask, min_new_tokens=10)[0]
+        self.assertGreater(result.shape[1], 10)
+
+
 # TODO (wj-Mcat: enable the unit test after fix)
 # class GenerationD2STest(unittest.TestCase):
 #     def test_to_static_use_top_k(self):
