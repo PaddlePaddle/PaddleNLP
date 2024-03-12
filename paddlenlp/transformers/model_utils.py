@@ -1607,9 +1607,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     filenames = [
                         _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant),
                         _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant),
-                        _add_variant(PYTORCH_WEIGHTS_INDEX_NAME, variant),
                         _add_variant(SAFE_WEIGHTS_NAME, variant),
                         _add_variant(PADDLE_WEIGHTS_NAME, variant),
+                        _add_variant(PYTORCH_WEIGHTS_INDEX_NAME, variant),
                         _add_variant(PYTORCH_WEIGHTS_NAME, variant),
                     ]
                 else:

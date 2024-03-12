@@ -39,7 +39,6 @@ from huggingface_hub.utils import (
 logger = logging.getLogger(__name__)
 
 from .common import (
-    _CACHED_NO_EXIST,
     DEFALUT_LOCAL_DIR_AUTO_SYMLINK_THRESHOLD,
     DEFAULT_ETAG_TIMEOUT,
     DEFAULT_REQUEST_TIMEOUT,
@@ -714,7 +713,7 @@ def aistudio_hub_try_to_load_from_cache(
 
     # Check if file is cached as "no_exist"
     if os.path.isfile(os.path.join(no_exist_dir, revision, filename)):
-        return _CACHED_NO_EXIST
+        return None
 
     # Check if revision folder exists
     if not os.path.exists(snapshots_dir):
