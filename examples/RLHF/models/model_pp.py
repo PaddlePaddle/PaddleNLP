@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import importlib
-import inspect
-import types
-
 import paddle
 import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import LayerDesc
@@ -28,215 +24,20 @@ from paddlenlp.transformers.llama.modeling_pp import (
     return_args,
 )
 
-from .ppo_model_utils import RLHFPPOMixedLoss, RLHFValueLoss, create_loss
+from .pp_model_utils import fwd_args_to_dict, get_expected_keys, pad_batches_inputs
+from .ppo_model_utils import (
+    RLHFPPOMixedLoss,
+    RLHFValueLoss,
+    create_loss,
+    make_position_ids,
+)
 from .score_model_utils import ScoreModelMixin
-
-
-def print_patch(func, output, *args, **kwargs):
-    return
-    print("=" * 20, func.__name__, output)
-
-
-def fwd_step_patch(func, output, self, *args, **kwargs):
-    # training patch
-    if self.training and self.is_pipeline_last_stage():
-        if getattr(self, "_step_losses", None):
-            self._step_losses.append(output.detach())
-        else:
-            self._step_losses = [output.detach()]
-
-
-# def fwd_step_eval_patch(func, output, self, *args, **kwargs):
-#     # eval patch for actor/reference model
-#     logits = output
-#     # sequence = self.
-#     log_probs = gather_log_probabilities(logits[:, :-1], sequence[:, 1:])
-#     if self.is_pipeline_first_stage():
-#         if getattr(self, "_step_losses", None):
-#             self._step_losses.append(output.detach())
-#         else:
-#             self._step_losses = [output.detach()]
-#         print("=" * 20, "fwd_step_patch", len(self._step_losses))
-
-
-def make_wrapper(func, pre_patch=None, post_patch=None):
-    def wrapper(*args, **kwargs):
-        if pre_patch is not None:
-            pre_patch(func, None, *args, **kwargs)
-        output = func(*args, **kwargs)
-        # print("=" * 20, func.__name__, output)
-        if post_patch is not None:
-            post_patch(func, output, *args, **kwargs)
-        return output
-
-    return wrapper
-
-
-funcs = [
-    paddle.distributed.fleet.meta_parallel.pp_utils.p2p_communication.P2pHelper.send_forward_recv_backward,
-    paddle.distributed.fleet.meta_parallel.pp_utils.p2p_communication.P2pHelper.send_backward_recv_forward,
-    paddle.distributed.fleet.model.PipelineParallel._backward_step,
-    paddle.distributed.fleet.meta_parallel.pp_utils.p2p_communication.P2pHelper.recv_backward,
-    paddle.distributed.fleet.meta_parallel.pp_utils.p2p_communication.P2pHelper.send_backward,
-    (paddle.distributed.fleet.model.PipelineParallel._forward_step, fwd_step_patch),
-    paddle.distributed.fleet.meta_parallel.pipeline_parallel.FakeMicroDataset._load_micro_batch,
-    paddle.distributed.fleet.meta_parallel.pp_utils.p2p_communication.P2pHelper.recv_forward,
-    paddle.distributed.fleet.meta_parallel.pp_utils.p2p_communication.P2pHelper.send_forward,
-    paddle.distributed.fleet.meta_parallel.pp_utils.p2p_communication.SendRecvMeta.recv_meta,
-    paddle.distributed.fleet.meta_parallel.pp_utils.p2p_communication.SendRecvMeta.send_meta,
-]
-
-for func in funcs:
-    if isinstance(func, tuple):
-        fun, patch = func
-    else:
-        fun, patch = func, print_patch
-    module = importlib.import_module(fun.__module__)
-    cls_name = fun.__qualname__[: -len(fun.__name__) - 1]
-    wrap_fun = make_wrapper(fun, post_patch=patch)
-    cls_obj = getattr(module, cls_name)
-    setattr(cls_obj, fun.__name__, wrap_fun)
-
-
-# _raw_load_micro_batch = paddle.distributed.fleet.meta_parallel.pipeline_parallel.FakeMicroDataset._load_micro_batch
-# _raw_forward_step = paddle.distributed.fleet.model.PipelineParallel._forward_step
-# _raw_recv_forward = paddle.distributed.fleet.meta_parallel.pp_utils.p2p_communication.P2pHelper.recv_forward
-# _raw_send_forward = paddle.distributed.fleet.meta_parallel.pp_utils.p2p_communication.P2pHelper.send_forward
-# _raw_recv_meta = paddle.distributed.fleet.meta_parallel.pp_utils.p2p_communication.SendRecvMeta.recv_meta
-# _raw_send_meta = paddle.distributed.fleet.meta_parallel.pp_utils.p2p_communication.SendRecvMeta.send_meta
-
-
-# def _load_micro_batch(self, micro_step):
-#     output = _raw_load_micro_batch(self, micro_step)
-#     print("=" * 20, "_load_micro_batch", output)
-#     return output
-
-# def _forward_step(self, input_tensor, micro_dataset, chunk_id=None):
-#     if True: # self.is_pipeline_first_stage():
-#         print("=" * 20, "_forward_step input", input_tensor, self._p2p_helper._use_cache)
-#     output = _raw_forward_step(self, input_tensor, micro_dataset, chunk_id)
-#     print("=" * 20, "_forward_step output", output, self._p2p_helper._use_cache)
-#     return output
-
-
-# def recv_forward(self, pp_first_stage, sync_recv=True):
-#     input_tensor = _raw_recv_forward(self, pp_first_stage, sync_recv)
-#     print("=" * 20, "recv_forward", input_tensor)
-#     return input_tensor
-
-
-# def send_forward(self, output_tensor, pp_last_stage):
-#     output = _raw_send_forward(self, output_tensor, pp_last_stage)
-#     print("=" * 20, "send_forward", output_tensor)
-#     return output
-
-
-# def recv_meta(self, group):
-#     output = _raw_recv_meta(self, group)
-#     print("=" * 20, "recv_meta", self.recv_shape_message, self.recv_dtype_message)
-#     return output
-
-
-# def send_meta(self, tensor, group):
-#     output = _raw_send_meta(self, tensor, group)
-#     print("=" * 20, "send_meta", self.send_shape_message, self.send_dtype_message)
-#     return output
-
-# paddle.distributed.fleet.model.PipelineParallel._forward_step = _forward_step
-# paddle.distributed.fleet.meta_parallel.pipeline_parallel.FakeMicroDataset._load_micro_batch = _load_micro_batch
-# paddle.distributed.fleet.meta_parallel.pp_utils.p2p_communication.P2pHelper.recv_forward = recv_forward
-# paddle.distributed.fleet.meta_parallel.pp_utils.p2p_communication.P2pHelper.send_forward = send_forward
-# paddle.distributed.fleet.meta_parallel.pp_utils.p2p_communication.SendRecvMeta.recv_meta = recv_meta
-# paddle.distributed.fleet.meta_parallel.pp_utils.p2p_communication.SendRecvMeta.send_meta = send_meta
-
-
-def loss_fwd_wrapper(loss_maker):
-    def _wrapper(*args, **kwargs):
-        loss = loss_maker(*args, **kwargs)
-        ori_fwd = loss.forward
-
-        def _fwd(self, output, label_info):
-            if isinstance(label_info, tuple):
-                loss = ori_fwd(self, output, *label_info)
-            else:
-                loss = ori_fwd(self, output, label_info)
-            return loss
-
-        loss.forward = types.MethodType(_fwd, loss)
-        return loss
-
-    return _wrapper
-
-
-@paddle.no_grad()
-def make_position_ids(attention_mask, source=None):
-    attention_mask_bool = attention_mask
-    attention_mask = attention_mask.cast(paddle.int64)
-    position_ids = attention_mask.cumsum(-1) - 1
-    # Make padding positions in source be 0, since reward model use position_ids
-    # plus with padding size (number of 0s) in source to calculate end offsets.
-    # It does not matter when source is left padding and target is right padding
-    # which is the output of non-FuseMT generation, while when using FuseMT whose
-    # output is right padding source and right padding target, we have to set
-    # padding positions in source be 0 to make compatible.
-    if source is not None:
-        src_len = position_ids[:, source.shape[-1] - 1].unsqueeze(-1)
-        position_ids = paddle.where(
-            paddle.logical_and(paddle.logical_not(attention_mask_bool), position_ids <= src_len),
-            attention_mask,
-            position_ids,
-        )
-        return position_ids
-    position_ids = paddle.where(position_ids == -1, attention_mask, position_ids)
-    return position_ids
-
-
-@paddle.no_grad()
-def pad_batches_inputs(inputs, padding_value=0, max_len=None, pad_len=None):
-    """Pad length for tensors shaped [bs, seq_len] to [bs, max(seq_lens)]"""
-    if pad_len is not None:
-        pad_len = [pad_len] * len(inputs) if isinstance(pad_len, int) else pad_len
-    elif max_len is None:
-        # max_len = max([x.shape[-1] for x in inputs if x is not None])
-        max_len = max([x.shape[-1] if isinstance(x, paddle.Tensor) else 0 for x in inputs])
-        pad_len = [max_len - x.shape[-1] if isinstance(x, paddle.Tensor) else 0 for x in inputs]
-    for i in range(len(inputs)):
-        x = inputs[i]
-        # if x is None or x.shape[-1] == max_len:
-        if not isinstance(x, paddle.Tensor) or x.shape[-1] == max_len:
-            continue
-        inputs[i] = paddle.concat([x, paddle.full([x.shape[0], pad_len[i]], padding_value, dtype=x.dtype)], -1)
-    return inputs
-
-
-def get_expected_keys(inputs, keys):
-    ret = tuple([inputs.get(k, None) for k in keys if k in inputs])
-    if len(ret) == 1:
-        ret = ret[0]
-    return ret
-
 
 # patches for base pipe model
 # non-pipe model class, can be used to parse and convert forward args
+# mainly used for generation with PipelienParallel model
 LlamaForCausalLMPipe._non_pipe_model_class = LlamaForCausalLM
 LlamaForCausalLMPipe._non_pipe_decoder_layer_class = LlamaDecoderLayer
-
-
-def fwd_args_to_dict(fun):
-    def _impl(self, *args, **kwargs):
-        try:
-            return fun(self, *args, **kwargs)
-        except TypeError:
-            # otherwise, inputs is any valid format of non_pipe_model forward args,
-            # convert to dict, to support more args format in prediction_pipeline_step
-
-            arg_dict = (
-                inspect.signature(self._non_pipe_model_class.forward).bind(*((self,) + args), **kwargs).arguments
-            )
-            arg_dict.pop("self")
-            return fun(self, arg_dict)
-
-    return _impl
 
 
 class LlamaPolicyPipe(LlamaForCausalLMPipe):
@@ -339,11 +140,16 @@ class LlamaPolicyPipe(LlamaForCausalLMPipe):
 
     @property
     def head_out_meta(self):
+        """mainly for eval/generation with PipelineParallel"""
         # None means to use actual data info
         return paddle.static.InputSpec(shape=[None, None, self.config.vocab_size], dtype=None)
 
 
 class _LlamaRMSNormPipe(LlamaRMSNormPipe):
+    """
+    We need position_ids for reward model, so wrap LlamaRMSNormPipe to pass position_ids
+    """
+
     def __init__(self, config):
         super().__init__(config)
 
