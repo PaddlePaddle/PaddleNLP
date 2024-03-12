@@ -1511,7 +1511,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
 }
 ############ case end ############
 
-function #check_result() {
+function check_result() {
     echo -e "$1" >> ${log_path}/result.log
     if [ $? -ne 0 ];then
         echo -e "\033[31m $1 run failed! \033[0m" | tee -a ${log_path}/result.log
