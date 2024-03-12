@@ -35,6 +35,7 @@ class LoRALinear(nn.Linear):
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
         merge_weights: bool = True,
+        use_dora: bool = False,
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
@@ -69,11 +70,27 @@ class LoRALinear(nn.Linear):
         # Freezing the pre-trained weight matrix
         self.weight.stop_gradient = True
 
+        self.use_dora = use_dora
+        if self.use_dora:
+            self.lora_magnitude = self.create_parameter(
+                shape=[1, out_features],
+                dtype=self.weight.dtype,
+                is_bias=False,
+                default_initializer=nn.initializer.Constant(value=1.0),
+            )
+            self.lora_magnitude_init = False
+            # cache the weight norm when we merge the weights
+            self.weight_norm_cached = None
+
     def train(self):
         super().train()
         if self.merge_weights and self.merged:
             # Make sure that the weights are not merged
-            new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
+            if self.use_dora:
+                dora_factor = self.lora_magnitude / self.weight_norm_cached
+                new_weight = self.weight / dora_factor - self.lora_A @ self.lora_B * self.scaling
+            else:
+                new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
             self.merged = False
 
@@ -81,14 +98,34 @@ class LoRALinear(nn.Linear):
         super().eval()
         if self.merge_weights and not self.merged:
             # Merge the weights and mark it
-            new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
+            if self.use_dora:
+                dora_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
+                self.weight_norm_cached = dora_weight.norm(p=2, axis=0, keepdim=True)
+                dora_factor = self.lora_magnitude / self.weight_norm_cached
+                new_weight = dora_factor * dora_weight
+            else:
+                new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
             self.merged = True
 
     def forward(self, input: paddle.Tensor, *args, **kwargs):
+        if self.use_dora and not self.lora_magnitude_init:
+            self.lora_magnitude.set_value(self.weight.norm(p=2, axis=0, keepdim=True))
+            self.lora_magnitude_init = True
+
         result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
         if not self.merged:
-            result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
+            if self.use_dora:
+                input = self.lora_dropout(input)
+                dora_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
+                weight_norm = dora_weight.norm(p=2, axis=0, keepdim=True).detach()
+                mag_norm_scale = (self.lora_magnitude / weight_norm).unsqueeze(0)
+                result_dora = (mag_norm_scale - 1) * (input @ self.weight) + mag_norm_scale * (
+                    input @ self.lora_A @ self.lora_B
+                ) * self.scaling
+                result += result_dora
+            else:
+                result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
         return result
 
     def extra_repr(self):
@@ -105,8 +142,11 @@ class RowParallelLoRALinear(RowParallelLinear):
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
         merge_weights: bool = True,
+        use_dora: bool = False,
         **kwargs
     ):
+        if use_dora:
+            raise ValueError(f"{self.__class__.__name__} does not support DoRA yet, please set it to False")
         RowParallelLinear.__init__(self, in_features, out_features, **kwargs)
         if not isinstance(r, int) or r <= 0:
             raise ValueError("Lora rank r should be a positive integer")
@@ -210,8 +250,11 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         lora_dropout: float = 0.0,
         merge_weights: bool = True,
         lora_A_weight_attr: Optional[paddle.ParamAttr] = None,
+        use_dora: bool = False,
         **kwargs
     ):
+        if use_dora:
+            raise ValueError(f"{self.__class__.__name__} does not support DoRA yet, please set it to False")
         ColumnParallelLinear.__init__(self, in_features, out_features, **kwargs)
         if not isinstance(r, int) or r <= 0:
             raise ValueError("Lora rank r should be a positive integer")
@@ -648,8 +691,11 @@ class LoRAConv2D(nn.Conv2D):
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
         merge_weights: bool = True,
+        use_dora: bool = False,
         **kwargs
     ):
+        if use_dora:
+            raise ValueError(f"{self.__class__.__name__} does not support DoRA yet, please set it to False")
         nn.Conv2D.__init__(self, in_channels, out_channels, kernel_size, **kwargs)
         if not isinstance(r, int) or r <= 0:
             raise ValueError("Lora rank r should be a positive integer")

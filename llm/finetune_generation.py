@@ -424,6 +424,7 @@ def main():
                 dtype=dtype,
                 do_qat=quant_args.do_qat,
                 base_model_name_or_path=model_args.model_name_or_path,
+                use_dora=model_args.use_dora,
             )
             model = LoRAModel(model, lora_config)
         else:

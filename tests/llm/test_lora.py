@@ -50,13 +50,14 @@ class LoraTest(LLMTest, unittest.TestCase):
         LLMTest.tearDown(self)
         sys.path.remove(self.model_codes_dir)
 
-    def test_lora(self):
+    def test_lora(self, use_dora=False):
         self.disable_static()
         paddle.set_default_dtype("float32")
 
         lora_config = load_test_config(self.config_path, "lora", self.model_dir)
         lora_config["output_dir"] = self.output_dir
         lora_config["dataset_name_or_path"] = self.data_dir
+        lora_config["use_dora"] = use_dora
 
         with argv_context_guard(lora_config):
             from finetune_generation import main
@@ -78,6 +79,9 @@ class LoraTest(LLMTest, unittest.TestCase):
             self.run_predictor({"inference_model": True})
 
         self.run_predictor({"inference_model": False})
+
+    def test_dora(self, use_dora=True):
+        self.test_lora(use_dora=use_dora)
 
 
 # @parameterized_class(

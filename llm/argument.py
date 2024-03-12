@@ -126,6 +126,20 @@ class ModelArgument:
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
     lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
     lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
+    # DoRA related parameters
+    use_dora: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "Enable 'Weight-Decomposed Low-Rank Adaptation' (DoRA). This technique decomposes the updates of the "
+                "weights into two parts, magnitude and direction. Direction is handled by normal LoRA, whereas the "
+                "magnitude is handled by a separate learnable parameter. This can improve the performance of LoRA, "
+                "especially at low ranks. Right now, DoRA only supports non-quantized linear layers. DoRA introduces "
+                "a bigger overhead than pure LoRA, so it is recommended to merge weights for inference. For more "
+                "information, see https://arxiv.org/abs/2402.09353."
+            )
+        },
+    )
 
     # prefix tuning related parameters
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})

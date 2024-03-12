@@ -383,8 +383,9 @@ class LoRAModel(nn.Layer):
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
                     bias_attr=False if module.bias is None else None,
+                    use_dora=lora_config.use_dora,
                 )
-            if isinstance(module, nn.Conv2D):
+            elif isinstance(module, nn.Conv2D):
                 lora_module = LoRAConv2D(
                     in_channels=module._in_channels,
                     out_channels=module._out_channels,
@@ -400,6 +401,7 @@ class LoRAModel(nn.Layer):
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
                     bias_attr=module._bias_attr,
+                    use_dora=lora_config.use_dora,
                 )
             elif isinstance(module, ColumnParallelLinear):
                 # recover the original output_features
@@ -418,6 +420,7 @@ class LoRAModel(nn.Layer):
                             negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
                         )
                     ),
+                    use_dora=lora_config.use_dora,
                 )
                 # Lora column parallel will spilt lora B matrix
                 self.add_lora_split_mapping(module_name + ".lora_B", is_column=True)
@@ -438,6 +441,7 @@ class LoRAModel(nn.Layer):
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
+                    use_dora=lora_config.use_dora,
                 )
                 # Lora column parallel will spilt lora A matrix
                 self.add_lora_split_mapping(module_name + ".lora_A", is_column=False)
