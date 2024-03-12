@@ -109,6 +109,11 @@ class LoRAModel(nn.Layer):
         logger.info("Mark only lora and trainable_module as trainable.")
         self.mark_only_lora_as_trainable()
 
+        # init dora weights after model init
+        for _, layer in self.model.named_sublayers():
+            if hasattr(layer, "use_dora") and layer.use_dora:
+                layer.dora_init()
+
     def add_lora_split_mapping(self, module_name, is_column=False):
         self.lora_split_mapping[module_name] = is_column
 

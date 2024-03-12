@@ -71,6 +71,9 @@ class LoRALinear(nn.Linear):
         self.weight.stop_gradient = True
 
         self.use_dora = use_dora
+        self.lora_magnitude_init = False
+        # cache the weight norm when we merge the weights
+        self.weight_norm_cached = None
         if self.use_dora:
             self.lora_magnitude = self.create_parameter(
                 shape=[1, out_features],
@@ -78,9 +81,6 @@ class LoRALinear(nn.Linear):
                 is_bias=False,
                 default_initializer=nn.initializer.Constant(value=1.0),
             )
-            self.lora_magnitude_init = False
-            # cache the weight norm when we merge the weights
-            self.weight_norm_cached = None
 
     def train(self):
         super().train()
@@ -108,11 +108,12 @@ class LoRALinear(nn.Linear):
             self.weight.set_value(new_weight)
             self.merged = True
 
-    def forward(self, input: paddle.Tensor, *args, **kwargs):
+    def dora_init(self):
         if self.use_dora and not self.lora_magnitude_init:
             self.lora_magnitude.set_value(self.weight.norm(p=2, axis=0, keepdim=True))
             self.lora_magnitude_init = True
 
+    def forward(self, input: paddle.Tensor, *args, **kwargs):
         result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
         if not self.merged:
             if self.use_dora:
