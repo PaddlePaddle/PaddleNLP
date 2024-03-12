@@ -436,13 +436,13 @@ class QWenVLTest(LLMTest, TestMultipleGpus):
             main()
 
     def test_export_twocards(self):
-        self.export_file = "llm/export_model.py"
-        self.multicard_export_args = {}
-        self.multicard_export_args["model_name_or_path"] = self.model_name_or_path
-        self.multicard_export_args["output_path"] = self.output_dir
-        self.multicard_export_args["dtype"] = "float16"
-        self.multicard_export_args["inference_model"] = True
-        self.multicard_export_args["model_prefix"] = "qwen"
-        self.multicard_export_args["model_type"] = "qwen-img2txt"
+        export_file = "llm/export_model.py"
+        multicard_export_args = {}
+        multicard_export_args["model_name_or_path"] = self.model_name_or_path
+        multicard_export_args["output_path"] = self.output_dir
+        multicard_export_args["dtype"] = "float16"
+        multicard_export_args["inference_model"] = True
+        multicard_export_args["model_prefix"] = "qwen"
+        multicard_export_args["model_type"] = "qwen-img2txt"
 
-        self.run_n1c2(self.export_file, **self.multicard_export_args)
+        self.run_n1c2(export_file, **multicard_export_args)
