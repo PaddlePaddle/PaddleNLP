@@ -331,7 +331,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                         a = qkv_quanted_weight_tensor.shape
                         qkv_quanted_weight_tensor = qkv_quanted_weight_tensor.reshape([a[1], a[0]])
                         qkv_quanted_weight_tensor = qkv_quanted_weight_tensor.transpose([1, 0]).contiguous()
-                        #qkv_quanted_weight_tensor = (qkv_quanted_weight_tensor.astype("int32") + 128).astype("uint8")
+                        qkv_quanted_weight_tensor = (qkv_quanted_weight_tensor.astype("int32") + 128).astype("uint8")
 
 
                         qkv_quanted_weight_tensor = qkv_quanted_weight_tensor.cpu()
@@ -363,7 +363,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                         a = linear_quanted_weight_tensor.shape
                         linear_quanted_weight_tensor = linear_quanted_weight_tensor.reshape([a[1], a[0]])
                         linear_quanted_weight_tensor = linear_quanted_weight_tensor.transpose([1, 0]).contiguous()
-                        #linear_quanted_weight_tensor = (linear_quanted_weight_tensor.astype("int32") + 128).astype("uint8")
+                        linear_quanted_weight_tensor = (linear_quanted_weight_tensor.astype("int32") + 128).astype("uint8")
 
 
                         linear_quanted_weight_tensor = linear_quanted_weight_tensor.cpu()
@@ -388,7 +388,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                         a = ffn1_quanted_weight_tensor.shape
                         ffn1_quanted_weight_tensor = ffn1_quanted_weight_tensor.reshape([a[1], a[0]])
                         ffn1_quanted_weight_tensor = ffn1_quanted_weight_tensor.transpose([1, 0]).contiguous()
-                        #ffn1_quanted_weight_tensor = (ffn1_quanted_weight_tensor.astype("int32") + 128).astype("uint8")
+                        ffn1_quanted_weight_tensor = (ffn1_quanted_weight_tensor.astype("int32") + 128).astype("uint8")
 
 
                         ffn1_quanted_weight_tensor = ffn1_quanted_weight_tensor.cpu()
@@ -409,7 +409,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                         a = ffn2_quanted_weight_tensor.shape
                         ffn2_quanted_weight_tensor = ffn2_quanted_weight_tensor.reshape([a[1], a[0]])
                         ffn2_quanted_weight_tensor = ffn2_quanted_weight_tensor.transpose([1, 0]).contiguous()
-                        #ffn2_quanted_weight_tensor = (ffn2_quanted_weight_tensor.astype("int32") + 128).astype("uint8")
+                        ffn2_quanted_weight_tensor = (ffn2_quanted_weight_tensor.astype("int32") + 128).astype("uint8")
 
 
                         ffn2_quanted_weight_tensor = ffn2_quanted_weight_tensor.cpu()

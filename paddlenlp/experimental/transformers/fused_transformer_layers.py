@@ -966,7 +966,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             self._add_parameter(ffn2_weight_scale)
 
     def get_weight_create_dype(self):
-        return "int8"  # If use weightonly int4, params dtype is int8, and one of the dimension will be half.
+        return "uint8"  # If use weightonly int4, params dtype is int8, and one of the dimension will be half.
 
     def init_weight_shape(self, config):
         super().init_weight_shape(config)
