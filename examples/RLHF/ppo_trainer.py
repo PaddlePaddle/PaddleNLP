@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
 import copy
+import inspect
 import itertools
 import math
 import os
@@ -26,13 +28,17 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import tqdm
 from data import DummyDataset, PromptOnlyBatch
+from models.model_pp import make_position_ids
+from models.ppo_model_utils import RLHFPPOMixedLoss, RLHFValueLoss, create_loss
+from paddle.distributed import fleet
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
-from paddle.utils import map_structure
+from paddle.utils import map_structure, try_import
 from rich.console import Console
 from rich.table import Table
 
 from paddlenlp.data import DataCollator
 from paddlenlp.generation import GenerationConfig
+from paddlenlp.generation.utils import GenerationMixin
 from paddlenlp.trainer.trainer import (
     TRAINER_STATE_NAME,
     EvalLoopOutput,
@@ -55,6 +61,9 @@ from paddlenlp.trainer.trainer import (
     split_inputs_sequence_dim,
 )
 from paddlenlp.transformers import BatchEncoding, PretrainedModel, PretrainedTokenizer
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
+from paddlenlp.transformers.model_outputs import ModelOutput
+from paddlenlp.transformers.model_utils import dtype_guard
 from paddlenlp.transformers.tokenizer_utils_base import (
     PaddingStrategy,
     TruncationStrategy,
@@ -495,7 +504,8 @@ class PolicyTrainer(Trainer):
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor] = None,
     ):
-
+        # only used for non-PipelineParallel models
+        criterion = create_loss(RLHFPPOMixedLoss, model.config, args)
         super().__init__(
             model,
             criterion,
@@ -510,66 +520,26 @@ class PolicyTrainer(Trainer):
             preprocess_logits_for_metrics,
         )
 
-    def actor_loss_fn(
-        self,
-        log_probs: paddle.Tensor,
-        old_log_probs: paddle.Tensor,
-        advantages: paddle.Tensor,
-        mask: paddle.Tensor,
-    ) -> paddle.Tensor:
-        # policy gradient loss
-        ratio = paddle.exp(log_probs - old_log_probs)
-        pg_loss1 = -advantages * ratio
-        pg_loss2 = -advantages * paddle.clip(
-            ratio,
-            1.0 - self.clip_range_ratio,
-            1.0 + self.clip_range_ratio,
-        )
-        return paddle.sum(paddle.maximum(pg_loss1, pg_loss2) * mask) / mask.sum()
-
-    def compute_loss(self, model, inputs, return_outputs=False):
-        """
-        How the loss is computed by Trainer. By default, all models return the loss in the first element.
-        Subclass and override for custom behavior.
-        """
-        labels = inputs.get("labels", None)
-        if labels is not None:
-            labels = inputs.get("labels", None)
-            outputs = model(**inputs)
-            ptx_loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
-            ptx_loss = self.ptx_coeff * ptx_loss
-            return ptx_loss
-
-        input_ids = inputs["input_ids"]
-        attention_mask = inputs["attention_mask"]
-        old_log_probs = inputs["old_log_probs"]
-        reward_advantages = inputs["reward_advantages"]
-        sequence_mask = inputs["sequence_mask"]
-        start = inputs["start"]
-        # NOTE: TensorParallel model requires non-Tensor inputs to be lists, thus
-        # do not use these inputs currently.
-        # use_cache = inputs["use_cache"]
-        # return_dict = inputs["return_dict"]
-        outputs = model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,  # use_cache=use_cache, return_dict=return_dict
-        )
-
-        logits = outputs["logits"] if isinstance(outputs, dict) else outputs
-        if isinstance(outputs, dict):
-            logits = outputs["logits"]
-        elif isinstance(outputs, tuple):
-            logits = outputs[0]
-
-        log_probs = gather_log_probabilities(logits[:, :-1], input_ids[:, 1:])
-        actor_loss = self.actor_loss_fn(
-            log_probs[:, start:],
-            old_log_probs[:, start:],
-            reward_advantages,
-            sequence_mask[:, start:],
-        )
-
-        return actor_loss
+    def _prepare_inputs(self, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> Dict[str, Union[paddle.Tensor, Any]]:
+        inputs = super()._prepare_input(inputs)
+        label_names = self.criterion.__class__.label_names
+        # some data fields are used both in model and loss
+        shared_fields = set(["input_ids", "attention_mask"])
+        labels = []
+        for name in label_names:
+            if name not in inputs:
+                label = self.criterion.__class__.label_default_values.get(name, None)
+            elif name in shared_fields:
+                label = inputs[name]
+            else:
+                label = inputs.pop(name)
+            labels.append(label)
+        # "labels" is the pre-defined label name in Trainer
+        inputs["labels"] = labels
+        # NOTE: TensorParallel model requires non-Tensor inputs to be lists and
+        # broadcast them, thus do not or optionally use these inputs. labels use
+        # in criterion not send to model can workaround this.
+        return inputs
 
     def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs):
         labels = inputs.get("labels", None)
@@ -602,7 +572,8 @@ class ValueTrainer(Trainer):
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor] = None,
     ):
-
+        # only used for non-PipelineParallel models
+        criterion = create_loss(RLHFValueLoss, model.config, args)
         super().__init__(
             model,
             criterion,
@@ -617,61 +588,30 @@ class ValueTrainer(Trainer):
             preprocess_logits_for_metrics,
         )
 
-    def critic_loss_fn(
-        self,
-        values: paddle.Tensor,
-        old_values: paddle.Tensor,
-        returns: paddle.Tensor,
-        mask: paddle.Tensor,
-    ) -> paddle.Tensor:
-        """Compute critic loss."""
-        # TODO(guosheng): use paddle.clip when its min/max can support more than
-        # 0D Tensor
-        values_clipped = paddle.minimum(
-            paddle.maximum(values, old_values - self.clip_range_value), old_values + self.clip_range_value
-        )
-        vf_loss1 = paddle.square(values - returns)
-        vf_loss2 = paddle.square(values_clipped - returns)
-        return 0.5 * paddle.sum(paddle.maximum(vf_loss1, vf_loss2) * mask) / mask.sum()
-
-    def compute_loss(self, model, inputs, return_outputs=False):
-        """
-        How the loss is computed by Trainer. By default, all models return the loss in the first element.
-        Subclass and override for custom behavior.
-        """
-        input_ids = inputs["input_ids"]
-        attention_mask = inputs["attention_mask"]
-        old_reward_values = inputs["old_reward_values"]
-        reward_returns = inputs["reward_returns"]
-        sequence_mask = inputs["sequence_mask"]
-        start = inputs["start"]
-        # NOTE: TensorParallel model requires non-Tensor inputs to be lists, thus
-        # do not use these inputs currently.
-        # use_cache = inputs["use_cache"]
-        # return_dict = inputs["return_dict"]
-        outputs = model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,  # use_cache=use_cache, return_dict=return_dict
-        )
-
-        # We don't use .loss here since the model may return tuples instead of ModelOutput.
-        reward_values = outputs["scores"] if isinstance(outputs, dict) else outputs
-        if isinstance(outputs, dict):
-            reward_values = outputs["scores"]
-        elif isinstance(outputs, tuple):
-            reward_values = outputs[0]
-
-        reward_values = reward_values.squeeze(axis=-1)[:, :-1]
-        reward_critic_loss = self.critic_loss_fn(
-            reward_values[:, start:],
-            old_reward_values[:, start:],
-            reward_returns,
-            sequence_mask[:, start:],
-        )
-
-        return reward_critic_loss
+    def _prepare_inputs(self, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> Dict[str, Union[paddle.Tensor, Any]]:
+        inputs = super()._prepare_input(inputs)
+        label_names = self.criterion.__class__.label_names
+        # some data fields are used both in model and loss
+        shared_fields = set(["input_ids", "attention_mask"])
+        labels = []
+        for name in label_names:
+            if name not in inputs:
+                label = self.criterion.__class__.label_default_values.get(name, None)
+            elif name in shared_fields:
+                label = inputs[name]
+            else:
+                label = inputs.pop(name)
+            labels.append(label)
+        # "labels" is the pre-defined label name in Trainer
+        inputs["labels"] = labels
+        # NOTE: TensorParallel model requires non-Tensor inputs to be lists and
+        # broadcast them, thus do not or optionally use these inputs. labels use
+        # in criterion not send to model can workaround this.
+        return inputs
 
     def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs):
+        # TODO(guosheng): Make these training control vars mapping as class attr,
+        # then PPOTrainer can extract and reuse them to avoid hard code.
         kwargs["model"] = kwargs.pop("value_model")
         kwargs["step_control"] = kwargs.pop("value_step_control")
         kwargs["tr_loss"] = kwargs.pop("reward_critic_loss")
@@ -713,6 +653,535 @@ def is_same_tokenizer(
     )
 
 
+class PipeEvalModel(GenerationMixin):
+    def __init__(self, trainer: Trainer):
+        self.model: fleet.model.PipelineParallel = trainer.model_wrapped
+        self.config: PretrainedConfig = trainer.model.config
+        self._is_gen = False
+        # self.gen_fn = None
+        # self.fwd_fn = None
+        # use non-pipe model generetion related methods
+        # self.prepare_inputs_for_generation = types.MethodType(
+        #     self.model._layers._non_pipe_model_class.prepare_inputs_for_generation, self
+        # )
+        self.update_model_kwargs_for_generation = (
+            self.model._layers._non_pipe_model_class.update_model_kwargs_for_generation
+        )
+
+    @property
+    def pp_group(self):
+        return self.model.pp_group
+
+    def eval(self):
+        self.model.eval()
+
+    def train(self):
+        self.model.train()
+
+    def _broadcast_outputs(self, outputs):
+        # outputs is PipelineParallel.eval_batch which is a list of batches.
+        out = []
+        outputs = (outputs,) if isinstance(outputs, paddle.Tensor) else outputs
+        for tensors in outputs:
+            if not self.model.is_pipeline_last_stage():
+                tensor = tensors if isinstance(tensors, paddle.Tensor) else tensors[0]
+                head_out_meta = (
+                    (self.model._layers.head_out_meta,)
+                    if isinstance(self.model._layers.head_out_meta, paddle.static.InputSpec)
+                    else self.model._layers.head_out_meta
+                )
+                tensors = tuple(
+                    paddle.empty(
+                        shape=[
+                            tensor.shape[i] if (meta.shape[i] is None or meta.shape[i] < 0) else meta.shape[i]
+                            for i in range(len(meta.shape))
+                        ],
+                        dtype=tensor.dtype if meta.dtype is None else meta.dtype,
+                    )
+                    for meta in head_out_meta
+                )
+            else:
+                # Currently use tuple instead of ModelOutput and require the
+                # caller use the return result as tuple.
+                tensors = (
+                    (tensors,)
+                    if isinstance(tensors, paddle.Tensor)
+                    else tensors.to_tuple()
+                    if isinstance(tensors, ModelOutput)
+                    else tensors
+                )
+
+            # map_structure(
+            #     lambda tensor: paddle.distributed.broadcast(
+            #         tensor,
+            #         src=self.model.pp_group.ranks[-1],
+            #         group=self.model.pp_group), tensors)
+            for tensor in tensors:
+                paddle.distributed.broadcast(tensor, src=self.model.pp_group.ranks[-1], group=self.model.pp_group)
+            out.append(tensors[0] if len(tensors) == 1 else tensors)
+        return out[0] if len(out) == 1 else out
+
+    def __call__(self, *args, **kwargs):
+        model = self.model
+        assert self.model.training is False
+        if self._is_gen:
+            # inputs by `prepare_inputs_for_generation` is a dict with following keys:
+            # "input_ids", "position_ids", "past_key_values", "use_cache", "attention_mask"
+            # NOTE: 1. cache/past_key_values should be passed across decoding steps
+            # by using as model attr rather than input args to reduce comm overhead.
+            # Also, pipe model defined for training not support this cache input.
+            # 2. ignore use_cache since _check_data_vaild requires tensor if not None.
+            # 3. attention_mask can reuse _prepare_decoder_attention_mask in LlamaEmbeddingPipe.
+            # 4. position_ids pass through _prepare_pipeline_inputs_func and PipeLayer.
+            inputs, labels = model._prepare_pipeline_inputs_func(*args, **kwargs)
+            # currently, set accumulate_steps to 1 to avoid multi-batch eval/gen
+            with guard_set_args(model, {"_compute_loss": False, "accumulate_steps": 1}):
+                outputs = model.eval_batch([inputs, labels], compute_loss=False)
+            # TODO(guosheng): Broadcasted logits are used to get next_scores, remove
+            # it to reduce comm overhead. Also note that we still need broadcast
+            # next_tokens though logits are broadcasted since pp ranks' seeds differs.
+            # Currently, just slice the last token to reduce comm overhead.
+            outputs = [
+                micro_batch_output[:, -1, :].unsqueeze(1)
+                if isinstance(micro_batch_output, paddle.Tensor)
+                else micro_batch_output[0][:, -1, :].unsqueeze(1)
+                for micro_batch_output in outputs
+            ]
+            outputs = self._broadcast_outputs(outputs)
+        else:
+            # use _prepare_pipeline_inputs_func to convert pipeline inputs
+            inputs, labels = model._prepare_pipeline_inputs_func(*args, **kwargs)
+            # NOTE(guosheng): bug seems exist. pp.eval_batch(compute_loss=False)
+            # will set pp._compute_loss to False and would not set it back. Thus
+            # hack here to set it back.
+            with guard_set_args(model, {"_compute_loss": False, "accumulate_steps": 1}):
+                outputs = model.eval_batch([inputs, labels], compute_loss=False)
+            outputs = self._broadcast_outputs(outputs)
+        return outputs
+
+    def generate(self, *args, **kwargs):
+        self._is_gen = True
+        # patch DecoderLayerPipe to use cache, DecoderLayerPipe is subclass of
+        # DecoderLayer, and would call super().forward
+        ori_decoder_layer_forward = self.model._layers._non_pipe_decoder_layer_class.forward
+
+        def decoder_layer_forward(layer_self, *args, **kwargs):
+            kwargs.update({"use_cache": True, "past_key_value": getattr(layer_self, "_cache", None)})
+            outputs = ori_decoder_layer_forward(layer_self, *args, **kwargs)
+            output = outputs[0]
+            layer_self._cache = outputs[1]
+            self._has_cache = True
+            return output
+
+        with guard_set_args(self.model._layers._non_pipe_decoder_layer_class, {"forward": decoder_layer_forward}):
+            outputs = super().generate(*args, **kwargs)
+        self._is_gen = False
+        # clear cache of decoder layers, sublayers is incursive thus suitable
+        # to both 1F1B and interleave
+        for layer in self.model._layers.sublayers():
+            if isinstance(layer, self.model._layers._non_pipe_decoder_layer_class):
+                layer._cache = None
+        self._has_cache = False
+        return outputs
+
+    def prepare_inputs_for_generation(self, *args, **kwargs):
+        arg_bind = inspect.signature(self.model._layers._non_pipe_model_class.prepare_inputs_for_generation).bind(
+            *((self,) + args), **kwargs
+        )
+        arg_bind.apply_defaults()
+        arg_dict = arg_bind.arguments
+        last_arg_name, last_arg_value = arg_dict.popitem()
+        if arg_bind.signature.parameters[last_arg_name].kind == inspect.Parameter.VAR_KEYWORD:
+            arg_dict.update(last_arg_value)
+        else:
+            arg_dict[last_arg_name] = last_arg_value
+        arg_dict.pop("self")
+        past_key_values = arg_dict.get("past_key_values", None)
+        # prepare_inputs_for_generation use past_key_values to discrimate prefill
+        # or decode and slice inputs accordingly.
+        if getattr(self, "_has_cache", False):
+            arg_dict.update({"past_key_values": True})
+        model_inputs = self.model._layers._non_pipe_model_class.prepare_inputs_for_generation(self, **arg_dict)
+        model_inputs.update({"past_key_values": past_key_values})
+        return model_inputs
+
+
+import types
+
+from predictor import DygraphInferencePredictor, InferencePredictorMixin
+
+
+class Timer:
+    def __init__(self, name):
+        self.name = name
+        self.tic_time = None
+        self.run_times = 0
+
+    def tic(self):
+        self.tic_time = time.time()
+
+    def toc(self):
+        self.run_times += time.time() - self.tic_time
+
+
+class Predictor(DygraphInferencePredictor):
+    def __init__(self, config, model: PretrainedModel = None, tokenizer: PretrainedTokenizer = None):
+        self.model_config = model.config
+        self.config = config
+        self.tokenizer = tokenizer
+        self.model = model
+        self.is_available = False
+        self._weights_mapping = None
+        # use multi stream to load weights
+        # self._stream_num = 4
+        # self._streams = []
+        # for i in range(self._stream_num):
+        #     stream = paddle.device.cuda.Stream()
+        #     self._streams.append(stream)
+        # self._param_counter = 0
+        # print("=" * 20, "cache shape", self.cache_kvs_shape, list(self.__dict__.keys()))
+        # exit(0)
+
+    @staticmethod
+    def create_predictor(trainer):
+        from predictor import (
+            PdArgumentParser,
+            PredictorArgument,
+            get_model_max_position_embeddings,
+        )
+
+        # create infer model
+        # NOTE:infer model use static name param_attr to create and cannot be
+        # created multiple times.
+        def create_infer_model(model, dtype, set_state=False):
+            # patches for inference model to make FuseMT adapt
+            import paddlenlp_ops
+
+            # should patch before infer model import
+            paddlenlp_ops.save_with_output = lambda *args, **kwargs: None
+            # TODO(guosheng): update the custom op code directly.
+            ori_set_ends = paddlenlp_ops.set_stop_value_multi_ends
+
+            def _set_ends(topk_ids, stop_flags, end_ids, mode):
+                # infer model uses eos_token_id to pad and discriminate ending,
+                # patch to use pad_token_id to pad to unify with non-infer model.
+                topk_ids_out, stop_flags_out = ori_set_ends(topk_ids, stop_flags, end_ids, mode)
+                if trainer.tokenizer.pad_token_id != trainer.tokenizer.eos_token_id:
+                    topk_ids_out = paddle.where(stop_flags, trainer.tokenizer.pad_token_id, topk_ids_out)
+                return topk_ids_out, stop_flags_out
+
+            paddlenlp_ops.set_stop_value_multi_ends = _set_ends
+            from models.infer_model_utils import _update_model_kwargs
+
+            import paddlenlp.experimental.transformers as infer_transformers
+
+            config = copy.deepcopy(model.config)
+            hcg = fleet.get_hybrid_communicate_group()  # may differ with training
+            config.tensor_parallel_degree = hcg.get_model_parallel_world_size()
+            config.tensor_parallel_rank = hcg.get_model_parallel_rank()
+            config.weight_only_quant_bits = -1
+            config.quant_type = None
+            config.use_cachekv_int8 = False
+            config.single_card_ptq = True
+            infer_model_cls = getattr(infer_transformers, model.__class__.__name__ + "InferenceModel")
+            with dtype_guard(dtype):
+                infer_model = infer_model_cls(config)
+            # apply patches
+            infer_model.update_model_kwargs_for_generation = types.MethodType(_update_model_kwargs, infer_model)
+            if set_state:
+                state_dict = {}
+                for k, v in model.state_dict().items():
+                    # state_dict[k] = np.from_dlpack(paddle.utils.dlpack.to_dlpack(v))
+                    state_dict[k] = v.numpy()
+                infer_model.set_state_dict(state_dict)
+            return infer_model
+
+        # to avoid oom, clear param of infer_model imediately
+        ori_creat_param = paddle.nn.Layer.create_parameter
+
+        def _create_param(self, *args, **kwargs):
+            param = ori_creat_param(self, *args, **kwargs)
+            param._clear_data()
+            return param
+
+        paddle.nn.Layer.create_parameter = _create_param
+        infer_model = create_infer_model(trainer.model, dtype=trainer.amp_dtype)
+        paddle.nn.Layer.create_parameter = ori_creat_param
+
+        # create predictor
+        parser = PdArgumentParser((PredictorArgument,))
+        predictor_args = parser.parse_dict(
+            {
+                "src_length": get_model_max_position_embeddings(  # can be changed dynamically by predictor.input_length
+                    trainer.model.config
+                ),
+                "max_length": trainer.args.max_length,
+                "dtype": trainer.amp_dtype,
+                "batch_size": trainer.args.per_device_train_batch_size,
+                # infer model do not support top_k, and differ with non-infer model
+                # generation which gets default top_K=50 using generation_config.top_k
+                "top_p": 0.8,
+                # trainer.args.top_p,
+                "temperature": trainer.args.temperature,
+                "repetition_penalty": trainer.args.repetition_penalty,
+            }
+        )[0]
+        policy_predictor = Predictor(predictor_args, model=infer_model, tokenizer=trainer.tokenizer)
+        return policy_predictor
+
+    def _create_caches(self):
+        """inputs can be reused among multiple predictions, such as cache"""
+        if hasattr(self, "cache_kvs_shape"):  # has created cache
+            input_length = getattr(self, "input_length", 0)
+            if input_length <= self.config.src_length:  # reuse cahce
+                return
+            else:  # create longer cache
+                self._clear_caches()
+        self.config.src_length = getattr(self, "input_length", self.config.src_length)
+        if not hasattr(self, "_buffer_attrs"):
+            pre_attrs = set(self.__dict__.keys())
+        self.cache_kvs_shape = self.model.get_cache_kvs_shape(
+            self.model_config, self.config.batch_size, self.config.total_max_length
+        )
+        # TODO: remove GenerationConfig.from_pretrained
+        InferencePredictorMixin.__init__(self, self.config, self.tokenizer)
+        if not hasattr(self, "_buffer_attrs"):
+            self._buffer_attrs = set(self.__dict__.keys()) - pre_attrs
+
+    def _clear_caches(self):
+        # del or offload
+        for attr in self._buffer_attrs:
+            delattr(self, attr)
+
+    def disable(self, model, onload_model=True):
+        # clear caches
+        self._clear_caches()
+        # clear params
+        for _, param in self.model.state_dict().items():
+            param._clear_data()
+        if onload_model:
+            model.to(paddle.device.get_device())
+        self.is_available = False
+
+    def enable(self, model, offload_model=True):
+        if self.is_available:
+            return
+        # set params
+        self.set_state_dict(model, offload_model)
+        self.is_available = True
+
+    @paddle.no_grad()
+    def set_state_dict(self, model, offload_model=True):
+        offload_place = paddle.CUDAPinnedPlace()
+        state_dict = {}
+        for k, v in model.state_dict().items():
+            # maybe use dlpack or some other zero-copy methods
+            state_dict[k] = v  # .numpy()
+            # state_dict[k] = v.to(offload_place)
+        # self.model.set_state_dict(state_dict)
+        # return
+
+        if getattr(self, "_weights_mapping", None) is None:
+            self._weights_mapping = self.model.get_weights_mapping()
+        convert_timer = Timer("cpu-convert")
+        set_timer = Timer("cpu-convert")
+        set_timer.tic()
+        # import nvtx
+
+        # set_rng = nvtx.start_range(message=f"set_state_dict", color="yellow")
+
+        for k, v in self._weights_mapping.items():
+            # with paddle.device.cuda.stream_guard(
+            #         self._streams[self._param_counter % self._stream_num]):
+            with contextlib.nullcontext():
+                # set_param_rng = nvtx.start_range(message=f"set_param",
+                #                                  color="green")
+                param, (convert_fun, args) = k, v
+                args = [state_dict[name] for name in args]
+                # maybe use thread pool to speedup cpu convert
+                # value = paddle.to_tensor(convert_fun(*args))
+                convert_timer.tic()
+                # with device_guard("cpu"):
+                # op with pinmemory input tensors get gpu output tensor
+                value = convert_fun(*args)
+                if offload_model:
+                    for arg in args:
+                        # shared params no need to offload
+                        if value is not arg:
+                            arg.to(offload_place, blocking=False)
+                convert_timer.toc()
+                if not isinstance(value, paddle.Tensor):
+                    param.set_value(value)
+                elif isinstance(value.place, paddle.CUDAPlace):
+                    # param.get_tensor()._share_data_with(value)
+                    value._share_buffer_to(param)
+                else:
+                    param.copy_(value, False)
+                # nvtx.end_range(set_param_rng)
+            # self._param_counter += 1
+        paddle.device.cuda.synchronize()
+        set_timer.toc()
+        # nvtx.end_range(set_rng)
+        print("=" * 20, "cpu-convert time", convert_timer.run_times, set_timer.run_times)
+        # exit(0)
+        # print("=" * 20, "lm_head.weight", self.model.lm_head.weight)
+        # print("=" * 20, "llama.embed_tokens.weight",
+        #       self.model.llama.embed_tokens.weight)
+        # print("=" * 20, "llama.transformer_block.qkv_weights",
+        #       self.model.llama.transformer_block.qkv_weights[0])
+        # print("=" * 20, "llama.transformer_block.ffn1_weights",
+        #       self.model.llama.transformer_block.ffn1_weights[0])
+        # print("=" * 20, "llama.transformer_block.linear_weights",
+        #       self.model.llama.transformer_block.linear_weights[0])
+
+    def _preprocess(self, source):
+        # make cache when infer happens to get actual shape to save memory
+        self._create_caches()
+        return super()._preprocess(source)
+
+    @paddle.no_grad()
+    def _infer(self, inputs):
+        for key in inputs.keys():
+            if paddle.is_tensor(inputs[key]):
+                continue
+            if isinstance(inputs[key], list):
+                if paddle.is_tensor(inputs[key]):
+                    continue
+                inputs[key] = [paddle.to_tensor(item) for item in inputs[key]]
+            else:
+                inputs[key] = paddle.to_tensor(inputs[key])
+
+        inputs["cache_kvs"] = self.cache_kvs
+        print("=" * 20, "infer input_ids", inputs["input_ids"])
+        return self.model.generate(**inputs)
+
+    def _postprocess(self, predictions):
+        return predictions
+
+
+policy_predictor: Predictor = None
+
+
+def check_memory_usage(msg=""):
+    import paddle
+
+    max_memory_allocated_size = paddle.device.cuda.max_memory_allocated() / (1024 * 1024 * 1024)
+    max_memory_reserved_size = paddle.device.cuda.max_memory_reserved() / (1024 * 1024 * 1024)
+    memory_allocated_size = paddle.device.cuda.memory_allocated() / (1024 * 1024 * 1024)
+    memory_reserved_size = paddle.device.cuda.memory_reserved() / (1024 * 1024 * 1024)
+    mem = {
+        f"{msg}_max_memory_allocated_size": max_memory_allocated_size,
+        f"{msg}_max_memory_reserved_size": max_memory_reserved_size,
+        f"{msg}_memory_allocated_size": memory_allocated_size,
+        f"{msg}_memory_reserved_size": memory_reserved_size,
+    }
+    print(mem)
+
+
+@contextmanager
+def infer_guard(trainer, offload_model=True):
+    try:
+        try_import("paddlenlp_ops")
+    except:
+        yield
+        return
+    check_memory_usage("before infer generation")
+    global policy_predictor
+    # offload training params before infer model creation
+    model = trainer.model
+    import time
+
+    # start_time = time.time()
+    # model.to(paddle.CUDAPinnedPlace())
+    # print("=" * 20, "offload time", time.time() - start_time)
+    start_time = time.time()
+    if policy_predictor is None:
+        policy_predictor = Predictor.create_predictor(trainer)
+    if not policy_predictor.is_available:
+        policy_predictor.enable(model, offload_model=offload_model)
+    print("=" * 20, "create infer time", time.time() - start_time)
+    # TODO(guosheng): patch for dist.all_recude to use tp group, fix it later
+    import paddle.distributed as dist
+
+    ori_all_reduce = dist.all_reduce
+    ori_broadcast = dist.broadcast
+    hcg = fleet.get_hybrid_communicate_group()
+    dist.all_reduce = lambda x: ori_all_reduce(x, group=hcg.get_model_parallel_group())
+    dist.broadcast = lambda x, rank: ori_broadcast(
+        x, src=hcg.get_model_parallel_group_src_rank(), group=hcg.get_model_parallel_group()
+    )
+    check_memory_usage("begin infer generation")
+    yield
+    dist.all_reduce = ori_all_reduce
+    dist.broadcast = ori_broadcast
+    print("=" * 20, "infer generation finished")
+    import sys
+
+    print("=" * 20, "predictor refcount", sys.getrefcount(policy_predictor))
+    # policy_predictor = None
+    # policy_predictor.model = None
+    policy_predictor.disable(model, onload_model=offload_model)
+    # start_time = time.time()
+    # model.to(paddle.device.get_device())
+    # print("=" * 20, "onload time", time.time() - start_time)
+    check_memory_usage("end infer generation")
+
+
+class InferEvalModel:
+    """For faster generation, not support PipelineParallel yet."""
+
+    def __init__(self, trainer: Trainer):
+        self.model: PretrainedModel = trainer.model
+        self.tokenizer: PretrainedTokenizer = trainer.tokenizer
+
+    def eval(self):
+        self.model.eval()
+
+    def train(self):
+        self.model.train()
+
+    def __call__(self, *args, **kwargs):
+        # assert model is on GPU
+        assert policy_predictor is None or not policy_predictor.is_available
+        return self.model(*args, **kwargs)
+
+    def generate(self, *args, **kwargs):
+        if policy_predictor is None or not policy_predictor.is_available:
+            return self.model.generate(*args, **kwargs)
+
+        arg_dict = inspect.signature(self.model.generate).bind(*args, **kwargs).arguments
+        input_ids = arg_dict["input_ids"]
+        generation_config = arg_dict["generation_config"]
+        # convert text and tokenize again to convert left padding to right padding
+        # remove this if inputs is right padding
+        print("=" * 20, "raw input_ids", input_ids)
+        # TODO(guosheng): allow to use right padding to infer directly
+        prompts = self.tokenizer.batch_decode(input_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+        print("=" * 20, "prompts", prompts)
+        # decoded prompts has been applied with chat_template
+        # NOTE(guosheng): Whether to add special token should be checked, None
+        # chat_template would not add special token in predictor, since it assumes
+        # chat_template includes special tokens. While Beaver dataset tokenization
+        # does not use chat_template, it uses hard coded template which excludes
+        # special tokens.
+        with guard_set_args(
+            policy_predictor.tokenizer,
+            {
+                # predictor use right padding for infer model by default
+                # "padding_side": "right",
+                # "chat_template": None
+            },
+        ):
+            policy_predictor.input_length = input_ids.shape[-1]
+            outputs = policy_predictor.predict(prompts)
+        outputs = (outputs[0][:, input_ids.shape[-1] :],) if generation_config.trunc_input else (outputs[0],)
+        if self.tokenizer.padding_side == "left":
+            # convert back to left padding inputs
+            outputs[0][:, : input_ids.shape[-1]] = input_ids
+        print("=" * 20, "infer output_ids", outputs[0])
+        return outputs
+
+
 class PPOTrainer(Trainer):
     def __init__(
         self,
@@ -729,7 +1198,14 @@ class PPOTrainer(Trainer):
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor] = None,
     ):
-        with guard_set_args(args, {"recompute": False, "fp16_opt_level": "O1"}):
+        with guard_set_args(
+            args,
+            {
+                "recompute": False,
+                "fp16_opt_level": "O1",
+                "pipeline_parallel_degree": 1,  # workaround for pipeline parallel model check
+            },
+        ):
             # just used to create trival attrs might be used in the training
             # process of trainer, while changing some args to avoid model usage
             # in __init__ such as recompute and AMP-O2
@@ -798,7 +1274,7 @@ class PPOTrainer(Trainer):
 
         # use trainer for reference_model/reward_model to enable sharding stage-3
         # maybe we should allow models to use  different dist strategies later
-        if ShardingOption.FULL_SHARD in args.sharding:
+        if True:  # ShardingOption.FULL_SHARD in args.sharding:
             self.reference_trainer = Trainer(
                 reference_model,
                 criterion,
@@ -873,28 +1349,30 @@ class PPOTrainer(Trainer):
 
     @property
     def reference_model(self):
-        # use model without Trainer
         model = getattr(self, "_reference_model", None)
         if model is not None:
             return model
         # use model with Trainer
         if self.reference_trainer.args.pipeline_parallel_degree > 1:
             # Only accept wrapped model for pipeline_parallel mode
-            model = self.reference_trainer.model_wrapped
+            # model = self.reference_trainer.model_wrapped
+            model = PipeEvalModel(self.reference_trainer)
+            self._reference_model = model
         else:
             model = self.reference_trainer.model
         return model
 
     @property
     def reward_model(self):
-        # use model without Trainer
         model = getattr(self, "_reward_model", None)
         if model is not None:
             return model
         # use model with Trainer
         if self.reward_trainer.args.pipeline_parallel_degree > 1:
             # Only accept wrapped model for pipeline_parallel mode
-            model = self.reward_trainer.model_wrapped
+            # model = self.reward_trainer.model_wrapped
+            model = PipeEvalModel(self.reward_trainer)
+            self._reward_model = model
         else:
             model = self.reward_trainer.model
         return model
@@ -903,20 +1381,32 @@ class PPOTrainer(Trainer):
     def actor_model(self):
         if self.training:
             return self.policy_trainer.model_wrapped
+        model = getattr(self, "_actor_model", None)
+        if model is not None:
+            return model
         if self.policy_trainer.args.pipeline_parallel_degree > 1:
             # Only accept wrapped model for pipeline_parallel mode
-            model = self.policy_trainer.model_wrapped
+            # model = self.policy_trainer.model_wrapped
+            model = PipeEvalModel(self.policy_trainer)
+            self._actor_model = model
         else:
-            model = self.policy_trainer.model
+            # model = self.policy_trainer.model
+            model = InferEvalModel(self.policy_trainer)
+            self._actor_model = model
         return model
 
     @property
     def reward_critic_model(self):
         if self.training:
             return self.value_trainer.model_wrapped
+        model = getattr(self, "_reward_critic_model", None)
+        if model is not None:
+            return model
         if self.value_trainer.args.pipeline_parallel_degree > 1:
             # Only accept wrapped model for pipeline_parallel mode
-            model = self.value_trainer.model_wrapped
+            # model = self.value_trainer.model_wrapped
+            model = PipeEvalModel(self.value_trainer)
+            self._reward_critic_model = model
         else:
             model = self.value_trainer.model
         return model
@@ -944,18 +1434,16 @@ class PPOTrainer(Trainer):
         prediction_loss_only: bool,
         ignore_keys: Optional[List[str]] = None,
     ) -> Tuple[Optional[paddle.Tensor], Optional[paddle.Tensor], Optional[paddle.Tensor]]:
-        if self.args.pipeline_parallel_degree > 1:
-            # hack for pipeline mode
-            inputs = self._prepare_inputs(inputs)
-            return self.prediction_pipeline_step(model, inputs, prediction_loss_only, ignore_keys)
-        else:
-            inputs = self._prepare_inputs(inputs)
+        inputs = self._prepare_inputs(inputs)
 
         with paddle.no_grad():
             with self.autocast_smart_context_manager():
                 seq = self.actor_model.generate(
                     input_ids=inputs["input_ids"],
                     attention_mask=inputs["attention_mask"],
+                    position_ids=inputs["position_ids"]
+                    if "position_ids" in inputs
+                    else make_position_ids(inputs["attention_mask"]),
                     generation_config=self.generation_config,
                     synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
                 )[0]
@@ -977,9 +1465,15 @@ class PPOTrainer(Trainer):
                     reward_input_ids = seq
                     reward_attention_mask = attention_mask
 
+                # unify PP with others since PP always return tuple
                 reward_score = self.reward_model(
-                    reward_input_ids, attention_mask=reward_attention_mask, return_dict=True
-                ).end_scores.squeeze(axis=-1)
+                    reward_input_ids,
+                    attention_mask=reward_attention_mask,
+                    # return_dict=True,
+                )[
+                    1
+                ]  # .end_scores
+                reward_score = reward_score.squeeze(axis=-1).cast(paddle.float32)
 
         # keep the first batch of eval output sequence to print and check
         prompt = self.tokenizer.batch_decode(inputs["input_ids"], skip_special_tokens=True)
@@ -992,7 +1486,7 @@ class PPOTrainer(Trainer):
             # generateds.extend(generated)
             self._eval_seq = (prompt, generated, reward_score.tolist())
 
-        return reward_score.cast(paddle.float32).mean(), None, None
+        return reward_score.mean(), None, None
 
     def evaluation_loop(
         self,
@@ -1079,6 +1573,39 @@ class PPOTrainer(Trainer):
             )
         return policy_model, value_model
 
+    def load_sing_gen_data(self, as_batches=True, use_counter=False, data_dir="pkl_data"):
+        if use_counter:
+            iter_counter = getattr(self, "iter_counter", 0)
+            self.iter_counter = iter_counter + 1
+        else:
+            iter_counter = ""
+        import pickle
+
+        from paddle.distributed import fleet
+
+        hcg = fleet.get_hybrid_communicate_group()
+        data_rank = hcg.get_sharding_parallel_rank()
+        with open(os.path.join(data_dir, f"{iter_counter}rl_batch-{data_rank}.data"), "rb") as f:
+            data = pickle.load(f)
+        rl_batch = map_structure(lambda x: paddle.to_tensor(x), data)
+        rl_batches = [rl_batch] if as_batches else rl_batch
+        return rl_batches
+
+    def save_single_gen_data(self, rl_batch, use_counter=False, data_dir="pkl_data"):
+        if use_counter:
+            iter_counter = getattr(self, "iter_counter", 0)
+            self.iter_counter = iter_counter + 1
+        else:
+            iter_counter = ""
+        import pickle
+
+        import paddle.distributed as dist
+
+        with open(os.path.join(data_dir, f"{iter_counter}rl_batch-{dist.get_rank()}.data"), "wb") as f:
+            rl_batch = map_structure(lambda x: x.numpy(), rl_batch)
+            pickle.dump(rl_batch, f)
+        # exit(0)
+
     def get_epoch_iterator(self):
         # TODO(guosheng): support iter dataset
         num_prompt_only_batches = len(self.prompt_only_dataloader)
@@ -1093,6 +1620,8 @@ class PPOTrainer(Trainer):
                 # generate batches
                 self.set_eval()
                 rl_batches = self.split_rl_micro_batches(prompt_only_batch)
+                # rl_batches = self.load_sing_gen_data(as_batches=True,
+                #                                      use_counter=True)
                 if self.use_ptx:
                     ptx_batches = self.split_ptx_micro_batches(ptx_batch)
                 else:
@@ -1102,6 +1631,7 @@ class PPOTrainer(Trainer):
                 self.set_train()
                 for _ in range(self.args.update_iters):
                     for rl_batch, ptx_batch in zip(rl_batches, ptx_batches):
+                        # self.save_single_gen_data(rl_batch, use_counter=True)
                         yield rl_batch, ptx_batch
 
         class EpochIterator:
@@ -1289,6 +1819,39 @@ class PPOTrainer(Trainer):
                 self.state.global_step = self.value_trainer.state.global_step
                 self.state.epoch = self.value_trainer.state.epoch
                 if train_step_kwargs["value_step_control"] == 0:
+                    # NOTE: PipelineParallel only returns a accumulated loss after
+                    # accumulated steps, which is a mixed loss of ppo-loss and
+                    # ptx-loss. We hack PipelineParallel._forward_step to record
+                    # loss metrics and postprocess the recorded losses here.
+                    # Maybe better to make the last_stage worker log to reduce
+                    # comm and for simplicity.
+                    if isinstance(policy_model, fleet.model.PipelineParallel):
+                        with paddle.no_grad():
+                            # TODO(guosheng): maybe move this to model_pp.py and
+                            # using interface here is better
+                            # interleave betweeen ppo-loss and ptx-loss
+                            if policy_model.is_pipeline_last_stage():
+                                # loss is 0D tensor, use stack rather than concat
+                                mix_loss = paddle.stack(policy_model._step_losses)
+                                policy_model._step_losses = None
+                            else:
+                                # The tessor shape is not policy_model.accumulate_steps
+                                # (args.accu_steps) but policy_trainer.args.accu_steps,
+                                # since policy_model is created with global pp_config
+                                # using global args.accu_steps which is only half of
+                                # policy_trainer.args.accu_steps, and indeed trainer hack
+                                # model.accumulate_steps in training_pipeline_step to use
+                                # trainer.args.accu_steps. The dtype is fp32(to be check),
+                                # thus no need to broadcast.
+                                mix_loss = paddle.empty(
+                                    shape=[self.policy_trainer.args.gradient_accumulation_steps], dtype=paddle.float32
+                                )
+                            paddle.distributed.broadcast(
+                                mix_loss, src=policy_model.pp_group.ranks[-1], group=policy_model.pp_group
+                            )
+                            real_actor_loss = mix_loss[0::2].mean()
+                            real_ptx_loss = mix_loss[1::2].mean()
+                        rl_info.update({"train/actor_loss": real_actor_loss, "train/ptx_loss": real_ptx_loss})
                     # on_step_end
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                 else:
@@ -1320,6 +1883,8 @@ class PPOTrainer(Trainer):
             for k, v in tr_loss.items():
                 if isinstance(v, paddle.Tensor) and "lr" not in k and "max_generated_length" not in k:
                     v_scalar = self._nested_gather(v).mean().item()
+                    # TODO(guosheng): maybe should consider self._enable_delay_scale_loss()
+                    # and maybe should merge with loss postprocess in PP
                     if "train/actor_loss" == k and "train/ptx_loss" in tr_loss:
                         # use_ptx would double the gradient_accumulation_steps
                         # which causes actor_loss and ptx_loss reduced by half
@@ -1391,6 +1956,7 @@ class PPOTrainer(Trainer):
         rewards: paddle.Tensor,
         sequence_mask: paddle.Tensor,
         start: int,
+        use_tgt_len_return: bool = True,
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         """Compute advantages and returns using Generalized Advantage Estimation (GAE)."""
         # Modified from https://github.com/CarperAI/trlx/blob/main/trlx/models/modeling_ppo.py
@@ -1399,6 +1965,16 @@ class PPOTrainer(Trainer):
         values = values * sequence_mask
         rewards = rewards * sequence_mask
         length = rewards.shape[-1]
+        if use_tgt_len_return and start > 0:
+            # consistent with Beaver
+            # values length is src+tgt-1, start is src-1, return length is tgt
+            pass
+        elif use_tgt_len_return:
+            # values length is tgt, start is 0, return length is tgt
+            assert start == 0
+        else:
+            # values length is src+tgt-1, start is src-1, return length is src+tgt-1
+            pass
         for t in reversed(range(start, length)):  # pylint: disable=invalid-name
             next_values = values[:, t + 1] if t < length - 1 else 0.0
             delta = rewards[:, t] + self.gamma * next_values - values[:, t]
@@ -1406,9 +1982,14 @@ class PPOTrainer(Trainer):
             advantages_reversed.append(last_gae_lambda)
         advantages = paddle.stack(advantages_reversed[::-1], axis=1)
         returns = advantages + values[:, start:]
+        if not use_tgt_len_return:
+            advantages = paddle.concat(
+                [paddle.zeros([advantages.shape[0], start], dtype=advantages.dtype), advantages], -1
+            )
+            returns = paddle.concat([paddle.zeros([returns.shape[0], start], dtype=returns.dtype), returns], -1)
         return advantages.detach(), returns
 
-    def rl_step(self, rl_batch: Dict[str, paddle.Tensor], **kwargs) -> Dict[str, Any]:
+    def _rl_step(self, rl_batch: Dict[str, paddle.Tensor], **kwargs) -> Dict[str, Any]:
         prompt = rl_batch["prompt"]
         old_log_probs = rl_batch["log_probs"]
         ref_log_probs = rl_batch["ref_log_probs"]
@@ -1417,6 +1998,10 @@ class PPOTrainer(Trainer):
         input_ids = rl_batch["input_ids"]
         attention_mask = rl_batch["attention_mask"]
 
+        # log_probs has shifted by one for predicted logits
+        # TODO(guosheng): When using flash_attn with casual mask and right padding
+        # inputs, responses of batch input cannot be got by sliced from start. And
+        # use sequences (as labels) with full length instead of target length.
         start = prompt.shape[-1] - 1
         sequence_mask = attention_mask[:, 1:]
 
@@ -1435,37 +2020,43 @@ class PPOTrainer(Trainer):
                 sequence_mask,
                 start,
             )
+            # metric
+            kl_divergence = ((old_log_probs - ref_log_probs) * sequence_mask)[:, start:].sum(axis=-1).mean()
+            mean_generated_length = sequence_mask[:, start:].cast(paddle.float32).sum(axis=-1).mean()
+            max_generated_length = sequence_mask[:, start:].cast(paddle.float32).sum(axis=-1).max()
+            rewards = rewards.mean()
+            # trainer inputs with target length
+            old_log_probs = old_log_probs[:, start:]
+            old_reward_values = old_reward_values[:, start:]
+            sequence_mask = sequence_mask[:, start:]
+            # position_ids is necessayr for left padding
+            position_ids = make_position_ids(attention_mask)
 
         policy_trainer_inputs = {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
+            "position_ids": position_ids,
             "old_log_probs": old_log_probs,
             "reward_advantages": reward_advantages,
             "sequence_mask": sequence_mask,
-            "start": start,
-            "use_cache": False,
-            "return_dict": True,
+            # "start": start,
+            # "use_cache": False,
+            # "return_dict": True,
         }
         kwargs = self.policy_trainer.full_training_step(policy_trainer_inputs, **kwargs)
 
         value_trainer_inputs = {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
+            "position_ids": position_ids,
             "old_reward_values": old_reward_values,
             "reward_returns": reward_returns,
             "sequence_mask": sequence_mask,
-            "start": start,
-            "use_cache": False,
-            "return_dict": True,
+            # "start": start,
+            # "use_cache": False,
+            # "return_dict": True,
         }
         kwargs = self.value_trainer.full_training_step(value_trainer_inputs, **kwargs)
-
-        with paddle.no_grad():
-            kl_divergence = ((old_log_probs - ref_log_probs) * sequence_mask)[:, start:].sum(axis=-1).mean()
-            mean_generated_length = sequence_mask[:, start:].cast(paddle.float32).sum(axis=-1).mean()
-            max_generated_length = sequence_mask[:, start:].cast(paddle.float32).sum(axis=-1).max()
-
-        rewards = rewards.mean()
 
         return {
             "train/actor_loss": kwargs["actor_loss"],
@@ -1521,17 +2112,31 @@ class PPOTrainer(Trainer):
     def rollout(self, prompt_only_batch: PromptOnlyBatch) -> List[Dict[str, Any]]:
         """Rollout a batch of experiences."""
         input_ids = prompt_only_batch["input_ids"]
+        attention_mask = prompt_only_batch["attention_mask"]
+        position_ids = (
+            prompt_only_batch["position_ids"]
+            if "position_ids" in prompt_only_batch
+            else make_position_ids(attention_mask)
+        )
         # NOTE: generation output of paddlenlp do not contain prompt, we should
         # change sequences here.
-        sequences = self.actor_model.generate(
-            input_ids=input_ids,
-            attention_mask=prompt_only_batch["attention_mask"],
-            generation_config=self.generation_config,
-            synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
-        )[0]
+        with infer_guard(self.policy_trainer):
+            # with contextlib.nullcontext():
+            sequences = self.actor_model.generate(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                generation_config=self.generation_config,
+                synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
+            )[0]
         sequences = sequences.reshape([input_ids.shape[0], self.args.num_return_sequences, -1]).transpose([1, 0, 2])
+        # sequences = [self.load_sing_gen_data(as_batches=False, use_counter=False)["input_ids"]]
 
         return [
+            # TODO(guosheng): move post_rollout out to split_rl_micro_batches
+            # to allow infer model generate multi times consecutively and then
+            # convert weights, otherwise we have to convert weights multi times
+            # when need multi batch rollout data.
             self.post_rollout(
                 input_ids,
                 seq,
@@ -1550,44 +2155,206 @@ class PPOTrainer(Trainer):
         sequence: paddle.Tensor,
         attention_mask: paddle.Tensor,
     ) -> Dict[str, Any]:
-        if self.reward_tokenizer is not self.tokenizer:
+        if False:  # self.reward_tokenizer is not self.tokenizer:
+            # right padding
             reward_tokenize_output = batch_retokenize(
                 sequence,
                 src_tokenizer=self.tokenizer,
                 dest_tokenizer=self.reward_tokenizer,
                 skip_special_tokens=True,
             )
-            reward_seq = reward_tokenize_output["input_ids"]
-            reward_attention_mask = reward_tokenize_output["attention_mask"]
+            reward_seq = sequence = reward_tokenize_output["input_ids"]
+            reward_attention_mask = attention_mask = reward_tokenize_output["attention_mask"]
         else:
+            for text in self.tokenizer.batch_decode(sequence, skip_special_tokens=True):
+                print(text)
             reward_seq = sequence
             reward_attention_mask = attention_mask
+        # position_ids is necessary for non-right padding
+        # If using right padding source + left padding target, make padding positions
+        # in source be 0, since reward model use position_ids plus with padding size
+        # (number of 0s) in source to calculate end offsets.
+        position_ids = make_position_ids(attention_mask)
 
+        # pipe model outputs a logits tensor with LMHead, while non-pipe model
+        # outputs a tuple with logits tensor as the only one element.
         logits = self.actor_model(
             sequence,
             attention_mask=attention_mask,
-            return_dict=True,
-        ).logits
-        ref_logits = self.reference_model(sequence, attention_mask=attention_mask, return_dict=True).logits
+            position_ids=position_ids,
+            # return_dict=True,
+        )  # .logits
+        if not isinstance(logits, paddle.Tensor):
+            logits = logits[0]
+        ref_logits = self.reference_model(
+            sequence,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            # return_dict=True,
+        )  # .logits
+        if not isinstance(ref_logits, paddle.Tensor):
+            ref_logits = ref_logits[0]
 
-        reward_score = self.reward_model(reward_seq, attention_mask=reward_attention_mask, return_dict=True).end_scores
+        reward_score = self.reward_model(
+            reward_seq,
+            attention_mask=reward_attention_mask,
+            position_ids=position_ids,
+            # return_dict=True,
+        )[
+            1
+        ]  # .end_scores
         reward_value = self.reward_critic_model(
             sequence,
             attention_mask=attention_mask,
-            return_dict=True,
-        ).scores
-
+            position_ids=position_ids,
+            # return_dict=True,
+        )[
+            0
+        ]  # .scores
+        # TODO(guosheng): move these to model methods such as get_logprobs
         reward_score = reward_score.squeeze(axis=-1)
-        reward_value = reward_value.squeeze(axis=-1)[:, :-1]
+        reward_value = reward_value.squeeze(axis=-1)
 
+        reward_value = reward_value[:, :-1]
         log_probs = gather_log_probabilities(logits[:, :-1], sequence[:, 1:])
         ref_log_probs = gather_log_probabilities(ref_logits[:, :-1], sequence[:, 1:])
-        return {
+        rollout_data = {
             "prompt": prompt,
-            "log_probs": log_probs,
-            "ref_log_probs": ref_log_probs,
+            "input_ids": sequence,
+            "position_ids": position_ids,
+            "attention_mask": attention_mask,
             "rewards": reward_score,
             "reward_values": reward_value,
-            "input_ids": sequence,
-            "attention_mask": attention_mask,
+            "log_probs": log_probs,
+            "ref_log_probs": ref_log_probs,
         }
+        rollout_data = self.normalize_data(rollout_data, use_tgt_len_value=False)
+        return rollout_data
+
+    @paddle.no_grad()
+    def normalize_data(
+        self,
+        rl_batch: Dict[str, paddle.Tensor],
+        use_tgt_len_value: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        data dispatch comm among devices needs padding, while the lengths of
+        all data fields are different and related, and it's hard to pad.
+        """
+        prompt = rl_batch["prompt"]  # length: src
+        attention_mask = rl_batch["attention_mask"]  # length: src + tgt
+        old_log_probs = rl_batch["log_probs"]  # length: src + tgt -1
+        ref_log_probs = rl_batch["ref_log_probs"]  # length: src + tgt -1
+        rewards = rl_batch["rewards"]  # length: 1
+        old_reward_values = rl_batch["reward_values"]  # length: src + tgt -1
+
+        # Beaver uses label data with target length, while we do not slice from
+        # inputs and use label data with target length:
+        # 1. Sometimes we cannot use label data with target length, mostly because
+        # it is hard to pad acorss batches. Think in some cases one batch might
+        # have the longest prompt+target length but the shortest target lengh, which
+        # might cause mismatch between inputs with prompt+target length and labels
+        # with target length. Padding acorss batches is needed in PP and data comm.
+        # 2. Additionally, when using flash_attn with casual mask and right padding
+        # we cannot use label data with target length.
+        start = prompt.shape[-1] - 1
+        # sequence_mask is for label masking, make source be masked out
+        # clone to avoid to change attention_mask
+        sequence_mask = attention_mask[:, 1:].clone()  # length: src + tgt -1
+        sequence_mask[:, :start] = False
+        if use_tgt_len_value:
+            ref_log_probs = ref_log_probs[:, start:]
+            old_log_probs = old_log_probs[:, start:]
+            old_reward_values = old_reward_values[:, start:]
+            sequence_mask = sequence_mask[:, start:]
+        old_rewards = self.add_kl_divergence_regularization(
+            None,  # prompt,
+            old_log_probs,
+            ref_log_probs,
+            rewards,
+            sequence_mask,
+        )  # length: tgt if use_tgt_len_value src + tgt -1
+        reward_advantages, reward_returns = self.get_advantages_and_returns(
+            old_reward_values,
+            old_rewards,
+            sequence_mask,
+            start=0 if use_tgt_len_value else start,
+            use_tgt_len_return=use_tgt_len_value,
+        )  # length: tgt if use_tgt_len_value src + tgt -1
+
+        rl_batch.update(
+            {
+                "log_probs": old_log_probs,
+                "reward_values": old_reward_values,
+                "reward_advantages": reward_advantages,
+                "reward_returns": reward_returns,
+                "sequence_mask": sequence_mask,
+                "ref_log_probs": ref_log_probs,
+                "rewards": rewards,
+            }
+        )
+        # pop out to reduce data dispatch comm overhead
+        rl_batch.pop("prompt")
+        return rl_batch
+
+    def rl_step(self, rl_batch: Dict[str, paddle.Tensor], **kwargs) -> Dict[str, Any]:
+        # inputs shared by policy and value trainer
+        input_ids = rl_batch["input_ids"]  # length: src+tgt
+        attention_mask = rl_batch["attention_mask"]  # length: src+tgt
+        position_ids = rl_batch["position_ids"]  # length: src+tgt
+        sequence_mask = rl_batch["sequence_mask"]  # length: src+tgt(-1)
+        # inputs used by policy trainer
+        old_log_probs = rl_batch["log_probs"]  # length: src+tgt(-1)
+        reward_advantages = rl_batch["reward_advantages"]  # length: src+tgt(-1)
+        # inputs used by value trainer
+        old_reward_values = rl_batch["reward_values"]  # length: src+tgt(-1)
+        reward_returns = rl_batch["reward_returns"]  # length: src+tgt(-1)
+
+        policy_trainer_inputs = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "position_ids": position_ids,
+            "old_log_probs": old_log_probs,
+            "reward_advantages": reward_advantages,
+            "sequence_mask": sequence_mask,
+        }
+        kwargs = self.policy_trainer.full_training_step(policy_trainer_inputs, **kwargs)
+
+        value_trainer_inputs = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "position_ids": position_ids,
+            "old_reward_values": old_reward_values,
+            "reward_returns": reward_returns,
+            "sequence_mask": sequence_mask,
+        }
+        kwargs = self.value_trainer.full_training_step(value_trainer_inputs, **kwargs)
+
+        # metric
+        rewards = rl_batch["rewards"]
+        rewards = rewards.mean()
+        ref_log_probs = rl_batch["ref_log_probs"]
+        kl_divergence = ((old_log_probs - ref_log_probs) * sequence_mask).sum(axis=-1).mean()
+        mean_generated_length = sequence_mask.cast(paddle.float32).sum(axis=-1).mean()
+        max_generated_length = sequence_mask.cast(paddle.float32).sum(axis=-1).max()
+
+        return {
+            "train/actor_loss": kwargs["actor_loss"],
+            "train/reward_critic_loss": kwargs["reward_critic_loss"],
+            "train/reward": rewards,
+            "train/kl_divergence": kl_divergence,
+            "train/mean_generated_length": mean_generated_length,
+            "train/max_generated_length": max_generated_length,
+            "train/actor_lr": self.policy_trainer._get_learning_rate(),
+            "train/reward_critic_lr": self.value_trainer._get_learning_rate(),
+        }, kwargs
+
+    # @paddle.no_grad()
+    # def post_rollout(
+    #     self,
+    #     prompt: paddle.Tensor,
+    #     sequence: paddle.Tensor,
+    #     attention_mask: paddle.Tensor,
+    # ) -> Dict[str, Any]:
+    #     if self.reward_tokenizer is not self.tokenizer:
+    #         reward_tokenize_output = batch_retokenize

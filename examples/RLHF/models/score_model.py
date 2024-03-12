@@ -88,6 +88,7 @@ class LlamaModelForScore(ScoreModelMixin, LlamaPretrainedModel):
         return self.get_score(
             hidden_states,
             attention_mask=attention_mask,
+            position_ids=position_ids,
             return_dict=return_dict,
         )
 
