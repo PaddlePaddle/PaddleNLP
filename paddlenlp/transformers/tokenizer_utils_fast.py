@@ -23,7 +23,7 @@ from tokenizers import Encoding as FastEncoding
 from tokenizers import Tokenizer as FastTokenizer
 
 from .convert_slow_tokenizer import convert_slow_tokenizer
-from .tokenizer_utils import PretrainedTokenizer
+from .tokenizer_utils import ChatTemplateMixin, PretrainedTokenizer
 from .tokenizer_utils_base import (
     AddedToken,
     BatchEncoding,
@@ -44,7 +44,7 @@ ADDED_TOKENS_FILE = "added_tokens.json"
 SPECIAL_TOKENS_MAP_FILE = "special_tokens_map.json"
 
 
-class PretrainedFastTokenizer(PretrainedTokenizerBase):
+class PretrainedFastTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
     resource_files_names = VOCAB_FILES_NAMES
     slow_tokenizer_class: PretrainedTokenizer = None
     can_save_slow_tokenizer: bool = True
