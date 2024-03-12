@@ -2202,10 +2202,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             dtype == "float16" or dtype == "bfloat16"
         )
 
-        if is_sharded:
-            loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
-        else:
+        if state_dict is not None:
             loaded_state_dict_keys = [k for k in state_dict.keys()]
+            # will only support load paddle.Tensor to model.
+            for k in list(state_dict.keys()):
+                if not isinstance(state_dict[k], paddle.Tensor):
+                    with device_guard():
+                        state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+        else:
+            if is_sharded:
+                loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
+            else:
+                loaded_state_dict_keys = [k for k in state_dict.keys()]
 
         if low_cpu_mem_usage:  # or use_keep_in_fp32_modules:
             state_dict = None
