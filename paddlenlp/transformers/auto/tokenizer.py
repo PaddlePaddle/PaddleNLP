@@ -144,7 +144,7 @@ class AutoTokenizer:
     _tokenizer_mapping = MAPPING_NAMES
     _name_mapping = TOKENIZER_MAPPING_NAMES
     _fast_name_mapping = FAST_TOKENIZER_MAPPING_NAMES
-    tokenizer_config_file = ["tokenizer_config.json", "config.json", "model_config.json"]
+    tokenizer_config_file = "tokenizer_config.json"
 
     def __init__(self, *args, **kwargs):
         raise EnvironmentError(
