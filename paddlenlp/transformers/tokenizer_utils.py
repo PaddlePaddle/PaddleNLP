@@ -658,7 +658,7 @@ class ChatTemplateMixin:
                             "so you should apply the conversation one by one."
                         )
             query = self.chat_template.render(messages=conversation, **self.special_tokens_map)
-            breakpoint()
+
         elif isinstance(self.chat_template, ChatTemplate):
             context_data = self.chat_template._init_context_data(context_data)
 
