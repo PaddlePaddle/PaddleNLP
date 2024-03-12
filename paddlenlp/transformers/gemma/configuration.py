@@ -1,5 +1,5 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 EleutherAI and the HuggingFace Inc. team. All rights reserved.
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2024 EleutherAI and the HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
