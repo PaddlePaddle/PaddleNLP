@@ -896,7 +896,7 @@ class GemmaPretrainedModel(PretrainedModel):
             ]
             model_mappings.extend(layer_mappings)
         init_name_mappings(mappings=model_mappings)
-        # base-model prefix "LlamaModel"
+        # base-model prefix "GemmaModel"
         if "GemmaModel" not in config.architectures:
             for mapping in model_mappings:
                 mapping[0] = "model." + mapping[0]
@@ -1277,7 +1277,7 @@ class GemmaModel(GemmaPretrainedModel):
 
 class GemmaPretrainingCriterion(nn.Layer):
     """
-    Criterion for Llama.
+    Criterion for gemma. Copied From Llama
     It calculates the final loss.
     """
 
