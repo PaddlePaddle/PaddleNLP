@@ -198,8 +198,6 @@ def bos_download(
     lock_path = os.path.join(locks_dir, repo_id, f"{filename}.lock")
     file_path = os.path.join(cache_dir, repo_id, filename)
 
-    os.makedirs(os.path.dirname(lock_path), exist_ok=True)
-
     if os.name == "nt" and len(os.path.abspath(lock_path)) > 255:
         lock_path = "\\\\?\\" + os.path.abspath(lock_path)
 
