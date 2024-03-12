@@ -35,7 +35,8 @@ class GemmaTokenizer(PretrainedTokenizer):
     resource_files_names = VOCAB_FILES_NAMES
     pretrained_resource_files_map = {
         "vocab_file": {
-            "google/gemma-7b": "fake/tokenizer.model",
+            "google/gemma-7b": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-7b/tokenizer.model",
+            "google/gemma-2b": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-2b/tokenizer.model",
         },
     }
 
@@ -92,7 +93,7 @@ class GemmaTokenizer(PretrainedTokenizer):
         state["sp_model_proto"] = self.sp_model.serialized_model_proto()
         return state
 
-    # Copied from transformers.models.llama.tokenization_llama.LlamaTokenizer.__setstate__
+    # Copied from transformers.models.llama.tokenizer_llama.LlamaTokenizer.__setstate__
     def __setstate__(self, d):
         self.__dict__ = d
         self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
