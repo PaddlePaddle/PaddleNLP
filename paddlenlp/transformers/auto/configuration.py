@@ -191,8 +191,7 @@ class AutoConfig(PretrainedConfig):
             from_hf_hub=from_hf_hub,
             from_aistudio=from_aistudio,
         )
-
-        if os.path.exists(config_file):
+        if config_file is not None and os.path.exists(config_file):
             config_class = cls._get_config_class_from_config(pretrained_model_name_or_path, config_file)
             logger.info("We are using %s to load '%s'." % (config_class, pretrained_model_name_or_path))
             if config_class is cls:
