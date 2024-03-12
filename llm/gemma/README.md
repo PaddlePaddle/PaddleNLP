@@ -6,11 +6,12 @@
 
 **支持模型权重:**
 
-| Model           |
-| --------------- |
-| google/gemma-7b |
-| google/gemma-2b |
-|                 |
+| Model              |
+| ------------------ |
+| google/gemma-7b    |
+| google/gemma-7b-it |
+| google/gemma-2b    |
+| google/gemma-2b-it |
 
 ## 2. 模型精调
 

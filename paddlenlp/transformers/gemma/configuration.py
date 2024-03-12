@@ -49,6 +49,8 @@ GEMMA_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
         "google/gemma-7b": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-7b/model_state.pdparams",
         "google/gemma-2b": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-2b/model_state.pdparams",
+        "google/gemma-7b-it": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-7b-it/model_state.pdparams",
+        "google/gemma-2b-it": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-2b-it/model_state.pdparams",
     },
 }
 
