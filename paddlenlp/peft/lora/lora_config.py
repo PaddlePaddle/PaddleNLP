@@ -72,6 +72,9 @@ class LoRAConfig:
         },
     )
     do_qat: bool = field(default=False, metadata={"help": "Whether the lora model would do quant-aware training"})
+    rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
+    lora_plus: bool = field(default=False, metadata={"help": "Whether to use LoRA+"})
+    lora_B_scale: int = field(default=16, metadata={"help": "Lora B scale in LoRA+"})
     base_model_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "The name of the base model to use."}
     )

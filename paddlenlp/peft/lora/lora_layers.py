@@ -35,6 +35,9 @@ class LoRALinear(nn.Linear):
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
         merge_weights: bool = True,
+        rslora: bool = False,
+        lora_plus: bool = False,
+        lora_B_scale: int = 16,
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
@@ -58,13 +61,29 @@ class LoRALinear(nn.Linear):
             is_bias=False,
             default_initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu"),
         )
-        self.lora_B = self.create_parameter(
-            shape=[r, out_features],
-            dtype=self._dtype,
-            is_bias=False,
-            default_initializer=nn.initializer.Constant(value=0.0),
-        )
-        self.scaling = self.lora_alpha / self.r
+        if lora_plus:
+            self.lora_B = self.create_parameter(
+                shape=[r, out_features],
+                dtype=self._dtype,
+                is_bias=False,
+                attr = paddle.ParamAttr(
+                                        initializer=paddle.nn.initializer.Constant(value=0.0),
+                                        learning_rate=lora_B_scale,
+                                        ),
+            )
+            print("Using LORA+")
+        else:
+            self.lora_B = self.create_parameter(
+                shape=[r, out_features],
+                dtype=self._dtype,
+                is_bias=False,
+                default_initializer=nn.initializer.Constant(value=0.0),
+            )
+        if not rslora:
+            self.scaling = self.lora_alpha / self.r
+        else:
+            self.scaling = 4.0 / math.sqrt(self.r)
+            print(f"Using RSLORA scaling {self.scaling}")
 
         # Freezing the pre-trained weight matrix
         self.weight.stop_gradient = True
@@ -104,6 +123,9 @@ class RowParallelLoRALinear(RowParallelLinear):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
+        rslora: bool = False,
+        lora_plus: bool = False,
+        lora_B_scale: int = 16,
         merge_weights: bool = True,
         **kwargs
     ):
@@ -133,16 +155,31 @@ class RowParallelLoRALinear(RowParallelLinear):
                 initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
             ),
         )
-        self.lora_B = self.create_parameter(
-            shape=[r, self.out_features],
-            dtype=self._dtype,
-            is_bias=False,
-            default_initializer=nn.initializer.Constant(value=0.0),
-        )
+        if lora_plus:
+            self.lora_B = self.create_parameter(
+                shape=[r, out_features],
+                dtype=self._dtype,
+                is_bias=False,
+                attr = paddle.ParamAttr(
+                                        initializer=paddle.nn.initializer.Constant(value=0.0),
+                                        learning_rate=lora_B_scale,
+                                        ),
+            )
+        else:
+            self.lora_B = self.create_parameter(
+                shape=[r, self.out_features],
+                dtype=self._dtype,
+                is_bias=False,
+                default_initializer=nn.initializer.Constant(value=0.0),
+            )
         self.lora_A.is_distributed = True
         self.lora_A.split_axis = 0
         self.lora_B.is_distributed = False
-        self.scaling = self.lora_alpha / self.r
+        if not rslora:
+            self.scaling = self.lora_alpha / self.r
+        else:
+            self.scaling = 4.0 / math.sqrt(self.r)
+            print(f"Using RSLORA scaling {self.scaling}")
 
         # Freezing the pre-trained weight matrix
         self.weight.stop_gradient = True
@@ -208,6 +245,9 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
+        rslora: bool = False,
+        lora_plus: bool = False,
+        lora_B_scale: int = 16,
         merge_weights: bool = True,
         lora_A_weight_attr: Optional[paddle.ParamAttr] = None,
         **kwargs
@@ -237,15 +277,30 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
             attr=lora_A_weight_attr,
         )
         self.lora_A.is_distributed = False
-        self.lora_B = self.create_parameter(
-            shape=[r, self.output_size_per_partition],
-            dtype=self._dtype,
-            is_bias=False,
-            default_initializer=nn.initializer.Constant(value=0.0),
-        )
+        if lora_plus:
+            self.lora_B = self.create_parameter(
+                shape=[r, out_features],
+                dtype=self._dtype,
+                is_bias=False,
+                attr = paddle.ParamAttr(
+                                        initializer=paddle.nn.initializer.Constant(value=0.0),
+                                        learning_rate=lora_B_scale,
+                                        ),
+            )
+        else:
+            self.lora_B = self.create_parameter(
+                shape=[r, self.output_size_per_partition],
+                dtype=self._dtype,
+                is_bias=False,
+                default_initializer=nn.initializer.Constant(value=0.0),
+            )
         self.lora_B.is_distributed = True
         self.lora_B.split_axis = 1
-        self.scaling = self.lora_alpha / self.r
+        if not rslora:
+            self.scaling = self.lora_alpha / self.r
+        else:
+            self.scaling = 4.0 / math.sqrt(self.r)
+            print(f"Using RSLORA scaling {self.scaling}")
 
         # Freezing the pre-trained weight matrix
         self.weight.stop_gradient = True
