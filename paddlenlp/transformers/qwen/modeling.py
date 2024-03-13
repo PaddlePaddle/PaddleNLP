@@ -248,7 +248,6 @@ class QWenAttention(nn.Layer):
         query = self._split_heads(query, self.num_heads, self.head_dim)
         key = self._split_heads(key, self.num_heads, self.head_dim)
         value = self._split_heads(value, self.num_heads, self.head_dim)
-
         kv_seq_len = hidden_states.shape[1]
         if layer_past:
             # layer past[0] shape: bs * seq_len * head_num * dim
@@ -260,11 +259,11 @@ class QWenAttention(nn.Layer):
             self._ntk_cached = ntk_alpha
         else:
             ntk_alpha = self._ntk_cached
+        print("ntk_alpha is ", ntk_alpha)
         if self.config.use_long_strategies:
             cos,sin = self.rotary_emb(seq_len=kv_seq_len,ntk_alpha=ntk_alpha)
             rotary_pos_emb =(cos[None, :, None, :] , sin[None, :, None, :])
         else:
-
             rotary_pos_emb = self.rotary_emb(value, kv_seq_len, ntk_alpha=ntk_alpha)
 
 
@@ -1000,10 +999,13 @@ class RotaryEmbedding(nn.Layer):
         seqlen = max_seq_len + offset
         if seqlen > self._seq_len_cached or ntk_alpha != self._ntk_alpha_cached:
             base = self.base * ntk_alpha ** (self.dim / (self.dim - 2))
+            print("base is" , base)
+            print(ntk_alpha != self._ntk_alpha_cached)
             self.inv_freq = 1.0 / (base ** (paddle.arange(0, self.dim, 2, dtype=paddle.float32) / self.dim))
-            self._seq_len_cached = max(2 * seqlen, 16)
+            self._seq_len_cached = seqlen#max(2 * seqlen, 16)
             self._ntk_alpha_cached = ntk_alpha
             seq = paddle.arange(self._seq_len_cached)
+            print("seq is" , len(seq))
             with paddle.amp.auto_cast(enable=False):
                 freqs = paddle.outer(seq.astype(self.inv_freq.dtype), self.inv_freq)
             emb = paddle.concat([freqs, freqs], axis=-1)

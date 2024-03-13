@@ -983,7 +983,7 @@ class LlamaAttention(nn.Layer):
                     cos, sin = self.rotary_emb(seq_len=kv_seq_len)
                     cos = cos[None, :, None, :]
                     sin = sin[None, :, None, :]
-                    cos,sin = (cos.cast(value_states.dtype) if cos.dtype != value_states.dtype else cos, sin.cast(value_statesx.dtype) if sin.dtype != value_states.dtype else sin)
+                    cos,sin = (cos.cast(value_states.dtype) if cos.dtype != value_states.dtype else cos, sin.cast(value_states.dtype) if sin.dtype != value_states.dtype else sin)
                 else:
                     cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
 
