@@ -61,32 +61,15 @@ from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
 class StepTrainer(Trainer):
     """
     Trainer enhanced with step-level training combining with patches of Trianer.
-    We can use this to do training whose step is composed of multi models (by
+    We can use this to do training whose step is composed of multi models via
     multiple instances of StepTrainer, such as PPO. Additionally, using a mixed
-    loss and get the separated loss metrics is supported.
+    loss and get the separated loss metrics is supported, which is helpful to
+    PipelienParallel with a mixed loss.
     """
 
-    # used to create criterion for trainer
+    # used to create criterion for trainer, please refer to `create_criterion`
+    # for details.
     loss_cls: type
-    # Moreover, a model/StepTrainer instance may use a mixed loss which uses a
-    # different loss for different step and inputs, while we often want to get
-    # the separated loss metric. We use a callable discriminator using inputs
-    # (dict) as arguments and returning corresponding loss name to identify
-    # current loss. NOTE: please make the loss name ends with "_loss". `tr_loss`
-    # is the default loss name used in trainer.train.
-    loss_identifier: callable
-    # refer to mark_step_loss. NOTE: This is transparent to users
-    loss_step_indice: Dict
-    # When using multiple instances of StepTrainer collaborate to do one training
-    # step, each should use its own vars such as loss/model/step_control which are
-    # local vars in Trainer.train, we define these vars by `train_step_vars`. They
-    # are vars needed by full_training_step for training control, as following:
-    # tr_loss, model, epoch, step, step_control. NOTE: This is transparent to users.
-    # some vars such as `epoch` are meaningless, they are needed just because
-    # full_training_step copies code from Trainer.train which is designed for
-    # complete training process.
-    # TODO(guosheng): use namedtuple or dataclass to make it more readable.
-    train_step_vars: Dict
 
     def __init__(
         self,
@@ -121,7 +104,11 @@ class StepTrainer(Trainer):
             self.criterion = self.create_criterion()
 
     def create_criterion(self):
-        """loss creator for trainer."""
+        """
+        create loss using `loss_cls` for trainer. It would use a wrapped loss_cls
+        whose label arguments are merged into one argument, this is useful to
+        PipelineParallel and trainer.criterion which limit loss format.
+        """
         criterion = create_loss(self.loss_cls, self.model.config, self.args, merge_labels=True)
         return criterion
 
@@ -157,8 +144,20 @@ class StepTrainer(Trainer):
 
     def get_train_step_vars(self, vars: Dict = None) -> Dict:
         """
-        return `train_step_vars`. If not exists, create it first. If `vars` is
-        not None, update `train_step_vars` with it.
+        NOTE: This is transparent to users.
+        When using multiple instances of StepTrainer collaborate to do one training
+        step, each should use its own vars such as loss/model/step_control which are
+        local vars in Trainer.train, we define these vars by `train_step_vars`. They
+        are vars needed by full_training_step for training control, as following:
+        tr_loss, model, epoch, step, step_control.
+        some vars such as `epoch` are meaningless, they are needed just because
+        full_training_step copies code from Trainer.train which is designed for
+        complete training process.
+
+        return `train_step_vars` (dict). If not exists, create it first. If `vars`
+        is not None, update `train_step_vars` with it.
+
+        TODO(guosheng): use namedtuple or dataclass to make it more readable.
         """
         if not hasattr(self, "train_step_vars"):
             # should be called after model is wrapped since the model field should
@@ -244,6 +243,7 @@ class StepTrainer(Trainer):
 
     def mark_step_loss(self, loss_name):
         """
+        NOTE: This is transparent to users.
         When using a mixed loss we often want to get the separated loss metrics,
         thus we mark loss type of each training step to separate them. This is
         not necessary since the loss would be returnd after each training step.
@@ -265,7 +265,10 @@ class StepTrainer(Trainer):
         """
         Return a dict mapping loss name to value of current training step. This
         is mainly to get loss for metric logging, and it would not affect the
-        training. Overwrite it when we want to change the logging value.
+        training. This is mostly helpful to PipelienParallel with a mixed loss
+        in which the loss returned is 0 when not reach accumulated step and the
+        loss returned at accumulated step is a mixed loss.
+        NOTE: Overwrite it when we want to change the logging value.
         """
         model = self.get_model(train=True)
         if not hasattr(self, "loss_dict"):
@@ -324,21 +327,20 @@ class PolicyTrainer(StepTrainer):
         return loss_name
 
     def get_step_loss(self, loss_prefix: str = "") -> Dict:
-        loss_dict = super().get_step_loss(loss_prefix=loss_prefix)
+        loss_dict = super().get_step_loss(loss_prefix="")
         # use_ptx would double the gradient_accumulation_steps which causes
         # actor_loss and ptx_loss reduced by half. Moreover, ptx_loss should
         # be divided by ptx_coeff for logging.
         # TODO(guosheng): maybe should consider self._enable_delay_scale_loss()
-        # if "ptx_loss" in loss_dict:
-        #     loss_dict[loss_prefix + "ptx_loss"] = loss_dict[
-        #         "ptx_loss"] * 2 / self.criterion.ptx_coeff
-        #     loss_dict[loss_prefix + "actor_loss"] = loss_dict["actor_loss"] * 2
+        if "ptx_loss" in loss_dict:
+            loss_dict[loss_prefix + "ptx_loss"] = loss_dict["ptx_loss"] * 2 / self.criterion.ptx_coeff
+            loss_dict[loss_prefix + "actor_loss"] = loss_dict["actor_loss"] * 2
         return loss_dict
 
 
 class ValueTrainer(StepTrainer):
     loss_cls = RLHFValueLoss
-    # define loss name
+    # define loss name for logging
     loss_identifier = lambda self, inputs: "reward_critic_loss"
 
 
@@ -493,7 +495,6 @@ class PPOTrainer(Trainer):
         # Those value can be changed
         self.kl_coeff = self.args.kl_coeff
         self.clip_range_score = self.args.clip_range_score
-        self.policy_trainer.ptx_coeff = self.ptx_coeff = self.args.ptx_coeff
         self.gamma = 1.0
         self.gae_lambda = 0.95
 
@@ -873,24 +874,14 @@ class PPOTrainer(Trainer):
             logs: Dict[str, float] = {}
 
             for k, v in tr_loss.items():
-                if isinstance(v, paddle.Tensor) and "lr" not in k and "max_generated_length" not in k:
+                if isinstance(v, paddle.Tensor) and "lr" not in k and "max" not in k:
                     v_scalar = self._nested_gather(v).mean().item()
-                    # TODO(guosheng): maybe should consider self._enable_delay_scale_loss()
-                    # and maybe should merge with loss postprocess in PP
-                    if "train/actor_loss" == k and "train/ptx_loss" in tr_loss:
-                        # use_ptx would double the gradient_accumulation_steps
-                        # which causes actor_loss and ptx_loss reduced by half
-                        v_scalar = v_scalar * 2
-                    elif "train/ptx_loss" == k:
-                        # similar to actor_loss and should double, additionally
-                        # it should be divided by ptx_coeff for logging
-                        v_scalar = v_scalar * 2 / self.ptx_coeff
                     logs[k] = round(v_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
                     v.subtract_(v)
                     attr_name = "_total_" + k.split("/")[-1] + "_scalar"
                     attr_value = getattr(self, attr_name, 0)
                     setattr(self, attr_name, attr_value + v_scalar)
-                elif "max_generated_length" in k:
+                elif isinstance(v, paddle.Tensor) and "max" in k:
                     v_scalar = self._nested_gather(v).max().item()
                     logs[k] = v_scalar
                 else:
