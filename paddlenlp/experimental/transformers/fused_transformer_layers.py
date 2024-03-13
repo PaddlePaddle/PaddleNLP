@@ -1767,7 +1767,6 @@ class FusedSpecuMultiTransformer(Layer):
         hidden_size = cache_k.shape[1] * cache_k.shape[3]
         seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
         seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
-        cu_seqlens_q = kwargs.get("cu_seqlens_q", None)
         cu_seqlens_k = kwargs.get("cu_seqlens_k", None)
         cache = kwargs.get("cache", None)
         gamma = kwargs.get("gamma", None)
@@ -1779,21 +1778,20 @@ class FusedSpecuMultiTransformer(Layer):
             cur_seq_len = seq_lens_decoder[0][0]
             cu_seqlens_k[1] = cur_seq_len + gamma
             token_num_in_cache = cur_seq_len - gamma
-            print("--------cu_seqlens_q: ", cu_seqlens_q)
-            print("--------cu_seqlens_k: ", cu_seqlens_k)
+            # print("--------cu_seqlens_k: ", cu_seqlens_k)
 
         # qkv_out: [bsz, 3*token_num*hidden_dim]
         fmha_out, qkv_out_specu, _, _ = paddle.incubate.nn.functional.speculative_decoding_multihead_attention(
             qkv_out,
             cache_k,
             cache_v,
-            kwargs.get("seq_lens_encoder", None),
-            kwargs.get("seq_lens_decoder", None),
+            seq_lens_encoder,
+            seq_lens_decoder,
             kwargs.get("seq_lens_this_time", None),
             kwargs.get("padding_offsets", None),
             kwargs.get("cum_offsets", None),
             kwargs.get("cu_seqlens_q", None),
-            kwargs.get("cu_seqlens_k", None),
+            cu_seqlens_k,
             pre_caches[2 * i] if pre_caches is not None else None,  # pre_key_cache
             pre_caches[2 * i + 1] if pre_caches is not None else None,  # pre_value_cache
             attn_mask,

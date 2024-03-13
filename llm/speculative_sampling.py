@@ -256,7 +256,7 @@ class SpeculativeSamplingPredictor(InferencePredictorMixin, BasePredictor):
         assistant_model_inputs = model_inuts.copy()
         assistant_model_inputs["cache_kvs"] = self.assistant_model_cache_kvs
         stop_criter = StoppingCriteriaList([
-                MaxLengthCriteria(max_length=40),
+                MaxLengthCriteria(max_length=60),
             ])
         output_ids = self.model.assisted_decoding(
             input_ids,

@@ -1550,7 +1550,7 @@ def predict():
                     target_texts.append("")
 
     else:
-        source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
+        source_texts = ["你好，请问你是谁?"]
         target_texts = ["", ""]
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)

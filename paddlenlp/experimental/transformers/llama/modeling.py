@@ -418,6 +418,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         if not is_decoder:
             ids_remove_padding, padding_offset, cum_offsets = self.remove_padding(input_ids, seq_len_encoder)
         else:
+            if input_ids.ndim == 1:
+                input_ids = input_ids[None, :]
             ids_remove_padding = input_ids.squeeze(axis=1)
             padding_offset = None
             cum_offsets = None
@@ -952,15 +954,8 @@ class LlamaSpecuInferenceModel(LlamaPretrainedModel):
         self.embed_tokens = value
 
     def remove_padding(self, input_ids, seq_lens_this_time):
-        cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
-        token_num = paddle.sum(seq_lens_this_time)
-        ids_remove_padding, cum_offsets, padding_offset = get_padding_offset(
-            input_ids, cum_offsets_now, token_num, seq_lens_this_time
-        )
-        return ids_remove_padding, padding_offset, cum_offsets
-
-    def get_padding_offset(self, bsz, max_seq_len, seq_lens_this_time):
-        cum_offsets_now = paddle.cumsum(max_seq_len - seq_lens_this_time)
+        bsz = seq_lens_this_time.shape[0]
+        cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
         cum_offsets = paddle.zeros(shape=(bsz + 1), dtype="int32")
         cum_offsets[1:] = cum_offsets_now
         token_num = paddle.sum(seq_lens_this_time)
@@ -971,11 +966,12 @@ class LlamaSpecuInferenceModel(LlamaPretrainedModel):
             seq_len_now = seq_lens_this_time[i]
             cum_offset = cum_offsets[i]
             for j in range(seq_len_now):
-                padding_offsets[i * max_seq_len - cum_offset + j] = cum_offset
-            cum_seq_len = (i + 1) * max_seq_len - cum_offsets[i + 1]
+                padding_offsets[i * self.max_seq_len - cum_offset + j] = cum_offset
+            cum_seq_len = (i + 1) * self.max_seq_len - cum_offsets[i + 1]
             cu_seqlens_q[i + 1] = cum_seq_len
             cu_seqlens_k[i + 1] = cum_seq_len
-        return padding_offsets, cum_offsets[:-1], cu_seqlens_q, cu_seqlens_k
+
+        return input_ids, padding_offsets, cum_offsets[:-1], cu_seqlens_q, cu_seqlens_k
 
     @staticmethod
     def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
@@ -1000,23 +996,20 @@ class LlamaSpecuInferenceModel(LlamaPretrainedModel):
         return_dict=False,
         **kwargs,
     ):
-        is_decoder = kwargs.get("cache", None) is not None
+
         seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
-        # seq_lens_this_time[0] = 1
-        if not is_decoder:
-            ids_remove_padding, padding_offset, cum_offsets = self.remove_padding(input_ids, seq_lens_this_time)
-        else:
-            seq_lens_this_time[0] = self.gamma
-            ids_remove_padding = input_ids.squeeze(0)
-            padding_offset = None
-            cum_offsets = None
         rope_emb = kwargs.get("rope_emb", None)
+        ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
+            input_ids, seq_lens_this_time
+        )
+        
+        ids_remove_padding = ids_remove_padding.squeeze(axis=0)
         print("-----input_ids's shape", input_ids.shape)
         print("-----ids_remove_padding's shape", ids_remove_padding.shape)
-
-        padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.get_padding_offset(
-            1, self.gamma, seq_lens_this_time
-        )
+        print("-----padding_offset", padding_offset)
+        print("-----cum_offsets", cum_offsets)
+        print("-----cu_seqlens_q", cu_seqlens_q)
+        print("-----cu_seqlens_k", cu_seqlens_k)
 
         kwargs["cu_seqlens_q"] = cu_seqlens_q
         kwargs["cu_seqlens_k"] = cu_seqlens_k
