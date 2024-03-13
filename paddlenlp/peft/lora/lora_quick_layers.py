@@ -197,7 +197,7 @@ class RowQuickLora(PyLayer):
         if not lora_B.stop_gradient:
             x_lora_A = paddle.matmul(input_fused, lora_A)
             if ctx.group is not None:
-                x_lora_A = mp_ops._mp_allreduce.forward(
+                x_lora_A = mp_ops._mp_allreduce(
                     x_lora_A,
                     group=ctx.group,
                     use_calc_stream=True,
