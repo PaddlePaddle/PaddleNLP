@@ -145,7 +145,7 @@ class RowParallelLoRALinear(RowParallelLinear):
             ),
         )
         self.lora_B = self.create_parameter(
-            shape=[r, out_features],
+            shape=[r, self.out_features],
             dtype=self._dtype,
             is_bias=False,
             attr=paddle.ParamAttr(
@@ -258,7 +258,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         )
         self.lora_A.is_distributed = False
         self.lora_B = self.create_parameter(
-            shape=[r, out_features],
+            shape=[r, self.output_size_per_partition],
             dtype=self._dtype,
             is_bias=False,
             attr=paddle.ParamAttr(
