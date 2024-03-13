@@ -127,8 +127,7 @@ class ModelArgument:
     lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
     lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
     rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
-    lora_plus: bool = field(default=False, metadata={"help": "Whether to use LoRA+ technique"})
-    lora_B_scale: int = field(default=16, metadata={"help": "Lora B scale in LoRA+ technique"})
+    lora_plus_scale: float = field(default=1.0, metadata={"help": "Lora B scale in LoRA+ technique"})
 
     # prefix tuning related parameters
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
