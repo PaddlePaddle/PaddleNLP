@@ -102,20 +102,16 @@ class QuickLora(PyLayer):
         grad_output = grad_output.flatten(0, 1)
         input_fused = input.flatten(0, 1)
         lora_B_input_grad = paddle.matmul(grad_output, lora_B, transpose_y=True)
-        input_grad = lora_A_grad = lora_B_grad = None
+        input_grad = None
 
         if not input.stop_gradient:
             input_grad = paddle.addmm(
                 paddle.matmul(grad_output, weight, transpose_y=True), lora_B_input_grad, lora_A.T, 1.0, ctx.scaling
             ).reshape(input.shape)
 
-        if not lora_A.stop_gradient:
-            lora_A_grad = paddle.matmul(input_fused, lora_B_input_grad, transpose_x=True) * ctx.scaling
+        lora_A_grad = paddle.matmul(input_fused, lora_B_input_grad, transpose_x=True) * ctx.scaling
 
-        if not lora_B.stop_gradient:
-            lora_B_grad = (
-                paddle.matmul(paddle.matmul(input_fused, lora_A), grad_output, transpose_x=True) * ctx.scaling
-            )
+        lora_B_grad = paddle.matmul(paddle.matmul(input_fused, lora_A), grad_output, transpose_x=True) * ctx.scaling
 
         return input_grad, lora_A_grad, lora_B_grad
 
@@ -137,7 +133,7 @@ class ColumnQuickLora(PyLayer):
         grad_output = grad_output.flatten(0, 1)
         input_fused = input.flatten(0, 1)
         lora_B_input_grad = paddle.matmul(grad_output, lora_B, transpose_y=True)
-        input_grad = lora_A_grad = lora_B_grad = None
+        input_grad = None
         if not input.stop_gradient:
             input_grad = paddle.addmm(
                 paddle.matmul(grad_output, weight, transpose_y=True),
@@ -147,15 +143,11 @@ class ColumnQuickLora(PyLayer):
                 ctx.scaling,
             ).reshape(input.shape)
 
-        if not lora_A.stop_gradient:
-            if ctx.group is not None:
-                ctx.group.process_group.all_reduce_on_calc_stream(lora_B_input_grad, ctx.op_type)
-            lora_A_grad = paddle.matmul(input_fused, lora_B_input_grad, transpose_x=True) * ctx.scaling
+        if ctx.group is not None:
+            ctx.group.process_group.all_reduce_on_calc_stream(lora_B_input_grad, ctx.op_type)
+        lora_A_grad = paddle.matmul(input_fused, lora_B_input_grad, transpose_x=True) * ctx.scaling
 
-        if not lora_B.stop_gradient:
-            lora_B_grad = (
-                paddle.matmul(paddle.matmul(input_fused, lora_A), grad_output, transpose_x=True) * ctx.scaling
-            )
+        lora_B_grad = paddle.matmul(paddle.matmul(input_fused, lora_A), grad_output, transpose_x=True) * ctx.scaling
 
         return input_grad, lora_A_grad, lora_B_grad
 
@@ -181,7 +173,7 @@ class RowQuickLora(PyLayer):
 
         lora_B_input_grad = paddle.matmul(grad_output, lora_B, transpose_y=True)
 
-        input_grad = lora_A_grad = lora_B_grad = None
+        input_grad = None
         if not input.stop_gradient:
             input_grad = paddle.addmm(
                 paddle.matmul(grad_output, weight, transpose_y=True),
@@ -191,17 +183,15 @@ class RowQuickLora(PyLayer):
                 ctx.scaling,
             ).reshape(input.shape)
 
-        if not lora_A.stop_gradient:
-            lora_A_grad = paddle.matmul(input_fused, lora_B_input_grad, transpose_x=True) * ctx.scaling
+        lora_A_grad = paddle.matmul(input_fused, lora_B_input_grad, transpose_x=True) * ctx.scaling
 
-        if not lora_B.stop_gradient:
-            x_lora_A = paddle.matmul(input_fused, lora_A)
-            if ctx.group is not None:
-                x_lora_A = mp_ops._mp_allreduce(
-                    x_lora_A,
-                    group=ctx.group,
-                    use_calc_stream=True,
-                    use_model_parallel=True,
-                )
-            lora_B_grad = paddle.matmul(x_lora_A, grad_output, transpose_x=True) * ctx.scaling
+        x_lora_A = paddle.matmul(input_fused, lora_A)
+        if ctx.group is not None:
+            x_lora_A = mp_ops._mp_allreduce(
+                x_lora_A,
+                group=ctx.group,
+                use_calc_stream=True,
+                use_model_parallel=True,
+            )
+        lora_B_grad = paddle.matmul(x_lora_A, grad_output, transpose_x=True) * ctx.scaling
         return input_grad, lora_A_grad, lora_B_grad
