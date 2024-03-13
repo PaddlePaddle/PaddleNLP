@@ -71,7 +71,6 @@ class LoRALinear(nn.Linear):
                                         learning_rate=lora_B_scale,
                                         ),
             )
-            print("Using LORA+")
         else:
             self.lora_B = self.create_parameter(
                 shape=[r, out_features],
@@ -83,7 +82,6 @@ class LoRALinear(nn.Linear):
             self.scaling = self.lora_alpha / self.r
         else:
             self.scaling = 4.0 / math.sqrt(self.r)
-            print(f"Using RSLORA scaling {self.scaling}")
 
         # Freezing the pre-trained weight matrix
         self.weight.stop_gradient = True
@@ -179,7 +177,6 @@ class RowParallelLoRALinear(RowParallelLinear):
             self.scaling = self.lora_alpha / self.r
         else:
             self.scaling = 4.0 / math.sqrt(self.r)
-            print(f"Using RSLORA scaling {self.scaling}")
 
         # Freezing the pre-trained weight matrix
         self.weight.stop_gradient = True
@@ -300,7 +297,6 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
             self.scaling = self.lora_alpha / self.r
         else:
             self.scaling = 4.0 / math.sqrt(self.r)
-            print(f"Using RSLORA scaling {self.scaling}")
 
         # Freezing the pre-trained weight matrix
         self.weight.stop_gradient = True
