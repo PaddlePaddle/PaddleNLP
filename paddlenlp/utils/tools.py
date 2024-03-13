@@ -128,6 +128,8 @@ def get_env_device():
         return "rocm"
     elif paddle.is_compiled_with_xpu():
         return "xpu"
+    elif paddle.is_compiled_with_custom_device("mlu"):
+        return "mlu"
     return "cpu"
 
 

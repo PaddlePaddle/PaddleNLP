@@ -81,6 +81,17 @@ try:
         for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
             if lib.endswith(".so"):
                 paddle.utils.cpp_extension.extension_utils.load_op_meta_info_and_register_op(lib)
+    elif get_env_device() == "mlu":
+        import os
+
+        from paddle.base import core
+
+        for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
+            if lib.endswith(".so"):
+                paddle.utils.cpp_extension.extension_utils.load_op_meta_info_and_register_op(lib)
+        from paddle.nn.functional.flash_attention import (
+            scaled_dot_product_attention as scaled_dot_product_attention_mlu,
+        )
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
@@ -240,6 +251,15 @@ def scaled_dot_product_attention(
                     True,
                     False,
                 )[0]
+            elif get_env_device() == "mlu":
+                attn_output = scaled_dot_product_attention_mlu(
+                    query_states,
+                    key_states,
+                    value_states,
+                    attn_mask=attention_mask,
+                    dropout_p=0.0,
+                    is_causal=attention_mask is None,
+                )
             else:
                 attn_output = F.scaled_dot_product_attention(
                     query_states,
