@@ -974,7 +974,7 @@ class TrainingArguments:
                         and self.sharding_parallel_degree > 1,
                         "enable_timer": "enable_timer" in pipeline_parallel_config,
                         "release_gradients": "enable_release_grads" in pipeline_parallel_config,
-                        "non_batch_p2p_comm": "disable_batch_p2p_comm" in pipeline_parallel_config,
+                        "use_batch_p2p_comm": "disable_batch_p2p_comm" not in pipeline_parallel_config,
                     }
                     if dygraph_pp_configs["dp_comm_overlap"]:
                         raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
