@@ -100,7 +100,7 @@ class LoRALinear(nn.Linear):
             result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
             if not self.merged:
                 result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
-            return result
+        return result
 
     def extra_repr(self):
         name = f", name={self.name}" if self.name else ""
