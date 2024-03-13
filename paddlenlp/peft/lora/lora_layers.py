@@ -95,7 +95,7 @@ class LoRALinear(nn.Linear):
 
     def forward(self, input: paddle.Tensor, *args, **kwargs):
         if self.use_quick_lora:
-            result = quick_lora(input, self.weight, self.bias, self.lora_A, self.lora_B, self.scaling)
+            result = quick_lora(input, self.lora_A, self.lora_B, self.weight, self.bias, self.scaling)
         else:
             result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
             if not self.merged:
@@ -189,10 +189,10 @@ class RowParallelLoRALinear(RowParallelLinear):
         if self.use_quick_lora:
             result_mp = quick_lora(
                 input_mp,
-                self.weight,
-                self.bias,
                 self.lora_A,
                 self.lora_B,
+                self.weight,
+                self.bias,
                 self.scaling,
                 is_row=True,
                 group=self.model_parallel_group,
@@ -319,10 +319,10 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
             # Use the quick lora implementation
             result_mp = quick_lora(
                 input_mp,
-                self.weight,
-                self.bias,
                 self.lora_A,
                 self.lora_B,
+                self.weight,
+                self.bias,
                 self.scaling,
                 is_column=True,
                 group=self.model_parallel_group,
