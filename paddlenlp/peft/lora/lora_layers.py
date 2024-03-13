@@ -36,8 +36,7 @@ class LoRALinear(nn.Linear):
         lora_dropout: float = 0.0,
         merge_weights: bool = True,
         rslora: bool = False,
-        lora_plus: bool = False,
-        lora_B_scale: int = 16,
+        lora_plus_scale: float = 1.0,
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
@@ -61,23 +60,16 @@ class LoRALinear(nn.Linear):
             is_bias=False,
             default_initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu"),
         )
-        if lora_plus:
-            self.lora_B = self.create_parameter(
-                shape=[r, out_features],
-                dtype=self._dtype,
-                is_bias=False,
-                attr = paddle.ParamAttr(
-                                        initializer=paddle.nn.initializer.Constant(value=0.0),
-                                        learning_rate=lora_B_scale,
-                                        ),
-            )
-        else:
-            self.lora_B = self.create_parameter(
-                shape=[r, out_features],
-                dtype=self._dtype,
-                is_bias=False,
-                default_initializer=nn.initializer.Constant(value=0.0),
-            )
+        self.lora_B = self.create_parameter(
+            shape=[r, out_features],
+            dtype=self._dtype,
+            is_bias=False,
+            attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.Constant(value=0.0),
+                learning_rate=lora_plus_scale,
+            ),
+        )
+
         if not rslora:
             self.scaling = self.lora_alpha / self.r
         else:
@@ -122,8 +114,7 @@ class RowParallelLoRALinear(RowParallelLinear):
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
         rslora: bool = False,
-        lora_plus: bool = False,
-        lora_B_scale: int = 16,
+        lora_plus_scale: float = 1.0,
         merge_weights: bool = True,
         **kwargs
     ):
@@ -153,23 +144,16 @@ class RowParallelLoRALinear(RowParallelLinear):
                 initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
             ),
         )
-        if lora_plus:
-            self.lora_B = self.create_parameter(
-                shape=[r, out_features],
-                dtype=self._dtype,
-                is_bias=False,
-                attr = paddle.ParamAttr(
-                                        initializer=paddle.nn.initializer.Constant(value=0.0),
-                                        learning_rate=lora_B_scale,
-                                        ),
-            )
-        else:
-            self.lora_B = self.create_parameter(
-                shape=[r, self.out_features],
-                dtype=self._dtype,
-                is_bias=False,
-                default_initializer=nn.initializer.Constant(value=0.0),
-            )
+        self.lora_B = self.create_parameter(
+            shape=[r, out_features],
+            dtype=self._dtype,
+            is_bias=False,
+            attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.Constant(value=0.0),
+                learning_rate=lora_plus_scale,
+            ),
+        )
+
         self.lora_A.is_distributed = True
         self.lora_A.split_axis = 0
         self.lora_B.is_distributed = False
@@ -243,8 +227,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
         rslora: bool = False,
-        lora_plus: bool = False,
-        lora_B_scale: int = 16,
+        lora_plus_scale: float = 1.0,
         merge_weights: bool = True,
         lora_A_weight_attr: Optional[paddle.ParamAttr] = None,
         **kwargs
@@ -274,23 +257,16 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
             attr=lora_A_weight_attr,
         )
         self.lora_A.is_distributed = False
-        if lora_plus:
-            self.lora_B = self.create_parameter(
-                shape=[r, out_features],
-                dtype=self._dtype,
-                is_bias=False,
-                attr = paddle.ParamAttr(
-                                        initializer=paddle.nn.initializer.Constant(value=0.0),
-                                        learning_rate=lora_B_scale,
-                                        ),
-            )
-        else:
-            self.lora_B = self.create_parameter(
-                shape=[r, self.output_size_per_partition],
-                dtype=self._dtype,
-                is_bias=False,
-                default_initializer=nn.initializer.Constant(value=0.0),
-            )
+        self.lora_B = self.create_parameter(
+            shape=[r, out_features],
+            dtype=self._dtype,
+            is_bias=False,
+            attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.Constant(value=0.0),
+                learning_rate=lora_plus_scale,
+            ),
+        )
+
         self.lora_B.is_distributed = True
         self.lora_B.split_axis = 1
         if not rslora:
