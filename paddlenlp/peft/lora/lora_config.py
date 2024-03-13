@@ -18,6 +18,7 @@ from dataclasses import asdict, dataclass, field
 from typing import List, Optional, Union
 
 from ...utils.env import LORA_CONFIG_NAME
+from ...utils.log import logger
 
 
 @dataclass
@@ -75,6 +76,20 @@ class LoRAConfig:
     base_model_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "The name of the base model to use."}
     )
+    use_quick_lora: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use quick lora, The use of Quick LoRa will only take effect when lora_dropout is set to 0."
+        },
+    )
+
+    def __post_init__(self):
+        if self.use_quick_lora and self.lora_dropout > 0:
+            logger.warning(
+                "Quick LoRa is enabled, but lora_dropout is set to a non-zero value. "
+                "We will automatically set `use_quick_lora` to `False` to avoid potential inconsistencies."
+            )
+            self.use_quick_lora = False
 
     @property
     def __dict__(self):

@@ -57,6 +57,8 @@ class LoraTest(LLMTest, unittest.TestCase):
         lora_config = load_test_config(self.config_path, "lora", self.model_dir)
         lora_config["output_dir"] = self.output_dir
         lora_config["dataset_name_or_path"] = self.data_dir
+        # use_quick_lora
+        lora_config["use_quick_lora"] = True
 
         with argv_context_guard(lora_config):
             from finetune_generation import main
