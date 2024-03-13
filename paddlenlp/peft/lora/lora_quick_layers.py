@@ -137,7 +137,7 @@ class ColumnQuickLora(PyLayer):
         grad_output = grad_output.flatten(0, 1)
         input_fused = input.flatten(0, 1)
         lora_B_input_grad = paddle.matmul(grad_output, lora_B, transpose_y=True)
-        input_grad = None
+        input_grad = lora_A_grad = lora_B_grad = None
         if not input.stop_gradient:
             input_grad = paddle.addmm(
                 paddle.matmul(grad_output, weight, transpose_y=True),
