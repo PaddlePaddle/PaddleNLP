@@ -445,12 +445,10 @@ class ChatGLMStack(nn.Layer):
         self.enable_recompute = False
         self.num_attention_heads = config.num_attention_heads
 
-        if config.use_long_strategies:
-            print("I am chatglm new rotary_emb")
+        if config.use_long_sequence_strategies:
             self.rotary_embeddings = LongSequenceStrategies.build_long_sequence_strategy(config.long_sequence_strategy_type , config.long_sequence_strategy_name , **config.long_sequence_init_args)
 
         else:
-            print("I am chatglm old rotary_emb")
             self.rotary_embeddings = RotaryEmbeddings(
                 self.hidden_size // (self.num_attention_heads * 2)
                 if self.position_encoding_2d
@@ -553,7 +551,7 @@ class ChatGLMStack(nn.Layer):
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
         inputs_embeds = inputs_embeds.transpose([1, 0, 2])
-        if self.config.use_long_strategies:  
+        if self.config.use_long_sequence_strategies:  
             rotary_embeds = self.rotary_embeddings(seq_len=int(position_ids.max() + 1))
             cos,sin = self.rotary_embeddings(seq_len=int(position_ids.max() + 1))         
             block_position_ids = position_ids[:, 1, :].transpose([1, 0])

@@ -147,7 +147,7 @@ class QWenAttention(nn.Layer):
             assert config.rotary_pct < 1
             self.rotary_ndims = int(self.hidden_size_per_attention_head * config.rotary_pct)
         dim = self.rotary_ndims if self.rotary_ndims is not None else self.hidden_size_per_attention_head
-        if config.use_long_strategies:
+        if config.use_long_sequence_strategies:
             self.rotary_emb = LongSequenceStrategies.build_long_sequence_strategy(config.long_sequence_strategy_type , config.long_sequence_strategy_name , **config.long_sequence_init_args)
         else:
             self.rotary_emb = RotaryEmbedding(dim, base=config.rotary_emb_base)
@@ -259,8 +259,7 @@ class QWenAttention(nn.Layer):
             self._ntk_cached = ntk_alpha
         else:
             ntk_alpha = self._ntk_cached
-        print("ntk_alpha is ", ntk_alpha)
-        if self.config.use_long_strategies:
+        if self.config.use_long_sequence_strategies:
             cos,sin = self.rotary_emb(seq_len=kv_seq_len,ntk_alpha=ntk_alpha)
             rotary_pos_emb =(cos[None, :, None, :] , sin[None, :, None, :])
         else:
@@ -548,7 +547,7 @@ class QWenPretrainedModel(PretrainedModel):
                 paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=module.weight.shape)
             )
             if getattr(module, "bias", None) is not None:
-                module.weight.set_value(paddle.zeros(shape=module.weight.shape, dtype=paddle.get_default_dtype()))
+                module.bias.set_value(paddle.zeros(shape=module.bias.shape, dtype=paddle.get_default_dtype()))
 
         for name, p in module.named_parameters():
             if name == "c_proj.weight":
@@ -999,13 +998,10 @@ class RotaryEmbedding(nn.Layer):
         seqlen = max_seq_len + offset
         if seqlen > self._seq_len_cached or ntk_alpha != self._ntk_alpha_cached:
             base = self.base * ntk_alpha ** (self.dim / (self.dim - 2))
-            print("base is" , base)
-            print(ntk_alpha != self._ntk_alpha_cached)
             self.inv_freq = 1.0 / (base ** (paddle.arange(0, self.dim, 2, dtype=paddle.float32) / self.dim))
-            self._seq_len_cached = seqlen#max(2 * seqlen, 16)
+            self._seq_len_cached = max(2 * seqlen, 16)
             self._ntk_alpha_cached = ntk_alpha
             seq = paddle.arange(self._seq_len_cached)
-            print("seq is" , len(seq))
             with paddle.amp.auto_cast(enable=False):
                 freqs = paddle.outer(seq.astype(self.inv_freq.dtype), self.inv_freq)
             emb = paddle.concat([freqs, freqs], axis=-1)

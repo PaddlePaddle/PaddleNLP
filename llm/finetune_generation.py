@@ -151,7 +151,7 @@ def main():
             quantization_config=quantization_config,
         )
         model_config.alibi = False #alibi/rope
-        model_config.use_long_strategies = True
+        model_config.use_long_sequence_strategies = True
         
         model_config.long_sequence_strategy_type = "EmbeddingStrategies" #AttentionStrategies#EmbeddingStrategies
         model_config.long_sequence_strategy_name = "RotaryEmbedding"#"NTKScalingRotaryEmbedding"  #RotaryEmbedding#LinearScalingRotaryEmbedding#v#AttentionWithLinearBias
@@ -206,6 +206,7 @@ def main():
 
     if isinstance(tokenizer, LlamaTokenizer):
         tokenizer.pad_token_id = tokenizer.eos_token_id
+
     if data_args.dataset_name_or_path is None:
         raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
     elif (
@@ -614,6 +615,8 @@ def main():
 
     # Evaluation dev set
     if training_args.do_eval:
+        import pdb
+        pdb.set_trace()
         eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("eval", eval_result)
 

@@ -521,7 +521,6 @@ class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
         if seq_len > self.max_position_embeddings:
-            print("self._scale_cos_sin(seq_len=seq_len)")
             scale_cos, scale_sin = self._scale_cos_sin(seq_len=seq_len)
         else:
             scale_cos, scale_sin = self.cos_cached, self.sin_cached
@@ -764,12 +763,9 @@ class LlamaAttention(nn.Layer):
             )
 
         if config.rope:
-            if config.use_long_strategies:
-                print("I am rope")
+            if config.use_long_sequence_strategies:
                 self.rotary_emb = LongSequenceStrategies.build_long_sequence_strategy(config.long_sequence_strategy_type , config.long_sequence_strategy_name , **config.long_sequence_init_args)
             else:
-                print("I am original rope")
-                print(self.config.rope_scaling_type)
                 self._init_rope()
 
         self.reshard_layer = None
@@ -979,7 +975,7 @@ class LlamaAttention(nn.Layer):
                             use_neox_rotary_style=False,
                         )
             else:
-                if self.config.use_long_strategies:
+                if self.config.use_long_sequence_strategies:
                     cos, sin = self.rotary_emb(seq_len=kv_seq_len)
                     cos = cos[None, :, None, :]
                     sin = sin[None, :, None, :]
@@ -1492,12 +1488,10 @@ class LlamaModel(LlamaPretrainedModel):
             # [bs, seq_len]
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
         if self.config.alibi:
-            if self.config.use_long_strategies:
-                print("I am alibi")
+            if self.config.use_long_sequence_strategies:
                 alibi_layer = LongSequenceStrategies.build_long_sequence_strategy(self.config.long_sequence_strategy_type , self.config.long_sequence_strategy_name , **self.config.long_sequence_init_args)
                 alibi = alibi_layer(attention_mask, self.config.num_attention_heads, dtype=inputs_embeds.dtype)
             else:
-                print("I am original alibi")
                 alibi = build_alibi_tensor(attention_mask, self.config.num_attention_heads, dtype=inputs_embeds.dtype)
             if self.config.tensor_parallel_degree > 1:
                 block_size = self.config.num_attention_heads // self.config.tensor_parallel_degree

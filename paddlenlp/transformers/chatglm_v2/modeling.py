@@ -652,7 +652,7 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         rotary_dim = (
             config.hidden_size // config.num_attention_heads if config.kv_channels is None else config.kv_channels
         )
-        if config.use_long_strategies:
+        if config.use_long_sequence_strategies:
             self.config = config
             self.rotary_pos_emb =  LongSequenceStrategies.build_long_sequence_strategy(config.long_sequence_strategy_type , config.long_sequence_strategy_name , **config.long_sequence_init_args)
         else:
@@ -692,14 +692,12 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         full_attention_mask = self.get_masks(input_ids, past_key_values, padding_mask=attention_mask)
 
         # Rotary positional embeddings
-        if self.config.use_long_strategies:
-            print("I am new rotary_pos_emb")
+        if self.config.use_long_sequence_strategies:
             cos,sin = self.rotary_pos_emb(seq_len=self.max_sequence_length)
             cos, cos = paddle.chunk(cos, 2, axis=-1)
             sin , sin = paddle.chunk(sin, 2, axis=-1)
             rotary_pos_emb = paddle.stack([cos, sin], axis=-1)
-        else:  
-            print("I am original rotary_pos_emb")  
+        else:   
             rotary_pos_emb = self.rotary_pos_emb(self.max_sequence_length)
 
         if position_ids is not None:

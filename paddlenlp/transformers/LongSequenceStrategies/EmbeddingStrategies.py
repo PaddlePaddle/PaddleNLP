@@ -43,6 +43,7 @@ class RotaryEmbedding(nn.Layer):
 class LinearScalingRotaryEmbedding(RotaryEmbedding):
     def __init__(self, **init_args):
         self.scaling_factor = init_args['scaling_factor'] 
+        print("I am here LinearScalingRotaryEmbedding")
         super().__init__(**init_args)
     def _set_cos_sin_cache(self, seq_len):
         self.max_seq_len_cached = seq_len
@@ -62,6 +63,7 @@ class NTKScalingRotaryEmbedding(RotaryEmbedding):
 
     def __init__(self, **init_args):
         init_args['base'] = init_args['base'] * init_args['scaling_factor'] ** (init_args['dim'] / (init_args['dim'] - 2))
+        print("I am here NTKScalingRotaryEmbedding",init_args['base'])
         super().__init__(**init_args)
 
 
@@ -91,6 +93,7 @@ class DynamicNTKScalingRotaryEmbedding(RotaryEmbedding):
     def forward(self, seq_len=None , ntk_alpha = None):
 
         if seq_len > self.max_position_embeddings:
+            print("I am here DynamicNTKScalingRotaryEmbedding")
             self._scale_cos_sin(seq_len=seq_len,ntk_alpha=ntk_alpha)
             
         return super().forward(seq_len)

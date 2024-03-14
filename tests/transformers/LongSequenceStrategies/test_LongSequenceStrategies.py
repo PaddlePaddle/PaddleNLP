@@ -15,37 +15,134 @@ from __future__ import annotations
 
 import sys
 import unittest
-
+import paddle
+import numpy as np
 from parameterized import parameterized_class
 
 from tests.testing_utils import argv_context_guard, load_test_config
 
-from .testing_utils import LLMTest
+from tests.llm.testing_utils import LLMTest
 
 from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoModel
 
+
+all_inputs = [
+    #llama-7b
+    [[1    , 910  , 3461 , 8128 , 3239 , 2472 , 322  , 5626 , 363  , 11559,
+         373  , 2473 , 6360 , 9580 , 545  , 358  , 313  , 17870, 29925, 29897,
+         14974, 6360 , 9580 , 545  , 358  , 313  , 17870, 29925, 29897, 322  ,
+         2908 , 15649, 8078 , 292  , 313  , 29933, 5371 , 29897, 526  , 4266 ,
+         8078 , 292  , 7208 , 12903, 393  , 11559, 3635 , 1169 , 278  , 10317,
+         310  , 5282 , 1947 , 313  , 3970 , 29928, 29897, 304  ]],
+    #qwen-7b
+    [[1986 , 1895 , 5707 , 4004 , 1995 , 323  , 4714 , 369  , 7992 , 389  ,
+         7299 , 3157 , 52578, 320  , 44   , 9954 , 8    , 323  , 2504 , 3695 ,
+         20358, 3157 , 52578, 320  , 44   , 9954 , 8    , 323  , 2504 , 3695 ,
+         59406, 320  , 66755, 8    , 525  , 3281 , 59406, 23783, 429  , 7992 ,
+         28690, 279  , 5887 , 315  , 16373, 320  , 35   , 2069 , 8    , 311  ,
+         990  , 369  , 264  , 7199 , 1372 , 315  , 9055 , 23390]],
+    #chatglm3-6b
+    [[64790, 64792, 666  , 1284 , 2736 , 4467 , 1097 , 293  , 2326 , 332  ,
+         4168 , 331  , 5332 , 2475 , 23355, 359  , 26594, 30947, 30945, 293  ,
+         15903, 2475 , 23355, 359  , 26594, 30947, 30945, 293  , 3579 , 2505 ,
+         26317, 359  , 54223, 30945, 383  , 1720 , 26317, 11972, 343  , 4168 ,
+         15125, 267  , 2902 , 290  , 10196, 359  , 30952, 3809 , 30945, 289  ,
+         792  , 332  , 260  , 3666 , 1276 , 290  , 5735 , 10625]],
+    ]
+all_position_ids = [
+    #llama-7b
+    [[0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 , 8 , 9 , 10, 11, 12, 13, 14, 15, 16, 17,
+         18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
+         36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53,
+         54, 55, 56, 57]],
+    #qwen07b
+    [[0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 , 8 , 9 , 10, 11, 12, 13, 14, 15, 16, 17,
+         18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
+         36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53,
+         54, 55, 56, 57]],
+    #chatglm3-6b
+    [[0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 , 8 , 9 , 10, 11, 12, 13, 14, 15, 16, 17,
+         18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
+         36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53,
+         54, 55, 56, 57]],
+    ]
+all_attention_mask = [
+    #llama
+   [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+         1, 1, 1, 1, 1, 1, 1, 1, 1, 1]],
+    #qwen
+[[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+         1, 1, 1, 1, 1, 1, 1, 1, 1, 1]],
+    #chatglm3-6b     
+    [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+         1, 1, 1, 1, 1, 1, 1, 1, 1, 1]]
+
+    ]
+all_labels = [
+    #llama
+    [[-100 , -100 , -100 , -100 , -100 , -100 , -100 , -100 , -100 , -100 ,
+         -100 , -100 , -100 , -100 , -100 , -100 , -100 , -100 , -100 , 14974,
+          6360,  9580,  545 ,  358 ,  313 , 17870, 29925, 29897,  322 ,  2908,
+         15649,  8078,  292 ,  313 , 29933,  5371, 29897,  526 ,  4266,  8078,
+          292 ,  7208, 12903,  393 , 11559,  3635,  1169,  278 , 10317,  310 ,
+          5282,  1947,  313 ,  3970, 29928, 29897,  304 ,  671 ]],
+    #qwen
+    [[-100 , -100 , -100 , -100 , -100 , -100 , -100 , -100 , -100 , -100 ,
+         -100 , -100 , -100 , -100 , -100 , -100 , -100 , -100 , -100 , 20358,
+          3157, 52578,  320 ,  44  ,  9954,  8   ,  323 ,  2504,  3695, 59406,
+          320 , 66755,  8   ,  525 ,  3281, 59406, 23783,  429 ,  7992, 28690,
+          279 ,  5887,  315 , 16373,  320 ,  35  ,  2069,  8   ,  311 ,  990 ,
+          369 ,  264 ,  7199,  1372,  315 ,  9055, 23390,  7468]],
+    #chatglm3-6b     
+ [[-100 , -100 , -100 , -100 , -100 , -100 , -100 , -100 , -100 , -100 ,
+         -100 , -100 , -100 , -100 , -100 , -100 , -100 , -100 , -100 , 15903,
+          2475, 23355,  359 , 26594, 30947, 30945,  293 ,  3579,  2505, 26317,
+          359 , 54223, 30945,  383 ,  1720, 26317, 11972,  343 ,  4168, 15125,
+          267 ,  2902,  290 , 10196,  359 , 30952,  3809, 30945,  289 ,  792 ,
+          332 ,  260 ,  3666,  1276,  290 ,  5735, 10625,  3181]]
+]
+
+all_ppl = [
+    #llama
+    31361.590644223128,
+    31361.590644223128,
+    31362.757106912533,
+    31361.62055298091,
+    #qwen
+    155909.83795939674,
+    155939.57823718787,
+    155917.27249705535,
+    155909.83795939674,
+    #chatglm3-6b
+    64415.31959719674,
+    64454.8934643284,
+    64416.60966606845,
+    64420.172847651804
+
+]
+
 @parameterized_class(
-    ["model_name_or_path", "model_class"],
+    ["model_name_or_path","strategy_type", "strategy_name","inputs","positin_ids","labels" ,"attention_mask", "ppl"],
     [
-        ["__internal_testing__/tiny-random-llama", LlamaForCausalLM],
-        ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
-        ["__internal_testing__/tiny-fused-chatglm2", ChatGLMv2ForCausalLM],
-        ["__internal_testing__/tiny-fused-qwen-inference5.2", QWenForCausalLM],
-    ],
-)
-@parameterized_class.expand(
-    ["strategy_type", "strategy_name"],
-    [
-        ["EmbeddingStrategies", "RotaryEmbedding"],
-        ["EmbeddingStrategies", "NTKScalingRotaryEmbedding"],
-        ["EmbeddingStrategies", "LinearScalingRotaryEmbedding"],
-        ["EmbeddingStrategies", "DynamicNTKScalingRotaryEmbedding"],
-        ["AttentionStrategies", "AttentionWithLinearBias"],
+        ["__internal_testing__/micro-random-llama","EmbeddingStrategies", "RotaryEmbedding" ,all_inputs[0],all_position_ids[0],all_labels[0],all_attention_mask[0],all_ppl[0]],
+        ["__internal_testing__/micro-random-llama","EmbeddingStrategies", "LinearScalingRotaryEmbedding" ,all_inputs[0],all_position_ids[0],all_labels[0],all_attention_mask[0],all_ppl[1]],
+        ["__internal_testing__/micro-random-llama","EmbeddingStrategies", "NTKScalingRotaryEmbedding" ,all_inputs[0],all_position_ids[0],all_labels[0],all_attention_mask[0],all_ppl[2]],
+        ["__internal_testing__/micro-random-llama","EmbeddingStrategies", "DynamicNTKScalingRotaryEmbedding" ,all_inputs[0],all_position_ids[0],all_labels[0],all_attention_mask[0],all_ppl[3]],
+        ["/mnt/_tiny_qwen-7b","EmbeddingStrategies", "RotaryEmbedding" ,all_inputs[1],all_position_ids[1],all_labels[1],all_attention_mask[1],all_ppl[4]],
+        ["/mnt/_tiny_qwen-7b","EmbeddingStrategies", "LinearScalingRotaryEmbedding" ,all_inputs[1],all_position_ids[1],all_labels[1],all_attention_mask[1],all_ppl[5]],
+        ["/mnt/_tiny_qwen-7b","EmbeddingStrategies", "NTKScalingRotaryEmbedding" ,all_inputs[1],all_position_ids[1],all_labels[1],all_attention_mask[1],all_ppl[6]], 
+        ["/mnt/_tiny_qwen-7b","EmbeddingStrategies", "DynamicNTKScalingRotaryEmbedding" ,all_inputs[1],all_position_ids[1],all_labels[1],all_attention_mask[1],all_ppl[7]],  
+        ["/mnt/_tiny_chatglm3_6b","EmbeddingStrategies", "RotaryEmbedding" ,all_inputs[2],all_position_ids[2],all_labels[2],all_attention_mask[2],all_ppl[8]],           
+        ["/mnt/_tiny_chatglm3_6b","EmbeddingStrategies", "LinearScalingRotaryEmbedding" ,all_inputs[2],all_position_ids[2],all_labels[2],all_attention_mask[2],all_ppl[9]],   
+        ["/mnt/_tiny_chatglm3_6b","EmbeddingStrategies", "NTKScalingRotaryEmbedding" ,all_inputs[2],all_position_ids[2],all_labels[2],all_attention_mask[2],all_ppl[10]], 
+        ["/mnt/_tiny_chatglm3_6b","EmbeddingStrategies", "DynamicNTKScalingRotaryEmbedding" ,all_inputs[2],all_position_ids[2],all_labels[2],all_attention_mask[2],all_ppl[11]], 
+
     ],
 )
 class TestLongSequenceStrategiesTest(LLMTest, unittest.TestCase):
-    inference_config = ""
-    model_dir: str = ""
 
     def setUp(self) -> None:
         LLMTest.setUp(self)
@@ -53,46 +150,81 @@ class TestLongSequenceStrategiesTest(LLMTest, unittest.TestCase):
     def tearDown(self) -> None:
         LLMTest.tearDown(self)
 
-    def test_long_sequence_strategies(self):
-        input = "中国的首都是"
+    def get_model(self,model_name_or_path):
         model_config = AutoConfig.from_pretrained(
-           self.model_name_or_path
+           model_name_or_path
         )
         if self.strategy_type == "EmbeddingStrategies":
             model_config.alibi = False 
         else:
             model_config.alibi = True 
-        model_config.use_long_strategies = True
-        model_config.long_sequence_strategy_type = self.strategy_type
-        model_config.long_sequence_strategy_name = self.strategy_name
-        if self.strategy_name == "DynamicNTKScalingRotaryEmbedding":
-            model_config.max_position_embeddings =  1024
-        else:
-            model_config.max_position_embeddings =  2048
-        if model_config.alibi:
-            model_config.long_sequence_init_args = {}
-        else:
-            if self.model_name_or_path in ["__internal_testing__/tiny-fused-chatglm" , "__internal_testing__/tiny-fused-chatglm2"]
-                position_encoding_2d = True
-            else:
-                position_encoding_2d = False
-            model_config.long_sequence_init_args ={"dim": int(model_config.hidden_size / model_config.num_attention_heads) 
-            ,"max_position_embeddings":model_config.max_position_embeddings,"base":10000,"scaling_factor":1,"position_encoding_2d":position_encoding_2d}
-        finetune_config = load_test_config(self.config_path, "finetune", self.model_dir)
+        model_config.use_long_sequence_strategies = True
+        model_config.long_sequence_strategy_type  = self.strategy_type
+        model_config.long_sequence_strategy_name  = self.strategy_name
+        max_position_embeddings = 10 if self.strategy_name == "DynamicNTKScalingRotaryEmbedding" else 2048
+        model_config.long_sequence_init_args ={"dim": int(model_config.hidden_size / model_config.num_attention_heads) 
+        ,"max_position_embeddings":max_position_embeddings,"base":10000,"scaling_factor":4}
+        if "chatglm" in model_name_or_path:
+            model_config.long_sequence_init_args['position_encoding_2d'] = True
+        model = AutoModelForCausalLM.from_pretrained(model_name_or_path , config=model_config , dtype=paddle.float32)
+        return model
+    def test_long_sequence_strategies(self):
+        input_ids = paddle.to_tensor(self.inputs,dtype=paddle.int64)
+        position_ids = paddle.to_tensor(self.positin_ids,dtype=paddle.int64)
+        attention_mask = paddle.to_tensor(self.attention_mask,dtype=paddle.int64)  
+        labels = paddle.to_tensor(self.labels,dtype=paddle.int64)  
+        ppl = self.ppl
+        inputs = {"input_ids":input_ids, "position_ids":position_ids,"labels":labels,"attention_mask":attention_mask}
+        model = self.get_model(self.model_name_or_path)
+        output = model(**inputs)
+        self.assertTrue(
+            np.allclose(
+                np.exp(output[0].item()),
+                ppl,
+                rtol=1e-2,
+            )
+            )            
 
-        finetune_config["dataset_name_or_path"] = self.data_dir
-        finetune_config["output_dir"] = self.output_dir
 
-        with argv_context_guard(finetune_config):
-            from finetune_generation import main
 
-            main()
 
-        # TODO(wj-Mcat): disable chatglm2 test temporarily
-        if self.model_dir not in ["qwen", "baichuan", "chatglm2"]:
-            self.run_predictor({"inference_model": True})
 
-        self.run_predictor({"inference_model": False})
+
+'''
+    def test_llama_long_sequence_strategies(self):
+        model_name_or_path_list = ["__internal_testing__/tiny-random-llama"]
+        for model_name_or_path in model_name_or_path_list:
+            model = self.get_model(model_name_or_path)
+            generation_config = self.get_generation_config()
+
+    def test_chatglm_long_sequence_strategies(self):
+        model_name_or_path_list = ["__internal_testing__/tiny-fused-chatglm", "__internal_testing__/tiny-fused-chatglm2"]
+        for model_name_or_path in model_name_or_path_list:
+            model = self.get_model(model_name_or_path)
+            generation_config = self.get_generation_config()
+
+    def test_qwen_long_sequence_strategies(self):
+        input_ids = paddle.to_tensor([[105538, 59975, 100132]])
+        position_ids = paddle.to_tensor([[0, 1, 2]])
+        attention_mask = paddle.to_tensor([[1, 1, 1]])   
+        inputs = {"input_ids":input_ids, "position_ids":position_ids, "attention_mask":attention_mask}
+        output = [68990 , 3837  , 68990 , 103987, 112015, 110893, 9370  , 106758, 106655,
+        3837  , 99583 , 99904 , 99430 , 57811 , 3837  , 104548, 114333, 3837  ,
+        29490 , 99272 , 67071 , 105507, 69041 , 102937, 108825, 3837  , 100409,
+        99416 , 99278 , 99377 , 99208 , 102730, 3837  , 100409, 99369 , 116442,
+        100361, 58883 , 198   , 99936 , 27442 , 5122  , 106114, 68990 , 9370  ,
+        102752, 112762, 151643]
+        model_name_or_path_list = ["__internal_testing__/tiny-fused-qwen-inference"]
+        for model_name_or_path in model_name_or_path_list:
+            model = self.get_model(model_name_or_path)
+            pred = model.generate(**inputs,
+                **generation_config
+                        )
+            res = print(list(pred[0])[0])
+            print(res)
+'''
+
+
         
         
 
