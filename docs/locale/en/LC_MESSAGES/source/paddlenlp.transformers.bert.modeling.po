@@ -432,7 +432,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.bert.modeling.BertPretrainingCriterion:1
 #: paddlenlp.transformers.bert.modeling.BertPretrainingHeads:1
-msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgid "基类：:class:`paddle.base.dygraph.layers.Layer`"
 msgstr ""
 
 #: of paddlenlp.transformers.bert.modeling.BertPretrainingCriterion:1

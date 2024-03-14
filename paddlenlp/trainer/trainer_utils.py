@@ -953,7 +953,7 @@ class IterableDatasetShard(IterableDataset):
         # if (
         #     not hasattr(self.dataset, "set_epoch")
         #     and hasattr(self.dataset, "generator")
-        #     and isinstance(self.dataset.generator, paddle.fluid.Generator)
+        #     and isinstance(self.dataset.generator, paddle.base.Generator)
         # ):
         #     self.dataset.generator.manual_seed(self.seed + self.epoch)
         real_batch_size = self.batch_size * self.num_processes

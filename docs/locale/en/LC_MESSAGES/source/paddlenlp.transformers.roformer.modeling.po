@@ -431,7 +431,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion:1
 #: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads:1
-msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgid "基类：:class:`paddle.base.dygraph.layers.Layer`"
 msgstr ""
 
 #: of paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion:1

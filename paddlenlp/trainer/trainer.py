@@ -178,7 +178,7 @@ except:
 try:
     from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
 except:
-    from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
+    from paddle.base.dataloader.dataloader_iter import _DataLoaderIterBase
 
 
 __all__ = ["Trainer"]

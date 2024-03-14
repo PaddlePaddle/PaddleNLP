@@ -419,7 +419,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion:1
 #: paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingHeads:1
-msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgid "基类：:class:`paddle.base.dygraph.layers.Layer`"
 msgstr ""
 
 #: of paddlenlp.transformers.bigbird.modeling.BigBirdPretrainingCriterion:1

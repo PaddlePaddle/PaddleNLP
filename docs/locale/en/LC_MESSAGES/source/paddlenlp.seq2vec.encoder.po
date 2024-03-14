@@ -27,7 +27,7 @@ msgstr ""
 #: paddlenlp.seq2vec.encoder.LSTMEncoder:1
 #: paddlenlp.seq2vec.encoder.RNNEncoder:1
 #: paddlenlp.seq2vec.encoder.TCNEncoder:1
-msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgid "基类：:class:`paddle.base.dygraph.layers.Layer`"
 msgstr ""
 
 #: of paddlenlp.seq2vec.encoder.BoWEncoder:1
