@@ -113,7 +113,7 @@ class AutoTrainer(Trainer):
 
         if self.args.to_static:
             unified_strategy = dist.Strategy()
-            unified_strategy._convert_to_unify_strategy(self.args.strategy)
+            unified_strategy._from_legacy_strategy(self.args.strategy)
             return (
                 dist.to_static(model, dist_loader, self.criterion, self.optimizer, strategy=unified_strategy),
                 dist_loader,
