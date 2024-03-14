@@ -537,7 +537,6 @@ class ChatGLMStack(nn.Layer):
         cache: Optional[Tensor] = None,
         use_cache: bool = False,
     ):
-
         if input_ids is not None and inputs_embeds is not None:
             input_ids = None
             logger.warning("Specify both input_ids and inputs_embeds at the same time, will use inputs_embeds")
