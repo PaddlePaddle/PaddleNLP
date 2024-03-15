@@ -18,11 +18,68 @@ from typing import List, Optional
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.autograd import PyLayer
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import (
     ColumnParallelLinear,
     RowParallelLinear,
 )
+
+
+class QuickBackward(PyLayer):
+    @staticmethod
+    def forward(
+        ctx,
+        input,
+        lora_A,
+        lora_B,
+        weight,
+        bias,
+        name,
+        scaling,
+        lora_dropout,
+    ):
+        # num = 0
+        # if input.stop_gradient == False:
+        #    print("input")
+        #    num += 1
+        # if weight.stop_gradient == False:
+        #    print("weight")
+        #    num += 1
+        # if bias is not None and bias.stop_gradient == False:
+        #    print("bias")
+        #    num += 1
+        # if lora_A.stop_gradient == False:
+        #    print("lora_A")
+        #    num += 1
+        # if lora_B.stop_gradient == False:
+        #    print("lora_B")
+        #    num += 1
+        # print(num)
+        # print("=====================quick forward============================")
+        ctx.save_for_backward(input, weight, lora_A, lora_B)
+
+        result = F.linear(x=input, weight=weight, bias=bias, name=name)
+        result += (lora_dropout(input) @ lora_A @ lora_B) * scaling
+        return result
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        # print("=====================quick backward============================")
+        input, weight, lora_A, lora_B = ctx.saved_tensor()
+
+        # [seq, h] @ [h, h]
+        if input.stop_gradient is False:
+            input_grad = grad_output @ (weight + lora_A @ lora_B).T
+        else:
+            input_grad = None
+        input_fused = input.reshape([-1, input.shape[-1]])
+        grad_output_fused = grad_output.reshape([-1, grad_output.shape[-1]])
+        lora_A_grad = input_fused.T @ (grad_output_fused @ lora_B.T)
+        # [r, i] @ [i, bz*seq] @ [bz*seq, h]
+        lora_B_grad = (lora_A.T @ input_fused.T) @ grad_output_fused
+
+        return input_grad, lora_A_grad, lora_B_grad
 
 
 class LoRALinear(nn.Linear):
@@ -35,6 +92,7 @@ class LoRALinear(nn.Linear):
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
         merge_weights: bool = True,
+        quick_backward: bool = False,
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
@@ -69,6 +127,8 @@ class LoRALinear(nn.Linear):
         # Freezing the pre-trained weight matrix
         self.weight.stop_gradient = True
 
+        self.quick_backward = quick_backward
+
     def train(self):
         super().train()
         if self.merge_weights and self.merged:
@@ -86,10 +146,22 @@ class LoRALinear(nn.Linear):
             self.merged = True
 
     def forward(self, input: paddle.Tensor, *args, **kwargs):
-        result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
-        if not self.merged:
-            result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
-        return result
+        if self.training and self.quick_backward and not self.merged:
+            return QuickBackward.apply(
+                input,
+                self.lora_A,
+                self.lora_B,
+                self.weight,
+                self.bias,
+                self.name,
+                self.scaling,
+                self.lora_dropout,
+            )
+        else:
+            result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
+            if not self.merged:
+                result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
+            return result
 
     def extra_repr(self):
         name = f", name={self.name}" if self.name else ""

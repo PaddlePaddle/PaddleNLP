@@ -382,6 +382,7 @@ class LoRAModel(nn.Layer):
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
+                    quick_backward=lora_config.quick_backward,
                     bias_attr=False if module.bias is None else None,
                 )
             if isinstance(module, nn.Conv2D):
