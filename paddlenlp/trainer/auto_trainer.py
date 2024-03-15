@@ -112,8 +112,10 @@ class AutoTrainer(Trainer):
         dist_loader = self._wrap_for_dist_loader(train_dataloader)
 
         if self.args.to_static:
+            unified_strategy = dist.Strategy()
+            unified_strategy._from_legacy_strategy(self.args.strategy)
             return (
-                dist.to_static(model, dist_loader, self.criterion, self.optimizer, strategy=self.args.strategy),
+                dist.to_static(model, dist_loader, self.criterion, self.optimizer, strategy=unified_strategy),
                 dist_loader,
             )
         else:

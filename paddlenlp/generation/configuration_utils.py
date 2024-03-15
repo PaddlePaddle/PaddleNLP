@@ -24,18 +24,11 @@ from paddle.common_ops_import import convert_dtype
 
 from paddlenlp import __version__
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
-from paddlenlp.transformers.utils import resolve_cache_dir
+from paddlenlp.utils.download import resolve_file_path
 from paddlenlp.utils.log import logger
 
-from ..transformers.aistudio_utils import aistudio_download
 from ..utils import GENERATION_CONFIG_NAME
-from ..utils.downloader import (
-    COMMUNITY_MODEL_PREFIX,
-    get_path_from_url_with_filelock,
-    hf_file_exists,
-    is_url,
-    url_file_exists,
-)
+from ..utils.downloader import hf_file_exists
 
 DEFAULT_MAX_NEW_TOKENS = 20
 
@@ -149,7 +142,12 @@ class GenerationConfig:
     def __init__(self, **kwargs):
         # Parameters that control the length of the output
         self.max_new_tokens = kwargs.get("max_new_tokens", DEFAULT_MAX_NEW_TOKENS)
-        self.min_new_token = kwargs.pop("min_new_token", 0)
+
+        if "min_new_token" in kwargs:
+            logger.warning("<min_new_token> field is deprecated. Please use <min_new_tokens> instead.")
+            kwargs["min_new_tokens"] = kwargs.pop("min_new_token")
+
+        self.min_new_tokens = kwargs.pop("min_new_tokens", 0)
         self.max_length = kwargs.pop("max_length", 0)
         self.min_length = kwargs.pop("min_length", 0)
         self.early_stopping = kwargs.pop("early_stopping", False)
@@ -413,53 +411,18 @@ class GenerationConfig:
         if subfolder is None:
             subfolder = ""
 
-        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
-
-        # 1. get the configuration file from local file, eg: /cache/path/model_config.json
-        if os.path.isfile(pretrained_model_name_or_path):
-            resolved_config_file = pretrained_model_name_or_path
-
-        # 2. get the configuration file from url, eg: https://ip/path/to/model_config.json
-        elif is_url(pretrained_model_name_or_path):
-            resolved_config_file = get_path_from_url_with_filelock(
-                pretrained_model_name_or_path,
-                cache_dir=os.path.join(cache_dir, pretrained_model_name_or_path, subfolder),
-                check_exist=not force_download,
-            )
-        # 3. get the configuration file from local dir with default name, eg: /local/path
-        elif os.path.isdir(pretrained_model_name_or_path):
-            configuration_file = os.path.join(pretrained_model_name_or_path, subfolder, config_file_name)
-            if os.path.exists(configuration_file):
-                resolved_config_file = configuration_file
-            else:
-                # try to detect old-school config file
-                raise FileNotFoundError("please make sure there is `generation_config.json` under the dir")
-        # 4. get the configuration file from aistudio
-        elif from_aistudio:
-            resolved_config_file = aistudio_download(
-                repo_id=pretrained_model_name_or_path,
-                filename=config_file_name,
-                cache_dir=cache_dir,
-                subfolder=subfolder,
-            )
-        # 5. get the configuration file from HF hub
-        elif from_hf_hub:
-            resolved_config_file = resolve_hf_generation_config_path(
-                repo_id=pretrained_model_name_or_path, cache_dir=cache_dir, subfolder=subfolder
-            )
-        else:
-            url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, config_file_name]
-            cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
-            if subfolder != "":
-                url_list.insert(2, subfolder)
-            community_url = "/".join(url_list)
-            if url_file_exists(community_url):
-                resolved_config_file = get_path_from_url_with_filelock(
-                    community_url, cache_dir, check_exist=not force_download
-                )
-            else:
-                raise FileNotFoundError(f"configuration file<{GENERATION_CONFIG_NAME}> not found")
-
+        resolved_config_file = resolve_file_path(
+            pretrained_model_name_or_path,
+            [config_file_name],
+            subfolder,
+            cache_dir=cache_dir,
+            force_download=force_download,
+            from_aistudio=from_aistudio,
+            from_hf_hub=from_hf_hub,
+        )
+        assert (
+            resolved_config_file is not None
+        ), f"please make sure {config_file_name} under {pretrained_model_name_or_path}"
         try:
             logger.info(f"Loading configuration file {resolved_config_file}")
             # Load config dict

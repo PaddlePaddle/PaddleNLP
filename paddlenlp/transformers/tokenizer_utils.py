@@ -58,7 +58,7 @@ from .tokenizer_utils_base import (
     TextInputPair,
     TruncationStrategy,
 )
-from .utils import InitTrackerMeta, fn_args_to_dict, resolve_cache_dir
+from .utils import InitTrackerMeta, fn_args_to_dict
 
 __all__ = [
     "PretrainedTokenizer",
@@ -701,7 +701,6 @@ class ChatTemplateMixin:
         if subfolder is None:
             subfolder = ""
 
-        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
         kwargs["subfolder"] = subfolder
         kwargs["cache_dir"] = cache_dir
         kwargs["from_hf_hub"] = from_hf_hub
