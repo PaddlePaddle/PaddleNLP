@@ -20,7 +20,6 @@ import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM
-from tests.testing_utils import slow
 
 all_inputs = [
     # llama-7b
@@ -4745,7 +4744,6 @@ class TestLongSequenceStrategiesTest(unittest.TestCase):
         model = AutoModelForCausalLM.from_pretrained(model_name_or_path, config=model_config, dtype=paddle.float32)
         return model
 
-    @slow
     def test_long_sequence_strategies(self):
         input_ids = paddle.to_tensor(self.inputs, dtype=paddle.int64)
         position_ids = paddle.to_tensor(self.positin_ids, dtype=paddle.int64)
