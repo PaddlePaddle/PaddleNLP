@@ -145,7 +145,7 @@ class TrainingArguments(TrainingArguments):
 
     offload_level: str = field(
         default=None,
-        metadata={"help": "Offload model, optional for: eval, reward, eval reward, ."},
+        metadata={"help": "Offload model, optional for: eval, reward, optimizer, train_model"},
     )
 
     # save_generation_output: bool = field(
