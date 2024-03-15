@@ -37,7 +37,14 @@ class AttentionWithLinearBias(nn.Layer):
             ratio = start
             return [start * ratio**i for i in range(n)]
 
-        return _get_interleave_power_of_2(n)
+        if math.log2(n).is_integer():
+            return _get_interleave_power_of_2(n)
+        else:
+            closest_power_of_2 = 2 ** math.floor(math.log2(n))
+            return (
+                _get_interleave_power_of_2(closest_power_of_2)
+                + self._get_interleave(2 * closest_power_of_2)[0::2][: n - closest_power_of_2]
+            )
 
     def forward(self, bool_attention_mask: Tensor, num_heads: int, dtype: paddle.dtype, tensor_parallel_degree=1):
         attention_mask = bool_attention_mask.astype("float32")
