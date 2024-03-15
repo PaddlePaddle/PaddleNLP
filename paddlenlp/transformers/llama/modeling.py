@@ -50,6 +50,7 @@ from paddlenlp.transformers.conversion_utils import (
     StateDictNameMapping,
     init_name_mappings,
 )
+from paddlenlp.transformers.LongSequenceStrategies import LongSequenceStrategies
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
@@ -57,7 +58,6 @@ from paddlenlp.transformers.model_outputs import (
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
-from paddlenlp.transformers.LongSequenceStrategies import LongSequenceStrategies
 
 from ..segment_parallel_utils import ReshardLayer
 from ..sequence_parallel_utils import (
@@ -764,7 +764,11 @@ class LlamaAttention(nn.Layer):
 
         if config.rope:
             if config.use_long_sequence_strategies:
-                self.rotary_emb = LongSequenceStrategies.build_long_sequence_strategy(config.long_sequence_strategy_type , config.long_sequence_strategy_name , **config.long_sequence_init_args)
+                self.rotary_emb = LongSequenceStrategies.build_long_sequence_strategy(
+                    config.long_sequence_strategy_type,
+                    config.long_sequence_strategy_name,
+                    **config.long_sequence_init_args,
+                )
             else:
                 self._init_rope()
 
@@ -979,7 +983,10 @@ class LlamaAttention(nn.Layer):
                     cos, sin = self.rotary_emb(seq_len=kv_seq_len)
                     cos = cos[None, :, None, :]
                     sin = sin[None, :, None, :]
-                    cos,sin = (cos.cast(value_states.dtype) if cos.dtype != value_states.dtype else cos, sin.cast(value_states.dtype) if sin.dtype != value_states.dtype else sin)
+                    cos, sin = (
+                        cos.cast(value_states.dtype) if cos.dtype != value_states.dtype else cos,
+                        sin.cast(value_states.dtype) if sin.dtype != value_states.dtype else sin,
+                    )
                 else:
                     cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
 
@@ -1489,7 +1496,11 @@ class LlamaModel(LlamaPretrainedModel):
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
         if self.config.alibi:
             if self.config.use_long_sequence_strategies:
-                alibi_layer = LongSequenceStrategies.build_long_sequence_strategy(self.config.long_sequence_strategy_type , self.config.long_sequence_strategy_name , **self.config.long_sequence_init_args)
+                alibi_layer = LongSequenceStrategies.build_long_sequence_strategy(
+                    self.config.long_sequence_strategy_type,
+                    self.config.long_sequence_strategy_name,
+                    **self.config.long_sequence_init_args,
+                )
                 alibi = alibi_layer(attention_mask, self.config.num_attention_heads, dtype=inputs_embeds.dtype)
             else:
                 alibi = build_alibi_tensor(attention_mask, self.config.num_attention_heads, dtype=inputs_embeds.dtype)
