@@ -43,7 +43,6 @@ class RotaryEmbedding(nn.Layer):
 class LinearScalingRotaryEmbedding(RotaryEmbedding):
     def __init__(self, **init_args):
         self.scaling_factor = init_args['scaling_factor'] 
-        print("I am here LinearScalingRotaryEmbedding")
         super().__init__(**init_args)
     def _set_cos_sin_cache(self, seq_len):
         self.max_seq_len_cached = seq_len
@@ -63,7 +62,6 @@ class NTKScalingRotaryEmbedding(RotaryEmbedding):
 
     def __init__(self, **init_args):
         init_args['base'] = init_args['base'] * init_args['scaling_factor'] ** (init_args['dim'] / (init_args['dim'] - 2))
-        print("I am here NTKScalingRotaryEmbedding",init_args['base'])
         super().__init__(**init_args)
 
 
@@ -81,6 +79,7 @@ class DynamicNTKScalingRotaryEmbedding(RotaryEmbedding):
         if ntk_alpha == None:
             ntk_alpha = (self.scaling_factor * seq_len / self.max_position_embeddings) - (self.scaling_factor - 1)
         base = self.base * ntk_alpha ** (self.dim / (self.dim - 2))
+
         # [seq_len, dim/2]
         inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype=paddle.float32) / self.dim))
         with paddle.amp.auto_cast(enable=False):
@@ -93,7 +92,6 @@ class DynamicNTKScalingRotaryEmbedding(RotaryEmbedding):
     def forward(self, seq_len=None , ntk_alpha = None):
 
         if seq_len > self.max_position_embeddings:
-            print("I am here DynamicNTKScalingRotaryEmbedding")
             self._scale_cos_sin(seq_len=seq_len,ntk_alpha=ntk_alpha)
             
         return super().forward(seq_len)

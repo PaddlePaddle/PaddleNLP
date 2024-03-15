@@ -1932,8 +1932,7 @@ class Trainer:
                 labels = inputs["generator_labels"]
         else:
             labels = None
-        import pdb
-        pdb.set_trace()
+
         outputs = model(**inputs)
 
         if self.criterion is not None:

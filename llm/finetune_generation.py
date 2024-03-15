@@ -150,22 +150,6 @@ def main():
             from_aistudio=model_args.from_aistudio,
             quantization_config=quantization_config,
         )
-        model_config.alibi = False #alibi/rope
-        model_config.use_long_sequence_strategies = True
-        
-        model_config.long_sequence_strategy_type = "EmbeddingStrategies" #AttentionStrategies#EmbeddingStrategies
-        model_config.long_sequence_strategy_name = "RotaryEmbedding"#"NTKScalingRotaryEmbedding"  #RotaryEmbedding#LinearScalingRotaryEmbedding#v#AttentionWithLinearBias
-                                                                                #"DynamicNTKScalingRotaryEmbedding"
-        model_config.seq_length = data_args.max_length
-        model_config.max_position_embeddings = data_args.max_length# model_config.max_sequence_length
-        #model_config.use_cache = True
-        print("original max position embeddings is {model_config.max_position_embeddings}")
-        if model_config.alibi:
-            model_config.long_sequence_init_args = {}
-        else:
-            position_encoding_2d = True
-            model_config.long_sequence_init_args ={"dim": int(model_config.hidden_size / model_config.num_attention_heads) 
-            ,"max_position_embeddings":model_config.max_position_embeddings,"base":10000,"scaling_factor":1,"position_encoding_2d":position_encoding_2d}
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
         if not training_args.autotuner_benchmark:
@@ -615,8 +599,6 @@ def main():
 
     # Evaluation dev set
     if training_args.do_eval:
-        import pdb
-        pdb.set_trace()
         eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("eval", eval_result)
 

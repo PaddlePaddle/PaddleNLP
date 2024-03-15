@@ -21,9 +21,9 @@ from parameterized import parameterized_class
 
 from tests.testing_utils import argv_context_guard, load_test_config
 
-from tests.llm.testing_utils import LLMTest
-
 from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoModel
+
+from tests.testing_utils import  slow
 
 
 all_inputs = [
@@ -534,16 +534,19 @@ all_labels = [
 ]
 
 all_ppl = [
+
     #llama
     31361.590644223128,
     31361.590644223128,
     31362.757106912533,
     31361.62055298091,
+
     #qwen
     155909.83795939674,
     155939.57823718787,
     155917.27249705535,
     155909.83795939674,
+
     #chatglm3-6b
     64415.31959719674,
     64454.8934643284,
@@ -562,32 +565,25 @@ all_ppl = [
 @parameterized_class(
     ["model_name_or_path","strategy_type", "strategy_name","inputs","positin_ids","labels" ,"attention_mask", "ppl"],
     [
-
         ["__internal_testing__/micro-random-llama","EmbeddingStrategies", "RotaryEmbedding" ,all_inputs[0],all_position_ids[0],all_labels[0],all_attention_mask[0],all_ppl[0]],
         ["__internal_testing__/micro-random-llama","EmbeddingStrategies", "LinearScalingRotaryEmbedding" ,all_inputs[0],all_position_ids[0],all_labels[0],all_attention_mask[0],all_ppl[1]],
         ["__internal_testing__/micro-random-llama","EmbeddingStrategies", "NTKScalingRotaryEmbedding" ,all_inputs[0],all_position_ids[0],all_labels[0],all_attention_mask[0],all_ppl[2]],
         ["__internal_testing__/micro-random-llama","EmbeddingStrategies", "DynamicNTKScalingRotaryEmbedding" ,all_inputs[0],all_position_ids[0],all_labels[0],all_attention_mask[0],all_ppl[3]],
-        ["/mnt/_tiny_qwen-7b","EmbeddingStrategies", "RotaryEmbedding" ,all_inputs[1],all_position_ids[1],all_labels[1],all_attention_mask[1],all_ppl[4]],
-        ["/mnt/_tiny_qwen-7b","EmbeddingStrategies", "LinearScalingRotaryEmbedding" ,all_inputs[1],all_position_ids[1],all_labels[1],all_attention_mask[1],all_ppl[5]],
-        ["/mnt/_tiny_qwen-7b","EmbeddingStrategies", "NTKScalingRotaryEmbedding" ,all_inputs[1],all_position_ids[1],all_labels[1],all_attention_mask[1],all_ppl[6]], 
-        ["/mnt/_tiny_qwen-7b","EmbeddingStrategies", "DynamicNTKScalingRotaryEmbedding" ,all_inputs[1],all_position_ids[1],all_labels[1],all_attention_mask[1],all_ppl[7]],  
-        ["/mnt/_tiny_chatglm3_6b","EmbeddingStrategies", "RotaryEmbedding" ,all_inputs[2],all_position_ids[2],all_labels[2],all_attention_mask[2],all_ppl[8]],           
-        ["/mnt/_tiny_chatglm3_6b","EmbeddingStrategies", "LinearScalingRotaryEmbedding" ,all_inputs[2],all_position_ids[2],all_labels[2],all_attention_mask[2],all_ppl[9]],   
-        ["/mnt/_tiny_chatglm3_6b","EmbeddingStrategies", "NTKScalingRotaryEmbedding" ,all_inputs[2],all_position_ids[2],all_labels[2],all_attention_mask[2],all_ppl[10]], 
-        ["/mnt/_tiny_chatglm3_6b","EmbeddingStrategies", "DynamicNTKScalingRotaryEmbedding" ,all_inputs[2],all_position_ids[2],all_labels[2],all_attention_mask[2],all_ppl[11]],  
-        ["/mnt/_tiny_chatglm_6b","EmbeddingStrategies", "RotaryEmbedding" ,all_inputs[3],all_position_ids[3],all_labels[3],all_attention_mask[3],all_ppl[12]], 
-        ["/mnt/_tiny_chatglm_6b","EmbeddingStrategies", "LinearScalingRotaryEmbedding" ,all_inputs[3],all_position_ids[3],all_labels[3],all_attention_mask[3],all_ppl[13]], 
-        ["/mnt/_tiny_chatglm_6b","EmbeddingStrategies", "NTKScalingRotaryEmbedding" ,all_inputs[3],all_position_ids[3],all_labels[3],all_attention_mask[3],all_ppl[14]], 
-        ["/mnt/_tiny_chatglm_6b","EmbeddingStrategies", "DynamicNTKScalingRotaryEmbedding" ,all_inputs[3],all_position_ids[3],all_labels[3],all_attention_mask[3],all_ppl[15]],
+        ["__internal_testing__/tiny-new-random-qwen-7b","EmbeddingStrategies", "RotaryEmbedding" ,all_inputs[1],all_position_ids[1],all_labels[1],all_attention_mask[1],all_ppl[4]],
+        ["__internal_testing__/tiny-new-random-qwen-7b","EmbeddingStrategies", "LinearScalingRotaryEmbedding" ,all_inputs[1],all_position_ids[1],all_labels[1],all_attention_mask[1],all_ppl[5]],
+        ["__internal_testing__/tiny-new-random-qwen-7b","EmbeddingStrategies", "NTKScalingRotaryEmbedding" ,all_inputs[1],all_position_ids[1],all_labels[1],all_attention_mask[1],all_ppl[6]], 
+        ["__internal_testing__/tiny-new-random-qwen-7b","EmbeddingStrategies", "DynamicNTKScalingRotaryEmbedding" ,all_inputs[1],all_position_ids[1],all_labels[1],all_attention_mask[1],all_ppl[7]],  
+        ["__internal_testing__/tiny-new-random-chatglm3-6b","EmbeddingStrategies", "RotaryEmbedding" ,all_inputs[2],all_position_ids[2],all_labels[2],all_attention_mask[2],all_ppl[8]],           
+        ["__internal_testing__/tiny-new-random-chatglm3-6b","EmbeddingStrategies", "LinearScalingRotaryEmbedding" ,all_inputs[2],all_position_ids[2],all_labels[2],all_attention_mask[2],all_ppl[9]],   
+        ["__internal_testing__/tiny-new-random-chatglm3-6b","EmbeddingStrategies", "NTKScalingRotaryEmbedding" ,all_inputs[2],all_position_ids[2],all_labels[2],all_attention_mask[2],all_ppl[10]], 
+        ["__internal_testing__/tiny-new-random-chatglm3-6b","EmbeddingStrategies", "DynamicNTKScalingRotaryEmbedding" ,all_inputs[2],all_position_ids[2],all_labels[2],all_attention_mask[2],all_ppl[11]],  
+        ["__internal_testing__/tiny-new-random-chatglm-6b","EmbeddingStrategies", "RotaryEmbedding" ,all_inputs[3],all_position_ids[3],all_labels[3],all_attention_mask[3],all_ppl[12]], 
+        ["__internal_testing__/tiny-new-random-chatglm-6b","EmbeddingStrategies", "LinearScalingRotaryEmbedding" ,all_inputs[3],all_position_ids[3],all_labels[3],all_attention_mask[3],all_ppl[13]], 
+        ["__internal_testing__/tiny-new-random-chatglm-6b","EmbeddingStrategies", "NTKScalingRotaryEmbedding" ,all_inputs[3],all_position_ids[3],all_labels[3],all_attention_mask[3],all_ppl[14]], 
+        ["__internal_testing__/tiny-new-random-chatglm-6b","EmbeddingStrategies", "DynamicNTKScalingRotaryEmbedding" ,all_inputs[3],all_position_ids[3],all_labels[3],all_attention_mask[3],all_ppl[15]],
     ],
 )
-class TestLongSequenceStrategiesTest(LLMTest, unittest.TestCase):
-
-    def setUp(self) -> None:
-        LLMTest.setUp(self)
-
-    def tearDown(self) -> None:
-        LLMTest.tearDown(self)
+class TestLongSequenceStrategiesTest(unittest.TestCase):
 
     def get_model(self,model_name_or_path):
         model_config = AutoConfig.from_pretrained(
@@ -607,6 +603,8 @@ class TestLongSequenceStrategiesTest(LLMTest, unittest.TestCase):
             model_config.long_sequence_init_args['position_encoding_2d'] = True
         model = AutoModelForCausalLM.from_pretrained(model_name_or_path , config=model_config , dtype=paddle.float32)
         return model
+
+    #@slow
     def test_long_sequence_strategies(self):
         input_ids = paddle.to_tensor(self.inputs,dtype=paddle.int64)
         position_ids = paddle.to_tensor(self.positin_ids,dtype=paddle.int64)
@@ -623,48 +621,4 @@ class TestLongSequenceStrategiesTest(LLMTest, unittest.TestCase):
                 ppl,
                 rtol=1e-2,
             )
-            )            
-
-
-
-
-
-
-'''
-    def test_llama_long_sequence_strategies(self):
-        model_name_or_path_list = ["__internal_testing__/tiny-random-llama"]
-        for model_name_or_path in model_name_or_path_list:
-            model = self.get_model(model_name_or_path)
-            generation_config = self.get_generation_config()
-
-    def test_chatglm_long_sequence_strategies(self):
-        model_name_or_path_list = ["__internal_testing__/tiny-fused-chatglm", "__internal_testing__/tiny-fused-chatglm2"]
-        for model_name_or_path in model_name_or_path_list:
-            model = self.get_model(model_name_or_path)
-            generation_config = self.get_generation_config()
-
-    def test_qwen_long_sequence_strategies(self):
-        input_ids = paddle.to_tensor([[105538, 59975, 100132]])
-        position_ids = paddle.to_tensor([[0, 1, 2]])
-        attention_mask = paddle.to_tensor([[1, 1, 1]])   
-        inputs = {"input_ids":input_ids, "position_ids":position_ids, "attention_mask":attention_mask}
-        output = [68990 , 3837  , 68990 , 103987, 112015, 110893, 9370  , 106758, 106655,
-        3837  , 99583 , 99904 , 99430 , 57811 , 3837  , 104548, 114333, 3837  ,
-        29490 , 99272 , 67071 , 105507, 69041 , 102937, 108825, 3837  , 100409,
-        99416 , 99278 , 99377 , 99208 , 102730, 3837  , 100409, 99369 , 116442,
-        100361, 58883 , 198   , 99936 , 27442 , 5122  , 106114, 68990 , 9370  ,
-        102752, 112762, 151643]
-        model_name_or_path_list = ["__internal_testing__/tiny-fused-qwen-inference"]
-        for model_name_or_path in model_name_or_path_list:
-            model = self.get_model(model_name_or_path)
-            pred = model.generate(**inputs,
-                **generation_config
-                        )
-            res = print(list(pred[0])[0])
-            print(res)
-'''
-
-
-        
-        
-
+            )   
