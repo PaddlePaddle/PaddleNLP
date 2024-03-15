@@ -1549,21 +1549,22 @@ class TrainingArguments:
 
     @property
     def optimizer_name_suffix(self):
-        if self.use_hybrid_parallel:
-            name = []
-            if self.tensor_parallel_degree > 1:
-                assert self.tensor_parallel_degree < 100, "tensor parallel degree should be less than 100."
-                name.append(f"tp{self.tensor_parallel_rank:0>2d}")
-            if self.pipeline_parallel_degree > 1:
-                assert self.pipeline_parallel_degree < 100, "pipeline parallel degree should be less than 100."
-                name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
-            if self.sharding_parallel_degree > 1:
-                assert self.sharding_parallel_degree < 100, "sharding parallel degree should be less than 100."
-                name.append(f"shard{self.sharding_parallel_rank:0>2d}")
-
-            return "_".join(name)
-        else:
+        if not self.use_hybrid_parallel:
             return None
+
+        def format_name(prefix, rank, degree):
+            if degree > 1:
+                size = max(2, len(str(degree)))
+                return f"{prefix}{rank:0>{size}d}"
+            return ""
+
+        parts = [
+            format_name("tp", self.tensor_parallel_rank, self.tensor_parallel_degree),
+            format_name("pp", self.pipeline_parallel_rank, self.pipeline_parallel_degree),
+            format_name("shard", self.sharding_parallel_rank, self.sharding_parallel_degree),
+        ]
+
+        return "_".join(filter(None, parts))
 
     @property
     def weight_name_suffix(self):
