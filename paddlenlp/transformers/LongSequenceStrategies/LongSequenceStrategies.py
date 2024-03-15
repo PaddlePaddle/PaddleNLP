@@ -27,7 +27,7 @@ class LongSequenceStrategies:
                        ...
 
         strategy_type: "None" ---------------走原始的build-in模块
-                       "EmbeddingStrategies"、
+                       "EmbeddingStrategies"
                        "AttentionStrategies"
                        ...
 
