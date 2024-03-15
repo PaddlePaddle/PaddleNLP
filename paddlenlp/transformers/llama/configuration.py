@@ -168,9 +168,9 @@ class LlamaConfig(PretrainedConfig):
         alibi=False,
         rope_scaling_factor=1.0,
         rope_scaling_type=None,
-        long_sequence_strategy_type= None,
-        long_sequence_strategy_name = None,
-        long_sequence_init_args = None,
+        long_sequence_strategy_type=None,
+        long_sequence_strategy_name=None,
+        long_sequence_init_args=None,
         use_long_sequence_strategies=False,
         **kwargs,
     ):
@@ -212,7 +212,7 @@ class LlamaConfig(PretrainedConfig):
         self.rope_scaling_factor = rope_scaling_factor
         self.rope_scaling_type = rope_scaling_type
 
-        self.long_sequence_strategy_type= long_sequence_strategy_type
+        self.long_sequence_strategy_type = long_sequence_strategy_type
         self.long_sequence_strategy_name = long_sequence_strategy_name
         self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args
         self.use_long_sequence_strategies = use_long_sequence_strategies
