@@ -799,21 +799,7 @@ class LlamaSpecuInferenceModel(LlamaPretrainedModel):
         self.num_layers = config.num_hidden_layers
         self.epsilon = config.rms_norm_eps
         self.max_position_embeddings = config.max_position_embeddings
-        self.quant_type = config.quant_type
         self.max_seq_len = config.max_seq_len
-
-        self.use_weight_only = False
-        self.weight_only_quant_bits = config.weight_only_quant_bits
-
-        if self.quant_type is not None and "weight_only_int" in self.quant_type:
-            self.use_weight_only = True
-        elif self.quant_type is not None and "a8w8" in self.quant_type:
-            self.quant_model_path = config.model_name_or_path
-            self.shift = config.quantization_config.shift
-            self.smooth = config.quantization_config.smooth
-            self.shift_smooth_all_linears = config.quantization_config.shift_smooth_all_linears
-        else:
-            self.use_weight_only = False
 
         if config.tensor_parallel_degree > 1:
             self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
@@ -886,17 +872,10 @@ class LlamaSpecuInferenceModel(LlamaPretrainedModel):
         ffn1_weight_scale_attrs = None
         ffn2_weight_scale_attrs = None
 
-        cache_k_scale_attrs = None
-        cache_v_scale_attrs = None
-        cache_k_out_scale_attrs = None
-        cache_v_out_scale_attrs = None
-
-
         transformer_config = FusedMultiTransformerConfig(
             self.hidden_size,
             self.num_attention_heads,
             self.intermediate_size,
-            weight_only_quant_bits=self.weight_only_quant_bits,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
             nranks=config.tensor_parallel_degree,
@@ -925,14 +904,9 @@ class LlamaSpecuInferenceModel(LlamaPretrainedModel):
             ffn_ln_bias_attrs=ffn_ln_bias_attrs,
             ffn1_bias_attrs=ffn1_bias_attrs,
             ffn2_bias_attrs=ffn2_bias_attrs,
-            cache_k_scale_attrs=cache_k_scale_attrs,
-            cache_v_scale_attrs=cache_v_scale_attrs,
-            cache_k_out_scale_attrs=cache_k_out_scale_attrs,
-            cache_v_out_scale_attrs=cache_v_out_scale_attrs,
             epsilon=self.epsilon,
             norm_type="rmsnorm",
             use_neox_rotary_style=True,
-            use_dynamic_cachekv_quant=config.use_cachekv_int8 == "dynamic",
             rank_id=config.tensor_parallel_rank,
         )
 
@@ -1002,7 +976,7 @@ class LlamaSpecuInferenceModel(LlamaPretrainedModel):
         ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
             input_ids, seq_lens_this_time
         )
-        
+
         ids_remove_padding = ids_remove_padding.squeeze(axis=0)
         print("-----input_ids's shape", input_ids.shape)
         print("-----ids_remove_padding's shape", ids_remove_padding.shape)
@@ -1015,7 +989,7 @@ class LlamaSpecuInferenceModel(LlamaPretrainedModel):
         kwargs["cu_seqlens_k"] = cu_seqlens_k
         kwargs["padding_offsets"] = padding_offset
         kwargs["gamma"] = self.gamma
-        kwargs["max_seq_len"] = self.max_seq_len
+        kwargs["max_input_length"] = self.max_seq_len
 
         inputs_embeds = self.embed_tokens(ids_remove_padding)
 
@@ -1050,8 +1024,6 @@ class LlamaSpecuInferenceModel(LlamaPretrainedModel):
         for idx in range(self.config.num_hidden_layers):
             logger.info(f"set state for layer {idx}")
 
-            if self.use_weight_only:
-                logger.info("weight only is enabled")
             unfused_state_dict = {}
             unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
                 "llama.layers.{}.self_attn.q_proj.weight".format(idx)
@@ -1406,10 +1378,12 @@ class LlamaForCausalLMSpecuInferenceModel(GenerationInferenceModel, LlamaPretrai
         pre_caches = kwargs.get("pre_caches", None)
         cache = kwargs.get("cache", None)
         seq_lens_this_time = kwargs["seq_lens_this_time"]
+        rope_emb = kwargs["rope_emb"]
 
         model_inputs = {
             "input_ids": input_ids,
             "src_mask": src_mask,
+            "rope_emb": rope_emb,
             "pre_caches": pre_caches,
             "caches": cache_kvs,
             "seq_lens_this_time": seq_lens_this_time,
@@ -1429,12 +1403,14 @@ class LlamaForCausalLMSpecuInferenceModel(GenerationInferenceModel, LlamaPretrai
         seq_lens_this_time=None,
         seq_lens_encoder=None,
         seq_lens_decoder=None,
+        rope_emb=None,
     ):
         outputs = self.llama(
             input_ids,
             src_mask=src_mask,
             cache=cache,
             caches=caches,
+            rope_emb=rope_emb,
             pre_caches=pre_caches,
             seq_lens_this_time=seq_lens_this_time,
             seq_lens_encoder=seq_lens_encoder,
@@ -1681,6 +1657,8 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         k_dequant_scales=None,
         v_dequant_scales=None,
     ):
+        input_ids[0][40:45] = paddle.to_tensor([29871, 15043, 29991, 306  , 29915])
+        print("-----inital input_ids: ", input_ids)
         outputs = self.llama(
             input_ids,
             src_mask=src_mask,

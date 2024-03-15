@@ -114,6 +114,8 @@ class SpeculativeSamplingPredictor(InferencePredictorMixin, BasePredictor):
         BasePredictor.__init__(self, config, tokenizer)
         InferencePredictorMixin.__init__(self, config, tokenizer)
         self.model = model
+        self.head_dim = self.cache_kvs_shape[0][-1]
+        self.total_max_length = config.src_length + config.max_length
         self.assistant_model = assistant_model
         self.assistant_model_cache_kvs_shape = self.cache_kvs_shape
         self.assistant_model_cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.assistant_model_cache_kvs_shape]
@@ -233,6 +235,9 @@ class SpeculativeSamplingPredictor(InferencePredictorMixin, BasePredictor):
         model_kwargs["cache_kvs"] = cache_kvs
         model_kwargs["temperature"] = temperature
         model_kwargs["inputs_embeds"] = inputs_embeds
+        model_kwargs["rope_emb"] = self._get_rotary_position_embedding(
+            paddle.arange(self.total_max_length).reshape((1, -1)), self.head_dim
+        )
         return input_ids, model_kwargs
 
 
@@ -272,6 +277,30 @@ class SpeculativeSamplingPredictor(InferencePredictorMixin, BasePredictor):
             predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False
         )
         return decoded_predictions
+
+    def _get_rotary_position_embedding(self, position_ids, head_dim):
+        """
+        Pre-calculate rotary position embedding for position_ids.
+
+        Args:
+            position_ids: [1, S]
+            head_dim: D
+
+        Returns:
+            rot_emb: [2, 1, S, 1, D], cos + sin
+        """
+        bsz, max_seq_len = position_ids.shape[:2]
+        rot_emb = paddle.zeros((2, bsz, max_seq_len, 1, head_dim), dtype="float32")
+        inv_freq = 10000 ** (-paddle.arange(0, head_dim, 2, dtype="float32") / head_dim)
+
+        # shape: [B, S, D/2]
+        freqs = paddle.einsum("ij,k->ijk", position_ids.cast("float32"), inv_freq)
+        # shape: [B, S, 1, D]
+        emb = paddle.concat([freqs, freqs], axis=-1).reshape((bsz, max_seq_len, 1, head_dim))
+
+        rot_emb[0] = paddle.cos(emb)
+        rot_emb[1] = paddle.sin(emb)
+        return rot_emb
 
 def create_predictor(
     predictor_args: PredictorArgument,

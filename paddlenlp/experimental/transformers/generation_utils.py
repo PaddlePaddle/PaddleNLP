@@ -523,22 +523,24 @@ class GenerationInferenceModel(GenerationMixin):
             step_idx_ori = paddle.full(shape=[1], dtype="int64", fill_value=1)
 
             if target_model_inputs.get("cache") is None:
-                target_model_input = candidate_input_ids
-                target_model_inputs["seq_len_encoder"][0] = candidate_input_ids.shape[1]
+                target_model_input_ids = candidate_input_ids
+                target_model_inputs["seq_len_encoder"][0] = target_model_input_ids.shape[1]
                 target_model_inputs["seq_len_decoder"][0] = target_model_inputs["seq_len_encoder"][0]
-                target_model_inputs["seq_lens_this_time"][0] = candidate_input_ids.shape[1]
+                target_model_inputs["seq_len_decoder"] *= 0
+                target_model_inputs["seq_lens_this_time"][0] = target_model_input_ids.shape[1]
             else:
-                target_model_input = candidate_input_ids[:, -gamma:]
-                target_model_inputs["seq_len_encoder"][0] = 0
-                target_model_inputs["seq_len_decoder"][0] = candidate_input_ids.shape[1]
-                target_model_inputs["seq_lens_this_time"][0] = gamma
+                # target_model_input_ids = candidate_input_ids[:, -gamma:]
+                # target_model_inputs["seq_len_encoder"][0] = 0
+                # target_model_inputs["seq_len_decoder"][0] = candidate_input_ids.shape[1]
+                # target_model_inputs["seq_lens_this_time"][0] = gamma
+                pass
 
             print("target_model's seq_len_encoder: ",target_model_inputs["seq_len_encoder"])
             print("target_model's seq_len_decoder: ",target_model_inputs["seq_len_decoder"])
             print("target_model's seq_lens_this_time: ",target_model_inputs["seq_lens_this_time"])
 
             target_model_outputs_logits = _post_process_(
-                _forward_(self, target_model_input, target_model_cache_kvs, **target_model_inputs),
+                _forward_(self, target_model_input_ids, target_model_cache_kvs, **target_model_inputs),
                 step_idx_ori,
                 True, # is_target_model
                 target_model_inputs,
@@ -548,7 +550,7 @@ class GenerationInferenceModel(GenerationMixin):
             print("!!!!!target model generated logits!!!!!!")
             
             # 2.2. Process the new logits
-            new_logits = target_model_outputs_logits[:, -candidate_length - 1 :, :]  # excludes the input prompt if present
+            new_logits = target_model_outputs_logits[:, -candidate_length-1 :, :]  # excludes the input prompt if present
             print("-------new_logits's shape: ", new_logits.shape)
 
             for i in range(candidate_length):
