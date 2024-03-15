@@ -990,6 +990,7 @@ class TrainingArguments:
                                 "enable_release_grads",
                                 "enable_dp_comm_overlap",
                                 "enable_clear_every_step_cache",
+                                "enable_overlap_p2p_comm",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
