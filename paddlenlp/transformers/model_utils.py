@@ -112,7 +112,7 @@ def filter_sharded_params(state_dict, optimizer, sharding_group):
                     continue
                 filtered_state_dict[k] = v
             else:
-                if sharing_rank == 0:
+                if sharding_rank == 0:
                     filtered_state_dict[k] = v
     else:
         from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
