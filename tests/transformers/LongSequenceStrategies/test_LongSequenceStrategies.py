@@ -4545,6 +4545,8 @@ all_ppl = [
     130573.01895270264,
     130539.15278071642,
     130538.4058318297,
+    # llama-alibi
+    31369.517462860927,
 ]
 
 
@@ -4720,6 +4722,16 @@ all_ppl = [
             all_attention_mask[3],
             all_ppl[15],
         ],
+        [
+            "__internal_testing__/micro-random-llama",
+            "AttentionStrategies",
+            "AttentionWithLinearBias",
+            all_inputs[0],
+            all_position_ids[0],
+            all_labels[0],
+            all_attention_mask[0],
+            all_ppl[16],
+        ],
     ],
 )
 class TestLongSequenceStrategiesTest(unittest.TestCase):
@@ -4741,7 +4753,7 @@ class TestLongSequenceStrategiesTest(unittest.TestCase):
         }
         if "chatglm" in model_name_or_path:
             model_config.long_sequence_init_args["position_encoding_2d"] = True
-        model = AutoModelForCausalLM.from_pretrained(model_name_or_path, config=model_config, dtype=paddle.float32)
+        model = AutoModelForCausalLM.from_pretrained(model_name_or_path, config=model_config, dtype="float32")
         return model
 
     def test_long_sequence_strategies(self):
