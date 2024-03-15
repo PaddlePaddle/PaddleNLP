@@ -173,13 +173,20 @@ def scaled_dot_product_attention(
 
 
 class LlamaRMSNormAuto(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config, ipp: Optional[int] = None):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.weight = paddle.create_parameter(
             shape=[self.hidden_size],
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(1.0),
+        )
+        # All the params and buffers need the dis_att before initializing them.
+        self.ipp = ipp
+        self.weight = dist.shard_tensor(
+            self.weight,
+            get_mesh(self.ipp),
+            [dist.Replicate(), dist.Replicate()],
         )
         self.variance_epsilon = config.rms_norm_eps
         self.config = config
@@ -374,6 +381,17 @@ class LlamaAttentionAuto(nn.Layer):
             )
         else:
             raise ValueError(f"Unknown RoPE scaling type {self.config.rope_scaling_type}")
+        # All the params and buffers need the dis_att before initializing them.
+        self.rotary_emb.sin_cached = dist.shard_tensor(
+            self.rotary_emb.sin_cached,
+            get_mesh(self.ipp),
+            [dist.Replicate(), dist.Replicate()],
+        )
+        self.rotary_emb.cos_cached = dist.shard_tensor(
+            self.rotary_emb.cos_cached,
+            get_mesh(self.ipp),
+            [dist.Replicate(), dist.Replicate()],
+        )
 
     def forward(
         self,
@@ -522,8 +540,8 @@ class LlamaDecoderLayerAuto(nn.Layer):
         self.hidden_size = config.hidden_size
         self.self_attn = LlamaAttentionAuto(config, layerwise_recompute, ipp)
         self.mlp = LlamaMLPAuto(config, ipp)
-        self.input_layernorm = LlamaRMSNormAuto(config)
-        self.post_attention_layernorm = LlamaRMSNormAuto(config)
+        self.input_layernorm = LlamaRMSNormAuto(config, ipp)
+        self.post_attention_layernorm = LlamaRMSNormAuto(config, ipp)
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
         # Enable_recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
@@ -815,7 +833,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                 for i in range(config.num_hidden_layers)
             ]
         )
-        self.norm = LlamaRMSNormAuto(config)
+        self.norm = LlamaRMSNormAuto(config, get_layer_ipp(config.num_hidden_layers - 1))
 
         self.gradient_checkpointing = False
 
