@@ -71,7 +71,22 @@ def merge_fwd_labels(loss_cls):
     return loss_cls
 
 
-def create_loss(loss_cls, config, extra_args):
+def create_loss(loss_cls, config, extra_args, merge_labels=None):
+    """
+    loss_cls(paddle.nn.Layer): loss class
+    config(PratrainedConfig): model config, to be consistent with loss defined
+        in transformers
+    extra_args(dict): create loss with more args not in config
+    merge_labels: use a wrapped loss_cls whose label args are merged into one arg,
+        this is useful to PipelineParallel and trainer.criterion since they only
+        support loss format corresponding to this format.
+    """
+    # TODO(guosheng): merge_labels if loss_cls not
+    ori_fwd = loss_cls.forward
+    if merge_labels:
+        fwd_params = inspect.signature(ori_fwd).parameters
+        if len(fwd_params.keys()) > 3:  # merge_fwd_labels has not done
+            loss_cls = merge_fwd_labels(loss_cls)
     # forward(self, predict, label1, label2, ...)
     loss_arg_names = list(inspect.signature(loss_cls.__init__).parameters.keys())[2:]
     if isinstance(extra_args, dict):
@@ -79,7 +94,32 @@ def create_loss(loss_cls, config, extra_args):
     else:
         # create from TrainingArguments
         loss_kwargs = dict([(name, getattr(extra_args, name)) for name in loss_arg_names if hasattr(extra_args, name)])
-    return loss_cls(config, **loss_kwargs)
+    loss = loss_cls(config, **loss_kwargs)
+    loss_cls.forward = ori_fwd
+    return loss
+
+
+@paddle.no_grad()
+def make_position_ids(attention_mask, source=None):
+    attention_mask_bool = attention_mask
+    attention_mask = attention_mask.cast(paddle.int64)
+    position_ids = attention_mask.cumsum(-1) - 1
+    # Make padding positions in source be 0, since reward model use position_ids
+    # plus with padding size (number of 0s) in source to calculate end offsets.
+    # It does not matter when source is left padding and target is right padding
+    # which is the output of non-FuseMT generation, while when using FuseMT whose
+    # output is right padding source and right padding target, we have to set
+    # padding positions in source be 0 to make compatible.
+    if source is not None:
+        src_len = position_ids[:, source.shape[-1] - 1].unsqueeze(-1)
+        position_ids = paddle.where(
+            paddle.logical_and(paddle.logical_not(attention_mask_bool), position_ids <= src_len),
+            attention_mask,
+            position_ids,
+        )
+        return position_ids
+    position_ids = paddle.where(position_ids == -1, attention_mask, position_ids)
+    return position_ids
 
 
 def gather_log_probabilities(logits: paddle.Tensor, labels: paddle.Tensor) -> paddle.Tensor:
@@ -108,20 +148,7 @@ class RLHFPPOLoss(nn.Layer):
         )
         return paddle.sum(paddle.maximum(pg_loss1, pg_loss2) * mask) / mask.sum()
 
-    def forward(self, logits, input_ids, old_log_probs, reward_advantages, sequence_mask, start=None):
-        # tgt_mask or sequence_mask according to length
-
-        # When used in pipe mode, batches among accumulation steps should be paded.
-        # Hard to pad acorss batches, think in some cases one batch might have the
-        # longest prompt+target length but the shortest target lengh, which might
-        # cause mismatch between inputs with prompt+target length and labels with
-        # target length. NOTE: Thus, we might make all fields be prompt+target
-        # length rather rather than target and company an extra start input.
-        # However trick can be used in pipe_model._prepare_pipeline_inputs_func,
-        # label fields with target length such as old_log_probs/reward_advantages/sequence_mask
-        # not need to join comm and thus there is no need to keep same shape among
-        # batches of accumulation steps, they just need to pad as prompt+target
-        # fields such as input_ids.
+    def forward(self, logits, input_ids, old_log_probs, reward_advantages, sequence_mask):
         log_probs = gather_log_probabilities(logits[:, :-1], input_ids[:, 1:])
         if log_probs.shape[1] == old_log_probs.shape[1]:
             # labels (old_log_probs, reward_advantages, sequence_mask) has
@@ -136,9 +163,6 @@ class RLHFPPOLoss(nn.Layer):
         else:
             # labels (old_log_probs, reward_advantages, sequence_mask) has tgt length
             log_probs = log_probs[:, -old_log_probs.shape[1] :]
-        # if start is not None:
-        #     old_log_probs = old_log_probs[:, start:]
-        #     sequence_mask = sequence_mask[:, start:]
         actor_loss = self.actor_loss_fn(
             log_probs,
             old_log_probs,
@@ -159,9 +183,6 @@ class RLHFPPOMixedLoss(nn.Layer):
         self.sft_criterion = PretrainingCriterion(config)
 
     def forward(self, logits, labels, input_ids, old_log_probs, reward_advantages, sequence_mask):
-        # def forward(self, logits, label_info):
-        #     labels, input_ids, old_log_probs, reward_advantages, sequence_mask = label_info
-
         logits = logits if isinstance(logits, paddle.Tensor) else logits[0]
         loss = None
         # sft, pt loss
@@ -198,16 +219,7 @@ class RLHFValueLoss(nn.Layer):
         vf_loss2 = paddle.square(values_clipped - returns)
         return 0.5 * paddle.sum(paddle.maximum(vf_loss1, vf_loss2) * mask) / mask.sum()
 
-    def forward(
-        self,
-        reward_values,
-        old_reward_values,
-        reward_returns,
-        sequence_mask,
-        start=None,
-        # label_info,
-    ):
-        # old_reward_values, reward_returns, sequence_mask = label_info
+    def forward(self, reward_values, old_reward_values, reward_returns, sequence_mask):
         reward_values = reward_values if isinstance(reward_values, paddle.Tensor) else reward_values[0]
         reward_values = reward_values.squeeze(axis=-1)[:, :-1]
         if reward_values.shape[1] == old_reward_values.shape[1]:
@@ -226,9 +238,6 @@ class RLHFValueLoss(nn.Layer):
             # labels (old_reward_values, reward_returns, sequence_mask) has
             # tgt length
             reward_values = reward_values[:, -old_reward_values.shape[1] :]
-        # if start is not None:
-        #     old_reward_values = old_reward_values[:, start:]
-        #     sequence_mask = sequence_mask[:, start:]
         reward_critic_loss = self.critic_loss_fn(
             reward_values,
             old_reward_values,

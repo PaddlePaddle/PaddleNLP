@@ -13,474 +13,55 @@
 # limitations under the License.
 
 import copy
-import inspect
 import itertools
 import math
 import os
 import sys
 import time
-from contextlib import contextmanager
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-import numpy as np
 import paddle
 import paddle.distributed as dist
 import paddle.nn as nn
-import paddle.nn.functional as F
-import tqdm
 from data import DummyDataset, PromptOnlyBatch
-from models.model_pp import make_position_ids
-from models.ppo_model_utils import RLHFPPOMixedLoss, RLHFValueLoss, create_loss
+from infer_utils import InferEvalModel, infer_guard
+from models.ppo_model_utils import (
+    RLHFPPOMixedLoss,
+    RLHFValueLoss,
+    create_loss,
+    gather_log_probabilities,
+    make_position_ids,
+)
 from paddle.distributed import fleet
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from paddle.utils import map_structure
 from rich.console import Console
 from rich.table import Table
+from trainer_utils import (
+    MuteDefaultFlowCallback,
+    PipeEvalModel,
+    batch_retokenize,
+    guard_set_args,
+    is_same_tokenizer,
+)
 
 from paddlenlp.data import DataCollator
 from paddlenlp.generation import GenerationConfig
-from paddlenlp.generation.utils import GenerationMixin
 from paddlenlp.trainer.plugins.unified_checkpoint import flatten_list
 from paddlenlp.trainer.trainer import (
-    TRAINER_STATE_NAME,
     EvalLoopOutput,
     EvalPrediction,
-    HybridParallelOptimizer,
-    NlpDistributedBatchSampler,
     ShardingOption,
     Trainer,
     TrainerCallback,
-    TrainerControl,
-    TrainerState,
     TrainingArguments,
-    _obtain_optimizer_parameters_list,
-    distributed_file,
-    distributed_isfile,
-    fused_allreduce_gradients,
     logger,
-    reshard_util,
     speed_metrics,
-    split_inputs_sequence_dim,
-)
-from paddlenlp.transformers import BatchEncoding, PretrainedModel, PretrainedTokenizer
-from paddlenlp.transformers.configuration_utils import PretrainedConfig
-from paddlenlp.transformers.model_outputs import ModelOutput
-from paddlenlp.transformers.tokenizer_utils_base import (
-    PaddingStrategy,
-    TruncationStrategy,
 )
 from paddlenlp.utils.distributed import distributed_gather
 
 global_dev_id = 0 if paddle.get_device() == "cpu" else int(paddle.get_device().split(":")[1])
-
-
-def batch_retokenize(
-    input_ids: paddle.Tensor,
-    src_tokenizer: PretrainedTokenizer,
-    dest_tokenizer: PretrainedTokenizer,
-    *,
-    padding: bool | str | PaddingStrategy = PaddingStrategy.LONGEST,
-    truncation: bool | str | TruncationStrategy = TruncationStrategy.DO_NOT_TRUNCATE,
-    skip_special_tokens: bool = True,
-) -> BatchEncoding:
-    """Re-tokenize a batch of input ids from one tokenizer to another."""
-    output = dest_tokenizer(
-        [
-            text + dest_tokenizer.eos_token
-            for text in src_tokenizer.batch_decode(
-                input_ids,
-                skip_special_tokens=skip_special_tokens,
-            )
-        ],
-        padding=padding,
-        truncation=truncation,
-        return_tensors="pd",
-    )
-    return output
-
-
-def gather_log_probabilities(logits: paddle.Tensor, labels: paddle.Tensor) -> paddle.Tensor:
-    """Gather log probabilities of the given labels from the logits."""
-    log_probs = F.log_softmax(logits, axis=-1)
-    log_probs_labels = paddle.take_along_axis(log_probs, axis=-1, indices=labels.unsqueeze(axis=-1))
-    return log_probs_labels.squeeze(axis=-1)
-
-
-def init_train_model_opt(
-    self: Trainer, max_steps: int, resume_from_checkpoint: bool = False, clear_master_weight: bool = False
-) -> PretrainedModel:
-    # Copy of model/optimizer init and resuming related code in `Trainer.train`.
-    # NOTE: this `_load_from_checkpoint` is indeed to load model states in the
-    # following elif-else branches, though they are apart away in `Trainer.train`.
-    if not self.args.should_load_sharding_stage1_model:
-        self._load_from_checkpoint(resume_from_checkpoint)
-
-    # delay_optimizer_creation = (
-    #     self.sharding is not None
-    #     and ShardingOption.SHARD_OP in self.args.sharding
-    # )
-    delay_optimizer_creation = False
-
-    if not delay_optimizer_creation:
-        self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-
-    if self.args.should_load_sharding_stage1_model:
-        model = self._wrap_model_and_load_sharded_checkpoint(resume_from_checkpoint)
-    elif self.args.should_save_sharding_stage1_model:
-        # In the non-sharded mode, should invoke _load_from_checkpoint before _wrap_model.
-        # In this mode, the rank0 load all params and the _wrap_model implicitly broadcast params from rank0 to the other ranks.
-        model = self._wrap_model(self.model_wrapped)
-        if self.sharding_io is not None:
-            assert delay_optimizer_creation is False, "delay_optimizer_creation should be False"
-            # the self.optimizer should be wrapped and it is done in _wrap_model
-            self.sharding_io.set_optimizer(self.optimizer)
-        # for the rest of this function `model` is the outside model, whether it was wrapped or not
-        if model is not self.model:
-            self.model_wrapped = model
-        if delay_optimizer_creation:
-            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-        self._load_optimizer_and_scheduler(resume_from_checkpoint)
-    else:
-        model = self._wrap_model(self.model_wrapped)
-        # for the rest of this function `model` is the outside model, whether it was wrapped or not
-        if model is not self.model:
-            self.model_wrapped = model
-        if delay_optimizer_creation:
-            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-        self._load_optimizer_and_scheduler(resume_from_checkpoint)
-
-    if ShardingOption.FULL_SHARD in self.args.sharding and clear_master_weight:
-        # for inference model to use Trainer sharding stage3, clear master_weight
-        # which is created in GroupShardedStage3.__init__
-        self.optimizer._master_weights = None
-
-    if self.args.device == "npu" and self.args.flatten_param_grads:
-        from .plugins.npu_plugin import npu_accelerate_plugin
-
-        npu_accelerate_plugin(self.optimizer)
-
-    return model
-
-
-def init_train_state(
-    self: Trainer,
-    resume_from_checkpoint: bool,
-    train_dataloader: DataLoader,
-    max_steps: int,
-    num_train_epochs: int,
-    num_update_steps_per_epoch: int,
-):
-    args = self.args
-
-    self.state = TrainerState()
-    self.state.epoch = 0
-    epochs_trained = 0
-    steps_trained_in_current_epoch = 0
-    steps_trained_progress_bar = None
-
-    # Check if continuing training from a checkpoint
-    if resume_from_checkpoint is not None and distributed_isfile(
-        os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
-    ):
-        self.state = TrainerState.load_from_json(
-            distributed_file(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
-        )
-        epochs_trained = self.state.global_step // num_update_steps_per_epoch
-        if not args.ignore_data_skip:
-            steps_trained_in_current_epoch = self.state.global_step % (num_update_steps_per_epoch)
-            steps_trained_in_current_epoch *= args.gradient_accumulation_steps
-        else:
-            steps_trained_in_current_epoch = 0
-
-        logger.info("  Continuing training from checkpoint, will skip to saved global_step")
-        logger.info(f"  Continuing training from epoch {epochs_trained}")
-        logger.info(f"  Continuing training from global step {self.state.global_step}")
-        if not args.ignore_data_skip:
-            logger.info(
-                f"  Will skip the first {epochs_trained} epochs then the first {steps_trained_in_current_epoch} "
-                "batches in the first epoch. If this takes a lot of time, you can add the `--ignore_data_skip` "
-                "flag to your launch command, but you will resume the training on data already seen by your model."
-            )
-            if self.is_local_process_zero() and not args.disable_tqdm:
-                steps_trained_progress_bar = tqdm(total=steps_trained_in_current_epoch)
-                steps_trained_progress_bar.set_description("Skipping the first batches")
-        if not args.ignore_data_skip:
-            if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
-                train_dataloader.batch_sampler, NlpDistributedBatchSampler
-            ):
-                consumed_samples = (
-                    self.state.global_step
-                    * args.train_batch_size
-                    * args.gradient_accumulation_steps
-                    * args.dataset_world_size
-                )
-                train_dataloader.batch_sampler.set_epoch(consumed_samples=consumed_samples)
-                logger.info(f"Set DistributedBatchSampler consumed_samples to {consumed_samples}")
-
-    self.state.max_steps = int(max_steps)
-    self.state.num_train_epochs = num_train_epochs
-    self.state.is_local_process_zero = self.is_local_process_zero()
-    self.state.is_world_process_zero = self.is_world_process_zero()
-
-    return epochs_trained, steps_trained_in_current_epoch, steps_trained_progress_bar
-
-
-def init_train_log(
-    self: Trainer,
-    num_examples: int,
-    num_train_epochs: int,
-    total_train_batch_size: int,
-    max_steps: int,
-    num_train_samples: int,
-    model: PretrainedModel,
-):
-    args = self.args
-
-    logger.info("***** Running training *****")
-    logger.info(f"  Num examples = {num_examples:,}")
-    logger.info(f"  Num Epochs = {num_train_epochs}")
-    logger.info(f"  Instantaneous batch size per device = {args.per_device_train_batch_size}")
-    logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}")
-    logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
-    logger.info(f"  Total optimization steps = {max_steps:,}")
-    logger.info(f"  Total num train samples = {num_train_samples:,}")
-    # per_device_trainable_numel = sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)
-    # TODO: Temporary fix since Tensor.numel() not supported in distributed mode
-    per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
-    logger.info(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
-    if self.args.use_hybrid_parallel:
-        # todo fix for pipeline_parallel_degree
-        parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
-        if parts_num > 1:
-            all_reduce_dtype = "int64"
-            if paddle.get_device().split(":")[0] in ["npu", "xpu"]:
-                # TODO(duanyanhui): fix when NPU all_reduce supports int64
-                all_reduce_dtype = "float32"
-            trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
-            paddle.distributed.all_reduce(trainable_numel_tensor)
-            trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
-            # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
-            # so, the trainable numel is a little bigger than real.
-            logger.info(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
-
-
-def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs):
-    """
-    Just a copy of single training step complete code in Trainer.train while loop
-    which including forward+backward+step, while wraps the inputs and outputs to
-    make the complicated copied code no need to change. Maybe a better way is to
-    add fine-grained methods including these steps to Trainer which is similar to
-    DeepSpeed engine.
-    """
-
-    # TODO(guosheng): step, steps_trained_in_current_epoch and steps_trained_progress_bar
-    # should use reference since they would be overwrite.
-    # for state update
-    epoch = kwargs.get("epoch", 0)
-    step = kwargs.get("step", 0)
-    steps_in_epoch = kwargs.get("steps_in_epoch", 0)
-    step_control = kwargs.get("step_control", 0)
-    # for step and progress update when resuming data
-    train_dataloader = kwargs.get("train_dataloader", None)
-    resume_from_checkpoint = kwargs.get("resume_from_checkpoint", None)
-    steps_trained_in_current_epoch = kwargs.get("steps_trained_in_current_epoch", 0)
-    steps_trained_progress_bar = kwargs.get("steps_trained_progress_bar", None)
-    # for eval output ignore to gather
-    ignore_keys_for_eval = kwargs.get("ignore_keys_for_eval", None)
-    tr_loss = kwargs.get("tr_loss", 0.0)
-    model = kwargs.get("model", self.model_wrapped)
-
-    args = self.args
-
-    if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
-        inputs = split_inputs_sequence_dim(inputs)
-    # self.timers and self.timers("read-data").stop()
-    os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
-    self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
-
-    # Skip past any already trained steps if resuming training
-    # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
-    # We use consumed_samples to reset the status
-    if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
-        train_dataloader.batch_sampler, NlpDistributedBatchSampler
-    ):
-        if step == 0:
-            if steps_trained_progress_bar is not None:
-                steps_trained_progress_bar.update(steps_trained_in_current_epoch)
-                steps_trained_progress_bar.close()
-                steps_trained_progress_bar = None
-            self._load_rng_state(resume_from_checkpoint)
-        step += steps_trained_in_current_epoch
-    elif steps_trained_in_current_epoch > 0:
-        steps_trained_in_current_epoch -= 1
-        if steps_trained_progress_bar is not None:
-            steps_trained_progress_bar.update(1)
-        if steps_trained_in_current_epoch == 0:
-            self._load_rng_state(resume_from_checkpoint)
-        # continue
-        final_local_vars = locals()
-        for k in kwargs.keys():
-            if k in final_local_vars:
-                kwargs[k] = final_local_vars[k]
-        return kwargs
-    elif steps_trained_progress_bar is not None:
-        steps_trained_progress_bar.close()
-        steps_trained_progress_bar = None
-
-    if step_control % args.gradient_accumulation_steps == 0:
-        self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
-        self.timers and self.timers("forward-backward").start()
-
-    dp_enabled = self.args.data_parallel_degree > 1 if self.args.use_hybrid_parallel else args.local_rank != -1
-    forbidden_no_sync = False
-    # stage2 and stage3 should not no_sync, because the is no DDP wrapper and no_sync API
-    # hybrid_parallel (tp or pp or sharding stage 1) should not no_sync
-    if self.args.use_hybrid_parallel:
-        forbidden_no_sync = True
-
-    availiable_no_sync = dp_enabled and not forbidden_no_sync
-
-    is_no_sync = (
-        ((step_control + 1) % args.gradient_accumulation_steps != 0)
-        and availiable_no_sync
-        and args._no_sync_in_gradient_accumulation
-    ) or (args.recompute and availiable_no_sync)
-    # sharding
-    # stage1. the same as ddp
-    # stage2. manualy collect gradient on dp group
-
-    dp_master_grad = self.args.world_size > 1 and self.args.amp_master_grad and not self.args.use_hybrid_parallel
-    if dp_master_grad:
-        is_no_sync = True
-
-    if is_no_sync:
-        # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
-        with model.no_sync():
-            tr_loss_step = self.training_step(model, inputs)
-    else:
-        tr_loss_step = self.training_step(model, inputs)
-
-    tr_loss += tr_loss_step
-
-    if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
-        # last step in epoch but step is always smaller than gradient_accumulation_steps
-        steps_in_epoch <= args.gradient_accumulation_steps
-        and (step + 1) == steps_in_epoch
-    ):
-        if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
-            tr_loss /= self.args.gradient_accumulation_steps
-
-        self.timers and self.timers("forward-backward").stop()
-        # Maunally collect gradients
-        # Case 1: Use recompute and dp
-        # Case 2: Hack dp with master_grad
-        # Case 3: Pipeline or sharding overlap
-        # local_rank != -1 don't means dp in networks.
-        self.timers and self.timers("all-reduce").start()
-
-        # Case 1: Use recompute and dp / sharding stage1,
-        # manualy collect gradient for dp.
-        if args.recompute and availiable_no_sync:
-            fused_allreduce_gradients(list(model.parameters()), None)
-
-        # Case 2: hack dp with master_grad
-        if dp_master_grad and not (args.recompute and availiable_no_sync):
-            fused_allreduce_gradients(list(model.parameters()), None)
-
-        # Pipeline parallel mode,  handle gradient reduce here to overlap
-        pipeline_parallel_config = (
-            set(args.pipeline_parallel_config.split(" ")) if args.pipeline_parallel_degree > 1 else set()
-        )
-        enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
-        enable_release_grads = "enable_release_grads" in pipeline_parallel_config
-
-        # Case 3: Pipeline parallel mode, overlap with dp
-        if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
-            parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
-
-            if not enable_dp_comm_overlap:
-                if self.optimizer._sharding_enable:
-                    assert reshard_util.is_sharding_opt(self.optimizer)
-                    self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
-
-                if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
-                    fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
-
-        self.timers and self.timers("all-reduce").stop()
-        self.timers and self.timers("optimizer-step").start()
-
-        if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss():
-            for p in model._layers.parameters():
-                with paddle.no_grad():
-                    if hasattr(p, "main_grad") and p.main_grad is not None:
-                        assert p.grad is None
-                        p.main_grad.scale_(1.0 / self.args.gradient_accumulation_steps)
-                    elif p.grad is not None:
-                        p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
-
-        # Optimizer step
-        self.callback_handler.on_optimizer_begin(
-            args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
-        )
-        optimizer_was_run = True
-        if self.do_grad_scaling:
-            scale_before = paddle.assign(self.scaler._scale)
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
-            scale_after = self.scaler._scale
-            optimizer_was_run = not self.scaler._cache_founf_inf
-            if not optimizer_was_run:
-                scale_before_value = scale_before.cpu().numpy()
-                scale_after_value = scale_after.cpu().numpy()
-                logger.warning(
-                    f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
-                )
-        elif isinstance(self.optimizer, HybridParallelOptimizer):
-            self.optimizer._step(parameters_list)
-        else:
-            self.optimizer.step()
-
-        self.timers and self.timers("optimizer-step").stop()
-
-        if optimizer_was_run:
-            self.lr_scheduler.step()
-
-        if enable_release_grads and args.pipeline_parallel_degree > 1:
-            self.optimizer.clear_grad(set_to_zero=False)
-            for _, buffers in model._chunk_2_comm_buffers.items():
-                for buffer in buffers:
-                    buffer._clear_grad_storage()
-        else:
-            self.optimizer.clear_grad()
-
-        self.callback_handler.on_optimizer_end(
-            args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
-        )
-
-        self.state.global_step += 1
-        self.state.epoch = epoch + (step + 1) / steps_in_epoch
-        self.control = self.callback_handler.on_step_end(args, self.state, self.control)
-        self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
-        self._print_timer()
-        step_control = 0
-    else:
-        self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
-        step_control += 1
-
-    if self.control.should_epoch_stop or self.control.should_training_stop:
-        # break
-        final_local_vars = locals()
-        for k in kwargs.keys():
-            if k in final_local_vars:
-                kwargs[k] = final_local_vars[k]
-        return kwargs
-    # self.timers and self.timers("read-data").start()
-
-    final_local_vars = locals()
-    for k in kwargs.keys():
-        if k in final_local_vars:
-            kwargs[k] = final_local_vars[k]
-    return kwargs
+from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
 
 
 def offload_tensor_to_cpu(tensors):
@@ -841,15 +422,18 @@ def create_data_trans_group(global_rank, group_nums):
     return group
 
 
-Trainer.init_train_model_opt = init_train_model_opt
-Trainer.init_train_log = init_train_log
-Trainer.init_train_state = init_train_state
-Trainer.full_training_step = full_training_step
-
 Trainer.export_evaluate_model = export_evaluate_model
 
 
-class PolicyTrainer(Trainer):
+class StepTrainer(Trainer):
+    """
+    Trainer enhanced with step-level training combining with patches of Trianer.
+    We can use this to do training whose step is composed of multi models via
+    multiple instances of StepTrainer, such as PPO. Additionally, using a mixed
+    loss and get the separated loss metrics is supported, which is helpful to
+    PipelienParallel with a mixed loss.
+    """
+
     def __init__(
         self,
         model: Union[PretrainedModel, nn.Layer] = None,
@@ -864,8 +448,6 @@ class PolicyTrainer(Trainer):
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor] = None,
     ):
-        # only used for non-PipelineParallel models
-        criterion = create_loss(RLHFPPOMixedLoss, model.config, args)
         super().__init__(
             model,
             criterion,
@@ -879,9 +461,130 @@ class PolicyTrainer(Trainer):
             optimizers,
             preprocess_logits_for_metrics,
         )
+        # criterion is only used for non-PipelineParallel models. criterion is
+        # included in model for PipelineParallel.
+        if getattr(self, "loss_cls", None) and self.criterion is None:
+            self.criterion = self.create_criterion()
+
+    def create_criterion(self):
+        """
+        create loss using `loss_cls` for trainer. It would use a wrapped loss_cls
+        whose label arguments are merged into one argument, this is useful to
+        PipelineParallel and trainer.criterion which limit loss format.
+        """
+        criterion = create_loss(self.loss_cls, self.model.config, self.args, merge_labels=True)
+        return criterion
+
+    def loss_identifier(self, inputs: Dict) -> str:
+        """
+        Moreover, a model/StepTrainer instance may use a mixed loss which uses a
+        different loss for different step and inputs, while we often want to get
+        the separated loss metric. We use a callable discriminator using inputs
+        (dict) as arguments and returning corresponding loss name to identify
+        current loss. NOTE: please make the loss name ends with "_loss". `tr_loss`
+        is the default loss name used in trainer.train.
+        """
+        return "tr_loss"
+
+    def get_model(self, train=False):
+        """
+        model visitor wrapps PipelineParalle and Inference model to do evaulation
+        and generation.
+        """
+        if train:
+            return self.model_wrapped
+        model = getattr(self, "_eval_model", None)
+        if model is not None:
+            return model
+        if self.args.pipeline_parallel_degree > 1:
+            # Only accept wrapped model for pipeline_parallel mode
+            model = PipeEvalModel(self)
+            self._eval_model = model
+        else:
+            model = InferEvalModel(self)
+            self._eval_model = model
+        return model
+
+    def get_train_step_vars(self, vars: Dict = None) -> Dict:
+        """
+        NOTE: This is transparent to users.
+        When using multiple instances of StepTrainer collaborate to do one training
+        step, each should use its own vars such as loss/model/step_control which are
+        local vars in Trainer.train, we define these vars by `train_step_vars`. They
+        are vars needed by full_training_step for training control, as following:
+        tr_loss, model, epoch, step, step_control.
+        some vars such as `epoch` are meaningless, they are needed just because
+        full_training_step copies code from Trainer.train which is designed for
+        complete training process.
+
+        return `train_step_vars` (dict). If not exists, create it first. If `vars`
+        is not None, update `train_step_vars` with it.
+
+        TODO(guosheng): use namedtuple or dataclass to make it more readable.
+        """
+        if not hasattr(self, "train_step_vars"):
+            # should be called after model is wrapped since the model field should
+            # use model_wrapped.
+
+            assert self.model is not self.model_wrapped
+            self.train_step_vars = {
+                # meaningless vars can pass from outter, dummy value is enough
+                "epoch": 0,  # meaningless for step training
+                "step": 0,  # meaningless for step training
+                "steps_in_epoch": 100000,  # meaningless for step training
+                "step_control": 0,  # to control training process
+                "model": self.model_wrapped,
+                # "tr_loss": paddle.to_tensor(0.0),  # lazy create
+            }
+        if vars:
+            self.train_step_vars.update(vars)
+        return self.train_step_vars
+
+    def full_training_step(self, **inputs) -> paddle.Tensor:
+        """
+        Accept any valid key word arguments of model and loss as inputs, they
+        would be sent to model and then loss. Mostly it is similar to output from
+        data collator.
+        Return loss var. However when using PipelienParallel, the loss returned
+        is 0 when not reach accumulated step and the loss returned at accumulated
+        step is a mixed loss. We can use `get_step_loss` to get the actual loss.
+        """
+        # if model has multi losses which are combined into one mixed criterion,
+        # loss statistic var may change for different training steps according
+        # to inputs.
+        train_step_vars = self.get_train_step_vars()
+        loss_name = self.loss_identifier(inputs)
+        loss_var = train_step_vars.get(loss_name, None)
+        if loss_var is None:
+            loss_var = paddle.to_tensor(0.0)
+            train_step_vars[loss_name] = loss_var
+        # trainer.train use `tr_loss` as loss var
+        train_step_vars["tr_loss"] = loss_var
+
+        new_train_step_vars = super().full_training_step(inputs, **train_step_vars)
+
+        # minimally update
+        train_step_vars = self.get_train_step_vars(
+            {"step_control": new_train_step_vars["step_control"], loss_name: new_train_step_vars["tr_loss"]}
+        )
+        if loss_name != "tr_loss":
+            train_step_vars.pop("tr_loss")
+
+        self.mark_step_loss(loss_name)
+
+        return train_step_vars[loss_name]
 
     def _prepare_inputs(self, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> Dict[str, Union[paddle.Tensor, Any]]:
+        """
+        trainer.criterion only support criterion(prediction, labels), so we need
+        to reorganize the inputs to extract label data into one argument. This is
+        only used in non-PipelineParallel model training since loss is included
+        in PipelineLayer.
+        """
         inputs = super()._prepare_input(inputs)
+        if self.criterion is None or getattr(self.criterion, "label_names", None) is None:
+            return inputs
+        # criterion created by create_loss has `label_names` and `label_default_values`
         label_names = self.criterion.__class__.label_names
         # some data fields are used both in model and loss
         shared_fields = set(["input_ids", "attention_mask"])
@@ -901,269 +604,107 @@ class PolicyTrainer(Trainer):
         # in criterion not send to model can workaround this.
         return inputs
 
-    def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs):
+    def mark_step_loss(self, loss_name):
+        """
+        NOTE: This is transparent to users.
+        When using a mixed loss we often want to get the separated loss metrics,
+        thus we mark loss type of each training step to separate them. This is
+        not necessary since the loss would be returnd after each training step.
+        However when using PipelienParallel, the loss returned is 0 when not reach
+        accumulated step and the loss returned at accumulated step is a mixed loss.
+        To separate loss metrics in PipelienParallel:
+        1. We hack PipelineParallel._forward_step to record actual loss for each
+           step in a list.
+        2. We mark the loss type only once for each step using `loss_step_indice`
+           (dict), then wen can check out the corresponding loss metrics from the
+           loss list.
+        We assume a static order of multi-losses and mark the loss indice only once.
+        """
+        self.loss_step_indice = getattr(self, "loss_step_indice", {})
+        if loss_name not in self.loss_step_indice:
+            self.loss_step_indice[loss_name] = len(self.loss_step_indice)
+
+    def get_step_loss(self, loss_prefix: str = "") -> Dict:
+        """
+        Return a dict mapping loss name to value of current training step. This
+        is mainly to get loss for metric logging, and it would not affect the
+        training. This is mostly helpful to PipelienParallel with a mixed loss
+        in which the loss returned is 0 when not reach accumulated step and the
+        loss returned at accumulated step is a mixed loss.
+        NOTE: Overwrite it when we want to change the logging value.
+        """
+        model = self.get_model(train=True)
+        if not hasattr(self, "loss_dict"):
+            self.loss_dict = {}
+            for var_name, value in self.get_train_step_vars().items():
+                if var_name.endswith("_loss"):
+                    self.loss_dict[var_name] = value
+        loss_dict = {}  # return a new dict because of new metric names
+        if isinstance(model, fleet.model.PipelineParallel) and len(self.loss_dict) > 1:
+            # NOTE: PipelineParallel only returns a accumulated loss after
+            # accumulated steps, which is a mixed loss of ppo-loss and
+            # ptx-loss. We hack PipelineParallel._forward_step to record
+            # loss metrics and postprocess the recorded losses here.
+            # Maybe better to make the last_stage worker log to reduce
+            # comm and for simplicity.
+            with paddle.no_grad():
+                if model.is_pipeline_last_stage():
+                    # loss is 0D tensor, use stack rather than concat
+                    mix_loss = paddle.stack(model._step_losses)
+                    model._step_losses = None
+                else:
+                    # The tessor shape is not policy_model.accumulate_steps
+                    # (args.accu_steps) but policy_trainer.args.accu_steps,
+                    # since policy_model is created with global pp_config
+                    # using global args.accu_steps which is only half of
+                    # policy_trainer.args.accu_steps, and indeed trainer hack
+                    # model.accumulate_steps in training_pipeline_step to use
+                    # trainer.args.accu_steps. The dtype is fp32(to be check),
+                    # thus no need to broadcast.
+                    mix_loss = paddle.empty(shape=[self.args.gradient_accumulation_steps], dtype=paddle.float32)
+                paddle.distributed.broadcast(mix_loss, src=model.pp_group.ranks[-1], group=model.pp_group)
+                for loss_name in self.loss_dict:
+                    # We assume a static order of multi-losses and mark the loss
+                    # indice only once.
+                    value = mix_loss[self.loss_step_indice[loss_name] :: len(self.loss_dict)].mean()
+                    loss_name = loss_prefix + loss_name if loss_prefix else loss_name
+                    loss_dict[loss_name] = value
+            return loss_dict
+
+        for loss_name in self.loss_dict:
+            value = self.get_train_step_vars()[loss_name]
+            loss_name = loss_prefix + loss_name if loss_prefix else loss_name
+            loss_dict[loss_name] = value
+        return loss_dict
+
+
+class PolicyTrainer(StepTrainer):
+    loss_cls = RLHFPPOMixedLoss
+
+    def loss_identifier(self, inputs: Dict) -> str:
         labels = inputs.get("labels", None)
         if labels is not None:  # use ptx
             loss_name = "ptx_loss"
         else:
             loss_name = "actor_loss"
-        kwargs["model"] = kwargs.pop("policy_model")
-        kwargs["step_control"] = kwargs.pop("policy_step_control")
-        kwargs["tr_loss"] = kwargs.pop(loss_name)
-        kwargs = super().full_training_step(inputs, **kwargs)
-        kwargs["policy_model"] = kwargs.pop("model")
-        kwargs["policy_step_control"] = kwargs.pop("step_control")
-        kwargs[loss_name] = kwargs.pop("tr_loss")
-        return kwargs
+        return loss_name
+
+    def get_step_loss(self, loss_prefix: str = "") -> Dict:
+        loss_dict = super().get_step_loss(loss_prefix="")
+        # use_ptx would double the gradient_accumulation_steps which causes
+        # actor_loss and ptx_loss reduced by half. Moreover, ptx_loss should
+        # be divided by ptx_coeff for logging.
+        # TODO(guosheng): maybe should consider self._enable_delay_scale_loss()
+        if "ptx_loss" in loss_dict:
+            loss_dict[loss_prefix + "ptx_loss"] = loss_dict["ptx_loss"] * 2 / self.criterion.ptx_coeff
+            loss_dict[loss_prefix + "actor_loss"] = loss_dict["actor_loss"] * 2
+        return loss_dict
 
 
-class ValueTrainer(Trainer):
-    def __init__(
-        self,
-        model: Union[PretrainedModel, nn.Layer] = None,
-        criterion: nn.Layer = None,
-        args: TrainingArguments = None,
-        data_collator: Optional[DataCollator] = None,
-        train_dataset: Optional[Dataset] = None,
-        eval_dataset: Union[Dataset, Dict[str, Dataset]] = None,
-        tokenizer: Optional[PretrainedTokenizer] = None,
-        compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
-        callbacks: Optional[List[TrainerCallback]] = None,
-        optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
-        preprocess_logits_for_metrics: Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor] = None,
-    ):
-        # only used for non-PipelineParallel models
-        criterion = create_loss(RLHFValueLoss, model.config, args)
-        super().__init__(
-            model,
-            criterion,
-            args,
-            data_collator,
-            train_dataset,
-            eval_dataset,
-            tokenizer,
-            compute_metrics,
-            callbacks,
-            optimizers,
-            preprocess_logits_for_metrics,
-        )
-
-    def _prepare_inputs(self, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> Dict[str, Union[paddle.Tensor, Any]]:
-        inputs = super()._prepare_input(inputs)
-        label_names = self.criterion.__class__.label_names
-        # some data fields are used both in model and loss
-        shared_fields = set(["input_ids", "attention_mask"])
-        labels = []
-        for name in label_names:
-            if name not in inputs:
-                label = self.criterion.__class__.label_default_values.get(name, None)
-            elif name in shared_fields:
-                label = inputs[name]
-            else:
-                label = inputs.pop(name)
-            labels.append(label)
-        # "labels" is the pre-defined label name in Trainer
-        inputs["labels"] = labels
-        # NOTE: TensorParallel model requires non-Tensor inputs to be lists and
-        # broadcast them, thus do not or optionally use these inputs. labels use
-        # in criterion not send to model can workaround this.
-        return inputs
-
-    def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs):
-        # TODO(guosheng): Make these training control vars mapping as class attr,
-        # then PPOTrainer can extract and reuse them to avoid hard code.
-        kwargs["model"] = kwargs.pop("value_model")
-        kwargs["step_control"] = kwargs.pop("value_step_control")
-        kwargs["tr_loss"] = kwargs.pop("reward_critic_loss")
-        kwargs = super().full_training_step(inputs, **kwargs)
-        kwargs["value_model"] = kwargs.pop("model")
-        kwargs["value_step_control"] = kwargs.pop("step_control")
-        kwargs["reward_critic_loss"] = kwargs.pop("tr_loss")
-        return kwargs
-
-
-@contextmanager
-def guard_set_args(args, arg_name_values):
-    for k, v in arg_name_values.items():
-        old_value = getattr(args, k, None)
-        setattr(args, k, v)
-        arg_name_values[k] = old_value
-    yield
-    for k, v in arg_name_values.items():
-        old_value = getattr(args, k)
-        setattr(args, k, v)
-        arg_name_values[k] = old_value
-
-
-class MuteDefaultFlowCallback(TrainerCallback):
-    def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
-        control.should_save = False
-        control.should_evaluate = False
-        control.should_log = False
-        return control
-
-
-def is_same_tokenizer(
-    tokenizer: PretrainedTokenizer,
-    other_tokenizer: PretrainedTokenizer,
-) -> bool:
-    """Check if two tokenizers are the same."""
-    return tokenizer is other_tokenizer or (
-        tokenizer.__class__ == other_tokenizer.__class__ and tokenizer.get_vocab() == other_tokenizer.get_vocab()
-    )
-
-
-class PipeEvalModel(GenerationMixin):
-    def __init__(self, trainer: Trainer):
-        self.model: fleet.model.PipelineParallel = trainer.model_wrapped
-        self.config: PretrainedConfig = trainer.model.config
-        self._is_gen = False
-        # self.gen_fn = None
-        # self.fwd_fn = None
-        # use non-pipe model generetion related methods
-        # self.prepare_inputs_for_generation = types.MethodType(
-        #     self.model._layers._non_pipe_model_class.prepare_inputs_for_generation, self
-        # )
-        self.update_model_kwargs_for_generation = (
-            self.model._layers._non_pipe_model_class.update_model_kwargs_for_generation
-        )
-
-    @property
-    def pp_group(self):
-        return self.model.pp_group
-
-    def eval(self):
-        self.model.eval()
-
-    def train(self):
-        self.model.train()
-
-    def _broadcast_outputs(self, outputs):
-        # outputs is PipelineParallel.eval_batch which is a list of batches.
-        out = []
-        outputs = (outputs,) if isinstance(outputs, paddle.Tensor) else outputs
-        for tensors in outputs:
-            if not self.model.is_pipeline_last_stage():
-                tensor = tensors if isinstance(tensors, paddle.Tensor) else tensors[0]
-                head_out_meta = (
-                    (self.model._layers.head_out_meta,)
-                    if isinstance(self.model._layers.head_out_meta, paddle.static.InputSpec)
-                    else self.model._layers.head_out_meta
-                )
-                tensors = tuple(
-                    paddle.empty(
-                        shape=[
-                            tensor.shape[i] if (meta.shape[i] is None or meta.shape[i] < 0) else meta.shape[i]
-                            for i in range(len(meta.shape))
-                        ],
-                        dtype=tensor.dtype if meta.dtype is None else meta.dtype,
-                    )
-                    for meta in head_out_meta
-                )
-            else:
-                # Currently use tuple instead of ModelOutput and require the
-                # caller use the return result as tuple.
-                tensors = (
-                    (tensors,)
-                    if isinstance(tensors, paddle.Tensor)
-                    else tensors.to_tuple()
-                    if isinstance(tensors, ModelOutput)
-                    else tensors
-                )
-
-            # map_structure(
-            #     lambda tensor: paddle.distributed.broadcast(
-            #         tensor,
-            #         src=self.model.pp_group.ranks[-1],
-            #         group=self.model.pp_group), tensors)
-            for tensor in tensors:
-                paddle.distributed.broadcast(tensor, src=self.model.pp_group.ranks[-1], group=self.model.pp_group)
-            out.append(tensors[0] if len(tensors) == 1 else tensors)
-        return out[0] if len(out) == 1 else out
-
-    def __call__(self, *args, **kwargs):
-        model = self.model
-        assert self.model.training is False
-        if self._is_gen:
-            # inputs by `prepare_inputs_for_generation` is a dict with following keys:
-            # "input_ids", "position_ids", "past_key_values", "use_cache", "attention_mask"
-            # NOTE: 1. cache/past_key_values should be passed across decoding steps
-            # by using as model attr rather than input args to reduce comm overhead.
-            # Also, pipe model defined for training not support this cache input.
-            # 2. ignore use_cache since _check_data_vaild requires tensor if not None.
-            # 3. attention_mask can reuse _prepare_decoder_attention_mask in LlamaEmbeddingPipe.
-            # 4. position_ids pass through _prepare_pipeline_inputs_func and PipeLayer.
-            inputs, labels = model._prepare_pipeline_inputs_func(*args, **kwargs)
-            # currently, set accumulate_steps to 1 to avoid multi-batch eval/gen
-            with guard_set_args(model, {"_compute_loss": False, "accumulate_steps": 1}):
-                outputs = model.eval_batch([inputs, labels], compute_loss=False)
-            # TODO(guosheng): Broadcasted logits are used to get next_scores, remove
-            # it to reduce comm overhead. Also note that we still need broadcast
-            # next_tokens though logits are broadcasted since pp ranks' seeds differs.
-            # Currently, just slice the last token to reduce comm overhead.
-            outputs = [
-                micro_batch_output[:, -1, :].unsqueeze(1)
-                if isinstance(micro_batch_output, paddle.Tensor)
-                else micro_batch_output[0][:, -1, :].unsqueeze(1)
-                for micro_batch_output in outputs
-            ]
-            outputs = self._broadcast_outputs(outputs)
-        else:
-            # use _prepare_pipeline_inputs_func to convert pipeline inputs
-            inputs, labels = model._prepare_pipeline_inputs_func(*args, **kwargs)
-            # NOTE(guosheng): bug seems exist. pp.eval_batch(compute_loss=False)
-            # will set pp._compute_loss to False and would not set it back. Thus
-            # hack here to set it back.
-            with guard_set_args(model, {"_compute_loss": False, "accumulate_steps": 1}):
-                outputs = model.eval_batch([inputs, labels], compute_loss=False)
-            outputs = self._broadcast_outputs(outputs)
-        return outputs
-
-    def generate(self, *args, **kwargs):
-        self._is_gen = True
-        # patch DecoderLayerPipe to use cache, DecoderLayerPipe is subclass of
-        # DecoderLayer, and would call super().forward
-        ori_decoder_layer_forward = self.model._layers._non_pipe_decoder_layer_class.forward
-
-        def decoder_layer_forward(layer_self, *args, **kwargs):
-            kwargs.update({"use_cache": True, "past_key_value": getattr(layer_self, "_cache", None)})
-            outputs = ori_decoder_layer_forward(layer_self, *args, **kwargs)
-            output = outputs[0]
-            layer_self._cache = outputs[1]
-            self._has_cache = True
-            return output
-
-        with guard_set_args(self.model._layers._non_pipe_decoder_layer_class, {"forward": decoder_layer_forward}):
-            outputs = super().generate(*args, **kwargs)
-        self._is_gen = False
-        # clear cache of decoder layers, sublayers is incursive thus suitable
-        # to both 1F1B and interleave
-        for layer in self.model._layers.sublayers():
-            if isinstance(layer, self.model._layers._non_pipe_decoder_layer_class):
-                layer._cache = None
-        self._has_cache = False
-        return outputs
-
-    def prepare_inputs_for_generation(self, *args, **kwargs):
-        arg_bind = inspect.signature(self.model._layers._non_pipe_model_class.prepare_inputs_for_generation).bind(
-            *((self,) + args), **kwargs
-        )
-        arg_bind.apply_defaults()
-        arg_dict = arg_bind.arguments
-        last_arg_name, last_arg_value = arg_dict.popitem()
-        if arg_bind.signature.parameters[last_arg_name].kind == inspect.Parameter.VAR_KEYWORD:
-            arg_dict.update(last_arg_value)
-        else:
-            arg_dict[last_arg_name] = last_arg_value
-        arg_dict.pop("self")
-        past_key_values = arg_dict.get("past_key_values", None)
-        # prepare_inputs_for_generation use past_key_values to discrimate prefill
-        # or decode and slice inputs accordingly.
-        if getattr(self, "_has_cache", False):
-            arg_dict.update({"past_key_values": True})
-        model_inputs = self.model._layers._non_pipe_model_class.prepare_inputs_for_generation(self, **arg_dict)
-        model_inputs.update({"past_key_values": past_key_values})
-        return model_inputs
+class ValueTrainer(StepTrainer):
+    loss_cls = RLHFValueLoss
+    # define loss name for logging
+    loss_identifier = lambda self, inputs: "reward_critic_loss"
 
 
 class PPOTrainer(Trainer):
@@ -1258,62 +799,43 @@ class PPOTrainer(Trainer):
             optimizers,
             preprocess_logits_for_metrics,
         )
+        # disable inner trainers' callback/state/control
+        self.policy_trainer.add_callback(MuteDefaultFlowCallback)
+        self.value_trainer.add_callback(MuteDefaultFlowCallback)
 
         # use trainer for reference_model/reward_model to enable sharding stage-3
-        # maybe we should allow models to use  different dist strategies later
-        if True:  # ShardingOption.FULL_SHARD in args.sharding:
-            from paddle.distributed.fleet.meta_parallel import PipelineLayer
-
-            with guard_set_args(
-                args,
-                {
-                    "recompute": False,
-                    "fp16_opt_level": "O1",
-                    "pipeline_parallel_degree": args.pipeline_parallel_degree
-                    if isinstance(reference_model, PipelineLayer)
-                    else 1,  # workaround for pipeline parallel model check
-                },
-            ):
-
-                # assert args.pipeline_parallel_degree == 1, "error"
-                self.reference_trainer = Trainer(
-                    reference_model,
-                    criterion,
-                    copy.deepcopy(args),
-                    data_collator,
-                    train_dataset,
-                    eval_dataset,
-                    reference_tokenizer,
-                    compute_metrics,
-                    callbacks,
-                    optimizers,
-                    preprocess_logits_for_metrics,
-                )
-
-                # assert args.pipeline_parallel_degree == 1, "error"
-                self.reward_trainer = Trainer(
-                    reward_model,
-                    criterion,
-                    copy.deepcopy(args),
-                    data_collator,
-                    train_dataset,
-                    eval_dataset,
-                    reward_tokenizer,
-                    compute_metrics,
-                    callbacks,
-                    optimizers,
-                    preprocess_logits_for_metrics,
-                )
-                # TODO(guosheng): sharding stage3 should create master weight optionally
-                # instead of creation and clear.
-                from paddlenlp.trainer.trainer_utils import ShardingOption
-
-                if args.pipeline_parallel_degree > 1 or ShardingOption.FULL_SHARD in args.sharding:
-                    self.reference_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
-                    self.reward_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
-        else:
-            self._reference_model = reference_model
-            self._reward_model = reward_model
+        # and PipelineParallel. maybe we should allow models to use different dist
+        # strategies later
+        self.reference_trainer = StepTrainer(
+            reference_model,
+            criterion,
+            args,
+            data_collator,
+            train_dataset,
+            eval_dataset,
+            reference_tokenizer,
+            compute_metrics,
+            callbacks,
+            optimizers,
+            preprocess_logits_for_metrics,
+        )
+        self.reward_trainer = StepTrainer(
+            reward_model,
+            criterion,
+            args,
+            data_collator,
+            train_dataset,
+            eval_dataset,
+            reward_tokenizer,
+            compute_metrics,
+            callbacks,
+            optimizers,
+            preprocess_logits_for_metrics,
+        )
+        # TODO(guosheng): sharding stage3 should create master weight optionally
+        # instead of creation and clear.
+        self.reference_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
+        self.reward_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
 
         self.reference_model.eval()
         self.reward_model.eval()
@@ -1331,6 +853,7 @@ class PPOTrainer(Trainer):
             # top_k=self.args.top_k,
             repetition_penalty=self.args.repetition_penalty,
             do_sample=True,
+            # allow generation output to contain input
             trunc_input=False,
             bos_token_id=self.tokenizer.bos_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
@@ -1338,10 +861,7 @@ class PPOTrainer(Trainer):
         )
         # Those value can be changed
         self.kl_coeff = self.args.kl_coeff
-        self.policy_trainer.clip_range_ratio = self.clip_range_ratio = self.args.clip_range_ratio
         self.clip_range_score = self.args.clip_range_score
-        self.value_trainer.clip_range_value = self.clip_range_value = self.args.clip_range_value
-        self.policy_trainer.ptx_coeff = self.ptx_coeff = self.args.ptx_coeff
         self.gamma = 1.0
         self.gae_lambda = 0.95
 
@@ -1351,75 +871,26 @@ class PPOTrainer(Trainer):
             "DummyPPOModel", (object,), {"eval": lambda _: self.set_eval(), "train": lambda _: self.set_train()}
         )
         self.model = self.model_wrapped = self.DummyPPOModel()
-        # self.optimizer = self.policy_trainer.optimizer
-        # self.scaler = self.reference_trainer.scaler = self.reward_trainer.scaler = None
 
     @property
     def reference_model(self):
-        model = getattr(self, "_reference_model", None)
-        if model is not None:
-            return model
-        # use model with Trainer
-        if self.reference_trainer.args.pipeline_parallel_degree > 1:
-            # Only accept wrapped model for pipeline_parallel mode
-            # model = self.reference_trainer.model_wrapped
-            model = PipeEvalModel(self.reference_trainer)
-            self._reference_model = model
-        else:
-            model = self.reference_trainer.model
-        return model
+        return self.reference_trainer.get_model(train=False)
 
     @property
     def reward_model(self):
-        model = getattr(self, "_reward_model", None)
-        if model is not None:
-            return model
-        # use model with Trainer
-        if self.reward_trainer.args.pipeline_parallel_degree > 1:
-            # Only accept wrapped model for pipeline_parallel mode
-            # model = self.reward_trainer.model_wrapped
-            model = PipeEvalModel(self.reward_trainer)
-            self._reward_model = model
-        else:
-            model = self.reward_trainer.model
-        return model
+        return self.reward_trainer.get_model(train=False)
 
     @property
     def actor_model(self):
-        if self.training:
-            return self.policy_trainer.model_wrapped
-        model = getattr(self, "_actor_model", None)
-        if model is not None:
-            return model
-        if self.policy_trainer.args.pipeline_parallel_degree > 1:
-            # Only accept wrapped model for pipeline_parallel mode
-            # model = self.policy_trainer.model_wrapped
-            model = PipeEvalModel(self.policy_trainer)
-            self._actor_model = model
-        else:
-            model = self.policy_trainer.model
-        return model
+        return self.policy_trainer.get_model(train=self.training)
 
     @property
     def reward_critic_model(self):
-        if self.training:
-            return self.value_trainer.model_wrapped
-        model = getattr(self, "_reward_critic_model", None)
-        if model is not None:
-            return model
-        if self.value_trainer.args.pipeline_parallel_degree > 1:
-            # Only accept wrapped model for pipeline_parallel mode
-            # model = self.value_trainer.model_wrapped
-            model = PipeEvalModel(self.value_trainer)
-            self._reward_critic_model = model
-        else:
-            model = self.value_trainer.model
-        return model
+        return self.value_trainer.get_model(train=self.training)
 
     def set_train(self, mode: bool = True) -> None:
         """Set training mode for all models."""
         if mode:
-            # self.is_in_train = True
             self.training = True
             self.actor_model.train()
             self.reward_critic_model.train()
@@ -1540,23 +1011,6 @@ class PPOTrainer(Trainer):
         with guard_set_args(self.value_trainer.args, {"output_dir": os.path.join(self.args.output_dir, "value")}):
             self.value_trainer._save_checkpoint(model, metrics)
 
-    # def _load_from_checkpoint(self, resume_from_checkpoint=None):
-    #     with guard_set_args(self.policy_trainer.args, {"output_dir": os.path.join(self.args.output_dir, "policy")}):
-    #         self.policy_trainer._load_from_checkpoint(resume_from_checkpoint)
-    #     with guard_set_args(self.value_trainer.args, {"output_dir": os.path.join(self.args.output_dir, "value")}):
-    #         self.value_trainer._load_from_checkpoint(resume_from_checkpoint)
-
-    # def _load_optimizer_and_scheduler(self, checkpoint):
-    #     # NOTE: `Trainer._load_optimizer_and_scheduler` would not seek the latest
-    #     # state as in `_load_from_checkpoint``, and it just use `resume_from_checkpoint`
-    #     # as value of `checkpoint` to load.
-    #     self.policy_trainer._load_optimizer_and_scheduler(
-    #         checkpoint if checkpoint is None else os.path.join(checkpoint, "policy")
-    #     )
-    #     self.value_trainer._load_optimizer_and_scheduler(
-    #         checkpoint if checkpoint is None else os.path.join(checkpoint, "value")
-    #     )
-
     def init_train_model_opt(
         self: Trainer, max_steps: int, resume_from_checkpoint: bool = False, clear_master_weight: bool = False
     ) -> PretrainedModel:
@@ -1577,39 +1031,6 @@ class PPOTrainer(Trainer):
                 else resume_from_checkpoint,
             )
         return policy_model, value_model
-
-    def load_sing_gen_data(self, as_batches=True, use_counter=False, data_dir="pkl_data"):
-        if use_counter:
-            iter_counter = getattr(self, "iter_counter", 0)
-            self.iter_counter = iter_counter + 1
-        else:
-            iter_counter = ""
-        import pickle
-
-        from paddle.distributed import fleet
-
-        hcg = fleet.get_hybrid_communicate_group()
-        data_rank = hcg.get_sharding_parallel_rank()
-        with open(os.path.join(data_dir, f"{iter_counter}rl_batch-{data_rank}.data"), "rb") as f:
-            data = pickle.load(f)
-        rl_batch = map_structure(lambda x: paddle.to_tensor(x), data)
-        rl_batches = [rl_batch] if as_batches else rl_batch
-        return rl_batches
-
-    def save_single_gen_data(self, rl_batch, use_counter=False, data_dir="pkl_data"):
-        if use_counter:
-            iter_counter = getattr(self, "iter_counter", 0)
-            self.iter_counter = iter_counter + 1
-        else:
-            iter_counter = ""
-        import pickle
-
-        import paddle.distributed as dist
-
-        with open(os.path.join(data_dir, f"{iter_counter}rl_batch-{dist.get_rank()}.data"), "wb") as f:
-            rl_batch = map_structure(lambda x: x.numpy(), rl_batch)
-            pickle.dump(rl_batch, f)
-        # exit(0)
 
     def get_epoch_iterator(self):
         # TODO(guosheng): support iter dataset
@@ -1722,7 +1143,6 @@ class PPOTrainer(Trainer):
                 self.set_train()
                 for _ in range(self.args.update_iters):
                     for rl_batch, ptx_batch in zip(rl_batches, ptx_batches):
-                        # self.save_single_gen_data(rl_batch, use_counter=True)
                         yield rl_batch, ptx_batch
 
         class EpochIterator:
@@ -1764,6 +1184,18 @@ class PPOTrainer(Trainer):
             num_examples,
             num_train_samples,
         )
+
+    def is_step_end(self):
+        # reach accumulation_steps, value trainer has the same step_control and
+        # gradient_accumulation_steps as PPO trainer.
+        # if (step_control + 1) % args.gradient_accumulation_steps == 0
+        return self.value_trainer.get_train_step_vars()["step_control"] == 0
+
+    def get_step_loss(self, loss_prefix: str = "") -> Dict:
+        rl_loss = self.policy_trainer.get_step_loss(loss_prefix)
+        value_loss = self.value_trainer.get_step_loss(loss_prefix)
+        rl_loss.update(value_loss)
+        return rl_loss
 
     def train(
         self,
@@ -1807,16 +1239,8 @@ class PPOTrainer(Trainer):
         ) = self.init_train_num(train_dataloader)
 
         # ##### model and optimizer related setting #####
-        # policy_trainer/value_trainer only init train with init_train_model_opt,
-        # maybe more training setting used in full_training_step should be set here,
-        # such as trainer.control and trainer.state
-        # policy_model = self.policy_trainer.init_train_model_opt(max_steps, resume_from_checkpoint)
-        # value_model = self.value_trainer.init_train_model_opt(max_steps, resume_from_checkpoint)
         policy_model, value_model = self.init_train_model_opt(max_steps, resume_from_checkpoint)
         paddle.device.cuda.empty_cache()
-        # disable inner trainers' callback/state/control
-        self.policy_trainer.add_callback(MuteDefaultFlowCallback)
-        self.value_trainer.add_callback(MuteDefaultFlowCallback)
 
         # ##### traing statistic logging #####
         # Number of trainable parameters only account for policy_model
@@ -1845,39 +1269,10 @@ class PPOTrainer(Trainer):
 
         self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
 
-        actor_loss = paddle.to_tensor(0.0)
-        reward_critic_loss = paddle.to_tensor(0.0)
-        ptx_loss = paddle.to_tensor(0.0)
-        # used when logging and last step
-        self._total_actor_loss_scalar = 0.0
-        self._total_reward_critic_loss_scalar = 0.0
-        self._total_ptx_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
 
-        # train_step_kwargs is used to provide arguments more than model inputs
-        # for full_training_step which is copied from Trainer.train and needs
-        # these arguments to control training process.
-        train_step_kwargs = {
-            "ignore_keys_for_eval": None,  # no need
-            # TODO(guosheng): commented args mean to resume data, not support yet
-            # "resume_from_checkpoint": resume_from_checkpoint,
-            # "train_dataloader": train_dataloader,
-            # "epochs_trained": epochs_trained,
-            # "steps_trained_in_current_epoch": steps_trained_in_current_epoch,
-            # "steps_trained_progress_bar": steps_trained_progress_bar,
-            "steps_in_epoch": steps_in_epoch,  # to control training process
-            # the following args are corresponding to tr_loss and model used in
-            # Trainer.train, and they would be used as tr_loss and model in
-            # PolicyTranier and ValueTrainer.
-            "actor_loss": actor_loss,
-            "reward_critic_loss": reward_critic_loss,
-            "ptx_loss": ptx_loss,
-            "policy_model": policy_model,
-            "value_model": value_model,
-        }
-
         start_time = time.time()
-        self._globalstep_last_start_time = start_time  # time.time()
+        self._globalstep_last_start_time = start_time
         # self.timers and self.timers("read-data").start()
 
         for epoch in range(epochs_trained, num_train_epochs):
@@ -1886,18 +1281,12 @@ class PPOTrainer(Trainer):
             ):
                 train_dataloader.batch_sampler.set_epoch(epoch)
 
-            step_control = 0  # used in loop control, reset to 0 after every step
-            train_step_kwargs.update({"policy_step_control": step_control, "value_step_control": step_control})
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
                 # self.timers and self.timers("read-data").stop()
-                os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
-                self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
-                # epoch, step and steps_in_epoch only mostly used in train_step by
-                # `self.state.epoch = epoch + (step + 1) / steps_in_epoch` if not
-                # resume data
-                train_step_kwargs.update({"epoch": epoch, "step": step})
+                # os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
+                # self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
                 rl_batch, ptx_batch = inputs
                 # TODO(guosheng): make rl_step/ptx_step run with autocast_smart_context_manager
 
@@ -1910,7 +1299,7 @@ class PPOTrainer(Trainer):
 
                 logger.info("Doing rl step...")
                 self.timers and self.timers("rl_step").start()
-                rl_info, train_step_kwargs = self.rl_step(rl_batch, **train_step_kwargs)
+                rl_info = self.rl_step(rl_batch)
                 paddle.device.cuda.empty_cache()
                 self.timers and self.timers("rl_step").stop()
                 if self.args.eval_mode is not None and "optimizer" in self.args.offload_level:
@@ -1921,7 +1310,7 @@ class PPOTrainer(Trainer):
                 if self.use_ptx:
                     logger.info("Doing ptx step...")
                     self.timers and self.timers("ptx_step").start()
-                    ptx_info, train_step_kwargs = self.ptx_step(ptx_batch, **train_step_kwargs)
+                    ptx_info = self.ptx_step(ptx_batch)
                     rl_info.update(ptx_info)
                     paddle.device.cuda.empty_cache()
                     self.timers and self.timers("ptx_step").stop()
@@ -1930,42 +1319,10 @@ class PPOTrainer(Trainer):
                     offload_tensor_to_cpu(self.policy_trainer.optimizer.state_dict())
                     self.timers and self.timers("offload-policy-optimizer").stop()
 
-                self.state.global_step = self.value_trainer.state.global_step
-                self.state.epoch = self.value_trainer.state.epoch
-                if train_step_kwargs["value_step_control"] == 0:
-                    # NOTE: PipelineParallel only returns a accumulated loss after
-                    # accumulated steps, which is a mixed loss of ppo-loss and
-                    # ptx-loss. We hack PipelineParallel._forward_step to record
-                    # loss metrics and postprocess the recorded losses here.
-                    # Maybe better to make the last_stage worker log to reduce
-                    # comm and for simplicity.
-                    if isinstance(policy_model, fleet.model.PipelineParallel):
-                        with paddle.no_grad():
-                            # TODO(guosheng): maybe move this to model_pp.py and
-                            # using interface here is better
-                            # interleave betweeen ppo-loss and ptx-loss
-                            if policy_model.is_pipeline_last_stage():
-                                # loss is 0D tensor, use stack rather than concat
-                                mix_loss = paddle.stack(policy_model._step_losses)
-                                policy_model._step_losses = None
-                            else:
-                                # The tessor shape is not policy_model.accumulate_steps
-                                # (args.accu_steps) but policy_trainer.args.accu_steps,
-                                # since policy_model is created with global pp_config
-                                # using global args.accu_steps which is only half of
-                                # policy_trainer.args.accu_steps, and indeed trainer hack
-                                # model.accumulate_steps in training_pipeline_step to use
-                                # trainer.args.accu_steps. The dtype is fp32(to be check),
-                                # thus no need to broadcast.
-                                mix_loss = paddle.empty(
-                                    shape=[self.policy_trainer.args.gradient_accumulation_steps], dtype=paddle.float32
-                                )
-                            paddle.distributed.broadcast(
-                                mix_loss, src=policy_model.pp_group.ranks[-1], group=policy_model.pp_group
-                            )
-                            real_actor_loss = mix_loss[0::2].mean()
-                            real_ptx_loss = mix_loss[1::2].mean()
-                        rl_info.update({"train/actor_loss": real_actor_loss, "train/ptx_loss": real_ptx_loss})
+                self.state.global_step += 1
+                self.state.epoch = epoch + (step + 1) / steps_in_epoch
+                if self.is_step_end():
+                    rl_info.update(self.get_step_loss(loss_prefix="train/"))
                     # on_step_end
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                 else:
@@ -1997,24 +1354,14 @@ class PPOTrainer(Trainer):
             logs: Dict[str, float] = {}
 
             for k, v in tr_loss.items():
-                if isinstance(v, paddle.Tensor) and "lr" not in k and "max_generated_length" not in k:
+                if isinstance(v, paddle.Tensor) and "lr" not in k and "max" not in k:
                     v_scalar = self._nested_gather(v).mean().item()
-                    # TODO(guosheng): maybe should consider self._enable_delay_scale_loss()
-                    # and maybe should merge with loss postprocess in PP
-                    if "train/actor_loss" == k and "train/ptx_loss" in tr_loss:
-                        # use_ptx would double the gradient_accumulation_steps
-                        # which causes actor_loss and ptx_loss reduced by half
-                        v_scalar = v_scalar * 2
-                    elif "train/ptx_loss" == k:
-                        # similar to actor_loss and should double, additionally
-                        # it should be divided by ptx_coeff for logging
-                        v_scalar = v_scalar * 2 / self.ptx_coeff
                     logs[k] = round(v_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
                     v.subtract_(v)
                     attr_name = "_total_" + k.split("/")[-1] + "_scalar"
                     attr_value = getattr(self, attr_name, 0)
                     setattr(self, attr_name, attr_value + v_scalar)
-                elif "max_generated_length" in k:
+                elif isinstance(v, paddle.Tensor) and "max" in k:
                     v_scalar = self._nested_gather(v).max().item()
                     logs[k] = v_scalar
                 else:
@@ -2105,48 +1452,18 @@ class PPOTrainer(Trainer):
             returns = paddle.concat([paddle.zeros([returns.shape[0], start], dtype=returns.dtype), returns], -1)
         return advantages.detach(), returns
 
-    def _rl_step(self, rl_batch: Dict[str, paddle.Tensor], **kwargs) -> Dict[str, Any]:
-        prompt = rl_batch["prompt"]
-        old_log_probs = rl_batch["log_probs"]
-        ref_log_probs = rl_batch["ref_log_probs"]
-        rewards = rl_batch["rewards"]
-        old_reward_values = rl_batch["reward_values"]
-        input_ids = rl_batch["input_ids"]
-        attention_mask = rl_batch["attention_mask"]
-
-        # log_probs has shifted by one for predicted logits
-        # TODO(guosheng): When using flash_attn with casual mask and right padding
-        # inputs, responses of batch input cannot be got by sliced from start. And
-        # use sequences (as labels) with full length instead of target length.
-        start = prompt.shape[-1] - 1
-        sequence_mask = attention_mask[:, 1:]
-
-        with paddle.no_grad():
-            # maybe these two can also be put into rollout
-            old_rewards = self.add_kl_divergence_regularization(
-                prompt,
-                old_log_probs,
-                ref_log_probs,
-                rewards,
-                sequence_mask,
-            )
-            reward_advantages, reward_returns = self.get_advantages_and_returns(
-                old_reward_values,
-                old_rewards,
-                sequence_mask,
-                start,
-            )
-            # metric
-            kl_divergence = ((old_log_probs - ref_log_probs) * sequence_mask)[:, start:].sum(axis=-1).mean()
-            mean_generated_length = sequence_mask[:, start:].cast(paddle.float32).sum(axis=-1).mean()
-            max_generated_length = sequence_mask[:, start:].cast(paddle.float32).sum(axis=-1).max()
-            rewards = rewards.mean()
-            # trainer inputs with target length
-            old_log_probs = old_log_probs[:, start:]
-            old_reward_values = old_reward_values[:, start:]
-            sequence_mask = sequence_mask[:, start:]
-            # position_ids is necessayr for left padding
-            position_ids = make_position_ids(attention_mask)
+    def rl_step(self, rl_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
+        # inputs shared by policy and value trainer
+        input_ids = rl_batch["input_ids"]  # length: src+tgt
+        attention_mask = rl_batch["attention_mask"]  # length: src+tgt
+        position_ids = rl_batch["position_ids"]  # length: src+tgt
+        sequence_mask = rl_batch["sequence_mask"]  # length: src+tgt(-1)
+        # inputs used by policy trainer
+        old_log_probs = rl_batch["log_probs"]  # length: src+tgt(-1)
+        reward_advantages = rl_batch["reward_advantages"]  # length: src+tgt(-1)
+        # inputs used by value trainer
+        old_reward_values = rl_batch["reward_values"]  # length: src+tgt(-1)
+        reward_returns = rl_batch["reward_returns"]  # length: src+tgt(-1)
 
         policy_trainer_inputs = {
             "input_ids": input_ids,
@@ -2155,11 +1472,8 @@ class PPOTrainer(Trainer):
             "old_log_probs": old_log_probs,
             "reward_advantages": reward_advantages,
             "sequence_mask": sequence_mask,
-            # "start": start,
-            # "use_cache": False,
-            # "return_dict": True,
         }
-        kwargs = self.policy_trainer.full_training_step(policy_trainer_inputs, **kwargs)
+        actor_loss = self.policy_trainer.full_training_step(**policy_trainer_inputs)
 
         value_trainer_inputs = {
             "input_ids": input_ids,
@@ -2168,27 +1482,37 @@ class PPOTrainer(Trainer):
             "old_reward_values": old_reward_values,
             "reward_returns": reward_returns,
             "sequence_mask": sequence_mask,
-            # "start": start,
-            # "use_cache": False,
-            # "return_dict": True,
         }
-        kwargs = self.value_trainer.full_training_step(value_trainer_inputs, **kwargs)
+        reward_critic_loss = self.value_trainer.full_training_step(**value_trainer_inputs)
+
+        # metric
+        rewards = rl_batch["rewards"]
+        rewards = rewards.mean()
+        ref_log_probs = rl_batch["ref_log_probs"]
+        kl_divergence = ((old_log_probs - ref_log_probs) * sequence_mask).sum(axis=-1).mean()
+        mean_generated_length = sequence_mask.cast(paddle.float32).sum(axis=-1).mean()
+        max_generated_length = sequence_mask.cast(paddle.float32).sum(axis=-1).max()
 
         return {
-            "train/actor_loss": kwargs["actor_loss"],
-            "train/reward_critic_loss": kwargs["reward_critic_loss"],
+            # when using PipelienParallel, the loss returned is 0 when not reach
+            # accumulated step and the loss returned at accumulated step is a
+            # mixed loss.
+            "train/actor_loss": actor_loss,
+            "train/reward_critic_loss": reward_critic_loss,
             "train/reward": rewards,
             "train/kl_divergence": kl_divergence,
             "train/mean_generated_length": mean_generated_length,
             "train/max_generated_length": max_generated_length,
             "train/actor_lr": self.policy_trainer._get_learning_rate(),
             "train/reward_critic_lr": self.value_trainer._get_learning_rate(),
-        }, kwargs
+        }
 
-    def ptx_step(self, ptx_batch: Dict[str, paddle.Tensor], **kwargs) -> Dict[str, Any]:
+    def ptx_step(self, ptx_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
         """Perform a single update step with PTX loss."""
-        kwargs = self.policy_trainer.full_training_step(ptx_batch, **kwargs)
-        return {"train/ptx_loss": kwargs["ptx_loss"]}, kwargs
+        ptx_loss = self.policy_trainer.full_training_step(**ptx_batch)
+        return {
+            "train/ptx_loss": ptx_loss,
+        }
 
     def split_ptx_micro_batches(
         self,
@@ -2249,16 +1573,17 @@ class PPOTrainer(Trainer):
         #     print(k, state[k])
 
         self.timers and self.timers("actor-model-generate").start()
-        sequences = actor_model_in_use.generate(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            generation_config=self.generation_config,
-            synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
-        )[0]
+        with infer_guard(self.policy_trainer):
+            sequences = actor_model_in_use.generate(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                generation_config=self.generation_config,
+                synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
+            )[0]
+
         self.timers and self.timers("actor-model-generate").stop()
         sequences = sequences.reshape([input_ids.shape[0], self.args.num_return_sequences, -1]).transpose([1, 0, 2])
-        # sequences = [self.load_sing_gen_data(as_batches=False, use_counter=False)["input_ids"]]
 
         return [
             # TODO(guosheng): move post_rollout out to split_rl_micro_batches
@@ -2283,7 +1608,7 @@ class PPOTrainer(Trainer):
         sequence: paddle.Tensor,
         attention_mask: paddle.Tensor,
     ) -> Dict[str, Any]:
-        if False:  # self.reward_tokenizer is not self.tokenizer:
+        if self.reward_tokenizer is not self.tokenizer:
             # right padding
             reward_tokenize_output = batch_retokenize(
                 sequence,
@@ -2291,8 +1616,8 @@ class PPOTrainer(Trainer):
                 dest_tokenizer=self.reward_tokenizer,
                 skip_special_tokens=True,
             )
-            reward_seq = sequence = reward_tokenize_output["input_ids"]
-            reward_attention_mask = attention_mask = reward_tokenize_output["attention_mask"]
+            reward_seq = reward_tokenize_output["input_ids"]
+            reward_attention_mask = reward_tokenize_output["attention_mask"]
         else:
             # actor_model_in_use gen
             for text in self.tokenizer.batch_decode(sequence, skip_special_tokens=True):
@@ -2357,12 +1682,10 @@ class PPOTrainer(Trainer):
         )[
             0
         ]  # .scores
-        # TODO(guosheng): move these to model methods such as get_logprobs
         reward_score = reward_score.squeeze(axis=-1)
         reward_value = reward_value.squeeze(axis=-1)
 
         self.timers and self.timers("reward-model-score").stop()
-
         reward_value = reward_value[:, :-1]
         log_probs = gather_log_probabilities(logits[:, :-1], sequence[:, 1:])
         ref_log_probs = gather_log_probabilities(ref_logits[:, :-1], sequence[:, 1:])
@@ -2444,65 +1767,3 @@ class PPOTrainer(Trainer):
         # pop out to reduce data dispatch comm overhead
         rl_batch.pop("prompt")
         return rl_batch
-
-    def rl_step(self, rl_batch: Dict[str, paddle.Tensor], **kwargs) -> Dict[str, Any]:
-        # inputs shared by policy and value trainer
-        input_ids = rl_batch["input_ids"]  # length: src+tgt
-        attention_mask = rl_batch["attention_mask"]  # length: src+tgt
-        position_ids = rl_batch["position_ids"]  # length: src+tgt
-        sequence_mask = rl_batch["sequence_mask"]  # length: src+tgt(-1)
-        # inputs used by policy trainer
-        old_log_probs = rl_batch["log_probs"]  # length: src+tgt(-1)
-        reward_advantages = rl_batch["reward_advantages"]  # length: src+tgt(-1)
-        # inputs used by value trainer
-        old_reward_values = rl_batch["reward_values"]  # length: src+tgt(-1)
-        reward_returns = rl_batch["reward_returns"]  # length: src+tgt(-1)
-
-        policy_trainer_inputs = {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "position_ids": position_ids,
-            "old_log_probs": old_log_probs,
-            "reward_advantages": reward_advantages,
-            "sequence_mask": sequence_mask,
-        }
-        kwargs = self.policy_trainer.full_training_step(policy_trainer_inputs, **kwargs)
-
-        value_trainer_inputs = {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "position_ids": position_ids,
-            "old_reward_values": old_reward_values,
-            "reward_returns": reward_returns,
-            "sequence_mask": sequence_mask,
-        }
-        kwargs = self.value_trainer.full_training_step(value_trainer_inputs, **kwargs)
-
-        # metric
-        rewards = rl_batch["rewards"]
-        rewards = rewards.mean()
-        ref_log_probs = rl_batch["ref_log_probs"]
-        kl_divergence = ((old_log_probs - ref_log_probs) * sequence_mask).sum(axis=-1).mean()
-        mean_generated_length = sequence_mask.cast(paddle.float32).sum(axis=-1).mean()
-        max_generated_length = sequence_mask.cast(paddle.float32).sum(axis=-1).max()
-
-        return {
-            "train/actor_loss": kwargs["actor_loss"],
-            "train/reward_critic_loss": kwargs["reward_critic_loss"],
-            "train/reward": rewards,
-            "train/kl_divergence": kl_divergence,
-            "train/mean_generated_length": mean_generated_length,
-            "train/max_generated_length": max_generated_length,
-            "train/actor_lr": self.policy_trainer._get_learning_rate(),
-            "train/reward_critic_lr": self.value_trainer._get_learning_rate(),
-        }, kwargs
-
-    # @paddle.no_grad()
-    # def post_rollout(
-    #     self,
-    #     prompt: paddle.Tensor,
-    #     sequence: paddle.Tensor,
-    #     attention_mask: paddle.Tensor,
-    # ) -> Dict[str, Any]:
-    #     if self.reward_tokenizer is not self.tokenizer:
-    #         reward_tokenize_output = batch_retokenize
