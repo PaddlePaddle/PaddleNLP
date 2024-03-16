@@ -1547,6 +1547,13 @@ class TrainingArguments:
         else:
             return 0
 
+    def _format_name(self, prefix, rank, degree):
+        if degree > 1:
+            size = max(2, len(str(degree)))
+            return f"{prefix}{rank:0>{size}d}"
+        else:
+            return ""
+
     @property
     def optimizer_name_suffix(self):
         if self.use_hybrid_parallel:
@@ -1558,8 +1565,7 @@ class TrainingArguments:
                 assert self.pipeline_parallel_degree < 100, "pipeline parallel degree should be less than 100."
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
             if self.sharding_parallel_degree > 1:
-                assert self.sharding_parallel_degree < 100, "sharding parallel degree should be less than 100."
-                name.append(f"shard{self.sharding_parallel_rank:0>2d}")
+                name.append(self._format_name("shard", self.sharding_parallel_rank, self.sharding_parallel_degree))
 
             return "_".join(name)
         else:
@@ -1596,8 +1602,7 @@ class TrainingArguments:
                 if shard_id is None:
                     shard_id = self.sharding_parallel_rank
                 assert isinstance(shard_id, int)
-                assert shard_id < 100, "shard_id should be less than 100."
-                name.append(f"shard{shard_id:0>2d}")
+                name.append(self._format_name("shard", shard_id, self.sharding_parallel_degree))
             return "_".join(name)
         else:
             return None
