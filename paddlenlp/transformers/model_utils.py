@@ -67,7 +67,7 @@ from ..generation import GenerationConfig, GenerationMixin
 from ..utils import device_guard
 from ..utils.download import resolve_file_path
 from .configuration_utils import PretrainedConfig
-from .conversion_utils import ConversionMixin, merged_as_tensor_parallel_qkv
+from .conversion_utils import ConversionMixin
 from .utils import (  # convert_ndarray_dtype,
     ContextManagers,
     InitTrackerMeta,
@@ -321,8 +321,6 @@ def load_state_dict(
     if tensor_parallel_split_mapping is None:
         tensor_parallel_split_mapping = {}
 
-    # import pdb; pdb.set_trace()
-
     if checkpoint_file.endswith(".safetensors") and is_safetensors_available():
         # Check format of the archive
         with safe_open(checkpoint_file, framework="np") as f:
@@ -345,7 +343,7 @@ def load_state_dict(
                         continue
                     py_safe_slice_ = f.get_slice(key)
                     if key in tensor_parallel_split_mapping:
-                        weight = tensor_parallel_split_mapping[key](py_safe_slice_)  # annot: 权重切分逻辑在模型中定义,fuse功能需要适配切分后的权重命名空间
+                        weight = tensor_parallel_split_mapping[key](py_safe_slice_)
                     else:
                         weight = py_safe_slice_[:]
                     state_dict[key] = weight
@@ -359,6 +357,7 @@ def load_state_dict(
     state_dict = paddlenlp_load(checkpoint_file, map_location="cpu")  # debug: sub-branch pdparams读取
     return state_dict
 
+
 def get_param_name_from_name_mappings(name_patt, name_map_list):
     # extract param name from name_mappings, using regular-expression pattern
     for name_map in name_map_list:
@@ -371,13 +370,34 @@ def select_fuse_parameter(model, loaded_keys, config=None):
     if config is None:
         config = model.config
 
+    from collections import Iterable
+
+    # fail-fast: check supporting models
+    if not (
+        hasattr(config, "architectures")
+        and isinstance(config.architectures, Iterable)
+        and (
+            config.architectures[0].lower().startswith("llama")
+            or (
+                config.architectures[0].lower().startswith("gpt")
+                and not config.architectures[0].lower().startswith("gptj")
+            )
+            or config.architectures[0].lower().startswith("qwen")
+        )
+    ):
+        logger.warning(
+            f"{model.__class__.__name__} does not support fuse-parameter, "
+            + "fuse_atten_qkv or fuse_atten_ffn will be ignored, the program will run in its original state."
+        )
+        return [], []
+
     # determine whether parameter already fused
     fuse_parameter_mappings = model._get_fused_param_mappings()
-    fuse_attn_param_name_map = fuse_parameter_mappings['attn_param_names']['qkv_proj']
-    fuse_ffn_param_name_map = fuse_parameter_mappings['ffn_param_names']['gate_up_proj']
+    fuse_attn_param_name_map = fuse_parameter_mappings["attn_param_names"]["qkv_proj"]
+    fuse_ffn_param_name_map = fuse_parameter_mappings["ffn_param_names"]["gate_up_proj"]
 
-    source_fuse_qkv = fuse_attn_param_name_map(0) in loaded_keys
-    source_fuse_ffn = fuse_ffn_param_name_map(0) in loaded_keys
+    source_fuse_qkv = fuse_attn_param_name_map(0) in loaded_keys if fuse_attn_param_name_map else False
+    source_fuse_ffn = fuse_ffn_param_name_map(0) in loaded_keys if fuse_ffn_param_name_map else False
 
     do_fuse_parameter_list, do_separate_parameter_list = [], []
 
@@ -1865,7 +1885,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # To avoid recursive import temporarily.
             import paddlenlp.ops.fast_transformer.transformer.decoding as ft_decoding
 
-            state_dict = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_dict)  # debug: sub-branch MP
+            state_dict = ft_decoding.get_ft_para_conf().fit_partial_model(
+                model_to_load, state_dict
+            )  # debug: sub-branch MP
 
             mismatched_keys = _find_mismatched_keys(
                 state_dict,
@@ -1902,8 +1924,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if len(resolved_archive_file) > 1:
                 resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
 
-            # annot: sharding + TP
-            # debug: branch-6.2 low_cpu_mem_usage
             for shard_file in resolved_archive_file:
                 pre_tensor_parallel_split = False
                 if (
@@ -1914,22 +1934,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     pre_tensor_parallel_split = True
                     assert loaded_keys is not None, "loaded_keys is not None."
 
-                    print(f"\n\n>>>>>>>>>>>>>> 1: pop掉get_tensor_parallel_convert_actions中qkv相关的key")
-                    pass
-
                     tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
 
-                import pdb; pdb.set_trace()
                 # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
-                print(f"\n\n>>>>>>>>>>>>>> 2: load weight tensors without tensor-parallel action on qkv/gate_up tensors")
                 state_dict = load_state_dict(  # debug: branch-5(6.5) load from sharding files // low_cpu_memory(state_dict is None)
                     shard_file,
                     tp_actions if pre_tensor_parallel_split else None,
                     None if config.quantization_config.is_weight_quantize() else set(expected_keys),
                 )
-
-                print(f"\n\n>>>>>>>>>>>>>> 3: apply qkv/gate_up fuse action and tensor-parallel action sequentially")
-                pass
 
                 if config.quantization_config.is_weight_quantize():
                     state_dict = convert_to_quantize_state_dict(  # debug: sub-branch quantize
@@ -1959,7 +1971,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     logger.info("Converted state_dict to Tensor Parallel Format")
 
                 if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
-                    new_error_msgs = _load_state_dict_into_meta_model(  # annot: 将shard数据加载到modle中
+                    new_error_msgs = _load_state_dict_into_meta_model(
                         model_to_load,
                         state_dict,
                         loaded_keys,
@@ -2035,20 +2047,17 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         return model, missing_keys, unexpected_keys, mismatched_keys
 
-
     @classmethod
     def fuse_attention_parameters(cls, state_dict, do_fuse_parameter_list, config):
         # fuse weight tensor specified by do_fuse_parameter_list
 
-        # import pdb; pdb.set_trace()
-
         # get target parameter names and fuse method from model
-        fuse_parameter_mappings = cls._get_fused_param_mappings()  # design: 放弃自适应参数名定位能力,参数名和方法由模型显式提供
+        fuse_parameter_mappings = cls._get_fused_param_mappings()
 
-        q_param_name_map = fuse_parameter_mappings["attn_param_names"]['q_proj']
-        k_param_name_map = fuse_parameter_mappings["attn_param_names"]['k_proj']
-        v_param_name_map = fuse_parameter_mappings["attn_param_names"]['v_proj']
-        qkv_param_name_map = fuse_parameter_mappings["attn_param_names"]['qkv_proj']
+        q_param_name_map = fuse_parameter_mappings["attn_param_names"]["q_proj"]
+        k_param_name_map = fuse_parameter_mappings["attn_param_names"]["k_proj"]
+        v_param_name_map = fuse_parameter_mappings["attn_param_names"]["v_proj"]
+        qkv_param_name_map = fuse_parameter_mappings["attn_param_names"]["qkv_proj"]
         qkv_fuse_action, ffn_fuse_action = fuse_parameter_mappings["fuse_action"]
 
         # do fuse action on each attention block, raise error on any failure
@@ -2057,22 +2066,24 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         num_attention_heads = config["num_attention_heads"]
 
         for layer_index in range(num_hidden_layers):
-            if "attention_qkv_proj" in do_fuse_parameter_list:  # todo: 管理融合参数范围([weight, bias])
+            if "attention_qkv_proj" in do_fuse_parameter_list:  # TODO: check fuse target [weight, bias]
                 q_param_name = q_param_name_map(layer_index)
                 k_param_name = k_param_name_map(layer_index)
                 v_param_name = v_param_name_map(layer_index)
                 qkv_param_name = qkv_param_name_map(layer_index)
 
-                fused_qkv_param = qkv_fuse_action(state_dict, q_param_name, k_param_name, v_param_name, num_attention_heads)
+                fused_qkv_param = qkv_fuse_action(
+                    state_dict, q_param_name, k_param_name, v_param_name, num_attention_heads
+                )
                 state_dict[qkv_param_name] = fused_qkv_param
 
-                del state_dict[q_param_name]  # todo: 需要实验验证是否释放了内存
+                del state_dict[q_param_name]  # TODO: validate gpu memory freed
                 del state_dict[k_param_name]
                 del state_dict[v_param_name]
                 # gc.collect()
 
             if "attention_ffn_proj" in do_fuse_parameter_list:
-                pass  # todo: implement parameter fuse for ffn
+                pass  # TODO: implement parameter fuse for ffn
 
         return state_dict, True
 
@@ -2086,10 +2097,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             NotImplementedError: when called and not be implemented
         """
         raise NotImplementedError(
-            f"`_get_fused_param_mappings` is not implemented for {self.__class__}`. To implement it, you should "
-            f"overwrite this method in the class {self.__class__} in `{self.__class__.__module__}.py`"
+            f"`_get_fused_param_mappings` is not implemented for {cls.__name__}`. To implement it, you should "
+            f"overwrite this method in the class {cls.__name__} in `{cls.__module__}.py`"
         )
-
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
@@ -2247,21 +2257,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         use_keep_in_fp32_modules = False
 
         # resolve model_weight file
-        
-        # import pdb; pdb.set_trace()
-
-        
 
         # 3. init the model
         init_args = config["init_args"] or ()
         with ContextManagers(init_contexts):
             model = cls(config, *init_args, **model_kwargs)
-        
-        # report config conflicts in advance
-        if low_cpu_mem_usage and (model.config.fuse_attention_qkv or model.config.fuse_attention_ffn):
-            raise ValueError("'low_cpu_mem_usage' is forbidden when fuse attention qkv or ffn is enabled")  # debug: 显示UnboundLocalError
 
-        # import pdb; pdb.set_trace()
+        fuse_attention_qkv = model.config.fuse_attention_qkv if hasattr(model.config, "fuse_attention_qkv") else False
+        fuse_attention_ffn = model.config.fuse_attention_ffn if hasattr(model.config, "fuse_attention_ffn") else False
+        if low_cpu_mem_usage and (fuse_attention_qkv or fuse_attention_ffn):
+            raise ValueError("'low_cpu_mem_usage' is forbidden when fuse attention qkv or ffn is enabled")
+        if convert_from_torch and (fuse_attention_qkv or fuse_attention_ffn):
+            raise ValueError("'convert_from_torch' is forbidden when fuse attention qkv or ffn is enabled")
 
         resolved_archive_file, resolved_sharded_files, sharded_metadata, is_sharded = cls._resolve_model_file_path(
             pretrained_model_name_or_path,
@@ -2275,7 +2282,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             variant=variant,
         )
 
-        if convert_from_torch and state_dict is None:  # annot: 先读取权重再做权重转换
+        if convert_from_torch and state_dict is None:
             if (
                 resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME)
                 or resolved_archive_file.endswith(PYTORCH_WEIGHTS_INDEX_NAME)
@@ -2288,7 +2295,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     f"Starting to convert pytorch weight file<{resolved_archive_file}> to "
                     f"paddle weight file<{convert_dir}> ..."
                 )
-                # annot: 转换pt权重为paddle权重
                 state_dict = cls.convert(  # debug: branch-4 torch
                     resolved_archive_file,
                     config,
@@ -2305,77 +2311,66 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 raise ValueError(f"Unexpected file: {resolved_archive_file} for weight conversion.")
             # load pt weights early so that we know which dtype to init the model under
 
-
-        # annot: state_dict 加载分支
-
-        # import pdb; pdb.set_trace()
-
         if not is_sharded and state_dict is None:
             # 4. loading non-sharded ckpt from the state dict
             if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
-                print("\n\n>>>>>>>>>> above branch-3\n")
-                state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)  # debug: branch-3 pdparams转换 + TP
+                state_dict = cls.convert_tensor_parallel(
+                    resolved_archive_file, config
+                )  # debug: branch-3 pdparams转换 + TP
             elif config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model.safetensors"):
                 with safe_open(resolved_archive_file, framework="np", device="cpu") as f:
                     loaded_keys = f.keys()
-                """ 
-                [问题描述]
-                1. config从描述态转为命令态,在非事实描述态时与执行逻辑产生差异
-                2. fuse与tp_action的执行最好保持先后顺序, 否则需要细致处理分布式参数状态问题非常麻烦
-                [坑]
-                1. 仅处理问题1.1会带来fuse和tp_action执行倒序
-                2. 可行的方式是跳过config与状态不一致的部分再拉出单独处理,是可靠的办法,代码可能比较繁琐,容易出错
-                [执行]
-                1. 先按照2.2方式执行.
-                """
-                
-                # pop掉get_tensor_parallel_convert_actions中qkv相关的tp_action
-                print(f"\n\n>>>>>>>>>>>>>> 1: pop掉get_tensor_parallel_convert_actions中qkv相关的key")
-                do_fuse_parameter_list, do_separate_parameter_list = select_fuse_parameter(model, loaded_keys)  # design: 判断需要融合的参数
-                if 'attention_qkv_proj' in do_fuse_parameter_list:
+
+                do_fuse_parameter_list, do_separate_parameter_list = select_fuse_parameter(model, loaded_keys)
+                if "attention_qkv_proj" in do_fuse_parameter_list:
                     separate_keys, fused_keys = set(), set()
-                    sep_qkv_name_mappings = model._get_fused_param_mappings()['attn_param_names']
+                    sep_qkv_name_mappings = model._get_fused_param_mappings()["attn_param_names"]
                     for idx, key in enumerate(loaded_keys):
-                        for name_map in (sep_qkv_name_mappings['q_proj'], sep_qkv_name_mappings['k_proj'], sep_qkv_name_mappings['v_proj']):
-                            if re.sub(r'\d+', '0', key) == name_map(0):  # todo: 命名转换过于繁琐, 考虑重构代码
-                                separate_keys.add(loaded_keys.pop(idx))  # avoid searching q,k,v tp_action when configured as qkv
-                                fused_keys.add(sep_qkv_name_mappings['qkv_proj'](re.search('\d+', key).group(0)))
-                
+                        for name_map in (
+                            sep_qkv_name_mappings["q_proj"],
+                            sep_qkv_name_mappings["k_proj"],
+                            sep_qkv_name_mappings["v_proj"],
+                        ):
+                            if re.sub(r"\d+", "0", key) == name_map(0):  # TODO: simplify this code
+                                separate_keys.add(
+                                    loaded_keys.pop(idx)
+                                )  # skip searching q,k,v tp_action when configured as qkv
+                                fused_keys.add(sep_qkv_name_mappings["qkv_proj"](re.search("\d+", key).group(0)))
+
                 # load weight tensors without tensor-parallel action on qkv/gate_up tensors
-                print(f"\n\n>>>>>>>>>>>>>> 2: load weight tensors without tensor-parallel action on qkv/gate_up tensors")
-                tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_params=separate_keys|fused_keys)
+                tp_actions = cls.get_tensor_parallel_convert_actions(
+                    config, loaded_keys, ignore_params=separate_keys | fused_keys
+                )
                 state_dict = load_state_dict(resolved_archive_file, tp_actions)  # debug: branch-2 TP
-                
+
                 # apply qkv/gate_up fuse action and tensor-parallel action sequentially
-                print(f"\n\n>>>>>>>>>>>>>> 3: apply qkv/gate_up fuse action and tensor-parallel action sequentially")
-                if 'attention_qkv_proj' in do_fuse_parameter_list:
-                    state_dict, fuse_success = cls.fuse_attention_parameters(state_dict, ['attention_qkv_proj'], model.config)  # design: q, k, v => qkv
-                    tp_actions = cls.get_tensor_parallel_convert_actions(config, fused_keys, ignore_params=set(state_dict.keys())-fused_keys)  # get tp-action for qkv
+                if "attention_qkv_proj" in do_fuse_parameter_list:
+                    state_dict, fuse_success = cls.fuse_attention_parameters(
+                        state_dict, ["attention_qkv_proj"], model.config
+                    )  # q, k, v => qkv
+                    tp_actions = cls.get_tensor_parallel_convert_actions(
+                        config, fused_keys, ignore_params=set(state_dict.keys()) - fused_keys
+                    )  # get tp-action for qkv
                     for qkv_name in tp_actions.keys():
                         state_dict[qkv_name] = tp_actions[qkv_name](state_dict[qkv_name])  # apply tp-action for qkv
             else:
                 state_dict = load_state_dict(resolved_archive_file)  # debug: branch-1 normal
 
-                print(f"\n\n>>>>>>>>>>>>>> 1: 融合参数")
-                do_fuse_parameter_list, do_separate_parameter_list = select_fuse_parameter(model, state_dict.keys())  # design: 判断需要融合的参数
+                do_fuse_parameter_list, do_separate_parameter_list = select_fuse_parameter(model, state_dict.keys())
                 if do_fuse_parameter_list:
-                    state_dict, fuse_success = model.fuse_attention_parameters(state_dict, do_fuse_parameter_list, model.config)
-       
-            logger.info("Loaded weights file from disk, setting weights to model.")
+                    state_dict, fuse_success = model.fuse_attention_parameters(
+                        state_dict, do_fuse_parameter_list, model.config
+                    )
 
-        # debug: build model_state.pdparams via paddle.save
-        # print(f">>>>>>>>>>> x: save model_state.pdparams")
-        # paddle.save(state_dict, os.path.join('/root/.paddlenlp/models/linly-ai/chinese-llama-2-7b/', 'model_state.pdparams'))
+            logger.info("Loaded weights file from disk, setting weights to model.")
 
         # Check if `_keep_in_fp32_modules` is not None
         use_keep_in_fp32_modules = (cls._keep_in_fp32_modules is not None) and (
             dtype == "float16" or dtype == "bfloat16"
         )
 
-        print(f"\n\n>>> is_sharded: ", is_sharded)
-
         if is_sharded:
-            loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]  # annot: 获取所有权重key
+            loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
         else:
             loaded_state_dict_keys = [k for k in state_dict.keys()]
 
@@ -2409,7 +2404,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     if "quant_weight" in key:
                         quantization_linear_list.append(key[:-13])
 
-        # annot: 加载权重到模型实例, 执行shard,quantize, TP/MP等多种操作
         model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
             model=model,
             state_dict=state_dict,
@@ -2423,13 +2417,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             keep_in_fp32_modules=keep_in_fp32_modules,
             quantization_linear_list=quantization_linear_list,
         )
-
-        # import pdb; pdb.set_trace()
-        # print(f">>>>>>>>>>>>>> 8: load tensor into model")
-        # print("\n\nmodel.state_dict()['llama.layers.1.self_attn.qkv_proj.weight']")
-        # print(model.state_dict()['llama.layers.1.self_attn.qkv_proj.weight'])
-        # print(model.state_dict()['llama.layers.1.self_attn.qkv_proj.weight'].shape)
-        # print("\n\nloaded_state_dict_keys\n", loaded_state_dict_keys)
 
         # load generation_config.json
         if model.can_generate() and pretrained_model_name_or_path is not None:

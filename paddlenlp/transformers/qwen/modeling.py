@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import math
+import re
 import warnings
 from functools import partial
 from typing import List
@@ -450,26 +451,29 @@ class QWenPretrainedModel(PretrainedModel):
         mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
 
         return mappings
-    
+
     @classmethod
     def _get_fused_param_mappings(cls):
         # return parameter fuse utils
-        from paddlenlp.transformers.conversion_utils import merged_as_tensor_parallel_qkv
+        from paddlenlp.transformers.conversion_utils import (
+            merged_as_tensor_parallel_qkv,
+        )
+
         # attention: q,k,v -> qkv, ffn: gate, up -> gate_up
         mappings = {
-            'fuse_action': [merged_as_tensor_parallel_qkv, None],
-            'split_action': [None, None],
-            'attn_param_names': {
-                'qkv_proj': 'qwen.h.0.attn.c_proj.weight',
-                'q_proj': None,
-                'k_proj': None,
-                'v_proj': None
+            "fuse_action": [merged_as_tensor_parallel_qkv, None],
+            "split_action": [None, None],
+            "attn_param_names": {
+                "qkv_proj": lambda layer_id: re.sub(r"\d+", str(layer_id), "qwen.h.0.attn.c_proj.weight"),
+                "q_proj": None,
+                "k_proj": None,
+                "v_proj": None,
             },
-            'ffn_param_names': {
-                'gate_up_proj': 'qwen.h.0.mlp.c_proj.weight',
-                'gate_proj': None,
-                'up_proj': None
-            }
+            "ffn_param_names": {
+                "gate_up_proj": lambda layer_id: re.sub(r"\d+", str(layer_id), "qwen.h.0.mlp.c_proj.weight"),
+                "gate_proj": None,
+                "up_proj": None,
+            },
         }
 
         return mappings

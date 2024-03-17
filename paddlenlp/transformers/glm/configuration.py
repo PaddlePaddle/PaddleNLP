@@ -227,6 +227,7 @@ class GLMConfig(PretrainedConfig):
         layernorm_epsilon=1e-5,
         use_scaled_init_for_output_weights=False,
         fuse_attention_qkv=False,
+        fuse_attention_ffn=False,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -252,3 +253,4 @@ class GLMConfig(PretrainedConfig):
         self.use_scaled_init_for_output_weights = use_scaled_init_for_output_weights
         self._fast_entry = None
         self.fuse_attention_qkv = fuse_attention_qkv
+        self.fuse_attention_ffn = fuse_attention_ffn

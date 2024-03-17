@@ -15,9 +15,9 @@
 from __future__ import annotations
 
 import inspect
-import re
 import json
 import os
+import re
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import (
@@ -489,17 +489,20 @@ def splited_qkv_to_tensor_parallel_qkv(weight_list, num_attention_heads):
     weight = np.concatenate(weight_list, axis=-1)
     return naive_merged_qkv_to_tensor_parallel_qkv(weight)
 
+
 def merged_as_tensor_parallel_qkv(state_dict, q_name, k_name, v_name, num_hidden_layers):
     q = state_dict[q_name]
     k = state_dict[k_name]
     v = state_dict[v_name]
 
     naive_merged_qkv = np.concatenate((q, k, v), axis=-1)
-    
+
     return naive_merged_qkv_to_tensor_parallel_qkv(naive_merged_qkv, num_hidden_layers)
+
 
 def merge_as_naive_merged_qkv():
     pass
+
 
 def merge_as_splited_qkv():
     pass
@@ -1075,8 +1078,6 @@ class ConversionMixin:
             logger.warning(f"there are {len(all_layer_names)} tensors not initialized:")
             for layer_name in all_layer_names:
                 logger.warning(f"--- {layer_name}")
-        
-        # debug: qkv_merge
 
         model_weight_file = os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)
         if not os.path.isfile(model_weight_file):
@@ -1102,26 +1103,24 @@ class ConversionMixin:
     def get_tensor_parallel_convert_actions(
         cls, config: PretrainedConfig, loaded_state_dict_keys, is_split=True, ignore_error=False, ignore_params=[]
     ):
-        # annot: map: name_action_mappings -> loaded_state_dict_keys
         name_action_mappings = cls._get_tensor_parallel_mappings(config, is_split=is_split)
-        
+
         # avoid act on fuse parameters (qkv/gate-up), they are not consistant between config and loaded_state_dict_keys
         name_map_list = cls._get_name_mappings(config)
         for key in ignore_params:
             for name_map in name_map_list:
                 if name_map.target_name == key:
                     name_action_mappings.pop(name_map.source_name.split("model.")[-1], None)
-        
+
         state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), loaded_state_dict_keys, ignore_error)
 
-        # annot: 将name_action_mappings的key由通用参数名替换为模型实例的参数名
         for k, v in state_keys_map.items():
             name_action_mappings[v] = name_action_mappings.pop(k)
         return name_action_mappings
 
     @classmethod
     def convert_tensor_parallel(
-        cls, weight_file: str, config: PretrainedConfig, state_dict=None, ignore_error=False,
+        cls, weight_file: str, config: PretrainedConfig, state_dict=None, ignore_error=False
     ) -> None:
         """the entry of converting config and converting model file
 
@@ -1129,15 +1128,14 @@ class ConversionMixin:
             weight_file (str | None): the weight file path of `model_state.pdparams` file
             config (PretrainedConfig): the PretrainedConfig instance of model
         """
+
         def _apply_tp_action(name_action_mappings):
-            # print(f"\n\nname_action_mappings.keys(): ", name_action_mappings.keys())
             state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys(), ignore_error)
 
             for k, v in state_keys_map.items():
                 name_action_mappings[v] = name_action_mappings.pop(k)
-            
+
             for name, action in name_action_mappings.items():
-                # print(f">>> appling action_name: {name}")
                 if name not in state_dict:
                     if not ignore_error:
                         logger.warning(f"Key <{name}> not in the model state weight file.")
@@ -1147,53 +1145,49 @@ class ConversionMixin:
                 with device_guard("cpu"):
                     state_dict[name] = paddle.Tensor(new_tensor, zero_copy=True)
 
-        # annot: 1. load state_dict
         if state_dict is None:
             with device_guard("cpu"):
                 state_dict = paddle.load(weight_file, return_numpy=False)
-
             logger.info("Starting to convert orignal state_dict to tensor parallel state_dict.")
 
-        # annot: 2. apply parameter fuse action
         from paddlenlp.transformers.model_utils import select_fuse_parameter
-        do_fuse_parameter_list, do_separate_parameter_list = select_fuse_parameter(cls, state_dict.keys(), config)
-        if 'attention_qkv_proj' in do_fuse_parameter_list:
-            state_dict, fuse_success = cls.fuse_attention_parameters(state_dict, ['attention_qkv_proj'], config)  # design: q, k, v => qkv
 
-        # annot: load tp_actions
-        # debug: 在do-fuse状态下, name_action_mappings元素多于state_dict, 需要先规避qkv再做后处理
+        do_fuse_parameter_list, do_separate_parameter_list = select_fuse_parameter(cls, state_dict.keys(), config)
+        if "attention_qkv_proj" in do_fuse_parameter_list:
+            state_dict, fuse_success = cls.fuse_attention_parameters(
+                state_dict, ["attention_qkv_proj"], config
+            )  # design: q, k, v => qkv
+
         name_action_mappings = cls._get_tensor_parallel_mappings(config)
 
         # avoid act on fuse parameters (qkv/gate-up), they are not consistant between config and loaded_state_dict_keys
-        if 'attention_qkv_proj' in do_fuse_parameter_list:
-            print(f">>>>>>>>>>>>> 1. pop qkv tp actions")
+        # pop qkv tp actions and apply the rest actions
+        if "attention_qkv_proj" in do_fuse_parameter_list:
+
             name_map_list = [
-                lambda layer_id: re.sub(r'\d+', str(layer_id), 'layers.0.self_attn.q_proj.weight'),
-                lambda layer_id: re.sub(r'\d+', str(layer_id), 'layers.0.self_attn.k_proj.weight'),
-                lambda layer_id: re.sub(r'\d+', str(layer_id), 'layers.0.self_attn.v_proj.weight'),
-                lambda layer_id: re.sub(r'\d+', str(layer_id), 'layers.0.self_attn.qkv_proj.weight'),
+                lambda layer_id: re.sub(r"\d+", str(layer_id), "layers.0.self_attn.q_proj.weight"),
+                lambda layer_id: re.sub(r"\d+", str(layer_id), "layers.0.self_attn.k_proj.weight"),
+                lambda layer_id: re.sub(r"\d+", str(layer_id), "layers.0.self_attn.v_proj.weight"),
+                lambda layer_id: re.sub(r"\d+", str(layer_id), "layers.0.self_attn.qkv_proj.weight"),
             ]
             tp_action_keys = list(name_action_mappings.keys())
             poped_param_names = []
             for key in tp_action_keys:
                 for name_map in name_map_list:
-                    if re.sub(r'\d+', '0', key) == name_map(0):
+                    if re.sub(r"\d+", "0", key) == name_map(0):
                         name_action_mappings.pop(key, None)
                         poped_param_names.append(key)
-                        print(f">> poped name_action_mappings {key}")
 
-        # annot: solve and apply tp_actions
         _apply_tp_action(name_action_mappings)
 
-        # annot: do-fuse状态下, 对qkv参数后处理(apply tp-action)
-        if 'attention_qkv_proj' in do_fuse_parameter_list:
-            print(f">>>>>>>>>>>>> 2. tail processing qkv parameters ")
+        # tail processing qkv parameters
+        if "attention_qkv_proj" in do_fuse_parameter_list:
             name_action_mappings_fuse = cls._get_tensor_parallel_mappings(config)
             tp_action_fuse_keys = list(name_action_mappings_fuse.keys())
             for key in tp_action_fuse_keys:
                 if key not in poped_param_names:
                     name_action_mappings_fuse.pop(key, None)
-            
+
             _apply_tp_action(name_action_mappings_fuse)
 
         return state_dict

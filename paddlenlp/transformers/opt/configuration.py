@@ -146,8 +146,8 @@ class OPTConfig(PretrainedConfig):
         eos_token_id=2,
         enable_bias: bool = True,
         mp_degree: int = 1,
-        fuse_attention_qkv = False,
-        fuse_attention_ffn = False,
+        fuse_attention_qkv=False,
+        fuse_attention_ffn=False,
         **kwargs,
     ):
         super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
