@@ -73,7 +73,7 @@ class LoRALinear(nn.Linear):
         if not rslora:
             self.scaling = self.lora_alpha / self.r
         else:
-            self.scaling = 4.0 / math.sqrt(self.r)
+            self.scaling = self.lora_alpha / math.sqrt(self.r)
 
         # Freezing the pre-trained weight matrix
         self.weight.stop_gradient = True
