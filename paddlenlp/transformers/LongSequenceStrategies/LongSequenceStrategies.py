@@ -14,6 +14,8 @@
 
 import importlib
 
+all_strategy_types = ["EmbeddingStrategies", "AttentionStrategies"]
+
 
 class LongSequenceStrategies:
     @classmethod
@@ -47,15 +49,18 @@ class LongSequenceStrategies:
         """
         try:
             import_class = importlib.import_module(f"paddlenlp.transformers.LongSequenceStrategies.{strategy_type}")
-        except ValueError:
-            raise ValueError(f"Wrong strategy type {strategy_type}.")
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError(
+                f"Wrong strategy type {strategy_type}. module only supports the following types: "
+                + ", ".join(m for m in all_strategy_types)
+            )
         try:
             strategy_class = getattr(import_class, stratety_name)
-            strategy_instance = strategy_class(**init_args)
-            return strategy_instance
-        except AttributeError:
+        except:
             all_strategy_classes = import_class.__all__
-            raise AttributeError(
+            raise LookupError(
                 f"module '{import_class.__name__}' only supports the following classes: "
                 + ", ".join(m for m in all_strategy_classes)
             )
+        strategy_instance = strategy_class(**init_args)
+        return strategy_instance
