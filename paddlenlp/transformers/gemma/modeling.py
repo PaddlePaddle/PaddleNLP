@@ -153,9 +153,7 @@ def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
     return hidden_states.reshape([batch, slen, num_key_value_heads * n_rep, head_dim])
 
 
-def parallel_matmul(
-    x: Tensor, y: paddle.base.framework.EagerParamBase, tensor_parallel_output=True, transpose_y=False
-):
+def parallel_matmul(x: Tensor, y, tensor_parallel_output=True, transpose_y=False):
     is_fleet_init = True
     tensor_parallel_degree = 1
     try:
