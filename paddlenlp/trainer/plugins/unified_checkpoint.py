@@ -1214,7 +1214,11 @@ def load_unified_optimizer_dynamically(args, model, optimizer, resume_from_check
         _, typename = key.split("/")
         typename_set.add(typename)
     struct2static_name_mappings = {k: v.name for k, v in get_expected_state_dict(model).items()}
-    static2struct_name_mappings = {v.name: k for k, v in get_expected_state_dict(model).items()}
+    static2struct_name_mappings = {}
+    for k, v in get_expected_state_dict(model).items():
+        if model._tied_weights_keys is not None and k in model._tied_weights_keys:
+            continue
+        static2struct_name_mappings[v.name] = k
     # Get send_table and recv_table. The send table indicates which workers are responsible for sending tensors, and the recv table indicates which workers should receive the tensors.
     send_table, recv_table = create_optimizer_dispatch_table(
         args,
