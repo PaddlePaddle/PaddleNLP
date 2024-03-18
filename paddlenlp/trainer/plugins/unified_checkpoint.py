@@ -226,6 +226,10 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
 
     model_state_dict = get_expected_state_dict(model)
     expected_keys = set(list(model_state_dict.keys()))
+    if model._tied_weights_keys is not None:
+        for key in model._tied_weights_keys:
+            expected_keys.remove(key)
+
     missing_keys = expected_keys - set(loaded_keys)
 
     if len(missing_keys) > 0:
@@ -607,6 +611,8 @@ def unified_optimizer_into_shards(
     static2struct_name_mappings = {}
     state_dict = get_expected_state_dict(model)
     for k, v in state_dict.items():
+        if model._tied_weights_keys is not None and k in model._tied_weights_keys:
+            continue
         static2struct_name_mappings[v.name] = k
 
     # rename optimizer param
@@ -739,6 +745,8 @@ def check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serializa
         need_files = set()
         state_dict = get_expected_state_dict(model)
         for key in state_dict.keys():
+            if model._tied_weights_keys is not None and key in model._tied_weights_keys:
+                continue
             filename = index["weight_map"][key]
             need_files.add(filename)
         diff_filelist = list(need_files.difference(set(existed_files)))
@@ -829,6 +837,8 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
             need_files = set()
             state_dict = get_expected_state_dict(model)
             for key in state_dict.keys():
+                if model._tied_weights_keys is not None and key in model._tied_weights_keys:
+                    continue
                 if sharding_group.nranks > 1:
                     static_name = struct2static_name_mappings.get(key, None)
                     param_rank = param2rank.get(static_name, None)
@@ -893,6 +903,8 @@ def save_single_card_checkpoint(args, model_to_save, output_dir):
     index_weight_file = {}
     total_size = 0
     for key, weight in state_dict.items():
+        if model_to_save._tied_weights_keys is not None and key in model_to_save._tied_weights_keys:
+            continue
         index_weight_file[key] = weight_filename
         total_size += weight.numel().item() * dtype_byte_size(weight.dtype)
     sharded_index_json = {}
@@ -926,6 +938,8 @@ def save_single_card_optimizer(args, model, optimizer, output_dir):
     static2struct_name_mappings = {}
     state_dict = get_expected_state_dict(model)
     for k, v in state_dict.items():
+        if model._tied_weights_keys is not None and k in model._tied_weights_keys:
+            continue
         static2struct_name_mappings[v.name] = k
 
     # rename optimizer param
@@ -1023,6 +1037,8 @@ def create_dispatch_table(args, model, file_keyname_mappings, file_machine_mappi
     if args.dataset_rank == 0:
         state_dict = get_expected_state_dict(model)
         for (k, v) in state_dict.items():
+            if model._tied_weights_keys is not None and k in model._tied_weights_keys:
+                continue
             if hasattr(v, "is_distributed") and v.is_distributed:
                 recv_table[k] = [(dist.get_rank(), tp_rank)]
             else:
@@ -1069,6 +1085,8 @@ def create_optimizer_dispatch_table(
     if args.data_parallel_rank == 0:
         state_dict = get_expected_state_dict(model)
         for (k, v) in state_dict.items():
+            if model._tied_weights_keys is not None and k in model._tied_weights_keys:
+                continue
             if sharding_group.nranks > 1:
                 static_name = struct2static_name_mappings[k]
                 param_rank = param2rank.get(static_name, None)
@@ -1349,6 +1367,9 @@ def load_single_card_checkpoint(args, model, resume_from_checkpoint: str):
     loaded_keys = sharded_metadata["all_checkpoint_keys"]
     model_state_dict = get_expected_state_dict(model)
     expected_keys = set(list(model_state_dict.keys()))
+    if model._tied_weights_keys is not None:
+        for key in model._tied_weights_keys:
+            expected_keys.remove(key)
     missing_keys = expected_keys - set(loaded_keys)
 
     if len(missing_keys) > 0:
@@ -1656,6 +1677,8 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
         tensor_bytes_dict = {}
         model_state_dict = get_expected_state_dict(model_to_save)
         for (k, v) in state_dict.items():
+            if model_to_save._tied_weights_keys is not None and k in model_to_save._tied_weights_keys:
+                continue
             model_v = model_state_dict[k.split("/")[0]] if is_optimizer else v
             if hasattr(model_v, "is_distributed") and model_v.is_distributed:
                 tensor_bytes_dict[k] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
