@@ -87,7 +87,7 @@ ${nsys_args} python3 -u -m paddle.distributed.launch \
         --warmup_ratio 0.01 \
         --max_grad_norm 1.0 \
         --do_train \
-        --max_steps 20 \
+        --max_steps 30 \
         --eval_steps 1000 \
         --save_steps 5000 \
         --logging_steps 1 \

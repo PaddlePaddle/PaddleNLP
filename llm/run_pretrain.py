@@ -76,6 +76,7 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
     )
+
     # NOTE(gongenlei): new add autotuner_benchmark
     autotuner_benchmark: bool = field(
         default=False,
@@ -154,6 +155,10 @@ class ModelArguments:
     use_fused_rms_norm: bool = field(
         default=False,
         metadata={"help": "llama or other model, use_fused_rms_norm"},
+    )
+    use_fast_layer_norm: bool = field(
+    	default=False,
+    	metadata={"help": "GPT3 or other model, Whether to use fast layernorm"}, 
     )
     fuse_attention_qkv: bool = field(
         default=False,
@@ -553,6 +558,11 @@ def main():
         * training_args.gradient_accumulation_steps
         * data_args.max_seq_length
     )
+
+    print("======== luqi ==========")
+    print(f"total_effective_tokens = {total_effective_tokens}")
+    print(f"training_args.dataset_world_size = {training_args.dataset_world_size}, training_args.max_steps = {training_args.max_steps}")
+    print(f"training_args.gradient_accumulation_steps = {training_args.gradient_accumulation_steps}, data_args.max_seq_length = {data_args.max_seq_length}")
 
     trainer = PretrainingTrainer(
         model=model,
