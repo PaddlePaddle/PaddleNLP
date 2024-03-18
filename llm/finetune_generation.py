@@ -112,6 +112,7 @@ def main():
         weight_double_quant=model_args.weight_double_quant,
         weight_double_quant_block_size=model_args.weight_double_quant_block_size,
     )
+
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
             raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
@@ -139,6 +140,9 @@ def main():
                 from_aistudio=model_args.from_aistudio,
                 quantization_config=quantization_config,
             )
+            # When lora and use_quick_lora are enabled, recompute_use_reentrant must be set to True to prevent any potential errors from occurring.
+            if model_args.lora and model_args.use_quick_lora:
+                model_config.recompute_use_reentrant = True
             model = AutoModelForCausalLMPipe.from_config(model_config, dtype=dtype)
     else:
         model_config = AutoConfig.from_pretrained(
@@ -150,6 +154,9 @@ def main():
             from_aistudio=model_args.from_aistudio,
             quantization_config=quantization_config,
         )
+        # When lora and use_quick_lora are enabled, recompute_use_reentrant must be set to True to prevent any potential errors from occurring.
+        if model_args.lora and model_args.use_quick_lora:
+            model_config.recompute_use_reentrant = True
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
 
@@ -429,6 +436,7 @@ def main():
             model = LoRAModel(model, lora_config)
         else:
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
+
         model.print_trainable_parameters()
 
     def compute_metrics_do_generation(eval_preds):
