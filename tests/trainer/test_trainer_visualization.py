@@ -77,7 +77,11 @@ class TestTensorboardCallback(unittest.TestCase):
         tensorboard_callback = TensorBoardCallback()
         self.assertIsNone(tensorboard_callback.tb_writer)
         tensorboard_callback.on_train_begin(args, state, control)
-        self.assertEqual(tensorboard_callback.tb_writer.log_dir, output_dir)
+        try:
+            log_directory = tensorboard_callback.tb_writer.logdir
+        except AttributeError:
+            log_directory = tensorboard_callback.tb_writer.log_dir
+        self.assertEqual(log_directory, output_dir)
         for global_step in range(args.max_steps):
             state.global_step = global_step
             if global_step % args.logging_steps == 0:

@@ -330,7 +330,9 @@ class ImageProcessingMixin(object):
             from_hf_hub=from_hf_hub,
             from_aistudio=from_aistudio,
         )
-
+        assert (
+            resolved_image_processor_file is not None
+        ), f"please make sure {IMAGE_PROCESSOR_NAME} under {pretrained_model_name_or_path}"
         try:
             # Load image_processor dict
             with open(resolved_image_processor_file, "r", encoding="utf-8") as reader:

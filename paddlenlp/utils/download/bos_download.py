@@ -186,6 +186,8 @@ def bos_download(
         # This is used to create a URL, and not a local path, hence the forward slash.
         filename = f"{subfolder}/{filename}"
 
+    locks_dir = os.path.join(cache_dir, ".locks")
+
     storage_folder = os.path.join(cache_dir, repo_id)
     os.makedirs(storage_folder, exist_ok=True)
 
@@ -193,10 +195,8 @@ def bos_download(
         url = bos_url(repo_id, filename, repo_type=REPO_TYPE, endpoint=endpoint)
     headers = None
     url_to_download = url
-    lock_path = os.path.join(cache_dir, repo_id, f"{filename}.lock")
+    lock_path = os.path.join(locks_dir, repo_id, f"{filename}.lock")
     file_path = os.path.join(cache_dir, repo_id, filename)
-
-    os.makedirs(os.path.dirname(lock_path), exist_ok=True)
 
     if os.name == "nt" and len(os.path.abspath(lock_path)) > 255:
         lock_path = "\\\\?\\" + os.path.abspath(lock_path)
@@ -204,6 +204,7 @@ def bos_download(
     if os.name == "nt" and len(os.path.abspath(file_path)) > 255:
         file_path = "\\\\?\\" + os.path.abspath(file_path)
 
+    Path(lock_path).parent.mkdir(parents=True, exist_ok=True)
     with FileLock(lock_path):
         # If the download just completed while the lock was activated.
         if os.path.exists(file_path) and not force_download:
