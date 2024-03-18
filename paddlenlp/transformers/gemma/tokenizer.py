@@ -146,6 +146,11 @@ class GemmaTokenizer(PretrainedTokenizer):
                     sub_texts.append(self.sp_model.decode(current_sub_text))
                 sub_texts.append(self.added_tokens_decoder[ids].content)
                 current_sub_text = []
+            elif ids in self.all_special_ids:
+                if current_sub_text:
+                    sub_texts.append(self.sp_model.decode(current_sub_text))
+                sub_texts.append(self._convert_id_to_token(ids))
+                current_sub_text = []
             else:
                 current_sub_text.append(ids)
         if current_sub_text:
@@ -167,6 +172,8 @@ class GemmaTokenizer(PretrainedTokenizer):
             if token in self._added_tokens_encoder:
                 out_string += self.sp_model.decode(current_sub_tokens) + token
                 current_sub_tokens = []
+            elif token in self.all_special_tokens:
+                out_string += self.sp_model.decode(current_sub_tokens) + token
             else:
                 current_sub_tokens.append(token)
         out_string += self.sp_model.decode(current_sub_tokens)
