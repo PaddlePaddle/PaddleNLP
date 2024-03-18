@@ -74,6 +74,7 @@ __all__ = [
     "GPTForCausalLM",
     "GPTEmbeddings",
     "GPTDecoderLayer",
+    "GPTLayerNorm",
 ]
 
 

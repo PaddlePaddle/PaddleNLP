@@ -31,6 +31,7 @@ from .modeling import (
     GPTLMHead,
     GPTPretrainedModel,
     GPTPretrainingCriterion,
+    GPTLayerNorm,
 )
 
 __all__ = [
@@ -125,9 +126,9 @@ class GPTDecoderLayerPipe(GPTDecoderLayer):
         return return_args(hidden_states, attention_mask, position_ids)
 
 
-class LayerNormPipe(nn.LayerNorm):
+class LayerNormPipe(GPTLayerNorm):
     def __init__(self, config):
-        super(LayerNormPipe, self).__init__(config.hidden_size, epsilon=1e-05)
+        super(LayerNormPipe, self).__init__(config, config.hidden_size, epsilon=1e-05)
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.weight)
             mark_as_sequence_parallel_parameter(self.bias)
