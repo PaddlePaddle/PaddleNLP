@@ -30,6 +30,7 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
+from paddle.utils import try_import
 
 from ...utils.converter import StateDictNameMapping
 from ...utils.log import logger
@@ -58,6 +59,9 @@ try:
     from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 except:
     FusedDropoutAdd = None
+
+OriginLayerNorm = paddle.nn.LayerNorm
+
 
 __all__ = [
     "GPTModel",
@@ -119,6 +123,11 @@ def seed_guard_context(name=None):
         return contextlib.nullcontext()
 
 
+def fast_layer_norm(input, weight, bias, eps):
+    fast_ln_lib = try_import("fast_ln")
+    return fast_ln_lib.fast_ln(input, weight, bias, eps)[0]
+
+
 def _make_causal_mask(input_ids_shape, past_key_values_length):
     """
     Make causal mask used for self-attention
@@ -147,6 +156,11 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     expanded_mask = mask.expand([batch_size, 1, tgt_length, src_length])
 
     return expanded_mask
+
+
+def _check_normalized_shape(normalized_shape):
+    if isinstance(normalized_shape, (list, tuple)):
+        assert len(normalized_shape) == 1
 
 
 class MultiHeadAttention(nn.Layer):
@@ -421,7 +435,7 @@ class TransformerDecoder(nn.Layer):
 
         self.config = config
         self.layers = decoder_layers
-        self.norm = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
+        self.norm = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
 
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.norm.weight)
@@ -579,8 +593,9 @@ class GPTDecoderLayer(nn.Layer):
             self.linear1 = nn.Linear(config.hidden_size, config.intermediate_size, bias_attr=True)
             self.linear2 = nn.Linear(config.intermediate_size, config.hidden_size, bias_attr=True)
 
-        self.norm1 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
-        self.norm2 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
+        self.norm1 = GPTLayerNorm(config, config.hiddden_size, epsilon=1e-5)
+        self.norm2 = GPTLayerNorm(config, config.hiddden_size, epsilon=1e-5)
+
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.norm1.weight)
             mark_as_sequence_parallel_parameter(self.norm1.bias)
@@ -739,6 +754,21 @@ class GPTEmbeddings(nn.Layer):
             embeddings = self.dropout(embeddings)
 
         return embeddings
+
+
+class GPTLayerNorm(OriginLayerNorm):
+    def __init__(self, config, normalized_shape, epsilon=1e-05, weight_attr=None, bias_attr=None, name=None):
+        super().__init__(
+            normalized_shape=normalized_shape, epsilon=epsilon, weight_attr=weight_attr, bias_attr=bias_attr
+        )
+
+        self.config = config
+        _check_normalized_shape(self._normalized_shape)
+
+    def forward(self, input):
+        if self.config.use_fast_layer_norm:
+            return fast_layer_norm(input, self.weight, self.bias, self._epsilon)
+        return super().forward(input)
 
 
 class GPTPretrainedModel(PretrainedModel):
