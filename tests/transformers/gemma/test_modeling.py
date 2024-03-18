@@ -262,6 +262,29 @@ class GemmaModelTester:
         else:
             self.parent.assertTrue((result_position_id[0] == result_no_position_id[0]).all())
 
+    def check_model_position_ids_alibi(self, config, input_ids, input_mask, *args):
+        config.alibi = True
+        model = GemmaForCausalLM(config)
+        model.eval()
+
+        result_no_position_id = model(
+            input_ids,
+            labels=input_ids if self.parent.use_labels else None,
+            return_dict=self.parent.return_dict,
+        )
+        batch_size, seq_len = input_ids.shape
+        position_ids = paddle.arange(seq_len).expand((batch_size, seq_len))
+        result_position_id = model(
+            input_ids,
+            position_ids,
+            labels=input_ids if self.parent.use_labels else None,
+            return_dict=self.parent.return_dict,
+        )
+        if self.parent.use_labels:
+            self.parent.assertTrue((result_position_id[1] == result_no_position_id[1]).all())
+        else:
+            self.parent.assertTrue((result_position_id[0] == result_no_position_id[0]).all())
+
     def create_and_check_gqa_model(self, config, input_ids, input_mask, *args):
         model = GemmaForCausalLM(config)
         config.num_key_value_heads = 8  # gqa
@@ -328,6 +351,7 @@ class GemmaModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase)
     def test_model_position_ids(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.check_model_position_ids(*config_and_inputs)
+        self.model_tester.check_model_position_ids_alibi(*config_and_inputs)
 
     def test_generate_without_input_ids(self):
         # this requires 4-D attention mask logic, which is not supported yet
