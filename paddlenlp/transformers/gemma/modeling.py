@@ -16,7 +16,7 @@
 import math
 import warnings
 from functools import partial
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
@@ -874,7 +874,7 @@ class GemmaPretrainedModel(PretrainedModel):
     _keep_in_fp32_modules = ["inv_freq", "rotary_emb", "cos_cached", "sin_cached"]
 
     @classmethod
-    def _get_name_mappings(cls, config: GemmaConfig) -> list[StateDictNameMapping]:
+    def _get_name_mappings(cls, config: GemmaConfig) -> List[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
             ["embed_tokens.weight"],
