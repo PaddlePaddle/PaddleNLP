@@ -16,10 +16,12 @@ import copy
 import itertools
 import math
 import os
+import sys
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import paddle
+import paddle.distributed as dist
 import paddle.nn as nn
 from data import DummyDataset, PromptOnlyBatch
 from infer_utils import InferEvalModel, infer_guard
@@ -45,6 +47,7 @@ from trainer_utils import (
 
 from paddlenlp.data import DataCollator
 from paddlenlp.generation import GenerationConfig
+from paddlenlp.trainer.plugins.unified_checkpoint import flatten_list
 from paddlenlp.trainer.trainer import (
     EvalLoopOutput,
     EvalPrediction,
@@ -55,7 +58,371 @@ from paddlenlp.trainer.trainer import (
     logger,
     speed_metrics,
 )
+from paddlenlp.utils.distributed import distributed_gather
+
+global_dev_id = 0 if paddle.get_device() == "cpu" else int(paddle.get_device().split(":")[1])
 from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
+
+
+def offload_tensor_to_cpu(tensors):
+    if isinstance(tensors, dict):
+        for _, v in tensors.items():
+            offload_tensor_to_cpu(v)
+    elif isinstance(tensors, paddle.Tensor):
+        if tensors.place.is_gpu_place():
+            cpu_tensor = tensors._copy_to(paddle.CUDAPinnedPlace(), False)
+            tensors.value().get_tensor()._share_data_with(cpu_tensor.value().get_tensor())
+    else:
+        logger.warning(f"Can't parse for type {type(tensors)}")
+        return tensors
+
+
+def reload_tensor_to_gpu(tensors):
+    if isinstance(tensors, dict):
+        for _, v in tensors.items():
+            reload_tensor_to_gpu(v)
+    elif isinstance(tensors, paddle.Tensor):
+        if not tensors.place.is_gpu_place():
+            gpu_tensor = tensors._copy_to(paddle.CUDAPlace(global_dev_id), False)
+            tensors.value().get_tensor()._share_data_with(gpu_tensor.value().get_tensor())
+    else:
+        logger.warning(f"Can't parse for type {type(tensors)}")
+        return tensors
+
+
+def cleanup_tensor_space(tensors):
+    if isinstance(tensors, dict):
+        for _, v in tensors.items():
+            cleanup_tensor_space(v)
+    elif isinstance(tensors, paddle.Tensor):
+        tensors._clear_data()
+    else:
+        logger.warning(f"Can't parse for type {type(tensors)}")
+        return tensors
+
+
+def data_group_split(tensors, group):
+    if group is None:
+        return tensors
+    if isinstance(tensors, (list, tuple)):
+        return type(tensors)(data_group_split(t, group) for t in tensors)
+    elif isinstance(tensors, dict):
+        new_dict = {}
+        for k, v in tensors.items():
+            new_dict[k] = data_group_split(v, group)
+        return new_dict
+    elif isinstance(tensors, paddle.Tensor):
+        return tensors.split(group.nranks)[group.rank]
+    else:
+        logger.warning(f"Can't parse for type {type(tensors)}")
+        return tensors
+
+
+def data_group_merge(tensors, group):
+    if group is None:
+        return tensors
+
+    if isinstance(tensors, (list, tuple)):
+        return type(tensors)(data_group_merge(t, group) for t in tensors)
+    elif isinstance(tensors, dict):
+        new_dict = {}
+        for k, v in tensors.items():
+            new_dict[k] = data_group_merge(v, group)
+        return new_dict
+    elif isinstance(tensors, paddle.Tensor):
+        tensor_list = []
+        all_gather_nd(tensor_list, tensors, group=group, padded=True)
+        return paddle.concat(tensor_list)
+    else:
+        logger.warning(f"Can't parse for type {type(tensors)}")
+        return tensors
+
+
+def repad_rl_batches(batches, input_lengths):
+    if "position_ids" in batches:
+        v = batches["position_ids"]
+        for x in range(v.shape[0]):
+            v[x, input_lengths[x] :] = 1
+        batches["position_ids"] = v
+    for key in list(batches.keys()):
+        if batches[key].shape[0] != input_lengths.shape[0]:
+            batches[key] = batches[key].mean()
+
+    return batches
+
+
+# https://stackoverflow.com/questions/12594148/skipping-execution-of-with-block
+class SkipWithBlock(Exception):
+    pass
+
+
+class SkipContextManager:
+    def __init__(self, skip):
+        self.skip = skip
+
+    def __enter__(self):
+        if self.skip:
+            sys.settrace(lambda *args, **keys: None)
+            frame = sys._getframe(1)
+            frame.f_trace = self.trace
+
+    def trace(self, frame, event, arg):
+        raise SkipWithBlock()
+
+    def __exit__(self, type, value, traceback):
+        if type is None:
+            return  # No exception
+        if issubclass(type, SkipWithBlock):
+            return True  # Suppress special SkipWithBlock exception
+
+
+def all_gather_nd(tensor_list, tensor, group=None, padded=False):
+    """
+    Gathers tensor arrays of different lengths in a list.
+    The length dimension is 0. This supports any number of extra dimensions in the tensors.
+    All the other dimensions should be equal between the tensors.
+
+    Args:
+        tensor (Tensor): Tensor to be broadcast from current process.
+
+    Returns:
+        (Tensor): output list of tensors that can be of different sizes
+    """
+    if len(tensor.shape) == 0:
+        tensor = tensor.reshape([1])
+        dist.all_gather(tensor_list, tensor, group=group)
+        return tensor_list
+
+    world_size = group.nranks
+    local_size = paddle.to_tensor(tensor.shape, place=tensor.place)
+    all_sizes = [paddle.zeros_like(local_size) for _ in range(world_size)]
+    dist.all_gather(all_sizes, local_size, group=group)
+
+    # max_length = max(size[0] for size in all_sizes)
+
+    # length_diff = max_length.item() - local_size[0].item()
+    # if length_diff:
+    #     pad_size = (length_diff, *tensor.size()[1:])
+    #     padding = paddle.zeros(pad_size, place=tensor.place(), dtype=tensor.dtype)
+    #     tensor = padle.concat((tensor, padding))
+
+    max_length = max(size[-1] for size in all_sizes)
+
+    length_diff = max_length.item() - local_size[-1].item()
+    if length_diff:
+        pad_size = (*tensor.shape[:-1], length_diff)
+        padding = paddle.zeros(pad_size, dtype=tensor.dtype)
+        tensor = paddle.concat([tensor, padding], axis=-1)
+
+    all_tensors_padded = []
+    dist.all_gather(all_tensors_padded, tensor, group=group)
+    # all_tensors = []
+    if padded:
+        tensor_list.extend(all_tensors_padded)
+        return all_tensors_padded
+
+    for tensor_, size in zip(all_tensors_padded, all_sizes):
+        tensor_list.append(tensor_[..., : size[-1]])
+    return tensor_list
+
+
+def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
+    if eval_model is None:
+        return None
+
+    with_offload = kwargs.pop("with_offload", False)
+    train_tp_size = max(train_model.config.tensor_parallel_degree, 1)
+    eval_tp_size = max(eval_model.config.tensor_parallel_degree, 1)
+    eval_tp_rank = max(eval_model.config.tensor_parallel_rank, 0)
+
+    hcg = fleet.get_hybrid_communicate_group()
+    tp_group = hcg.get_model_parallel_group()
+    pp_group = hcg.get_pipe_parallel_group()
+    sd_group = hcg.get_sharding_parallel_group()
+    dp_group = hcg.get_data_parallel_group()
+
+    global_rank = paddle.distributed.get_rank()
+
+    train_state_dict = train_model.state_dict()
+    eval_state_dict = eval_model.state_dict()
+
+    if dp_group.rank <= 0 and sd_group.rank <= 0:
+        train_pp_size = pp_group.nranks
+        if eval_tp_size > 1 and train_tp_size != eval_tp_size:
+            raise ValueError("Only support for the same tensor_parallel_degree for train and eval model for now.")
+
+        # 单卡情况
+        # tp->single
+        # tp+pp -> single
+        if eval_tp_size == 1:
+            if train_pp_size == 1 and train_tp_size > 1:
+                # tp ->single
+                logger.error("using tp to single eval model.")
+                # state = train_model.merge_tensor_parallel()
+                tp_actions = train_model.get_tensor_parallel_convert_actions(
+                    train_model.config,
+                    loaded_state_dict_keys=eval_state_dict.keys(),
+                    is_split=False,
+                    ignore_error=False,
+                )
+
+                is_dst = global_rank == 0
+                for key in eval_state_dict.keys():
+                    tensor = train_state_dict[key]
+                    if key in tp_actions:
+                        ret = distributed_gather(tensor, dst=0, group=tp_group, offload=False)
+                        action = tp_actions.pop(key)
+                        tensor = action(ret) if is_dst else None
+                    else:
+                        tensor = tensor._copy_to(paddle.CPUPlace(), False) if is_dst else None
+
+                    if tensor is not None:
+                        eval_state_dict[key].set_value(tensor)
+
+                    if not eval_state_dict[key]._is_initialized():
+                        v = eval_state_dict[key]
+                        t = paddle._C_ops.full_like(v, 0, v.dtype, paddle.CUDAPlace(global_dev_id))
+                        v.get_tensor()._share_data_with(t.get_tensor())
+
+                    if with_offload:
+                        offload_tensor_to_cpu(train_state_dict[key])
+            else:
+                # single to single
+                # tp+pp -> single
+                raise ValueError("Not support yet.")
+
+        def create_send_recv_table(train_keys, eval_keys):
+            recv_table = []
+            send_table = []
+            if pp_group.rank == 0:
+                for key in eval_keys:
+                    recv_table.append((key, global_rank))
+
+            for key in train_keys:
+                send_table.append((key, global_rank))
+
+            all_recv, all_send = [], []
+            paddle.distributed.all_gather_object(all_recv, [recv_table], group=pp_group)
+            paddle.distributed.all_gather_object(all_send, [send_table], group=pp_group)
+            all_recv = flatten_list(all_recv)
+            all_send = flatten_list(all_send)
+
+            send_dict = {}
+            for k, v in all_send:
+                send_dict[k] = v
+
+            table = []
+            for k, v in all_recv:
+                # key, send, recv
+                table.append([k, send_dict.pop(k), v])
+            assert len(send_dict) == 0, f"Some key can't be recv {send_dict.keys()}"
+            return table
+
+            # pp0tp0 -> pp0tp0
+            # pp0tp1 -> pp0tp1
+            # pp1tp0 -> pp0tp0
+            # pp1tp1 -> pp0tp1
+
+        # tp情况
+        # tp+pp->tp
+        self.timers and self.timers("export-merge-pp").start()
+        if eval_tp_size > 1 and train_pp_size > 1:
+            table = create_send_recv_table(train_state_dict.keys(), eval_state_dict.keys())
+
+            for key, src_rank, dst_rank in table:
+                # Init tensor for model is cleaned
+                if not eval_state_dict[key]._is_initialized():
+                    v = eval_state_dict[key]
+                    t = paddle._C_ops.full_like(v, 0, v.dtype, paddle.CUDAPlace(global_dev_id))
+                    v.get_tensor()._share_data_with(t.get_tensor())
+
+                if src_rank == dst_rank and global_rank == src_rank:
+                    eval_state_dict[key].copy_(train_state_dict[key], True)
+                else:
+                    if global_rank == src_rank:
+                        dist.stream.send(train_state_dict[key], dst=dst_rank)
+
+                    if global_rank == dst_rank:
+                        dist.stream.recv(eval_state_dict[key], src=src_rank)
+
+                # Offload train model if need
+                if global_rank == src_rank and with_offload:
+                    offload_tensor_to_cpu(train_state_dict[key])
+
+        self.timers and self.timers("export-merge-pp").stop()
+        self.timers and self.timers("export-broadcast-pp").start()
+        if pp_group.nranks > 1:
+            paddle.distributed.parallel.sync_params_buffers(
+                eval_model, comm_group=pp_group, src_rank=pp_group.ranks[0], fuse_params=False
+            )
+        self.timers and self.timers("export-broadcast-pp").stop()
+    else:
+        # 其他 DP rank 的state dict, 适配 offload 和初始化
+        self.timers and self.timers("export-offload-and-init").start()
+        if with_offload:
+            for key in list(train_state_dict.keys()):
+                offload_tensor_to_cpu(train_state_dict[key])
+        for k, v in eval_state_dict.items():
+            if not v._is_initialized():
+                t = paddle._C_ops.full_like(v, 0, v.dtype, paddle.CUDAPlace(global_dev_id))
+                v.get_tensor()._share_data_with(t.get_tensor())
+        self.timers and self.timers("export-offload-and-init").stop()
+
+    paddle.distributed.barrier()
+    self.timers and self.timers("export-broadcast-sd-dp").start()
+    if eval_tp_size == 1:
+        for _, tensor in eval_state_dict.items():
+            paddle.distributed.broadcast(tensor, src=0, group=None, sync_op=True)
+    else:
+        if sd_group.nranks > 1:
+            if dp_group.rank <= 0:
+                paddle.distributed.parallel.sync_params_buffers(
+                    eval_model, comm_group=sd_group, src_rank=sd_group.ranks[0], fuse_params=False
+                )
+        if dp_group.nranks > 1:
+            paddle.distributed.parallel.sync_params_buffers(
+                eval_model, comm_group=dp_group, src_rank=dp_group.ranks[0], fuse_params=False
+            )
+    self.timers and self.timers("export-broadcast-sd-dp").stop()
+    # paddle.save(eval_state_dict, f"./tmp/eval_{sd_group.rank}_tp_{eval_tp_rank}_pp_{pp_group.rank}.pdparams")
+    # paddle.save(train_state_dict, f"./tmp/train_{sd_group.rank}_tp_{tp_group.rank}_pp_{pp_group.rank}.pdparams")
+    # paddle.distributed.barrier()
+    # exit(-1)
+
+    old_dp_workers = self.args.world_size // (max(sd_group.nranks, 1) * max(dp_group.nranks, 1))
+    group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
+
+    if not hasattr(self, "_policy_model_eval_group") or self._policy_model_eval_group is None:
+        self._policy_model_eval_group = create_data_trans_group(global_rank, group_nums)
+
+    return None
+
+
+def create_data_trans_group(global_rank, group_nums):
+    all_split_table = []
+    paddle.distributed.all_gather_object(all_split_table, [(global_rank, group_nums)])
+    all_split_table = flatten_list(all_split_table)
+    split_dict = {}
+    for k, v in all_split_table:
+        split_dict[k] = v
+
+    split_ranks = {}
+    for k, v in all_split_table:
+        if v in split_ranks:
+            split_ranks[v].append(k)
+        else:
+            split_ranks[v] = [k]
+
+    group = None
+    for k, ranks in split_ranks.items():
+        gp = paddle.distributed.new_group(ranks=ranks)
+        if global_rank in ranks:
+            group = gp
+
+    return group
+
+
+Trainer.export_evaluate_model = export_evaluate_model
 
 
 class StepTrainer(Trainer):
@@ -66,10 +433,6 @@ class StepTrainer(Trainer):
     loss and get the separated loss metrics is supported, which is helpful to
     PipelienParallel with a mixed loss.
     """
-
-    # used to create criterion for trainer, please refer to `create_criterion`
-    # for details.
-    loss_cls: type
 
     def __init__(
         self,
@@ -389,7 +752,10 @@ class PPOTrainer(Trainer):
         self.ptx_dataset = ptx_dataset
         self.eval_dataset = eval_dataset
 
-        (policy_model, reference_model, reward_model, value_model) = model
+        (policy_model, reference_model, reward_model, value_model, policy_model_eval, value_model_eval) = model
+        self._policy_model_eval = policy_model_eval
+        self._value_model_eval = value_model_eval
+
         # policy_tokenizer and value_tokenizer should be same
         (policy_tokenizer, reference_tokenizer, reward_tokenizer, value_tokenizer) = tokenizer
 
@@ -440,36 +806,54 @@ class PPOTrainer(Trainer):
         # use trainer for reference_model/reward_model to enable sharding stage-3
         # and PipelineParallel. maybe we should allow models to use different dist
         # strategies later
-        self.reference_trainer = StepTrainer(
-            reference_model,
-            criterion,
+
+        from paddle.distributed.fleet.meta_parallel import PipelineLayer
+
+        with guard_set_args(
             args,
-            data_collator,
-            train_dataset,
-            eval_dataset,
-            reference_tokenizer,
-            compute_metrics,
-            callbacks,
-            optimizers,
-            preprocess_logits_for_metrics,
-        )
-        self.reward_trainer = StepTrainer(
-            reward_model,
-            criterion,
-            args,
-            data_collator,
-            train_dataset,
-            eval_dataset,
-            reward_tokenizer,
-            compute_metrics,
-            callbacks,
-            optimizers,
-            preprocess_logits_for_metrics,
-        )
-        # TODO(guosheng): sharding stage3 should create master weight optionally
-        # instead of creation and clear.
-        self.reference_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
-        self.reward_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
+            {
+                "recompute": False,
+                "fp16_opt_level": "O1",
+                "pipeline_parallel_degree": args.pipeline_parallel_degree
+                if isinstance(reference_model, PipelineLayer)
+                else 1,  # workaround for pipeline parallel model check
+            },
+        ):
+
+            self.reference_trainer = StepTrainer(
+                reference_model,
+                criterion,
+                copy.deepcopy(args),
+                data_collator,
+                train_dataset,
+                eval_dataset,
+                reference_tokenizer,
+                compute_metrics,
+                callbacks,
+                optimizers,
+                preprocess_logits_for_metrics,
+            )
+            self.reward_trainer = StepTrainer(
+                reward_model,
+                criterion,
+                copy.deepcopy(args),
+                data_collator,
+                train_dataset,
+                eval_dataset,
+                reward_tokenizer,
+                compute_metrics,
+                callbacks,
+                optimizers,
+                preprocess_logits_for_metrics,
+            )
+            # TODO(guosheng): sharding stage3 should create master weight optionally
+            # instead of creation and clear.
+            from paddlenlp.trainer.trainer_utils import ShardingOption
+
+            if args.pipeline_parallel_degree > 1 or ShardingOption.FULL_SHARD in args.sharding:
+                self.reference_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
+                self.reward_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
+
         self.reference_model.eval()
         self.reward_model.eval()
 
@@ -479,7 +863,7 @@ class PPOTrainer(Trainer):
             self.reward_tokenizer = self.tokenizer
 
         self.generation_config = GenerationConfig(
-            max_length=self.args.max_length,
+            max_new_tokens=self.args.max_length,
             num_return_sequences=self.args.num_return_sequences,
             temperature=self.args.temperature,
             top_p=self.args.top_p,
@@ -678,12 +1062,100 @@ class PPOTrainer(Trainer):
             ):
                 # generate batches
                 self.set_eval()
+
+                # self.optimizer.offload()
+                if self.args.eval_mode is not None and "optimizer" in self.args.offload_level:
+                    self.timers and self.timers("offload-optimizer").start()
+                    offload_tensor_to_cpu(self.policy_trainer.optimizer.state_dict())
+                    offload_tensor_to_cpu(self.value_trainer.optimizer.state_dict())
+                    self.timers and self.timers("offload-optimizer").stop()
+
+                self.timers and self.timers("export-evaluate-model").start()
+
+                self.policy_trainer.export_evaluate_model(
+                    self.policy_trainer.model,
+                    self._policy_model_eval,
+                    with_offload="train_model" in self.args.offload_level,
+                )
+                gp = (
+                    self.policy_trainer._policy_model_eval_group
+                    if hasattr(self.policy_trainer, "_policy_model_eval_group")
+                    else None
+                )
+                # gp = create_data_trans_group(self.args.logical_process_index, paddle.distributed.get_rank(), self._policy_model_eval.config.tensor_parallel_degree)
+                # # todo: zhui
+                self.value_trainer.export_evaluate_model(
+                    self.value_trainer.model,
+                    self._value_model_eval,
+                    with_offload="train_model" in self.args.offload_level,
+                )
+                self.timers and self.timers("export-evaluate-model").stop()
+
+                # self.reference_model.reload()
+                # self.reward_model.reload()
+                if "reward" in self.args.offload_level:
+                    self.timers and self.timers("reload-reward").start()
+                    reload_tensor_to_gpu(self.reference_model.state_dict())
+                    reload_tensor_to_gpu(self.reward_model.state_dict())
+                    self.timers and self.timers("reload-reward").stop()
+
+                # todo, split prompt_only_batch
+                # pp2tp2dp2 -> dp4tp2 prompt_only_batch
+                self.timers and self.timers("resplit-data").start()
+                prompt_only_batch = data_group_split(prompt_only_batch, group=gp)
+                self.timers and self.timers("resplit-data").stop()
+
+                self.timers and self.timers("split-rl-micro-batches").start()
+                # 生成数据
+                # per_train 4, accu 8
+                # prompt 32
+
+                # 32? [4,4,4,4,4,4,4]
                 rl_batches = self.split_rl_micro_batches(prompt_only_batch)
+                # rl_batches = self.load_sing_gen_data(as_batches=True,
+                #                                      use_counter=True)
+                self.timers and self.timers("split-rl-micro-batches").stop()
+
+                self.timers and self.timers("ptx-batch").start()
                 if self.use_ptx:
+                    ptx_batch = data_group_split(ptx_batch, group=gp)
                     ptx_batches = self.split_ptx_micro_batches(ptx_batch)
+                    ptx_batches = data_group_merge(ptx_batches, group=gp)
                 else:
                     ptx_batches = [None for _ in range(len(rl_batches))]
+
+                self.timers and self.timers("ptx-batch").stop()
+
+                self.timers and self.timers("merge-data").start()
+                # todo, merge data
+                if gp is not None:
+                    input_ids_length = rl_batches[0]["input_ids"].shape[-1]
+                    rl_batches[0]["input_ids_length"] = paddle.to_tensor(
+                        [input_ids_length] * rl_batches[0]["input_ids"].shape[0], dtype="int64"
+                    )
+                    rl_batches = data_group_merge(rl_batches, group=gp)
+                    input_ids_length_batchs = rl_batches[0].pop("input_ids_length")
+                    rl_batches[0] = repad_rl_batches(rl_batches[0], input_ids_length_batchs)
+
                 paddle.device.cuda.empty_cache()
+                self.timers and self.timers("merge-data").stop()
+
+                # # 数据造好, 开始训练
+                # self.reference_model.offload()
+                # self.reward_model.offload()
+                # policy_model_eval.cleanup()
+                # value_model_eval.cleanup()
+                if self.args.offload_level is not None:
+                    if "eval" in self.args.offload_level:
+                        self.timers and self.timers("offload-eval").start()
+                        cleanup_tensor_space(self._policy_model_eval.state_dict())
+                        cleanup_tensor_space(self._value_model_eval.state_dict())
+                        self.timers and self.timers("offload-eval").stop()
+                    if "reward" in self.args.offload_level:
+                        self.timers and self.timers("offload-reward").start()
+                        offload_tensor_to_cpu(self.reference_model.state_dict())
+                        offload_tensor_to_cpu(self.reward_model.state_dict())
+                        self.timers and self.timers("offload-reward").stop()
 
                 self.set_train()
                 for _ in range(self.args.update_iters):
@@ -834,12 +1306,35 @@ class PPOTrainer(Trainer):
                 # self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
                 rl_batch, ptx_batch = inputs
                 # TODO(guosheng): make rl_step/ptx_step run with autocast_smart_context_manager
+
+                # policy_model.reload()
+                # value_model.reload()
+                self.timers and self.timers("offload-reload").start()
+                reload_tensor_to_gpu(self.actor_model.state_dict())
+                reload_tensor_to_gpu(self.reward_critic_model.state_dict())
+                self.timers and self.timers("offload-reload").stop()
+
+                logger.info("Doing rl step...")
+                self.timers and self.timers("rl_step").start()
                 rl_info = self.rl_step(rl_batch)
                 paddle.device.cuda.empty_cache()
+                self.timers and self.timers("rl_step").stop()
+                if self.args.eval_mode is not None and "optimizer" in self.args.offload_level:
+                    self.timers and self.timers("offload-value-optimizer").start()
+                    offload_tensor_to_cpu(self.value_trainer.optimizer.state_dict())
+                    self.timers and self.timers("offload-value-optimizer").stop()
+
                 if self.use_ptx:
+                    logger.info("Doing ptx step...")
+                    self.timers and self.timers("ptx_step").start()
                     ptx_info = self.ptx_step(ptx_batch)
                     rl_info.update(ptx_info)
                     paddle.device.cuda.empty_cache()
+                    self.timers and self.timers("ptx_step").stop()
+
+                    self.timers and self.timers("offload-policy-optimizer").start()
+                    offload_tensor_to_cpu(self.policy_trainer.optimizer.state_dict())
+                    self.timers and self.timers("offload-policy-optimizer").stop()
 
                 self.state.global_step += 1
                 self.state.epoch = epoch + (step + 1) / steps_in_epoch
@@ -851,6 +1346,7 @@ class PPOTrainer(Trainer):
                     # on_sub_step_end
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
                 self._maybe_log_save_evaluate(rl_info, None, epoch, ignore_keys_for_eval, inputs=inputs)
+                self._print_timer()
 
             if step < 0:
                 logger.warning(
@@ -863,6 +1359,7 @@ class PPOTrainer(Trainer):
             self.control = self.callback_handler.on_epoch_end(args, self.state, self.control)
             # argument model is not used in _maybe_log_save_evaluate, thus use None
             self._maybe_log_save_evaluate(rl_info, None, epoch, ignore_keys_for_eval, inputs=inputs)
+            self._print_timer()
 
             if self.control.should_training_stop:
                 break
@@ -1066,6 +1563,7 @@ class PPOTrainer(Trainer):
                 prompt_only_batch,
             )
             micro_batches.extend(self.rollout(micro_batch))
+
         return micro_batches
 
     @paddle.no_grad()
@@ -1078,14 +1576,30 @@ class PPOTrainer(Trainer):
             if "position_ids" in prompt_only_batch
             else make_position_ids(attention_mask)
         )
+        # NOTE: generation output of paddlenlp do not contain prompt, we should
+        # change sequences here.
+
+        # todo, fixme zhui, self.actor_model.generate
+        if self._policy_model_eval is not None:
+            actor_model_in_use = self._policy_model_eval
+        else:
+            actor_model_in_use = self.actor_model
+
+        # state = actor_model_in_use.state_dict()
+        # for k in list(state.keys())[:3]:
+        #     print(k, state[k])
+
+        self.timers and self.timers("actor-model-generate").start()
         with infer_guard(self.policy_trainer):
-            sequences = self.actor_model.generate(
+            sequences = actor_model_in_use.generate(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
                 generation_config=self.generation_config,
                 synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
             )[0]
+
+        self.timers and self.timers("actor-model-generate").stop()
         sequences = sequences.reshape([input_ids.shape[0], self.args.num_return_sequences, -1]).transpose([1, 0, 2])
 
         return [
@@ -1122,8 +1636,9 @@ class PPOTrainer(Trainer):
             reward_seq = reward_tokenize_output["input_ids"]
             reward_attention_mask = reward_tokenize_output["attention_mask"]
         else:
-            # for text in self.tokenizer.batch_decode(sequence, skip_special_tokens=True):
-            #     print(text)
+            # actor_model_in_use gen
+            for text in self.tokenizer.batch_decode(sequence, skip_special_tokens=True):
+                print(text)
             reward_seq = sequence
             reward_attention_mask = attention_mask
         # position_ids is necessary for non-right padding
@@ -1132,25 +1647,41 @@ class PPOTrainer(Trainer):
         # (number of 0s) in source to calculate end offsets.
         position_ids = make_position_ids(attention_mask)
 
+        # todo, fixme zhui, self.actor_model forward
+        if self._policy_model_eval is not None:
+            actor_model_in_use = self._policy_model_eval
+        else:
+            actor_model_in_use = self.actor_model
+
+        if self._value_model_eval is not None:
+            reward_critic_model_in_use = self._value_model_eval
+        else:
+            reward_critic_model_in_use = self.reward_critic_model
+
         # pipe model outputs a logits tensor with LMHead, while non-pipe model
         # outputs a tuple with logits tensor as the only one element.
-        logits = self.actor_model(
+        self.timers and self.timers("actor-model-logit").start()
+        logits = actor_model_in_use(
             sequence,
             attention_mask=attention_mask,
             position_ids=position_ids,
             # return_dict=True,
         )  # .logits
+        self.timers and self.timers("actor-model-logit").stop()
         if not isinstance(logits, paddle.Tensor):
             logits = logits[0]
+        self.timers and self.timers("reference-model-logit").start()
         ref_logits = self.reference_model(
             sequence,
             attention_mask=attention_mask,
             position_ids=position_ids,
             # return_dict=True,
         )  # .logits
+        self.timers and self.timers("reference-model-logit").stop()
         if not isinstance(ref_logits, paddle.Tensor):
             ref_logits = ref_logits[0]
 
+        self.timers and self.timers("reward-model-score").start()
         reward_score = self.reward_model(
             reward_seq,
             attention_mask=reward_attention_mask,
@@ -1159,7 +1690,8 @@ class PPOTrainer(Trainer):
         )[
             1
         ]  # .end_scores
-        reward_value = self.reward_critic_model(
+
+        reward_value = reward_critic_model_in_use(
             sequence,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -1169,6 +1701,8 @@ class PPOTrainer(Trainer):
         ]  # .scores
         reward_score = reward_score.squeeze(axis=-1)
         reward_value = reward_value.squeeze(axis=-1)
+
+        self.timers and self.timers("reward-model-score").stop()
         reward_value = reward_value[:, :-1]
         log_probs = gather_log_probabilities(logits[:, :-1], sequence[:, 1:])
         ref_log_probs = gather_log_probabilities(ref_logits[:, :-1], sequence[:, 1:])

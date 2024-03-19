@@ -116,6 +116,7 @@ class Timers:
         assert normalizer > 0.0
         # string = "time (ms) / rate"
         string = "time (ms)"
+        names = sorted(list(names))
 
         time_dict = {}
         for name in names:
