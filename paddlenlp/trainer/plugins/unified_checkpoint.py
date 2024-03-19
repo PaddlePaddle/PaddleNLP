@@ -902,6 +902,8 @@ def save_single_card_checkpoint(args, model_to_save, output_dir):
         sharded_index_json["type"] = "lora"
     elif isinstance(model_to_save, PrefixModelForCausalLM):
         sharded_index_json["type"] = "ptuning"
+
+    os.makedirs(output_dir, exist_ok=True)
     path = os.path.join(output_dir, index_filename)
     with open(path, "w") as f:
         json.dump(sharded_index_json, f, indent=4)
@@ -911,6 +913,13 @@ def save_single_card_checkpoint(args, model_to_save, output_dir):
 
     if isinstance(model_to_save, PrefixModelForCausalLM):
         save_prefix_past_key_value(model_to_save, output_dir)
+        model_to_save.prefix_config.save_pretrained(output_dir)
+    if isinstance(model_to_save, LoRAModel):
+        model_to_save.lora_config.save_pretrained(output_dir)
+
+    config_to_save = save_config(model_to_save)
+    config_to_save.architectures = [model_to_save.__class__.__name__]
+    config_to_save.save_pretrained(output_dir)
 
 
 def save_single_card_optimizer(args, model, optimizer, output_dir):
