@@ -2231,7 +2231,9 @@ class Trainer:
             need_to_rotate_checkpoints = self.args.should_save_model_state
 
         # Delete only by one process
-        need_to_rotate_checkpoints = need_to_rotate_checkpoints and (self.args.local_rank == 0 or self.args.local_rank == -1)
+        need_to_rotate_checkpoints = need_to_rotate_checkpoints and (
+            self.args.local_rank == 0 or self.args.local_rank == -1
+        )
         if need_to_rotate_checkpoints:
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
 
