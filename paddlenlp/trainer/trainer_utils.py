@@ -120,7 +120,7 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
         dp_rank, dp_size = 0, 1
         sharding_rank, _ = 0, 1
 
-    seed_offset = seed
+    seed_offset = seed + 100
     global_seed = (
         seed_offset
         + sep_rank * (mp_size)
