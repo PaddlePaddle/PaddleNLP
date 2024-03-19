@@ -878,12 +878,12 @@ class GenerationMixin(object):
             logger.warning("`max_length` will be deprecated in future releases, use `max_new_tokens` instead.")
             generation_config.max_new_tokens = generation_config.max_length
 
-        if generation_config.min_length != 0 and generation_config.min_new_token == 0:
-            logger.warning("`min_length` will be deprecated in future releases, use `min_new_token` instead.")
-            generation_config.min_new_token = generation_config.min_length
+        if generation_config.min_length != 0 and generation_config.min_new_tokens == 0:
+            logger.warning("`min_length` will be deprecated in future releases, use `min_new_tokens` instead.")
+            generation_config.min_new_tokens = generation_config.min_length
 
         max_length = generation_config.max_new_tokens
-        min_length = generation_config.min_new_token
+        min_length = generation_config.min_new_tokens
 
         input_len = input_ids.shape[-1]
         min_len = input_len + min_length

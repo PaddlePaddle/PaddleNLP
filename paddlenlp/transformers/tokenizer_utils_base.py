@@ -33,23 +33,15 @@ import paddle
 from huggingface_hub import (
     create_repo,
     get_hf_file_metadata,
-    hf_hub_download,
     hf_hub_url,
     repo_type_and_id_from_hf_id,
     upload_folder,
 )
 from huggingface_hub.utils import EntryNotFoundError
-from paddle import __version__
 
-from ..utils.downloader import (
-    COMMUNITY_MODEL_PREFIX,
-    get_path_from_url_with_filelock,
-    url_file_exists,
-)
+from ..utils.download import resolve_file_path
 from ..utils.env import CHAT_TEMPLATE_CONFIG_NAME, TOKENIZER_CONFIG_NAME
 from ..utils.log import logger
-from .aistudio_utils import aistudio_download
-from .utils import resolve_cache_dir
 
 
 @dataclass(frozen=True, eq=True)
@@ -1459,7 +1451,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         if subfolder is None:
             subfolder = ""
 
-        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
         vocab_files = {}
         init_configuration = {}
 
@@ -1492,72 +1483,29 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 if os.path.isfile(full_file_name):
                     vocab_files[file_id] = full_file_name
         else:
-            url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path]
-            if subfolder != "":
-                url_list.insert(2, subfolder)
             # Assuming from community-contributed pretrained models
             for file_id, file_name in vocab_files_target.items():
-                full_file_name = "/".join(url_list + [file_name])
-                vocab_files[file_id] = full_file_name
-
-            vocab_files["tokenizer_config_file"] = "/".join(url_list + [cls.tokenizer_config_file])
+                vocab_files[file_id] = file_name
 
         resolved_vocab_files = {}
         for file_id, file_path in vocab_files.items():
             if file_path is None or os.path.isfile(file_path):
                 resolved_vocab_files[file_id] = file_path
                 continue
-            if from_aistudio:
-                resolved_vocab_files[file_id] = aistudio_download(
-                    repo_id=pretrained_model_name_or_path,
-                    filename=file_path,
-                    cache_dir=cache_dir,
-                    subfolder=subfolder,
-                )
-            elif from_hf_hub:
-                resolved_vocab_files[file_id] = hf_hub_download(
-                    repo_id=pretrained_model_name_or_path,
-                    filename=file_path,
-                    subfolder=subfolder,
-                    cache_dir=cache_dir,
-                    library_name="PaddleNLP",
-                    library_version=__version__,
-                )
-            else:
-                path = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder, file_path.split("/")[-1])
-                if os.path.exists(path):
-                    logger.info("Already cached %s" % path)
-                    resolved_vocab_files[file_id] = path
+            resolved_vocab_files[file_id] = resolve_file_path(
+                pretrained_model_name_or_path,
+                [file_path],
+                subfolder,
+                cache_dir=cache_dir,
+                from_aistudio=from_aistudio,
+                from_hf_hub=from_hf_hub,
+            )
 
-                else:
-                    logger.info(
-                        "Downloading %s and saved to %s"
-                        % (file_path, os.path.join(cache_dir, pretrained_model_name_or_path, subfolder))
-                    )
-                    try:
-                        if not url_file_exists(file_path):
-                            # skip warning for chat-template config file
-                            if file_path.endswith(CHAT_TEMPLATE_CONFIG_NAME):
-                                continue
+        for file_id, file_path in resolved_vocab_files.items():
+            if resolved_vocab_files[file_id] is not None:
+                cache_dir = os.path.dirname(resolved_vocab_files[file_id])
+                break
 
-                            logger.warning(f"file<{file_path}> not exist")
-                            resolved_vocab_files[file_id] = None
-                            continue
-                        resolved_vocab_files[file_id] = get_path_from_url_with_filelock(
-                            file_path, os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
-                        )
-                    except RuntimeError as err:
-                        if file_id not in cls.resource_files_names:
-                            resolved_vocab_files[file_id] = None
-                        else:
-                            logger.error(err)
-                            raise RuntimeError(
-                                f"Can't load tokenizer for '{pretrained_model_name_or_path}'.\n"
-                                f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-                                "- a correct model-identifier of built-in pretrained models,\n"
-                                "- or a correct model-identifier of community-contributed pretrained models,\n"
-                                "- or the correct path to a directory containing relevant tokenizer files.\n"
-                            )
         tokenizer_config_file_dir_list = set()
         for k, v in resolved_vocab_files.items():
             if v is not None and os.path.isfile(v):
@@ -1674,7 +1622,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             )
         # save all of related things into default root dir
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
-            tokenizer.save_pretrained(os.path.join(cache_dir, pretrained_model_name_or_path, subfolder))
+            # tokenizer.save_pretrained(os.path.join(cache_dir, pretrained_model_name_or_path, subfolder))
+            tokenizer.save_pretrained(cache_dir)
 
         if return_tokenizer_file_dir:
             return tokenizer, list(tokenizer_config_file_dir_list)[0]

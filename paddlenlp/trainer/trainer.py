@@ -1031,7 +1031,11 @@ class Trainer:
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
                         scale_after = self.scaler._scale
-                        optimizer_was_run = not self.scaler._cache_founf_inf
+                        # Compatible with paddlepaddle 2.6.0 using typo word.
+                        if hasattr(self.scaler, "_cache_founf_inf"):
+                            optimizer_was_run = not self.scaler._cache_founf_inf
+                        else:
+                            optimizer_was_run = not self.scaler._cache_found_inf
                         if not optimizer_was_run:
                             scale_before_value = scale_before.cpu().numpy()
                             scale_after_value = scale_after.cpu().numpy()
@@ -1258,12 +1262,16 @@ class Trainer:
                 self.args.train_batch_size * self.args.gradient_accumulation_steps * self.args.dataset_world_size
             )
             num_steps = self.state.global_step - self._globalstep_last_logged
+            seq_length = None
+            if getattr(self, "is_pretraining", False) and hasattr(self.model, "config"):
+                seq_length = getattr(self.model.config, "seq_length", None)
             logs.update(
                 speed_metrics(
                     "interval",
                     self._globalstep_last_start_time,
                     num_samples=total_train_batch_size * num_steps,
                     num_steps=num_steps,
+                    seq_length=seq_length,
                 )
             )
 
@@ -2297,7 +2305,8 @@ class Trainer:
         checkpoints_to_be_deleted = checkpoints_sorted[:number_of_checkpoints_to_delete]
         for checkpoint in checkpoints_to_be_deleted:
             logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
-            shutil.rmtree(checkpoint)
+            # ignore_errors for shared disks between train nodes.
+            shutil.rmtree(checkpoint, ignore_errors=True)
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
         output_dir = output_dir if output_dir is not None else self.args.output_dir

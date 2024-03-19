@@ -537,8 +537,6 @@ class QWenPretrainedModel(PretrainedModel):
             module.weight.set_value(
                 paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=module.weight.shape)
             )
-            if getattr(module, "bias", None) is not None:
-                module.weight.set_value(paddle.zeros(shape=module.weight.shape, dtype=paddle.get_default_dtype()))
 
         for name, p in module.named_parameters():
             if name == "c_proj.weight":

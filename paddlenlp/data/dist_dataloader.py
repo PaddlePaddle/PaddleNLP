@@ -238,10 +238,17 @@ def broadcast_data_list(data_list, datatype, comm_rank=0, comm_group=None, src_r
         assert data.dtype == datatype, "input has data type {} which " "is different than {}".format(
             data.dtype, datatype
         )
-        data_b = paddle.concat([d.cuda().reshape([-1]) for d in data_list], 0)
+        if paddle.is_compiled_with_cuda():
+            data_b = paddle.concat([d.cuda().reshape([-1]) for d in data_list], 0)
+        else:
+            data_b = paddle.concat([d.reshape([-1]) for d in data_list], 0)
+
         assert numel == sum([d.numel().item() for d in data_list]), (numel, [d.numel().item() for d in data_list])
     else:
-        data_b = paddle.empty([numel], dtype=datatype).cuda()
+        if paddle.is_compiled_with_cuda():
+            data_b = paddle.empty([numel], dtype=datatype).cuda()
+        else:
+            data_b = paddle.empty([numel], dtype=datatype)
 
     # Broadcast
     paddle.distributed.broadcast(data_b, src_rank, group=comm_group).wait()
