@@ -211,7 +211,7 @@ class MultiHeadAttention(nn.Layer):
                     3 * config.hidden_size,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=config.fused_linear,
+                    fuse_matmul_bias=config.use_fused_linear,
                 )
             else:
                 self.q_proj = ColumnParallelLinear(
@@ -219,7 +219,7 @@ class MultiHeadAttention(nn.Layer):
                     config.hidden_size,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=config.fused_linear,
+                    fuse_matmul_bias=config.use_fused_linear,
                 )
 
                 self.k_proj = ColumnParallelLinear(
@@ -227,7 +227,7 @@ class MultiHeadAttention(nn.Layer):
                     config.hidden_size,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=config.fused_linear,
+                    fuse_matmul_bias=config.use_fused_linear,
                 )
 
                 self.v_proj = ColumnParallelLinear(
@@ -235,7 +235,7 @@ class MultiHeadAttention(nn.Layer):
                     config.hidden_size,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=config.fused_linear,
+                    fuse_matmul_bias=config.use_fused_linear,
                 )
 
             self.out_proj = RowParallelLinear(
@@ -243,7 +243,7 @@ class MultiHeadAttention(nn.Layer):
                 config.hidden_size,
                 has_bias=True,
                 input_is_parallel=True,
-                fuse_matmul_bias=config.fused_linear,
+                fuse_matmul_bias=config.use_fused_linear,
             )
         else:
             if self.config.fuse_attention_qkv:
@@ -581,14 +581,14 @@ class GPTDecoderLayer(nn.Layer):
                 config.intermediate_size,
                 gather_output=False,
                 has_bias=True,
-                fuse_matmul_bias=self.config.fused_linear,
+                fuse_matmul_bias=self.config.use_fused_linear,
             )
             self.linear2 = RowParallelLinear(
                 config.intermediate_size,
                 config.hidden_size,
                 input_is_parallel=True,
                 has_bias=True,
-                fuse_matmul_bias=self.config.fused_linear,
+                fuse_matmul_bias=self.config.use_fused_linear,
             )
         else:
             self.linear1 = nn.Linear(config.hidden_size, config.intermediate_size, bias_attr=True)

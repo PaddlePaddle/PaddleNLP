@@ -158,7 +158,11 @@ class ModelArguments:
     )
     use_fast_layer_norm: bool = field(
         default=False,
-        metadata={"help": "Whether to use fast layernorm in GPT3 model"},
+        metadata={"help": "GPT3 model, use fast layernorm"},
+    )
+    use_fused_linear: bool = field(
+        default=False,
+        metadata={"help": "GPT3 model, use fused linear layer"},
     )
     fuse_attention_qkv: bool = field(
         default=False,
@@ -447,6 +451,7 @@ def main():
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.use_fast_layer_norm = model_args.use_fast_layer_norm
+    config.use_fused_linear = model_args.use_fused_linear
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.fuse_attention_ffn = model_args.fuse_attention_ffn
     config.recompute_granularity = model_args.recompute_granularity
