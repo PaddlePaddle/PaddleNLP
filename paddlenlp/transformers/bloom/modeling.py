@@ -26,6 +26,7 @@ from paddle.autograd import PyLayer
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
+from paddlenlp.transformers.LongSequenceStrategies import LongSequenceStrategies
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
@@ -944,10 +945,27 @@ class BloomModel(BloomPreTrainedModel):
             attention_mask = paddle.cast(attention_mask, "bool")
         if len(attention_mask.shape) > 2:
             _attention_mask = paddle.ones([batch_size, seq_length_with_past], dtype="bool")
-            alibi = build_alibi_tensor(_attention_mask, self.config.n_head, dtype=hidden_states.dtype)
+            if self.config.use_long_sequence_strategies:
+                alibi_layer = LongSequenceStrategies.build_long_sequence_strategy(
+                    self.config.long_sequence_strategy_type,
+                    self.config.long_sequence_strategy_name,
+                    **self.config.long_sequence_init_args,
+                )
+                alibi = alibi_layer(_attention_mask, self.config.n_head, dtype=hidden_states.dtype)
+                alibi = paddle.squeeze(alibi)
+            else:
+                alibi = build_alibi_tensor(_attention_mask, self.config.n_head, dtype=hidden_states.dtype)
         else:
-            alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
-
+            if self.config.use_long_sequence_strategies:
+                alibi_layer = LongSequenceStrategies.build_long_sequence_strategy(
+                    self.config.long_sequence_strategy_type,
+                    self.config.long_sequence_strategy_name,
+                    **self.config.long_sequence_init_args,
+                )
+                alibi = alibi_layer(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
+                alibi = paddle.squeeze(alibi)
+            else:
+                alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
         if self.config.tensor_parallel_degree > 1:
             block_size = self.config.n_head // self.config.tensor_parallel_degree
             alibi = alibi[
