@@ -806,36 +806,53 @@ class PPOTrainer(Trainer):
         # use trainer for reference_model/reward_model to enable sharding stage-3
         # and PipelineParallel. maybe we should allow models to use different dist
         # strategies later
-        self.reference_trainer = StepTrainer(
-            reference_model,
-            criterion,
+
+        from paddle.distributed.fleet.meta_parallel import PipelineLayer
+
+        with guard_set_args(
             args,
-            data_collator,
-            train_dataset,
-            eval_dataset,
-            reference_tokenizer,
-            compute_metrics,
-            callbacks,
-            optimizers,
-            preprocess_logits_for_metrics,
-        )
-        self.reward_trainer = StepTrainer(
-            reward_model,
-            criterion,
-            args,
-            data_collator,
-            train_dataset,
-            eval_dataset,
-            reward_tokenizer,
-            compute_metrics,
-            callbacks,
-            optimizers,
-            preprocess_logits_for_metrics,
-        )
-        # TODO(guosheng): sharding stage3 should create master weight optionally
-        # instead of creation and clear.
-        self.reference_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
-        self.reward_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
+            {
+                "recompute": False,
+                "fp16_opt_level": "O1",
+                "pipeline_parallel_degree": args.pipeline_parallel_degree
+                if isinstance(reference_model, PipelineLayer)
+                else 1,  # workaround for pipeline parallel model check
+            },
+        ):
+
+            self.reference_trainer = StepTrainer(
+                reference_model,
+                criterion,
+                copy.deepcopy(args),
+                data_collator,
+                train_dataset,
+                eval_dataset,
+                reference_tokenizer,
+                compute_metrics,
+                callbacks,
+                optimizers,
+                preprocess_logits_for_metrics,
+            )
+            self.reward_trainer = StepTrainer(
+                reward_model,
+                criterion,
+                copy.deepcopy(args),
+                data_collator,
+                train_dataset,
+                eval_dataset,
+                reward_tokenizer,
+                compute_metrics,
+                callbacks,
+                optimizers,
+                preprocess_logits_for_metrics,
+            )
+            # TODO(guosheng): sharding stage3 should create master weight optionally
+            # instead of creation and clear.
+            from paddlenlp.trainer.trainer_utils import ShardingOption
+
+            if args.pipeline_parallel_degree > 1 or ShardingOption.FULL_SHARD in args.sharding:
+                self.reference_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
+                self.reward_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
 
         self.reference_model.eval()
         self.reward_model.eval()

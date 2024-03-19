@@ -240,7 +240,7 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
 
     if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
         inputs = split_inputs_sequence_dim(inputs)
-    self.timers and self.timers("read-data").stop()
+    # self.timers and self.timers("read-data").stop()
     os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
     self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
 
@@ -420,7 +420,7 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
             if k in final_local_vars:
                 kwargs[k] = final_local_vars[k]
         return kwargs
-    self.timers and self.timers("read-data").start()
+    # self.timers and self.timers("read-data").start()
 
     final_local_vars = locals()
     for k in kwargs.keys():
