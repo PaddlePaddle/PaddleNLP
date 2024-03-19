@@ -14,6 +14,7 @@
 import json
 import os
 import sys
+from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
@@ -53,6 +54,14 @@ def read_local_dataset(path):
     with open(path, "r", encoding="utf-8") as fp:
         for line in fp:
             yield json.loads(line.strip())
+
+
+@dataclass
+class FinetuneArguments:
+    sequence_parallel: bool = field(
+        default=False,
+        metadata={"help": "whether to use sequence parallel"},
+    )
 
 
 def main():
@@ -153,6 +162,8 @@ def main():
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
 
+        model_config.sequence_parallel = True
+        model_config.seq_length = 4096
         if not training_args.autotuner_benchmark:
             model = AutoModelForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
