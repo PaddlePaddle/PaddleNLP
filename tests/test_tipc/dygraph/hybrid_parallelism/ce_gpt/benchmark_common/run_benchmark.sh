@@ -145,6 +145,7 @@ function _train(){
                 --scale_loss 32768\
                 --per_device_train_batch_size ${micro_batch_size}\
                 --do_train \
+                --skip_memory_metrics 0 \
                 --recompute ${use_recompute}"
 
 

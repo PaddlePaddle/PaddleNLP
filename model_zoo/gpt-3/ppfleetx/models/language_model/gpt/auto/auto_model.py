@@ -49,6 +49,11 @@ try:
 except:
     flash_attention = None
 
+try:
+    from paddle.jit.api import set_dynamic_shape
+except:
+    from paddle.jit.dy2static.utils_helper import set_dynamic_shape
+
 def shard_op_for_sequence_parallel_linear(tgt, mesh):
     # FIXME Hack to shard op for module (linear)
     # we only shard the second to the last op (matmul) leave the last op (elementwise_add) un-touched
@@ -1206,7 +1211,7 @@ class GPTForGenerationAuto(nn.Layer):
 
         attn_mask = model_kwargs["attention_mask"]
         # make the shape of attention_mask = (-1, -1, -1, -1) in dy2static.
-        paddle.jit.dy2static.utils_helper.set_dynamic_shape(model_kwargs["attention_mask"], [-1, -1, -1, -1])
+        set_dynamic_shape(model_kwargs["attention_mask"], [-1, -1, -1, -1])
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
         max_length = paddle.to_tensor(max_length)
         while cur_len < max_length:

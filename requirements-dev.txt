@@ -20,3 +20,11 @@ tiktoken
 visualdl
 wandb
 tensorboard
+modelscope
+hyperopt
+h5py
+deploy
+ray
+loguru
+data
+wget
