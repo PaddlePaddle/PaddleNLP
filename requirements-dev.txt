@@ -1,4 +1,4 @@
-paddlepaddle==2.5.1
+paddlepaddle==0.0.0 -f https://www.paddlepaddle.org.cn/whl/linux/cpu-mkl/develop.html
 paddleocr<2.7
 pre-commit
 pytest
