@@ -164,6 +164,10 @@ class ModelArguments:
         default=False,
         metadata={"help": "GPT3 model, use fused linear layer"},
     )
+    use_fused_dropout_add: bool = field(
+        default=False,
+        metadata={"help": "GPT3 model, use fused `dropout + residual add` op"},
+    )
     fuse_attention_qkv: bool = field(
         default=False,
         metadata={"help": "whether to fuse attention qkv"},
@@ -452,6 +456,7 @@ def main():
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.use_fast_layer_norm = model_args.use_fast_layer_norm
     config.use_fused_linear = model_args.use_fused_linear
+    config.use_fused_dropout_add = model_args.use_fused_dropout_add
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.fuse_attention_ffn = model_args.fuse_attention_ffn
     config.recompute_granularity = model_args.recompute_granularity
