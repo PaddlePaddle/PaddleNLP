@@ -594,8 +594,8 @@ class GPTDecoderLayer(nn.Layer):
             self.linear1 = nn.Linear(config.hidden_size, config.intermediate_size, bias_attr=True)
             self.linear2 = nn.Linear(config.intermediate_size, config.hidden_size, bias_attr=True)
 
-        self.norm1 = GPTLayerNorm(config, config.hiddden_size, epsilon=1e-5)
-        self.norm2 = GPTLayerNorm(config, config.hiddden_size, epsilon=1e-5)
+        self.norm1 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
+        self.norm2 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
 
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.norm1.weight)
