@@ -58,7 +58,7 @@ class RotaryEmbedding(nn.Layer):
 
     def forward(self, seq_len=None, ntk_alpha=None):
 
-        return self.cos_cached[:seq_len, :], self.sin_cached[:seq_len, :]
+        return self.cos_cached[:, :], self.sin_cached[:, :]
 
 
 class LinearScalingRotaryEmbedding(RotaryEmbedding):
