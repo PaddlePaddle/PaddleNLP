@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import math
+import os
 from typing import List, Optional
 
 import paddle
@@ -27,6 +28,8 @@ from paddle.distributed.fleet.meta_parallel import (
 from paddlenlp.transformers.sequence_parallel_utils import (
     AllGatherOp,
     ColumnSequenceParallelLinear,
+    MC2ColumnSeqParallelLinear,
+    MC2RowSeqParallelLinear,
     ReduceScatterOp,
     RowSequenceParallelLinear,
 )
@@ -279,17 +282,25 @@ class RowSequenceParallelLoRALinear(RowSequenceParallelLinear):
         else:
             input_mp = x
 
-        if self.is_mp:
-            output_parallel = self.linear(input_mp, self.weight, name=self._name)
-            output_ = ReduceScatterOp.apply(output_parallel)
-            result_mp = output_ + self.bias if self.bias is not None else output_
+        if not int(os.getenv("MC2", 0)):
+            if self.is_mp:
+                output_parallel = self.linear(input_mp, self.weight, name=self._name)
+                output_ = ReduceScatterOp.apply(output_parallel)
+                result_mp = output_ + self.bias if self.bias is not None else output_
+            else:
+                result_mp = self.linear(input_mp, self.weight, self.bias, name=self._name)
         else:
-            result_mp = self.linear(input_mp, self.weight, self.bias, name=self._name)
+            output_ = MC2RowSeqParallelLinear.apply(input_mp, self.weight, self.model_parallel_group)
+            result_mp = output_ + self.bias if self.bias is not None else output_
 
         if not self.merged:
-            input_mp = self.lora_dropout(input_mp) @ self.lora_A
-            if self.is_mp:
-                input_mp = ReduceScatterOp.apply(input_mp)
+            input_mp = self.lora_dropout(input_mp)
+            if not int(os.getenv("MC2", 0)):
+                input_mp = input_mp @ self.lora_A
+                if self.is_mp:
+                    input_mp = ReduceScatterOp.apply(input_mp)
+            else:
+                input_mp = MC2RowSeqParallelLinear.apply(input_mp, self.lora_A, self.model_parallel_group)
             delta_mp = (input_mp @ self.lora_B) * self.scaling
             result_mp += delta_mp
         return result_mp
@@ -453,15 +464,26 @@ class ColumnSequenceParallelLoRALinear(ColumnSequenceParallelLinear):
             self.merged = True
 
     def forward(self, x: paddle.Tensor):
-        if self.is_mp:
-            input_parallel = AllGatherOp.apply(x)
+        if not int(os.getenv("MC2", 0)):
+            if self.is_mp:
+                input_parallel = AllGatherOp.apply(x)
+            else:
+                input_parallel = x
+            result_mp = self.linear(input_parallel, self.weight, self.bias, name=self._name)
         else:
-            input_parallel = x
-        result_mp = self.linear(input_parallel, self.weight, self.bias, name=self._name)
+            result_mp = MC2ColumnSeqParallelLinear.apply(x, self.weight, self.model_parallel_group)
+            if self.bias is not None:
+                result_mp += self.bias
 
         if not self.merged:
-            input_a = self.lora_dropout(input_parallel) @ self.lora_A
-            delta_mp = (input_a @ self.lora_B) * self.scaling
+            input_a = self.lora_dropout(x) @ self.lora_A
+            if not int(os.getenv("MC2", 0)):
+                if self.is_mp:
+                    input_a = AllGatherOp.apply(input_a)
+                delta_mp = (input_a @ self.lora_B) * self.scaling
+            else:
+                input_a = MC2ColumnSeqParallelLinear.apply(input_a, self.lora_B, self.model_parallel_group)
+                delta_mp = input_a * self.scaling
             result_mp += delta_mp
 
         if self.gather_output and self.is_mp:

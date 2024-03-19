@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 import paddle
 from paddle import distributed as dist
 from paddle.autograd import PyLayer
@@ -33,6 +35,8 @@ __all__ = [
     "ReduceScatterOp",
     "ColumnSequenceParallelLinear",
     "RowSequenceParallelLinear",
+    "MC2ColumnSeqParallelLinear",
+    "MC2RowSeqParallelLinear",
     "mark_as_sequence_parallel_parameter",
     "register_sequence_parallel_allreduce_hooks",
 ]
@@ -143,6 +147,132 @@ class ReduceScatterOp(PyLayer):
         return all_gather(grad)
 
 
+if paddle.is_compiled_with_custom_device():
+    import paddle_custom_device
+else:
+    paddle_custom_device = None
+
+__all_gather_recomputation__ = False
+
+
+def set_all_gather_recomputation(all_gather_recomputation_flag):
+    global __all_gather_recomputation__
+    __all_gather_recomputation__ = all_gather_recomputation_flag
+
+
+class MC2ColumnSeqParallelLinear(PyLayer):
+    @staticmethod
+    def forward(ctx, input_, weight, group):
+        # [1024, 2, 5120], [5120, 640]
+        ctx.weight_stop_gradient = weight.stop_gradient
+        # ctx.save_for_backward(input_ if not ctx.weight_stop_gradient else None, weight)
+        ctx.save_for_backward(input_, weight)
+
+        rank = paddle.distributed.get_rank()
+        hcomm_info = group.process_group.get_comm_name(rank)
+
+        # [1024, 2, 5120] => [2048, 5120]
+
+        world_size = group.nranks
+        # [2048, 5120], [5120, 640] => [16384, 640], [16384, 5120]
+        output, gather_out = paddle_custom_device.npu.fused_allgather_mm(
+            input_,
+            weight,
+            bias=None,
+            hcom=hcomm_info,
+            world_size=world_size,
+            gather_index=0,
+            gather_output=(not __all_gather_recomputation__),
+            comm_turn=0,
+        )
+
+        ctx.all_gather_output = gather_out
+        ctx.world_size = world_size
+        ctx.group = group
+        return output
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        # [1024, 2, 5120], [5120, 640]
+        input_, weight = ctx.saved_tensor()
+
+        if __all_gather_recomputation__:
+            dim_size = list(input_.size())
+            dim_size[0] = dim_size[0] * ctx.world_size
+            all_gather_output = paddle.empty(dim_size, dtype=input_.dtype)
+            all_gather_output.stop_gradient = True
+            all_gather_work = ctx.group.process_group.all_gather(input_.contiguous(), all_gather_output)
+        else:
+            all_gather_output = ctx.all_gather_output
+
+        # [16384, 640] [5120, 640] [1024, 2, 5120]
+        grad_input = grad_output.matmul(weight.t())
+
+        sub_grad_input = paddle.empty(input_.shape, dtype=input_.dtype)
+        reduce_scatter_work = dist.stream.reduce_scatter(sub_grad_input, grad_input, group=ctx.group, sync_op=False)
+
+        if __all_gather_recomputation__:
+            all_gather_work.wait()
+
+        # [16384, 640] [16384, 5120]
+        grad_weight = all_gather_output.t().matmul(grad_output) if not ctx.weight_stop_gradient else None
+        reduce_scatter_work.wait()
+
+        return sub_grad_input, grad_weight
+
+
+class MC2RowSeqParallelLinear(PyLayer):
+    @staticmethod
+    def forward(ctx, input_, weight, group):
+        # [8192, 2, 640], [640, 5120]
+        ctx.weight_stop_gradient = weight.stop_gradient
+        ctx.save_for_backward(input_ if not ctx.weight_stop_gradient else None, weight)
+
+        rank = paddle.distributed.get_rank()
+        hcomm_info = group.process_group.get_comm_name(rank)
+        world_size = group.nranks
+
+        # [16384, 640], [640, 5120] => [2048, 5120]
+        output = paddle_custom_device.npu.fused_mm_reduce_scatter(
+            input_,
+            weight,
+            bias=None,
+            hcom=hcomm_info,
+            world_size=world_size,
+            reduce_op="sum",
+            comm_turn=0,
+        )
+
+        ctx.hcomm_info = hcomm_info
+        ctx.world_size = world_size
+
+        return output
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        # [8192, 2, 640], [640, 5120]
+        input_, weight = ctx.saved_tensor()
+        hcomm_info = ctx.hcomm_info
+        world_size = ctx.world_size
+
+        # [2048, 5120], [640, 5120] => [16384, 640] [16384, 5120]
+        grad_input, all_gather_grad_output = paddle_custom_device.npu.fused_allgather_mm(
+            grad_output,
+            weight.t(),
+            bias=None,
+            hcom=hcomm_info,
+            world_size=world_size,
+            gather_index=0,
+            gather_output=True,
+            comm_turn=0,
+        )
+
+        # [16384, 5120], [16384, 640] => [640, 5120]
+        grad_weight = input_.t().matmul(all_gather_grad_output) if not ctx.weight_stop_gradient else None
+
+        return grad_input, grad_weight
+
+
 ###################################################
 #                                                 #
 #        Modified Parallel Linear Operator        #
@@ -218,6 +348,8 @@ def register_sequence_parallel_allreduce_hooks(model, accumulation_steps, fuse_s
 def is_fused_matmul_bias_supported():
     if paddle.is_compiled_with_cuda() and not paddle.is_compiled_with_rocm():
         return hasattr(core.eager.ops.legacy, "fused_gemm_epilogue")
+    elif paddle.is_compiled_with_custom_device("npu"):
+        return True
     else:
         return False
 
@@ -316,11 +448,15 @@ class ColumnSequenceParallelLinear(Layer):
         # sequence parallelism is same as model parallelism
         # if sequence parallel is true, input shape is [s, b, h]
         # else input shape is [b, s, h]
-        if self.is_mp:
-            input_parallel = AllGatherOp.apply(x)
+        if not int(os.getenv("MC2", 0)):
+            if self.is_mp:
+                input_parallel = AllGatherOp.apply(x)
+            else:
+                input_parallel = x
+            output = self.linear(input_parallel, self.weight, self.bias, name=self._name)
         else:
-            input_parallel = x
-        output = self.linear(input_parallel, self.weight, self.bias, name=self._name)
+            output = MC2ColumnSeqParallelLinear.apply(x, self.weight, self.model_parallel_group)
+        output = output + self.bias if self.bias is not None else output
         return output
 
 
@@ -420,12 +556,16 @@ class RowSequenceParallelLinear(Layer):
 
     def forward(self, x):
         input_parallel = x
-        if self.is_mp:
-            output_parallel = self.linear(input_parallel, self.weight, name=self._name)
-            # if self.bias is not none, sequence parallel will use
-            # register_hook to all_reduce self.bias
-            output_ = ReduceScatterOp.apply(output_parallel)
-            output = output_ + self.bias if self.bias is not None else output_
+        if not int(os.getenv("MC2", 0)):
+            if self.is_mp:
+                output_parallel = self.linear(input_parallel, self.weight, name=self._name)
+                # if self.bias is not none, sequence parallel will use
+                # register_hook to all_reduce self.bias
+                output_ = ReduceScatterOp.apply(output_parallel)
+                output = output_ + self.bias if self.bias is not None else output_
+            else:
+                output = self.linear(input_parallel, self.weight, self.bias, name=self._name)
         else:
-            output = self.linear(input_parallel, self.weight, self.bias, name=self._name)
+            output = MC2RowSeqParallelLinear.apply(x, self.weight, self.model_parallel_group)
+            output = output + self.bias if self.bias is not None else output
         return output

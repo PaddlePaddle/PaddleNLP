@@ -16,6 +16,7 @@ import os
 import sys
 from dataclasses import dataclass, field
 from functools import partial
+from typing import List, Optional
 
 import paddle
 from argument import (
@@ -64,9 +65,85 @@ class FinetuneArguments:
     )
 
 
+def add_start_docstrings(*docstr):
+    def docstring_decorator(fn):
+        fn.__doc__ = "".join(docstr) + (fn.__doc__ if fn.__doc__ is not None else "")
+        return fn
+
+    return docstring_decorator
+
+
+@dataclass
+@add_start_docstrings(ModelArgument.__doc__)
+class SFTModelArguments(ModelArgument):
+    """
+    Arguments pertaining to which model/config/tokenizer we are going to pre-train from.
+    """
+
+    tokenizer_name_or_path: Optional[str] = field(
+        default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
+    )
+
+    use_fused_rms_norm: bool = field(
+        default=False,
+        metadata={"help": "llama or other model, use_fused_rms_norm"},
+    )
+    fuse_attention_qkv: bool = field(
+        default=False,
+        metadata={"help": "whether to fuse attention qkv"},
+    )
+    fuse_attention_ffn: bool = field(
+        default=False,
+        metadata={"help": "whether to fuse first up and gate proj in mlp block"},
+    )
+    recompute_granularity: str = field(
+        default="full",
+        metadata={"help": "Choose among ['full', 'core_attn', 'full_attn']"},
+    )
+    virtual_pp_degree: int = field(
+        default=1,
+        metadata={"help": "virtual_pp_degree"},
+    )
+    hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
+    attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
+
+    continue_training: bool = field(
+        default=False,
+        metadata={
+            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
+        },
+    )
+    sequence_parallel: bool = field(
+        default=False,
+        metadata={"help": "whether to use sequence parallel"},
+    )
+    fuse_sequence_parallel_allreduce: bool = field(
+        default=False,
+        metadata={"help": "whether to use fuse sequence parallel allreduce"},
+    )
+    use_fused_rope: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable rope fusion or not."},
+    )
+    no_recompute_layers: Optional[List[int]] = field(
+        default=None,
+        metadata={"help": "Specify the full transformer layers that should not be recomputed."},
+    )
+    pp_recompute_interval: int = field(
+        default=1,
+        metadata={
+            "help": "The interval for the number of layers at which recomputation occurs. A value of 0 indicates no recomputation. Default is 0."
+        },
+    )
+    recompute_use_reentrant: bool = field(
+        default=False,
+        metadata={"help": "recompute_use_reentrant"},
+    )
+
+
 def main():
     # Arguments
-    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
+    parser = PdArgumentParser((GenerateArgument, QuantArgument, SFTModelArguments, DataArgument, TrainingArguments))
     # Support format as "args.json --arg1 value1 --arg2 value2.”
     # In case of conflict, command line arguments take precedence.
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
@@ -162,8 +239,33 @@ def main():
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
 
+        model_config.use_fused_rms_norm = model_args.use_fused_rms_norm
+        model_config.fuse_attention_qkv = model_args.fuse_attention_qkv
+        model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
+        model_config.recompute_granularity = model_args.recompute_granularity
+        model_config.virtual_pp_degree = model_args.virtual_pp_degree
+        model_config.sequence_parallel = model_args.sequence_parallel
+        model_config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
+        model_config.use_fused_rope = model_args.use_fused_rope
+
+        model_config.no_recompute_layers = model_args.no_recompute_layers
+        model_config.pp_recompute_interval = model_args.pp_recompute_interval
+        model_config.recompute_use_reentrant = model_args.recompute_use_reentrant
+        model_config.use_recompute = training_args.recompute
+
+        model_config.tensor_parallel_degree = training_args.tensor_parallel_degree
+        model_config.tensor_parallel_rank = training_args.tensor_parallel_rank
+
+        # Config for model using dropout, such as GPT.
+        model_config.hidden_dropout_prob = model_args.hidden_dropout_prob
+        model_config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
+
+        model_config.sep_parallel_degree = training_args.sep_parallel_degree
+        model_config.tensor_parallel_output = True
+        model_config.seq_length = data_args.max_length
+
         model_config.sequence_parallel = True
-        model_config.seq_length = 4096
+        # model_config.seq_length = 4096
         if not training_args.autotuner_benchmark:
             model = AutoModelForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
@@ -495,6 +597,7 @@ def main():
             padding=padding,
             max_label_length=max_length,
             return_tensors="np",
+            pad_to_multiple_of=data_args.pad_to_multiple_of,
         ),
         do_generation=data_args.eval_with_do_generation,
         callbacks=[InTokensIterDatasetCallback()] if isinstance(train_ds, InTokensIterableDataset) else None,
