@@ -147,7 +147,7 @@ class ReduceScatterOp(PyLayer):
         return all_gather(grad)
 
 
-if paddle.is_compiled_with_custom_device():
+if len(paddle.device.get_all_custom_device_type()) > 0:
     import paddle_custom_device
 else:
     paddle_custom_device = None
@@ -296,7 +296,7 @@ def create_fused_allreduce_gradient_hook(parameter_list, accumulation_steps):
 
     def __impl__(grad):
         step[0] += 1
-        if step == accumulation_steps:
+        if step[0] == accumulation_steps:
             step[0] = 0
             fused_allreduce_gradients_with_group(parameter_list, group=group, scale=1.0)
         return grad
@@ -456,7 +456,7 @@ class ColumnSequenceParallelLinear(Layer):
             output = self.linear(input_parallel, self.weight, self.bias, name=self._name)
         else:
             output = MC2ColumnSeqParallelLinear.apply(x, self.weight, self.model_parallel_group)
-        output = output + self.bias if self.bias is not None else output
+            output = output + self.bias if self.bias is not None else output
         return output
 
 
