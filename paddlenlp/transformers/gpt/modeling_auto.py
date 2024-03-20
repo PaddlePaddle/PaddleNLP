@@ -14,13 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import annotations
-from calendar import c
 
 import collections
 import contextlib
 import math
 from functools import partial
-from re import X
 
 import numpy as np
 import paddle
@@ -31,20 +29,13 @@ import paddle.tensor as tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
-from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 import paddle.distributed as dist
-from symbol import return_stmt
 
 from ...utils.converter import StateDictNameMapping
-from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
-from ..model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions,
-    CausalLMOutputWithCrossAttentions,
-)
-from ..model_utils import dy2st_nocheck_guard_context
+from ..model_outputs import BaseModelOutputWithPastAndCrossAttentions
+
 from ..sequence_parallel_utils import (
-    GatherOp,
     ScatterOp,
     mark_as_sequence_parallel_parameter,
 )
@@ -144,7 +135,7 @@ class MultiHeadAttentionAuto(nn.Layer):
 
     Cache = collections.namedtuple("Cache", ["k", "v"])
 
-    def __init__(self, config, ipp: Optional[int] = None):
+    def __init__(self, config, ipp=None):
         super(MultiHeadAttentionAuto, self).__init__()
 
         self.config = config
@@ -559,7 +550,7 @@ class GPTDecoderLayerAuto(nn.Layer):
     It contains multiheadattention and some linear layers.
     """
 
-    def __init__(self, config: GPTConfig, ipp: Optional[int] = None):
+    def __init__(self, config: GPTConfig, ipp=None):
         super(GPTDecoderLayerAuto, self).__init__()
         self.config = config
         self.ipp = ipp
@@ -679,15 +670,14 @@ class GPTDecoderLayerAuto(nn.Layer):
         # hidden_states => [bs * seq_len / n, embed_dim]
         with seed_guard_context(current_seed):
             if not self.config.use_fused_dropout_add:
-                a = self.linear1(hidden_states)
-                b = self.activation(a, approximate=True)
-                b = dist.reshard(b, get_mesh(self.ipp),
-                                 [dist.Shard(0), dist.Shard(2)])
-                c = self.linear2(b)
-                c = dist.reshard(c, get_mesh(
+                act = self.activation(self.linear1(hidden_states),
+                                      approximate=True)
+                act = dist.reshard(act, get_mesh(
+                    self.ipp), [dist.Shard(0), dist.Shard(2)])
+                l_2 = self.linear2(act)
+                l_2 = dist.reshard(l_2, get_mesh(
                     self.ipp), [dist.Shard(0), dist.Replicate()])
-                d = self.dropout2(c)
-                hidden_states = residual + d
+                hidden_states = residual + self.dropout2(l_2)
             else:
                 hidden_states = self.fused_dropout_add2(
                     self.linear2(
@@ -1303,14 +1293,6 @@ class GPTPretrainingCriterionAuto(paddle.nn.Layer):
             Tensor: The pretraining loss. Its data type should be float32 and its shape is [1].
 
         """
-        # with paddle.amp.auto_cast(False):
-        #     masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
-        #     # skip ignore_index which loss == 0
-        #     if loss_mask is None:
-        #         loss_mask = (masked_lm_loss > 0).astype("float32")
-        #         loss_mask = loss_mask.reshape([-1])
-        #     masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
-        #     loss = masked_lm_loss / loss_mask.sum()
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(
                 prediction_scores.astype("float32"),
@@ -1324,10 +1306,7 @@ class GPTPretrainingCriterionAuto(paddle.nn.Layer):
 
 class GPTLMHeadAuto(nn.Layer):
 
-    def __init__(self,
-                 config: GPTConfig,
-                 embedding_weights=None,
-                 ipp: Optional[int] = None):
+    def __init__(self, config: GPTConfig, embedding_weights=None, ipp=None):
         super(GPTLMHeadAuto, self).__init__()
         self.config = config
         self.transpose_y = True
@@ -1462,16 +1441,11 @@ class GPTForCausalLMAuto(GPTPretrainedModelAuto):
         else:
             hidden_states = outputs[0]
         logits = self.lm_head(hidden_states)
-        # y = dist.reshard(self.gpt.embeddings.word_embeddings.weight,
-        #                  get_mesh(self.ipp),
-        #                  [dist.Replicate(), dist.Shard(1)])
-        # logits = paddle.matmul(hidden_states, y, transpose_y=True)
         logits = dist.reshard(logits, get_mesh(self.ipp),
                               [dist.Shard(0), dist.Replicate()])
         return logits
 
-        # 因为动转静不适配，以下逻辑注释掉。
-        # 但要给 AutoTrainer 配置 criterion，计算loss
+        # NOTE: The following code failed to run from dynamic to static mode
         # loss = None
         # if labels is not None:
         #     loss = self.criterion(logits, labels)
