@@ -74,6 +74,10 @@ class GenerationTesterMixin:
         max_batch_size = 2
         sequence_length = input_ids.shape[-1] // 2
         input_ids = input_ids[:max_batch_size, :sequence_length]
+        # For test_sample_generate such as: NVIDIA_TF32_OVERRIDE=0 FLAGS_cudnn_deterministic=1 python3.10 -m pytest -svv tests/transformers/bloom/test_modeling.py::BloomModelTest_0::test_sample_generate
+        # There are serious memory bug for this tensor slice. which use the original tensor mem ptr for cold start
+        # Here we just clone the tensor to avoid this problem.
+        input_ids = input_ids.clone()
         attention_mask = attention_mask[:max_batch_size, :sequence_length].unsqueeze([1, 2])
 
         attention_mask = attention_mask * attention_mask.transpose([0, 1, 3, 2])
@@ -270,6 +274,7 @@ class GenerationTesterMixin:
         logits_warper,
         process_kwargs,
     ):
+
         with paddle.no_grad():
             output_generate = model.generate(
                 input_ids,
@@ -440,9 +445,9 @@ class GenerationTesterMixin:
             self.assertListEqual(output_greedy[0].tolist(), output_generate[0].tolist())
 
     def test_sample_generate(self):
-
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
+            input_ids = input_ids.clone()
             paddle.seed(124)
             model = self._make_model_instance(config, model_class)
             model.eval()
