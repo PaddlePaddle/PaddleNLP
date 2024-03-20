@@ -438,7 +438,7 @@ class QWenVLMulticardExportTest(LLMTest, TestMultipleGpus):
     model_name_or_path: str = "__internal_testing__/tiny-fused-qwen-head2"
     model_class = QWenForCausalLM
 
-    def test_export_twocards(self):
+    def test_export_two_cards(self):
         export_file = "../../llm/export_model.py"
         multicard_export_args = {}
         multicard_export_args["model_name_or_path"] = self.model_name_or_path
