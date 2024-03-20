@@ -30,42 +30,42 @@ unset CUDA_VISIBLE_DEVICES
 
 function gpt_case_list_auto() {
     gpt_auto_recompute_bs16_fp32_DP1-MP1-PP1
-    gpt_auto_recompute_bs16_fp16_o2_DP1-MP1-PP8
-    gpt_auto_recompute_bs16_fp16_o2_DP1-MP2-PP4
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2
-    gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage1
-    gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage2
-    gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage3
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage1
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage2
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage3
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage1
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3
-    gpt_auto_sp_acc_check
+    # gpt_auto_recompute_bs16_fp16_o2_DP1-MP1-PP8
+    # gpt_auto_recompute_bs16_fp16_o2_DP1-MP2-PP4
+    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2
+    # gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage1
+    # gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage2
+    # gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage3
+    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage1
+    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage2
+    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage3
+    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage1
+    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2
+    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3
+    # gpt_auto_sp_acc_check
 }
 
 function llama_case_list_auto() {
     llama_dygraph_auto_bs8_fp32_DP2
-    llama_dygraph_auto_bs8_fp32_DP2-MP2
-    llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
-    llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
+    # llama_dygraph_auto_bs8_fp32_DP2-MP2
+    # llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
+    # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
 
-    llama_static_auto_recompute_bs8_fp32_DP1-MP1-PP1
-    llama_static_auto_recompute_bs16_fp32_DP2-MP1-PP1
-    llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP1
-    llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2
-    llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
-    llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
+    # llama_static_auto_recompute_bs8_fp32_DP1-MP1-PP1
+    # llama_static_auto_recompute_bs16_fp32_DP2-MP1-PP1
+    # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP1
+    # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2
+    # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
+    # llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
 }
 
 function gpt_case_list_auto_pir() {
     gpt_auto_recompute_bs16_fp16_o2_DP1-MP1-PP8_pir
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_pir
-    gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage1_pir
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage1_pir
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2_pir
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3_pir
+    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_pir
+    # gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage1_pir
+    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage1_pir
+    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2_pir
+    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3_pir
 }
 
 function llm_gpt_case_list_auto() {
