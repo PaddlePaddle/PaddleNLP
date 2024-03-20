@@ -155,7 +155,7 @@ class QWenInferenceModel(QWenPretrainedModel):
             ffn2_weight_scale_attrs = [
                 paddle.ParamAttr(name="fuseqwen.{}.ffn2_weight_scale".format(i)) for i in range(self.num_layers)
             ]
-
+        nranks = 1 if config.tensor_parallel_degree == -1 else config.tensor_parallel_degree
         transformer_config = FusedMultiTransformerConfig(
             self.hidden_size,
             self.num_attention_heads,
@@ -163,7 +163,7 @@ class QWenInferenceModel(QWenPretrainedModel):
             weight_only_quant_bits=self.weight_only_quant_bits,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
-            nranks=config.tensor_parallel_degree,
+            nranks=nranks,
             ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
