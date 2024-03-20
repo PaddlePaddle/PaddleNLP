@@ -440,7 +440,7 @@ class QWenMulticardExportTest(LLMTest, TestMultipleGpus):
     model_class = QWenForCausalLM
 
     def test_export_two_cards(self):
-        export_file = "../../llm/export_model.py"
+        export_file = "llm/export_model.py"
         multicard_export_args = {}
         multicard_export_args["model_name_or_path"] = self.model_name_or_path
         multicard_export_args["output_path"] = self.output_dir
