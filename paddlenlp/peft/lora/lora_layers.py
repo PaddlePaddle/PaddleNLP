@@ -38,6 +38,8 @@ class LoRALinear(nn.Linear):
         lora_dropout: float = 0.0,
         merge_weights: bool = True,
         use_quick_lora: bool = False,
+        rslora: bool = False,
+        lora_plus_scale: float = 1.0,
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
@@ -65,9 +67,16 @@ class LoRALinear(nn.Linear):
             shape=[r, out_features],
             dtype=self._dtype,
             is_bias=False,
-            default_initializer=nn.initializer.Constant(value=0.0),
+            attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.Constant(value=0.0),
+                learning_rate=lora_plus_scale,
+            ),
         )
-        self.scaling = self.lora_alpha / self.r
+
+        if not rslora:
+            self.scaling = self.lora_alpha / self.r
+        else:
+            self.scaling = self.lora_alpha / math.sqrt(self.r)
 
         # Freezing the pre-trained weight matrix
         self.weight.stop_gradient = True
@@ -115,6 +124,8 @@ class RowParallelLoRALinear(RowParallelLinear):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
+        rslora: bool = False,
+        lora_plus_scale: float = 1.0,
         merge_weights: bool = True,
         use_quick_lora: bool = False,
         **kwargs
@@ -149,12 +160,19 @@ class RowParallelLoRALinear(RowParallelLinear):
             shape=[r, self.out_features],
             dtype=self._dtype,
             is_bias=False,
-            default_initializer=nn.initializer.Constant(value=0.0),
+            attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.Constant(value=0.0),
+                learning_rate=lora_plus_scale,
+            ),
         )
+
         self.lora_A.is_distributed = True
         self.lora_A.split_axis = 0
         self.lora_B.is_distributed = False
-        self.scaling = self.lora_alpha / self.r
+        if not rslora:
+            self.scaling = self.lora_alpha / self.r
+        else:
+            self.scaling = self.lora_alpha / math.sqrt(self.r)
 
         # Freezing the pre-trained weight matrix
         self.weight.stop_gradient = True
@@ -243,6 +261,8 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
+        rslora: bool = False,
+        lora_plus_scale: float = 1.0,
         merge_weights: bool = True,
         lora_A_weight_attr: Optional[paddle.ParamAttr] = None,
         use_quick_lora: bool = False,
@@ -277,11 +297,18 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
             shape=[r, self.output_size_per_partition],
             dtype=self._dtype,
             is_bias=False,
-            default_initializer=nn.initializer.Constant(value=0.0),
+            attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.Constant(value=0.0),
+                learning_rate=lora_plus_scale,
+            ),
         )
+
         self.lora_B.is_distributed = True
         self.lora_B.split_axis = 1
-        self.scaling = self.lora_alpha / self.r
+        if not rslora:
+            self.scaling = self.lora_alpha / self.r
+        else:
+            self.scaling = self.lora_alpha / math.sqrt(self.r)
 
         # Freezing the pre-trained weight matrix
         self.weight.stop_gradient = True
