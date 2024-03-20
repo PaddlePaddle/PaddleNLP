@@ -238,7 +238,7 @@ tokenizer.save_pretrained("BAAI/bge-m3-pd")
 然后在这里像这样注册一下即可使用：
 
 ```
-"BAAI/bge-m3": {
+"BAAI/bge-m3-pd": {
                 "task_class": SentenceFeatureExtractionTask,
                 "task_flag": "feature_extraction-BAAI/bge-m3",
                 "task_priority_path": "BAAI/bge-m3",
