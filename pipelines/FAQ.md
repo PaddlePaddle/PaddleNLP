@@ -231,14 +231,14 @@ from paddlenlp.transformers import AutoModel, AutoTokenizer
 model = AutoModel.from_pretrained("BAAI/bge-m3", from_hf_hub=True, convert_from_torch=True)
 tokenizer = AutoTokenizer.from_pretrained('BAAI/bge-m3')
 
-model.save_pretrained("BAAI/bge-m3-pd")
-tokenizer.save_pretrained("BAAI/bge-m3-pd")
+model.save_pretrained("BAAI/bge-m3")
+tokenizer.save_pretrained("BAAI/bge-m3")
 ```
 
 然后在这里像这样注册一下即可使用：
 
 ```
-"BAAI/bge-m3-pd": {
+"BAAI/bge-m3": {
                 "task_class": SentenceFeatureExtractionTask,
                 "task_flag": "feature_extraction-BAAI/bge-m3",
                 "task_priority_path": "BAAI/bge-m3",
