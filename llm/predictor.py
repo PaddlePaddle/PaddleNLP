@@ -49,8 +49,8 @@ from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
-    ChatGLMv2Tokenizer,
     ChatGLMTokenizer,
+    ChatGLMv2Tokenizer,
     LlamaTokenizer,
     PretrainedModel,
     PretrainedTokenizer,
@@ -242,7 +242,8 @@ class BasePredictor:
             padding=True,
             # when use chat_template, it should not add special tokens
             # chatglm2 prefix-tokens can not be tokenized into ids
-            add_special_tokens=self.tokenizer.chat_template is None or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
+            add_special_tokens=self.tokenizer.chat_template is None
+            or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
         )
         return tokenized_source
 
@@ -1414,6 +1415,8 @@ def create_predictor(
                     predictor_args.model_name_or_path,
                     config=config,
                     dtype=predictor_args.dtype,
+                    tensor_parallel_degree=tensor_parallel_degree,
+                    tensor_parallel_rank=tensor_parallel_rank,
                 )
                 model.eval()
             else:
