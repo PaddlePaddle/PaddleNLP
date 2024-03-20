@@ -67,12 +67,13 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
     dir4=${arr_file_name[3]}
     file_item=$dir1/$dir2/$dir3/$dir4
     echo "file_name:"${file_name}, "path:"${file_item}
+    if [[ ${dir1} =~ "paddlenlp" ]];then
+	    export FLAGS_paddlenlp=1
+    fi
     if [ ! -f ${file_name} ];then # 针对pr删掉文件
         continue
     elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
         continue
-    elif [[ ${dir1} =~ "paddlenlp" ]];then
-	    export FLAGS_paddlenlp=1
     else
         for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
             if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then

@@ -382,6 +382,8 @@ class LoRAModel(nn.Layer):
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
+                    rslora=lora_config.rslora,
+                    lora_plus_scale=lora_config.lora_plus_scale,
                     bias_attr=False if module.bias is None else None,
                 )
             if isinstance(module, nn.Conv2D):
@@ -412,6 +414,8 @@ class LoRAModel(nn.Layer):
                     r=lora_config.r,
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
+                    rslora=lora_config.rslora,
+                    lora_plus_scale=lora_config.lora_plus_scale,
                     merge_weights=lora_config.merge_weights,
                     lora_A_weight_attr=paddle.ParamAttr(
                         initializer=nn.initializer.KaimingUniform(
@@ -437,6 +441,8 @@ class LoRAModel(nn.Layer):
                     r=lora_config.r,
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
+                    rslora=lora_config.rslora,
+                    lora_plus_scale=lora_config.lora_plus_scale,
                     merge_weights=lora_config.merge_weights,
                 )
                 # Lora column parallel will spilt lora A matrix

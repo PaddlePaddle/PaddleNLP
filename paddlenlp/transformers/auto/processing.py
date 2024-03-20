@@ -19,14 +19,9 @@ import json
 import os
 from collections import OrderedDict
 
-from huggingface_hub import hf_hub_download
-
-from ... import __version__
-from ...utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
+from ...utils.download import resolve_file_path
 from ...utils.import_utils import import_module
 from ...utils.log import logger
-from ..aistudio_utils import aistudio_download
-from ..utils import resolve_cache_dir
 
 __all__ = [
     "AutoProcessor",
@@ -152,7 +147,6 @@ class AutoProcessor:
             subfolder = ""
         from_aistudio = kwargs.get("from_aistudio", False)
         from_hf_hub = kwargs.get("from_hf_hub", False)
-        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
         kwargs["subfolder"] = subfolder
         kwargs["cache_dir"] = cache_dir
 
@@ -161,15 +155,8 @@ class AutoProcessor:
             for name in names:
                 all_processor_names.append(name)
 
-        # From local dir path
-        if os.path.isdir(pretrained_model_name_or_path):
-            config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.processor_config_file)
-            if os.path.exists(config_file):
-                processor_class = cls._get_processor_class_from_config(pretrained_model_name_or_path, config_file)
-                logger.info("We are using %s to load '%s'." % (processor_class, pretrained_model_name_or_path))
-                return processor_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         # From built-in pretrained models
-        elif pretrained_model_name_or_path in all_processor_names:
+        if pretrained_model_name_or_path in all_processor_names:
             for names, processor_classes in cls._processor_mapping.items():
                 for pattern in names:
                     if pattern == pretrained_model_name_or_path:
@@ -181,54 +168,26 @@ class AutoProcessor:
                             pretrained_model_name_or_path, *model_args, **kwargs
                         )
 
-        # From AI Studio or HF Hub
-        elif from_aistudio or from_hf_hub:
-            if from_aistudio:
-                config_file = aistudio_download(
-                    repo_id=pretrained_model_name_or_path,
-                    filename=cls.processor_config_file,
-                    cache_dir=cache_dir,
-                    subfolder=subfolder,
-                )
-            else:
-                config_file = hf_hub_download(
-                    repo_id=pretrained_model_name_or_path,
-                    filename=cls.processor_config_file,
-                    subfolder=subfolder,
-                    cache_dir=cache_dir,
-                    library_name="PaddleNLP",
-                    library_version=__version__,
-                )
-            if os.path.exists(config_file):
-                processor_class = cls._get_processor_class_from_config(
-                    pretrained_model_name_or_path,
-                    config_file,
-                )
-                logger.info(f"We are using {processor_class} to load '{pretrained_model_name_or_path}'.")
-                return processor_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-        # Assuming from community-contributed pretrained models
+        config_file = resolve_file_path(
+            pretrained_model_name_or_path,
+            [cls.processor_config_file],
+            subfolder,
+            cache_dir=cache_dir,
+            from_hf_hub=from_hf_hub,
+            from_aistudio=from_aistudio,
+        )
+        if config_file is not None and os.path.exists(config_file):
+            processor_class = cls._get_processor_class_from_config(
+                pretrained_model_name_or_path,
+                config_file,
+            )
+            logger.info(f"We are using {processor_class} to load '{pretrained_model_name_or_path}'.")
+            return processor_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         else:
-            url_list = [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.processor_config_file]
-            cache_dir = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
-            if subfolder != "":
-                url_list.insert(2, subfolder)
-            community_config_path = "/".join(url_list)
-
-            try:
-                resolved_vocab_file = get_path_from_url_with_filelock(community_config_path, cache_dir)
-            except RuntimeError as err:
-                logger.error(err)
-                raise RuntimeError(
-                    f"Can't load processor for '{pretrained_model_name_or_path}'.\n"
-                    f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-                    "- a correct model-identifier of built-in pretrained models,\n"
-                    "- or a correct model-identifier of community-contributed pretrained models,\n"
-                    "- or the correct path to a directory containing relevant processor files.\n"
-                )
-
-            if os.path.exists(resolved_vocab_file):
-                processor_class = cls._get_processor_class_from_config(
-                    pretrained_model_name_or_path, resolved_vocab_file
-                )
-                logger.info("We are using %s to load '%s'." % (processor_class, pretrained_model_name_or_path))
-                return processor_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+            raise RuntimeError(
+                f"Can't load processor for '{pretrained_model_name_or_path}'.\n"
+                f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
+                "- a correct model-identifier of built-in pretrained processor,\n"
+                "- or a correct model-identifier of community-contributed pretrained models,\n"
+                "- or the correct path to a directory containing relevant processor files.\n"
+            )

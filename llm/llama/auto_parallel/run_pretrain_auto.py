@@ -404,6 +404,10 @@ def init_seed(seed: int = 1234, args=None):
     else:
         assert not args.use_hybrid_parallel and args.enable_auto_parallel
         if dist.get_world_size() > 1:
+            if args.hybrid_parallel_topo_order is None or args.hybrid_parallel_topo_order == "pp_first":
+                order = ["pp", "dp", "sharding", "mp", "sep"]
+            elif args.hybrid_parallel_topo_order == "sharding_first":
+                order = ["dp", "sharding", "pp", "mp", "sep"]
             topo = Topology(
                 dist.get_rank(),
                 dist.get_world_size(),
@@ -411,6 +415,7 @@ def init_seed(seed: int = 1234, args=None):
                 pp_degree=args.pipeline_parallel_degree,
                 mp_degree=args.tensor_parallel_degree,
                 sharding_degree=1,  # auto_parallel's sharding is not orthogonal with dp, mp and pp
+                order=order,
             )
 
             global_seed, local_seed, random_seed = _get_distributed_seeds(args.seed, topo)

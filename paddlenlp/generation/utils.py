@@ -878,12 +878,12 @@ class GenerationMixin(object):
             logger.warning("`max_length` will be deprecated in future releases, use `max_new_tokens` instead.")
             generation_config.max_new_tokens = generation_config.max_length
 
-        if generation_config.min_length != 0 and generation_config.min_new_token == 0:
-            logger.warning("`min_length` will be deprecated in future releases, use `min_new_token` instead.")
-            generation_config.min_new_token = generation_config.min_length
+        if generation_config.min_length != 0 and generation_config.min_new_tokens == 0:
+            logger.warning("`min_length` will be deprecated in future releases, use `min_new_tokens` instead.")
+            generation_config.min_new_tokens = generation_config.min_length
 
         max_length = generation_config.max_new_tokens
-        min_length = generation_config.min_new_token
+        min_length = generation_config.min_new_tokens
 
         input_len = input_ids.shape[-1]
         min_len = input_len + min_length
@@ -1209,18 +1209,6 @@ class GenerationMixin(object):
 
             # multinomial already support fp16 and bf16 currently, fix issue: https://github.com/PaddlePaddle/Paddle/issues/51852
             next_tokens = paddle.multinomial(probs)
-            # # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
-            # if probs.dtype == paddle.bfloat16 and top_k == 1:
-            #     probs = probs.astype("float32")
-            #     next_tokens = paddle.unsqueeze(paddle.argmax(probs, axis=-1), -1)
-            # else:
-            #     # next_tokens = paddle.multinomial(probs)
-            #     probs = probs.cpu()
-            #     from paddlenlp.transformers.utils import device_guard
-
-            #     with device_guard("cpu"):
-            #         next_tokens = paddle.multinomial(probs)
-            #     next_tokens = next_tokens.cuda()
 
             if self.config.tensor_parallel_degree > 1:
                 # Maybe no need to broadcast if seed is set correclty.

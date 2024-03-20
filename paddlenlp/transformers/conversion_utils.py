@@ -1061,7 +1061,8 @@ class ConversionMixin:
                 logger.warning(f"--- {layer_name}")
 
         model_weight_file = os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)
-        paddle.save(state_dict, model_weight_file)
+        if not os.path.isfile(model_weight_file):
+            paddle.save(state_dict, model_weight_file)
         return state_dict
 
     @classmethod
