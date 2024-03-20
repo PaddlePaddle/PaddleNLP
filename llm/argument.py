@@ -48,6 +48,9 @@ class DataArgument:
     dataset_name_or_path: str = field(default=None, metadata={"help": "Name or path for dataset"})
     task_name: str = field(default=None, metadata={"help": "Additional name to select a more specific task."})
     zero_padding: bool = field(default=False, metadata={"help": "Whether to use Zero Padding data stream"})
+    pad_to_multiple_of: int = field(
+        default=1, metadata={"help": "If set will pad the sequence to a multiple of the provided value."}
+    )
     src_length: int = field(default=1024, metadata={"help": "The maximum length of source(context) tokens."})
     max_length: int = field(
         default=2048,
