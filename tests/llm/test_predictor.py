@@ -434,7 +434,7 @@ class QWenVLTest(LLMTest, unittest.TestCase):
             main()
 
 
-class QWenVLMulticardExportTest(LLMTest, TestMultipleGpus):
+class QWenMulticardExportTest(LLMTest, TestMultipleGpus):
     model_name_or_path: str = "__internal_testing__/tiny-fused-qwen-head2"
     model_class = QWenForCausalLM
 
