@@ -155,7 +155,10 @@ class QWenInferenceModel(QWenPretrainedModel):
             ffn2_weight_scale_attrs = [
                 paddle.ParamAttr(name="fuseqwen.{}.ffn2_weight_scale".format(i)) for i in range(self.num_layers)
             ]
-        nranks = 1 if config.tensor_parallel_degree == -1 else config.tensor_parallel_degree
+        # If not at inference mode in the create_predictor, the value of tensor_parallel_degree is -1.
+        if config.tensor_parallel_degree == -1:
+            config.tensor_parallel_degree == 1
+
         transformer_config = FusedMultiTransformerConfig(
             self.hidden_size,
             self.num_attention_heads,
@@ -163,7 +166,7 @@ class QWenInferenceModel(QWenPretrainedModel):
             weight_only_quant_bits=self.weight_only_quant_bits,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
-            nranks=nranks,
+            nranks=config.tensor_parallel_degree,
             ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
@@ -212,7 +215,9 @@ class QWenInferenceModel(QWenPretrainedModel):
                 state_dict["qwen.h.{}.ln_1.weight".format(idx)], dtype=self.transformer_block.ln_scales[idx].dtype
             )
             self.transformer_block.ln_scales[idx].set_value(ln_scale)
-
+            self.config.tensor_parallel_degree = (
+                1 if self.config.tensor_parallel_degree == -1 else self.config.tensor_parallel_degree
+            )
             qkv_weight = paddle.to_tensor(
                 state_dict["qwen.h.{}.attn.c_attn.weight".format(idx)].transpose([1, 0]), dtype=dtype
             ).reshape(
