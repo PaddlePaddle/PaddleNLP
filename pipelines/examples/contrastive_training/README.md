@@ -2,7 +2,7 @@
 
 ## 安装
 
-推荐安装gpu版本的[PaddlePalle](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)，以cuda11.7的paddle为例，安装命令如下：
+推荐安装gpu版本的[PaddlePaddle](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)，以cuda11.7的paddle为例，安装命令如下：
 
 ```
 python -m pip install paddlepaddle-gpu==2.6.0.post117 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
@@ -12,7 +12,7 @@ python -m pip install paddlepaddle-gpu==2.6.0.post117 -f https://www.paddlepaddl
 pip install -r requirements.txt
 ```
 
-下载dureader中文数据集：
+下载DuReader-Retrieval中文数据集：
 
 ```
 cd data

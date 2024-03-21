@@ -99,6 +99,28 @@ class BiEncoderModel(PretrainedModel):
         # p_reps [batch_size, embedding_dim]
         return paddle.matmul(q_reps, p_reps.transpose([1, 0]))
 
+    def hard_negative_loss(self, q_reps, p_reps):
+        scores = self.compute_similarity(q_reps, p_reps)
+        scores = scores / self.temperature
+        scores = scores.reshape([q_reps.shape[0], -1])
+
+        target = paddle.arange(scores.shape[0], dtype="int64")
+        target = target * (p_reps.shape[0] // q_reps.shape[0])
+        loss = self.compute_loss(scores, target)
+        return scores, loss
+
+    def in_batch_negative_loss(self, q_reps, p_reps):
+        # In batch negatives
+        scores = self.compute_similarity(q_reps, p_reps)
+        # Substract margin from all positive samples cosine_sim()
+        margin_diag = paddle.full(shape=[q_reps.shape[0]], fill_value=self.margin, dtype=q_reps.dtype)
+        scores = scores - paddle.diag(margin_diag)
+        # Scale cosine to ease training converge
+        scores = scores / self.temperature
+        target = paddle.arange(0, q_reps.shape[0], dtype="int64")
+        loss = self.compute_loss(scores, target)
+        return scores, loss
+
     def forward(
         self,
         inputs: Dict[str, paddle.Tensor] = None,
@@ -109,6 +131,12 @@ class BiEncoderModel(PretrainedModel):
         q_reps = self.encode(query)
         p_reps = self.encode(passage)
 
+        # For non-matryoshka loss, we normalize the representations
+        if not self.matryoshka_dims:
+            if self.normalized:
+                q_reps = paddle.nn.functional.normalize(q_reps, axis=-1)
+                p_reps = paddle.nn.functional.normalize(p_reps, axis=-1)
+
         if self.training:
             # Cross device negatives
             if self.negatives_cross_device:
@@ -117,45 +145,25 @@ class BiEncoderModel(PretrainedModel):
 
             if self.matryoshka_dims:
                 loss = 0.0
+                scores = 0.0
                 for loss_weight, dim in zip(self.matryoshka_loss_weights, self.matryoshka_dims):
                     reduced_q = q_reps[:, :dim]
                     reduced_d = p_reps[:, :dim]
                     if self.normalized:
                         reduced_q = paddle.nn.functional.normalize(reduced_q, axis=-1)
                         reduced_d = paddle.nn.functional.normalize(reduced_d, axis=-1)
-                    scores = self.compute_similarity(reduced_q, reduced_d)
-                    scores = scores / self.temperature
-                    scores = scores.reshape([q_reps.shape[0], -1])
 
-                    target = paddle.arange(scores.shape[0], dtype="int64")
-                    target = target * (p_reps.shape[0] // q_reps.shape[0])
-                    dim_loss = self.compute_loss(scores, target)
+                    if self.use_inbatch_neg:
+                        dim_score, dim_loss = self.in_batch_negative_loss(reduced_q, reduced_d)
+                    else:
+                        dim_score, dim_loss = self.hard_negative_loss(reduced_q, reduced_d)
+                    scores += dim_score
                     loss += loss_weight * dim_loss
 
             elif self.use_inbatch_neg:
-                if self.normalized:
-                    q_reps = paddle.nn.functional.normalize(q_reps, axis=-1)
-                    p_reps = paddle.nn.functional.normalize(p_reps, axis=-1)
-                # In batch negatives
-                scores = self.compute_similarity(q_reps, p_reps)
-                # Substract margin from all positive samples cosine_sim()
-                margin_diag = paddle.full(shape=[q_reps.shape[0]], fill_value=self.margin, dtype=q_reps.dtype)
-                scores = scores - paddle.diag(margin_diag)
-                # Scale cosine to ease training converge
-                scores = scores / self.temperature
-                target = paddle.arange(0, q_reps.shape[0], dtype="int64")
-                loss = self.compute_loss(scores, target)
+                scores, loss = self.in_batch_negative_loss(q_reps, p_reps)
             else:
-                if self.normalized:
-                    q_reps = paddle.nn.functional.normalize(q_reps, axis=-1)
-                    p_reps = paddle.nn.functional.normalize(p_reps, axis=-1)
-                scores = self.compute_similarity(q_reps, p_reps)
-                scores = scores / self.temperature
-                scores = scores.reshape([q_reps.shape[0], -1])
-
-                target = paddle.arange(scores.shape[0], dtype="int64")
-                target = target * (p_reps.shape[0] // q_reps.shape[0])
-                loss = self.compute_loss(scores, target)
+                scores, loss = self.hard_negative_loss(q_reps, p_reps)
 
         else:
             scores = self.compute_similarity(q_reps, p_reps)

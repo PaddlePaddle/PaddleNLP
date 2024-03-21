@@ -131,7 +131,7 @@ def main():
         tokenizer=tokenizer,
         query_max_len=data_args.query_max_len,
         passage_max_len=data_args.passage_max_len,
-        is_batch_negative=model_args.is_batch_negative,
+        is_batch_negative=training_args.use_inbatch_neg,
     )
 
     trainer = BiTrainer(
