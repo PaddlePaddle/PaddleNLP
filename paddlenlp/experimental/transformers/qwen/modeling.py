@@ -157,7 +157,7 @@ class QWenInferenceModel(QWenPretrainedModel):
             ]
         # If not at inference mode in the create_predictor, the value of tensor_parallel_degree is -1.
         if config.tensor_parallel_degree == -1:
-            config.tensor_parallel_degree == 1
+            config.tensor_parallel_degree = 1
 
         transformer_config = FusedMultiTransformerConfig(
             self.hidden_size,
