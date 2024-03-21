@@ -140,9 +140,6 @@ def main():
                 from_aistudio=model_args.from_aistudio,
                 quantization_config=quantization_config,
             )
-            # When lora and use_quick_lora are enabled, recompute_use_reentrant must be set to True to prevent any potential errors from occurring.
-            if model_args.lora and model_args.use_quick_lora:
-                model_config.recompute_use_reentrant = True
             model = AutoModelForCausalLMPipe.from_config(model_config, dtype=dtype)
     else:
         model_config = AutoConfig.from_pretrained(
@@ -154,9 +151,6 @@ def main():
             from_aistudio=model_args.from_aistudio,
             quantization_config=quantization_config,
         )
-        # When lora and use_quick_lora are enabled, recompute_use_reentrant must be set to True to prevent any potential errors from occurring.
-        if model_args.lora and model_args.use_quick_lora:
-            model_config.recompute_use_reentrant = True
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
 
