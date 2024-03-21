@@ -123,11 +123,10 @@ class BiEncoderModel(PretrainedModel):
 
     def forward(
         self,
-        inputs: Dict[str, paddle.Tensor] = None,
+        query: Dict[str, paddle.Tensor] = None,
+        passage: Dict[str, paddle.Tensor] = None,
         teacher_score: paddle.Tensor = None,
     ):
-        query = inputs["query"]
-        passage = inputs["passage"]
         q_reps = self.encode(query)
         p_reps = self.encode(passage)
 

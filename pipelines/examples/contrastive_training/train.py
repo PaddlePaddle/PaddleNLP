@@ -18,10 +18,9 @@ from arguments import DataArguments, ModelArguments
 from arguments import RetrieverTrainingArguments as TrainingArguments
 from data import EmbedCollator, TrainDatasetForEmbedding
 from models.modeling import BiEncoderModel
-from utils import BiTrainer
 
 from paddlenlp.peft import LoRAConfig, LoRAModel
-from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint, set_seed
+from paddlenlp.trainer import PdArgumentParser, Trainer, get_last_checkpoint, set_seed
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.log import logger
 
@@ -134,7 +133,7 @@ def main():
         is_batch_negative=training_args.use_inbatch_neg,
     )
 
-    trainer = BiTrainer(
+    trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
