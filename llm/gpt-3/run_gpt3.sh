@@ -31,7 +31,7 @@ PP=4
 VPP=1
 SD=$(($WORLD_SIZE / ($MP * $PP)))
 ACC_STEPS=$(($GBS / ($SD * $MBS)))
-SEQLEN=4096
+SEQLEN=2048
 
 MODEL_TYPE="gpt3-13B-en"
 #cp gpt3-13B-en.json /root/.paddlenlp/models/gpt3-13B-en/config.json
@@ -95,7 +95,10 @@ ${nsys_args} python3 -u -m paddle.distributed.launch \
         --dataloader_num_workers 1 \
         --use_flash_attention true \
         --use_fused_rms_norm true \
-        --fuse_attention_qkv true \
+        --use_fast_layer_norm true \
+		--use_fused_linear false	\
+		--use_fused_dropout_add false \
+		--fuse_attention_qkv true \
         --use_fused_rope true \
         --enable_linear_fused_grad_add false \
         --sharding "stage1" \
