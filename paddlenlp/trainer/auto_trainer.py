@@ -32,6 +32,7 @@ from .trainer import SCALER_NAME, SCHEDULER_NAME, TRAINER_STATE_NAME, TRAINING_A
 from .trainer_callback import TrainerState
 from .trainer_utils import (  # set_hyrbid_parallel_seed,
     PREFIX_CHECKPOINT_DIR,
+    ShardingOption,
     TrainOutput,
     _exec_mode_guard,
     get_last_checkpoint,
@@ -111,6 +112,13 @@ class AutoTrainer(Trainer):
     def _wrap_for_auto(self, model, train_dataloader):
         dist_loader = self._wrap_for_dist_loader(train_dataloader)
 
+        if ShardingOption.SHARD_OP in self.args.sharding:
+            self.optimizer = dist.shard_optimizer(self.optimizer, dist.ShardingStage1(self.global_mesh))
+        elif ShardingOption.SHARD_GRAD_OP in self.args.sharding:
+            self.optimizer = dist.shard_optimizer(self.optimizer, dist.ShardingStage2(self.global_mesh))
+        elif ShardingOption.FULL_SHARD in self.args.sharding:
+            self.optimizer = dist.shard_optimizer(self.optimizer, dist.ShardingStage3(self.global_mesh))
+
         if self.args.to_static:
             unified_strategy = dist.Strategy()
             unified_strategy._from_legacy_strategy(self.args.strategy)
@@ -119,7 +127,6 @@ class AutoTrainer(Trainer):
                 dist_loader,
             )
         else:
-            self.optimizer = dist.shard_optimizer(self.optimizer)
             return model, dist_loader
 
     def _wrap_amp_model(self, args, model):
@@ -392,6 +399,43 @@ class AutoTrainer(Trainer):
             batch_size=total_batch_size,
             drop_last=self.args.dataloader_drop_last,
         )
+
+    def create_optimizer(self, lr_scheduler=None):
+        """
+        Setup the optimizer.
+
+        We provide a reasonable default that works well. If you want to use something else, you can pass a tuple in the
+        Trainer's init through `optimizers`, or subclass and override this method in a subclass.
+        """
+        if self.optimizer is None:
+            if self.optimizer_grouped_parameters is not None:
+                params = self.optimizer_grouped_parameters
+                apply_decay_param_fun = None
+            else:
+                params = self.model.parameters()
+                decay_parameters = [
+                    p.name for n, p in self.model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])
+                ]
+
+                def apply_decay_param_fun(x):
+                    return x in decay_parameters
+
+            optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
+            if hasattr(optimizer_cls, "_create_master_weight") and self.args.fp16_opt_level == "O2":
+                optimizer_kwargs["multi_precision"] = True
+
+            self.optimizer = optimizer_cls(
+                learning_rate=self.lr_scheduler if lr_scheduler is None else lr_scheduler,
+                apply_decay_param_fun=apply_decay_param_fun,
+                parameters=params,
+                weight_decay=self.args.weight_decay,
+                grad_clip=paddle.nn.ClipGradByGlobalNorm(self.args.max_grad_norm)
+                if self.args.max_grad_norm > 0
+                else None,
+                **optimizer_kwargs,
+            )
+
+        return self.optimizer
 
     def compute_loss(self, model, inputs, return_outputs=False):
         """
