@@ -1,4 +1,4 @@
-# generative-search
+# 向量检索模型训练
 
 ## 安装
 
@@ -106,3 +106,7 @@ python evaluation/benchmarks.py --model_type bert \
 - `query_max_length`: query的最大长度
 - `passage_max_length`: passage的最大长度
 - `evaluate_all`: 是否评估所有的checkpoint，默认为False，即只评估指定的checkpoint
+
+## Reference
+
+[1] Aditya Kusupati, Gantavya Bhatt, Aniket Rege, Matthew Wallingford, Aditya Sinha, Vivek Ramanujan, William Howard-Snyder, Kaifeng Chen, Sham M. Kakade, Prateek Jain, Ali Farhadi: Matryoshka Representation Learning. NeurIPS 2022
