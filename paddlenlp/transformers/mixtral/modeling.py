@@ -518,15 +518,11 @@ class MixtralSparseMoeBlock(nn.Layer):
             dtype=hidden_states.dtype,
         )
 
-        # One hot encode the selected experts to create an expert mask
-        # this will be used to easily index which expert is going to be sollicitated.
-        # shape: [num_experts, top_k, batch_size * seq_len]
-        expert_mask = F.one_hot(selected_experts, num_classes=self.num_experts).transpose([2, 1, 0])
-
         # Loop over all available experts in the model and perform the computation on each expert.
         for expert_id in range(self.num_experts):
             expert_layer = self.experts[expert_id]
-            idx, top_x = paddle.where(expert_mask[expert_id])
+
+            top_x, idx = paddle.where(selected_experts == expert_id)
 
             if top_x.shape[0] == 0:
                 continue
