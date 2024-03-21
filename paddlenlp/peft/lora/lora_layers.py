@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import math
+import os
 from typing import List, Optional
 
 import paddle
@@ -25,6 +26,12 @@ from paddle.distributed.fleet.meta_parallel import (
 )
 
 from .lora_quick_layers import quick_lora
+
+if "npu" in paddle.device.get_all_custom_device_type():
+    from .mc2_lora_npu import MC2LoRaColumnParallelLinear, MC2LoRaRowParallelLinear
+else:
+    MC2LoRaRowParallelLinear = None
+    MC2LoRaColumnParallelLinear = None
 
 
 class LoRALinear(nn.Linear):
@@ -104,6 +111,7 @@ class LoRALinear(nn.Linear):
 
     def forward(self, input: paddle.Tensor, *args, **kwargs):
         if self.use_quick_lora:
+            # Use the quick lora implementation
             result = quick_lora(input, self.lora_A, self.lora_B, self.weight, self.bias, self.scaling)
         else:
             result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
@@ -205,6 +213,7 @@ class RowParallelLoRALinear(RowParallelLinear):
             input_mp = x
 
         if self.use_quick_lora:
+            # Use the quick lora implementation
             result_mp = quick_lora(
                 input_mp,
                 self.lora_A,
@@ -224,13 +233,16 @@ class RowParallelLoRALinear(RowParallelLinear):
             )
         else:
             # x @ W : [bz, in_f / ws] ===> [bz, out_f]
-            result_mp = F.linear(x=input_mp, weight=self.weight, name=self.name)
-            output = mp_ops._mp_allreduce(
-                result_mp,
-                group=self.model_parallel_group,
-                use_calc_stream=True,
-                use_model_parallel=True,
-            )
+            if "npu" in paddle.device.get_all_custom_device_type() and int(os.getenv("MC2", "0")):
+                output = MC2LoRaRowParallelLinear.apply(input_mp, self.weight, self.model_parallel_group)
+            else:
+                result_mp = F.linear(x=input_mp, weight=self.weight, name=self.name)
+                output = mp_ops._mp_allreduce(
+                    result_mp,
+                    group=self.model_parallel_group,
+                    use_calc_stream=True,
+                    use_model_parallel=True,
+                )
 
             if not self.merged:
                 # x @ A: [bz, in_f/ ws] ===> [bz, r]
@@ -335,15 +347,9 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
             self.merged = True
 
     def forward(self, input: paddle.Tensor):
-        if self.is_mp:
-            input_mp = mp_ops._c_identity(
-                input,
-                group=self.model_parallel_group,
-            )
-        else:
-            input_mp = input
         if self.use_quick_lora:
             # Use the quick lora implementation
+            input_mp = mp_ops._c_identity(input, group=self.model_parallel_group) if self.is_mp else input
             result_mp = quick_lora(
                 input_mp,
                 self.lora_A,
@@ -356,12 +362,21 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
                 world_size=self.world_size,
             )
         else:
-            result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
+            if "npu" in paddle.device.get_all_custom_device_type() and int(os.getenv("MC2", "0")):
+                res_mp = MC2LoRaColumnParallelLinear.apply(input, self.weight, self.model_parallel_group)
+                result_mp = res_mp + self.bias
+            else:
+                input_mp = mp_ops._c_identity(input, group=self.model_parallel_group)
+                result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
 
             if not self.merged:
                 input_a = self.lora_dropout(input) @ self.lora_A
-                input_a_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
-                delta_mp = (input_a_mp @ self.lora_B) * self.scaling
+                if "npu" in paddle.device.get_all_custom_device_type() and int(os.getenv("MC2", "0")):
+                    tmp = MC2LoRaColumnParallelLinear.apply(input_a, self.lora_B, self.model_parallel_group)
+                    delta_mp = tmp * self.scaling
+                else:
+                    input_a_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
+                    delta_mp = (input_a_mp @ self.lora_B) * self.scaling
                 result_mp += delta_mp
 
         if self.gather_output and self.is_mp:
