@@ -79,6 +79,35 @@ class LoraTest(LLMTest, unittest.TestCase):
 
         self.run_predictor({"inference_model": False})
 
+    def test_rslora_plus(self):
+        self.disable_static()
+        paddle.set_default_dtype("float32")
+
+        lora_config = load_test_config(self.config_path, "rslora_plus", self.model_dir)
+        lora_config["output_dir"] = self.output_dir
+        lora_config["dataset_name_or_path"] = self.data_dir
+
+        with argv_context_guard(lora_config):
+            from finetune_generation import main
+
+            main()
+
+        # merge weights
+        merge_lora_weights_config = {
+            "lora_path": lora_config["output_dir"],
+            "merge_lora_model_path": lora_config["output_dir"],
+        }
+        with argv_context_guard(merge_lora_weights_config):
+            from merge_lora_params import merge
+
+            merge()
+
+        # TODO(wj-Mcat): disable chatglm2 test temporarily
+        if self.model_dir not in ["qwen", "baichuan", "chatglm2"]:
+            self.run_predictor({"inference_model": True})
+
+        self.run_predictor({"inference_model": False})
+
 
 # @parameterized_class(
 #     ["model_dir"],
