@@ -469,7 +469,8 @@ class PipeEvalModel(GenerationMixin):
     """
 
     def __init__(self, trainer: Trainer):
-        self.model: fleet.model.PipelineParallel = trainer.model_wrapped
+        eval_model = getattr(trainer, "_inner_eval_model", None)
+        self.model: fleet.model.PipelineParallel = trainer.model_wrapped if eval_model is None else eval_model
         self.config: PretrainedConfig = trainer.model.config
         self._is_gen = False
         self.update_model_kwargs_for_generation = (

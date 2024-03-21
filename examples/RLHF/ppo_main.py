@@ -144,7 +144,7 @@ class TrainingArguments(TrainingArguments):
     )
 
     offload_level: str = field(
-        default=None,
+        default="",
         metadata={"help": "Offload model, optional for: eval, reward, optimizer, train_model"},
     )
 
@@ -269,6 +269,8 @@ def main():
             "clip_range_ratio": training_args.clip_range_ratio,
         }
     else:
+        # non-pipe modelForCausalLM does not accept extra_args and use other ways
+        # (StepTrainer.create_criterion) to set hyper-parameters
         extra_args = {}
 
     # actor model
@@ -297,6 +299,9 @@ def main():
             config.tensor_parallel_degree = -1
             config.tensor_parallel_rank = 0
         actor_eval_model = AutoModelForCausalLM.from_config(config)
+        # TODO(guosheng): AutoModel (in `_get_model_class_from_config`) pop out
+        # architecture which is necessary for infer predictor currently
+        config.architectures = actor_model.config.architectures
         # actor_eval_model = AutoModelForCausalLM.from_pretrained(model_args.actor_model_name_or_path, config=config)
     else:
         actor_eval_model = None

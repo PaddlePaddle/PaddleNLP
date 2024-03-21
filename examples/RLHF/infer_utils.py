@@ -96,7 +96,9 @@ class Predictor:
             return param
 
         paddle.nn.Layer.create_parameter = _create_param
-        infer_model = create_infer_model(trainer.model, dtype=trainer.amp_dtype)
+        # trainer might use an extra model instead of trainer.model for eval
+        eval_model = getattr(trainer, "_inner_eval_model", None)
+        infer_model = create_infer_model(trainer.model if eval_model is None else eval_model, dtype=trainer.amp_dtype)
         paddle.nn.Layer.create_parameter = ori_creat_param
 
         # create predictor
@@ -104,7 +106,7 @@ class Predictor:
         predictor_args = parser.parse_dict(
             {
                 "src_length": get_model_max_position_embeddings(  # can be changed dynamically by predictor.input_length
-                    trainer.model.config
+                    trainer.model.config if eval_model is None else eval_model.config
                 ),
                 "max_length": trainer.args.max_length,
                 "dtype": trainer.amp_dtype,
@@ -231,7 +233,9 @@ def infer_guard(trainer, offload_model=True):
         return
 
     global policy_predictor
-    model = trainer.model
+    # trainer might use an extra model instead of trainer.model for eval
+    eval_model = getattr(trainer, "_inner_eval_model", None)
+    model = trainer.model if eval_model is None else eval_model
     if policy_predictor is None:
         policy_predictor = Predictor.create_predictor(trainer)
     if not policy_predictor.is_available:
@@ -256,7 +260,9 @@ class InferEvalModel:
     """For faster generation, not support PipelineParallel yet."""
 
     def __init__(self, trainer: Trainer):
-        self.model: PretrainedModel = trainer.model
+        # trainer might use an extra model instead of trainer.model for eval
+        eval_model = getattr(trainer, "_inner_eval_model", None)
+        self.model: PretrainedModel = trainer.model if eval_model is None else eval_model
         self.tokenizer: PretrainedTokenizer = trainer.tokenizer
 
     def eval(self):

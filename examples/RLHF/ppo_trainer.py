@@ -427,12 +427,18 @@ Trainer.export_evaluate_model = export_evaluate_model
 
 class StepTrainer(Trainer):
     """
-    Trainer enhanced with step-level training combining with patches of Trianer.
-    We can use this to do training whose step is composed of multi models via
-    multiple instances of StepTrainer, such as PPO. Additionally, using a mixed
-    loss and get the separated loss metrics is supported, which is helpful to
-    PipelienParallel with a mixed loss.
+    Features of StepTrainer:
+    1. Trainer enhanced with step-level training combining with patches of
+    Trianer. We can use this to do training whose step is composed of multi
+    models via multiple instances of StepTrainer, such as PPO.
+    2. Additionally, using a mixed loss and get the separated loss metrics is
+    supported, which is helpful to PipelienParallel with a mixed loss.
+    3. EMA is supported.
     """
+
+    # used to create criterion for trainer, please refer to `create_criterion`
+    # for details.
+    loss_cls: type
 
     def __init__(
         self,
@@ -466,6 +472,12 @@ class StepTrainer(Trainer):
         if getattr(self, "loss_cls", None) and self.criterion is None:
             self.criterion = self.create_criterion()
 
+        # ablout 4s slower than infer generation without ema
+        self.use_ema = getattr(args, "use_ema", False)
+        self.shard_ema = getattr(args, "shard_ema", False)
+        self.offload_ema = getattr(args, "offload_ema", True)
+        self.ema_beta = getattr(args, "ema_beta", 0.992)
+
     def create_criterion(self):
         """
         create loss using `loss_cls` for trainer. It would use a wrapped loss_cls
@@ -486,6 +498,12 @@ class StepTrainer(Trainer):
         """
         return "tr_loss"
 
+    def set_eval_model(self, model):
+        if model is None:
+            logger.warning("use None to set eval model for trainer and it would be ignored")
+        else:
+            self._inner_eval_model = model
+
     def get_model(self, train=False):
         """
         model visitor wrapps PipelineParalle and Inference model to do evaulation
@@ -496,7 +514,10 @@ class StepTrainer(Trainer):
         model = getattr(self, "_eval_model", None)
         if model is not None:
             return model
-        if self.args.pipeline_parallel_degree > 1:
+        inner_eval_model = getattr(self, "_inner_eval_model", None)
+        if (self.args.pipeline_parallel_degree > 1 and inner_eval_model is None) or isinstance(
+            inner_eval_model, fleet.model.PipelineParallel
+        ):
             # Only accept wrapped model for pipeline_parallel mode
             model = PipeEvalModel(self)
             self._eval_model = model
@@ -540,6 +561,13 @@ class StepTrainer(Trainer):
             self.train_step_vars.update(vars)
         return self.train_step_vars
 
+    @property
+    def loss_names(self):
+        if not hasattr(self, "_loss_names"):
+            self._loss_names = [var_name for var_name in self.get_train_step_vars() if var_name.endswith("_loss")]
+            assert len(self._loss_names) > 0
+        return self._loss_names
+
     def full_training_step(self, **inputs) -> paddle.Tensor:
         """
         Accept any valid key word arguments of model and loss as inputs, they
@@ -555,10 +583,22 @@ class StepTrainer(Trainer):
         train_step_vars = self.get_train_step_vars()
         loss_name = self.loss_identifier(inputs)
         loss_var = train_step_vars.get(loss_name, None)
-        if loss_var is None:
+        # trainer.train use `tr_loss` as loss var to accumulate loss.
+        # NOTE: `tr_loss` in trainer.train not only accumulate mean loss for
+        # steps in one `gradient_accumulation_steps`, but also accumulate for
+        # one logging intervel which may contains more than one accumulated steps.
+        # However, in StepTrainer we only want to use `tr_loss` to accumulate
+        # mean loss for steps in a `gradient_accumulation_steps` range. As for
+        # logging intervel loss accumulation is not take into account here and
+        # should be considered in outter.
+        if loss_var is None:  # the first step of current loss type
             loss_var = paddle.to_tensor(0.0)
             train_step_vars[loss_name] = loss_var
-        # trainer.train use `tr_loss` as loss var
+        elif self.is_accumulation_step:  # begin a new accumulation step intervel
+            for name in self.loss_names:
+                train_step_vars[name] = paddle.to_tensor(0.0)
+            loss_var = train_step_vars[loss_name]
+
         train_step_vars["tr_loss"] = loss_var
 
         new_train_step_vars = super().full_training_step(inputs, **train_step_vars)
@@ -571,6 +611,11 @@ class StepTrainer(Trainer):
             train_step_vars.pop("tr_loss")
 
         self.mark_step_loss(loss_name)
+
+        if self.use_ema and self.is_accumulation_step:
+            # TODO(guosheng): assume rollout next thus make ema weights on gpu,
+            # but may not, maybe need a way to specify it.
+            self.ema_update(beta=self.ema_beta, offload_ema=self.offload_ema, offload_model=not self.offload_ema)
 
         return train_step_vars[loss_name]
 
@@ -614,7 +659,7 @@ class StepTrainer(Trainer):
         accumulated step and the loss returned at accumulated step is a mixed loss.
         To separate loss metrics in PipelienParallel:
         1. We hack PipelineParallel._forward_step to record actual loss for each
-           step in a list.
+           step in a list (only in training and not in evaluation currently).
         2. We mark the loss type only once for each step using `loss_step_indice`
            (dict), then wen can check out the corresponding loss metrics from the
            loss list.
@@ -624,23 +669,24 @@ class StepTrainer(Trainer):
         if loss_name not in self.loss_step_indice:
             self.loss_step_indice[loss_name] = len(self.loss_step_indice)
 
-    def get_step_loss(self, loss_prefix: str = "") -> Dict:
+    @paddle.no_grad()
+    def get_step_loss(self, loss_prefix: str = "", loss_accumulator: Dict = {}) -> Dict[str, paddle.Tensor]:
         """
         Return a dict mapping loss name to value of current training step. This
         is mainly to get loss for metric logging, and it would not affect the
         training. This is mostly helpful to PipelienParallel with a mixed loss
         in which the loss returned is 0 when not reach accumulated step and the
         loss returned at accumulated step is a mixed loss.
-        NOTE: Overwrite it when we want to change the logging value.
+        NOTE: 1. Only when reaching accumulated step the losses returned are
+        accurate, and each loss is a mean loss of steps among one accumulated
+        steps range.
         """
+        if not self.is_accumulation_step:
+            msg = "The loss returned may not be accurate when not reaching accumulated step."
+            logger.error(msg)
         model = self.get_model(train=True)
-        if not hasattr(self, "loss_dict"):
-            self.loss_dict = {}
-            for var_name, value in self.get_train_step_vars().items():
-                if var_name.endswith("_loss"):
-                    self.loss_dict[var_name] = value
-        loss_dict = {}  # return a new dict because of new metric names
-        if isinstance(model, fleet.model.PipelineParallel) and len(self.loss_dict) > 1:
+        loss_dict = loss_accumulator if loss_accumulator else {}
+        if isinstance(model, fleet.model.PipelineParallel) and len(self.loss_names) > 1:
             # NOTE: PipelineParallel only returns a accumulated loss after
             # accumulated steps, which is a mixed loss of ppo-loss and
             # ptx-loss. We hack PipelineParallel._forward_step to record
@@ -663,19 +709,154 @@ class StepTrainer(Trainer):
                     # thus no need to broadcast.
                     mix_loss = paddle.empty(shape=[self.args.gradient_accumulation_steps], dtype=paddle.float32)
                 paddle.distributed.broadcast(mix_loss, src=model.pp_group.ranks[-1], group=model.pp_group)
-                for loss_name in self.loss_dict:
+                for loss_name in self.loss_names:
                     # We assume a static order of multi-losses and mark the loss
                     # indice only once.
-                    value = mix_loss[self.loss_step_indice[loss_name] :: len(self.loss_dict)].mean()
+                    value = mix_loss[self.loss_step_indice[loss_name] :: len(self.loss_names)].mean()
                     loss_name = loss_prefix + loss_name if loss_prefix else loss_name
-                    loss_dict[loss_name] = value
+                    loss_dict[loss_name] = loss_dict[loss_name].add_(value) if loss_name in loss_dict else value
             return loss_dict
+        elif isinstance(model, fleet.model.PipelineParallel):
+            model._step_losses = None
 
-        for loss_name in self.loss_dict:
+        for loss_name in self.loss_names:
             value = self.get_train_step_vars()[loss_name]
             loss_name = loss_prefix + loss_name if loss_prefix else loss_name
-            loss_dict[loss_name] = value
+            loss_dict[loss_name] = loss_dict[loss_name].add_(value) if loss_name in loss_dict else value
         return loss_dict
+
+    @property
+    def is_accumulation_step(self):
+        """Indicate whether accumulation steps' training is done."""
+        return self.get_train_step_vars()["step_control"] == 0
+
+    def get_sharding_master_weight_structured_names(self, model, optimizer):
+        rank_param_names = [p.name for p in optimizer._rank2params[optimizer._sharding_rank]]
+        structured_names = []
+        # for pipeline model, use `model.state_dict()` would auto map param name
+        # for name, p in model.named_parameters():
+        for name, p in model.state_dict().items():
+            if p.name in rank_param_names:
+                structured_names.append(name)
+        return structured_names
+
+    def get_master_weight_state_dict(self, model, optimizer):
+        if self.amp_dtype in ["float16", "bfloat16"] and hasattr(optimizer, "_master_weights"):
+            master_weights = dict(optimizer._master_weights)
+            result = {}
+            # for pipeline model, use `model.state_dict()` would auto map param name
+            # for name, p in model.named_parameters():
+            for name, p in model.state_dict().items():
+                if p.name in master_weights:
+                    result[name] = master_weights[p.name]
+            return result
+        else:
+            return model.state_dict()
+
+    def ema_init(self, offload_ema=True, offload_model=False, shard_ema=True):
+        """should be called after model and optimizer are created and wrapped"""
+        self.ema_state_dict = {}
+        self.bak_state_dict = {}
+        hcg = fleet.get_hybrid_communicate_group()
+        sharding_size = hcg.get_sharding_parallel_world_size()
+        # NOTE: use optimizer.master_weight instead of model.state_dict to set
+        # ema_state_dict would make ema coupled with master_weight reshard.
+        structured_names = (
+            self.get_sharding_master_weight_structured_names(self.model, self.optimizer)
+            if sharding_size > 1 and shard_ema
+            else None
+        )
+        # print("=" * 20, "structured_names", structured_names)
+        # for pipeline model, use `model.state_dict()` would auto map param name
+        # for name, p in self.model.named_parameters():
+        for name, p in self.model.state_dict().items():
+            if structured_names is None or name in structured_names:
+                ema_p = p.detach().cast(dtype=paddle.float32)
+                if offload_ema:
+                    ema_p = ema_p.pin_memory()
+                # print("="*20, "ema name", name)
+                self.ema_state_dict[name] = ema_p
+            if offload_model:
+                cpu_p = p.pin_memory()
+                cpu_p._share_buffer_to(p)
+            self.bak_state_dict[name] = p
+        if getattr(self.model, "tie_word_embeddings", False):
+            raise NotImplementedError
+
+    @paddle.no_grad()
+    def ema_update(self, beta=0.992, offload_ema=True, offload_model=False):
+        """
+        This would be called automatically in `full_training_step` if `use_ema`
+        is True to update ema state when ending an accumulated step intervel.
+        """
+        model_keys = list(self.ema_state_dict.keys())
+        hcg = fleet.get_hybrid_communicate_group()
+        sharding_size = hcg.get_sharding_parallel_world_size()
+        trainer_state_dict = (
+            self.get_master_weight_state_dict(self.model, self.optimizer)
+            if sharding_size > 1 and self.shard_ema
+            else self.model.state_dict()
+        )
+        for key in model_keys:
+            if getattr(self.model, "tie_word_embeddings", False) and "lm_head" in key:
+                raise NotImplementedError
+            trainer_data = trainer_state_dict[key].cuda()
+            if trainer_data.dtype != paddle.float32:
+                # use model state dict instead of master weights
+                trainer_data = trainer_data.cast(dtype=paddle.float32)
+            ema_data = self.ema_state_dict[key].cuda()
+            # update ema & offload ema
+            ema_result = (beta * ema_data) + (1.0 - beta) * trainer_data
+            self.ema_state_dict[key] = ema_result.pin_memory() if offload_ema else ema_result
+            if offload_model:
+                cpu_p = trainer_data.pin_memory()
+                cpu_p._share_buffer_to(trainer_data)
+        if getattr(self.model, "tie_word_embeddings", False):
+            raise NotImplementedError
+
+    def ema_apply(self):
+        """
+        If use sharding and `shard_ema` is true, `ema_state_dict` only includes
+        sharded weights, thus we need the completed ema state to apply it to model
+        and ema would be coupled with reshard, then we need to reshard here.
+        """
+        # TODO(guosheng): `bak_state_dict` is indeed trainer.model, allow to use
+        # a new model instead of trainer.model as target model.
+        # NOTE: if `shard_ema` is True, `ema_state_dict` is just a subset (sharded
+        # part) of model state_dict, and ema would coupled with reshard.
+        for k, v in self.bak_state_dict.items():
+            # TODO(guosheng): reshard here
+            value = self.ema_state_dict[k].cuda().cast(dtype=v.dtype)
+            value._share_buffer_to(v)
+
+    def ema_restore(self):
+        for k, v in self.bak_state_dict.items():
+            value = v.cuda()
+            value._share_buffer_to(v)
+            if self.offload_ema:  # ema weights always in pin_memory in fact
+                ema_v = self.ema_state_dict[k]
+                ema_value = ema_v.pin_memory()
+                ema_value._share_buffer_to(ema_v)
+
+
+class ema(paddle.no_grad.__mro__[1]):
+    def __init__(self, trainer: StepTrainer):
+        self.trainer = trainer
+
+    def __enter__(self):
+        trainer = self.trainer
+        if trainer.use_ema and not hasattr(trainer, "ema_state_dict"):
+            # call ema_init here since it should be called after model and
+            # optimizer are created and wrapped
+            trainer.ema_init(
+                offload_ema=trainer.offload_ema, offload_model=not trainer.offload_ema, shard_ema=trainer.shard_ema
+            )
+        if self.trainer.use_ema:
+            self.trainer.ema_apply()
+
+    def __exit__(self, *args):
+        if self.trainer.use_ema:
+            self.trainer.ema_restore()
 
 
 class PolicyTrainer(StepTrainer):
@@ -689,22 +870,78 @@ class PolicyTrainer(StepTrainer):
             loss_name = "actor_loss"
         return loss_name
 
-    def get_step_loss(self, loss_prefix: str = "") -> Dict:
-        loss_dict = super().get_step_loss(loss_prefix="")
-        # use_ptx would double the gradient_accumulation_steps which causes
-        # actor_loss and ptx_loss reduced by half. Moreover, ptx_loss should
-        # be divided by ptx_coeff for logging.
-        # TODO(guosheng): maybe should consider self._enable_delay_scale_loss()
-        if "ptx_loss" in loss_dict:
-            loss_dict[loss_prefix + "ptx_loss"] = loss_dict["ptx_loss"] * 2 / self.criterion.ptx_coeff
-            loss_dict[loss_prefix + "actor_loss"] = loss_dict["actor_loss"] * 2
-        return loss_dict
-
 
 class ValueTrainer(StepTrainer):
     loss_cls = RLHFValueLoss
     # define loss name for logging
     loss_identifier = lambda self, inputs: "reward_critic_loss"
+
+
+class PPOMetric:
+    metric_names = [
+        "train/" + name
+        for name in [
+            "actor_loss",
+            "ptx_loss",
+            "reward_critic_loss",
+            "reward",
+            "kl_divergence",
+            "mean_generated_length",
+            "max_generated_length",
+        ]
+    ]
+    metric_ops = ["mean", "mean", "mean", "mean", "mean", "mean", "max"]
+
+    def __init__(self, freq, use_stack=True):
+        self.freq = freq
+        self.counter = 0
+        self.use_stack = use_stack
+        if use_stack:
+            self.metrics = paddle.zeros([freq, len(self.metric_names)], dtype=paddle.float32)
+        else:
+            self.metrics = [None] * len(self.metric_names)
+            for i in range(len(self.metrics)):
+                self.metrics[i] = paddle.zeros([freq], dtype=paddle.float32)
+
+    @paddle.no_grad()
+    def update(self, metrics: Dict[str, paddle.Tensor]) -> Union[None, Dict[str, float]]:
+        """
+        If has updated for`freq` times then return metrics (results reduced from
+        all worker) and reset metric states, otherwise return `None`.
+        """
+        for name in self.metric_names:
+            # PipelineParallel broadcast loss with shape [1]
+            if len(metrics[name].shape) != 0:
+                metrics[name] = metrics[name].squeeze()
+            if metrics[name].dtype != paddle.float32:
+                metrics[name] = metrics[name].cast(paddle.float32)
+        if self.use_stack:
+            self.metrics[self.counter] = paddle.stack([metrics[name] for name in self.metric_names])
+        else:
+            for i, name in enumerate(self.metric_names):
+                self.metrics[i][self.counter] = metrics[name]
+        if self.counter + 1 == self.freq:
+            from paddlenlp.trainer.utils import distributed_concat
+
+            metrics = distributed_concat(self.metrics)
+            out_metrics = {}
+            if self.use_stack:
+                mean_metric = metrics.mean(0)
+                max_metric = metrics.max(0)
+            for i, (name, op) in enumerate(zip(self.metric_names, self.metric_ops)):
+                if op == "max":
+                    out_metrics[name] = max_metric[i].item() if self.use_stack else metrics[i].max().item()
+                else:
+                    out_metrics[name] = mean_metric[i].item() if self.use_stack else metrics[i].mean().item()
+
+            # reset
+            self.counter = 0
+            if self.use_stack:
+                self.metrics.fill_(0.0)
+            else:
+                for i, name in enumerate(self.metric_names):
+                    self.metrics[i].fill_(0.0)
+            return out_metrics
 
 
 class PPOTrainer(Trainer):
@@ -799,6 +1036,8 @@ class PPOTrainer(Trainer):
             optimizers,
             preprocess_logits_for_metrics,
         )
+        self.policy_trainer.set_eval_model(policy_model_eval)
+        self.value_trainer.set_eval_model(value_model_eval)
         # disable inner trainers' callback/state/control
         self.policy_trainer.add_callback(MuteDefaultFlowCallback)
         self.value_trainer.add_callback(MuteDefaultFlowCallback)
@@ -867,7 +1106,7 @@ class PPOTrainer(Trainer):
             num_return_sequences=self.args.num_return_sequences,
             temperature=self.args.temperature,
             top_p=self.args.top_p,
-            # top_k=self.args.top_k,
+            # top_k=0,  # to disable top_k sampling, default is 50
             repetition_penalty=self.args.repetition_penalty,
             do_sample=True,
             # allow generation output to contain input
@@ -879,6 +1118,7 @@ class PPOTrainer(Trainer):
         # Those value can be changed
         self.kl_coeff = self.args.kl_coeff
         self.clip_range_score = self.args.clip_range_score
+        self.ptx_coeff = self.args.ptx_coeff
         self.gamma = 1.0
         self.gae_lambda = 0.95
 
@@ -996,9 +1236,20 @@ class PPOTrainer(Trainer):
         )
         self._eval_out_file = open(eval_out_file, "w")
 
-        output = super().evaluation_loop(
-            dataloader, description, prediction_loss_only, ignore_keys, metric_key_prefix, max_eval_iters
-        )
+        # TODO(guosheng): use _inner_eval_model (if trainer has one) instead of
+        # original trainer model to eval, especially when using sharded EMA
+        # NOTE: use here rather than in prediction_step since actor_model would
+        # be set to eval out of prediction_step
+        with guard_set_args(
+            self.policy_trainer,  # disable _inner_eval_model
+            {
+                "_eval_model": None,  # otherwise would use cached _eval_model
+                "_inner_eval_model": None,  # otherwise would use _inner_eval_model to create _eval_model
+            },
+        ):
+            output = super().evaluation_loop(
+                dataloader, description, prediction_loss_only, ignore_keys, metric_key_prefix, max_eval_iters
+            )
         output.metrics[f"{metric_key_prefix}/reward"] = output.metrics.pop(f"{metric_key_prefix}_loss")
 
         columns = ["Prompt", "Generated", "Reward"]
@@ -1055,6 +1306,8 @@ class PPOTrainer(Trainer):
         num_ptx_batches = len(self.ptx_dataloader)
         num_ptx_replicas = (num_prompt_only_batches + num_ptx_batches - 1) // num_ptx_batches
 
+        @ema(self.policy_trainer)
+        @ema(self.value_trainer)
         def gen_epoch_data():
             for prompt_only_batch, ptx_batch in zip(
                 self.prompt_only_dataloader,
@@ -1206,7 +1459,7 @@ class PPOTrainer(Trainer):
         # reach accumulation_steps, value trainer has the same step_control and
         # gradient_accumulation_steps as PPO trainer.
         # if (step_control + 1) % args.gradient_accumulation_steps == 0
-        return self.value_trainer.get_train_step_vars()["step_control"] == 0
+        return self.value_trainer.is_accumulation_step
 
     def get_step_loss(self, loss_prefix: str = "") -> Dict:
         rl_loss = self.policy_trainer.get_step_loss(loss_prefix)
@@ -1287,6 +1540,7 @@ class PPOTrainer(Trainer):
         self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
 
         self._globalstep_last_logged = self.state.global_step
+        metric = PPOMetric(freq=self.args.logging_steps)
 
         start_time = time.time()
         self._globalstep_last_start_time = start_time
@@ -1340,6 +1594,7 @@ class PPOTrainer(Trainer):
                 self.state.epoch = epoch + (step + 1) / steps_in_epoch
                 if self.is_step_end():
                     rl_info.update(self.get_step_loss(loss_prefix="train/"))
+                    rl_info = metric.update(rl_info)
                     # on_step_end
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                 else:
@@ -1369,21 +1624,16 @@ class PPOTrainer(Trainer):
         if self.control.should_log:
 
             logs: Dict[str, float] = {}
-
-            for k, v in tr_loss.items():
-                if isinstance(v, paddle.Tensor) and "lr" not in k and "max" not in k:
-                    v_scalar = self._nested_gather(v).mean().item()
-                    logs[k] = round(v_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
-                    v.subtract_(v)
-                    attr_name = "_total_" + k.split("/")[-1] + "_scalar"
-                    attr_value = getattr(self, attr_name, 0)
-                    setattr(self, attr_name, attr_value + v_scalar)
-                elif isinstance(v, paddle.Tensor) and "max" in k:
-                    v_scalar = self._nested_gather(v).max().item()
-                    logs[k] = v_scalar
-                else:
-                    logs[k] = float("{0:.3e}".format(v))
+            # use_ptx would double the gradient_accumulation_steps which causes
+            # actor_loss and ptx_loss reduced by half. Moreover, ptx_loss should
+            # be divided by ptx_coeff for logging.
+            if "train/ptx_loss" in tr_loss:
+                tr_loss["train/actor_loss"] = tr_loss["train/actor_loss"] * 2
+                tr_loss["train/ptx_loss"] = tr_loss["train/ptx_loss"] * 2 / self.ptx_coeff
+            logs.update(tr_loss)
             logs["global_step"] = int(self.state.global_step)
+            logs["train/actor_lr"] = float("{0:.3e}".format(self.policy_trainer._get_learning_rate()))
+            logs["train/reward_critic_lr"] = float("{0:.3e}".format(self.value_trainer._get_learning_rate()))
 
             total_train_batch_size = (
                 self.args.train_batch_size * self.args.gradient_accumulation_steps * self.args.dataset_world_size
@@ -1422,6 +1672,7 @@ class PPOTrainer(Trainer):
             min=-self.clip_range_score,
             max=self.clip_range_score,
         )
+        # TODO(guosheng): use scatter_add/put_along_axis
         batch_size = log_probs.shape[0]
         for i in range(batch_size):
             end_index = sequence_mask[i].nonzero()[-1]
@@ -1520,8 +1771,6 @@ class PPOTrainer(Trainer):
             "train/kl_divergence": kl_divergence,
             "train/mean_generated_length": mean_generated_length,
             "train/max_generated_length": max_generated_length,
-            "train/actor_lr": self.policy_trainer._get_learning_rate(),
-            "train/reward_critic_lr": self.value_trainer._get_learning_rate(),
         }
 
     def ptx_step(self, ptx_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
@@ -1579,19 +1828,9 @@ class PPOTrainer(Trainer):
         # NOTE: generation output of paddlenlp do not contain prompt, we should
         # change sequences here.
 
-        # todo, fixme zhui, self.actor_model.generate
-        if self._policy_model_eval is not None:
-            actor_model_in_use = self._policy_model_eval
-        else:
-            actor_model_in_use = self.actor_model
-
-        # state = actor_model_in_use.state_dict()
-        # for k in list(state.keys())[:3]:
-        #     print(k, state[k])
-
         self.timers and self.timers("actor-model-generate").start()
         with infer_guard(self.policy_trainer):
-            sequences = actor_model_in_use.generate(
+            sequences = self.actor_model.generate(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
@@ -1637,8 +1876,8 @@ class PPOTrainer(Trainer):
             reward_attention_mask = reward_tokenize_output["attention_mask"]
         else:
             # actor_model_in_use gen
-            for text in self.tokenizer.batch_decode(sequence, skip_special_tokens=True):
-                print(text)
+            # for text in self.tokenizer.batch_decode(sequence, skip_special_tokens=True):
+            #     print(text)
             reward_seq = sequence
             reward_attention_mask = attention_mask
         # position_ids is necessary for non-right padding
@@ -1647,21 +1886,10 @@ class PPOTrainer(Trainer):
         # (number of 0s) in source to calculate end offsets.
         position_ids = make_position_ids(attention_mask)
 
-        # todo, fixme zhui, self.actor_model forward
-        if self._policy_model_eval is not None:
-            actor_model_in_use = self._policy_model_eval
-        else:
-            actor_model_in_use = self.actor_model
-
-        if self._value_model_eval is not None:
-            reward_critic_model_in_use = self._value_model_eval
-        else:
-            reward_critic_model_in_use = self.reward_critic_model
-
         # pipe model outputs a logits tensor with LMHead, while non-pipe model
         # outputs a tuple with logits tensor as the only one element.
         self.timers and self.timers("actor-model-logit").start()
-        logits = actor_model_in_use(
+        logits = self.actor_model(
             sequence,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -1691,7 +1919,7 @@ class PPOTrainer(Trainer):
             1
         ]  # .end_scores
 
-        reward_value = reward_critic_model_in_use(
+        reward_value = self.reward_critic_model(
             sequence,
             attention_mask=attention_mask,
             position_ids=position_ids,
