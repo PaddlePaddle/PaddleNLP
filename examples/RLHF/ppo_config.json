@@ -13,8 +13,8 @@
     "repetition_penalty": 1.0,
     "num_train_epochs": 1,
     "update_iters": 1,
-    "per_device_prompt_batch_size": 16,
-    "per_device_train_batch_size": 16,
+    "per_device_prompt_batch_size": 64,
+    "per_device_train_batch_size": 64,
     "gradient_accumulation_steps": 1,
     "learning_rate": 1e-5,
     "weight_decay": 0.01,
@@ -32,7 +32,7 @@
     "clip_range_score": 50.0,
     "clip_range_value": 5.0,
     "ptx_coeff": 16.0,
-    "per_device_eval_batch_size": 16,
+    "per_device_eval_batch_size": 64,
     "logging_steps": 1,
     "evaluation_strategy": "steps",
     "eval_steps": 100,
@@ -53,6 +53,10 @@
     "max_grad_norm": 1.0, 
     "adam_beta1": 0.9,
     "adam_beta2": 0.95,
+    "overwrite_output_dir": 1,
+    "skip_profile_timer": 0,
+    "skip_memory_metric": 0,
+    "dataloader_drop_last": true,
     "eval_mode": "tensor_parallel",
-    "offload_level": "eval"
+    "offload_level": "eval optimizer"
 }
