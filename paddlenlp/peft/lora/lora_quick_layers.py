@@ -68,15 +68,20 @@ def quick_lora(
     if bias is not None:
         assert bias.stop_gradient, "When using Quick LoRA, it is necessary that bias.stop_gradient is set to True."
 
+    input_stop_gradient = input.stop_gradient
     if is_column:
         # If is_column is True, apply the LORA operation by column using the ColumnQuickLora class
-        return ColumnQuickLora.apply(input, lora_A, lora_B, weight, bias, scaling, group)
+        return ColumnQuickLora.apply(
+            input, lora_A, lora_B, weight, bias, scaling, group, input_stop_gradient=input_stop_gradient
+        )
     elif is_row:
         # If is_row is True, apply the LORA operation by row using the RowQuickLora class
-        return RowQuickLora.apply(input, lora_A, lora_B, weight, bias, scaling, group, world_size)
+        return RowQuickLora.apply(
+            input, lora_A, lora_B, weight, bias, scaling, group, world_size, input_stop_gradient=input_stop_gradient
+        )
     else:
         # If neither is_column nor is_row is True, apply the regular LORA operation using the QuickLora class
-        return QuickLora.apply(input, lora_A, lora_B, weight, bias, scaling)
+        return QuickLora.apply(input, lora_A, lora_B, weight, bias, scaling, input_stop_gradient=input_stop_gradient)
 
 
 class QuickLora(PyLayer):
@@ -89,8 +94,10 @@ class QuickLora(PyLayer):
         weight,
         bias: paddle.Tensor = None,
         scaling: float = 1.0,
+        input_stop_gradient: bool = False,
     ):
-        merged_weight = paddle.addmm(weight, lora_A, lora_B, 1.0, scaling)
+        merged_weight = paddle.addmm(weight, lora_A, lora_B, beta=1.0, alpha=scaling)
+        ctx.input_stop_gradient = input_stop_gradient
         ctx.scaling = scaling
         ctx.save_for_backward(input, weight, lora_A, lora_B)
         result = linear_func(input, merged_weight, bias)
@@ -104,9 +111,13 @@ class QuickLora(PyLayer):
         lora_B_input_grad = paddle.matmul(grad_output, lora_B, transpose_y=True)
         input_grad = None
 
-        if not input.stop_gradient:
+        if not ctx.input_stop_gradient:
             input_grad = paddle.addmm(
-                paddle.matmul(grad_output, weight, transpose_y=True), lora_B_input_grad, lora_A.T, 1.0, ctx.scaling
+                paddle.matmul(grad_output, weight, transpose_y=True),
+                lora_B_input_grad,
+                lora_A.T,
+                beta=1.0,
+                alpha=ctx.scaling,
             ).reshape(input.shape)
 
         lora_A_grad = paddle.matmul(input_fused, lora_B_input_grad, transpose_x=True) * ctx.scaling
@@ -118,10 +129,13 @@ class QuickLora(PyLayer):
 
 class ColumnQuickLora(PyLayer):
     @staticmethod
-    def forward(ctx, input, lora_A, lora_B, weight, bias=None, scaling=1.0, group=None):
-        merged_weight = paddle.addmm(weight, lora_A, lora_B, 1.0, scaling)
+    def forward(
+        ctx, input, lora_A, lora_B, weight, bias=None, scaling=1.0, group=None, input_stop_gradient: bool = False
+    ):
+        merged_weight = paddle.addmm(weight, lora_A, lora_B, beta=1.0, alpha=scaling)
         ctx.group = group
         ctx.op_type = _get_reduce_op(ReduceOp.SUM, "_c_identity")
+        ctx.input_stop_gradient = input_stop_gradient
         ctx.scaling = scaling
         ctx.save_for_backward(input, weight, lora_A, lora_B)
         result = linear_func(input, merged_weight, bias)
@@ -134,13 +148,13 @@ class ColumnQuickLora(PyLayer):
         input_fused = input.flatten(0, 1)
         lora_B_input_grad = paddle.matmul(grad_output, lora_B, transpose_y=True)
         input_grad = None
-        if not input.stop_gradient:
+        if not ctx.input_stop_gradient:
             input_grad = paddle.addmm(
                 paddle.matmul(grad_output, weight, transpose_y=True),
                 lora_B_input_grad,
                 lora_A.T,
-                1.0,
-                ctx.scaling,
+                beta=1.0,
+                alpha=ctx.scaling,
             ).reshape(input.shape)
 
         if ctx.group is not None:
@@ -154,10 +168,22 @@ class ColumnQuickLora(PyLayer):
 
 class RowQuickLora(PyLayer):
     @staticmethod
-    def forward(ctx, input, lora_A, lora_B, weight, bias=None, scaling: float = 1.0, group=None, world_size: int = 1):
+    def forward(
+        ctx,
+        input,
+        lora_A,
+        lora_B,
+        weight,
+        bias=None,
+        scaling: float = 1.0,
+        group=None,
+        world_size: int = 1,
+        input_stop_gradient: bool = False,
+    ):
         if world_size > 1 and bias is not None:
             bias = paddle.scale(bias, 1.0 / world_size)
-        merged_weight = paddle.addmm(weight, lora_A, lora_B, 1.0, scaling)
+        merged_weight = paddle.addmm(weight, lora_A, lora_B, beta=1.0, alpha=scaling)
+        ctx.input_stop_gradient = input_stop_gradient
         ctx.group = group
         ctx.scaling = scaling
         ctx.save_for_backward(input, weight, lora_A, lora_B)
@@ -174,13 +200,13 @@ class RowQuickLora(PyLayer):
         lora_B_input_grad = paddle.matmul(grad_output, lora_B, transpose_y=True)
 
         input_grad = None
-        if not input.stop_gradient:
+        if not ctx.input_stop_gradient:
             input_grad = paddle.addmm(
                 paddle.matmul(grad_output, weight, transpose_y=True),
                 lora_B_input_grad,
                 lora_A.T,
-                1.0,
-                ctx.scaling,
+                beta=1.0,
+                alpha=ctx.scaling,
             ).reshape(input.shape)
 
         lora_A_grad = paddle.matmul(input_fused, lora_B_input_grad, transpose_x=True) * ctx.scaling
