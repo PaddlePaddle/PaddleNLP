@@ -55,3 +55,14 @@ class TestExportEvalModel(TestMultipleGpus):
         }
         scripts = "tests/run_model.py"
         self.run_2gpu(scripts, **config)
+
+    def test_group_rank_guard(self):
+        config = {
+            "output_dir": "./tmp",
+            "model_name_or_path": "__internal_testing__/tiny-random-llama",
+            "tensor_parallel_degree": 2,
+            "pipeline_parallel_degree": 1,
+            "test_mode": "rank_guard",
+        }
+        scripts = "tests/run_model.py"
+        self.run_2gpu(scripts, **config)

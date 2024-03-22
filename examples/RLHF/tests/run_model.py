@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 import numpy
 import paddle
 from paddle.distributed import fleet
-from ppo_trainer import Trainer, data_group_merge, data_group_split
+from ppo_trainer import Trainer, data_group_merge, data_group_split, group_rank_guard
 
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import (
@@ -33,12 +33,35 @@ class ModelArgument:
     model_name_or_path: str = field(
         default=None, metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
+    test_mode: str = field(default="export", metadata={"help": "export data_split or rank_guard."})
+
+
+def test_group_rank_guard(group):
+    @group_rank_guard(group=group, rank=0)
+    def func():
+        tensor = paddle.randn([4, 64])
+        return tensor
+
+    t = func()
+    ret = []
+    paddle.distributed.stream.all_gather(ret, t, group=group)
+
+    for x in ret:
+        assert x._md5sum() == t._md5sum(), f"{x} {t}"
 
 
 def main():
     # Arguments
     parser = PdArgumentParser((ModelArgument, TrainingArguments))
     model_args, training_args = parser.parse_args_into_dataclasses()
+
+    hcg = fleet.get_hybrid_communicate_group()
+    pp_group = hcg.get_pipe_parallel_group()
+    tp_group = hcg.get_model_parallel_group()
+
+    if model_args.test_mode == "rank_guard":
+        test_group_rank_guard(tp_group)
+        return 0
 
     model_config = AutoConfig.from_pretrained(
         model_args.model_name_or_path,
@@ -81,10 +104,6 @@ def main():
             assert (
                 v._md5sum() == export_state[k]._md5sum()
             ), f"{k} groud_truth: {v.shape}, export: {export_state[k].shape}"
-
-        hcg = fleet.get_hybrid_communicate_group()
-        pp_group = hcg.get_pipe_parallel_group()
-        tp_group = hcg.get_model_parallel_group()
 
         split_group = tp_group
         if training_args.pipeline_parallel_degree > 1:
