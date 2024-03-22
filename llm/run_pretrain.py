@@ -437,8 +437,7 @@ def main():
             )
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
-    # config = AutoConfig.from_pretrained(model_args.model_name_or_path)
-    config = GPTConfig.from_pretrained(model_args.model_name_or_path)
+    config = AutoConfig.from_pretrained(model_args.model_name_or_path)
 
     config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
@@ -568,15 +567,6 @@ def main():
         * training_args.max_steps
         * training_args.gradient_accumulation_steps
         * data_args.max_seq_length
-    )
-
-    print("======== luqi ==========")
-    print(f"total_effective_tokens = {total_effective_tokens}")
-    print(
-        f"training_args.dataset_world_size = {training_args.dataset_world_size}, training_args.max_steps = {training_args.max_steps}"
-    )
-    print(
-        f"training_args.gradient_accumulation_steps = {training_args.gradient_accumulation_steps}, data_args.max_seq_length = {data_args.max_seq_length}"
     )
 
     trainer = PretrainingTrainer(

@@ -1,3 +1,0 @@
-SOURCE_PATH=$(realpath "./")
-export PYTHONPATH=${SOURCE_PATH}:${PYTHONPATH}
-

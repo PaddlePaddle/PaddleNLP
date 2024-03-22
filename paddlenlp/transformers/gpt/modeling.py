@@ -583,6 +583,11 @@ class GPTDecoderLayer(nn.Layer):
                 has_bias=True,
                 fuse_matmul_bias=self.config.use_fused_linear,
             )
+            
+            print("============= luqi ============")
+            print(self.linear1.linear)
+            print(type(self.linear1.linear))
+            
             self.linear2 = RowParallelLinear(
                 config.intermediate_size,
                 config.hidden_size,
