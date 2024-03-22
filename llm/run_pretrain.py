@@ -41,7 +41,6 @@ from paddlenlp.transformers import (
     AutoModelForCausalLMPipe,
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
-    GPTConfig,
     LinearAnnealingWithWarmupDecay,
     register_sequence_parallel_allreduce_hooks,
 )

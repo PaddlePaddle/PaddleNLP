@@ -13,7 +13,6 @@
 # limitations under the License.
 import paddle
 import paddle.distributed.fleet as fleet
-import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import (
     LayerDesc,
     PipelineLayer,
@@ -28,10 +27,10 @@ from .modeling import (
     GPTConfig,
     GPTDecoderLayer,
     GPTEmbeddings,
+    GPTLayerNorm,
     GPTLMHead,
     GPTPretrainedModel,
     GPTPretrainingCriterion,
-    GPTLayerNorm,
 )
 
 __all__ = [
