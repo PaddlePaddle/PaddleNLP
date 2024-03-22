@@ -13,6 +13,6 @@
 # limitations under the License.
 
 
-from .AttentionStrategies import *
-from .EmbeddingStrategies import *
-from .LongSequenceStrategies import *
+from .attention_strategies import *
+from .embedding_strategies import *
+from .long_sequence_strategies import *

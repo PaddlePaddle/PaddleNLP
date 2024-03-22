@@ -21,7 +21,7 @@ import paddle.nn.functional as F
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import map_structure
 
-from paddlenlp.transformers.LongSequenceStrategies import LongSequenceStrategies
+from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
 
 from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import PretrainedModel, register_base_model

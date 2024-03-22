@@ -14,6 +14,7 @@
 
 import math
 
+import numpy as np
 import paddle
 from paddle import Tensor, nn
 
@@ -27,7 +28,7 @@ class AttentionWithLinearBias(nn.Layer):
     def _get_interleave(self, n):
         def _get_interleave_power_of_2(n):
             start = 2 ** (-(2 ** -(math.log2(n) - 3)))
-            return [start * start**i for i in range(n)]
+            return np.array([start * start**i for i in range(n)]).astype(np.float32)
 
         if math.log2(n).is_integer():
             return _get_interleave_power_of_2(n)
@@ -42,8 +43,9 @@ class AttentionWithLinearBias(nn.Layer):
         attention_mask = bool_attention_mask.astype("float32")
         batch_size, seq_length = attention_mask.shape[0], attention_mask.shape[-1]
         slopes = paddle.to_tensor(self._get_interleave(num_heads), dtype="float32")
-        alibi = slopes.unsqueeze(axis=[1, 2]) * paddle.arange(seq_length, dtype="float32").unsqueeze(
-            axis=[0, 1]
-        ).expand([num_heads, -1, -1])
+        with paddle.amp.auto_cast(enable=False):
+            alibi = slopes.unsqueeze(axis=[1, 2]) * paddle.arange(seq_length, dtype="float32").unsqueeze(
+                axis=[0, 1]
+            ).expand([num_heads, -1, -1])
         alibi = alibi.reshape(shape=(1, num_heads, 1, seq_length)).expand([batch_size, -1, -1, -1])
         return paddle.cast(alibi, dtype)

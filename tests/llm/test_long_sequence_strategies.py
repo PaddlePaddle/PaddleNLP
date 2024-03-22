@@ -13,13 +13,17 @@
 # limitations under the License.
 from __future__ import annotations
 
+import os
+import sys
 import unittest
 
 import numpy as np
 import paddle
 from parameterized import parameterized_class
 
-from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM
+from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+
+from .testing_utils import LLMTest, argv_context_guard, load_test_config
 
 all_inputs = [
     # llama-7b
@@ -4818,7 +4822,7 @@ all_ppl = [
     [
         [
             "__internal_testing__/micro-random-llama",
-            "EmbeddingStrategies",
+            "embedding_strategies",
             "RotaryEmbedding",
             all_inputs[0],
             all_position_ids[0],
@@ -4828,7 +4832,7 @@ all_ppl = [
         ],
         [
             "__internal_testing__/micro-random-llama",
-            "EmbeddingStrategies",
+            "embedding_strategies",
             "LinearScalingRotaryEmbedding",
             all_inputs[0],
             all_position_ids[0],
@@ -4838,7 +4842,7 @@ all_ppl = [
         ],
         [
             "__internal_testing__/micro-random-llama",
-            "EmbeddingStrategies",
+            "embedding_strategies",
             "NTKScalingRotaryEmbedding",
             all_inputs[0],
             all_position_ids[0],
@@ -4848,7 +4852,7 @@ all_ppl = [
         ],
         [
             "__internal_testing__/micro-random-llama",
-            "EmbeddingStrategies",
+            "embedding_strategies",
             "DynamicNTKScalingRotaryEmbedding",
             all_inputs[0],
             all_position_ids[0],
@@ -4858,7 +4862,7 @@ all_ppl = [
         ],
         [
             "__internal_testing__/tiny-new-random-qwen-7b",
-            "EmbeddingStrategies",
+            "embedding_strategies",
             "RotaryEmbedding",
             all_inputs[1],
             all_position_ids[1],
@@ -4868,7 +4872,7 @@ all_ppl = [
         ],
         [
             "__internal_testing__/tiny-new-random-qwen-7b",
-            "EmbeddingStrategies",
+            "embedding_strategies",
             "LinearScalingRotaryEmbedding",
             all_inputs[1],
             all_position_ids[1],
@@ -4878,7 +4882,7 @@ all_ppl = [
         ],
         [
             "__internal_testing__/tiny-new-random-qwen-7b",
-            "EmbeddingStrategies",
+            "embedding_strategies",
             "NTKScalingRotaryEmbedding",
             all_inputs[1],
             all_position_ids[1],
@@ -4888,7 +4892,7 @@ all_ppl = [
         ],
         [
             "__internal_testing__/tiny-new-random-qwen-7b",
-            "EmbeddingStrategies",
+            "embedding_strategies",
             "DynamicNTKScalingRotaryEmbedding",
             all_inputs[1],
             all_position_ids[1],
@@ -4898,7 +4902,7 @@ all_ppl = [
         ],
         [
             "__internal_testing__/tiny-new-random-chatglm3-6b",
-            "EmbeddingStrategies",
+            "embedding_strategies",
             "RotaryEmbedding",
             all_inputs[2],
             all_position_ids[2],
@@ -4908,7 +4912,7 @@ all_ppl = [
         ],
         [
             "__internal_testing__/tiny-new-random-chatglm3-6b",
-            "EmbeddingStrategies",
+            "embedding_strategies",
             "LinearScalingRotaryEmbedding",
             all_inputs[2],
             all_position_ids[2],
@@ -4918,7 +4922,7 @@ all_ppl = [
         ],
         [
             "__internal_testing__/tiny-new-random-chatglm3-6b",
-            "EmbeddingStrategies",
+            "embedding_strategies",
             "NTKScalingRotaryEmbedding",
             all_inputs[2],
             all_position_ids[2],
@@ -4928,7 +4932,7 @@ all_ppl = [
         ],
         [
             "__internal_testing__/tiny-new-random-chatglm3-6b",
-            "EmbeddingStrategies",
+            "embedding_strategies",
             "DynamicNTKScalingRotaryEmbedding",
             all_inputs[2],
             all_position_ids[2],
@@ -4938,7 +4942,7 @@ all_ppl = [
         ],
         [
             "__internal_testing__/tiny-new-random-chatglm-6b",
-            "EmbeddingStrategies",
+            "embedding_strategies",
             "RotaryEmbedding",
             all_inputs[3],
             all_position_ids[3],
@@ -4948,7 +4952,7 @@ all_ppl = [
         ],
         [
             "__internal_testing__/tiny-new-random-chatglm-6b",
-            "EmbeddingStrategies",
+            "embedding_strategies",
             "LinearScalingRotaryEmbedding",
             all_inputs[3],
             all_position_ids[3],
@@ -4958,7 +4962,7 @@ all_ppl = [
         ],
         [
             "__internal_testing__/tiny-new-random-chatglm-6b",
-            "EmbeddingStrategies",
+            "embedding_strategies",
             "NTKScalingRotaryEmbedding",
             all_inputs[3],
             all_position_ids[3],
@@ -4968,7 +4972,7 @@ all_ppl = [
         ],
         [
             "__internal_testing__/tiny-new-random-chatglm-6b",
-            "EmbeddingStrategies",
+            "embedding_strategies",
             "DynamicNTKScalingRotaryEmbedding",
             all_inputs[3],
             all_position_ids[3],
@@ -4978,7 +4982,7 @@ all_ppl = [
         ],
         [
             "__internal_testing__/micro-random-llama",
-            "AttentionStrategies",
+            "attention_strategies",
             "AttentionWithLinearBias",
             all_inputs[0],
             all_position_ids[0],
@@ -4988,7 +4992,7 @@ all_ppl = [
         ],
         [
             "__internal_testing__/tiny-random-bloom",
-            "AttentionStrategies",
+            "attention_strategies",
             "AttentionWithLinearBias",
             all_inputs[4],
             all_position_ids[4],
@@ -4998,10 +5002,21 @@ all_ppl = [
         ],
     ],
 )
-class TestLongSequenceStrategiesTest(unittest.TestCase):
+class TestLongSequenceStrategiesTest(LLMTest, unittest.TestCase):
+    config_path: str = "./tests/fixtures/llm/predictor.yaml"
+    root_path = ""
+
+    def setUp(self) -> None:
+        super().setUp()
+        sys.path.insert(0, "./llm")
+
+    def disable_static(self):
+        paddle.utils.unique_name.switch()
+        paddle.disable_static()
+
     def get_model(self, model_name_or_path):
         model_config = AutoConfig.from_pretrained(model_name_or_path)
-        if self.strategy_type == "EmbeddingStrategies":
+        if self.strategy_type == "embedding_strategies":
             model_config.alibi = False
         else:
             model_config.alibi = True
@@ -5042,3 +5057,28 @@ class TestLongSequenceStrategiesTest(unittest.TestCase):
                 rtol=1e-2,
             )
         )
+
+    def test_dynamic_to_static_inference(self):
+
+        if (
+            "qwen" not in self.model_name_or_path
+            and "chatglm-6b" not in self.model_name_or_path
+            and "bloom" not in self.model_name_or_path
+        ):
+            model = self.get_model(self.model_name_or_path)
+            save_path = os.path.join(self.output_dir, self.model_name_or_path)
+            model.save_pretrained(save_path)
+            tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path)
+            if "llama" in self.model_name_or_path:
+                tokenizer.add_special_tokens({"pad_token": "[PAD]"})
+            tokenizer.save_pretrained(save_path)
+
+            self.disable_static()
+            config = load_test_config(self.config_path, "inference-to-static")
+            config["output_path"] = self.inference_output_dir
+            config["model_name_or_path"] = save_path
+
+            with argv_context_guard(config):
+                from export_model import main
+
+                main()

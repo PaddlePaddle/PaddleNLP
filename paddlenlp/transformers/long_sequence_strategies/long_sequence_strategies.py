@@ -14,7 +14,7 @@
 
 import importlib
 
-all_strategy_types = ["EmbeddingStrategies", "AttentionStrategies"]
+all_strategy_types = ["embedding_strategies", "attention_strategies"]
 
 
 class LongSequenceStrategies:
@@ -29,8 +29,8 @@ class LongSequenceStrategies:
                        ...
 
         strategy_type: "None" ---------------走原始的build-in模块
-                       "EmbeddingStrategies"、
-                       "AttentionStrategies"
+                       "embedding_strategies"、
+                       "attention_strategies"
                        ...
 
         stratety_name: "RotaryEmbedding"、
@@ -43,12 +43,12 @@ class LongSequenceStrategies:
         """
 
         """
-        paddlenlp.transformers.LongSequenceStrategies.{strategy_type<->import_class)}.{stratety_name<->strategy_class)}
-        paddlenlp.transformers.LongSequenceStrategies.{EmbeddingStrategies}.{RoPE,...}
-        paddlenlp.transformers.LongSequenceStrategies.{AttentionStrategies}.{ALiBi,...}
+        paddlenlp.transformers.long_sequence_strategies.{strategy_type<->import_class)}.{stratety_name<->strategy_class)}
+        paddlenlp.transformers.long_sequence_strategies.{embedding_strategies}.{RoPE,...}
+        paddlenlp.transformers.long_sequence_strategies.{attention_strategies}.{ALiBi,...}
         """
         try:
-            import_class = importlib.import_module(f"paddlenlp.transformers.LongSequenceStrategies.{strategy_type}")
+            import_class = importlib.import_module(f"paddlenlp.transformers.long_sequence_strategies.{strategy_type}")
         except ModuleNotFoundError:
             raise ModuleNotFoundError(
                 f"Wrong strategy type {strategy_type}. module only supports the following types: "

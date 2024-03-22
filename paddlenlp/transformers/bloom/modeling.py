@@ -26,7 +26,7 @@ from paddle.autograd import PyLayer
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
-from paddlenlp.transformers.LongSequenceStrategies import LongSequenceStrategies
+from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,

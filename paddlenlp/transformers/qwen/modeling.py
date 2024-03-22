@@ -25,7 +25,7 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import try_import
 
-from paddlenlp.transformers.LongSequenceStrategies import LongSequenceStrategies
+from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPast,
     CausalLMOutputWithPast,

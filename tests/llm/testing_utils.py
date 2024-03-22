@@ -29,7 +29,6 @@ class LLMTest:
     data_dir = "./tests/fixtures/llm/data/"
 
     def setUp(self) -> None:
-        self.root_path = "./llm"
         self.output_dir = tempfile.mkdtemp()
         self.inference_output_dir = tempfile.mkdtemp()
         sys.path.insert(0, self.root_path)
@@ -37,7 +36,6 @@ class LLMTest:
         paddle.set_default_dtype("float32")
 
     def tearDown(self) -> None:
-        sys.path.remove(self.root_path)
         shutil.rmtree(self.output_dir)
         shutil.rmtree(self.inference_output_dir)
         self.disable_static()

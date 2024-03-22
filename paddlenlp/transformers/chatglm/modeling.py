@@ -27,7 +27,7 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import map_structure
 
-from paddlenlp.transformers.LongSequenceStrategies import LongSequenceStrategies
+from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
 
 from ...utils.env import CONFIG_NAME
 from ...utils.log import logger

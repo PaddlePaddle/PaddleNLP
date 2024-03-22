@@ -119,4 +119,4 @@ class DynamicNTKScalingRotaryEmbedding(RotaryEmbedding):
         if seq_len > self.max_position_embeddings:
             self._scale_cos_sin(seq_len=seq_len, ntk_alpha=ntk_alpha)
 
-        return super().forward(seq_len)
+        return self.cos_cached[:, :], self.sin_cached[:, :]
