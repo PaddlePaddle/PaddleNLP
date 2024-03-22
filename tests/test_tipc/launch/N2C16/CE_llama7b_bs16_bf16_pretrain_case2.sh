@@ -14,12 +14,12 @@
 
 param="model_item=CE_autotuner_llama7b "
 param+="run_mode=pretrain "
-param+="device_num=N2C16"
+param+="device_num=case2_N2C16 "
 param+="global_batch_size=16 "
 param+="nnodes=2 "
-param+="modle_json_file=../llama7b_pretrain_params.json "
+param+="modle_json_file=./launch/llama7b_pretrain_params.json "
 
 cd ./tests
-bash ./test_tipc/launch/llama_pretrain/benchmark_common/prepare.sh multi
+bash ./test_tipc/launch/benchmark_common/prepare.sh multi
 
 bash -c "${param} bash ./test_tipc/launch/benchmark_common/run_benchmark.sh"
