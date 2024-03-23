@@ -1251,12 +1251,13 @@ class Trainer:
             # all_gather + mean() to get average loss over all processes
             tr_loss_scalar = self._get_item_from_loss(self._nested_gather(tr_loss).mean())
 
-            # reset tr_loss to zero
-            tr_loss.subtract_(tr_loss)
-
             logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
+            logs["loss_cur_dp"] = round(tr_loss.item(), 8)
             logs["learning_rate"] = float("{0:.3e}".format(self._get_learning_rate()))
             logs["global_step"] = int(self.state.global_step)
+
+            # reset tr_loss to zero
+            tr_loss.subtract_(tr_loss)
 
             total_train_batch_size = (
                 self.args.train_batch_size * self.args.gradient_accumulation_steps * self.args.dataset_world_size
@@ -1319,6 +1320,7 @@ class Trainer:
             self._save_checkpoint(model, metrics=metrics)
             logger.info(f"{self.runtime_timer.log()}")
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
+            self._globalstep_last_start_time = time.time()
 
     def _get_learning_rate(self):
         return self.optimizer.get_lr()
