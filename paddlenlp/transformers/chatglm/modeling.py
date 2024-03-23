@@ -17,7 +17,7 @@ from __future__ import annotations
 import math
 import re
 from functools import partial
-from typing import Any, Dict, Optional
+from typing import List, Optional
 
 import paddle
 import paddle.nn as nn
@@ -27,12 +27,14 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import map_structure
 
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithPast,
+    ModelOutput,
 )
 from .configuration import CHATGLM_PRETRAINED_RESOURCE_FILES_MAP, ChatGLMConfig
 
@@ -559,9 +561,11 @@ class ChatGLMStack(nn.Layer):
             prefix_attention_mask = (prefix_attention_mask < 0.5).astype("int64")
             attention_mask = paddle.concat((prefix_attention_mask, attention_mask), axis=3)
 
+        if attention_mask is None:
+            attention_mask = paddle.zeros(shape=[1, 1]).astype("bool")
         zero = paddle.zeros(attention_mask.shape, dtype=inputs_embeds.dtype)
         neg_inf = paddle.full_like(attention_mask, paddle.finfo(inputs_embeds.dtype).min, dtype=inputs_embeds.dtype)
-        attention_mask = paddle.where(attention_mask, zero, neg_inf)
+        attention_mask = paddle.where(attention_mask, neg_inf, zero)
 
         hidden_states = inputs_embeds
 
@@ -617,6 +621,18 @@ class ChatGLMPretrainedModel(PretrainedModel):
     def init_weights(self, layer):
         """Initialization hook"""
         return None
+
+    def get_masks(self, input_ids):
+        batch_size, seq_length = input_ids.shape
+        context_lengths = [seq.tolist().index(self.config.bos_token_id) for seq in input_ids]
+        attention_mask = paddle.ones((batch_size, seq_length, seq_length))
+        attention_mask = paddle.tril(attention_mask)
+        for i, context_length in enumerate(context_lengths):
+            attention_mask[i, :, :context_length] = 1
+        attention_mask = paddle.unsqueeze(attention_mask, 1)
+        attention_mask = (attention_mask < 0.5).astype("bool")
+
+        return attention_mask
 
     def get_position_ids(self, input_ids, mask_positions, use_gmasks=None):
         batch_size, seq_length = input_ids.shape
@@ -694,6 +710,83 @@ class ChatGLMPretrainedModel(PretrainedModel):
 
         return mappings
 
+    @classmethod
+    def _get_name_mappings(cls, config: ChatGLMConfig) -> List[StateDictNameMapping]:
+        mappings = [
+            "final_layernorm.bias",
+            "final_layernorm.weight",
+            "word_embeddings.weight",
+        ]
+
+        for layer_index in range(config.num_hidden_layers):
+            layer_mappings = [
+                [
+                    f"layers.{layer_index}.attention.dense.bias",
+                    f"layers.{layer_index}.attention.dense.bias",
+                ],
+                [
+                    f"layers.{layer_index}.attention.dense.weight",
+                    f"layers.{layer_index}.attention.dense.weight",
+                    "transpose",
+                ],
+                [
+                    f"layers.{layer_index}.attention.query_key_value.bias",
+                    f"layers.{layer_index}.attention.query_key_value.bias",
+                ],
+                [
+                    f"layers.{layer_index}.attention.query_key_value.weight",
+                    f"layers.{layer_index}.attention.query_key_value.weight",
+                    "transpose",
+                ],
+                # [
+                #    f"layers.{layer_index}.attention.rotary_emb.inv_freq",
+                #    f"layers.{layer_index}.attention.rotary_emb.inv_freq",
+                # ],
+                [
+                    f"layers.{layer_index}.input_layernorm.bias",
+                    f"layers.{layer_index}.input_layernorm.bias",
+                ],
+                [
+                    f"layers.{layer_index}.input_layernorm.weight",
+                    f"layers.{layer_index}.input_layernorm.weight",
+                ],
+                [
+                    f"layers.{layer_index}.mlp.dense_4h_to_h.bias",
+                    f"layers.{layer_index}.mlp.dense_4h_to_h.bias",
+                ],
+                [
+                    f"layers.{layer_index}.mlp.dense_4h_to_h.weight",
+                    f"layers.{layer_index}.mlp.dense_4h_to_h.weight",
+                    "transpose",
+                ],
+                [
+                    f"layers.{layer_index}.mlp.dense_h_to_4h.bias",
+                    f"layers.{layer_index}.mlp.dense_h_to_4h.bias",
+                ],
+                [
+                    f"layers.{layer_index}.mlp.dense_h_to_4h.weight",
+                    f"layers.{layer_index}.mlp.dense_h_to_4h.weight",
+                    "transpose",
+                ],
+                [
+                    f"layers.{layer_index}.post_attention_layernorm.bias",
+                    f"layers.{layer_index}.post_attention_layernorm.bias",
+                ],
+                [
+                    f"layers.{layer_index}.post_attention_layernorm.weight",
+                    f"layers.{layer_index}.post_attention_layernorm.weight",
+                ],
+            ]
+            mappings.extend(layer_mappings)
+
+        init_name_mappings(mappings)
+        for mapping in mappings:
+            mapping[0] = "transformer." + mapping[0]
+            if len(mapping) > 1 and mapping[1] is not None:
+                mapping[1] = "transformer." + mapping[1]
+        init_name_mappings(mappings)
+        return [StateDictNameMapping(*mapping) for mapping in mappings]
+
 
 @register_base_model
 class ChatGLMModel(ChatGLMPretrainedModel):
@@ -735,11 +828,6 @@ class ChatGLMModel(ChatGLMPretrainedModel):
         if input_ids is None:
             assert position_ids is not None, "`position_ids` must be explicitly specified when input_ids is None."
             assert attention_mask is not None, "`attention_mask` must be explicitly specified when input_ids is None."
-
-        if attention_mask is None or len(attention_mask.shape) != 4:
-            raise ValueError(f"attention mask should'nt be None or has size other than 4Dim. Found {attention_mask}")
-
-        attention_mask = attention_mask.astype("bool")
 
         if position_ids is None:
             MASK, gMASK = self.config.mask_token_id, self.config.gmask_token_id
@@ -819,8 +907,10 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
         if cache is not None or past_key_values is not None:
             last_token = input_ids[:, -1].unsqueeze(-1)
 
-            attention_mask = attention_mask[:, :, -1:]
-
+            if attention_mask is not None and attention_mask.dtype == paddle.bool:
+                attention_mask = attention_mask[:, :, -1:]
+            else:
+                attention_mask = None
             if position_ids is not None:
                 position_ids = position_ids[..., -1:]
             else:
@@ -847,6 +937,13 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
                 "attention_mask": attention_mask,
             }
         else:
+            if attention_mask is not None and attention_mask.dtype != paddle.bool:
+                logger.warning(f"The dtype of attention mask ({attention_mask.dtype}) is not bool")
+                attention_mask = None
+            if attention_mask is None:
+                attention_mask = self.get_masks(
+                    input_ids,
+                )
             if position_ids is None:
                 position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, use_gmasks=use_gmasks)
 
@@ -862,35 +959,47 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
         cache = map_structure(lambda x: paddle.index_select(x, beam_idx, axis=1), cache)
         return cache
 
-    def update_model_kwargs_for_generation(
-        self,
-        outputs,
-        model_kwargs: Dict[str, Any],
-        is_encoder_decoder: bool = False,
-        standardize_cache_format: bool = False,
-    ) -> Dict[str, Any]:
+    @staticmethod
+    def update_model_kwargs_for_generation(outputs, model_kwargs, is_encoder_decoder=False):
+        # Update the model inputs during generation.
+        # Note that If `token_type_ids` and `attention_mask` in `model_kwargs`
+        # and they contain pad value, the result vectors updated by this method
+        # may be different from expected. In this case, you need to rewrite the
+        # method.
+
         # update cache
-        model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else outputs["past_key_values"]
-
-        # update attention mask
-        if "attention_mask" in model_kwargs:
-            attention_mask = model_kwargs["attention_mask"]
-            if attention_mask is not None:
-                attention_mask = paddle.concat(
-                    [attention_mask, paddle.zeros([*attention_mask.shape[:3], 1], attention_mask.dtype)], axis=3
-                )
-                new_attention_mask = attention_mask[:, :, -1:].clone()
-                new_attention_mask[..., -1] = 1
-                model_kwargs["attention_mask"] = paddle.concat([attention_mask, new_attention_mask], axis=2)
-
-        # update position ids
-        if "position_ids" in model_kwargs:
+        if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
+            model_kwargs["cache"] = outputs[1]
+            model_kwargs["past_key_values"] = outputs[1]
+        if isinstance(outputs, ModelOutput) and "past_key_values" in outputs:
+            model_kwargs["cache"] = outputs.past_key_values
+            model_kwargs["past_key_values"] = outputs.past_key_values
+        if "position_ids" in model_kwargs and model_kwargs["position_ids"] is not None:
             position_ids = model_kwargs["position_ids"]
-            new_position_id = position_ids[..., -1:].clone()
-            new_position_id[:, 1, :] += 1
-            model_kwargs["position_ids"] = paddle.concat([position_ids, new_position_id], axis=-1)
+            model_kwargs["position_ids"] = paddle.concat([position_ids, position_ids[..., -1:] + 1], axis=-1)
+        # update attention_mask
+        if not is_encoder_decoder and "attention_mask" in model_kwargs:
+            attention_mask = model_kwargs["attention_mask"]
+            if attention_mask is not None and len(attention_mask.shape) == 2:
+                model_kwargs["attention_mask"] = paddle.concat(
+                    [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)], axis=-1
+                )
+            else:
+                model_kwargs["attention_mask"] = None
 
         return model_kwargs
+
+    @staticmethod
+    def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
+        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(input_ids == pad_token_id).item()
+        is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
+            (eos_token_id is not None) and (pad_token_id != eos_token_id)
+        )
+        if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
+            attention_mask = (input_ids != pad_token_id).astype(paddle.int64)
+        else:
+            attention_mask = paddle.ones_like(input_ids, dtype=paddle.int64)
+        return attention_mask
 
     def forward(
         self,
