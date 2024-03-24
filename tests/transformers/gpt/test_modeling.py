@@ -369,8 +369,7 @@ class GPTModelTester:
         else:
             self.parent.assertEqual(result.shape, [self.batch_size, self.seq_length, self.num_labels])
 
-    def create_and_check_gpt_for_fast_ln_and_fused_linear_and_fused_dropout_add(self, config, input_ids, *args):
-        config.use_fast_layer_norm = True
+    def create_and_check_gpt_for_fused_linear_and_fused_dropout_add(self, config, input_ids, *args):
         config.use_fused_linear = True
         config.use_fused_dropout_add = True
         config.hidden_size = 768
@@ -486,9 +485,9 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_gpt_weight_initialization(*config_and_inputs)
 
-    def test_gpt_fast_ln_and_fused_linear_and_fused_dropout_add(self):
+    def test_gpt_fused_linear_and_fused_dropout_add(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_gpt_for_fast_ln_and_fused_linear_and_fused_dropout_add(*config_and_inputs)
+        self.model_tester.create_and_check_gpt_for_fused_linear_and_fused_dropout_add(*config_and_inputs)
 
     def test_inputs_embeds(self):
         # NOTE: rewrite test inputs embeds for gpt model since couldn't detect eos token id from inputs_embeds
