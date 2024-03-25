@@ -55,7 +55,7 @@ from paddlenlp.transformers import (
     PretrainedModel,
     PretrainedTokenizer,
 )
-
+from paddlenlp.utils.import_utils import import_module
 # from paddlenlp.utils.import_utils import import_module, is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
@@ -252,6 +252,10 @@ class DygraphPredictor(BasePredictor):
     ):
         super().__init__(config, tokenizer)
         self.model = model
+        import_module("custom_xft_ops.xft_weight_quantize_custom")
+        import_module("custom_xft_ops.xft_compute_silu")
+        import_module("custom_xft_ops.xft_compute_resmul")
+        import_module("custom_xft_ops.xft_compute_residential")
         if config.lora_path is not None:
             lora_config = LoRAConfig.from_pretrained(config.lora_path)
             dtype = lora_config.dtype
@@ -339,6 +343,10 @@ class StaticGraphPredictor(BasePredictor):
             # set GPU configs accordingly
             inference_config.enable_use_gpu(100, 0)
         elif self.config.device == "cpu":
+            import_module("custom_xft_ops.xft_weight_quantize_custom")
+            import_module("custom_xft_ops.xft_compute_silu")
+            import_module("custom_xft_ops.xft_compute_resmul")
+            import_module("custom_xft_ops.xft_compute_residential")
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             # import pdb;pdb.set_trace()
@@ -1466,38 +1474,38 @@ def predict():
         fleet.init(is_collective=True, strategy=strategy)
 
     predictor = create_predictor(predictor_args, model_args)
-    # source_texts = []
-    # target_texts = []
-    # if model_args.data_file:
-    #     with open(model_args.data_file, "r", encoding="utf-8") as f:
-    #         for line in f:
-    #             example = json.loads(line)
-    #             source_texts.append(example["src"])
-    #             target_texts.append(example["tgt"])
-    # else:
-    #     source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
-    #     target_texts = ["", ""]
+    source_texts = []
+    target_texts = []
+    if model_args.data_file:
+        with open(model_args.data_file, "r", encoding="utf-8") as f:
+            for line in f:
+                example = json.loads(line)
+                source_texts.append(example["src"])
+                target_texts.append(example["tgt"])
+    else:
+        source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
+        target_texts = ["", ""]
 
-    # batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
-    # batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
+    batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
+    batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
 
-    # with open(model_args.output_file, "w", encoding="utf-8") as f:
-    #     for bs, batch_source_text in enumerate(batch_source_texts):
-    #         logger.info("Start predict")
-    #         outputs = predictor.predict(batch_source_text)
-    #         logger.info("End predict")
+    with open(model_args.output_file, "w", encoding="utf-8") as f:
+        for bs, batch_source_text in enumerate(batch_source_texts):
+            logger.info("Start predict")
+            outputs = predictor.predict(batch_source_text)
+            logger.info("End predict")
 
-    #         if predictor.tensor_parallel_rank > 0:
-    #             continue
-    #         for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
-    #             print("***********Source**********")
-    #             print(source)
-    #             print("***********Target**********")
-    #             print(target)
-    #             print("***********Output**********")
-    #             print(output)
-    #             out = {"src": source, "tgt": target, "output": output}
-    #             f.write(json.dumps(out, ensure_ascii=False) + "\n")
+            if predictor.tensor_parallel_rank > 0:
+                continue
+            for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
+                print("***********Source**********")
+                print(source)
+                print("***********Target**********")
+                print(target)
+                print("***********Output**********")
+                print(output)
+                out = {"src": source, "tgt": target, "output": output}
+                f.write(json.dumps(out, ensure_ascii=False) + "\n")
 
     if predictor_args.benchmark:
         benchmark(predictor, predictor_args, model_args)
@@ -1511,8 +1519,8 @@ def benchmark(predictor, predictor_args, model_args):
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
-    warmup_time = 3
-    test_time = 5
+    warmup_time = 10
+    test_time = 10
 
     print("***********Start Warmup**********")
     for i in range(warmup_time):
@@ -1520,42 +1528,42 @@ def benchmark(predictor, predictor_args, model_args):
         for _, batch_source_text in enumerate(batch_benchmark_texts):
             predictor.predict(batch_source_text)
 
-    # from paddle import profiler
+    from paddle import profiler
 
     # 创建性能分析器相关的代码
-    # def my_on_trace_ready(prof):  # 定义回调函数，性能分析器结束采集数据时会被调用
-    #     callback = profiler.export_chrome_tracing("./profiler_demo")  # 创建导出性能数据到profiler_demo文件夹的回调函数
-    #     callback(prof)  # 执行该导出函数
-    #     if predictor_args.device=="cpu":
-    #         prof.summary(sorted_by=profiler.SortedKeys.CPUTotal)  # 打印表单，按CPUTotal排序表单项
-    #     else:
-    #         prof.summary(sorted_by=profiler.SortedKeys.GPUTotal)  # 打印表单，按GPUTotal排序表单项
-    # # p = profiler.Profiler(scheduler=[3, 4], on_trace_ready=my_on_trace_ready, timer_only=False)  # 初始化Profiler对象
-    #     p = profiler.Profiler(
-    #         targets=[profiler.ProfilerTarget.CPU],
-    #         scheduler = (2, 5),
-    #         on_trace_ready = profiler.export_chrome_tracing('./log')
-    #     )
-    # paddle.device.set_device('cpu')
-    # import paddle.profiler as profiler
+    def my_on_trace_ready(prof):  # 定义回调函数，性能分析器结束采集数据时会被调用
+        callback = profiler.export_chrome_tracing("./profiler_demo")  # 创建导出性能数据到profiler_demo文件夹的回调函数
+        callback(prof)  # 执行该导出函数
+        if predictor_args.device=="cpu":
+            prof.summary(sorted_by=profiler.SortedKeys.CPUTotal)  # 打印表单，按CPUTotal排序表单项
+        else:
+            prof.summary(sorted_by=profiler.SortedKeys.GPUTotal)  # 打印表单，按GPUTotal排序表单项
+    # p = profiler.Profiler(scheduler=[3, 4], on_trace_ready=my_on_trace_ready, timer_only=False)  # 初始化Profiler对象
+        p = profiler.Profiler(
+            targets=[profiler.ProfilerTarget.CPU],
+            scheduler = (2, 5),
+            on_trace_ready = profiler.export_chrome_tracing('./log')
+        )
+    paddle.device.set_device('cpu')
+    import paddle.profiler as profiler
 
-    # p = profiler.Profiler(
-    #     targets=[profiler.ProfilerTarget.CPU],
-    #     scheduler = (3, 7),
-    #     on_trace_ready = profiler.export_chrome_tracing('./log')
-    # )
+    p = profiler.Profiler(
+        targets=[profiler.ProfilerTarget.CPU],
+        scheduler = (3, 7),
+        on_trace_ready = profiler.export_chrome_tracing('./log')
+    )
 
     print("***********Start Speed Test**********")
     start = time.perf_counter()
     output_tokens = 0
-    # p.start()
+    p.start()
     for i in range(test_time):
         print("test ", i)
         for _, batch_source_text in enumerate(batch_benchmark_texts):
             predictor.predict(batch_source_text)
             output_tokens += predictor_args.max_length * predictor_args.batch_size
-    #     p.step()
-    # p.stop()
+        p.step()
+    p.stop()
     end = time.perf_counter()
     print("Avg Elapse time is: ", (end - start) / test_time)
     print("Output tokens is: ", output_tokens)

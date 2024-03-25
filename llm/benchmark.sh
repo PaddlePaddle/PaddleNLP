@@ -26,17 +26,29 @@ export PYTHONPATH=$(dirname $(pwd)):$PYTHONPATH
 
 # python export_model.py \
 #     --model_name_or_path meta-llama/Llama-2-7b-chat \
-#     --output_path ./inference \
+#     --output_path ./inference_with_mlp \
 #     --dtype float32
 
+#dynamic
 python predictor.py \
-    --model_name_or_path ./inference \
+    --model_name_or_path ./meta-llama/Llama-2-7b-chat \
     --dtype float32 \
     --src_length 128 \
     --max_length 15 \
     --output_file "infer.json" \
     --batch_size 1 \
-    --mode "static"\
+    --mode "dynamic"\
     --benchmark True\
     --device "cpu"
 
+# #static
+# python predictor.py \
+#     --model_name_or_path ./inference_with_mlp \
+#     --dtype float32 \
+#     --src_length 128 \
+#     --max_length 15 \
+#     --output_file "infer.json" \
+#     --batch_size 1 \
+#     --mode "static"\
+#     --benchmark True\
+#     --device "cpu"

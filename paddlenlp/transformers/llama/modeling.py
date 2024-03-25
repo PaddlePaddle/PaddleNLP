@@ -190,23 +190,35 @@ def scaled_dot_product_attention(
     value_states,
     attention_mask,
     output_attentions,
+    kcache,
+    vcache,
     alibi=None,
     sequence_parallel=False,
     reshard_layer=None,
-    encoder=False,
+    past_len=0,
     self_dp_attn=None,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
-    if CPU_MODE and encoder and self_dp_attn is not None:
-        attention_mask = None
-        attn_output = self_dp_attn(query_states, key_states, value_states)
-        attn_weights = None
-        if sequence_parallel:
-            attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
-        else:
-            attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
-        return (attn_output, attn_weights) if output_attentions else attn_output
+    if CPU_MODE :
+        if past_len==0 and self_dp_attn is not None:
+            attention_mask = None
+            attn_output = self_dp_attn(query_states, key_states, value_states)
+            attn_weights = None
+            if sequence_parallel:
+                attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
+            else:
+                attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+            return (attn_output, attn_weights) if output_attentions else attn_output
+        elif past_len>0 :
+            hidden_size=num_heads*head_dim
+            scale=1/math.sqrt(head_dim)
+            attn_weights = None
+            from custom_xft_ops import  xft_attention
+            scoreBuf=paddle.zeros(shape=[bsz,num_heads,1,past_len+1],dtype=paddle.float32).cpu()
+            out,_,_=xft_attention(query_states,key_states,value_states,kcache,vcache,scoreBuf,query_states.shape,key_states.shape,hidden_size,hidden_size,scale,bsz,1,past_len)
+            attn_output = out.reshape([bsz, q_len, hidden_size])
+            return (attn_output, attn_weights) if output_attentions else attn_output
     elif config.use_flash_attention and flash_attention:
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
@@ -281,6 +293,7 @@ def scaled_dot_product_attention(
         # NOTE: we only call get_triangle_upper_mask under PP setup
         # FIXME ZHUI when we use pipeline parallel, the attention_mask can be None
         # we just make it triangle_upper_mask
+        # import pdb;pdb.set_trace()
         if attention_mask is None:
             attention_mask = get_triangle_upper_mask(attn_weights)
         attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
@@ -448,8 +461,7 @@ def xft_weight_only_linear(x, weight_quant, scale, zero_point, bias=None, bits="
         )
         return out
 
-
-class XFTWeightOnlyLinear(nn.Layer):
+class XFTGateGemm(nn.Layer):
     def __init__(
         self,
         in_features,
@@ -458,8 +470,8 @@ class XFTWeightOnlyLinear(nn.Layer):
         bias_attr=None,
         scale_attr=None,
         zero_point_attr=None,
-        name=None,
-        bits="int8",
+        sum_weight_attr=None,
+        alog="int8",
     ):
         super().__init__()
         self._dtype = self._helper.get_default_dtype()
@@ -467,8 +479,9 @@ class XFTWeightOnlyLinear(nn.Layer):
         self._bias_attr = bias_attr
         self._scale_attr = scale_attr
         self._zero_point_attr = zero_point_attr
+        self._sum_weight_attr = sum_weight_attr
         self.weight = self.create_parameter(
-            shape=[out_features, in_features],
+            shape=[in_features, out_features],
             attr=self._weight_attr,
             dtype=paddle.int8,
             is_bias=False,
@@ -492,18 +505,199 @@ class XFTWeightOnlyLinear(nn.Layer):
             dtype=paddle.float32,
             is_bias=False,
         )
+        self.sum_weight = self.create_parameter(
+            shape=[out_features],
+            attr=self._sum_weight_attr,
+            dtype=paddle.float32,
+            is_bias=False,
+        )
+        self.alog = alog
+        self.trans = False
+        self.alpha=1.0
+        self.beta=0.0
+
+    def forward(self, input):
+        from custom_xft_ops import xft_compute_silu
+        out = xft_compute_silu(input,self.weight,self.scales,self.zero_point,self.sum_weight,alog=self.alog,trans=self.trans,alpha=self.alpha,beta=self.beta)
+        return out
+    
+class XFTUpGemm(nn.Layer):
+    def __init__(
+        self,
+        in_features,
+        out_features,
+        weight_attr=None,
+        bias_attr=None,
+        scale_attr=None,
+        zero_point_attr=None,
+        sum_weight_attr=None,
+        alog="int8",
+    ):
+        super().__init__()
+        self._dtype = self._helper.get_default_dtype()
+        self._weight_attr = weight_attr
+        self._bias_attr = bias_attr
+        self._scale_attr = scale_attr
+        self._zero_point_attr = zero_point_attr
+        self._sum_weight_attr = sum_weight_attr
+        self.weight = self.create_parameter(
+            shape=[in_features, out_features],
+            attr=self._weight_attr,
+            dtype=paddle.int8,
+            is_bias=False,
+            default_initializer=nn.initializer.Constant(0),       
+            )
+        self.bias = self.create_parameter(
+            shape=[out_features],
+            attr=self._bias_attr,
+            dtype=self._dtype,
+            is_bias=True,
+        )
+        self.scales = self.create_parameter(
+            shape=[out_features],
+            attr=self._scale_attr,
+            dtype=paddle.float32,
+            is_bias=False,
+        )
+        self.zero_point = self.create_parameter(
+            shape=[out_features],
+            attr=self._zero_point_attr,
+            dtype=paddle.float32,
+            is_bias=False,
+        )
+        self.sum_weight = self.create_parameter(
+            shape=[out_features],
+            attr=self._sum_weight_attr,
+            dtype=paddle.float32,
+            is_bias=False,
+        )
+        self.alog = alog
+        self.trans = False
+        self.alpha=1.0
+        self.beta=0.0
+
+    def forward(self, input,im_input):
+        from custom_xft_ops import xft_compute_resmul
+        out = xft_compute_resmul(input,self.weight,im_input,self.scales,self.zero_point,self.sum_weight,alog="int8",trans=False,alpha=1.0,beta=0.0)
+        return out   
+
+class XFTDownGemm(nn.Layer):
+    def __init__(
+        self,
+        in_features,
+        out_features,
+        weight_attr=None,
+        bias_attr=None,
+        scale_attr=None,
+        zero_point_attr=None,
+        sum_weight_attr=None,
+        alog="int8",
+    ):
+        super().__init__()
+        self._dtype = self._helper.get_default_dtype()
+        self._weight_attr = weight_attr
+        self._bias_attr = bias_attr
+        self._scale_attr = scale_attr
+        self._zero_point_attr = zero_point_attr
+        self._sum_weight_attr = sum_weight_attr
+        self.weight = self.create_parameter(
+            shape=[in_features, out_features],
+            attr=self._weight_attr,
+            dtype=paddle.int8,
+            is_bias=False,
+            default_initializer=nn.initializer.Constant(0),
+        )
+        self.bias = self.create_parameter(
+            shape=[out_features],
+            attr=self._bias_attr,
+            dtype=self._dtype,
+            is_bias=True,
+        )
+        self.scales = self.create_parameter(
+            shape=[out_features],
+            attr=self._scale_attr,
+            dtype=paddle.float32,
+            is_bias=False,
+        )
+        self.zero_point = self.create_parameter(
+            shape=[out_features],
+            attr=self._zero_point_attr,
+            dtype=paddle.float32,
+            is_bias=False,
+        )
+        self.sum_weight = self.create_parameter(
+            shape=[out_features],
+            attr=self._sum_weight_attr,
+            dtype=paddle.float32,
+            is_bias=False,
+        )
+        self.alog = alog
+        self.trans = False
+        self.alpha=1.0
+        self.beta=0.0
+
+    def forward(self, input,im_input):
+        from custom_xft_ops import xft_compute_residential
+        out = xft_compute_residential(im_input,self.weight,input,self.scales,self.zero_point,self.sum_weight,alog=self.alog,trans=self.trans,alpha=self.alpha,beta=self.beta)
+        return out          
+
+class XFTWeightOnlyLinear(nn.Layer):
+    def __init__(
+        self,
+        in_features,
+        out_features,
+        weight_attr=None,
+        bias_attr=None,
+        scale_attr=None,
+        zero_point_attr=None,
+        sum_attr=None,
+        name=None,
+        bits="int8",
+    ):
+        super().__init__()
+        self._dtype = self._helper.get_default_dtype()
+        self._weight_attr = weight_attr
+        self._bias_attr = bias_attr
+        self._scale_attr = scale_attr
+        self._zero_point_attr = zero_point_attr
+        self._sum_attr=sum_attr
+        self.weight = self.create_parameter(
+            shape=[in_features, out_features],
+            attr=self._weight_attr,
+            dtype=paddle.int8,
+            is_bias=False,
+            default_initializer=nn.initializer.Constant(0),
+        )
+        self.bias = self.create_parameter(
+            shape=[out_features],
+            attr=self._bias_attr,
+            dtype=self._dtype,
+            is_bias=True,
+        )
+        self.scales = self.create_parameter(
+            shape=[out_features],
+            attr=self._scale_attr,
+            dtype=paddle.float32,
+            is_bias=False,
+        )
+        self.zero_point = self.create_parameter(
+            shape=[out_features],
+            attr=self._zero_point_attr,
+            dtype=paddle.float32,
+            is_bias=False,
+        )
+        self.sum_weight = self.create_parameter(
+            shape=[out_features],
+            attr=self._sum_attr,
+            dtype=paddle.float32,
+            is_bias=False,
+        )
         self.bits = bits
         self.name = name
 
     def forward(self, input):
-        out = xft_weight_only_linear(
-            x=input,
-            weight_quant=self.weight,
-            scale=self.scales,
-            zero_point=self.zero_point,
-            bias=self.bias,
-            bits=self.bits,
-        )
+        from custom_xft_ops import xft_custom_weight_only
+        out=xft_custom_weight_only(input,self.weight,self.scales,self.zero_point,self.sum_weight)
         return out
 
     def extra_repr(self):
@@ -667,26 +861,91 @@ def rotate_half(x):
 
 
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
-
-    if position_ids is None:
-        # Note: Only for LlamaForCausalLMPipe model pretraining
-        cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
-        sin = sin[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
-    else:
+    if CPU_MODE:
+        from custom_xft_ops import xft_rotary_embedding
+        head_size=q.shape[-1]
+        num_tokens=q.shape[0]*q.shape[1]
+        num_head=q.shape[-2]
+        hidden_dim=num_head*head_size
         cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
         sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
-        cos = cos[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
-        sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
-    q_embed = (q * cos) + (rotate_half(q) * sin)
-    k_embed = (k * cos) + (rotate_half(k) * sin)
+        q_embed,k_embed=xft_rotary_embedding(position_ids,q,k,cos,sin,head_size,hidden_dim,hidden_dim,num_tokens,num_head,head_size,num_head)
+    else:
+        if position_ids is None:
+            # Note: Only for LlamaForCausalLMPipe model pretraining
+            cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+            sin = sin[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+            q_embed = (q * cos) + (rotate_half(q) * sin)
+            k_embed = (k * cos) + (rotate_half(k) * sin)
+        else:
+            cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
+            sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
+            cos = cos[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
+            sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
+            q_embed = (q * cos) + (rotate_half(q) * sin)
+            k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
 
+class invokerLlamaMlp(nn.Layer):
+    def __init__(
+        self,
+        hidden_dim,
+        intermediate_size,
+        gate_weight_attr=None,
+        up_weight_attr=None,
+        down_weight_attr=None,
+        norm_weight_attr=None,
+    ):
+        super().__init__()
+        self._dtype = self._helper.get_default_dtype()
+        self.gate_weight_attr = gate_weight_attr
+        self.up_weight_attr = up_weight_attr
+        self.down_weight_attr = down_weight_attr
+        self.norm_weight_attr=norm_weight_attr
+        self.gate_weight = self.create_parameter(
+            shape=[hidden_dim, intermediate_size],
+            attr=self.gate_weight_attr,
+            dtype=paddle.float32,
+            is_bias=False,
+            default_initializer=nn.initializer.Constant(0),
+        )
+        self.up_weight = self.create_parameter(
+            shape=[hidden_dim, intermediate_size],
+            attr=self.up_weight_attr,
+            dtype=paddle.float32,
+            is_bias=False,
+            default_initializer=nn.initializer.Constant(0),
+        )
+        self.down_weight = self.create_parameter(
+            shape=[intermediate_size, hidden_dim],
+            attr=self.down_weight_attr,
+            dtype=paddle.float32,
+            is_bias=False,
+            default_initializer=nn.initializer.Constant(0),
+        )
+        self.norm_weight = self.create_parameter(
+            shape=[hidden_dim],
+            attr=self.norm_weight_attr,
+            dtype=paddle.float32,
+            is_bias=False,
+            default_initializer=nn.initializer.Constant(0),
+        )
+        self.hidden_dim=hidden_dim
+        self.intermediate_size=intermediate_size
+
+    def forward(self, input):
+        from custom_xft_ops import  xft_llama_mlp
+        seq_len=input.shape[1]
+        # paddle.save(input, "input_tensor")        
+        out2=xft_llama_mlp(input,self.gate_weight ,self.up_weight,self.down_weight,self.norm_weight,alog="int8",numtokens=seq_len,hiddensize=self.hidden_dim,intermediatesize=self.intermediate_size,outputstride=self.hidden_dim,inputstride=self.hidden_dim)
+        return out2
 
 class LlamaMLP(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
+        self.xft_llama_mlp=invokerLlamaMlp(hidden_dim= self.hidden_size,intermediate_size=self.intermediate_size)
         self.tensor_parallel_degree = config.tensor_parallel_degree
         self.fuse_attention_ffn = config.fuse_attention_ffn
 
@@ -728,25 +987,25 @@ class LlamaMLP(nn.Layer):
         else:
             if config.fuse_attention_ffn:
                 self.gate_up_fused_proj = nn.Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
+                self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
             else:
-                # if CPU_MODE:
-                #     self.gate_proj_weight_only =XFTWeightOnlyLinear(self.hidden_size, self.intermediate_size, bias_attr=False)
-                #     self.up_proj_weight_only =XFTWeightOnlyLinear(self.hidden_size, self.intermediate_size, bias_attr=False)
+                if CPU_MODE:
+                    self.gate_proj_weight_only =XFTGateGemm(in_features=self.hidden_size, out_features=self.intermediate_size, bias_attr=False)
+                    self.up_proj_weight_only =XFTUpGemm(in_features=self.hidden_size, out_features=self.intermediate_size, bias_attr=False)
+                    self.down_proj_weight_only =XFTDownGemm(in_features=self.intermediate_size, out_features=self.hidden_size, bias_attr=False)
                 self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
                 self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-            # if CPU_MODE:
-            #     self.down_proj_weight_only =XFTWeightOnlyLinear(self.intermediate_size, self.hidden_size, bias_attr=False)
             self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
 
-    def forward(self, x, encoder=False):
+    def forward(self, x,CPU_MODE=False):
         if self.fuse_attention_ffn:
             gate_out, up_out = paddle.chunk(self.gate_up_fused_proj(x), chunks=2, axis=-1)
             out = self.down_proj(F.silu(gate_out) * up_out)
         else:
-            # if CPU_MODE and encoder is False:
-            #     out = self.down_proj_weight_only(F.silu(self.gate_proj_weight_only(x)) * self.up_proj_weight_only(x))
-            # else:
-            out = self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+            if CPU_MODE:
+                out=self.xft_llama_mlp(x)
+            else:
+                out = self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
         return out
 
 
@@ -873,23 +1132,22 @@ class LlamaAttention(nn.Layer):
                     bias_attr=False,
                 )
             else:
-                # if CPU_MODE:
-                #     self.q_proj_weight_only = XFTWeightOnlyLinear(
-                #     self.hidden_size,
-                #     self.hidden_size,
-                #     bias_attr=False,
-                #     )
-                #     self.k_proj_weight_only = XFTWeightOnlyLinear(
-                #         self.hidden_size,
-                #         self.config.num_key_value_heads * self.head_dim,
-                #         bias_attr=False,
-                #     )
-                #     self.v_proj_weight_only = XFTWeightOnlyLinear(
-                #         self.hidden_size,
-                #         self.config.num_key_value_heads * self.head_dim,
-                #         bias_attr=False,
-                #     )
-
+                if CPU_MODE:
+                    self.q_proj_weight_only = XFTWeightOnlyLinear(
+                    self.hidden_size,
+                    self.hidden_size,
+                    bias_attr=False,
+                    )
+                    self.k_proj_weight_only = XFTWeightOnlyLinear(
+                        self.hidden_size,
+                        self.config.num_key_value_heads * self.head_dim,
+                        bias_attr=False,
+                    )
+                    self.v_proj_weight_only = XFTWeightOnlyLinear(
+                        self.hidden_size,
+                        self.config.num_key_value_heads * self.head_dim,
+                        bias_attr=False,
+                    )
                 self.q_proj = nn.Linear(
                     self.hidden_size,
                     self.hidden_size,
@@ -905,8 +1163,6 @@ class LlamaAttention(nn.Layer):
                     self.config.num_key_value_heads * self.head_dim,
                     bias_attr=False,
                 )
-        print("config.tensor_parallel_degree")
-        print(config.tensor_parallel_degree)
         if config.tensor_parallel_degree > 1:
             self.o_proj = RowParallelLinear(
                 self.hidden_size,
@@ -915,12 +1171,12 @@ class LlamaAttention(nn.Layer):
                 input_is_parallel=True,
             )
         else:
-            # if CPU_MODE:
-            #     self.o_proj_weight_only = XFTWeightOnlyLinear(
-            #         self.hidden_size,
-            #         self.hidden_size,
-            #         bias_attr=False,
-            #     )
+            if CPU_MODE:
+                self.o_proj_weight_only = XFTWeightOnlyLinear(
+                    self.hidden_size,
+                    self.hidden_size,
+                    bias_attr=False,
+                )
             self.o_proj = nn.Linear(
                 self.hidden_size,
                 self.hidden_size,
@@ -968,18 +1224,22 @@ class LlamaAttention(nn.Layer):
     def forward(
         self,
         hidden_states,
+        kcache,
+        vcache,
         position_ids: Optional[Tuple[paddle.Tensor]] = None,
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         attention_mask: Optional[paddle.Tensor] = None,
         output_attentions: bool = False,
         use_cache: bool = False,
         alibi: Optional[paddle.Tensor] = None,
-    ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
+        past_len:int = 0,
+    ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]],Optional[int]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
-        encoder = False
-        if past_key_value is None:
-            encoder = True
+        # encoder = False
+        # if past_key_value is None:
+        #     encoder = True
+
 
         if self.fuse_attention_qkv:
             # if CPU_MODE and encoder is False:
@@ -1011,14 +1271,14 @@ class LlamaAttention(nn.Layer):
                 mix_layer = paddle.reshape_(mix_layer, target_shape)
             query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
         else:
-            # if CPU_MODE and encoder is False:
-            #     query_states=self.q_proj_weight_only(hidden_states)
-            #     key_states=self.k_proj_weight_only(hidden_states)
-            #     value_states=self.v_proj_weight_only(hidden_states)
-            # else:
-            query_states = self.q_proj(hidden_states)
-            key_states = self.k_proj(hidden_states)
-            value_states = self.v_proj(hidden_states)
+            if CPU_MODE :
+                query_states=self.q_proj_weight_only(hidden_states)
+                key_states=self.k_proj_weight_only(hidden_states)
+                value_states=self.v_proj_weight_only(hidden_states)
+            else:
+                query_states = self.q_proj(hidden_states)
+                key_states = self.k_proj(hidden_states)
+                value_states = self.v_proj(hidden_states)
             if self.reshard_layer is not None:
                 if self.sequence_parallel:
                     assert self.seq_length % self.config.sep_parallel_degree == 0
@@ -1066,9 +1326,12 @@ class LlamaAttention(nn.Layer):
                 value_states = value_states.reshape(shape=target_key_value_shape)
 
         kv_seq_len = key_states.shape[-3]
+        batch,seq_len,num_heads,head_size=key_states.shape[0],key_states.shape[1],key_states.shape[2],key_states.shape[3]
 
-        if past_key_value is not None:
-            kv_seq_len += past_key_value[0].shape[-3]
+        # if past_key_value is not None:
+        #     kv_seq_len += past_key_value[0].shape[-3]
+        if past_len>0:
+            kv_seq_len+=past_len
 
         if self.config.rope:
             if self.reshard_layer is not None:
@@ -1090,13 +1353,18 @@ class LlamaAttention(nn.Layer):
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
-        # [bs, seq_len, num_head, head_dim]
-        if past_key_value is not None:
-            # reuse k, v, self_attention
-            key_states = paddle.concat([past_key_value[0], key_states], axis=1)
-            value_states = paddle.concat([past_key_value[1], value_states], axis=1)
+        if CPU_MODE and past_len ==0:
+            from custom_xft_ops import  write_kv_cache
+            write_kv_cache(kcache,vcache,key_states,value_states,batch,num_heads,seq_len,head_size)
 
-        past_key_value = (key_states, value_states) if use_cache else None
+
+        # # [bs, seq_len, num_head, head_dim]
+        # if past_key_value is not None:
+        #     # reuse k, v, self_attention
+        #     key_states = paddle.concat([past_key_value[0], key_states], axis=1)
+        #     value_states = paddle.concat([past_key_value[1], value_states], axis=1)
+
+        # past_key_value = (key_states, value_states) if use_cache else None
 
         if self.kv_indices is not None:
             key_states = paddle.index_select(key_states, self.kv_indices, axis=2)
@@ -1104,8 +1372,8 @@ class LlamaAttention(nn.Layer):
 
         # TODO(wj-Mcat): use broadcast strategy when n_kv_heads = 1
         # repeat k/v heads if n_kv_heads < n_heads
-        key_states = repeat_kv(key_states, self.num_key_value_groups)
-        value_states = repeat_kv(value_states, self.num_key_value_groups)
+        # key_states = repeat_kv(key_states, self.num_key_value_groups)
+        # value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (
@@ -1135,10 +1403,12 @@ class LlamaAttention(nn.Layer):
                 value_states,
                 attention_mask,
                 output_attentions,
+                kcache,
+                vcache,
                 alibi,
                 self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
-                encoder=encoder,
+                past_len=past_len,
                 self_dp_attn=self.self_dp_attn,
             )
         if output_attentions:
@@ -1148,10 +1418,10 @@ class LlamaAttention(nn.Layer):
 
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
-        # if CPU_MODE and encoder is False:
-        #     attn_output = self.o_proj_weight_only(attn_output)
-        # else:
-        attn_output = self.o_proj(attn_output)
+        if CPU_MODE :
+            attn_output = self.o_proj_weight_only(attn_output)
+        else:
+            attn_output = self.o_proj(attn_output)
 
         if not output_attentions:
             attn_weights = None
@@ -1162,7 +1432,7 @@ class LlamaAttention(nn.Layer):
             outputs += (attn_weights,)
 
         if use_cache:
-            outputs += (past_key_value,)
+            outputs += (past_key_value,kv_seq_len)
 
         if type(outputs) is tuple and len(outputs) == 1:
             outputs = outputs[0]
@@ -1189,13 +1459,16 @@ class LlamaDecoderLayer(nn.Layer):
     def forward(
         self,
         hidden_states: paddle.Tensor,
+        kcache: paddle.Tensor,
+        vcache: paddle.Tensor,
         position_ids: Optional[Tuple[paddle.Tensor]] = None,
         attention_mask: Optional[paddle.Tensor] = None,
         output_attentions: Optional[bool] = False,
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
         alibi: Optional[paddle.Tensor] = None,
-    ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
+        past_len:Optional[int] =0,
+    ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor,int]]]:
         """
         Args:
             hidden_states (`paddle.Tensor`): input to the layer of shape `(batch, seq_len, embed_dim)`
@@ -1213,9 +1486,6 @@ class LlamaDecoderLayer(nn.Layer):
         # [bs * seq_len, embed_dim] -> [seq_len * bs / n, embed_dim] (sequence_parallel)
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
-        encoder = False
-        if past_key_value is None:
-            encoder = True
         # Self Attention
         has_gradient = not hidden_states.stop_gradient
         if (
@@ -1238,12 +1508,15 @@ class LlamaDecoderLayer(nn.Layer):
         else:
             outputs = self.self_attn(
                 hidden_states,
+                kcache,
+                vcache,
                 position_ids,
                 past_key_value,
                 attention_mask,
                 output_attentions,
                 use_cache,
                 alibi,
+                past_len,
             )
 
         if type(outputs) is tuple:
@@ -1256,22 +1529,22 @@ class LlamaDecoderLayer(nn.Layer):
 
         if use_cache:
             present_key_value = outputs[2 if output_attentions else 1]
+            past_len = outputs[2]
 
         hidden_states = residual + hidden_states
-
         # Fully Connected
-        residual = hidden_states
-        hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states = self.mlp(hidden_states, encoder)
-        hidden_states = residual + hidden_states
-
+        # residual = hidden_states
+        # hidden_states = self.post_attention_layernorm(hidden_states)
+        # hidden_states = self.mlp(hidden_states)
+        # hidden_states = residual + hidden_states
+        hidden_states = self.mlp(hidden_states,True)
         outputs = (hidden_states,)
 
         if output_attentions:
             outputs += (self_attn_weights,)
 
         if use_cache:
-            outputs += (present_key_value,)
+            outputs += (present_key_value,past_len)
 
         # remove empty tuple for pipeline parallel
         if type(outputs) is tuple and len(outputs) == 1:
@@ -1460,6 +1733,9 @@ class LlamaModel(LlamaPretrainedModel):
         self.layers = nn.LayerList(
             [LlamaDecoderLayer(config, i not in self.no_recompute_layers) for i in range(config.num_hidden_layers)]
         )
+
+        self.kcache=None
+        self.vcache=None
         self.norm = LlamaRMSNorm(config)
 
         self.gradient_checkpointing = False
@@ -1537,6 +1813,7 @@ class LlamaModel(LlamaPretrainedModel):
         output_attentions=False,
         output_hidden_states=None,
         return_dict=False,
+        past_len=0,
         **kwargs,
     ):
         if self.sequence_parallel and use_cache:
@@ -1563,6 +1840,12 @@ class LlamaModel(LlamaPretrainedModel):
         if past_key_values is None:
             past_key_values = tuple([None] * len(self.layers))
 
+        if self.kcache is None:
+            self.kcache=[paddle.zeros(shape=[2048,batch_size, self.config.num_attention_heads, self.config.hidden_size// self.config.num_attention_heads],
+                                                dtype=paddle.get_default_dtype()) for _ in range(self.config.num_hidden_layers)]
+        if self.vcache is None:
+            self.vcache=[paddle.zeros(shape=[2048,batch_size, self.config.num_attention_heads, self.config.hidden_size// self.config.num_attention_heads],
+                                            dtype=paddle.get_default_dtype()) for _ in range(self.config.num_hidden_layers)]
         seq_length_with_past = seq_length
         cache_length = 0
         if past_key_values[0] is not None:
@@ -1614,11 +1897,14 @@ class LlamaModel(LlamaPretrainedModel):
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
+        next_seq_len=0
 
         for idx, (decoder_layer) in enumerate(self.layers):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
             past_key_value = past_key_values[idx] if past_key_values is not None else None
+
+            
 
             has_gradient = not hidden_states.stop_gradient
             if (
@@ -1640,12 +1926,15 @@ class LlamaModel(LlamaPretrainedModel):
             else:
                 layer_outputs = decoder_layer(
                     hidden_states,
+                    self.kcache[idx],
+                    self.vcache[idx],
                     position_ids,
                     attention_mask,
                     output_attentions,
                     past_key_value,
                     use_cache,
                     alibi=alibi,
+                    past_len=past_len,
                 )
 
             if type(layer_outputs) is tuple:
@@ -1658,6 +1947,7 @@ class LlamaModel(LlamaPretrainedModel):
 
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
+                next_seq_len=layer_outputs[2]
 
         hidden_states = self.norm(hidden_states)
 
@@ -1667,8 +1957,9 @@ class LlamaModel(LlamaPretrainedModel):
 
         next_cache = next_decoder_cache if use_cache else None
 
+
         if not return_dict:
-            return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None)
+            return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns,next_seq_len] if v is not None)
         return BaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=hidden_states,
             past_key_values=next_cache,
@@ -1746,7 +2037,13 @@ class LlamaLMHead(nn.Layer):
             vocab_size = config.vocab_size // config.tensor_parallel_degree
         else:
             vocab_size = config.vocab_size
-
+        if CPU_MODE:
+            self.xft_lmhead = XFTWeightOnlyLinear(
+                    config.hidden_size,
+                    vocab_size,
+                    bias_attr=False,
+                )
+           
         self.weight = self.create_parameter(
             shape=[config.hidden_size, vocab_size],
             dtype=paddle.get_default_dtype(),
@@ -1767,8 +2064,10 @@ class LlamaLMHead(nn.Layer):
 
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
-
-        logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
+        if CPU_MODE:
+            logits=self.xft_lmhead(hidden_states)
+        else:
+            logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         return logits
 
 
@@ -1783,105 +2082,127 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         self.lm_head = LlamaLMHead(config)
         self.criterion = LlamaPretrainingCriterion(config)
 
-    # @paddle.no_grad()
-    # def set_state_dict(self, state_dict):
-    #     super().set_state_dict(state_dict)
-    #     logger.info("Finish super")
-    #     import numpy as np
-    #     unfused_state_dict = {}
-    #     head_size = self.config.hidden_size // self.config.num_attention_heads
-    #     for idx in range(self.config.num_hidden_layers):
-    #         unfused_state_dict = {}
-    #         unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
-    #             "llama.layers.{}.self_attn.q_proj.weight".format(idx)
-    #         ]
-    #         unfused_state_dict["self_attn.k_proj.weight"] = state_dict[
-    #             "llama.layers.{}.self_attn.k_proj.weight".format(idx)
-    #         ]
-    #         unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
-    #             "llama.layers.{}.self_attn.v_proj.weight".format(idx)
-    #         ]
-    #         unfused_state_dict["self_attn.o_proj.weight"] = state_dict[
-    #             "llama.layers.{}.self_attn.o_proj.weight".format(idx)
-    #         ]
-    #         unfused_state_dict["mlp.gate_proj.weight"]=state_dict[
-    #             "llama.layers.{}.mlp.gate_proj.weight".format(idx)
-    #         ]
-    #         unfused_state_dict["mlp.down_proj.weight"]=state_dict[
-    #             "llama.layers.{}.mlp.down_proj.weight".format(idx)
-    #         ]
-    #         unfused_state_dict["mlp.up_proj.weight"]=state_dict[
-    #             "llama.layers.{}.mlp.up_proj.weight".format(idx)
-    #         ]
-    #         # unfused_state_dict["self_attn.v_proj.weight"] = np.unfused_state_dict["self_attn.v_proj.weight"].reshape(
-    #         #         3 * (self.num_attention_heads // self.config.tensor_parallel_degree) * (head_size),
-    #         #         self.hidden_size,
-    #         #     )
-    #         if CPU_MODE:
-    #             from paddle._C_ops import  xft_weight_quantize
-    #             self.bit="int8"
-    #             if self.config.fuse_attention_qkv:
-    #                 weight_quant, scale, zero_point = xft_weight_quantize(qkv_weight_tensor, "weight_only_" + self.bit)
-    #                 self.llama.layers[idx].self_attn.qkv_proj_weight_only.weight.set_value(weight_quant)
-    #                 self.llama.layers[idx].self_attn.qkv_proj_weight_only.scales.set_value(scale)
-    #                 self.llama.layers[idx].self_attn.qkv_proj_weight_only.zero_point.set_value(zero_point)
-    #             else:
-    #                 q_weight_tensor=paddle.to_tensor(unfused_state_dict["self_attn.q_proj.weight"],dtype=paddle.get_default_dtype())
-    #                 k_weight_tensor=paddle.to_tensor(unfused_state_dict["self_attn.k_proj.weight"],dtype=paddle.get_default_dtype())
-    #                 v_weight_tensor=paddle.to_tensor(unfused_state_dict["self_attn.v_proj.weight"],dtype=paddle.get_default_dtype())
-    #                 weight_quant, scale, zero_point = xft_weight_quantize(q_weight_tensor, "weight_only_" + self.bit)
-    #                 self.llama.layers[idx].self_attn.q_proj_weight_only.weight.set_value(weight_quant)
-    #                 self.llama.layers[idx].self_attn.q_proj_weight_only.scales.set_value(scale)
-    #                 self.llama.layers[idx].self_attn.q_proj_weight_only.zero_point.set_value(zero_point)
-    #                 weight_quant, scale, zero_point = xft_weight_quantize(k_weight_tensor, "weight_only_" + self.bit)
-    #                 self.llama.layers[idx].self_attn.k_proj_weight_only.weight.set_value(weight_quant)
-    #                 self.llama.layers[idx].self_attn.k_proj_weight_only.scales.set_value(scale)
-    #                 self.llama.layers[idx].self_attn.k_proj_weight_only.zero_point.set_value(zero_point)
-    #                 weight_quant, scale, zero_point = xft_weight_quantize(v_weight_tensor, "weight_only_" + self.bit)
-    #                 self.llama.layers[idx].self_attn.v_proj_weight_only.weight.set_value(weight_quant)
-    #                 self.llama.layers[idx].self_attn.v_proj_weight_only.scales.set_value(scale)
-    #                 self.llama.layers[idx].self_attn.v_proj_weight_only.zero_point.set_value(zero_point)
-    #             o_weight_tensor=paddle.to_tensor(unfused_state_dict["self_attn.o_proj.weight"],dtype=paddle.get_default_dtype())
-    #             weight_quant, scale, zero_point = xft_weight_quantize(o_weight_tensor, "weight_only_" + self.bit)
-    #             self.llama.layers[idx].self_attn.o_proj_weight_only.weight.set_value(weight_quant)
-    #             self.llama.layers[idx].self_attn.o_proj_weight_only.scales.set_value(scale)
-    #             self.llama.layers[idx].self_attn.o_proj_weight_only.zero_point.set_value(zero_point)
-    #             gate_weight_tensor=paddle.to_tensor(unfused_state_dict["mlp.gate_proj.weight"],dtype=paddle.get_default_dtype())
-    #             weight_quant, scale, zero_point = xft_weight_quantize(gate_weight_tensor, "weight_only_" + self.bit)
-    #             self.llama.layers[idx].mlp.gate_proj_weight_only.weight.set_value(weight_quant)
-    #             self.llama.layers[idx].mlp.gate_proj_weight_only.scales.set_value(scale)
-    #             self.llama.layers[idx].mlp.gate_proj_weight_only.zero_point.set_value(zero_point)
-    #             down_weight_tensor=paddle.to_tensor(unfused_state_dict["mlp.down_proj.weight"],dtype=paddle.get_default_dtype())
-    #             weight_quant, scale, zero_point = xft_weight_quantize(down_weight_tensor, "weight_only_" + self.bit)
-    #             self.llama.layers[idx].mlp.down_proj_weight_only.weight.set_value(weight_quant)
-    #             self.llama.layers[idx].mlp.down_proj_weight_only.scales.set_value(scale)
-    #             self.llama.layers[idx].mlp.down_proj_weight_only.zero_point.set_value(zero_point)
-    #             up_weight_tensor=paddle.to_tensor(unfused_state_dict["mlp.up_proj.weight"],dtype=paddle.get_default_dtype())
-    #             weight_quant, scale, zero_point = xft_weight_quantize(up_weight_tensor, "weight_only_" + self.bit)
-    #             self.llama.layers[idx].mlp.up_proj_weight_only.weight.set_value(weight_quant)
-    #             self.llama.layers[idx].mlp.up_proj_weight_only.scales.set_value(scale)
-    #             self.llama.layers[idx].mlp.up_proj_weight_only.zero_point.set_value(zero_point)
-    #         else:
-    #             if self.config.fuse_attention_qkv:
-    #                 concated_qkv_weight = (
-    #                     np.concatenate(
-    #                         [
-    #                             unfused_state_dict["self_attn.q_proj.weight"],
-    #                             unfused_state_dict["self_attn.k_proj.weight"],
-    #                             unfused_state_dict["self_attn.v_proj.weight"],
-    #                         ],
-    #                         axis=-1,
-    #                     )
-    #                     .reshape([self.config.hidden_size, 3, (self.config.num_attention_heads // self.config.tensor_parallel_degree), head_size])
-    #                     .transpose([0,2,1,3]).reshape([self.config.hidden_size,3*(self.config.num_attention_heads // self.config.tensor_parallel_degree)*head_size])
-    #                     # .reshape(
-    #                     #     3 * (self.num_attention_heads // self.config.tensor_parallel_degree) * (head_size),
-    #                     #     self.hidden_size,
-    #                     # )
-    #                 )
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict):
+        super().set_state_dict(state_dict)
+        logger.info("Finish super")
+        import numpy as np
+        unfused_state_dict = {}
+        head_size = self.config.hidden_size // self.config.num_attention_heads
+        if CPU_MODE:
+            from custom_xft_ops import xft_weight_quantize_custom
+            unfused_state_dict["lm_head.xft_lmhead.weight"]=state_dict["lm_head.weight"]
+            lmhead_tensor=paddle.to_tensor(unfused_state_dict["lm_head.xft_lmhead.weight"],dtype=paddle.get_default_dtype())
+            weight_quant, scale, zero_point,sum_weight = xft_weight_quantize_custom(lmhead_tensor,alog="int8",trans=False,vertical_split=True)
+            self.lm_head.xft_lmhead.weight.set_value(weight_quant)
+            self.lm_head.xft_lmhead.scales.set_value(scale)
+            self.lm_head.xft_lmhead.zero_point.set_value(zero_point)
+            self.lm_head.xft_lmhead.sum_weight.set_value(sum_weight)
+            for idx in range(self.config.num_hidden_layers):
+                unfused_state_dict = {}
+                unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
+                    "llama.layers.{}.self_attn.q_proj.weight".format(idx)
+                ]
+                unfused_state_dict["self_attn.k_proj.weight"] = state_dict[
+                    "llama.layers.{}.self_attn.k_proj.weight".format(idx)
+                ]
+                unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
+                    "llama.layers.{}.self_attn.v_proj.weight".format(idx)
+                ]
+                unfused_state_dict["self_attn.o_proj.weight"] = state_dict[
+                    "llama.layers.{}.self_attn.o_proj.weight".format(idx)
+                ]
+                unfused_state_dict["mlp.xft_llama_mlp.gate_weight"]=state_dict[
+                    "llama.layers.{}.mlp.gate_proj.weight".format(idx)
+                ]
+                unfused_state_dict["mlp.xft_llama_mlp.down_weight"]=state_dict[
+                    "llama.layers.{}.mlp.down_proj.weight".format(idx)
+                ]
+                unfused_state_dict["mlp.xft_llama_mlp.up_weight"]=state_dict[
+                    "llama.layers.{}.mlp.up_proj.weight".format(idx)
+                ]
+                unfused_state_dict["mlp.xft_llama_mlp.norm_weight"]=state_dict[
+                    "llama.layers.{}.post_attention_layernorm.weight".format(idx)
+                ]
+            
+                # from paddle._C_ops import  xft_weight_quantize
+                if self.config.fuse_attention_qkv:
+                    weight_quant, scale, zero_point = xft_weight_quantize(qkv_weight_tensor, "weight_only_" + self.bit)
+                    self.llama.layers[idx].self_attn.qkv_proj_weight_only.weight.set_value(weight_quant)
+                    self.llama.layers[idx].self_attn.qkv_proj_weight_only.scales.set_value(scale)
+                    self.llama.layers[idx].self_attn.qkv_proj_weight_only.zero_point.set_value(zero_point)
+                else:
+                    q_weight_tensor=paddle.to_tensor(unfused_state_dict["self_attn.q_proj.weight"],dtype=paddle.get_default_dtype())
+                    k_weight_tensor=paddle.to_tensor(unfused_state_dict["self_attn.k_proj.weight"],dtype=paddle.get_default_dtype())
+                    v_weight_tensor=paddle.to_tensor(unfused_state_dict["self_attn.v_proj.weight"],dtype=paddle.get_default_dtype())
+                    weight_quant, scale, zero_point,sum_weight = xft_weight_quantize_custom(q_weight_tensor,alog="int8",trans=False,vertical_split=True)
+                    self.llama.layers[idx].self_attn.q_proj_weight_only.weight.set_value(weight_quant)
+                    self.llama.layers[idx].self_attn.q_proj_weight_only.scales.set_value(scale)
+                    self.llama.layers[idx].self_attn.q_proj_weight_only.zero_point.set_value(zero_point)
+                    self.llama.layers[idx].self_attn.q_proj_weight_only.sum_weight.set_value(sum_weight)
+                    weight_quant, scale, zero_point,sum_weight = xft_weight_quantize_custom(k_weight_tensor,alog="int8",trans=False,vertical_split=True)
+                    self.llama.layers[idx].self_attn.k_proj_weight_only.weight.set_value(weight_quant)
+                    self.llama.layers[idx].self_attn.k_proj_weight_only.scales.set_value(scale)
+                    self.llama.layers[idx].self_attn.k_proj_weight_only.zero_point.set_value(zero_point)
+                    self.llama.layers[idx].self_attn.k_proj_weight_only.sum_weight.set_value(sum_weight)
+                    weight_quant, scale, zero_point,sum_weight = xft_weight_quantize_custom(v_weight_tensor,alog="int8",trans=False,vertical_split=True)
+                    self.llama.layers[idx].self_attn.v_proj_weight_only.weight.set_value(weight_quant)
+                    self.llama.layers[idx].self_attn.v_proj_weight_only.scales.set_value(scale)
+                    self.llama.layers[idx].self_attn.v_proj_weight_only.zero_point.set_value(zero_point)
+                    self.llama.layers[idx].self_attn.v_proj_weight_only.sum_weight.set_value(sum_weight)
+                o_weight_tensor=paddle.to_tensor(unfused_state_dict["self_attn.o_proj.weight"],dtype=paddle.get_default_dtype())
+                weight_quant, scale, zero_point,sum_weight = xft_weight_quantize_custom(o_weight_tensor,alog="int8",trans=False,vertical_split=True)
+                self.llama.layers[idx].self_attn.o_proj_weight_only.weight.set_value(weight_quant)
+                self.llama.layers[idx].self_attn.o_proj_weight_only.scales.set_value(scale)
+                self.llama.layers[idx].self_attn.o_proj_weight_only.zero_point.set_value(zero_point)
+                self.llama.layers[idx].self_attn.o_proj_weight_only.sum_weight.set_value(sum_weight)
+                gate_weight_tensor = paddle.to_tensor(unfused_state_dict["mlp.xft_llama_mlp.gate_weight"],dtype=paddle.float32)
+                self.llama.layers[idx].mlp.xft_llama_mlp.gate_weight.set_value(gate_weight_tensor)
+                up_weight_tensor = paddle.to_tensor(unfused_state_dict["mlp.xft_llama_mlp.up_weight"],dtype=paddle.float32)
+                self.llama.layers[idx].mlp.xft_llama_mlp.up_weight.set_value(up_weight_tensor)
+                down_weight_tensor = paddle.to_tensor(unfused_state_dict["mlp.xft_llama_mlp.down_weight"],dtype=paddle.float32)
+                self.llama.layers[idx].mlp.xft_llama_mlp.down_weight.set_value(down_weight_tensor)
+                norm_weight_tensor = paddle.to_tensor(unfused_state_dict["mlp.xft_llama_mlp.norm_weight"],dtype=paddle.float32)
+                self.llama.layers[idx].mlp.xft_llama_mlp.norm_weight.set_value(norm_weight_tensor)
+                # gate_weight_tensor=paddle.to_tensor(unfused_state_dict["mlp.gate_proj.weight"],dtype=paddle.get_default_dtype())
+                # weight_quant, scale, zero_point,sum_weight = xft_weight_quantize_custom(gate_weight_tensor, alog="int8",trans=False,vertical_split=True)
+                # self.llama.layers[idx].mlp.gate_proj_weight_only.weight.set_value(weight_quant)
+                # self.llama.layers[idx].mlp.gate_proj_weight_only.scales.set_value(scale)
+                # self.llama.layers[idx].mlp.gate_proj_weight_only.zero_point.set_value(zero_point)
+                # self.llama.layers[idx].mlp.gate_proj_weight_only.sum_weight.set_value(sum_weight)
+                # down_weight_tensor=paddle.to_tensor(unfused_state_dict["mlp.down_proj.weight"],dtype=paddle.get_default_dtype())
+                # weight_quant, scale, zero_point,sum_weight = xft_weight_quantize_custom(down_weight_tensor, alog="int8",trans=False,vertical_split=False)
+                # self.llama.layers[idx].mlp.down_proj_weight_only.weight.set_value(weight_quant)
+                # self.llama.layers[idx].mlp.down_proj_weight_only.scales.set_value(scale)
+                # self.llama.layers[idx].mlp.down_proj_weight_only.zero_point.set_value(zero_point)
+                # self.llama.layers[idx].mlp.down_proj_weight_only.sum_weight.set_value(sum_weight)
+                # up_weight_tensor=paddle.to_tensor(unfused_state_dict["mlp.up_proj.weight"],dtype=paddle.get_default_dtype())
+                # weight_quant, scale, zero_point, sum_weight = xft_weight_quantize_custom(up_weight_tensor, alog="int8",trans=False,vertical_split=True)
+                # self.llama.layers[idx].mlp.up_proj_weight_only.weight.set_value(weight_quant)
+                # self.llama.layers[idx].mlp.up_proj_weight_only.scales.set_value(scale)
+                # self.llama.layers[idx].mlp.up_proj_weight_only.zero_point.set_value(zero_point)
+                # self.llama.layers[idx].mlp.up_proj_weight_only.sum_weight.set_value(sum_weight)
+            # else:
+            #     if self.config.fuse_attention_qkv:
+            #         concated_qkv_weight = (
+            #             np.concatenate(
+            #                 [
+            #                     unfused_state_dict["self_attn.q_proj.weight"],
+            #                     unfused_state_dict["self_attn.k_proj.weight"],
+            #                     unfused_state_dict["self_attn.v_proj.weight"],
+            #                 ],
+            #                 axis=-1,
+            #             )
+            #             .reshape([self.config.hidden_size, 3, (self.config.num_attention_heads // self.config.tensor_parallel_degree), head_size])
+            #             .transpose([0,2,1,3]).reshape([self.config.hidden_size,3*(self.config.num_attention_heads // self.config.tensor_parallel_degree)*head_size])
+            #             # .reshape(
+            #             #     3 * (self.num_attention_heads // self.config.tensor_parallel_degree) * (head_size),
+            #             #     self.hidden_size,
+            #             # )
+            #         )
 
-    #                 qkv_weight_tensor = paddle.to_tensor(concated_qkv_weight,dtype=paddle.get_default_dtype())
-    #                 self.llama.layers[idx].self_attn.qkv_proj.weight.set_value(qkv_weight_tensor)
+            #         qkv_weight_tensor = paddle.to_tensor(concated_qkv_weight,dtype=paddle.get_default_dtype())
+            #         self.llama.layers[idx].self_attn.qkv_proj.weight.set_value(qkv_weight_tensor)
 
     def get_input_embeddings(self):
         return self.llama.embed_tokens
@@ -1902,27 +2223,39 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         return self.llama
 
     def prepare_inputs_for_generation(
-        self, input_ids, use_cache=False, past_key_values=None, inputs_embeds=None, **kwargs
+        self, input_ids, use_cache=False, past_key_values=None, inputs_embeds=None,past_len=0, **kwargs
     ):
         batch_size, seq_length = input_ids.shape
         position_ids = kwargs.get("position_ids", paddle.arange(seq_length).expand((batch_size, seq_length)))
         attention_mask = kwargs.get("attention_mask", None)
-        if past_key_values:
+        # if past_key_values:
+        #     input_ids = input_ids[:, -1].unsqueeze(axis=-1)
+        #     position_ids = position_ids[:, -1].unsqueeze(-1)
+        if past_len>0:
             input_ids = input_ids[:, -1].unsqueeze(axis=-1)
             position_ids = position_ids[:, -1].unsqueeze(-1)
-
         # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
         if inputs_embeds is not None and past_key_values is None:
             model_inputs = {"inputs_embeds": inputs_embeds}
         else:
             model_inputs = {"input_ids": input_ids}
 
+        # model_inputs.update(
+        #     {
+        #         "position_ids": position_ids,
+        #         "past_key_values": past_key_values,
+        #         "use_cache": use_cache,
+        #         "attention_mask": attention_mask,
+                
+        #     }
+        # )
         model_inputs.update(
             {
                 "position_ids": position_ids,
-                "past_key_values": past_key_values,
+                "past_key_values":past_key_values,
                 "use_cache": use_cache,
                 "attention_mask": attention_mask,
+                "past_len": past_len,
             }
         )
         return model_inputs
@@ -1939,9 +2272,10 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         # update cache
         if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
             model_kwargs["past_key_values"] = outputs[1]
+            model_kwargs["past_len"]=outputs[2]
 
-        if isinstance(outputs, CausalLMOutputWithCrossAttentions) and "past_key_values" in outputs:
-            model_kwargs["past_key_values"] = outputs.past_key_values
+        # if isinstance(outputs, CausalLMOutputWithCrossAttentions) and "past_key_values" in outputs:
+        #     model_kwargs["past_key_values"] = outputs.past_key_values
 
         # update position_ids
         if "position_ids" in model_kwargs and model_kwargs["position_ids"] is not None:
@@ -1968,6 +2302,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
+        past_len=0,
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1984,6 +2319,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            past_len=past_len,
         )
 
         hidden_states = outputs[0]  # [bs, seq_len, dim]
