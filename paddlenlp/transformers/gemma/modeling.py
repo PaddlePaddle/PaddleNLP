@@ -34,6 +34,14 @@ except ImportError:
     fused_rotary_position_embedding = None
 
 
+from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+    ColumnSequenceParallelLinear,
+    GatherOp,
+    RowSequenceParallelLinear,
+    ScatterOp,
+    mark_as_sequence_parallel_parameter,
+)
+
 from paddlenlp.transformers.conversion_utils import (
     StateDictNameMapping,
     init_name_mappings,
@@ -45,13 +53,6 @@ from paddlenlp.transformers.model_outputs import (
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
 from ..segment_parallel_utils import ReshardLayer
-from ..sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    GatherOp,
-    RowSequenceParallelLinear,
-    ScatterOp,
-    mark_as_sequence_parallel_parameter,
-)
 from .configuration import (
     GEMMA_PRETRAINED_INIT_CONFIGURATION,
     GEMMA_PRETRAINED_RESOURCE_FILES_MAP,
