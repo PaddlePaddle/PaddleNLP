@@ -364,8 +364,8 @@ class GemmaRMSNorm(nn.Layer):
         return x * paddle.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.variance_epsilon)
 
     def forward(self, x):
-        # if self.config.use_fused_rms_norm:
-        #     return rms_norm_fused(x, self.weight + 1, self.variance_epsilon)
+        if self.config.use_fused_rms_norm:
+            return rms_norm_fused(x, self.weight + 1, self.variance_epsilon)
 
         output = self._norm(x.astype(paddle.float32)).astype(x.dtype)
         return output * (self.weight + 1)
@@ -602,7 +602,6 @@ class GemmaAttention(nn.Layer):
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
-
         query_states = self.q_proj(hidden_states)
         key_states = self.k_proj(hidden_states)
         value_states = self.v_proj(hidden_states)
@@ -664,15 +663,38 @@ class GemmaAttention(nn.Layer):
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-                query_states, key_states, _ = fused_rotary_position_embedding(
-                    query_states,
-                    key_states,
-                    v=None,
-                    sin=sin,
-                    cos=cos,
-                    position_ids=position_ids,
-                    use_neox_rotary_style=False,
-                )
+                paddle_version = float(paddle.__version__[:3])
+                if ((paddle_version != 0.0) and (paddle_version <= 2.6)) and (
+                    self.num_heads != self.num_key_value_heads
+                ):
+                    query_states, _, _ = fused_rotary_position_embedding(
+                        query_states,
+                        None,
+                        None,
+                        sin=sin,
+                        cos=cos,
+                        position_ids=position_ids,
+                        use_neox_rotary_style=False,
+                    )
+                    key_states, _, _ = fused_rotary_position_embedding(
+                        key_states,
+                        None,
+                        None,
+                        sin=sin,
+                        cos=cos,
+                        position_ids=position_ids,
+                        use_neox_rotary_style=False,
+                    )
+                else:
+                    query_states, key_states, _ = fused_rotary_position_embedding(
+                        query_states,
+                        key_states,
+                        v=None,
+                        sin=sin,
+                        cos=cos,
+                        position_ids=position_ids,
+                        use_neox_rotary_style=False,
+                    )
             else:
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
@@ -1347,6 +1369,7 @@ class GemmaLMHead(nn.Layer):
             dtype=paddle.get_default_dtype(),
         )
 
+        # Must set distributed attr for Tensor Parallel !
         self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
         if self.weight.is_distributed:
             self.weight.split_axis = 1
