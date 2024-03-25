@@ -130,6 +130,16 @@ function _train(){
             echo -e "auto_tuner, SUCCESS" >> ${log_file}
         fi
     fi
+    if [[ ${model_item} =~ "buffer" ]];then
+        bash autoconfig/check_mem_usage.sh ${autoconfig_json_file} >> ${log_file} 2>&1
+        if [ $? -ne 0 ];then
+            echo -e "${model_name}, mem_usage buffer check FAIL" >> ${log_file}
+            sed '/ips/d' "$log_file" > "$log_file.tmp"
+            mv "$log_file.tmp" "$log_file" 
+        else
+            echo -e "${model_name}, mem_usage buffer check SUCCESS" >> ${log_file}
+        fi
+    fi
     #kill -9 `ps -ef|grep 'python'|awk '{print $2}'`
     if [ ${device_num} != "N1C1" -a -d ./autoconfig/best_cfg ]; then
         case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/tests/mylog

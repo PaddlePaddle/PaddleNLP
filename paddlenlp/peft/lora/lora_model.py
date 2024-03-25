@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import copy
+import gc
 import math
 import os
 import re
@@ -32,10 +33,16 @@ from paddle.distributed.fleet.meta_parallel import (
 )
 
 from ...transformers.conversion_utils import ConversionMixin
-from ...transformers.model_utils import PretrainedModel, _add_variant, dtype_guard
-from ...transformers.utils import weight_name_suffix
+from ...transformers.model_utils import (
+    PretrainedModel,
+    _add_variant,
+    _load_state_dict_into_model,
+    dtype_guard,
+    load_state_dict,
+)
+from ...transformers.utils import get_checkpoint_shard_files, weight_name_suffix
 from ...utils.distributed import distributed_gather
-from ...utils.env import LORA_WEIGHTS_NAME
+from ...utils.env import LORA_WEIGHTS_NAME, SAFE_PEFT_WEIGHTS_INDEX_NAME
 from ...utils.log import logger
 from .lora_config import LoRAConfig
 from .lora_layers import (
@@ -99,6 +106,9 @@ class LoRAModel(nn.Layer):
             )
         self.forward = self.model.forward
 
+        logger.info("Mark only lora and trainable_module as trainable.")
+        self.mark_only_lora_as_trainable()
+
     def add_lora_split_mapping(self, module_name, is_column=False):
         self.lora_split_mapping[module_name] = is_column
 
@@ -113,9 +123,51 @@ class LoRAModel(nn.Layer):
             num_attention_heads=config.num_attention_heads,
         )
 
+        rename_lora_split_mapping = {}
+        if issubclass(type(self.model), PipelineLayer):
+            # rename lora_split_mapping
+            prefixes = self.model.get_sequential_name_prefixes()
+            keys = self.lora_split_mapping.keys()
+            first_key = ""
+            for k in keys:
+                first_key = k
+                break
+            first_key = first_key.split(".")
+            use_virtual_pp_degree = first_key[0].isdigit() and first_key[1].isdigit()
+
+            for k in keys:
+                name_splited = k.split(".")
+                if use_virtual_pp_degree:
+                    if name_splited[0].isdigit():
+                        if name_splited[1].isdigit():
+                            idx = str(int(name_splited[0]) + int(name_splited[1]))
+                            single_name = [prefixes[idx]]
+                            single_name.extend(name_splited[2:])
+                        else:
+                            single_name = [prefixes[str(len(prefixes) - 1)]]
+                            single_name.extend(name_splited[2:])
+                            logger.warning(
+                                f"Please check! we treat this key as last layer, get {k}, set origin name as {'.'.join(single_name)}"
+                            )
+                    else:
+                        raise ValueError(f"Please check! {k} is not a valid key.")
+                else:
+                    idx = name_splited[0]
+                    # for normal pp layer name
+                    if idx.isdigit():
+                        single_name = [prefixes[idx]]
+                        single_name.extend(name_splited[1:])
+                    else:
+                        raise ValueError(f"Unexpected key: {k} for pp lora layer.")
+                rename_lora_split_mapping[".".join(single_name)] = self.lora_split_mapping[k]
+
+        lora_split_mapping = (
+            rename_lora_split_mapping if issubclass(type(self.model), PipelineLayer) else self.lora_split_mapping
+        )
+
         def get_tensor_parallel_split_mappings():
             final_actions = {}
-            for key, is_col in self.lora_split_mapping.items():
+            for key, is_col in lora_split_mapping.items():
                 final_actions[key] = partial(fn, is_column=is_col)
 
             return final_actions
@@ -133,6 +185,41 @@ class LoRAModel(nn.Layer):
         # define a new variable to conserve original lora_config.tensor_parallel_degree value which will update while initializing lora model
         lora_config_tensor_parallel_degree = lora_config.tensor_parallel_degree
         lora_model = cls(model, lora_config)
+
+        lora_model_index_file = os.path.join(lora_path, SAFE_PEFT_WEIGHTS_INDEX_NAME)
+        if os.path.exists(lora_model_index_file):
+            # load safetensors format file.
+            resolved_archieve_file, sharded_metadata = get_checkpoint_shard_files(
+                pretrained_model_name_or_path=lora_path,
+                index_filename=lora_model_index_file,
+            )
+            loaded_keys = sharded_metadata["all_checkpoint_keys"]
+            expected_keys = set(lora_model.get_trainable_state_dict().keys())
+
+            missing_keys = expected_keys - set(loaded_keys)
+            if len(missing_keys) > 0:
+                raise ValueError(f"missing_keys: {missing_keys}")
+
+            error_msgs = []
+            for shard_file in resolved_archieve_file:
+                pre_tensor_parallel_split = False
+                if model.config.tensor_parallel_degree > 1:
+                    pre_tensor_parallel_split = True
+                    tp_actions = lora_model._get_tensor_parallel_convert_actions(loaded_keys, is_split=True)
+                state_dict = load_state_dict(
+                    shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys
+                )
+                error_msgs += _load_state_dict_into_model(lora_model.model, state_dict, "")
+                del state_dict
+                gc.collect()
+
+            if len(error_msgs) > 0:
+                error_msg = "\n\t".join(error_msgs)
+                raise RuntimeError(
+                    f"Error(s) in loading state_dict for {lora_model.__class__.__name__}:\n\t{error_msg}"
+                )
+
+            return lora_model
 
         # define lora weight name
         if lora_config_tensor_parallel_degree > 1:
@@ -176,15 +263,9 @@ class LoRAModel(nn.Layer):
         logger.info("Load lora weight successfully")
 
     def _merge_trainable_tensor_parallel(self, trainable_state_dict):
-        trainable_name_action_mappings = self._get_tensor_parallel_mappings(self.model.config, is_split=False)
-
-        name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
-        state_keys_map = ConversionMixin._resolve_prefix_keys(
-            name_action_mappings.keys(), self.model.state_dict().keys()
+        trainable_name_action_mappings = self._get_tensor_parallel_convert_actions(
+            trainable_state_dict.keys(), is_split=False
         )
-        for k, v in state_keys_map.items():
-            if v in trainable_state_dict:
-                trainable_name_action_mappings[v] = name_action_mappings[k]
 
         hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
         mp_group = hcg.get_model_parallel_group()
@@ -206,16 +287,21 @@ class LoRAModel(nn.Layer):
 
         return trainable_state_dict
 
-    def _convert_tensor_parallel(self, lora_state_dict):
-        lora_name_action_mappings = self._get_tensor_parallel_mappings(self.model.config, is_split=False)
-
-        name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
+    def _get_tensor_parallel_convert_actions(self, loaded_keys, is_split=True, ignore_error=False, config=None):
+        if config is None:
+            config = self.model.config
+        specific_name_action_mappings = self._get_tensor_parallel_mappings(config, is_split=is_split)
+        name_action_mappings = self.model._get_tensor_parallel_mappings(config, is_split=is_split)
         state_keys_map = ConversionMixin._resolve_prefix_keys(
-            name_action_mappings.keys(), self.model.state_dict().keys()
+            name_action_mappings.keys(), self.model.state_dict().keys(), ignore_error=ignore_error
         )
         for k, v in state_keys_map.items():
-            if v in lora_state_dict.keys():
-                lora_name_action_mappings[v] = name_action_mappings[k]
+            if v in loaded_keys:
+                specific_name_action_mappings[v] = name_action_mappings[k]
+        return specific_name_action_mappings
+
+    def _convert_tensor_parallel(self, lora_state_dict):
+        lora_name_action_mappings = self._get_tensor_parallel_convert_actions(lora_state_dict.keys(), is_split=True)
 
         for name, action in lora_name_action_mappings.items():
             if name in lora_state_dict:
@@ -296,7 +382,10 @@ class LoRAModel(nn.Layer):
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
+                    rslora=lora_config.rslora,
+                    lora_plus_scale=lora_config.lora_plus_scale,
                     bias_attr=False if module.bias is None else None,
+                    use_quick_lora=lora_config.use_quick_lora,
                 )
             if isinstance(module, nn.Conv2D):
                 lora_module = LoRAConv2D(
@@ -326,12 +415,15 @@ class LoRAModel(nn.Layer):
                     r=lora_config.r,
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
+                    rslora=lora_config.rslora,
+                    lora_plus_scale=lora_config.lora_plus_scale,
                     merge_weights=lora_config.merge_weights,
                     lora_A_weight_attr=paddle.ParamAttr(
                         initializer=nn.initializer.KaimingUniform(
                             negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
                         )
                     ),
+                    use_quick_lora=lora_config.use_quick_lora,
                 )
                 # Lora column parallel will spilt lora B matrix
                 self.add_lora_split_mapping(module_name + ".lora_B", is_column=True)
@@ -351,7 +443,10 @@ class LoRAModel(nn.Layer):
                     r=lora_config.r,
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
+                    rslora=lora_config.rslora,
+                    lora_plus_scale=lora_config.lora_plus_scale,
                     merge_weights=lora_config.merge_weights,
+                    use_quick_lora=lora_config.use_quick_lora,
                 )
                 # Lora column parallel will spilt lora A matrix
                 self.add_lora_split_mapping(module_name + ".lora_A", is_column=False)

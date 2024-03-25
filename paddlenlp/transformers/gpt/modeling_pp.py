@@ -20,10 +20,12 @@ from paddle.distributed.fleet.meta_parallel import (
     SharedLayerDesc,
 )
 from paddle.distributed.fleet.utils import recompute
+from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+    mark_as_sequence_parallel_parameter,
+)
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
 
-from ..sequence_parallel_utils import mark_as_sequence_parallel_parameter
 from .modeling import (
     GPTConfig,
     GPTDecoderLayer,

@@ -44,6 +44,13 @@ except ImportError:
         return F.silu(x) * y
 
 
+from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+    ColumnSequenceParallelLinear,
+    GatherOp,
+    RowSequenceParallelLinear,
+    ScatterOp,
+    mark_as_sequence_parallel_parameter,
+)
 from paddle.utils import try_import
 
 from paddlenlp.transformers.conversion_utils import (
@@ -59,13 +66,6 @@ from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
 
 from ..segment_parallel_utils import ReshardLayer
-from ..sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    GatherOp,
-    RowSequenceParallelLinear,
-    ScatterOp,
-    mark_as_sequence_parallel_parameter,
-)
 from .configuration import (
     LLAMA_PRETRAINED_INIT_CONFIGURATION,
     LLAMA_PRETRAINED_RESOURCE_FILES_MAP,

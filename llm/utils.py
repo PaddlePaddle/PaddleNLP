@@ -149,6 +149,16 @@ def get_lora_target_modules(model):
             ".*mlp.w2.*",
             ".*mlp.c_proj.*",
         ]
+    elif model.base_model_prefix == "mixtral":
+        target_modules = [
+            ".*q_proj.*",
+            ".*k_proj.*",
+            ".*v_proj.*",
+            ".*o_proj.*",
+            ".*w1.*",
+            ".*w2.*",
+            ".*w3.*",
+        ]
     else:
         raise ValueError(f"Unknown base_model_prefix: {model.base_model_prefix}.")
     return target_modules

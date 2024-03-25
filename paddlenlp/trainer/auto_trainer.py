@@ -92,9 +92,12 @@ class AutoTrainer(Trainer):
         def _get_mesh(pp_idx=0):
             return self.global_mesh.get_mesh_with_dim("pp")[pp_idx]
 
+        # Note(lizhiyu): If the values returned by `DataLoader` don't have the format `[images, labels]`,
+        # error may occurs here.
         meshes = []
-        for pp_idx in range(self.args.pipeline_parallel_degree):
-            meshes.append(_get_mesh(pp_idx))
+        meshes.append(_get_mesh(0))
+        if self.args.pipeline_parallel_degree > 1:
+            meshes.append(_get_mesh(self.args.pipeline_parallel_degree - 1))
         return meshes
 
     def _wrap_for_dist_loader(self, train_dataloader):
@@ -109,8 +112,10 @@ class AutoTrainer(Trainer):
         dist_loader = self._wrap_for_dist_loader(train_dataloader)
 
         if self.args.to_static:
+            unified_strategy = dist.Strategy()
+            unified_strategy._from_legacy_strategy(self.args.strategy)
             return (
-                dist.to_static(model, dist_loader, self.criterion, self.optimizer, strategy=self.args.strategy),
+                dist.to_static(model, dist_loader, self.criterion, self.optimizer, strategy=unified_strategy),
                 dist_loader,
             )
         else:
@@ -388,6 +393,58 @@ class AutoTrainer(Trainer):
             drop_last=self.args.dataloader_drop_last,
         )
 
+    def compute_loss(self, model, inputs, return_outputs=False):
+        """
+        How the loss is computed by Trainer. By default, all models return the loss in the first element.
+        Subclass and override for custom behavior.
+        """
+        if self.criterion is not None:
+            if "labels" in inputs:
+                labels = inputs.pop("labels")
+            elif "start_positions" in inputs and "end_positions" in inputs:
+                labels = (inputs.pop("start_positions"), inputs.pop("end_positions"))
+            elif self.args.label_names is not None:
+                labels = []
+                for label in self.label_names:
+                    labels.append(inputs.pop(label))
+                labels = tuple(labels)
+            elif "generator_labels" in inputs:
+                labels = inputs["generator_labels"]
+        else:
+            labels = None
+
+        outputs = model(**inputs)
+
+        if self.criterion is not None:
+
+            def to_list(value):
+                if value is None:
+                    return value
+                if isinstance(value, (list, tuple)):
+                    return list(value)
+                return [value]
+
+            criterion_inputs = to_list(outputs)
+            criterion_labels = to_list(labels)
+            loss = self.criterion(*(criterion_inputs + criterion_labels))
+            outputs = (loss, outputs)
+
+        # Save past state if it exists
+        # TODO: this needs to be fixed and made cleaner later.
+        if self.args.past_index >= 0:
+            self._past = outputs[self.args.past_index]
+
+        # We don't use .loss here since the model may return tuples instead of ModelOutput.
+        loss = outputs["loss"] if isinstance(outputs, dict) else outputs
+        if isinstance(outputs, dict):
+            loss = outputs["loss"]
+        elif isinstance(outputs, tuple):
+            loss = outputs[0]
+        else:
+            loss = outputs
+
+        return (loss, outputs) if return_outputs else loss
+
     def dynamic_traning(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
@@ -438,7 +495,11 @@ class AutoTrainer(Trainer):
                 self.scaler.step(self.optimizer)
                 self.scaler.update()
                 scale_after = self.scaler._scale
-                optimizer_was_run = not self.scaler._cache_founf_inf
+                # Compatible with paddlepaddle 2.6.0 using typo word.
+                if hasattr(self.scaler, "_cache_founf_inf"):
+                    optimizer_was_run = not self.scaler._cache_founf_inf
+                else:
+                    optimizer_was_run = not self.scaler._cache_found_inf
                 if not optimizer_was_run:
                     scale_before_value = scale_before.cpu().numpy()
                     scale_after_value = scale_after.cpu().numpy()
