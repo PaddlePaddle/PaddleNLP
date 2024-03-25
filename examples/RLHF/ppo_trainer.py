@@ -58,6 +58,7 @@ from paddlenlp.trainer.trainer import (
     logger,
     speed_metrics,
 )
+from paddlenlp.trainer.utils.helper import nested_broadcast_tensor_with_empty
 from paddlenlp.utils.distributed import distributed_gather
 
 global_dev_id = 0 if paddle.get_device() == "cpu" else int(paddle.get_device().split(":")[1])
@@ -136,6 +137,23 @@ def data_group_merge(tensors, group):
     else:
         logger.warning(f"Can't parse for type {type(tensors)}")
         return tensors
+
+
+def group_rank_guard(group, rank=0):
+    def decorator(func):
+        def wrapper_func(*args, **kwargs):
+            if group.rank == rank:
+                ret = func(*args, **kwargs)
+                dist.barrier()
+            else:
+                ret = None
+                dist.barrier()
+            ret = nested_broadcast_tensor_with_empty(ret, group=group)
+            return ret
+
+        return wrapper_func
+
+    return decorator
 
 
 def repad_rl_batches(batches, input_lengths):
