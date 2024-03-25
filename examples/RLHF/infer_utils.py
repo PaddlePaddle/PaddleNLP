@@ -126,6 +126,8 @@ class Predictor:
         """inputs can be reused among multiple predictions, such as cache"""
         if hasattr(self, "cache_kvs_shape"):  # has created cache
             input_length = getattr(self, "input_length", 0)
+            # TODO(guosheng): better way to get history max cahce length, we can
+            # not get cahce length form cache tensor when not know cache layout
             if input_length <= self.config.src_length:  # reuse cahce
                 return
             else:  # create longer cache
@@ -192,7 +194,13 @@ class Predictor:
     def _preprocess(self, source):
         # make cache when infer happens to get actual shape to save memory
         self._create_caches()
-        return self._inputs_processer(source)
+        with guard_set_args(self.config, {"src_length": getattr(self, "input_length", self.config.src_length)}):
+            inputs = self._inputs_processer(source)
+        # We want to use a defined input_length to create cache and input_ids.
+        # However predictor could not use a specified length to pad currently.
+        # Thus we use this way to let get the actual input length.
+        self.infer_input_length = inputs["input_ids"].shape[-1]
+        return inputs
 
     @paddle.no_grad()
     def _infer(self, inputs):
@@ -225,6 +233,17 @@ policy_predictor: Predictor = None
 
 @contextmanager
 def infer_guard(trainer, offload_model=True):
+    # trainer might use an extra model instead of trainer.model for eval
+    eval_model = getattr(trainer, "_inner_eval_model", None)
+    model = trainer.model if eval_model is None else eval_model
+
+    # PipelineParallel does not support inference speedup
+    if not getattr(trainer, "use_fusemt", False) or isinstance(
+        model, (dist.fleet.meta_parallel.PipelineLayer, dist.fleet.model.PipelineParallel)
+    ):
+        yield
+        return
+
     try:
         try_import("paddlenlp_ops")
     except:
@@ -233,9 +252,6 @@ def infer_guard(trainer, offload_model=True):
         return
 
     global policy_predictor
-    # trainer might use an extra model instead of trainer.model for eval
-    eval_model = getattr(trainer, "_inner_eval_model", None)
-    model = trainer.model if eval_model is None else eval_model
     if policy_predictor is None:
         policy_predictor = Predictor.create_predictor(trainer)
     if not policy_predictor.is_available:
@@ -301,9 +317,26 @@ class InferEvalModel:
                 # "chat_template": None
             },
         ):
+            # NOTE: right padding in predictor according to prompt might have a
+            # different length with input_ids, espically when input_ids has more
+            # paddings than the necessary. Thus pass input_length to predictor to:
+            # 1. use a consistent length to replace input_ids back to output to
+            #    keep the same padding format. however predictor could not use a
+            #    specified length to pad currently
+            # 2. allow to use a dynamic length for memory efficiency (by a smaller
+            #    cache)
             policy_predictor.input_length = input_ids.shape[-1]
             outputs = policy_predictor.predict(prompts)
-        outputs = (outputs[0][:, input_ids.shape[-1] :],) if generation_config.trunc_input else (outputs[0],)
+
+        if generation_config.trunc_input:
+            outputs = (outputs[0][:, policy_predictor.infer_input_length :],)
+            return outputs
+
+        if policy_predictor.input_length != policy_predictor.infer_input_length:
+            outputs = (paddle.concat([input_ids, outputs[0][:, policy_predictor.infer_input_length :]], axis=-1),)
+            return outputs
+
+        outputs = (outputs[0],)
         if self.tokenizer.padding_side == "left":
             # convert back to left padding inputs
             outputs[0][:, : input_ids.shape[-1]] = input_ids

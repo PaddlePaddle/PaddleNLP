@@ -82,7 +82,7 @@ def reload_tensor_to_gpu(tensors):
         for _, v in tensors.items():
             reload_tensor_to_gpu(v)
     elif isinstance(tensors, paddle.Tensor):
-        if not tensors.place.is_gpu_place():
+        if tensors._is_initialized() and not tensors.place.is_gpu_place():
             gpu_tensor = tensors._copy_to(paddle.CUDAPlace(global_dev_id), False)
             tensors.value().get_tensor()._share_data_with(gpu_tensor.value().get_tensor())
     else:
@@ -472,6 +472,7 @@ class StepTrainer(Trainer):
         if getattr(self, "loss_cls", None) and self.criterion is None:
             self.criterion = self.create_criterion()
 
+        self.use_fusemt = getattr(args, "use_fusemt", False)
         # ablout 4s slower than infer generation without ema
         self.use_ema = getattr(args, "use_ema", False)
         self.shard_ema = getattr(args, "shard_ema", False)
@@ -766,7 +767,6 @@ class StepTrainer(Trainer):
             if sharding_size > 1 and shard_ema
             else None
         )
-        # print("=" * 20, "structured_names", structured_names)
         # for pipeline model, use `model.state_dict()` would auto map param name
         # for name, p in self.model.named_parameters():
         for name, p in self.model.state_dict().items():
@@ -774,7 +774,6 @@ class StepTrainer(Trainer):
                 ema_p = p.detach().cast(dtype=paddle.float32)
                 if offload_ema:
                     ema_p = ema_p.pin_memory()
-                # print("="*20, "ema name", name)
                 self.ema_state_dict[name] = ema_p
             if offload_model:
                 cpu_p = p.pin_memory()
@@ -1306,8 +1305,6 @@ class PPOTrainer(Trainer):
         num_ptx_batches = len(self.ptx_dataloader)
         num_ptx_replicas = (num_prompt_only_batches + num_ptx_batches - 1) // num_ptx_batches
 
-        @ema(self.policy_trainer)
-        @ema(self.value_trainer)
         def gen_epoch_data():
             for prompt_only_batch, ptx_batch in zip(
                 self.prompt_only_dataloader,
@@ -1317,63 +1314,65 @@ class PPOTrainer(Trainer):
                 self.set_eval()
 
                 # self.optimizer.offload()
-                if self.args.eval_mode is not None and "optimizer" in self.args.offload_level:
-                    self.timers and self.timers("offload-optimizer").start()
-                    offload_tensor_to_cpu(self.policy_trainer.optimizer.state_dict())
-                    offload_tensor_to_cpu(self.value_trainer.optimizer.state_dict())
-                    self.timers and self.timers("offload-optimizer").stop()
+                # if self.args.eval_mode is not None and "optimizer" in self.args.offload_level:
+                #     self.timers and self.timers("offload-optimizer").start()
+                #     offload_tensor_to_cpu(self.policy_trainer.optimizer.state_dict())
+                #     offload_tensor_to_cpu(self.value_trainer.optimizer.state_dict())
+                #     self.timers and self.timers("offload-optimizer").stop()
 
-                self.timers and self.timers("export-evaluate-model").start()
+                with ema(self.policy_trainer), ema(self.value_trainer):
+                    if self.args.eval_mode is not None:
+                        self.timers and self.timers("export-evaluate-model").start()
 
-                self.policy_trainer.export_evaluate_model(
-                    self.policy_trainer.model,
-                    self._policy_model_eval,
-                    with_offload="train_model" in self.args.offload_level,
-                )
-                gp = (
-                    self.policy_trainer._policy_model_eval_group
-                    if hasattr(self.policy_trainer, "_policy_model_eval_group")
-                    else None
-                )
-                # gp = create_data_trans_group(self.args.logical_process_index, paddle.distributed.get_rank(), self._policy_model_eval.config.tensor_parallel_degree)
-                # # todo: zhui
-                self.value_trainer.export_evaluate_model(
-                    self.value_trainer.model,
-                    self._value_model_eval,
-                    with_offload="train_model" in self.args.offload_level,
-                )
-                self.timers and self.timers("export-evaluate-model").stop()
+                        self.policy_trainer.export_evaluate_model(
+                            self.policy_trainer.model,
+                            self._policy_model_eval,
+                            with_offload="train_model" in self.args.offload_level,
+                        )
+                        self.value_trainer.export_evaluate_model(
+                            self.value_trainer.model,
+                            self._value_model_eval,
+                            with_offload="train_model" in self.args.offload_level,
+                        )
+                    gp = (
+                        self.policy_trainer._policy_model_eval_group
+                        if hasattr(self.policy_trainer, "_policy_model_eval_group")
+                        else None
+                    )
+                    # gp = create_data_trans_group(self.args.logical_process_index, paddle.distributed.get_rank(), self._policy_model_eval.config.tensor_parallel_degree)
+                    # # todo: zhui
+                    self.timers and self.timers("export-evaluate-model").stop()
 
-                # self.reference_model.reload()
-                # self.reward_model.reload()
-                if "reward" in self.args.offload_level:
-                    self.timers and self.timers("reload-reward").start()
-                    reload_tensor_to_gpu(self.reference_model.state_dict())
-                    reload_tensor_to_gpu(self.reward_model.state_dict())
-                    self.timers and self.timers("reload-reward").stop()
+                    # self.reference_model.reload()
+                    # self.reward_model.reload()
+                    if "reward" in self.args.offload_level:
+                        self.timers and self.timers("reload-reward").start()
+                        reload_tensor_to_gpu(self.reference_model.state_dict())
+                        reload_tensor_to_gpu(self.reward_model.state_dict())
+                        self.timers and self.timers("reload-reward").stop()
 
-                # todo, split prompt_only_batch
-                # pp2tp2dp2 -> dp4tp2 prompt_only_batch
-                self.timers and self.timers("resplit-data").start()
-                prompt_only_batch = data_group_split(prompt_only_batch, group=gp)
-                self.timers and self.timers("resplit-data").stop()
+                    # todo, split prompt_only_batch
+                    # pp2tp2dp2 -> dp4tp2 prompt_only_batch
+                    self.timers and self.timers("resplit-data").start()
+                    prompt_only_batch = data_group_split(prompt_only_batch, group=gp)
+                    self.timers and self.timers("resplit-data").stop()
 
-                self.timers and self.timers("split-rl-micro-batches").start()
-                # 生成数据
-                # per_train 4, accu 8
-                # prompt 32
+                    self.timers and self.timers("split-rl-micro-batches").start()
+                    # 生成数据
+                    # per_train 4, accu 8
+                    # prompt 32
 
-                # 32? [4,4,4,4,4,4,4]
-                rl_batches = self.split_rl_micro_batches(prompt_only_batch)
-                # rl_batches = self.load_sing_gen_data(as_batches=True,
-                #                                      use_counter=True)
-                self.timers and self.timers("split-rl-micro-batches").stop()
+                    # 32? [4,4,4,4,4,4,4]
+                    rl_batches = self.split_rl_micro_batches(prompt_only_batch)
+                    # rl_batches = self.load_sing_gen_data(as_batches=True,
+                    #                                      use_counter=True)
+                    self.timers and self.timers("split-rl-micro-batches").stop()
 
                 self.timers and self.timers("ptx-batch").start()
                 if self.use_ptx:
-                    ptx_batch = data_group_split(ptx_batch, group=gp)
+                    # ptx_batch = data_group_split(ptx_batch, group=gp)
                     ptx_batches = self.split_ptx_micro_batches(ptx_batch)
-                    ptx_batches = data_group_merge(ptx_batches, group=gp)
+                    # ptx_batches = data_group_merge(ptx_batches, group=gp)
                 else:
                     ptx_batches = [None for _ in range(len(rl_batches))]
 
@@ -1399,7 +1398,7 @@ class PPOTrainer(Trainer):
                 # policy_model_eval.cleanup()
                 # value_model_eval.cleanup()
                 if self.args.offload_level is not None:
-                    if "eval" in self.args.offload_level:
+                    if self.args.eval_mode is not None and "eval" in self.args.offload_level:
                         self.timers and self.timers("offload-eval").start()
                         cleanup_tensor_space(self._policy_model_eval.state_dict())
                         cleanup_tensor_space(self._value_model_eval.state_dict())
@@ -1805,18 +1804,21 @@ class PPOTrainer(Trainer):
         total_batch_size = prompt_only_batch["input_ids"].shape[0]
         micro_batch_size = self.args.per_device_train_batch_size
         micro_batches = []
-        for i in range(0, total_batch_size, micro_batch_size):
-            micro_batch = {}
-            micro_batch = map_structure(
-                lambda tensor: tensor[i : i + micro_batch_size],
-                prompt_only_batch,
-            )
-            micro_batches.extend(self.rollout(micro_batch))
-
+        with infer_guard(self.policy_trainer):
+            for i in range(0, total_batch_size, micro_batch_size):
+                micro_batch = {}
+                micro_batch = map_structure(
+                    lambda tensor: tensor[i : i + micro_batch_size],
+                    prompt_only_batch,
+                )
+                micro_batches.extend(self.generate(micro_batch))
+        # size of micro_batches (num of training batch) would be:
+        # per_device_prompt_batch_size * num_return_sequences // per_device_train_batch_size
+        micro_batches = [self.post_rollout(*micro_batch) for micro_batch in micro_batches]
         return micro_batches
 
     @paddle.no_grad()
-    def rollout(self, prompt_only_batch: PromptOnlyBatch) -> List[Dict[str, Any]]:
+    def generate(self, prompt_only_batch: PromptOnlyBatch) -> List[Dict[str, Any]]:
         """Rollout a batch of experiences."""
         input_ids = prompt_only_batch["input_ids"]
         attention_mask = prompt_only_batch["attention_mask"]
@@ -1829,27 +1831,23 @@ class PPOTrainer(Trainer):
         # change sequences here.
 
         self.timers and self.timers("actor-model-generate").start()
-        with infer_guard(self.policy_trainer):
-            sequences = self.actor_model.generate(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
-                generation_config=self.generation_config,
-                synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
-            )[0]
+        sequences = self.actor_model.generate(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            generation_config=self.generation_config,
+            synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
+        )[0]
 
         self.timers and self.timers("actor-model-generate").stop()
         sequences = sequences.reshape([input_ids.shape[0], self.args.num_return_sequences, -1]).transpose([1, 0, 2])
 
+        # prompt, sequence, attention_mask
         return [
-            # TODO(guosheng): move post_rollout out to split_rl_micro_batches
-            # to allow infer model generate multi times consecutively and then
-            # convert weights, otherwise we have to convert weights multi times
-            # when need multi batch rollout data.
-            self.post_rollout(
+            (
                 input_ids,
                 seq,
-                attention_mask=paddle.logical_and(
+                paddle.logical_and(
                     seq != self.tokenizer.pad_token_id,
                     seq != self.tokenizer.unk_token_id,
                 ),
