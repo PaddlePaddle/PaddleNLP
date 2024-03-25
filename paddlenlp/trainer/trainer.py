@@ -921,6 +921,7 @@ class Trainer:
                         steps_trained_progress_bar.update(1)
                     if steps_trained_in_current_epoch == 0:
                         self._load_rng_state(resume_from_checkpoint)
+                    self.timers and self.timers("read-data").start()
                     continue
                 elif steps_trained_progress_bar is not None:
                     steps_trained_progress_bar.close()
@@ -2305,7 +2306,8 @@ class Trainer:
         checkpoints_to_be_deleted = checkpoints_sorted[:number_of_checkpoints_to_delete]
         for checkpoint in checkpoints_to_be_deleted:
             logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
-            shutil.rmtree(checkpoint)
+            # ignore_errors for shared disks between train nodes.
+            shutil.rmtree(checkpoint, ignore_errors=True)
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
         output_dir = output_dir if output_dir is not None else self.args.output_dir
@@ -2456,6 +2458,7 @@ class Trainer:
             # Load in optimizer and scheduler states
             self.optimizer.set_state_dict(opt_state_dict)
         else:
+            optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             raise ValueError(f"optimizer-state-dict not found, opt: {os.path.join(checkpoint, optimizer_name)}.")
 
         if not self.args.ignore_load_lr_and_optim:

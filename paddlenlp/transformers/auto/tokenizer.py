@@ -150,7 +150,7 @@ class AutoTokenizer:
     _tokenizer_mapping = MAPPING_NAMES
     _name_mapping = TOKENIZER_MAPPING_NAMES
     _fast_name_mapping = FAST_TOKENIZER_MAPPING_NAMES
-    tokenizer_config_file = ["tokenizer_config.json", "config.json", "model_config.json"]
+    tokenizer_config_file = "tokenizer_config.json"
 
     def __init__(self, *args, **kwargs):
         raise EnvironmentError(
@@ -329,8 +329,7 @@ class AutoTokenizer:
             from_hf_hub=from_hf_hub,
             from_aistudio=from_aistudio,
         )
-
-        if os.path.exists(config_file):
+        if config_file is not None and os.path.exists(config_file):
             tokenizer_class = cls._get_tokenizer_class_from_config(
                 pretrained_model_name_or_path, config_file, use_fast
             )

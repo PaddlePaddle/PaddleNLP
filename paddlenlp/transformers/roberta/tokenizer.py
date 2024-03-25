@@ -612,7 +612,9 @@ class RobertaTokenizer:
                 from_aistudio=from_aistudio,
                 from_hf_hub=from_hf_hub,
             )
-            assert resolved_config_file is not None
+            assert (
+                resolved_config_file is not None
+            ), f"please make sure {cls.tokenizer_config_file} under {pretrained_model_name_or_path}"
 
             with io.open(resolved_config_file, encoding="utf-8") as f:
                 init_kwargs = json.load(f)

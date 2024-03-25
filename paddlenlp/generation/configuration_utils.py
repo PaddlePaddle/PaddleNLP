@@ -142,7 +142,12 @@ class GenerationConfig:
     def __init__(self, **kwargs):
         # Parameters that control the length of the output
         self.max_new_tokens = kwargs.get("max_new_tokens", DEFAULT_MAX_NEW_TOKENS)
-        self.min_new_token = kwargs.pop("min_new_token", 0)
+
+        if "min_new_token" in kwargs:
+            logger.warning("<min_new_token> field is deprecated. Please use <min_new_tokens> instead.")
+            kwargs["min_new_tokens"] = kwargs.pop("min_new_token")
+
+        self.min_new_tokens = kwargs.pop("min_new_tokens", 0)
         self.max_length = kwargs.pop("max_length", 0)
         self.min_length = kwargs.pop("min_length", 0)
         self.early_stopping = kwargs.pop("early_stopping", False)
@@ -415,7 +420,9 @@ class GenerationConfig:
             from_aistudio=from_aistudio,
             from_hf_hub=from_hf_hub,
         )
-
+        assert (
+            resolved_config_file is not None
+        ), f"please make sure {config_file_name} under {pretrained_model_name_or_path}"
         try:
             logger.info(f"Loading configuration file {resolved_config_file}")
             # Load config dict

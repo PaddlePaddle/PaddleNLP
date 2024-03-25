@@ -166,7 +166,7 @@ class AutoImageProcessor:
             from_hf_hub=from_hf_hub,
             from_aistudio=from_aistudio,
         )
-        if os.path.exists(config_file):
+        if config_file is not None and os.path.exists(config_file):
             processor_class = cls._get_image_processor_class_from_config(
                 pretrained_model_name_or_path,
                 config_file,

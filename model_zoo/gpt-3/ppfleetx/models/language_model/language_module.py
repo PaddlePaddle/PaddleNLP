@@ -24,7 +24,7 @@ from paddle.static import InputSpec
 from ppfleetx.core.module.basic_module import BasicModule
 from ppfleetx.data.tokenizers import GPTTokenizer
 from ppfleetx.distributed.apis import env
-from ppfleetx.models.language_model.gpt.dygraph.sequence_parallel_utils import (
+from paddle.distributed.fleet.utils.sequence_parallel_utils import (
     register_sequence_parallel_allreduce_hooks,
 )
 from ppfleetx.utils.log import logger

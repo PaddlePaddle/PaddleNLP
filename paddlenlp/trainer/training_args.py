@@ -127,7 +127,7 @@ class TrainingArguments:
             The epsilon hyperparameter for the [`AdamW`] optimizer.
         max_grad_norm (`float`, *optional*, defaults to 1.0):
             Maximum gradient norm (for gradient clipping).
-        num_train_epochs(`float`, *optional*, defaults to 3.0):
+        num_train_epochs(`float`, *optional*, defaults to 1.0):
             Total number of training epochs to perform (if not an integer, will perform the decimal part percents of
             the last epoch before stopping training).
         max_steps (`int`, *optional*, defaults to -1):
@@ -234,6 +234,7 @@ class TrainingArguments:
             Some additional configs which affect data parallel performance, we provide some option to config it.
             following config is support:
               enable_allreduce_avg_in_gradinent_scale, it replace `allreduce_sum + scale` pattern with `allreduce_avg` when scale gradient in data_parallel, which improve the performance. ONLY supported for auto mode now.
+              gradient_sync_after_accumulate, move gradient sync operations from backward into optimizer step when gradient accumulate enabling, which reduce the sync times to improve performance, but will increase the memory usage. ONLY supported for auto mode now.
         tensor_parallel_config (`str`, *optional*)(
             Some additional configs which affect model parallel performance, we provide some option to config it.
             following config is support:
@@ -250,12 +251,15 @@ class TrainingArguments:
               enable_dp_comm_overlap, fuse data parallel gradient communication.
               enable_sharding_comm_overlap, fuse sharding stage 1 parallel gradient communication.
               enable_release_grads, reduce peak memory usage by releasing gradients after each iteration. The creation of gradients will be postponed until backward propagation of the next iteration.
+              enable_overlap_p2p_comm, overlap p2p communication with computation.
+              enable_clear_every_step_cache, clear every step cache for pipeline parallel.
         sharding_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
             following config is support:
               enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation
               enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed
               enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap.
+              disable_stage1_reduce_avg, replace reduce_avg with original reduce_sum+scale in stage1, which can be used for accuracy verification.
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -388,7 +392,7 @@ class TrainingArguments:
     adam_epsilon: float = field(default=1e-8, metadata={"help": "Epsilon for AdamW optimizer."})
     max_grad_norm: float = field(default=1.0, metadata={"help": "Max gradient norm."})
 
-    num_train_epochs: float = field(default=3.0, metadata={"help": "Total number of training epochs to perform."})
+    num_train_epochs: float = field(default=1.0, metadata={"help": "Total number of training epochs to perform."})
     max_steps: int = field(
         default=-1,
         metadata={"help": "If > 0: set total number of training steps to perform. Override num_train_epochs."},
@@ -582,6 +586,7 @@ class TrainingArguments:
                 "Some additional configs which affect data parallel performance, we provide some option to config it."
                 "following config is support:\n"
                 "enable_allreduce_avg_in_gradinent_scale, it replace `allreduce_sum + scale` pattern with `allreduce_avg` when scale gradient in data_parallel, which improve the performance. ONLY supported for auto mode now. \n"
+                "gradient_sync_after_accumulate, move gradient sync operations from backward into optimizer step when gradient accumulate enabling, which reduce the sync times to improve performance, but will increase the memory usage. ONLY supported for auto mode now. \n"
             )
         },
     )
@@ -609,6 +614,8 @@ class TrainingArguments:
                 "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
                 "enable_dp_comm_overlap, fuse data parallel gradient communication. \n"
                 "enable_sharding_comm_overlap, fuse sharding stage 1 parallel gradient communication. \n"
+                "enable_overlap_p2p_comm, overlap p2p communication with computation. \n"
+                "enable_clear_every_step_cache, clear every step cache for pipeline parallel. \n"
             )
         },
     )
@@ -620,6 +627,7 @@ class TrainingArguments:
                 "following config is support: \n"
                 "enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation\n"
                 "enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed\n"
+                "disable_stage1_reduce_avg, replace reduce_avg with original reduce_sum+scale in stage1, which can be used for accuracy verification.\n"
                 "enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap"
             )
         },
@@ -982,6 +990,9 @@ class TrainingArguments:
                                 "enable_sharding_comm_overlap",
                                 "enable_timer",
                                 "enable_release_grads",
+                                "enable_dp_comm_overlap",
+                                "enable_clear_every_step_cache",
+                                "enable_overlap_p2p_comm",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -995,14 +1006,25 @@ class TrainingArguments:
                         # "delay_scale_loss": True, Fix ME
                     }
                     logger.info(f"PP configs:{strategy.pipeline_configs}, use master_grad: {self.amp_master_grad}")
+
+                    using_comm_overlap = (
+                        "enable_sharding_comm_overlap" in pipeline_parallel_config
+                        or "enable_dp_comm_overlap" in pipeline_parallel_config
+                    )
+                    enable_dp_comm_overlap = using_comm_overlap and self.data_parallel_degree > 1
+                    enable_sharding_comm_overlap = using_comm_overlap and self.sharding_parallel_degree > 1
+                    assert not (
+                        enable_dp_comm_overlap and enable_sharding_comm_overlap
+                    ), "dp_comm_overlap and sharding_comm_overlap cannot be enabled at the same time"
+
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
-                        "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config
-                        and self.data_parallel_degree > 1,
-                        "sharding_comm_overlap": "enable_sharding_comm_overlap" in pipeline_parallel_config
-                        and self.sharding_parallel_degree > 1,
+                        "dp_comm_overlap": enable_dp_comm_overlap,
+                        "sharding_comm_overlap": enable_sharding_comm_overlap,
                         "enable_timer": "enable_timer" in pipeline_parallel_config,
                         "release_gradients": "enable_release_grads" in pipeline_parallel_config,
+                        "overlap_p2p_comm": "enable_overlap_p2p_comm" in pipeline_parallel_config,
+                        "clear_every_step_cache": "enable_clear_every_step_cache" in pipeline_parallel_config,
                     }
                     if dygraph_pp_configs["dp_comm_overlap"]:
                         raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
@@ -1016,6 +1038,7 @@ class TrainingArguments:
                                 "In pipeline model, the evaluation also shares same setting with training. "
                                 "We will enforce that per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
                             )
+
                             self.per_device_eval_batch_size = (
                                 self.per_device_train_batch_size * self.gradient_accumulation_steps
                             )
@@ -1116,11 +1139,23 @@ class TrainingArguments:
                                 "enable_stage1_overlap",
                                 "enable_stage2_overlap",
                                 "split_param",
+                                "disable_stage1_reduce_avg",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, "
                                     f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap."
                                 )
+                    if "disable_stage1_reduce_avg" in sharding_parallel_config:
+                        assert self.sharding == [
+                            ShardingOption.SHARD_OP
+                        ], "Only sharding stage1 supports to disable reduce_avg strategy."
+                        try:
+                            strategy.hybrid_configs["sharding_configs"].use_reduce_avg = False
+                        except:
+                            warnings.warn(
+                                "The reduce_avg strategy is not supported by current version of Paddle so you don't need to disable it. The nccl comm in sharding still use reduce_sum and scale of gradients."
+                            )
+
                     try:
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
@@ -1184,12 +1219,14 @@ class TrainingArguments:
                 data_parallel_config = set(self.data_parallel_config.split(" "))
                 for x in data_parallel_config:
                     if len(x) > 0:
-                        if x not in ["enable_allreduce_avg_in_gradinent_scale"]:
+                        if x not in ["enable_allreduce_avg_in_gradinent_scale", "gradient_sync_after_accumulate"]:
                             raise ValueError(
                                 f"Found unknown data parallel config {x}, accpet config is enable_allreduce_avg_in_gradinent_scale."
                             )
                 if "enable_allreduce_avg_in_gradinent_scale" in data_parallel_config:
                     strategy.gradient_scale_using_allreduce_avg = True
+                if "gradient_sync_after_accumulate" in data_parallel_config:
+                    strategy.dp_optimization.gradient_sync_after_accumulate = True
 
             # navie-pp: pipeline_parallel_degree > 1 and gradient_accumulation_steps == 1
             if self.pipeline_parallel_degree > 1 and self.gradient_accumulation_steps > 1:
@@ -1362,27 +1399,31 @@ class TrainingArguments:
             self.unified_checkpoint = False
 
         if self.unified_checkpoint:
-            unified_checkpoint_config = set(self.unified_checkpoint_config.split(" "))
-            for x in unified_checkpoint_config:
-                if len(x) > 0:
-                    if x not in [
+            if self.ignore_save_lr_and_optim:
+                self.unified_checkpoint_config = ""
+                logger.info("Setting unified_checkpoint_config to empty for using ignore_save_lr_and_optim.")
+            else:
+                unified_checkpoint_config = set(self.unified_checkpoint_config.split(" "))
+                for x in unified_checkpoint_config:
+                    if len(x) > 0:
+                        if x not in [
+                            "skip_save_model_weight",
+                            "master_weight_compatible",
+                            "async_save",
+                            "enable_all_options",
+                        ]:
+                            raise ValueError(
+                                f"Found unknown unified_checkpoint config {x}, accpet config is skip_save_model_weight, "
+                                + "master_weight_compatible, async_save, enable_all_options."
+                            )
+                if "enable_all_options" in unified_checkpoint_config:
+                    self.unified_checkpoint_config = [
                         "skip_save_model_weight",
                         "master_weight_compatible",
-                        "async_save",
-                        "enable_all_options",
-                    ]:
-                        raise ValueError(
-                            f"Found unknown unified_checkpoint config {x}, accpet config is skip_save_model_weight, "
-                            + "master_weight_compatible, async_save, enable_all_options."
-                        )
-            if "enable_all_options" in unified_checkpoint_config:
-                self.unified_checkpoint_config = [
-                    "skip_save_model_weight",
-                    "master_weight_compatible",
-                    # "async_save",
-                ]
-            else:
-                self.unified_checkpoint_config = self.unified_checkpoint_config.split(" ")
+                        # "async_save",
+                    ]
+                else:
+                    self.unified_checkpoint_config = self.unified_checkpoint_config.split(" ")
 
         if self.report_to is None:
             logger.info(
