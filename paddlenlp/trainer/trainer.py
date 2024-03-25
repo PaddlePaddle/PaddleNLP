@@ -1615,7 +1615,7 @@ class Trainer:
 
         core = paddle.framework.core
 
-        core.default_cpu_generator().manual_seed(checkpoint_rng_state["cpu"])
+        core.default_cpu_generator().set_state(checkpoint_rng_state["cpu"])
         if core.is_compiled_with_cuda():
             if not len(checkpoint_rng_state["cuda"]) == core.get_cuda_device_count():
                 raise ValueError("Length of gpu state list shoule be equal to the gpu device count")
@@ -2208,7 +2208,7 @@ class Trainer:
                 paddle.framework.core.default_cuda_generator(i).get_state()
                 for i in range(paddle.framework.core.get_cuda_device_count())
             ],
-            "cpu": paddle.framework.core.default_cpu_generator().get_state().current_seed(),
+            "cpu": paddle.framework.core.default_cpu_generator().get_state(),
         }
         if self.args.use_hybrid_parallel:
             rng_states[
