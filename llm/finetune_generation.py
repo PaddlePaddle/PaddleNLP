@@ -112,6 +112,7 @@ def main():
         weight_double_quant=model_args.weight_double_quant,
         weight_double_quant_block_size=model_args.weight_double_quant_block_size,
     )
+
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
             raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
@@ -426,10 +427,12 @@ def main():
                 dtype=dtype,
                 do_qat=quant_args.do_qat,
                 base_model_name_or_path=model_args.model_name_or_path,
+                use_quick_lora=model_args.use_quick_lora,
             )
             model = LoRAModel(model, lora_config)
         else:
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
+
         model.print_trainable_parameters()
 
     def compute_metrics_do_generation(eval_preds):
