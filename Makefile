@@ -45,6 +45,7 @@ unit-test:
 
 .PHONY: install
 install:
+	pip install paddlepaddle==0.0.0 -f https://www.paddlepaddle.org.cn/whl/linux/cpu-mkl/develop.html
 	pip install -r requirements-dev.txt
 	pip install -r requirements.txt
 	pip install -r paddlenlp/experimental/autonlp/requirements.txt

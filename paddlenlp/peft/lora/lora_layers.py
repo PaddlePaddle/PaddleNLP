@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import math
+import os
 from typing import List, Optional
 
 import paddle
@@ -23,6 +24,14 @@ from paddle.distributed.fleet.meta_parallel import (
     ColumnParallelLinear,
     RowParallelLinear,
 )
+
+from .lora_quick_layers import quick_lora
+
+if "npu" in paddle.device.get_all_custom_device_type():
+    from .mc2_lora_npu import MC2LoRaColumnParallelLinear, MC2LoRaRowParallelLinear
+else:
+    MC2LoRaRowParallelLinear = None
+    MC2LoRaColumnParallelLinear = None
 
 
 class LoRALinear(nn.Linear):
@@ -36,6 +45,9 @@ class LoRALinear(nn.Linear):
         lora_dropout: float = 0.0,
         merge_weights: bool = True,
         use_dora: bool = False,
+        use_quick_lora: bool = False,
+        rslora: bool = False,
+        lora_plus_scale: float = 1.0,
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
@@ -63,13 +75,24 @@ class LoRALinear(nn.Linear):
             shape=[r, out_features],
             dtype=self._dtype,
             is_bias=False,
-            default_initializer=nn.initializer.Constant(value=0.0),
+            attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.Constant(value=0.0),
+                learning_rate=lora_plus_scale,
+            ),
         )
-        self.scaling = self.lora_alpha / self.r
+
+        if not rslora:
+            self.scaling = self.lora_alpha / self.r
+        else:
+            self.scaling = self.lora_alpha / math.sqrt(self.r)
 
         # Freezing the pre-trained weight matrix
         self.weight.stop_gradient = True
 
+        # quick_lora
+        self._use_quick_lora = use_quick_lora and lora_dropout == 0.0
+
+        # dora
         self.use_dora = use_dora
         self.lora_magnitude_init = False
         # cache the weight norm when we merge the weights
@@ -81,6 +104,11 @@ class LoRALinear(nn.Linear):
                 is_bias=False,
                 default_initializer=nn.initializer.Constant(value=1.0),
             )
+            self._use_quick_lora = False
+
+    @property
+    def use_quick_lora(self):
+        return self._use_quick_lora and self.training and not self.merged
 
     def train(self):
         super().train()
@@ -115,18 +143,24 @@ class LoRALinear(nn.Linear):
 
     def forward(self, input: paddle.Tensor, *args, **kwargs):
         result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
-        if not self.merged:
-            if self.use_dora:
-                input = self.lora_dropout(input)
-                dora_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
-                weight_norm = dora_weight.norm(p=2, axis=0, keepdim=True).detach()
-                mag_norm_scale = (self.lora_magnitude / weight_norm).unsqueeze(0)
-                result_dora = (mag_norm_scale - 1) * (input @ self.weight) + mag_norm_scale * (
-                    input @ self.lora_A @ self.lora_B
-                ) * self.scaling
-                result += result_dora
-            else:
-                result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
+        if self.use_quick_lora:
+            # Use the quick lora implementation
+            result = quick_lora(input, self.lora_A, self.lora_B, self.weight, self.bias, self.scaling)
+        else:
+            result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
+            if not self.merged:
+                if self.use_dora:
+                    input = self.lora_dropout(input)
+                    dora_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
+                    weight_norm = dora_weight.norm(p=2, axis=0, keepdim=True).detach()
+                    mag_norm_scale = (self.lora_magnitude / weight_norm).unsqueeze(0)
+                    result_dora = (mag_norm_scale - 1) * (input @ self.weight) + mag_norm_scale * (
+                        input @ self.lora_A @ self.lora_B
+                    ) * self.scaling
+                    result += result_dora
+                else:
+                    # lora
+                    result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
         return result
 
     def extra_repr(self):
@@ -142,8 +176,11 @@ class RowParallelLoRALinear(RowParallelLinear):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
+        rslora: bool = False,
+        lora_plus_scale: float = 1.0,
         merge_weights: bool = True,
         use_dora: bool = False,
+        use_quick_lora: bool = False,
         **kwargs
     ):
         if use_dora:
@@ -178,15 +215,27 @@ class RowParallelLoRALinear(RowParallelLinear):
             shape=[r, self.out_features],
             dtype=self._dtype,
             is_bias=False,
-            default_initializer=nn.initializer.Constant(value=0.0),
+            attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.Constant(value=0.0),
+                learning_rate=lora_plus_scale,
+            ),
         )
+
         self.lora_A.is_distributed = True
         self.lora_A.split_axis = 0
         self.lora_B.is_distributed = False
-        self.scaling = self.lora_alpha / self.r
+        if not rslora:
+            self.scaling = self.lora_alpha / self.r
+        else:
+            self.scaling = self.lora_alpha / math.sqrt(self.r)
 
         # Freezing the pre-trained weight matrix
         self.weight.stop_gradient = True
+        self._use_quick_lora = use_quick_lora and lora_dropout == 0.0
+
+    @property
+    def use_quick_lora(self):
+        return self._use_quick_lora and self.training and not self.merged
 
     def train(self):
         super().train()
@@ -210,30 +259,52 @@ class RowParallelLoRALinear(RowParallelLinear):
         else:
             input_mp = x
 
-        # x @ W : [bz, in_f / ws] ===> [bz, out_f]
-        result_mp = F.linear(x=input_mp, weight=self.weight, name=self.name)
-
-        output = mp_ops._mp_allreduce(
-            result_mp,
-            group=self.model_parallel_group,
-            use_calc_stream=True,
-            use_model_parallel=True,
-        )
-
-        if not self.merged:
-            # x @ A: [bz, in_f/ ws] ===> [bz, r]
-            input_mp = self.lora_dropout(input_mp) @ self.lora_A
-            # all reduce to keep Lora B's gradient on different gpu consistent
-            input_dup = mp_ops._mp_allreduce(
+        if self.use_quick_lora:
+            # Use the quick lora implementation
+            result_mp = quick_lora(
                 input_mp,
+                self.lora_A,
+                self.lora_B,
+                self.weight,
+                self.bias,
+                self.scaling,
+                is_row=True,
+                group=self.model_parallel_group,
+                world_size=self.world_size,
+            )
+            output = mp_ops._mp_allreduce(
+                result_mp,
                 group=self.model_parallel_group,
                 use_calc_stream=True,
                 use_model_parallel=True,
             )
-            #  @ B: [bz, r] ===> [bz, out_f]
-            delta_mp = (input_dup @ self.lora_B) * self.scaling
-            output += delta_mp
-        output = output + self.bias if self.bias is not None else output
+        else:
+            # x @ W : [bz, in_f / ws] ===> [bz, out_f]
+            if "npu" in paddle.device.get_all_custom_device_type() and int(os.getenv("MC2", "0")):
+                output = MC2LoRaRowParallelLinear.apply(input_mp, self.weight, self.model_parallel_group)
+            else:
+                result_mp = F.linear(x=input_mp, weight=self.weight, name=self.name)
+                output = mp_ops._mp_allreduce(
+                    result_mp,
+                    group=self.model_parallel_group,
+                    use_calc_stream=True,
+                    use_model_parallel=True,
+                )
+
+            if not self.merged:
+                # x @ A: [bz, in_f/ ws] ===> [bz, r]
+                input_mp = self.lora_dropout(input_mp) @ self.lora_A
+                # all reduce to keep Lora B's gradient on different gpu consistent
+                input_dup = mp_ops._mp_allreduce(
+                    input_mp,
+                    group=self.model_parallel_group,
+                    use_calc_stream=True,
+                    use_model_parallel=True,
+                )
+                #  @ B: [bz, r] ===> [bz, out_f]
+                delta_mp = (input_dup @ self.lora_B) * self.scaling
+                output += delta_mp
+            output = output + self.bias if self.bias is not None else output
         return output
 
     def extra_repr(self):
@@ -249,9 +320,12 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
+        rslora: bool = False,
+        lora_plus_scale: float = 1.0,
         merge_weights: bool = True,
         lora_A_weight_attr: Optional[paddle.ParamAttr] = None,
         use_dora: bool = False,
+        use_quick_lora: bool = False,
         **kwargs
     ):
         if use_dora:
@@ -285,14 +359,26 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
             shape=[r, self.output_size_per_partition],
             dtype=self._dtype,
             is_bias=False,
-            default_initializer=nn.initializer.Constant(value=0.0),
+            attr=paddle.ParamAttr(
+                initializer=paddle.nn.initializer.Constant(value=0.0),
+                learning_rate=lora_plus_scale,
+            ),
         )
+
         self.lora_B.is_distributed = True
         self.lora_B.split_axis = 1
-        self.scaling = self.lora_alpha / self.r
+        if not rslora:
+            self.scaling = self.lora_alpha / self.r
+        else:
+            self.scaling = self.lora_alpha / math.sqrt(self.r)
 
         # Freezing the pre-trained weight matrix
         self.weight.stop_gradient = True
+        self._use_quick_lora = use_quick_lora and lora_dropout == 0.0
+
+    @property
+    def use_quick_lora(self):
+        return self._use_quick_lora and self.training and not self.merged
 
     def train(self):
         super().train()
@@ -311,14 +397,37 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
             self.merged = True
 
     def forward(self, input: paddle.Tensor):
-        input_mp = mp_ops._c_identity(input, group=self.model_parallel_group)
-        result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
+        if self.use_quick_lora:
+            # Use the quick lora implementation
+            input_mp = mp_ops._c_identity(input, group=self.model_parallel_group) if self.is_mp else input
+            result_mp = quick_lora(
+                input_mp,
+                self.lora_A,
+                self.lora_B,
+                self.weight,
+                self.bias,
+                self.scaling,
+                is_column=True,
+                group=self.model_parallel_group,
+                world_size=self.world_size,
+            )
+        else:
+            if "npu" in paddle.device.get_all_custom_device_type() and int(os.getenv("MC2", "0")):
+                res_mp = MC2LoRaColumnParallelLinear.apply(input, self.weight, self.model_parallel_group)
+                result_mp = res_mp + self.bias
+            else:
+                input_mp = mp_ops._c_identity(input, group=self.model_parallel_group)
+                result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
 
-        if not self.merged:
-            input_a = self.lora_dropout(input) @ self.lora_A
-            input_a_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
-            delta_mp = (input_a_mp @ self.lora_B) * self.scaling
-            result_mp += delta_mp
+            if not self.merged:
+                input_a = self.lora_dropout(input) @ self.lora_A
+                if "npu" in paddle.device.get_all_custom_device_type() and int(os.getenv("MC2", "0")):
+                    tmp = MC2LoRaColumnParallelLinear.apply(input_a, self.lora_B, self.model_parallel_group)
+                    delta_mp = tmp * self.scaling
+                else:
+                    input_a_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
+                    delta_mp = (input_a_mp @ self.lora_B) * self.scaling
+                result_mp += delta_mp
 
         if self.gather_output and self.is_mp:
             result = mp_ops._c_concat(result_mp, group=self.model_parallel_group)
