@@ -300,6 +300,7 @@ class LoRAModel(nn.Layer):
                     rslora=lora_config.rslora,
                     lora_plus_scale=lora_config.lora_plus_scale,
                     bias_attr=False if module.bias is None else None,
+                    use_quick_lora=lora_config.use_quick_lora,
                 )
             if isinstance(module, nn.Conv2D):
                 lora_module = LoRAConv2D(
@@ -337,6 +338,7 @@ class LoRAModel(nn.Layer):
                             negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
                         )
                     ),
+                    use_quick_lora=lora_config.use_quick_lora,
                 )
                 # Lora column parallel will spilt lora B matrix
                 self.add_lora_split_mapping(module_name + ".lora_B", is_column=True)
@@ -359,6 +361,7 @@ class LoRAModel(nn.Layer):
                     rslora=lora_config.rslora,
                     lora_plus_scale=lora_config.lora_plus_scale,
                     merge_weights=lora_config.merge_weights,
+                    use_quick_lora=lora_config.use_quick_lora,
                 )
                 # Lora column parallel will spilt lora A matrix
                 self.add_lora_split_mapping(module_name + ".lora_A", is_column=False)
