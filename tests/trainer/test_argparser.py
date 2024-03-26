@@ -18,7 +18,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from llm.run_pretrain import PreTrainingArguments
+sys.path.insert(0, "./llm/")
+from run_pretrain import PreTrainingArguments
+
+sys.path.remove("./llm/")
 from paddlenlp.trainer.argparser import PdArgumentParser
 
 

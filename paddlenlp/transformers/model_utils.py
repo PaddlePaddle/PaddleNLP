@@ -1347,7 +1347,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # Tie the weights between the input embeddings and the output embeddings if needed.
         self.tie_weights()
-
         return new_embeddings
 
     def _update_init_config(self, init_config: dict, key: str, value: Any):
@@ -1398,7 +1397,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 " should either use a different resize function or make sure that old_embeddings are an instance of"
                 f" {nn.Embedding}."
             )
-
         # Build new embeddings
         new_embeddings = nn.Embedding(
             new_num_tokens,
