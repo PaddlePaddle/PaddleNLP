@@ -216,7 +216,7 @@ class Verbalizer(nn.Layer):
         verb_config_file = os.path.join(data_path, VERBALIZER_CONFIG_FILE)
         if not os.path.isfile(verb_config_file):
             raise ValueError("{} not found under {}".format(VERBALIZER_CONFIG_FILE, data_path))
-        with open(verb_config_file, "r") as fp:
+        with open(verb_config_file, "r", encoding="utf-8") as fp:
             label_words = json.load(fp)
 
         verbalizer = cls(label_words, tokenizer)
