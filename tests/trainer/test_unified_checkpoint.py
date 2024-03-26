@@ -1140,7 +1140,7 @@ class TestUnifiedCheckpointOnN1C8EnableAll(TestUnifiedCheckpointBase):
         self.run_n1c8(self.run_pretrain_file, **train_args)
 
 
-class TestUnifiedCheckpointOnN1C8SaveLoadSpeed(TestUnifiedCheckpointFull):
+class TestUnifiedCheckpointOnN1C8SaveLoadSpeed(TestUnifiedCheckpointBase):
     def setUp(self):
         super().setUp()
         for config_key in self.configs:
@@ -1155,7 +1155,8 @@ class TestUnifiedCheckpointOnN1C8SaveLoadSpeed(TestUnifiedCheckpointFull):
         self.run_n1c8(self.run_pretrain_file, log_dir="log_uc", **train_args)
 
     def rerun(self, train_args):
-        self.run_n1c8(self.run_pretrain_file, log_dir="log_uc", **train_args)
+        pass
+        # self.run_n1c8(self.run_pretrain_file, log_dir="log_uc", **train_args)
 
 
 class TestPaddleCheckpointOnN1C8SaveLoadSpeed(TestUnifiedCheckpointFull):

@@ -639,6 +639,7 @@ def unified_optimizer_into_shards(
             tp_actions = model.get_tensor_parallel_convert_actions(
                 model.config, model_keys, is_split=False, ignore_error=True
             )
+        logger.info("Unified optimizer tensor parallel in shards")
         optim_state_dict = merge_tensor_parallel_for_optimizer(
             optim_state_dict,
             tp_actions,
@@ -647,6 +648,7 @@ def unified_optimizer_into_shards(
         paddle.device.cuda.empty_cache()
 
         if master_weights is not None:
+            logger.info("Unified master weight tensor parallel in shards")
             master_weights = merge_tensor_parallel_for_optimizer(
                 master_weights,
                 tp_actions,
@@ -1739,14 +1741,14 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
 
 
 def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys):
-    logger.info("Unified optimizer tensor parallel in shards")
-
+    # Core function for UC
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
     tp_rank = tp_group.rank
 
     state_dict_to_save = {}
     max_key_len = max([len(_) for _ in all_filter_keys])
+    logger.info("core send recv start!")
     for i in range(max_key_len):
         for j, filter_keys in enumerate(all_filter_keys):
             is_dst = tp_rank == j
@@ -1770,6 +1772,8 @@ def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys)
 
             if is_dst:
                 state_dict_to_save[filter_keys[i]] = tensor
+
+    logger.info("core send recv over!")
 
     return state_dict_to_save
 

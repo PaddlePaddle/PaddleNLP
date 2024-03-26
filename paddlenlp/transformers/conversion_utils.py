@@ -286,7 +286,7 @@ def naive_fuse_merge_tp(weight_list, is_column=True, fuse_tensor_parts=2):
     if isinstance(weight_list[0], np.ndarray):
         return np.concatenate([reorder[i] for i in index], axis=axis)
 
-    return paddle.concat([reorder[i] for i in index], axis=axis)._copy_to(paddle.CPUPlace(), False)
+    return paddle.concat([reorder[i] for i in index], axis=axis)._copy_to(paddle.CUDAPinnedPlace(), False)
 
 
 def naive_fuse_split_tp(
@@ -361,12 +361,12 @@ def normal_fuse_merge_tp(weight_list, is_column=True):
         if isinstance(weight_list[0], np.ndarray):
             return np.concatenate(weight_list, axis=-1)
         else:
-            return paddle.concat(weight_list, axis=-1)._copy_to(paddle.CPUPlace(), False)
+            return paddle.concat(weight_list, axis=-1)._copy_to(paddle.CUDAPinnedPlace(), False)
     else:
         if isinstance(weight_list[0], np.ndarray):
             return np.concatenate(weight_list, axis=0)
         else:
-            return paddle.concat(weight_list, axis=0)._copy_to(paddle.CPUPlace(), False)
+            return paddle.concat(weight_list, axis=0)._copy_to(paddle.CUDAPinnedPlace(), False)
 
 
 def normal_fuse_split_tp(weight, tensor_parallel_degree, tensor_parallel_rank=None, is_column=True):
