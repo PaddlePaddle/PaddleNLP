@@ -26,7 +26,7 @@ struct msgdata {
     int mtext[MAX_BSZ + 2];   // stop_flag, bsz, tokens
 };
 
-void SaveOutMmsg(const paddle::Tensor& x,
+void SaveOutMsg(const paddle::Tensor& x,
                  const paddle::Tensor& not_need_stop,
                  int64_t rank_id) {
     if (rank_id > 0) return;
@@ -55,4 +55,4 @@ PD_BUILD_OP(save_output)
     .Attrs({"rank_id: int64_t"})
     .Outputs({"x_out"})
     .SetInplaceMap({{"x", "x_out"}})
-    .SetKernelFn(PD_KERNEL(SaveOutMmsg));
+    .SetKernelFn(PD_KERNEL(SaveOutMsg));
