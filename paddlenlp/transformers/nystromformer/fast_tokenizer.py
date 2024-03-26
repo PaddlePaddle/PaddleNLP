@@ -16,7 +16,7 @@
 import json
 from typing import Optional, Tuple
 
-from fast_tokenizer import normalizers
+from tokenizers import normalizers
 
 from ..tokenizer_utils_fast import PretrainedFastTokenizer
 from .tokenizer import NystromformerTokenizer

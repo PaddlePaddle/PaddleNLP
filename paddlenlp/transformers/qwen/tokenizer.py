@@ -23,6 +23,7 @@ import numpy as np
 
 from ...utils.import_utils import is_tiktoken_available
 from .. import PretrainedTokenizer
+from ..tiktoken_model_utils import load_tiktoken_bpe
 from ..tokenizer_utils_base import (
     AddedToken,
     BatchEncoding,
@@ -52,14 +53,6 @@ SPECIAL_TOKENS = (
 tiktoken = None
 
 
-def _load_tiktoken_bpe(tiktoken_bpe_file: str) -> Dict[bytes, int]:
-    with open(tiktoken_bpe_file, "rb") as f:
-        contents = f.read()
-    return {
-        base64.b64decode(token): int(rank) for token, rank in (line.split() for line in contents.splitlines() if line)
-    }
-
-
 class QWenTokenizer(PretrainedTokenizer):
     """QWen tokenizer."""
 
@@ -83,7 +76,8 @@ class QWenTokenizer(PretrainedTokenizer):
 
         self.errors = errors  # how to handle errors in decoding
 
-        self.mergeable_ranks = _load_tiktoken_bpe(vocab_file)  # type: dict[bytes, int]
+        self.tiktoken_file = vocab_file
+        self.mergeable_ranks = load_tiktoken_bpe(vocab_file)  # type: dict[bytes, int]
         self.special_tokens = {
             token: index for index, token in enumerate(SPECIAL_TOKENS, start=len(self.mergeable_ranks))
         }

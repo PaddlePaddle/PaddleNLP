@@ -107,6 +107,12 @@ FAST_TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("TinyBertFastTokenizer", "tinybert"),
         ("ErnieMFastTokenizer", "ernie_m"),
         ("NystromformerFastTokenizer", "nystromformer"),
+        ("DistilBertFastTokenizer", "distilbert"),
+        ("AlbertEnglishFastTokenizer", "albert"),
+        ("RobertaBPEFastTokenizer", "roberta"),
+        ("LlamaFastTokenizer", "llama"),
+        ("QWenFastTokenizer", "qwen"),
+        ("ChatGLMv2FastTokenizer", "chatglm_v2"),
     ]
 )
 # For FastTokenizer
@@ -173,9 +179,9 @@ class AutoTokenizer:
                 )
         else:
             logger.warning(
-                "Can't find the fast_tokenizer package, "
+                "Can't find the tokenizers package, "
                 "please ensure install fast_tokenizer correctly. "
-                "You can install fast_tokenizer by `pip install fast-tokenizer-python`."
+                "You can install tokenizers by `pip install tokenizers`."
             )
         return tokenizer_class
 
@@ -189,8 +195,13 @@ class AutoTokenizer:
             init_class = init_kwargs.pop("tokenizer_class", None)
 
         if init_class:
+            if "Fast" in init_class:
+                init_class = init_class.replace("Fast", "")
             class_name = cls._name_mapping[init_class]
-            import_class = import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
+            if init_class.endswith("FastTokenizer"):
+                import_class = import_module(f"paddlenlp.transformers.{class_name}.fast_tokenizer")
+            else:
+                import_class = import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
             tokenizer_class = getattr(import_class, init_class)
             if use_fast:
                 fast_tokenizer_class = cls._get_fast_tokenizer_class(init_class, class_name)
@@ -305,7 +316,6 @@ class AutoTokenizer:
                                     "please ensure install fast_tokenizer correctly. "
                                     "You can install fast_tokenizer by `pip install fast-tokenizer-python`."
                                 )
-
                         logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
                         return actual_tokenizer_class.from_pretrained(
                             pretrained_model_name_or_path, *model_args, **kwargs
