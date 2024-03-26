@@ -139,7 +139,7 @@ class PredictorServer:
                             chat_query.append([history[idx]["utterance"], history[idx + 1]["utterance"]])
                         else:
                             raise ValueError(
-                                "history data should be list[str] or list[dict], eg: ['sentence-1', 'sentece-2', ...], or "
+                                "history data should be list[str] or list[dict], eg: ['sentence-1', 'sentence-2', ...], or "
                                 "[{'utterance': 'sentence-1'}, {'utterance': 'sentence-2'}, ...]"
                             )
 

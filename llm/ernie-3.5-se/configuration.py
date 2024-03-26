@@ -199,4 +199,4 @@ class Ernie35Config(PretrainedConfig):
             assert self.seqlen, "seqlen not provided in sequence-parallel"
             assert (
                 self.tensor_parallel_degree > 1
-            ), f"senquence-parallel only works in mp, got mp={self.tensor_parallel_degree}"
+            ), f"sequence-parallel only works in mp, got mp={self.tensor_parallel_degree}"

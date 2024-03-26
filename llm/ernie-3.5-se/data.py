@@ -48,7 +48,7 @@ def convert_example(example, tokenizer, data_args, is_test=False):
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
     # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
-    # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
+    # that HuggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
     if "context" in example:
         context = example["context"]
         question = example["question"]
@@ -186,13 +186,13 @@ def left_padding(inputs, pad_id, max_length=-1):
     for ids in inputs:
         max_length = max(max_length, len(ids))
 
-    def extend_max_lenth(value, max_length, to_pad_id):
+    def extend_max_length(value, max_length, to_pad_id):
         return [to_pad_id] * (max_length - len(value)) + value
 
     def extend_filed(values, max_length, to_pad_id):
         res = []
         for value in values:
-            res.append(extend_max_lenth(value.tolist(), max_length, to_pad_id))
+            res.append(extend_max_length(value.tolist(), max_length, to_pad_id))
         return res
 
     res = extend_filed(inputs, max_length, pad_id)

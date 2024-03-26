@@ -82,7 +82,7 @@ best_pretrain_config_for_a100_80g = {
 def log_test_result(model_name_or_path, config_name, config, log_dir="log"):
     model_name_or_path = model_name_or_path
     max_seq_len = config["max_seq_length"]
-    distribued_info = config_name.split("b-")[-1].split(".json")[0]
+    distributed_info = config_name.split("b-")[-1].split(".json")[0]
     speed = "NA"
     memory = "NA"
     config_name = config_name
@@ -120,7 +120,7 @@ def log_test_result(model_name_or_path, config_name, config, log_dir="log"):
         [
             f"`{model_name_or_path}`",
             max_seq_len,
-            f"`{distribued_info}`",
+            f"`{distributed_info}`",
             speed,
             memory,
             f"`{config_name}`",
@@ -136,8 +136,8 @@ result_file_name = "results_of_best_pretrain_config_for_a100_80g.md"
 
 
 def write_result(res):
-    fileds_name = [x.strip() for x in result_title.split("|")[1:-1]]
-    assert len(fileds_name) == len(res)
+    fields_name = [x.strip() for x in result_title.split("|")[1:-1]]
+    assert len(fields_name) == len(res)
 
     def format_list_to_str(lst):
         content = "|".join([""] + ["{:10}".format(x) for x in lst] + [""])
@@ -145,8 +145,8 @@ def write_result(res):
 
     if not os.path.exists(result_file_name):
         with open(result_file_name, "w") as f:
-            f.write(format_list_to_str(fileds_name) + "\n")
-            f.write(format_list_to_str([" :-: "] * len(fileds_name)) + "\n")
+            f.write(format_list_to_str(fields_name) + "\n")
+            f.write(format_list_to_str([" :-: "] * len(fields_name)) + "\n")
 
     with open(result_file_name, "a+") as f:
         f.write(format_list_to_str(res) + "\n")

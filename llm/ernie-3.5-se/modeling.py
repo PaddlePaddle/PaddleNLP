@@ -148,7 +148,7 @@ def scaled_dot_product_attention(
 
     if config.use_flash_attention and flash_attention is not None:
         # Flash Attention now ignore attention mask
-        # Current Flash Attention doesn't support attn maskt
+        # Current Flash Attention doesn't support attn mask
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
         # without past keys
@@ -165,7 +165,7 @@ def scaled_dot_product_attention(
     else:
 
         query_states = paddle.transpose(query_states, [0, 2, 1, 3]) / math.sqrt(head_dim)
-        # merge with the next tranpose
+        # merge with the next transpose
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
@@ -952,7 +952,7 @@ class Ernie35Model(Ernie35PretrainedModel):
             if not config.parallel_attn_hatf:
                 _layer = Ernie35DecoderLayer(config, has_ffn=False, has_mha=False, parallel_attn_ffn=True)
             else:
-                # no ffn in fisrt layer
+                # no ffn in first layer
                 # no mha in last layer
                 # Head mhA tail Ffn
                 if i == 0:

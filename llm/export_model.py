@@ -55,7 +55,7 @@ def validate_pdmodel(model_path, model_prefix):
             ops: list[paddle.framework.Operator] = block.ops
             for op in tqdm(ops, desc="checking the validation of ops"):
                 if op.type.lower() == "print":
-                    logger.warning(f"UNEXPECTED OP<{op.type}> which will reduce the performace of the static model")
+                    logger.warning(f"UNEXPECTED OP<{op.type}> which will reduce the performance of the static model")
 
 
 def main():

@@ -37,7 +37,7 @@ def split_qkv_gate_up_tensor_parallel_weight(
         stop = (tensor_parallel_rank + 1) * block_size
         assert (
             3 * hidden_size % tensor_parallel_degree == 0
-        ), f"The choosen size {hidden_size} is not compatible with sharding on {tensor_parallel_degree} shards"
+        ), f"The chosen size {hidden_size} is not compatible with sharding on {tensor_parallel_degree} shards"
         qkv = QKV[:, start:stop]
 
         # Split G, U
@@ -46,7 +46,7 @@ def split_qkv_gate_up_tensor_parallel_weight(
         stop = (tensor_parallel_rank + 1) * block_size
         assert (
             intermediate_size % tensor_parallel_degree == 0
-        ), f"The choosen size {intermediate_size} is not compatible with sharding on {tensor_parallel_degree} shards"
+        ), f"The chosen size {intermediate_size} is not compatible with sharding on {tensor_parallel_degree} shards"
         g = G[:, start:stop]
         u = U[:, start:stop]
 
@@ -56,7 +56,7 @@ def split_qkv_gate_up_tensor_parallel_weight(
     QKV, G, U = np.split(weight, [hidden_size * 3, hidden_size * 3 + intermediate_size], axis=-1)
     assert (
         weight.shape[-1] % tensor_parallel_degree == 0
-    ), f"The choosen size {weight.shape[-1]} is not compatible with sharding on {tensor_parallel_degree} shards, for tensor shape {weight.shape}"
+    ), f"The chosen size {weight.shape[-1]} is not compatible with sharding on {tensor_parallel_degree} shards, for tensor shape {weight.shape}"
     sQKV, sG, sU = [np.split(item, tensor_parallel_degree, axis=-1) for item in [QKV, G, U]]
     qkv, g, u = [item[tensor_parallel_rank] for item in [sQKV, sG, sU]]
     tensor = np.concatenate([qkv, g, u], axis=-1)
@@ -130,7 +130,7 @@ def split_o_tensor_parallel_weight(
         stop = (tensor_parallel_rank + 1) * block_size
         assert (
             intermediate_size % tensor_parallel_degree == 0
-        ), f"The choosen size {intermediate_size} is not compatible with sharding on {tensor_parallel_degree} shards"
+        ), f"The chosen size {intermediate_size} is not compatible with sharding on {tensor_parallel_degree} shards"
         a = A[start:stop]
 
         B = weight[intermediate_size:]
@@ -139,7 +139,7 @@ def split_o_tensor_parallel_weight(
         stop = (tensor_parallel_rank + 1) * block_size
         assert (
             hidden_size % tensor_parallel_degree == 0
-        ), f"The choosen size {hidden_size} is not compatible with sharding on {tensor_parallel_degree} shards"
+        ), f"The chosen size {hidden_size} is not compatible with sharding on {tensor_parallel_degree} shards"
         b = B[start:stop]
         tensor = np.concatenate([a, b], axis=0)
         return tensor
@@ -147,7 +147,7 @@ def split_o_tensor_parallel_weight(
     A, B = np.split(weight, [intermediate_size], axis=0)
     assert (
         weight.shape[0] % tensor_parallel_degree == 0
-    ), f"The choosen size {weight.shape[-1]} is not compatible with sharding on {tensor_parallel_degree} shards, for tensor shape {weight.shape}"
+    ), f"The chosen size {weight.shape[-1]} is not compatible with sharding on {tensor_parallel_degree} shards, for tensor shape {weight.shape}"
     sA = np.split(A, tensor_parallel_degree, axis=0)
     sB = np.split(B, tensor_parallel_degree, axis=0)
     a, b = [item[tensor_parallel_rank] for item in [sA, sB]]
