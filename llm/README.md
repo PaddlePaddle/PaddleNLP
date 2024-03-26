@@ -178,7 +178,7 @@ python  finetune_generation.py ./llama/pt_argument.json
 python  finetune_generation.py ./llama/ptq_argument.json
 
 # GPTQ 量化启动命令参考
-python  finetune_generation.py ./llama/ptq_argument.json
+python  finetune_generation.py ./llama/gptq_argument.json
 ```
 
 更多技术细节和模型量化使用详见[量化文档](./docs/quantization.md)。
