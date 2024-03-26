@@ -19,7 +19,7 @@ import gradio as gr
 from prompt_utils import functions, get_parse_args
 
 from pipelines.document_stores import BaiduElasticsearchDocumentStore
-from pipelines.nodes import EmbeddingRetriever
+from pipelines.nodes import DensePassageRetriever, EmbeddingRetriever
 from pipelines.pipelines import Pipeline
 
 args = get_parse_args()
@@ -37,14 +37,27 @@ document_store_with_docs = BaiduElasticsearchDocumentStore(
     vector_type="bpack_vector",
     search_fields=["content", "meta"],
     index=args.abstract_index_name,
+    index_type=args.index_type,
 )
-dpr_retriever = EmbeddingRetriever(
-    document_store=document_store_with_docs,
-    retriever_batch_size=args.retriever_batch_size,
-    api_key=args.embedding_api_key,
-    embed_title=args.embed_title,
-    secret_key=args.embedding_secret_key,
-)
+if args.model_type == "ernie-embedding-v1":
+    dpr_retriever = EmbeddingRetriever(
+        document_store=document_store_with_docs,
+        retriever_batch_size=args.retriever_batch_size,
+        api_key=args.embedding_api_key,
+        embed_title=args.embed_title,
+        secret_key=args.embedding_secret_key,
+    )
+else:
+    dpr_retriever = DensePassageRetriever(
+        document_store=document_store_with_docs,
+        query_embedding_model=args.query_embedding_model,
+        passage_embedding_model=args.passage_embedding_model,
+        max_seq_len_query=args.max_seq_len_query,
+        max_seq_len_passage=args.max_seq_len_passage,
+        batch_size=args.retriever_batch_size,
+        embed_title=args.embed_title,
+        precision="fp16",
+    )
 
 pipeline = Pipeline()
 pipeline.add_node(component=dpr_retriever, name="DenseRetriever", inputs=["Query"])
@@ -103,6 +116,18 @@ def search_single_paper(query, title):
     return {"documents": documents}
 
 
+def get_literature_review(history, messages):
+    base_prompt = """
+    请根据聊天历史信息提到的几篇文章，生成综述。按照下面的方式进行输出：某某论文提出什么方法，这个方法有什么点，解决了什么问题。
+    """
+    literature_text = base_prompt
+    messages = messages[:-1]
+    messages.append({"role": "user", "content": literature_text})
+
+    resp_stream = erniebot.ChatCompletion.create(model="ernie-bot-3.5", messages=messages, stream=False)
+    return {"result": resp_stream["result"]}
+
+
 def history_transform(history=[]):
     messages = []
     if len(history) < 2:
@@ -128,6 +153,7 @@ def prediction(history):
             history[turn_idx][1] = history[turn_idx][1].replace("<br>", "")
 
     messages = history_transform(history)
+
     messages.append({"role": "user", "content": query})
     logs.append(f"Function Call的输入: {messages}")
     # Step 1, decide whether we need function call
@@ -155,13 +181,22 @@ def prediction(history):
     if hasattr(output_response, "function_call"):
         function_call = output_response.function_call
         logs.append(f"Function Call已触发: {function_call}")
-        name2function = {"search_multi_paper": search_multi_paper, "search_single_paper": search_single_paper}
+        name2function = {
+            "search_multi_paper": search_multi_paper,
+            "search_single_paper": search_single_paper,
+            "get_literature_review": get_literature_review,
+        }
         func = name2function[function_call["name"]]
         func_args = json.loads(function_call["arguments"])
+        if function_call["name"] == "get_literature_review":
+            func_args["history"] = history
+            func_args["messages"] = messages
         res = func(**func_args)
         # 对于多篇论文检索加入润色prompt
         if function_call["name"] == "search_multi_paper":
-            res["prompt"] = "请根据论文检索工具的结果返回每篇论文的标题（加粗）, 内容以及关键词，使用自然语言的方式输出，不要使用json或者表格的形式。"
+            res["prompt"] = "请根据论文检索工具的结果返回每篇论文的标题（加粗）, 内容以及关键词，使用自然语言的方式输出，不允许胡编乱造，不要使用json或者表格的形式。"
+        elif function_call["name"] == "get_literature_review":
+            res["prompt"] = "请根据生成的综述，先在开头加上总结性的话语，然后按照某某论文提出什么方法，这个方法有什么点，解决了什么问题的方式输出综述，不要使用json或者表格的形式。"
         logs.append(f"Function Call调用结果: {res}")
         # Step 3: return msg to erniebot
         messages.append({"role": "assistant", "content": None, "function_call": function_call})
@@ -185,23 +220,22 @@ def add_message_chatbot(messages, history):
 
 
 def launch_ui():
-    with gr.Blocks(title="维普小助手", theme=gr.themes.Base()) as demo:
-        gr.HTML("""<h1 align="center">ChatPaper维普小助手</h1>""")
-        with gr.Tab("ChatPaper"):
-            with gr.Column():
-                chatbot = gr.Chatbot(value=[[None, "您好, 我是维普论文小助手"]], scale=35, height=500)
-                message = gr.Textbox(placeholder="你能帮我找一些有关机器学习和强化学习方面的论文吗", lines=1, max_lines=20)
-                with gr.Row():
-                    submit = gr.Button("🚀 提交", variant="primary", scale=1)
-                    clear = gr.Button("清除", variant="primary", scale=1)
-                log = gr.Textbox(value="当前轮次日志")
-            message.submit(add_message_chatbot, inputs=[message, chatbot], outputs=[message, chatbot]).then(
-                prediction, inputs=[chatbot], outputs=[chatbot, log]
-            )
-            submit.click(add_message_chatbot, inputs=[message, chatbot], outputs=[message, chatbot]).then(
-                prediction, inputs=[chatbot], outputs=[chatbot, log]
-            )
-            clear.click(lambda _: ([[None, "您好, 我是维普论文小助手"]]), inputs=[clear], outputs=[chatbot])
+    with gr.Blocks(title="维普论文助手", theme=gr.themes.Base()) as demo:
+        gr.HTML("""<h1 align="center">维普论文助手</h1>""")
+        with gr.Column():
+            chatbot = gr.Chatbot(value=[[None, "您好, 我是维普论文小助手"]], scale=35, height=500)
+            message = gr.Textbox(placeholder="你能帮我找一些有关机器学习和强化学习方面的论文吗", lines=1, max_lines=20)
+            with gr.Row():
+                submit = gr.Button("🚀 提交", variant="primary", scale=1)
+                clear = gr.Button("清除", variant="primary", scale=1)
+            log = gr.Textbox(value="当前轮次日志")
+        message.submit(add_message_chatbot, inputs=[message, chatbot], outputs=[message, chatbot]).then(
+            prediction, inputs=[chatbot], outputs=[chatbot, log]
+        )
+        submit.click(add_message_chatbot, inputs=[message, chatbot], outputs=[message, chatbot]).then(
+            prediction, inputs=[chatbot], outputs=[chatbot, log]
+        )
+        clear.click(lambda _: ([[None, "您好, 我是维普论文小助手"]]), inputs=[clear], outputs=[chatbot])
     demo.queue()
     demo.launch(server_name=args.serving_name, server_port=args.serving_port, debug=True)
 
