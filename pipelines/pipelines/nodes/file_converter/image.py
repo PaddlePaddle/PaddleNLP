@@ -49,7 +49,7 @@ class ImageToTextConverter(BaseConverter):
         # save init parameters to enable export of component config as YAML
         self.set_config(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
         use_gpu = True if "gpu" in paddle.device.get_device() else False
-        self.recognize = PaddleOCR(use_angle_cls=True, lang="ch", use_gpu=use_gpu)
+        self.recognize = PaddleOCR(use_angle_cls=False, lang="ch", use_gpu=use_gpu)
 
         super().__init__(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
 
