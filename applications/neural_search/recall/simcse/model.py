@@ -38,7 +38,7 @@ class SimCSE(nn.Layer):
 
         self.margin = margin
         # Used scaling cosine similarity to ease converge
-        self.sacle = scale
+        self.scale = scale
 
     @paddle.jit.to_static(
         input_spec=[
@@ -130,7 +130,7 @@ class SimCSE(nn.Layer):
         cosine_sim = cosine_sim - paddle.diag(margin_diag)
 
         # scale cosine to ease training converge
-        cosine_sim *= self.sacle
+        cosine_sim *= self.scale
 
         labels = paddle.arange(0, query_cls_embedding.shape[0], dtype="int64")
         labels = paddle.reshape(labels, shape=[-1, 1])

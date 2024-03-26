@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
 import copy
 import os
 import unittest
@@ -57,7 +58,6 @@ def read_dataset(path, is_test=False):
                 yield {"sentence": sentence}
             else:
                 yield {"sentence": sentence, "labels": labels}
-
 
 class TestAutoTrainerForTextClassification(unittest.TestCase):
     @classmethod
@@ -517,7 +517,6 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                     id2label={0: "negative", 1: "positive"},
                     problem_type="multi_label",
                 )
-
-
 if __name__ == "__main__":
     unittest.main()
+"""

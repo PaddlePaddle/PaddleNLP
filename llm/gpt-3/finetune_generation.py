@@ -100,7 +100,7 @@ def main():
     training_args.tgt_length = data_args.tgt_length
     paddle.set_device(training_args.device)
 
-    set_seed(args=training_args)
+    set_seed(seed=training_args.seed)
 
     # Log on each process the small summary:
     logger.warning(

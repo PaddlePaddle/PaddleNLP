@@ -23,7 +23,6 @@ def get_gencode_flags():
     cc = prop.major * 10 + prop.minor
     return ["-gencode", "arch=compute_{0},code=sm_{0}".format(cc)]
 
-
 def run(func):
     p = multiprocessing.Process(target=func)
     p.start()

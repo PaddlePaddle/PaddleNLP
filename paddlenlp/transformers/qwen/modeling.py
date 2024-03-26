@@ -25,6 +25,7 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import try_import
 
+from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPast,
     CausalLMOutputWithPast,
@@ -145,7 +146,14 @@ class QWenAttention(nn.Layer):
             assert config.rotary_pct < 1
             self.rotary_ndims = int(self.hidden_size_per_attention_head * config.rotary_pct)
         dim = self.rotary_ndims if self.rotary_ndims is not None else self.hidden_size_per_attention_head
-        self.rotary_emb = RotaryEmbedding(dim, base=config.rotary_emb_base)
+        if config.use_long_sequence_strategies:
+            self.rotary_emb = LongSequenceStrategies.build_long_sequence_strategy(
+                config.long_sequence_strategy_type,
+                config.long_sequence_strategy_name,
+                **config.long_sequence_init_args,
+            )
+        else:
+            self.rotary_emb = RotaryEmbedding(dim, base=config.rotary_emb_base)
 
         self.use_dynamic_ntk = config.use_dynamic_ntk
         self.use_logn_attn = config.use_logn_attn
@@ -166,14 +174,25 @@ class QWenAttention(nn.Layer):
             # Current Flash Attention doesn't support attn maskt
             # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
             # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
-            attn_output, attn_weights = flash_attention(
-                query,
-                key,
-                value,
-                causal=query.shape[1] != 1,
-                dropout=self.config.attn_dropout_prob,
-                return_softmax=self.config.attn_dropout_prob > 0.0,
-            )
+            version = paddle.version.full_version
+            if version != "0.0.0" and version <= "2.5.2":
+                attn_output, attn_weights = flash_attention(
+                    query,
+                    key,
+                    value,
+                    causal=query.shape[1] != 1,
+                    dropout=self.config.attn_dropout_prob,
+                    return_softmax=self.config.attn_dropout_prob > 0.0,
+                )
+            else:
+                attn_output = F.scaled_dot_product_attention(
+                    query,
+                    key,
+                    value,
+                    attn_mask=attention_mask,
+                    is_causal=attention_mask is None,
+                )
+                attn_weights = None
             return attn_output, attn_weights
         else:
             # [bz, sql, nh, hid] ==> [bz, nh, sql hdim]
@@ -232,7 +251,6 @@ class QWenAttention(nn.Layer):
         query = self._split_heads(query, self.num_heads, self.head_dim)
         key = self._split_heads(key, self.num_heads, self.head_dim)
         value = self._split_heads(value, self.num_heads, self.head_dim)
-
         kv_seq_len = hidden_states.shape[1]
         if layer_past:
             # layer past[0] shape: bs * seq_len * head_num * dim
@@ -244,7 +262,11 @@ class QWenAttention(nn.Layer):
             self._ntk_cached = ntk_alpha
         else:
             ntk_alpha = self._ntk_cached
-        rotary_pos_emb = self.rotary_emb(value, kv_seq_len, ntk_alpha=ntk_alpha)
+        if self.config.use_long_sequence_strategies:
+            cos, sin = self.rotary_emb(seq_len=kv_seq_len, ntk_alpha=ntk_alpha)
+            rotary_pos_emb = (cos[None, :, None, :], sin[None, :, None, :])
+        else:
+            rotary_pos_emb = self.rotary_emb(value, kv_seq_len, ntk_alpha=ntk_alpha)
 
         if rotary_pos_emb is not None:
             if isinstance(rotary_pos_emb, tuple):
@@ -496,7 +518,7 @@ class QWenPretrainedModel(PretrainedModel):
                 mapping[1] = "qwen." + mapping[1]
 
         if config.architectures is not None:
-            if "QWenForCausalLM" or "QWenLMHeadModel" in config.architectures:
+            if "QWenForCausalLM" in config.architectures or "QWenLMHeadModel" in config.architectures:
                 mappings.extend(
                     [
                         [
@@ -526,8 +548,6 @@ class QWenPretrainedModel(PretrainedModel):
             module.weight.set_value(
                 paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=module.weight.shape)
             )
-            if getattr(module, "bias", None) is not None:
-                module.weight.set_value(paddle.zeros(shape=module.weight.shape, dtype=paddle.get_default_dtype()))
 
         for name, p in module.named_parameters():
             if name == "c_proj.weight":
@@ -982,7 +1002,8 @@ class RotaryEmbedding(nn.Layer):
             self._seq_len_cached = max(2 * seqlen, 16)
             self._ntk_alpha_cached = ntk_alpha
             seq = paddle.arange(self._seq_len_cached)
-            freqs = paddle.outer(seq.astype(self.inv_freq.dtype), self.inv_freq)
+            with paddle.amp.auto_cast(enable=False):
+                freqs = paddle.outer(seq.astype(self.inv_freq.dtype), self.inv_freq)
             emb = paddle.concat([freqs, freqs], axis=-1)
             self.cos_cached = emb.cos()[None, :, None, :]
             self.sin_cached = emb.sin()[None, :, None, :]

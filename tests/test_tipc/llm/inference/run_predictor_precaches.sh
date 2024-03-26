@@ -28,7 +28,7 @@ common_arguments="--decode_strategy ${decode_strategy} --src_length 300 --max_le
 if [ $fused_model ]; then
     common_arguments+=" --inference_model "
 fi
-common_arguments+="--data_file ${data_file} --top_p ${top_p} --benchmark ${benchmark}"
+common_arguments+="--data_file ${data_file} --top_p ${top_p} --benchmark ${benchmark} --chat_template none"
 
 cd ..
 echo "precache ing"

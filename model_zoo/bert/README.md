@@ -65,7 +65,6 @@ python -m paddle.distributed.launch --gpus "0" run_pretrain.py \
     --weight_decay 1e-2 \
     --adam_epsilon 1e-6 \
     --warmup_steps 10000 \
-    --num_train_epochs 3 \
     --input_dir data/ \
     --output_dir pretrained_models/ \
     --logging_steps 1 \
@@ -83,7 +82,6 @@ python -m paddle.distributed.launch --gpus "0" run_pretrain.py \
 - `weight_decay` 表示AdamW优化器中使用的weight_decay的系数。
 - `adam_epsilon` 表示AdamW优化器中使用的epsilon值。
 - `warmup_steps` 表示动态学习率热启的step数。
-- `num_train_epochs` 表示训练轮数。
 - `input_dir` 表示输入数据的目录，该目录下所有文件名中包含training的文件将被作为训练数据。
 - `output_dir` 表示模型的保存目录。
 - `logging_steps` 表示日志打印间隔。
@@ -128,7 +126,6 @@ python -m paddle.distributed.launch --xpus "0" run_pretrain.py \
     --weight_decay 1e-2 \
     --adam_epsilon 1e-6 \
     --warmup_steps 10000 \
-    --num_train_epochs 3 \
     --input_dir data/ \
     --output_dir pretrained_models/ \
     --logging_steps 1 \
@@ -146,7 +143,6 @@ python -m paddle.distributed.launch --xpus "0" run_pretrain.py \
 - `weight_decay` 表示AdamW优化器中使用的weight_decay的系数。
 - `adam_epsilon` 表示AdamW优化器中使用的epsilon值。
 - `warmup_steps` 表示动态学习率热启的step数。
-- `num_train_epochs` 表示训练轮数。
 - `input_dir` 表示输入数据的目录，该目录下所有文件名中包含training的文件将被作为训练数据。
 - `output_dir` 表示模型的保存目录。
 - `logging_steps` 表示日志打印间隔。

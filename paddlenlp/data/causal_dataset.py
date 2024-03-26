@@ -363,26 +363,52 @@ class GPTDataset(paddle.io.Dataset):
         if doc_index_f == doc_index_l:
             doc_ids.append(self.doc_idx[doc_index_f])
 
-            sample = self.indexed_dataset.get(
+            sample, mask = self.indexed_dataset.get(
                 self.doc_idx[doc_index_f], offset=offset_f, length=offset_l - offset_f + 1
             )
         else:
             # Otherwise, get the rest of the initial document.
             doc_ids.append(self.doc_idx[doc_index_f])
-            sample_list = [self.indexed_dataset.get(self.doc_idx[doc_index_f], offset=offset_f)]
+            sample, mask = self.indexed_dataset.get(self.doc_idx[doc_index_f], offset=offset_f)
+            append_mask = True
+            if mask is None:
+                append_mask = False
+
+            sample_list = [sample]
+            mask_list = []
+            mask_list = [mask]
             # Loop over all in between documents and add the entire document.
             for i in range(doc_index_f + 1, doc_index_l):
                 doc_ids.append(self.doc_idx[i])
-                sample_list.append(self.indexed_dataset.get(self.doc_idx[i]))
+                sample, mask = self.indexed_dataset.get(self.doc_idx[i])
+                sample_list.append(sample)
+                if append_mask:
+                    mask_list.append(mask)
+
             # And finally add the relevant portion of last document.
             doc_ids.append(self.doc_idx[doc_index_l])
-            sample_list.append(self.indexed_dataset.get(self.doc_idx[doc_index_l], length=offset_l + 1))
+            sample, mask = self.indexed_dataset.get(self.doc_idx[doc_index_l], length=offset_l + 1)
+            sample_list.append(sample)
+            if append_mask:
+                mask_list.append(mask)
             sample = np.concatenate(sample_list)
+            if append_mask:
+                mask = np.concatenate(mask_list)
         # print(sample)
         if self.return_doc_ids:  # for retro preprocessing
-            return {"text": np.array(sample, dtype=np.int64), "doc_ids": np.array(doc_ids, dtype=np.int64)}
+            if mask is None:
+                return {"text": np.array(sample, dtype=np.int64), "doc_ids": np.array(doc_ids, dtype=np.int64)}
+            else:
+                return {
+                    "text": np.array(sample, dtype=np.int64),
+                    "doc_ids": np.array(doc_ids, dtype=np.int64),
+                    "mask": np.array(mask, dtype=np.int64),
+                }
         else:
-            return {"text": np.array(sample, dtype=np.int64)}
+            if mask is None:
+                return {"text": np.array(sample, dtype=np.int64)}
+            else:
+                return {"text": np.array(sample, dtype=np.int64), "mask": np.array(mask, dtype=np.int64)}
 
 
 def _build_index_mappings(

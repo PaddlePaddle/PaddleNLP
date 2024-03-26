@@ -22,6 +22,7 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from ppfleetx.distributed.apis import comm_groups
 from ppfleetx.utils.log import logger
+from paddlenlp.trainer.trainer_utils import _get_distributed_seeds
 
 __all__ = ["init_dist_env"]
 
@@ -37,62 +38,22 @@ def set_seed(seed):
     # global seed: only mp group is same.
     # local seed: all groups are different
 
-    if dist.get_world_size() > 1:
-        # obtain rank message of hybrid parallel
-        hcg = get_hcg()
+    global_seed, local_seed, random_seed = _get_distributed_seeds(seed)
 
-        mp_rank = hcg.get_model_parallel_rank()
-        mp_size = hcg.get_model_parallel_world_size()
-
-        pp_rank = hcg.get_stage_id()
-        pp_size = hcg.get_pipe_parallel_world_size()
-
-        dp_rank = hcg.get_data_parallel_rank()
-        dp_size = hcg.get_data_parallel_world_size()
-
-        sharding_rank = hcg.get_sharding_parallel_rank()
-        # sharding_size = hcg.get_sharding_parallel_world_size()
-    else:
-        mp_rank, mp_size = 0, 1
-        pp_rank, pp_size = 0, 1
-        dp_rank, dp_size = 0, 1
-        sharding_rank, _ = 0, 1
-
-    # NOTE: the commented seeds are set only for precision validation
-    # seed += 100 * pp_rank
-    random.seed(seed + 100 * pp_rank)
-    np.random.seed(seed + 100 * pp_rank)
-
-    # seed = mp_rank +
-    #        pp_rank * (mp_size) +
-    #        dp_rank * (mp_size * pp_size) +
-    #        sharding_rank * (mp_size * pp_size * dp_size)
-    # seed offset is order to avoid conflicts with the parameter initialization seed
-
-    seed_offset = seed + 1024 + paddle.distributed.get_world_size()
-    global_seed = (
-        seed_offset
-        + pp_rank * (mp_size)
-        + dp_rank * (mp_size * pp_size)
-        + sharding_rank * (mp_size * pp_size * dp_size)
-    )
-
-    seed_offset += paddle.distributed.get_world_size()
-    local_seed = (
-        seed_offset
-        + mp_rank
-        + pp_rank * (mp_size)
-        + dp_rank * (mp_size * pp_size)
-        + sharding_rank * (mp_size * pp_size * dp_size)
-    )
+    # NOTE: add (1024 + world_size) to seed for CI cases
+    global_seed = global_seed + 1024 + paddle.distributed.get_world_size()
+    local_seed = local_seed + 1024 + paddle.distributed.get_world_size()
 
     tracker = get_rng_state_tracker()
     tracker.add("global_seed", global_seed)
     tracker.add("local_seed", local_seed)
 
     paddle.seed(global_seed)
+    random.seed(random_seed)
+    np.random.seed(random_seed)
 
-    logger.info("The global seed is set to {} and local seed is set to {}.".format(global_seed, local_seed))
+    logger.info("The global seed is set to {}, local seed is set to {} and "
+                "random seed is set to {}.".format(global_seed, local_seed, random_seed))
 
     global _seed
     global _dp_seed
@@ -126,7 +87,10 @@ def init_dist_env(config):
     def is_segment_parallel_supported():
         import inspect
         members = [name for (name, date) in inspect.getmembers(fleet.HybridCommunicateGroup)]
-        return "get_sep_parallel_world_size" in members
+        support_sep = "get_sep_parallel_world_size" in members
+        if not support_sep:
+            logger.warning("segment parallel is not supported!!!, Ignore it.")
+        return support_sep
 
     if config.Distributed.mp_degree == 1 and config.Distributed.sharding.sharding_degree == 1:
         if is_segment_parallel_supported():
@@ -139,13 +103,23 @@ def init_dist_env(config):
         else:
             order = ["dp", "pp", "sharding", "mp"]
 
-    strategy.hybrid_configs = {
-        "dp_degree": config.Distributed.dp_degree,
-        "mp_degree": config.Distributed.mp_degree,
-        "pp_degree": config.Distributed.pp_degree,
-        "sharding_degree": config.Distributed.sharding.sharding_degree,
-        "order": order,
-    }
+    if is_segment_parallel_supported():
+        strategy.hybrid_configs = {
+            "dp_degree": config.Distributed.dp_degree,
+            "mp_degree": config.Distributed.mp_degree,
+            "pp_degree": config.Distributed.pp_degree,
+            "sharding_degree": config.Distributed.sharding.sharding_degree,
+            "sep_degree": config.Distributed.sep_degree,
+            "order": order,
+        }
+    else:
+        strategy.hybrid_configs = {
+            "dp_degree": config.Distributed.dp_degree,
+            "mp_degree": config.Distributed.mp_degree,
+            "pp_degree": config.Distributed.pp_degree,
+            "sharding_degree": config.Distributed.sharding.sharding_degree,
+            "order": order,
+        }
 
     if config.Distributed.pp_degree > 1:
         if "sequence_parallel" in config.Model:

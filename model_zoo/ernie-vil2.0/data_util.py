@@ -154,7 +154,7 @@ def get_train_eval_dataset(args, epoch_id=0, max_txt_length=64, tokenizer=None):
     )
     eval_dataset = ArrowDataset(
         args.val_data,
-        split="val",
+        split="valid",
         max_txt_length=max_txt_length,
         tokenizer=tokenizer,
         use_augment=False,

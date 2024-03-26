@@ -104,8 +104,7 @@ function _train(){
     fi
 
     use_pure_fp16=False
-    train_cmd="--model_type llama \
-    --model_name_or_path ${model_name_or_path} \
+    train_cmd="--model_name_or_path ${model_name_or_path} \
     --tokenizer_name_or_path ${model_name_or_path} \
     --input_dir ./data \
     --output_dir ./output \
@@ -144,6 +143,7 @@ function _train(){
     --tensor_parallel_config ${tensor_parallel_config} ${pipeline_parallel_config_args} \
     --recompute ${recompute} \
     --recompute_use_reentrant ${recompute_use_reentrant} \
+    --skip_memory_metrics 0 \
     --data_cache ./data_cache"
 
     if [ ${PADDLE_TRAINER_ID} ]
@@ -191,8 +191,10 @@ function _train(){
     fi
     #kill -9 `ps -ef|grep 'python'|awk '{print $2}'`
     if [ ${device_num} != "N1C1" -a -d mylog ]; then
+        case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/tests/mylog
+        cp -r ${case_path}/mylog/workerlog.* ./mylog/
         rm ${log_file}
-        cp mylog/workerlog.${workerlog_id} ${log_file}
+        cp ${case_path}/mylog/workerlog.${workerlog_id} ${log_file}
     fi
 }
 

@@ -21,3 +21,9 @@ chatglm2:
   fused_model: true
   dtype: float16
   data_file: tests/fixtures/llm/zh_query.json
+
+qwen:
+  model_name: qwen/qwen-7b-chat
+  fused_model: true
+  dtype: bfloat16
+  data_file: tests/fixtures/llm/zh_query.json

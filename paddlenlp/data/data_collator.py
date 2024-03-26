@@ -405,7 +405,6 @@ class DataCollatorForSeq2Seq:
             return_tensors=return_tensors,
             return_attention_mask=self.return_attention_mask,
         )
-
         # prepare decoder_input_ids
         if (
             labels is not None

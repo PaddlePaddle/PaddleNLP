@@ -11,7 +11,6 @@ sqlalchemy_utils
 langdetect
 python-docx
 nltk
-pdfplumber
 faiss-cpu>=1.7.2
 opencv-python>=4.4
 opencv-contrib-python-headless
@@ -27,3 +26,4 @@ tritonclient[all]
 typing_extensions==4.5.0
 aistudio_sdk
 markdown
+pypdf

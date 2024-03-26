@@ -28,7 +28,7 @@ data_file=${data_file:-"tests/fixtures/llm/zh_query.json"}
 benchmark=${benchmark:-"0"}
 
 common_arguments="--decode_strategy ${decode_strategy} --src_length 300 --max_length 200 --benchmark ${benchmark} --dtype ${dtype} --batch_size 3 --inference_model ${inference_model} "
-common_arguments+="--data_file ${data_file} --top_p ${top_p}"
+common_arguments+="--data_file ${data_file} --top_p ${top_p} --chat_template none"
 
 echo "pwd -> "
 

@@ -1,3 +1,4 @@
+trainer.md
 # PaddleNLP Trainer API
 
 PaddleNLP提供了Trainer训练API，针对训练过程的通用训练配置做了封装，比如：
@@ -114,7 +115,7 @@ if training_args.do_train:
 ## Trainer 实例化参数介绍
 Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并针对 PaddleNLP 模型进行了优化。
 
-```python
+```text
 参数：
     model（[`PretrainedModel`] 或 `paddle.nn.Layer`，可选）：
         用于训练、评估或预测的模型。
@@ -209,7 +210,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
 
 
 ## TrainingArguments 参数介绍
-```python
+```text
   --output_dir
                         保存模型输出和中间checkpoints的输出目录。(`str`, 必须, 默认为 `None`)
 
@@ -320,9 +321,9 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
   --num_train_epochs
                         要执行的训练 epoch 总数（如果不是整数，将在停止训练
                         之前执行最后一个 epoch 的小数部分百分比）。
-                        (`float`, 可选, 默认为 3.0):
+                        (`float`, 可选, 默认为 1.0):
 
-                        Total number of training epochs to perform. (default:3.0)
+                        Total number of training epochs to perform. (default:1.0)
 
   --max_steps
                         如果设置为正数，则表示要执行的训练步骤总数。
@@ -551,6 +552,16 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                           enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
                           enable_dp_comm_overlap, fuse data parallel gradient communication.
 
+  --data_parallel_config
+                        对于数据并行,一些选项会影响训练性能,这里将一些选项配置集中管理,以str形式传入配置.
+                        支持如下选项:
+                            enable_allreduce_avg_in_gradinent_scale : 在数据并行中, 替换`allreduce_sum + scale`模式为`allreduce_avg`, 以提高性能. 仅支持auto模式.
+                            gradient_sync_after_accumulate : 当梯度累积开启时, 将梯度同步操作从backward阶段移动到optimizer阶段, 以减少同步次数, 提高性能, 但会增加显存占用. 仅支持auto模式.
+
+                        Some additional configs which affect data parallel performance, we provide some option to config it.
+                        following config is support:
+                            enable_allreduce_avg_in_gradinent_scale, it replace `allreduce_sum + scale` pattern with `allreduce_avg` when scale gradient in data_parallel, which improve the performance. ONLY supported for auto mode now.
+                            gradient_sync_after_accumulate, move gradient sync operations from backward into optimizer step when gradient accumulate enabling, which reduce the sync times to improve performance, but will increase the memory usage. ONLY supported for auto mode now.
 
   --recompute
                         是否使用重计算训练。可以节省显存。
@@ -660,6 +671,29 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         是否从断点重启恢复训练，(可选，默认为 None)
                         The path to a folder with a valid checkpoint for your
                         model. (default: None)
+
+  --unified_checkpoint
+                       是否使用unified_checkpoint，开启后训练的checkpoint将存储为新格式。
+                       可以支持跨分布式策略重启、动态扩缩容重启。(可选，默认为False)
+                       Whether to use unified_checkpoint, enable it to store training checkpoint in a new format.
+                       Supporting restart with different distribution strategies and devices，(optional, defaults to False)
+
+  --unified_checkpoint_config
+                       与Unified Checkpoint相关的一些优化配置项，以str形式传入配置。
+                       支持如下选项:
+                           skip_save_model_weight: 当master_weights存在时，跳过保存模型权重。
+                           master_weight_compatible: 1. 仅当optimizer需要master_weights时，才进行加载;
+                                                     2. 如果checkpoint中不存在master_weights，则将model weight作为master_weights进行加载。
+                           async_save: 在保存Checkpoint至磁盘时做异步保存，不影响训练过程，提高训练效率。
+                           enable_all_options: 上述参数全部开启。
+
+                       Some additional config of Unified checkpoint, we provide some options to config.
+                       Following config is support:
+                           skip_save_model_weight, no need to save model weights when the master_weights exist.
+                           master_weight_compatible, 1. if the master_weights exist, only load when needed.
+                                                     2. if master_weights does not exist, convert model weights to master_weights when needed.
+                           async_save, enable asynchronous saving checkpoints to disk.
+                           enable_all_options, enable all unified checkpoint optimization configs.
 
   --skip_memory_metrics
                        是否跳过内存profiler检测。（可选，默认为True，跳过）

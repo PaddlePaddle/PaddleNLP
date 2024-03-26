@@ -156,16 +156,12 @@ class MiniGPT4PretrainedModel(PretrainedModel):
             module.gradient_checkpointing = value
 
     @classmethod
-    def from_pretrained(
-        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str = "", *args, **kwargs
-    ):
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         vit_dtype = kwargs.pop("vit_dtype", "float16")
         qformer_dtype = kwargs.pop("qformer_dtype", "float32")
         llama_dtype = kwargs.pop("llama_dtype", "float16")
 
-        model = super().from_pretrained(
-            pretrained_model_name_or_path, from_hf_hub=from_hf_hub, subfolder=subfolder, *args, **kwargs
-        )
+        model = super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
 
         logger.info("Trying to convert dtype for MiniGPT4 model, it may take a while.")
         if isinstance(model, (MiniGPT4Model, MiniGPT4ForConditionalGeneration)):
@@ -885,7 +881,7 @@ class MiniGPT4QFormerEncoder(nn.Layer):
 
             if getattr(self.config, "gradient_checkpointing", False) and self.training:
                 if use_cache:
-                    logger.warn(
+                    logger.warning(
                         "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
                     )
                     use_cache = False

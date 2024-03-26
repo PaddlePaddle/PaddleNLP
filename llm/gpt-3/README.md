@@ -38,7 +38,6 @@ python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir ${log_dir} \
     run_pretrain.py \
-    --model_type "gpt" \
     --model_name_or_path gpt2-medium-en \
     --tokenizer_name_or_path gpt2-medium-en \
     --input_dir "./data" \
@@ -78,7 +77,6 @@ python -u  -m paddle.distributed.launch \
 
 其中参数释义如下：
 
-- `model_type`: 预训练模型基础类型。
 - `model_name_or_path`: 预训练模型内置名称或者模型所在目录，默认为`gpt2-medium-en`。
 - `tokenizer_name_or_path`: tokenizer名称或者tokenizer所在目录，默认为`gpt2-medium-en`。
 - `input_dir`: 预训练数据所在目录。
@@ -130,7 +128,6 @@ python -u  -m paddle.distributed.launch \
     --gpus "0" \
     --log_dir ${log_dir} \
     finetune_generation.py \
-    --model_type "gpt" \
     --model_name_or_path gpt2-medium-en \
     --output_dir "output/$task_name" \
     --per_device_train_batch_size 2 \
@@ -169,7 +166,6 @@ log_dir="log"
 rm -rf $log_dir
 
 python finetune_generation.py \
-    --model_type "gpt" \
     --model_name_or_path gpt2-medium-en \
     --output_dir "output/$task_name" \
     --per_device_train_batch_size 2 \

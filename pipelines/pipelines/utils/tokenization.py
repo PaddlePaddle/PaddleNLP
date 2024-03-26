@@ -35,7 +35,7 @@ def tokenize_batch_question_answering(pre_baskets, tokenizer, indices):
     Tokenizes text data for question answering tasks. Tokenization means splitting words into subwords, depending on the
     tokenizer's vocabulary.
 
-    - We first tokenize all documents in batch mode. (When using FastTokenizers Rust multithreading can be enabled by TODO add how to enable rust mt)
+    - We first tokenize all documents in batch mode. (When using FastTokenizer Rust multithreading can be enabled by TODO add how to enable rust mt)
     - Then we tokenize each question individually
     - We construct dicts with question and corresponding document text + tokens + offsets + ids
 

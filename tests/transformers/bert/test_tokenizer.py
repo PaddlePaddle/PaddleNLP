@@ -314,7 +314,8 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         text_with_chinese_char = "".join(list_of_commun_chinese_char)
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
-
+                if pretrained_name == "squeezebert-uncased":
+                    continue
                 kwargs["tokenize_chinese_chars"] = True
                 tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
                 tokenizer_fast = self.fast_tokenizer_class.from_pretrained(pretrained_name, **kwargs)

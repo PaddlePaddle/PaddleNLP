@@ -83,7 +83,11 @@ def main():
 
     predictor.model.to_static(
         get_infer_model_path(export_args.output_path, predictor_args.model_prefix),
-        {"dtype": predictor_args.dtype, "export_precache": predictor_args.export_precache},
+        {
+            "dtype": predictor_args.dtype,
+            "export_precache": predictor_args.export_precache,
+            "use_cachekv_int8": predictor_args.use_cachekv_int8,
+        },
     )
     predictor.model.config.save_pretrained(export_args.output_path)
     predictor.tokenizer.save_pretrained(export_args.output_path)

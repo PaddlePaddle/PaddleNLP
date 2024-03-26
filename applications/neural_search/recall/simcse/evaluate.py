@@ -57,16 +57,15 @@ if __name__ == "__main__":
     with open(args.recall_result_file, "r", encoding="utf-8") as f:
         relevance_labels = []
         for index, line in enumerate(f):
-
-            if index % args.recall_num == 0 and index != 0:
-                rs.append(relevance_labels)
-                relevance_labels = []
-
             text, recalled_text, cosine_sim = line.rstrip().split("\t")
             if text2similar[text] == recalled_text:
                 relevance_labels.append(1)
             else:
                 relevance_labels.append(0)
+
+            if (index + 1) % args.recall_num == 0:
+                rs.append(relevance_labels)
+                relevance_labels = []
 
     recall_N = []
     recall_num = [1, 5, 10, 20, 50]

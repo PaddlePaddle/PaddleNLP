@@ -18,7 +18,7 @@ from typing import Dict
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
-__all__ = ["GPT_PRETRAINED_INIT_CONFIGURATION", "GPTConfig", "GPT_PRETRAINED_RESOURCE_FILES_MAP"]
+__all__ = ["GPT_PRETRAINED_INIT_CONFIGURATION", "GPTConfig"]
 
 GPT_PRETRAINED_INIT_CONFIGURATION = {
     "gpt-cpm-large-cn": {  # 2.6B
@@ -130,66 +130,6 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
         "eos_token_id": 50256,
         "eol_token_id": 198,
     },
-    "gpt2-xl-en": {  # 1558M
-        "vocab_size": 50257,
-        "hidden_size": 1600,
-        "num_hidden_layers": 48,
-        "num_attention_heads": 25,
-        "intermediate_size": 6400,
-        "hidden_act": "gelu",
-        "hidden_dropout_prob": 0.1,
-        "attention_probs_dropout_prob": 0.1,
-        "max_position_embeddings": 1024,
-        "type_vocab_size": 1,  # no use
-        "initializer_range": 0.02,
-        "eos_token_id": 50256,
-        "eol_token_id": 198,
-    },
-    "gpt2-large-en": {  # 774M
-        "vocab_size": 50257,
-        "hidden_size": 1280,
-        "num_hidden_layers": 36,
-        "num_attention_heads": 20,
-        "intermediate_size": 5120,
-        "hidden_act": "gelu",
-        "hidden_dropout_prob": 0.1,
-        "attention_probs_dropout_prob": 0.1,
-        "max_position_embeddings": 1024,
-        "type_vocab_size": 1,  # no use
-        "initializer_range": 0.02,
-        "eos_token_id": 50256,
-        "eol_token_id": 198,
-    },
-    "gpt2-medium-en": {  # 345M
-        "vocab_size": 50304,
-        "hidden_size": 1024,
-        "num_hidden_layers": 24,
-        "num_attention_heads": 16,
-        "intermediate_size": 4096,
-        "hidden_act": "gelu",
-        "hidden_dropout_prob": 0.1,
-        "attention_probs_dropout_prob": 0.1,
-        "max_position_embeddings": 1024,
-        "type_vocab_size": 1,  # no use
-        "initializer_range": 0.02,
-        "eos_token_id": 50256,
-        "eol_token_id": 198,
-    },
-    "gpt2-en": {  # 117M
-        "vocab_size": 50257,
-        "hidden_size": 768,
-        "num_hidden_layers": 12,
-        "num_attention_heads": 12,
-        "intermediate_size": 3072,
-        "hidden_act": "gelu",
-        "hidden_dropout_prob": 0.1,
-        "attention_probs_dropout_prob": 0.1,
-        "max_position_embeddings": 1024,
-        "type_vocab_size": 1,  # no use
-        "initializer_range": 0.02,
-        "eos_token_id": 50256,
-        "eol_token_id": 198,
-    },
     "gpt2-small-en": {  # config for CE
         "vocab_size": 50304,
         "hidden_size": 1024,
@@ -205,17 +145,6 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
         "eos_token_id": 50256,
         "eol_token_id": 198,
     },
-}
-
-GPT_PRETRAINED_RESOURCE_FILES_MAP = {
-    "model_state": {
-        "gpt-cpm-large-cn": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
-        "gpt-cpm-small-cn-distill": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
-        "gpt2-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-en.pdparams",
-        "gpt2-medium-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-medium-en.pdparams",
-        "gpt2-large-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-large-en.pdparams",
-        "gpt2-xl-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-xl-en.pdparams",
-    }
 }
 
 
@@ -331,7 +260,6 @@ class GPTConfig(PretrainedConfig):
         fused_linear: bool = False,
         fuse_attention_qkv: bool = False,
         fuse_attention_ffn: bool = False,
-        enable_fuse_transformer: bool = False,
         fused_softmax_with_triangular: bool = False,
         virtual_pp_degree: int = 1,
         sequence_parallel=False,
@@ -371,7 +299,6 @@ class GPTConfig(PretrainedConfig):
         self.output_attentions = output_attentions
         self.ignore_index = ignore_index
         self.fused_linear = fused_linear
-        self.enable_fuse_transformer = enable_fuse_transformer
         self.use_fused_dropout_add = use_fused_dropout_add
         self.fused_softmax_with_triangular = fused_softmax_with_triangular
         self.virtual_pp_degree = virtual_pp_degree

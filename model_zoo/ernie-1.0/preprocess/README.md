@@ -175,6 +175,8 @@ common config:
                         打印日志间隔，interval表示处理 文本行数/doc数的 间隔。
   --workers WORKERS     Number of worker processes to launch
                         处理文本id化的进程个数。
+  --max_repeated_len    Max length of repeated chars to keep
+                        最大保留重复的字符个数。
 ```
 通过下面脚本转化，我们可以得到处理好的预训练数据，token ids:`baike_sample.bin`, 文章索引信息`baike_sample.idx`.
 

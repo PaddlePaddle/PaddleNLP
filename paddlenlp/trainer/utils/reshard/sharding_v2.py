@@ -38,12 +38,12 @@ def shard(node_model_state, model, optimizer, hcg):
     def split_func(k, v):
         param_name = k[1]
         opt_name = k[-1]
-        assert param_name in split_infos
+        assert param_name in split_infos, f"param_name {param_name}, split_infos{split_infos}"
         is_beta = is_bata(opt_name)
         index, padded_size, buffer_size, has_slice_grad = split_infos[param_name]
 
         if not is_beta:
-            v = pad_tensor(v, padded_size)
+            v = pad_tensor(k, v, padded_size)
 
         def get_slice(v, begin, end):
             if is_beta:
@@ -101,13 +101,13 @@ def restore(node_model_state, model, optimizer, hcg):
         if is_bata(opt_name):
             return tensor_list[0]
         shape = param_shapes[structure_name]
-        return merge_tensors(tensor_list, shape)
+        return merge_tensors(k, tensor_list, shape)
 
     node_model_state.collapse_key().merge_items(merge_func)
     return node_model_state
 
 
-def merge_tensors(tensor_list, shape):
+def merge_tensors(k, tensor_list, shape):
     assert len(tensor_list) > 0
     if len(tensor_list) == 1:
         t = tensor_list[0]
@@ -116,16 +116,16 @@ def merge_tensors(tensor_list, shape):
         t = paddle.concat(x=tensor_list, axis=0)
     tensor_size = np.prod(shape)
     padded_size = t._numel()
-    assert padded_size >= tensor_size
+    assert padded_size >= tensor_size, f"{k} padded_size {padded_size} tensor_size {tensor_size}"
     t = t._slice(0, tensor_size)
     t.get_tensor()._set_dims(shape)
     return t
 
 
-def pad_tensor(tensor, padded_size):
+def pad_tensor(k, tensor, padded_size):
     tensor_shape = tensor.shape
     tensor_size = np.prod(tensor_shape)
-    assert tensor_size <= padded_size
+    assert tensor_size <= padded_size, f"{k} tensor_size {tensor_size} padded_size {padded_size}"
     t = paddle.zeros([padded_size], dtype=tensor.dtype)
     tensor.flatten_()
     t[0:tensor_size] = tensor

@@ -9,6 +9,7 @@ ChatGLM2-6B 是开源中英双语对话模型 [ChatGLM-6B](https://github.com/TH
 | Model                            |
 |----------------------------------|
 | THUDM/chatglm2-6b                |
+| THUDM/chatglm3-6b                |
 
 ## 2. 模型协议
 

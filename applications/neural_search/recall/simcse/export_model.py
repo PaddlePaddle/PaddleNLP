@@ -29,7 +29,7 @@ args = parser.parse_args()
 # yapf: enable
 
 if __name__ == "__main__":
-    # If you want to use ernie1.0 model, plesace uncomment the following code
+    # If you want to use ernie1.0 model, please uncomment the following code
     output_emb_size = 256
 
     pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)

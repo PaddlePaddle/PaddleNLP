@@ -29,6 +29,13 @@ import paddle.tensor as tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
+from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+    ColumnSequenceParallelLinear,
+    GatherOp,
+    RowSequenceParallelLinear,
+    ScatterOp,
+    mark_as_sequence_parallel_parameter,
+)
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
 from ...utils.converter import StateDictNameMapping
@@ -41,18 +48,7 @@ from ..model_outputs import (
     TokenClassifierOutput,
 )
 from ..model_utils import dy2st_nocheck_guard_context
-from ..sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    GatherOp,
-    RowSequenceParallelLinear,
-    ScatterOp,
-    mark_as_sequence_parallel_parameter,
-)
-from .configuration import (
-    GPT_PRETRAINED_INIT_CONFIGURATION,
-    GPT_PRETRAINED_RESOURCE_FILES_MAP,
-    GPTConfig,
-)
+from .configuration import GPT_PRETRAINED_INIT_CONFIGURATION, GPTConfig
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
@@ -306,15 +302,16 @@ class MultiHeadAttention(nn.Layer):
         return query_states, key_states, value_states, past_key_value
 
     def _flash_attention(self, q, k, v, attention_mask=None, output_attentions=False):
-        out, weights = flash_attention(
-            query=q,
-            key=k,
-            value=v,
-            dropout=self.config.attention_probs_dropout_prob,
-            causal=q.shape[1] != 1,
-            return_softmax=output_attentions,
-            training=self.training,
-        )
+        with seed_guard_context("local_seed"):
+            out, weights = flash_attention(
+                query=q,
+                key=k,
+                value=v,
+                dropout=self.config.attention_probs_dropout_prob,
+                causal=q.shape[1] != 1,
+                return_softmax=output_attentions,
+                training=self.training,
+            )
         # [bs, seq_len, num_head, head_dim] -> [bs, seq_len, num_head * head_dim]
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
         return (out, weights) if output_attentions else out
@@ -639,7 +636,11 @@ class GPTDecoderLayer(nn.Layer):
         attention_weights = hidden_states[1] if output_attentions else None
         hidden_states = hidden_states[0] if (use_cache or output_attentions) else hidden_states
 
-        with seed_guard_context("global_seed"):
+        # Use a ternary operator for a more concise assignment of current_seed
+        current_seed = "local_seed" if self.config.sequence_parallel else "global_seed"
+
+        # The 'with' block ensures the correct seed context is used
+        with seed_guard_context(current_seed):
             if self.config.use_fused_dropout_add:
                 hidden_states = self.fused_dropout_add1(hidden_states, residual)
             else:
@@ -654,7 +655,7 @@ class GPTDecoderLayer(nn.Layer):
 
         # when sequence_parallel=True:
         # hidden_states => [bs * seq_len / n, embed_dim]
-        with seed_guard_context("global_seed"):
+        with seed_guard_context(current_seed):
             if not self.config.use_fused_dropout_add:
                 hidden_states = residual + self.dropout2(
                     self.linear2(self.activation(self.linear1(hidden_states), approximate=True))
@@ -730,7 +731,12 @@ class GPTEmbeddings(nn.Layer):
             embeddings = paddle.reshape_(embeddings, [bs * seq_len, hidden_size])
             # [bs * seq_len / n, dim] (n is mp parallelism)
             embeddings = ScatterOp.apply(embeddings)
-        embeddings = self.dropout(embeddings)
+
+        # Use a ternary operator for a more concise assignment of current_seed
+        current_seed = "local_seed" if self.config.sequence_parallel else "global_seed"
+        # The 'with' block ensures the correct seed context is used
+        with seed_guard_context(current_seed):
+            embeddings = self.dropout(embeddings)
 
         return embeddings
 
@@ -749,7 +755,6 @@ class GPTPretrainedModel(PretrainedModel):
     base_model_prefix = "gpt"
     config_class = GPTConfig
     pretrained_init_configuration = GPT_PRETRAINED_INIT_CONFIGURATION
-    pretrained_resource_files_map = GPT_PRETRAINED_RESOURCE_FILES_MAP
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):

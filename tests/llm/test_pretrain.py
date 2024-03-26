@@ -13,7 +13,6 @@
 # limitations under the License.
 from __future__ import annotations
 
-import os
 import shutil
 import sys
 import tempfile
@@ -32,6 +31,7 @@ from .testing_utils import LLMTest
     [
         ["llama"],
         ["qwen"],
+        ["gpt"],
     ],
 )
 class PretrainTest(LLMTest, unittest.TestCase):
@@ -42,18 +42,10 @@ class PretrainTest(LLMTest, unittest.TestCase):
         LLMTest.setUp(self)
 
         self.dataset_dir = tempfile.mkdtemp()
-        if self.model_dir != "qwen":
-            self.model_codes_dir = os.path.join(self.root_path, self.model_dir)
-            sys.path.insert(0, self.model_codes_dir)
-        else:
-            self.model_codes_dir = self.root_path
+        self.model_codes_dir = self.root_path
 
     def tearDown(self) -> None:
         LLMTest.tearDown(self)
-
-        if self.model_dir != "qwen":
-            sys.path.remove(self.model_codes_dir)
-
         shutil.rmtree(self.dataset_dir)
 
     def test_pretrain(self):
@@ -82,6 +74,8 @@ class PretrainTest(LLMTest, unittest.TestCase):
 
             main()
 
-        if self.model_dir != "qwen":
+        # Now, only work for llama, not gpt or qwen
+        if self.model_dir == "llama":
             self.run_predictor({"inference_model": True})
+
         self.run_predictor({"inference_model": False})

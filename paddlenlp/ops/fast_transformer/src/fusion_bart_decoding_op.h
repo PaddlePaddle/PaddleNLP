@@ -24,7 +24,7 @@ limitations under the License. */
 #ifdef PADDLE_ON_INFERENCE
 #include "paddle/extension.h"
 #include "paddle_inference_api.h"
-#include "paddle/phi/api/ext/exception.h"
+#include "paddle/common/exception.h"
 #else
 #include "paddle/extension.h"
 #endif

@@ -31,15 +31,17 @@ class _Timer:
 
     def start(self):
         """Start the timer."""
-        assert not self.started_, "timer has already started"
-        paddle.device.synchronize()
+        assert not self.started_, f"{self.name} timer has already started"
+        if "gpu" in paddle.device.get_device():
+            paddle.device.synchronize()
         self.start_time = time.time()
         self.started_ = True
 
     def stop(self):
         """Stop the timers."""
-        assert self.started_, "timer is not started."
-        paddle.device.synchronize()
+        assert self.started_, f"{self.name} timer is not started."
+        if "gpu" in paddle.device.get_device():
+            paddle.device.synchronize()
         self.elapsed_ += time.time() - self.start_time
         self.started_ = False
 
@@ -63,6 +65,32 @@ class _Timer:
         if started_:
             self.start()
         return elapsed_
+
+
+class RuntimeTimer:
+    """A timer that can be dynamically adjusted during runtime."""
+
+    def __init__(self, name):
+        self.timer = _Timer(name)
+
+    def start(self, name):
+        """Start the RuntimeTimer."""
+        self.timer.name = name
+        self.timer.start()
+
+    def stop(self):
+        """Stop the RuntimeTimer."""
+        self.timer.stop()
+
+    def log(self):
+        """Log, stop and reset the RuntimeTimer."""
+        runtime = self.timer.elapsed(reset=True)
+        if self.timer.started_ is True:
+            self.timer.stop()
+        self.timer.reset()
+
+        string = "[timelog] {}: {:.2f}s ({}) ".format(self.timer.name, runtime, time.strftime("%Y-%m-%d %H:%M:%S"))
+        return string
 
 
 class Timers:

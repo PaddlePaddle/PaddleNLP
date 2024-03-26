@@ -24,6 +24,11 @@
 #include "layer_norm_cuda.h"  // NOLINT
 #include "paddle/extension.h"
 
+#ifdef CUSTOM_OP_WITH_SPMD
+#include "paddle/phi/api/ext/spmd_infer.h"
+#include "paddle/phi/infermeta/spmd_rules/rules.h"
+#endif
+
 #define CHECK_CUDA(x) PD_CHECK(!x.is_cpu(), #x " must be a CUDA tensor")
 
 static void GetRowsCols(const std::vector<int64_t> &shape,
@@ -53,8 +58,9 @@ std::vector<paddle::Tensor> RMSLnFwd(const paddle::Tensor &x,
 
   auto place = x.place();
   auto y = paddle::empty(x_shape, scale.type(), place);
-  auto invvar = paddle::empty({rows}, paddle::DataType::FLOAT32, place);
-
+  auto variance_shape = x_shape;
+  variance_shape.pop_back();
+  auto invvar = paddle::empty(variance_shape, paddle::DataType::FLOAT32, place);
   cuda_rms_norm(x, scale, rows, cols, epsilon, &y, &invvar);
   return {y, invvar};
 }
@@ -99,9 +105,9 @@ std::vector<std::vector<int64_t>> RMSLnFwdInferShape(
     std::vector<int64_t> x_shape,
     std::vector<int64_t> scale_shape,
     float epsilon) {
-  int rows, cols;
-  GetRowsCols(x_shape, &rows, &cols);
-  return {x_shape, {rows}};
+  auto variance_shape = x_shape;
+  variance_shape.pop_back();
+  return {x_shape, variance_shape};
 }
 
 std::vector<paddle::DataType> LnFwdInferDtype(paddle::DataType x_dtype,
@@ -214,14 +220,22 @@ PD_BUILD_OP(fused_rms_norm)
     .Attrs({"epsilon: float"})
     .SetKernelFn(PD_KERNEL(RMSLnFwd))
     .SetInferShapeFn(PD_INFER_SHAPE(RMSLnFwdInferShape))
-    .SetInferDtypeFn(PD_INFER_DTYPE(RMSLnFwdInferDtype));
+    .SetInferDtypeFn(PD_INFER_DTYPE(RMSLnFwdInferDtype))
+#ifdef CUSTOM_OP_WITH_SPMD
+    .SetInferSpmdFn(PD_INFER_SPMD_RULE(phi::distributed::RmsNormInferSpmd))
+#endif
+    ;
 
 PD_BUILD_GRAD_OP(fused_rms_norm)
     .Inputs({"x", "scale", "invvar", paddle::Grad("y")})
     .Outputs({paddle::Grad("x"), paddle::Grad("scale")})
     .Attrs({"epsilon: float"})
     .SetKernelFn(PD_KERNEL(RMSLnBwd))
-    .SetInferShapeFn(PD_INFER_SHAPE(RMSLnBwdInferShape));
+    .SetInferShapeFn(PD_INFER_SHAPE(RMSLnBwdInferShape))
+#ifdef CUSTOM_OP_WITH_SPMD
+    .SetInferSpmdFn(PD_INFER_SPMD_RULE(phi::distributed::RmsNormGradInferSpmd))
+#endif
+    ;
 
 
 // https://github.com/NVIDIA/apex/blob/85e9eddece9d4ac72b48c2407f8162f2173e1bf4/csrc/layer_norm_cuda_kernel.cu#L679

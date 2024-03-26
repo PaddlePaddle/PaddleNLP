@@ -44,11 +44,11 @@ def get_convert_example(model):
 
     if base_model_prefix == "chatglm":
         return convert_example_chatglm
-    elif base_model_prefix in ["chatglm_v2", "llama", "bloom", "opt", "qwen"]:
+    elif base_model_prefix in ["chatglm_v2", "llama", "bloom", "opt", "qwen", "mixtral"]:
         return convert_example_common
     else:
         raise ValueError(
-            f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama."
+            f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama, qwen, mixtral"
         )
 
 
@@ -105,6 +105,9 @@ def tokenize_rounds_example(tokenizer, example, data_args):
     """
 
     # 0. prepare data
+    context_data = example.get("context", {})
+    context_data["is_training"] = True
+
     example["src"] = example["src"] if isinstance(example["src"], list) else [example["src"]]
     example["tgt"] = example["tgt"] if isinstance(example["tgt"], list) else [example["tgt"]]
 
@@ -113,7 +116,9 @@ def tokenize_rounds_example(tokenizer, example, data_args):
     conversations = [[src, tgt] for src, tgt in zip(example["src"], example["tgt"])]
 
     # 1. only tokenize input_ids
-    conversation_result: list[tuple[list[int], list[int]]] = tokenizer.encode_chat_inputs(conversations)
+    conversation_result: list[tuple[list[int], list[int]]] = tokenizer.encode_chat_inputs(
+        conversations, context_data=context_data
+    )
     system_ids = conversation_result.pop("system", []) or []
 
     # 2. truncate conversations based on conversation unit
@@ -208,6 +213,7 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, i
     input_ids = rounds_inputs.pop("input_ids")
     # shift input_ids and labels
     input_ids, labels = input_ids[:-1], labels[1:]
+
     seq_length = len(input_ids)
     features = {"input_ids": input_ids, "labels": labels}
     if intokens:

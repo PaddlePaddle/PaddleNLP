@@ -24,7 +24,7 @@ class SemanticIndexBatchNeg(SemanticIndexBase):
 
         self.margin = margin
         # Used scaling cosine similarity to ease converge
-        self.sacle = scale
+        self.scale = scale
 
     def forward(
         self,
@@ -48,7 +48,7 @@ class SemanticIndexBatchNeg(SemanticIndexBase):
 
         cosine_sim = paddle.matmul(query_cls_embedding, title_cls_embedding, transpose_y=True)
 
-        # Substract margin from all positive samples cosine_sim()
+        # Subtract margin from all positive samples cosine_sim()
         margin_diag = paddle.full(
             shape=[query_cls_embedding.shape[0]], fill_value=self.margin, dtype=paddle.get_default_dtype()
         )
@@ -56,7 +56,7 @@ class SemanticIndexBatchNeg(SemanticIndexBase):
         cosine_sim = cosine_sim - paddle.diag(margin_diag)
 
         # Scale cosine to ease training converge
-        cosine_sim *= self.sacle
+        cosine_sim *= self.scale
 
         labels = paddle.arange(0, query_cls_embedding.shape[0], dtype="int64")
         labels = paddle.reshape(labels, shape=[-1, 1])
@@ -71,7 +71,7 @@ class SemanticIndexCacheNeg(SemanticIndexBase):
         super().__init__(pretrained_model, dropout, output_emb_size)
         self.margin = margin
         # Used scaling cosine similarity to ease converge
-        self.sacle = scale
+        self.scale = scale
 
     def forward(
         self,
@@ -95,13 +95,13 @@ class SemanticIndexCacheNeg(SemanticIndexBase):
 
         cosine_sim = paddle.matmul(query_cls_embedding, title_cls_embedding, transpose_y=True)
 
-        # Substract margin from all positive samples cosine_sim()
+        # Subtract margin from all positive samples cosine_sim()
         margin_diag = paddle.full(shape=[query_cls_embedding.shape[0]], fill_value=self.margin, dtype=cosine_sim.dtype)
 
         cosine_sim = cosine_sim - paddle.diag(margin_diag)
 
         # Scale cosine to ease training converge
-        cosine_sim *= self.sacle
+        cosine_sim *= self.scale
 
         labels = paddle.arange(0, query_cls_embedding.shape[0], dtype="int64")
         labels = paddle.reshape(labels, shape=[-1, 1])

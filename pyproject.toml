@@ -22,6 +22,7 @@ testpaths = [
     "tests/layers",
     "tests/metrics",
     "tests/ops",
+    "tests/trainer",
     "tests/transformers",
     "tests/peft",
     "tests/prompt",

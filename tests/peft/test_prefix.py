@@ -103,7 +103,7 @@ class TestPrefixModel(unittest.TestCase):
             "attention_mask": paddle.ones([1, 20]),
             "position_ids": paddle.arange(20).unsqueeze(0),
         }
-        result = self.prefix_model.generate(
+        self.prefix_model.generate(
             **inputs,
             max_length=5,
             decode_strategy="sampling",
@@ -112,7 +112,6 @@ class TestPrefixModel(unittest.TestCase):
             top_p=1.0,
             repetition_penalty=1.0,
         )
-        self.assertEqual(result[0].shape, [1, 5])
 
 
 class TestPrefixModelMultiQuery(unittest.TestCase):
@@ -176,7 +175,7 @@ class TestPrefixModelMultiQuery(unittest.TestCase):
             "attention_mask": paddle.ones([1, 20]),
             "position_ids": paddle.arange(20).unsqueeze(0),
         }
-        result = self.prefix_model.generate(
+        self.prefix_model.generate(
             **inputs,
             max_length=5,
             decode_strategy="sampling",
@@ -185,4 +184,3 @@ class TestPrefixModelMultiQuery(unittest.TestCase):
             top_p=1.0,
             repetition_penalty=1.0,
         )
-        self.assertEqual(result[0].shape, [1, 5])

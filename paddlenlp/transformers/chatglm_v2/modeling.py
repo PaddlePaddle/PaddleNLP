@@ -21,6 +21,8 @@ import paddle.nn.functional as F
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import map_structure
 
+from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
+
 from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -650,7 +652,15 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         rotary_dim = (
             config.hidden_size // config.num_attention_heads if config.kv_channels is None else config.kv_channels
         )
-        self.rotary_pos_emb = RotaryEmbedding(rotary_dim // 2)
+        if config.use_long_sequence_strategies:
+            self.config = config
+            self.rotary_pos_emb = LongSequenceStrategies.build_long_sequence_strategy(
+                config.long_sequence_strategy_type,
+                config.long_sequence_strategy_name,
+                **config.long_sequence_init_args,
+            )
+        else:
+            self.rotary_pos_emb = RotaryEmbedding(rotary_dim // 2)
         self.encoder = GLMTransformer(config)
         self.output_layer = nn.Linear(config.hidden_size, config.padded_vocab_size, bias_attr=False)
 
@@ -677,7 +687,6 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         )
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
         batch_size, seq_length = input_ids.shape
 
         if inputs_embeds is None:
@@ -686,7 +695,14 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         full_attention_mask = self.get_masks(input_ids, past_key_values, padding_mask=attention_mask)
 
         # Rotary positional embeddings
-        rotary_pos_emb = self.rotary_pos_emb(self.max_sequence_length)
+        if self.config.use_long_sequence_strategies:
+            cos, sin = self.rotary_pos_emb(seq_len=self.max_sequence_length)
+            cos, cos = paddle.chunk(cos, 2, axis=-1)
+            sin, sin = paddle.chunk(sin, 2, axis=-1)
+            rotary_pos_emb = paddle.stack([cos, sin], axis=-1)
+        else:
+            rotary_pos_emb = self.rotary_pos_emb(self.max_sequence_length)
+
         if position_ids is not None:
             rotary_pos_emb = rotary_pos_emb[position_ids]
         else:

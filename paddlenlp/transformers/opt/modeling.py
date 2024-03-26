@@ -81,7 +81,7 @@ def _expand_mask(mask, tgt_length):
     tgt_length = tgt_length if tgt_length is not None else src_length
 
     expanded_mask = ~(paddle.cast(mask[:, None, None, :], "bool"))
-    expanded_mask = paddle.cast(expanded_mask, dtype=paddle.float32)
+    expanded_mask = paddle.cast(expanded_mask, dtype=paddle.get_default_dtype())
 
     expanded_mask = expanded_mask.expand([batch_size, 1, tgt_length, src_length])
     expanded_mask = expanded_mask * float(finfo(paddle.get_default_dtype()).min)

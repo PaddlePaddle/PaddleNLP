@@ -23,6 +23,8 @@ from paddle.distributed.fleet.meta_parallel import (
 from paddle.quantization import PTQ, QAT, QuantConfig
 from paddleslim.quant.advanced import (
     GPTQ,
+    AutoClip,
+    AWQSearch,
     EMASampler,
     MultiStepSampler,
     PieceWiseSearch,
@@ -34,11 +36,16 @@ from paddleslim.quant.layers import (
     QuantizedColumnParallelLinear,
     QuantizedRowParallelLinear,
 )
-from paddleslim.quant.observers import AbsMaxChannelWiseWeightObserver, AVGObserver
+from paddleslim.quant.observers import (
+    AbsMaxChannelWiseWeightObserver,
+    AVGObserver,
+    GroupWiseWeightObserver,
+)
 from paddleslim.quant.observers.abs_max_weight import (
     AbsMaxChannelWiseWeightObserverLayer,
 )
 from paddleslim.quant.observers.avg import AVGObserverLayer
+from paddleslim.quant.observers.groupwise import GroupWiseWeightObserverLayer
 
 from paddlenlp.peft import PrefixModelForCausalLM
 from paddlenlp.peft.lora import (
@@ -96,20 +103,23 @@ def apply_shift(quant_args, trainer, ptq_dataloader, ptq_model_config):
         sample_function=shift_sampler,
         shift_all_linears=quant_args.shift_all_linears,
     )
-
-    trainer.ptq_loop(
-        ptq_dataloader,
-        description="Shift",
-        max_eval_iters=quant_args.shift_step,
-    )
-    shift.update_weight()
+    with paddle.no_grad():
+        trainer.ptq_loop(
+            ptq_dataloader,
+            description="Shift",
+            max_eval_iters=quant_args.shift_step,
+        )
+        shift.update_weight()
     del shift, shift_sampler
     logger.info("***** Shift done *****")
 
 
 def apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config):
 
-    logger.info("***** Running Smooth *****")
+    if quant_args.do_awq:
+        logger.info("***** Running AWQ *****")
+    else:
+        logger.info("***** Running Smooth *****")
     smooth_sampler = MultiStepSampler() if quant_args.smooth_sampler == "multi_step" else None
     if quant_args.smooth_piecewise_search:
         search_func = PieceWiseSearch(
@@ -123,6 +133,12 @@ def apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config):
             weight_quant_method="abs_max_channel_wise",
             act_quant_method="avg",
         )
+    elif quant_args.do_awq:
+        search_func = AWQSearch(
+            n_grid=20,
+            bits_length=4,
+            weight_quant_method=quant_args.weight_quant_method,
+        )
     else:
         search_func = None
     smooth = Smooth(
@@ -132,31 +148,64 @@ def apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config):
         smooth_all_linears=quant_args.smooth_all_linears,
         sample_function=smooth_sampler,
         search_function=search_func,
+        smooth_method="awq" if quant_args.do_awq else "smoothquant",
     )
-    trainer.ptq_loop(
-        ptq_dataloader,
-        description="Smooth",
-        max_eval_iters=quant_args.smooth_step,
-    )
+    with paddle.no_grad():
+        trainer.ptq_loop(
+            ptq_dataloader,
+            description="Smooth",
+            max_eval_iters=quant_args.smooth_step,
+        )
 
-    smooth.update_weight()
+        smooth.update_weight()
     del smooth, smooth_sampler, search_func
     logger.info("***** Smooth done *****")
+
+
+def apply_autoclip(quant_args, trainer, ptq_dataloader):
+    """
+    AutoClip
+    """
+    print("-------------------Start AutoClip------------------")
+    sampler = MultiStepSampler()
+    auto_clip = AutoClip(
+        trainer.model,
+        weight_bits=4,
+        weight_quant_method=quant_args.weight_quant_method,
+        sample_function=sampler,
+        n_grid=20,
+        max_shrink=0.5,
+    )
+    with paddle.no_grad():
+        trainer.ptq_loop(
+            ptq_dataloader,
+            description="AutoClip",
+            max_eval_iters=quant_args.autoclip_step,
+        )
+        auto_clip.auto_clip()
+    del sampler, auto_clip
+    logger.info("***** AutoClip done *****")
 
 
 def apply_ptq(quant_args, trainer, ptq_dataloader):
     logger.info("***** Running PTQ *****")
     q_config = QuantConfig(activation=None, weight=None)
+    if quant_args.weight_quant_method == "abs_max_channel_wise":
+        weight_observer = AbsMaxChannelWiseWeightObserver
+    elif quant_args.weight_quant_method == "groupwise":
+        weight_observer = GroupWiseWeightObserver
+    else:
+        raise ValueError("weight_quant_method should be one of ['abs_max_channel_wise', 'groupwise']")
 
     if quant_args.quant_type == "a8w8":
         activation = AVGObserver(quant_bits=8)
-        weight = AbsMaxChannelWiseWeightObserver(quant_bits=8)
+        weight = weight_observer(quant_bits=8)
     elif quant_args.quant_type == "weight_only_int4":
         activation = None
-        weight = AbsMaxChannelWiseWeightObserver(quant_bits=4)
+        weight = weight_observer(quant_bits=4)
     elif quant_args.quant_type == "weight_only_int8":
         activation = None
-        weight = AbsMaxChannelWiseWeightObserver(quant_bits=8)
+        weight = weight_observer(quant_bits=8)
     else:
         raise ValueError("quant_type should be one of ['a8w8', 'weight_only_int4', 'weight_only_int8']")
 
@@ -181,10 +230,12 @@ def apply_ptq(quant_args, trainer, ptq_dataloader):
         if isinstance(cur_layer, AbsMaxChannelWiseWeightObserverLayer):
             if "_observer" not in cur_name:
                 weight_scales[cur_name] = cur_layer.scales().numpy().tolist()
+        if isinstance(cur_layer, GroupWiseWeightObserverLayer):
+            if "_observer" not in cur_name:
+                weight_scales[cur_name] = cur_layer.scales().numpy().tolist()
         if isinstance(cur_layer, AVGObserverLayer):
             if "_observer" not in cur_name:
                 act_scales[cur_name] = cur_layer.scales().numpy().tolist()
-
     weight_scales_path = os.path.join(trainer.args.output_dir, "weight_scales.json")
     with open(weight_scales_path, "w") as f:
         json.dump(weight_scales, f)
@@ -210,12 +261,13 @@ def apply_gptq(quant_args, trainer, ptq_dataloader):
             parent_layer, sub_name = find_parent_layer_and_sub_name(model, cur_name)
             cur_quant_layer = GPTQ(cur_layer)
             setattr(parent_layer, sub_name, cur_quant_layer)
-            trainer.ptq_loop(
-                ptq_dataloader,
-                description="GPTQ",
-                max_eval_iters=quant_args.gptq_step,
-            )
-            cur_quant_layer.fasterquant(percdamp=0.1, groupsize=-1, actorder=True)
+            with paddle.no_grad():
+                trainer.ptq_loop(
+                    ptq_dataloader,
+                    description="GPTQ",
+                    max_eval_iters=quant_args.gptq_step,
+                )
+                cur_quant_layer.fasterquant(percdamp=0.1, groupsize=-1, actorder=True)
             del cur_quant_layer
             setattr(parent_layer, sub_name, cur_layer)
     logger.info("***** GPTQ done *****")

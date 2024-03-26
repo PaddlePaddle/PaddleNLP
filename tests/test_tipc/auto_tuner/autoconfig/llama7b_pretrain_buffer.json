@@ -1,0 +1,89 @@
+{
+    "dp_degree": "auto",
+    "max_search_time": 900,
+    "max_time_per_task": 400,
+    "buffer":17408,
+    "max_mem_usage":40960,
+    "metric_cfg": {
+      "OptimizationDirection": "Maximize",
+      "name": "interval_samples_per_second"
+    },
+    "micro_batch_size": "auto",
+    "model_cfg": {
+      "global_batch_size": 8,
+      "hidden_size": 5120,
+      "num_attention_heads": 40,
+      "num_layers": 40,
+      "vocab_size": 32000
+    },
+    "mp_degree": "auto",
+    "pp_degree": "auto",
+    "run_cmd": {
+      "gradient_accumulation_steps": [
+        "./autoconfig/llama7b_pretrain_params.json",
+        "gradient_accumulation_steps"
+      ],
+      "micro_batch_size": [
+        "./autoconfig/llama7b_pretrain_params.json",
+        "per_device_train_batch_size"
+      ],
+      "mp_degree": [
+        "./autoconfig/llama7b_pretrain_params.json",
+        "tensor_parallel_degree"
+      ],
+      "pp_degree": [
+        "./autoconfig/llama7b_pretrain_params.json",
+        "pipeline_parallel_degree"
+      ],
+      "run_best_stage": {
+        "continue_training": [
+          "./autoconfig/llama7b_pretrain_params.json",
+          "continue_training",
+          0
+        ],
+        "autotuner_benchmark": [
+          "./autoconfig/llama7b_pretrain_params.json",
+          "autotuner_benchmark",
+          0
+        ]
+      },
+      "search_stage": {
+        "continue_training": [
+          "./autoconfig/llama7b_pretrain_params.json",
+          "continue_training",
+          0
+        ],
+        "autotuner_benchmark": [
+          "./autoconfig/llama7b_pretrain_params.json",
+          "autotuner_benchmark",
+          1
+        ]
+      },
+      "sharding_degree": [
+        "./autoconfig/llama7b_pretrain_params.json",
+        "sharding_parallel_degree"
+      ],
+      "sharding_stage": [
+        "./autoconfig/llama7b_pretrain_params.json",
+        "sharding",
+        "stage"
+      ],
+      "use_recompute": [
+        "./autoconfig/llama7b_pretrain_params.json",
+        "recompute"
+      ],
+      "recompute_granularity": [
+        "./autoconfig/llama7b_pretrain_params.json",
+        "recompute_granularity"
+      ]
+    },
+    "sharding_degree": "auto",
+    "sharding_stage": "auto",
+    "task_limit": 2000,
+    "use_recompute": "auto",
+    "recompute_granularity": "auto",
+    "invalid_strategy": ["stage3_mp*"],
+    "schedule_prior": ["mp4"],
+    "need_baseline": true,
+    "mode": "Pretrain"
+  }

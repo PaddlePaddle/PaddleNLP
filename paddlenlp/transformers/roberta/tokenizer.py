@@ -19,9 +19,8 @@ import os
 
 from paddle.utils import try_import
 
-from ...utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
-from ...utils.env import MODEL_HOME
-from ...utils.log import logger
+from paddlenlp.utils.download import resolve_file_path
+
 from .. import (
     AddedToken,
     BasicTokenizer,
@@ -597,17 +596,26 @@ class RobertaTokenizer:
             return RobertaBPETokenizer.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         else:
             # Assuming from community-contributed pretrained models
-            config_file = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file])
-            default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
-            try:
-                resolved_config_file = get_path_from_url(config_file, default_root)
-            except RuntimeError as err:
-                logger.error(err)
-                raise RuntimeError(
-                    f"Can't find load tokenizer_config_file for '{pretrained_model_name_or_path}'.\n"
-                    f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-                    "a correct model-identifier of community-contributed pretrained models.\n"
-                )
+
+            subfolder = kwargs.pop("subfolder", None)
+            cache_dir = kwargs.pop("cache_dir", None)
+            force_download = kwargs.pop("force_download", False)
+            from_aistudio = kwargs.pop("from_aistudio", False)
+            from_hf_hub = kwargs.pop("from_hf_hub", False)
+
+            resolved_config_file = resolve_file_path(
+                pretrained_model_name_or_path,
+                [cls.tokenizer_config_file],
+                subfolder,
+                cache_dir=cache_dir,
+                force_download=force_download,
+                from_aistudio=from_aistudio,
+                from_hf_hub=from_hf_hub,
+            )
+            assert (
+                resolved_config_file is not None
+            ), f"please make sure {cls.tokenizer_config_file} under {pretrained_model_name_or_path}"
+
             with io.open(resolved_config_file, encoding="utf-8") as f:
                 init_kwargs = json.load(f)
 

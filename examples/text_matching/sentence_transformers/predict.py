@@ -152,6 +152,8 @@ if __name__ == "__main__":
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
+    else:
+        raise ValueError("Please set --params_path with correct pretrained model file")
 
     results = predict(model, data, tokenizer, label_map, batch_size=args.batch_size)
     for idx, text in enumerate(data):

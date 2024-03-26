@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Optional
+
 from aistudio_sdk.hub import download
 
 
@@ -23,11 +25,32 @@ class EntryNotFoundError(Exception):
     pass
 
 
-def aistudio_download(repo_id: str, filename: str):
-    # TODO: add arguments such as cache_dir, revision, etc.
+def _add_subfolder(weights_name: str, subfolder: Optional[str] = None) -> str:
+    if subfolder is not None and subfolder != "":
+        weights_name = "/".join([subfolder, weights_name])
+    return weights_name
+
+
+def aistudio_download(
+    repo_id: str,
+    filename: str = None,
+    cache_dir: Optional[str] = None,
+    subfolder: Optional[str] = "",
+    revision: Optional[str] = None,
+    **kwargs,
+):
+    if revision is None:
+        revision = "master"
+    filename = _add_subfolder(filename, subfolder)
+    download_kwargs = {}
+    if revision is not None:
+        download_kwargs["revision"] = revision
+    if cache_dir is not None:
+        download_kwargs["cache_dir"] = cache_dir
     res = download(
         repo_id=repo_id,
         filename=filename,
+        **download_kwargs,
     )
     if "path" in res:
         return res["path"]
