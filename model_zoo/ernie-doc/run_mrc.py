@@ -221,13 +221,18 @@ def do_train(args):
         random_seed=args.seed,
     )
 
-    train_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
+    # paddle version > 2.5 or develop
+    paddle_version = float(paddle.__version__[:3])
+    if (paddle_version == 0.0) or (paddle_version > 2.5):
+        DataLoader = paddle.base.io.reader.DataLoader
+    else:
+        DataLoader = paddle.fluid.reader.DataLoader
+
+    train_dataloader = DataLoader.from_generator(capacity=70, return_list=True)
     train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
-
-    eval_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
+    eval_dataloader = DataLoader.from_generator(capacity=70, return_list=True)
     eval_dataloader.set_batch_generator(eval_ds_iter, paddle.get_device())
-
-    test_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
+    test_dataloader = DataLoader.from_generator(capacity=70, return_list=True)
     test_dataloader.set_batch_generator(test_ds_iter, paddle.get_device())
 
     num_training_examples = train_ds_iter.get_num_examples()
