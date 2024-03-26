@@ -158,7 +158,7 @@ std::vector<paddle::DataType> DequantInt8Dtype(const paddle::DataType& input_dty
 }
 
 PD_BUILD_OP(dequant_int8)
-    .Inputs({"intput","out_scale"})
+    .Inputs({"input","out_scale"})
     .Outputs({"output"})
     .Attrs({"dtype: std::string"})
     .SetKernelFn(PD_KERNEL(DequantInt8))

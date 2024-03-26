@@ -195,7 +195,7 @@ def evaluate(model, criterion, metric, data_loader):
 
 def load_ds(datafiles):
     """
-    intput:
+    input:
         datafiles -- str or list[str] -- the path of train or dev sets
         split_train -- Boolean -- split from train or not
         dev_size -- int -- split how much data from train

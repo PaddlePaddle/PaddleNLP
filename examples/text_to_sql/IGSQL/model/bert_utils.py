@@ -275,7 +275,7 @@ def get_wemb_bert(
     ) = get_bert_output(model_bert, tokenizer, nlu_t, hds, max_seq_length)
     # all_encoder_layer: BERT outputs from all layers.
     # pooled_output: output of [CLS] vec.
-    # tokens: BERT intput tokens
+    # tokens: BERT input tokens
     # i_nlu: start and end indices of question in tokens
     # i_hds: start and end indices of headers
 
