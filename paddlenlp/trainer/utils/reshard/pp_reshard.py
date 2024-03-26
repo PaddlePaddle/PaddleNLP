@@ -21,7 +21,7 @@ from paddle.distributed.fleet.utils.log_util import logger
 _GLOBAL_EXTRACT_LAYER_NAME_FUNC = None
 
 
-def regitser_extract_layer_name_func(func):
+def register_extract_layer_name_func(func):
     global _GLOBAL_EXTRACT_LAYER_NAME_FUNC
     _GLOBAL_EXTRACT_LAYER_NAME_FUNC = func
 
@@ -155,7 +155,7 @@ class LayerReNamingManager:
         return ".".join(names)
 
 
-class PipeLinelayer:
+class PipeLineLayer:
     def __init__(self, layer_name, param_names):
         self._layer_name = layer_name
 
@@ -189,7 +189,7 @@ class PipeLineSegment:
 
     def add_layer(self, layer_name, param_names):
         assert self._cur_index < self._end_index
-        layer = PipeLinelayer(layer_name, param_names)
+        layer = PipeLineLayer(layer_name, param_names)
         self._layers[layer_name] = layer
         self._cur_index = self._cur_index + 1
 
@@ -202,7 +202,7 @@ class PipeLineSegment:
 class PipeLineStage:
     def __init__(self):
         self._rename_mgr = LayerReNamingManager()
-        # map segement start index to segment
+        # map segment start index to segment
         self._segments = OrderedDict()
         self._layer_to_segment = OrderedDict()
         self._param_to_tname = OrderedDict()

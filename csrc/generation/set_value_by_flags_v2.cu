@@ -19,7 +19,7 @@ __global__ void set_value_by_flag_and_id_v2(const bool *stop_flags,
         if (step_idx[tid] >= 0) {
             if (seq_len_dec == 0) { // encoder, get last token accord to seq_lens_encoder
                 pre_ids_all_now[step_idx[tid]] = input_ids_now[seq_len_enc - 1];
-            } else { // decoedr, get first token
+            } else { // decoder, get first token
                 pre_ids_all_now[step_idx[tid]] = input_ids_now[0];
             }
         }

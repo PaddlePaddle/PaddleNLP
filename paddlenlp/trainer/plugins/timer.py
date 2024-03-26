@@ -21,7 +21,7 @@ from paddlenlp.utils.log import logger
 
 
 class _Timer:
-    """Profile Timer for recording time taken by forward/ bacward/ reduce/ step."""
+    """Profile Timer for recording time taken by forward/ backward/ reduce/ step."""
 
     def __init__(self, name):
         self.name = name
