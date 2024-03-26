@@ -101,15 +101,13 @@ class GPTEmbeddingPipe(GPTEmbeddings):
         embeddings = super().forward(input_ids=input_ids, position_ids=position_ids)
 
         batch_size, seq_length = input_ids.shape
-        causal_mask = self.bias[:, :, 0:seq_length, :seq_length]
         if attention_mask is not None:
             if attention_mask.dtype != paddle.int64:
                 attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
             if len(attention_mask.shape) == 2:
                 attention_mask = attention_mask[:, None, None, :]
+            causal_mask = self.bias[:, :, 0:seq_length, :seq_length]
             attention_mask = (1.0 - (attention_mask & causal_mask)) * -1e4
-        else:
-            attention_mask = (1.0 - causal_mask) * -1e4
 
         return return_args(embeddings, attention_mask, position_ids)
 
