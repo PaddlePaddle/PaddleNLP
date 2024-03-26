@@ -865,12 +865,10 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         self.lm_head = LlamaLMHead(config)
 
     @classmethod
-    def from_pretrained(
-        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
-    ):
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         # TODO: Support safetensors loading.
         kwargs["use_safetensors"] = False
-        return super().from_pretrained(pretrained_model_name_or_path, from_hf_hub, subfolder, *args, **kwargs)
+        return super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
@@ -1106,17 +1104,15 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         return mappings
 
     @classmethod
-    def from_pretrained(
-        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
-    ):
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         # TODO: Support safetensors loading.
         kwargs["use_safetensors"] = False
         from paddlenlp.transformers.utils import (
             ContextManagers,
             is_safetensors_available,
-            resolve_cache_dir,
         )
 
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
         config = kwargs.pop("config", None)
         from_aistudio = kwargs.get("from_aistudio", False)
         subfolder = kwargs.get("subfolder", None)
@@ -1124,8 +1120,6 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
         convert_from_torch = kwargs.pop("convert_from_torch", None)
         cache_dir = kwargs.pop("cache_dir", None)
-
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
         init_contexts = []
         with ContextManagers(init_contexts):

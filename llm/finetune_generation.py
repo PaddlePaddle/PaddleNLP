@@ -112,6 +112,7 @@ def main():
         weight_double_quant=model_args.weight_double_quant,
         weight_double_quant_block_size=model_args.weight_double_quant_block_size,
     )
+
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
             raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
@@ -398,12 +399,18 @@ def main():
             multi_query_group_num=prefix_tuning_params["multi_query_group_num"],
             dtype=dtype,
         )
-        model = PrefixModelForCausalLM(
-            model=model,
-            prefix_config=prefix_config,
-            postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
-        )
-        model.mark_only_prefix_as_trainable()
+        if model_args.prefix_path is None:
+            model = PrefixModelForCausalLM(
+                model=model,
+                prefix_config=prefix_config,
+                postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
+            )
+        else:
+            model = PrefixModelForCausalLM.from_pretrained(
+                model=model,
+                prefix_path=model_args.prefix_path,
+                postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
+            )
         model.print_trainable_parameters()
 
     if model_args.lora:
@@ -412,17 +419,20 @@ def main():
             lora_config = LoRAConfig(
                 target_modules=target_modules,
                 r=model_args.lora_rank,
-                lora_alpha=2 * model_args.lora_rank,
+                lora_alpha=2 * model_args.lora_rank if not model_args.rslora else 4,
+                rslora=model_args.rslora,
+                lora_plus_scale=model_args.lora_plus_scale,
                 merge_weights=False,
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 dtype=dtype,
                 do_qat=quant_args.do_qat,
                 base_model_name_or_path=model_args.model_name_or_path,
+                use_quick_lora=model_args.use_quick_lora,
             )
             model = LoRAModel(model, lora_config)
         else:
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
-        model.mark_only_lora_as_trainable()
+
         model.print_trainable_parameters()
 
     def compute_metrics_do_generation(eval_preds):

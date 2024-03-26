@@ -965,7 +965,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP1-PP1() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.42011845
+    loss_base=9.42011833
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -1031,7 +1031,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP1() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.44299495
+    loss_base=9.44299471
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -1093,7 +1093,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2() {
         --data_impl "mmap" \
         --enable_auto_parallel 1 \
         >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $case_log_dir/workerlog.2 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    loss=`cat $case_log_dir/workerlog.4 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
@@ -1161,7 +1161,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
         --data_impl "mmap" \
         --enable_auto_parallel 1 \
         >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $case_log_dir/workerlog.3 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    loss=`cat $case_log_dir/workerlog.4 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
@@ -1230,7 +1230,7 @@ function llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
         --data_impl "mmap" \
         --enable_auto_parallel 1 \
         >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $case_log_dir/workerlog.3 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    loss=`cat $case_log_dir/workerlog.4 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
@@ -1301,7 +1301,7 @@ function llama_dygraph_auto_bs8_fp32_DP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.52781677
+    loss_base=9.53389835
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -1368,7 +1368,7 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.40659046
+    loss_base=9.39066124
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -1435,7 +1435,7 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.38319206
+    loss_base=9.38235474
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -1503,7 +1503,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.38341904
+    loss_base=9.38257694
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}

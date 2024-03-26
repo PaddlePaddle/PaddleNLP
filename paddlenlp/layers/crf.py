@@ -198,7 +198,7 @@ class LinearChainCrf(nn.Layer):
         flattened_transition_indices = transition_indices.reshape([-1])
         flattened_transition_params = paddle.flatten(self.transitions)
         scores = paddle.gather(flattened_transition_params, flattened_transition_indices).reshape([batch_size, -1])
-        mask_scores = scores * mask[:, 1:]
+        mask_scores = scores * mask[:, 1:].astype(scores.dtype)
 
         # Accumulate the transition score
         score = paddle.sum(mask_scores, 1)

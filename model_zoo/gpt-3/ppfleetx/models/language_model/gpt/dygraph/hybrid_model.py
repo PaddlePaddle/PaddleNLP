@@ -48,7 +48,7 @@ from .processor import (
     MinLengthLogitsProcessor,
     RepetitionPenaltyLogitsProcessor,
 )
-from .sequence_parallel_utils import (
+from paddle.distributed.fleet.utils.sequence_parallel_utils import (
     ColumnSequenceParallelLinear,
     GatherOp,
     RowSequenceParallelLinear,

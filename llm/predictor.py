@@ -26,6 +26,7 @@ import numpy as np
 import paddle
 import paddle.distributed.fleet.base.topology as tp
 import paddle.incubate.multiprocessing as mp
+from paddle.base.framework import in_cinn_mode, in_pir_executor_mode
 from paddle.distributed import fleet
 from utils import (
     dybatch_preprocess,
@@ -360,6 +361,10 @@ class StaticGraphPredictor(BasePredictor):
             inference_config.disable_gpu()
         inference_config.disable_glog_info()
         inference_config.enable_new_executor()
+        if in_pir_executor_mode():
+            inference_config.enable_new_ir()
+            if in_cinn_mode():
+                inference_config.enable_cinn()
 
         with static_mode_guard():
             self.predictor = paddle.inference.create_predictor(inference_config)

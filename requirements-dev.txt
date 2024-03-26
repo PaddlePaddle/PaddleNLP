@@ -1,4 +1,3 @@
-paddlepaddle==2.5.1
 paddleocr<2.7
 pre-commit
 pytest
@@ -20,3 +19,11 @@ tiktoken
 visualdl
 wandb
 tensorboard
+modelscope
+hyperopt
+h5py
+deploy
+ray
+loguru
+data
+wget
