@@ -18,3 +18,4 @@ from .modeling_auto import *
 from .modeling_auto_static import *
 from .modeling_pp import *
 from .tokenizer import *
+from .modeling_3D_auto import *
