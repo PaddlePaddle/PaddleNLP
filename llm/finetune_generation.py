@@ -433,6 +433,8 @@ def main():
         else:
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
 
+        # lora训练固定原始模型权重
+        model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
 
     def compute_metrics_do_generation(eval_preds):
