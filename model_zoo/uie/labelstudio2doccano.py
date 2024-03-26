@@ -13,12 +13,11 @@
 # limitations under the License.
 
 import argparse
-import os
 import json
+import os
 
 
-def append_attrs(data, item, label_id, relation_id):
-
+def append_attrs(data, item, label_id, relation_id, default_relation_type):
     mapp = {}
 
     for anno in data["annotations"][0]["result"]:
@@ -42,7 +41,7 @@ def append_attrs(data, item, label_id, relation_id):
                     "id": relation_id,
                     "from_id": mapp[anno["from_id"]],
                     "to_id": mapp[anno["to_id"]],
-                    "type": anno["labels"][0],
+                    "type": anno["labels"][0] if len(anno["labels"]) else default_relation_type,
                 }
             )
 
@@ -57,8 +56,19 @@ def convert(dataset, task_type):
         relation_id = 0
         for data in dataset:
             outer_id += 1
-            item = {"id": outer_id, "text": data["data"]["text"], "entities": [], "relations": []}
-            item, label_id, relation_id = append_attrs(data, item, label_id, relation_id)
+            item = {
+                "id": outer_id,
+                "text": data["data"][args.text_field],
+                "entities": [],
+                "relations": [],
+            }
+            item, label_id, relation_id = append_attrs(
+                data,
+                item,
+                label_id,
+                relation_id,
+                default_relation_type=args.default_relation_type,
+            )
             results.append(item)
     # for the classification task
     else:
@@ -67,7 +77,7 @@ def convert(dataset, task_type):
             results.append(
                 {
                     "id": outer_id,
-                    "text": data["data"]["text"],
+                    "text": data["data"][args.text_field],
                     "label": data["annotations"][0]["result"][0]["value"]["choices"],
                 }
             )
@@ -75,13 +85,11 @@ def convert(dataset, task_type):
 
 
 def do_convert(args):
-
     if not os.path.exists(args.labelstudio_file):
         raise ValueError("Please input the correct path of label studio file.")
 
     with open(args.labelstudio_file, "r", encoding="utf-8") as infile:
-        for content in infile:
-            dataset = json.loads(content)
+        dataset = json.load(infile)
         results = convert(dataset, args.task_type)
 
     with open(args.doccano_file, "w", encoding="utf-8") as outfile:
@@ -91,19 +99,37 @@ def do_convert(args):
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--labelstudio_file", type=str, help="The export file path of label studio, only support the JSON format."
+        "--labelstudio_file",
+        type=str,
+        help="The export file path of label studio, only support the JSON format.",
     )
-    parser.add_argument("--doccano_file", type=str, default="doccano_ext.jsonl", help="Saving path in doccano format.")
+    parser.add_argument(
+        "--doccano_file",
+        type=str,
+        default="doccano_ext.jsonl",
+        help="Saving path in doccano format.",
+    )
     parser.add_argument(
         "--task_type",
         type=str,
         choices=["ext", "cls"],
         default="ext",
         help="Select task type, ext for the extraction task and cls for the classification task, defaults to ext.",
+    )
+    parser.add_argument(
+        "--default_relation_type",
+        type=str,
+        default="relation",
+        help="The default relation type for missing relation type, defaults to relation.",
+    )
+    parser.add_argument(
+        "--text_field",
+        type=str,
+        default="text",
+        help="The field name representing the text column of data , defaults to text.",
     )
 
     args = parser.parse_args()
