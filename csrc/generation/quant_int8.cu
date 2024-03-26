@@ -23,8 +23,9 @@
 #include<stdio.h>
 #include<algorithm>
 #include<cuda_fp16.h>
+#ifdef CUDA_ENABLE_BF16
 #include<cuda_bf16.h>
-
+#endif
 
 constexpr int DequantKernelVecSize = 4;
 
@@ -52,10 +53,12 @@ __forceinline__ __device__ half add_mul<half>(half a, half b, half c) {
     return __hmul(__hadd(a, b), c);
 }
 
+#ifdef CUDA_ENABLE_BF16
 template<>
 __forceinline__ __device__ __nv_bfloat16 add_mul<__nv_bfloat16>(__nv_bfloat16 a, __nv_bfloat16 b, __nv_bfloat16 c) {
     return __hmul(__hadd(a, b), c);
 }
+#endif
 
 
 
@@ -210,11 +213,13 @@ std::vector<paddle::Tensor> QuantInt8(const paddle::Tensor& input,
                                       float min_bound) {
     // printf("#### quant int8 scale:%f \n",scale);
     switch (input.type()) {
+#ifdef CUDA_ENABLE_BF16
         case paddle::DataType::BFLOAT16: {
             return LaunchQuantInt8<paddle::DataType::BFLOAT16>(
                 input, shift, smooth, scale, round_type, max_bound, min_bound
             );
         }
+#endif
         case paddle::DataType::FLOAT16: {
             return LaunchQuantInt8<paddle::DataType::FLOAT16>(
                 input, shift, smooth, scale, round_type, max_bound, min_bound

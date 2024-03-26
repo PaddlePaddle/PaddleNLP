@@ -135,6 +135,7 @@ std::vector<paddle::Tensor> QKVTransposeSplit(const paddle::Tensor& qkv,
                                               int num_head,
                                               int head_size) {
     switch (qkv.type()) {
+#ifdef CUDA_ENABLE_BF16
         case paddle::DataType::BFLOAT16: {
             return qkv_transpose_split<paddle::DataType::BFLOAT16>(
                 qkv,
@@ -145,6 +146,7 @@ std::vector<paddle::Tensor> QKVTransposeSplit(const paddle::Tensor& qkv,
                 head_size
             );
         }
+#endif
         case paddle::DataType::FLOAT16: {
             return qkv_transpose_split<paddle::DataType::FLOAT16>(
                 qkv,

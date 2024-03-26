@@ -109,6 +109,7 @@ std::vector<paddle::Tensor> RebuildPadding(const paddle::Tensor& tmp_out,
                                            const paddle::Tensor& seq_lens,
                                            const paddle::Tensor& input_ids) {
     switch (tmp_out.type()) {
+#ifdef CUDA_ENABLE_BF16
         case paddle::DataType::BFLOAT16: {
             return rebuild_padding<paddle::DataType::BFLOAT16>(
                 tmp_out,
@@ -117,6 +118,7 @@ std::vector<paddle::Tensor> RebuildPadding(const paddle::Tensor& tmp_out,
                 input_ids
             );
         }
+#endif
         case paddle::DataType::FLOAT16: {
             return rebuild_padding<paddle::DataType::FLOAT16>(
                 tmp_out,

@@ -15,7 +15,6 @@
 #pragma once
 
 #include "paddle/extension.h"
-#include <cub/cub.cuh>
 #include <curand_kernel.h>
 
 constexpr int kBlockSize = 256; 
@@ -71,12 +70,14 @@ public:
   typedef paddle::float16 data_t;
 };
 
+#ifdef CUDA_ENABLE_BF16
 template <>
 class PDTraits<paddle::DataType::BFLOAT16> {
 public:
   typedef __nv_bfloat16 DataType;
   typedef paddle::bfloat16 data_t;
 };
+#endif
 
 template <typename T, int Size>
 struct alignas(sizeof(T) * Size) AlignedVector {

@@ -106,8 +106,10 @@ std::vector<paddle::Tensor> LaunchDequantInt8(const paddle::Tensor& input,
 
     if (dtype == "float32")
         data_type = paddle::DataType::FLOAT32;
+#ifdef CUDA_ENABLE_BF16
     else if (dtype == "bfloat16")
         data_type = paddle::DataType::BFLOAT16;
+#endif
     else if (dtype ==  "float16")
         data_type = paddle::DataType::FLOAT16;
     else 
@@ -116,9 +118,11 @@ std::vector<paddle::Tensor> LaunchDequantInt8(const paddle::Tensor& input,
                 "Only bfloat16, float16 and float32 are supported. ");
 
     switch (data_type) {
+#ifdef CUDA_ENABLE_BF16
         case paddle::DataType::BFLOAT16: 
             return DispatchLaunchDequantInt8<paddle::DataType::BFLOAT16>(input, scale);
             break;
+#endif
         case paddle::DataType::FLOAT16: 
             return DispatchLaunchDequantInt8<paddle::DataType::FLOAT16>(input, scale);
             break;
@@ -145,8 +149,10 @@ std::vector<paddle::DataType> DequantInt8Dtype(const paddle::DataType& input_dty
     paddle::DataType data_type;
     if (dtype == "float32")
         data_type = paddle::DataType::FLOAT32;
+#ifdef CUDA_ENABLE_BF16
     else if (dtype == "bfloat16")
         data_type = paddle::DataType::BFLOAT16;
+#endif
     else if (dtype ==  "float16")
         data_type = paddle::DataType::FLOAT16;
     else 
