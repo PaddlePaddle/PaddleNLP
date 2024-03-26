@@ -25,12 +25,11 @@ import paddle.distributed as dist
 import paddle.nn as nn
 from data import DummyDataset, PromptOnlyBatch
 from infer_utils import InferEvalModel, infer_guard
-from models.ppo_model_utils import (
+from models.ppo_model_utils import (  # make_position_ids,
     RLHFPPOMixedLoss,
     RLHFValueLoss,
     create_loss,
     gather_log_probabilities,
-    make_position_ids,
 )
 from paddle.distributed import fleet
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
@@ -1065,11 +1064,12 @@ class PPOTrainer(Trainer):
 
         from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
+        # allow reference_model/reward_model to use different dist strategy
         with guard_set_args(
             args,
             {
                 "recompute": False,
-                "fp16_opt_level": "O1",
+                # "fp16_opt_level": "O1",
                 "pipeline_parallel_degree": args.pipeline_parallel_degree
                 if isinstance(reference_model, PipelineLayer)
                 else 1,  # workaround for pipeline parallel model check
@@ -1191,9 +1191,9 @@ class PPOTrainer(Trainer):
                 seq = self.actor_model.generate(
                     input_ids=inputs["input_ids"],
                     attention_mask=inputs["attention_mask"],
-                    position_ids=inputs["position_ids"]
-                    if "position_ids" in inputs
-                    else make_position_ids(inputs["attention_mask"]),
+                    # position_ids=inputs["position_ids"]
+                    # if "position_ids" in inputs
+                    # else make_position_ids(inputs["attention_mask"]),
                     generation_config=self.generation_config,
                     synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
                 )[0]
@@ -1369,35 +1369,14 @@ class PPOTrainer(Trainer):
                         reload_tensor_to_gpu(self.reward_model.state_dict())
                         self.timers and self.timers("reload-reward").stop()
 
-                    # todo, split prompt_only_batch
-                    # pp2tp2dp2 -> dp4tp2 prompt_only_batch
+                    # TODO(guosheng): guard for data split/merge
                     self.timers and self.timers("resplit-data").start()
                     prompt_only_batch = data_group_split(prompt_only_batch, group=gp)
                     self.timers and self.timers("resplit-data").stop()
-
                     self.timers and self.timers("split-rl-micro-batches").start()
-                    # 生成数据
-                    # per_train 4, accu 8
-                    # prompt 32
-
-                    # 32? [4,4,4,4,4,4,4]
                     rl_batches = self.split_rl_micro_batches(prompt_only_batch)
-                    # rl_batches = self.load_sing_gen_data(as_batches=True,
-                    #                                      use_counter=True)
                     self.timers and self.timers("split-rl-micro-batches").stop()
-
-                self.timers and self.timers("ptx-batch").start()
-                if self.use_ptx:
-                    # ptx_batch = data_group_split(ptx_batch, group=gp)
-                    ptx_batches = self.split_ptx_micro_batches(ptx_batch)
-                    # ptx_batches = data_group_merge(ptx_batches, group=gp)
-                else:
-                    ptx_batches = [None for _ in range(len(rl_batches))]
-
-                self.timers and self.timers("ptx-batch").stop()
-
                 self.timers and self.timers("merge-data").start()
-                # todo, merge data
                 if gp is not None:
                     input_ids_length = rl_batches[0]["input_ids"].shape[-1]
                     rl_batches[0]["input_ids_length"] = paddle.to_tensor(
@@ -1406,15 +1385,17 @@ class PPOTrainer(Trainer):
                     rl_batches = data_group_merge(rl_batches, group=gp)
                     input_ids_length_batchs = rl_batches[0].pop("input_ids_length")
                     rl_batches[0] = repad_rl_batches(rl_batches[0], input_ids_length_batchs)
-
-                paddle.device.cuda.empty_cache()
                 self.timers and self.timers("merge-data").stop()
 
-                # # 数据造好, 开始训练
-                # self.reference_model.offload()
-                # self.reward_model.offload()
-                # policy_model_eval.cleanup()
-                # value_model_eval.cleanup()
+                self.timers and self.timers("ptx-batch").start()
+                if self.use_ptx:
+                    ptx_batches = self.split_ptx_micro_batches(ptx_batch)
+                else:
+                    ptx_batches = [None for _ in range(len(rl_batches))]
+                self.timers and self.timers("ptx-batch").stop()
+
+                paddle.device.cuda.empty_cache()
+
                 if self.args.offload_level is not None:
                     if self.args.eval_mode is not None and "eval" in self.args.offload_level:
                         self.timers and self.timers("offload-eval").start()
@@ -1580,17 +1561,18 @@ class PPOTrainer(Trainer):
 
                 # policy_model.reload()
                 # value_model.reload()
-                self.timers and self.timers("offload-reload").start()
-                reload_tensor_to_gpu(self.actor_model.state_dict())
-                reload_tensor_to_gpu(self.reward_critic_model.state_dict())
-                self.timers and self.timers("offload-reload").stop()
+                # self.timers and self.timers("offload-reload").start()
+                # reload_tensor_to_gpu(self.actor_model.state_dict())
+                # reload_tensor_to_gpu(self.reward_critic_model.state_dict())
+                # self.timers and self.timers("offload-reload").stop()
 
                 logger.info("Doing rl step...")
                 self.timers and self.timers("rl_step").start()
                 rl_info = self.rl_step(rl_batch)
                 paddle.device.cuda.empty_cache()
                 self.timers and self.timers("rl_step").stop()
-                if self.args.eval_mode is not None and "optimizer" in self.args.offload_level:
+
+                if "optimizer" in self.args.offload_level:
                     self.timers and self.timers("offload-value-optimizer").start()
                     offload_tensor_to_cpu(self.value_trainer.optimizer.state_dict())
                     self.timers and self.timers("offload-value-optimizer").stop()
@@ -1603,6 +1585,7 @@ class PPOTrainer(Trainer):
                     paddle.device.cuda.empty_cache()
                     self.timers and self.timers("ptx_step").stop()
 
+                if "optimizer" in self.args.offload_level:
                     self.timers and self.timers("offload-policy-optimizer").start()
                     offload_tensor_to_cpu(self.policy_trainer.optimizer.state_dict())
                     self.timers and self.timers("offload-policy-optimizer").stop()
@@ -1741,7 +1724,7 @@ class PPOTrainer(Trainer):
         # inputs shared by policy and value trainer
         input_ids = rl_batch["input_ids"]  # length: src+tgt
         attention_mask = rl_batch["attention_mask"]  # length: src+tgt
-        position_ids = rl_batch["position_ids"]  # length: src+tgt
+        position_ids = None  # rl_batch["position_ids"]  # length: src+tgt
         sequence_mask = rl_batch["sequence_mask"]  # length: src+tgt(-1)
         # inputs used by policy trainer
         old_log_probs = rl_batch["log_probs"]  # length: src+tgt(-1)
@@ -1840,19 +1823,17 @@ class PPOTrainer(Trainer):
         """Rollout a batch of experiences."""
         input_ids = prompt_only_batch["input_ids"]
         attention_mask = prompt_only_batch["attention_mask"]
-        position_ids = (
-            prompt_only_batch["position_ids"]
-            if "position_ids" in prompt_only_batch
-            else make_position_ids(attention_mask)
-        )
-        # NOTE: generation output of paddlenlp do not contain prompt, we should
-        # change sequences here.
+        # position_ids = (
+        #     prompt_only_batch["position_ids"]
+        #     if "position_ids" in prompt_only_batch
+        #     else make_position_ids(attention_mask)
+        # )
 
         self.timers and self.timers("actor-model-generate").start()
         sequences = self.actor_model.generate(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            position_ids=position_ids,
+            # position_ids=position_ids,
             generation_config=self.generation_config,
             synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
         )[0]
@@ -1900,7 +1881,7 @@ class PPOTrainer(Trainer):
         # If using right padding source + left padding target, make padding positions
         # in source be 0, since reward model use position_ids plus with padding size
         # (number of 0s) in source to calculate end offsets.
-        position_ids = make_position_ids(attention_mask)
+        position_ids = None  # make_position_ids(attention_mask)
 
         # pipe model outputs a logits tensor with LMHead, while non-pipe model
         # outputs a tuple with logits tensor as the only one element.

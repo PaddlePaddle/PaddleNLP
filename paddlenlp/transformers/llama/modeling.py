@@ -366,8 +366,9 @@ class LlamaRMSNorm(nn.Layer):
 
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
-                hidden_states = hidden_states.astype("float32")
-                variance = hidden_states.pow(2).mean(-1, keepdim=True)
+                # hidden_states = hidden_states.astype("float32")
+                # variance = hidden_states.pow(2).mean(-1, keepdim=True)
+                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
                 hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
         else:
             hidden_states = hidden_states.astype("float32")

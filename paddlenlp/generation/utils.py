@@ -1208,19 +1208,19 @@ class GenerationMixin(object):
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
 
             # multinomial already support fp16 and bf16 currently, fix issue: https://github.com/PaddlePaddle/Paddle/issues/51852
-            next_tokens = paddle.multinomial(probs)
-            # # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
-            # if probs.dtype == paddle.bfloat16 and top_k == 1:
-            #     probs = probs.astype("float32")
-            #     next_tokens = paddle.unsqueeze(paddle.argmax(probs, axis=-1), -1)
-            # else:
-            #     # next_tokens = paddle.multinomial(probs)
-            #     probs = probs.cpu()
-            #     from paddlenlp.transformers.utils import device_guard
+            # next_tokens = paddle.multinomial(probs)
+            # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
+            if probs.dtype == paddle.bfloat16 and top_k == 1:
+                probs = probs.astype("float32")
+                next_tokens = paddle.unsqueeze(paddle.argmax(probs, axis=-1), -1)
+            else:
+                # next_tokens = paddle.multinomial(probs)
+                probs = probs.cpu()
+                from paddlenlp.transformers.utils import device_guard
 
-            #     with device_guard("cpu"):
-            #         next_tokens = paddle.multinomial(probs)
-            #     next_tokens = next_tokens.cuda()
+                with device_guard("cpu"):
+                    next_tokens = paddle.multinomial(probs)
+                next_tokens = next_tokens.cuda()
 
             if self.config.tensor_parallel_degree > 1:
                 # Maybe no need to broadcast if seed is set correclty.
@@ -1240,7 +1240,7 @@ class GenerationMixin(object):
             # and sampling, and then broadcast to avoid broadcast logits.
             if hasattr(self, "pp_group"):
                 paddle.distributed.broadcast(
-                    next_tokens, src=self.pp_group.ranks[-1], group=self.pp_group  # use rank 0 for same seed to check
+                    next_tokens, src=self.pp_group.ranks[0], group=self.pp_group  # use rank 0 for same seed to check
                 )
 
             next_scores = paddle.index_sample(origin_probs, next_tokens)
