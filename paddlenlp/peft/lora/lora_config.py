@@ -33,6 +33,13 @@ class LoRAConfig:
         lora_dropout (`float`): The dropout probability for Lora layers.
         merge_weights (`bool`):
             Whether to merge the weights of the Lora layers with the base transformer model in `eval` mode.
+        use_dora (`bool`):
+            Enable 'Weight-Decomposed Low-Rank Adaptation' (DoRA). This technique decomposes the updates of the weights
+            into two parts, magnitude and direction. Direction is handled by normal LoRA, whereas the magnitude is
+            handled by a separate learnable parameter. This can improve the performance of LoRA, especially at low
+            ranks. Right now, DoRA only supports non-quantized linear layers. DoRA introduces a bigger overhead than
+            pure LoRA, so it is recommended to merge weights for inference. For more information, see
+            https://arxiv.org/abs/2402.09353.
     """
 
     r: int = field(default=8, metadata={"help": "Lora attention dimension"})
@@ -92,6 +99,20 @@ class LoRAConfig:
                 "We will automatically set `use_quick_lora` to `False` to avoid potential inconsistencies."
             )
             self.use_quick_lora = False
+
+    use_dora: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "Enable 'Weight-Decomposed Low-Rank Adaptation' (DoRA). This technique decomposes the updates of the "
+                "weights into two parts, magnitude and direction. Direction is handled by normal LoRA, whereas the "
+                "magnitude is handled by a separate learnable parameter. This can improve the performance of LoRA, "
+                "especially at low ranks. Right now, DoRA only supports non-quantized linear layers. DoRA introduces "
+                "a bigger overhead than pure LoRA, so it is recommended to merge weights for inference. For more "
+                "information, see https://arxiv.org/abs/2402.09353."
+            )
+        },
+    )
 
     @property
     def __dict__(self):

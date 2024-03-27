@@ -109,6 +109,11 @@ class LoRAModel(nn.Layer):
         logger.info("Mark only lora and trainable_module as trainable.")
         self.mark_only_lora_as_trainable()
 
+        # init dora weights after model init
+        for _, layer in self.model.named_sublayers():
+            if hasattr(layer, "use_dora") and layer.use_dora:
+                layer.dora_init()
+
     def add_lora_split_mapping(self, module_name, is_column=False):
         self.lora_split_mapping[module_name] = is_column
 
@@ -385,9 +390,10 @@ class LoRAModel(nn.Layer):
                     rslora=lora_config.rslora,
                     lora_plus_scale=lora_config.lora_plus_scale,
                     bias_attr=False if module.bias is None else None,
+                    use_dora=lora_config.use_dora,
                     use_quick_lora=lora_config.use_quick_lora,
                 )
-            if isinstance(module, nn.Conv2D):
+            elif isinstance(module, nn.Conv2D):
                 lora_module = LoRAConv2D(
                     in_channels=module._in_channels,
                     out_channels=module._out_channels,
@@ -403,6 +409,7 @@ class LoRAModel(nn.Layer):
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
                     bias_attr=module._bias_attr,
+                    use_dora=lora_config.use_dora,
                 )
             elif isinstance(module, ColumnParallelLinear):
                 # recover the original output_features
@@ -423,6 +430,7 @@ class LoRAModel(nn.Layer):
                             negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
                         )
                     ),
+                    use_dora=lora_config.use_dora,
                     use_quick_lora=lora_config.use_quick_lora,
                 )
                 # Lora column parallel will spilt lora B matrix
@@ -446,6 +454,7 @@ class LoRAModel(nn.Layer):
                     rslora=lora_config.rslora,
                     lora_plus_scale=lora_config.lora_plus_scale,
                     merge_weights=lora_config.merge_weights,
+                    use_dora=lora_config.use_dora,
                     use_quick_lora=lora_config.use_quick_lora,
                 )
                 # Lora column parallel will spilt lora A matrix
