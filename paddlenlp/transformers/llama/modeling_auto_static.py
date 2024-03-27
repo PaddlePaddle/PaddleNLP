@@ -467,7 +467,6 @@ class LlamaAttentionAuto(nn.Layer):
                 attention_mask,
                 output_attentions,
                 alibi,
-                use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
             outputs = scaled_dot_product_attention(
@@ -582,7 +581,6 @@ class LlamaDecoderLayerAuto(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
-                use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
             outputs = self.self_attn(
