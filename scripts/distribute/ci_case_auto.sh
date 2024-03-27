@@ -894,7 +894,7 @@ function llama_static_auto_recompute_bs8_fp32_DP1-MP1-PP1() {
         --device "gpu" \
         --data_impl "mmap" \
         --enable_auto_parallel 1 \
-        -o Profiler_auto.memory_stats=True \
+        --skip_memory_metrics 0 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
@@ -961,7 +961,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP1-PP1() {
         --device "gpu" \
         --data_impl "mmap" \
         --enable_auto_parallel 1 \
-        -o Profiler_auto.memory_stats=True \
+        --skip_memory_metrics 0 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
@@ -1028,7 +1028,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP1() {
         --device "gpu" \
         --data_impl "mmap" \
         --enable_auto_parallel 1 \
-        -o Profiler_auto.memory_stats=True \
+        --skip_memory_metrics 0 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
@@ -1095,7 +1095,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2() {
         --device "gpu" \
         --data_impl "mmap" \
         --enable_auto_parallel 1 \
-        -o Profiler_auto.memory_stats=True \
+        --skip_memory_metrics 0 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.4 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
@@ -1164,7 +1164,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
         --device "gpu" \
         --data_impl "mmap" \
         --enable_auto_parallel 1 \
-        -o Profiler_auto.memory_stats=True \
+        --skip_memory_metrics 0 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.4 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
@@ -1234,7 +1234,7 @@ function llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
         --device "gpu" \
         --data_impl "mmap" \
         --enable_auto_parallel 1 \
-        -o Profiler_auto.memory_stats=True \
+        --skip_memory_metrics 0 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.4 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
@@ -1302,7 +1302,7 @@ function llama_dygraph_auto_bs8_fp32_DP2() {
         --enable_auto_parallel 1 \
         --to_static 0 \
         --max_grad_norm 1.0 \
-        -o Profiler_auto.memory_stats=True \
+        --skip_memory_metrics 0 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
@@ -1370,7 +1370,7 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2() {
         --enable_auto_parallel 1 \
         --to_static 0 \
         --max_grad_norm 1.0 \
-        -o Profiler_auto.memory_stats=True \
+        --skip_memory_metrics 0 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
@@ -1438,7 +1438,7 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
         --enable_auto_parallel 1 \
         --to_static 0 \
         --max_grad_norm 1.0 \
-        -o Profiler_auto.memory_stats=True \
+        --skip_memory_metrics 0 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
@@ -1507,7 +1507,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
         --enable_auto_parallel 1 \
         --to_static 0 \
         --max_grad_norm 1.0 \
-        -o Profiler_auto.memory_stats=True \
+        --skip_memory_metrics 0 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
