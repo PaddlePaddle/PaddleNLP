@@ -41,6 +41,7 @@ from paddlenlp.transformers import (
     AutoModelForCausalLMPipe,
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
+    GPTConfig,
     LinearAnnealingWithWarmupDecay,
     register_sequence_parallel_allreduce_hooks,
 )
@@ -75,6 +76,7 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
     )
+
     # NOTE(gongenlei): new add autotuner_benchmark
     autotuner_benchmark: bool = field(
         default=False,
@@ -153,6 +155,18 @@ class ModelArguments:
     use_fused_rms_norm: bool = field(
         default=False,
         metadata={"help": "llama or other model, use_fused_rms_norm"},
+    )
+    use_fast_layer_norm: bool = field(
+        default=False,
+        metadata={"help": "GPT3 model, use fast layernorm"},
+    )
+    use_fused_linear: bool = field(
+        default=False,
+        metadata={"help": "GPT3 model, use fused linear layer"},
+    )
+    use_fused_dropout_add: bool = field(
+        default=False,
+        metadata={"help": "GPT3 model, use fused `dropout + residual add` op"},
     )
     fuse_attention_qkv: bool = field(
         default=False,
@@ -424,7 +438,8 @@ def main():
             )
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
-    config = AutoConfig.from_pretrained(model_args.model_name_or_path)
+    # config = AutoConfig.from_pretrained(model_args.model_name_or_path)
+    config = GPTConfig.from_pretrained(model_args.model_name_or_path)
 
     config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
@@ -440,6 +455,9 @@ def main():
 
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
+    config.use_fast_layer_norm = model_args.use_fast_layer_norm
+    config.use_fused_linear = model_args.use_fused_linear
+    config.use_fused_dropout_add = model_args.use_fused_dropout_add
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.fuse_attention_ffn = model_args.fuse_attention_ffn
     config.recompute_granularity = model_args.recompute_granularity
@@ -551,6 +569,15 @@ def main():
         * training_args.max_steps
         * training_args.gradient_accumulation_steps
         * data_args.max_seq_length
+    )
+
+    print("======== luqi ==========")
+    print(f"total_effective_tokens = {total_effective_tokens}")
+    print(
+        f"training_args.dataset_world_size = {training_args.dataset_world_size}, training_args.max_steps = {training_args.max_steps}"
+    )
+    print(
+        f"training_args.gradient_accumulation_steps = {training_args.gradient_accumulation_steps}, data_args.max_seq_length = {data_args.max_seq_length}"
     )
 
     trainer = PretrainingTrainer(
