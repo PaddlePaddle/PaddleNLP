@@ -342,10 +342,12 @@ class PearsonAndSpearman(Metric):
             preds = preds.numpy()
         if isinstance(labels, paddle.Tensor):
             labels = labels.numpy()
-        preds = np.squeeze(preds.reshape(-1, 1)).tolist()
-        labels = np.squeeze(labels.reshape(-1, 1)).tolist()
-        self.preds.append(preds)
-        self.labels.append(labels)
+        # 确保 preds 和 labels 是一维数组
+        preds = np.squeeze(preds).reshape(-1).tolist()
+        labels = np.squeeze(labels).reshape(-1).tolist()
+        # 现在 preds 和 labels 应该是一维列表，我们将它们包装成列表的列表
+        self.preds.append([preds])
+        self.labels.append([labels])
 
     def accumulate(self):
         """
@@ -368,8 +370,8 @@ class PearsonAndSpearman(Metric):
                 coefficient.
 
         """
-        preds = [item for sublist in self.preds for item in sublist]
-        labels = [item for sublist in self.labels for item in sublist]
+        preds = [item for sublist in self.preds for item in sublist[0]]
+        labels = [item for sublist in self.labels for item in sublist[0]]
         pearson = self.pearson(preds, labels)
         spearman = self.spearman(preds, labels)
         return (
