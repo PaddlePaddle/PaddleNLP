@@ -240,7 +240,7 @@ def scaled_dot_product_attention(
                     attention_mask is None,
                     True,
                     False,
-                    False,
+                    False
                 )[0]
             else:
                 attn_output = F.scaled_dot_product_attention(
@@ -670,7 +670,7 @@ class LlamaAttention(nn.Layer):
                 )
 
         self.use_fused_rope = config.use_fused_rope
-        if self.use_fused_rope:
+        if self.use_fused_rope and get_env_device() != "npu":
             if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
@@ -1526,9 +1526,12 @@ class LlamaModel(LlamaPretrainedModel):
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
         if self.config.use_flash_attention:
-            is_casual = is_casual_mask(attention_mask)
-            if is_casual and alibi is None:
-                attention_mask = None
+            if get_env_device != "npu":
+                is_casual = is_casual_mask(attention_mask)
+                if is_casual and alibi is None:
+                    attention_mask = None
+            else:
+                attention_mask = attention_mask.astype("bool")
         hidden_states = inputs_embeds
 
         # decoder layers
