@@ -42,8 +42,7 @@ def load_inference_model(model_path, model_name, param_name, exe):
 
 def validate_pdmodel(model_path, model_prefix):
     paddle.enable_static()
-    place = paddle.CUDAPlace(0)
-    exe = paddle.static.Executor(place)
+    exe = paddle.static.Executor()
     scope = paddle.static.Scope()
 
     with paddle.static.scope_guard(scope):
