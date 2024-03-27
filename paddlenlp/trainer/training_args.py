@@ -1200,19 +1200,6 @@ class TrainingArguments:
                 world_size % (self.tensor_parallel_degree * self.pipeline_parallel_degree) == 0
             ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
 
-            self.data_parallel_degree = world_size // (
-                self.sharding_parallel_degree * self.tensor_parallel_degree * self.pipeline_parallel_degree
-            )
-
-            if self.sharding_parallel_degree == -1:
-                if len(self.sharding) > 0:
-                    self.sharding_parallel_degree = self.data_parallel_degree
-
-            self.sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
-            if self.sharding_parallel_degree == 1 and len(self.sharding) > 0:
-                logger.warning("sharding_parallel_degree=1 means no sharding, please set sharding to empty!")
-                self.sharding = []
-
             if ShardingOption.OFFLOAD in self.sharding:
                 warnings.warn("`offload` is not supported NOW!")
 
