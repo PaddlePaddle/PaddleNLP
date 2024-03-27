@@ -26,9 +26,9 @@ class CustomModelHandler(BaseModelHandler):
     def process(cls, predictor, tokenizer, data, parameters):
         max_seq_len = 128
         batch_size = 1
-        if "max_seq_len" not in parameters:
+        if "max_seq_len" in parameters:
             max_seq_len = parameters["max_seq_len"]
-        if "batch_size" not in parameters:
+        if "batch_size" in parameters:
             batch_size = parameters["batch_size"]
         text = None
         if "text" in data:
@@ -97,9 +97,9 @@ class ERNIEMHandler(BaseModelHandler):
     def process(cls, predictor, tokenizer, data, parameters):
         max_seq_len = 128
         batch_size = 1
-        if "max_seq_len" not in parameters:
+        if "max_seq_len" in parameters:
             max_seq_len = parameters["max_seq_len"]
-        if "batch_size" not in parameters:
+        if "batch_size" in parameters:
             batch_size = parameters["batch_size"]
         text = None
         if "text" in data:
