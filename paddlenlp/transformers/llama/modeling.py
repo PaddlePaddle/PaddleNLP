@@ -385,6 +385,11 @@ def rms_norm_fused(x_in, w, eps):
     return fused_ln.fused_rms_norm(x_in, w, eps)[0]
 
 
+def fast_rms_norm(x_in, w, eps):
+    fast_ln = try_import("fast_ln")
+    return fast_ln.fast_rms_norm(x_in, w, eps)[0]
+
+
 class LlamaRMSNorm(nn.Layer):
     def __init__(self, config):
         super().__init__()
@@ -404,7 +409,8 @@ class LlamaRMSNorm(nn.Layer):
         if self.config.use_fused_rms_norm:
             if get_env_device() == "npu":
                 return core.eager._run_custom_op("rms_norm_npu", hidden_states, self.weight, self.variance_epsilon)[0]
-            return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
+            # return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
+            return fast_rms_norm(hidden_states, self.weight, self.variance_epsilon)
 
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
