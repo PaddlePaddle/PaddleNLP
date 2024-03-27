@@ -60,7 +60,6 @@ class ModelArguments:
         default=80, metadata={"help": "The maximum total of masked tokens in input sequence"}
     )
 
-    to_static: strtobool = field(default=False, metadata={"help": "Enable training under @to_static."})
     profiler_options: str = field(
         default=None,
         metadata={"help": "Whether to use FusedTransformerEncoderLayer to replace a TransformerEncoderLayer or not."},
@@ -232,7 +231,7 @@ def do_train():
     train_dataset = PretrainingDataset(input_file=data_file, max_pred_length=model_args.max_predictions_per_seq)
 
     # decorate @to_static for benchmark, skip it by default.
-    if model_args.to_static:
+    if training_args.to_static:
         specs = create_input_specs()
         model = paddle.jit.to_static(model, input_spec=specs)
         logger.info("Successfully to apply @to_static with specs: {}".format(specs))
