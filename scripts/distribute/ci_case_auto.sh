@@ -1166,7 +1166,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.46707726
-    ips_base=-1
+    ips_base=11.9509
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -1235,7 +1235,7 @@ function llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=10.0859375
-    ips_base=-1
+    ips_base=25.1894
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
