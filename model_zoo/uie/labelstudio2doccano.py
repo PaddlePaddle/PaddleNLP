@@ -24,6 +24,16 @@ def append_attrs(data, item, label_id, relation_id):
     for anno in data["annotations"][0]["result"]:
         if anno["type"] == "labels":
             label_id += 1
+            # add by wty
+            if anno["value"]["labels"][0] == "观点词":
+                tag = "Opinion"
+            elif anno["value"]["labels"][0] == "评价维度##正向":
+                tag = "Pos-Aspect"
+            elif anno["value"]["labels"][0] == "评价维度##负向":
+                tag = "Neg-Aspect"
+            else:
+                raise ValueError(anno["value"]["labels"][0], "标签未定义，请核实.")
+            # end of add by wty
             item["entities"].append(
                 {
                     "id": label_id,
@@ -42,7 +52,8 @@ def append_attrs(data, item, label_id, relation_id):
                     "id": relation_id,
                     "from_id": mapp[anno["from_id"]],
                     "to_id": mapp[anno["to_id"]],
-                    "type": anno["labels"][0],
+                   # "type": anno["labels"][0], modi by wty
+                    "type": anno["labels"],
                 }
             )
 
