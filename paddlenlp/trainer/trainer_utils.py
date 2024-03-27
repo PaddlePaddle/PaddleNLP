@@ -120,7 +120,7 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
         dp_rank, dp_size = 0, 1
         sharding_rank, _ = 0, 1
 
-    seed_offset = seed
+    seed_offset = seed + 1 + paddle.distributed.get_world_size()
     global_seed = (
         seed_offset
         + sep_rank * (mp_size)
@@ -129,7 +129,7 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
         + sharding_rank * (mp_size * sep_size * pp_size * dp_size)
     )
 
-    seed_offset += paddle.distributed.get_world_size()
+    seed_offset = seed_offset + 1 + paddle.distributed.get_world_size()
     local_seed = (
         seed_offset
         + mp_rank
