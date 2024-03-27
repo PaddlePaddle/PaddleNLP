@@ -1185,7 +1185,9 @@ class TrainingArguments:
                 world_size % (self.tensor_parallel_degree * self.pipeline_parallel_degree) == 0
             ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
 
-            self.data_parallel_degree = world_size // (self.tensor_parallel_degree * self.pipeline_parallel_degree)
+            self.data_parallel_degree = world_size // (
+                self.sharding_parallel_degree * self.tensor_parallel_degree * self.pipeline_parallel_degree
+            )
 
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
@@ -1200,7 +1202,7 @@ class TrainingArguments:
                 warnings.warn("`offload` is not supported NOW!")
 
             strategy = fleet.auto.Strategy()
-            if self.data_parallel_degree > 1:
+            if self.dataset_world_size > 1:
                 data_parallel_config = set(self.data_parallel_config.split(" "))
                 for x in data_parallel_config:
                     if len(x) > 0:
@@ -1341,10 +1343,10 @@ class TrainingArguments:
             self.strategy = strategy
             if self.hybrid_parallel_topo_order == "pp_first":
                 order = ["pp", "dp", "mp"]
-                degree = [self.pipeline_parallel_degree, self.data_parallel_degree, self.tensor_parallel_degree]
+                degree = [self.pipeline_parallel_degree, self.dataset_world_size, self.tensor_parallel_degree]
             elif self.hybrid_parallel_topo_order == "sharding_first":
                 order = ["dp", "pp", "mp"]
-                degree = [self.data_parallel_degree, self.pipeline_parallel_degree, self.tensor_parallel_degree]
+                degree = [self.dataset_world_size, self.pipeline_parallel_degree, self.tensor_parallel_degree]
             mesh_dims = list(zip(order, degree))
             fleet.auto.create_mesh(mesh_dims)
 
@@ -1356,7 +1358,7 @@ class TrainingArguments:
 
             strategy = fleet.DistributedStrategy()
             strategy.hybrid_configs = {
-                "dp_degree": self.data_parallel_degree,
+                "dp_degree": self.dataset_world_size,
                 "mp_degree": self.tensor_parallel_degree,
                 "pp_degree": self.pipeline_parallel_degree,
                 "order": order,
@@ -1511,7 +1513,7 @@ class TrainingArguments:
         if self.use_hybrid_parallel:
             return max(self.sharding_parallel_degree, 1) * max(self.data_parallel_degree, 1)
         elif self.enable_auto_parallel:
-            return max(self.data_parallel_degree, 1)
+            return max(self.sharding_parallel_degree, 1) * max(self.data_parallel_degree, 1)
         else:
             return paddle.distributed.get_world_size()
 
