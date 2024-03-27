@@ -94,10 +94,12 @@ from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatch
 from ..utils.env import (
     LORA_WEIGHTS_NAME,
     PADDLE_MASTER_WEIGHTS_INDEX_NAME,
+    PADDLE_PEFT_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
     PREFIX_WEIGHTS_NAME,
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
+    SAFE_PEFT_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
 )
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
@@ -346,11 +348,21 @@ class Trainer:
         )
         self.add_callback(PrinterCallback if self.args.disable_tqdm else DEFAULT_PROGRESS_CALLBACK)
 
+        self._save_ckpt_func = dist.save_state_dict if self.args.enable_auto_parallel else paddle.save
+        self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
+
         if args.max_steps > 0:
             logger.info("max_steps is given, it will override any value given in num_train_epochs")
 
         if train_dataset is not None and not isinstance(train_dataset, collections.abc.Sized) and args.max_steps <= 0:
             raise ValueError("train_dataset does not implement __len__, max_steps has to be specified")
+
+        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+            if self.args.unified_checkpoint and "skip_save_model_weight" in self.args.unified_checkpoint_config:
+                self.args.unified_checkpoint_config.remove("skip_save_model_weight")
+                logger.warning(
+                    "We do not support skip_save_model_weight in peft model when using unified checkpoint, remove this config."
+                )
 
         self.do_grad_scaling = False
         self.enable_autocast_context_manager = False
@@ -782,7 +794,6 @@ class Trainer:
         resume_from_checkpoint,
         ignore_keys_for_eval,
     ):
-
         start_time = time.time()
         self._globalstep_last_start_time = time.time()
         self.state.epoch = 0
@@ -910,6 +921,7 @@ class Trainer:
                         steps_trained_progress_bar.update(1)
                     if steps_trained_in_current_epoch == 0:
                         self._load_rng_state(resume_from_checkpoint)
+                    self.timers and self.timers("read-data").start()
                     continue
                 elif steps_trained_progress_bar is not None:
                     steps_trained_progress_bar.close()
@@ -1020,7 +1032,11 @@ class Trainer:
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
                         scale_after = self.scaler._scale
-                        optimizer_was_run = not self.scaler._cache_founf_inf
+                        # Compatible with paddlepaddle 2.6.0 using typo word.
+                        if hasattr(self.scaler, "_cache_founf_inf"):
+                            optimizer_was_run = not self.scaler._cache_founf_inf
+                        else:
+                            optimizer_was_run = not self.scaler._cache_found_inf
                         if not optimizer_was_run:
                             scale_before_value = scale_before.cpu().numpy()
                             scale_after_value = scale_after.cpu().numpy()
@@ -1092,20 +1108,29 @@ class Trainer:
             if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
                 self._load_best_model_from_peft_checkpoint()
             else:
-                weight_name = PADDLE_WEIGHTS_NAME
-                best_model_path = os.path.join(
-                    self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
-                )
-                if os.path.exists(best_model_path):
-                    # We load the model state dict on the CPU to avoid an OOM error.
-                    state_dict = paddle.load(best_model_path, return_numpy=True)
-                    # If the model is on the GPU, it still works!
-                    self._set_state_dict_in_model(state_dict)
-                else:
-                    logger.warning(
-                        f"Could not locate the best model at {best_model_path}, if you are running a distributed training "
-                        "on multiple nodes, you should activate `--save_on_each_node`."
+                if self.args.unified_checkpoint:
+                    load_unified_checkpoint(
+                        self.args,
+                        self.model,
+                        self.optimizer,
+                        self.state.best_model_checkpoint,
+                        safe_serialization=True,
                     )
+                else:
+                    weight_name = PADDLE_WEIGHTS_NAME
+                    best_model_path = os.path.join(
+                        self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
+                    )
+                    if os.path.exists(best_model_path):
+                        # We load the model state dict on the CPU to avoid an OOM error.
+                        state_dict = paddle.load(best_model_path, return_numpy=True)
+                        # If the model is on the GPU, it still works!
+                        self._set_state_dict_in_model(state_dict)
+                    else:
+                        logger.warning(
+                            f"Could not locate the best model at {best_model_path}, if you are running a distributed training "
+                            "on multiple nodes, you should activate `--save_on_each_node`."
+                        )
 
         self._total_loss_scalar += tr_loss.item()
         train_loss = self._total_loss_scalar / self.state.global_step
@@ -1125,6 +1150,16 @@ class Trainer:
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
     def _load_best_model_from_peft_checkpoint(self):
+        if self.args.unified_checkpoint:
+            load_unified_checkpoint(
+                self.args,
+                self.model,
+                self.optimizer,
+                self.state.best_model_checkpoint,
+                safe_serialization=True,
+            )
+            return
+
         convert_tp = False
         if isinstance(self.model, LoRAModel):
             if self.model.quantized or self.args.pipeline_parallel_degree > 1:
@@ -1205,13 +1240,17 @@ class Trainer:
         if timer_info or paddle_timer_info:
             logger.info(f"[Profile global_step: {self.state.global_step}] {timer_info} {paddle_timer_info}")
 
+    def _get_item_from_loss(self, loss):
+        assert isinstance(loss, paddle.Tensor) and loss._is_initialized()
+        return loss.item()
+
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
 
             logs: Dict[str, float] = {}
 
             # all_gather + mean() to get average loss over all processes
-            tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
+            tr_loss_scalar = self._get_item_from_loss(self._nested_gather(tr_loss).mean())
 
             # reset tr_loss to zero
             tr_loss.subtract_(tr_loss)
@@ -1224,12 +1263,16 @@ class Trainer:
                 self.args.train_batch_size * self.args.gradient_accumulation_steps * self.args.dataset_world_size
             )
             num_steps = self.state.global_step - self._globalstep_last_logged
+            seq_length = None
+            if getattr(self, "is_pretraining", False) and hasattr(self.model, "config"):
+                seq_length = getattr(self.model.config, "seq_length", None)
             logs.update(
                 speed_metrics(
                     "interval",
                     self._globalstep_last_start_time,
                     num_samples=total_train_batch_size * num_steps,
                     num_steps=num_steps,
+                    seq_length=seq_length,
                 )
             )
 
@@ -1345,7 +1388,7 @@ class Trainer:
             if self.args.pipeline_parallel_degree > 1:
                 drop_last = True
                 logger.warning(
-                    "In parallel mode, the bacth_size is strictly checked. set DistributedBatchSampler drop_last=True."
+                    "In parallel mode, the batch_size is strictly checked. set DistributedBatchSampler drop_last=True."
                 )
 
             return DistributedBatchSampler(
@@ -1572,12 +1615,12 @@ class Trainer:
 
         core = paddle.framework.core
 
-        core.default_cpu_generator().manual_seed(checkpoint_rng_state["cpu"])
+        core.default_cpu_generator().set_state(checkpoint_rng_state["cpu"])
         if core.is_compiled_with_cuda():
             if not len(checkpoint_rng_state["cuda"]) == core.get_cuda_device_count():
                 raise ValueError("Length of gpu state list shoule be equal to the gpu device count")
             for i in range(core.get_cuda_device_count()):
-                core.default_cuda_generator(i).manual_seed(checkpoint_rng_state["cuda"][i])
+                core.default_cuda_generator(i).set_state(checkpoint_rng_state["cuda"][i])
 
         if paddle.device.get_all_custom_device_type() is not None:
             custom_device_type = paddle.device.get_all_custom_device_type()
@@ -1585,7 +1628,7 @@ class Trainer:
                 if not len(checkpoint_rng_state["cuda"]) == core.get_custom_device_count(device):
                     raise ValueError("Length of custom device state list shoule be equal to the custom device count")
                 for i in range(core.get_custom_device_count(device)):
-                    core.default_custom_device_generator(paddle.CustomPlace(device, i)).manual_seed(
+                    core.default_custom_device_generator(paddle.CustomPlace(device, i)).set_state(
                         checkpoint_rng_state["cuda"][i]
                     )
 
@@ -2094,36 +2137,47 @@ class Trainer:
         else:
             self.save_model(output_dir)
 
-        optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+        # only save model state dict, ignore optimizer and scheduler
+        if not self.args.ignore_save_lr_and_optim:
+            optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
-        if self.args.use_hybrid_parallel:
-            if self.dp_group.rank <= 0:
-                os.makedirs(output_dir, exist_ok=True)
-                logger.info("Saving optimizer files.")
-                if self.args.unified_checkpoint:
-                    save_unified_optimizer(
-                        self.args,
-                        self.model,
-                        self.optimizer,
-                        output_dir,
-                        safe_serialization=True,
-                    )
-                else:
-                    paddle.save(
-                        self.optimizer.state_dict(),
-                        os.path.join(output_dir, optimizer_name),
-                    )
+            if self.args.use_hybrid_parallel:
+                if self.dp_group.rank <= 0:
+                    os.makedirs(output_dir, exist_ok=True)
+                    logger.info("Saving optimizer files.")
+                    if self.args.unified_checkpoint:
+                        save_unified_optimizer(
+                            self.args,
+                            self.model,
+                            self.optimizer,
+                            output_dir,
+                            safe_serialization=True,
+                        )
+                    else:
+                        self._save_ckpt_func(
+                            self.optimizer.state_dict(),
+                            os.path.join(output_dir, optimizer_name),
+                        )
 
-        if self.args.should_save:
-            if not self.args.use_hybrid_parallel:
-                logger.info("Saving optimizer files.")
-                paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+            if self.args.should_save:
+                if not self.args.use_hybrid_parallel:
+                    logger.info("Saving optimizer files.")
+                    if self.args.unified_checkpoint:
+                        save_unified_optimizer(
+                            self.args,
+                            self.model,
+                            self.optimizer,
+                            output_dir,
+                            safe_serialization=True,
+                        )
+                    else:
+                        self._save_ckpt_func(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
-            # FIXME: maybe only save one copy
-            paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
+                # FIXME: maybe only save one copy
+                paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
 
-            if self.do_grad_scaling:
-                paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
+                if self.do_grad_scaling:
+                    paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
 
         self.runtime_timer.stop()
         # Determine the new best metric / best model checkpoint
@@ -2150,8 +2204,8 @@ class Trainer:
         rng_states = {
             "python": random.getstate(),
             "numpy": np.random.get_state(),
-            "cuda": [k.current_seed() for k in paddle.get_rng_state()],
-            "cpu": paddle.framework.core.default_cpu_generator().get_state().current_seed(),
+            "cuda": paddle.get_rng_state(),
+            "cpu": paddle.framework.core.default_cpu_generator().get_state(),
         }
         if self.args.use_hybrid_parallel:
             rng_states[
@@ -2252,7 +2306,8 @@ class Trainer:
         checkpoints_to_be_deleted = checkpoints_sorted[:number_of_checkpoints_to_delete]
         for checkpoint in checkpoints_to_be_deleted:
             logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
-            shutil.rmtree(checkpoint)
+            # ignore_errors for shared disks between train nodes.
+            shutil.rmtree(checkpoint, ignore_errors=True)
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
         output_dir = output_dir if output_dir is not None else self.args.output_dir
@@ -2277,6 +2332,7 @@ class Trainer:
             self.model.save_pretrained(
                 output_dir,
                 variant=self.args.weight_name_suffix,
+                save_function=self._save_ckpt_func,
                 merge_tensor_parallel=merge_tensor_parallel,
                 is_main_process=self.args.should_save,
                 max_shard_size="1024GB",
@@ -2295,6 +2351,7 @@ class Trainer:
                         config_to_save=config_to_save,
                         merge_tensor_parallel=merge_tensor_parallel,
                         variant=weight_name_suffix,
+                        save_function=self._save_ckpt_func,
                         is_main_process=self.args.should_save,
                         max_shard_size="1024GB",
                     )
@@ -2303,6 +2360,7 @@ class Trainer:
                         output_dir,
                         merge_tensor_parallel=merge_tensor_parallel,
                         variant=self.args.weight_name_suffix,
+                        save_function=self._save_ckpt_func,
                         is_main_process=self.args.should_save,
                         max_shard_size="1024GB",
                     )
@@ -2313,7 +2371,7 @@ class Trainer:
                 if state_dict is None:
                     state_dict = self.model.state_dict()
 
-                paddle.save(
+                self._save_ckpt_func(
                     state_dict,
                     os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix)),
                 )
@@ -2329,6 +2387,7 @@ class Trainer:
                     config_to_save=config_to_save,
                     merge_tensor_parallel=merge_tensor_parallel,
                     variant=weight_name_suffix,
+                    save_function=self._save_ckpt_func,
                     is_main_process=self.args.should_save,
                     max_shard_size="1024GB",
                 )
@@ -2337,6 +2396,7 @@ class Trainer:
                     output_dir,
                     merge_tensor_parallel=merge_tensor_parallel,
                     variant=self.args.weight_name_suffix,
+                    save_function=self._save_ckpt_func,
                     is_main_process=self.args.should_save,
                     max_shard_size="1024GB",
                 )
@@ -2390,12 +2450,15 @@ class Trainer:
             opt_state_dict = tmp
 
         # broadcast optimizer state in dp group
+        if self.args.local_rank != -1:
+            dist.barrier()
         opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
 
         if opt_state_dict is not None:
             # Load in optimizer and scheduler states
             self.optimizer.set_state_dict(opt_state_dict)
         else:
+            optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             raise ValueError(f"optimizer-state-dict not found, opt: {os.path.join(checkpoint, optimizer_name)}.")
 
         if not self.args.ignore_load_lr_and_optim:
@@ -3018,7 +3081,12 @@ class Trainer:
 
     def is_unified_checkpoint(self, resume_from_checkpoint, safe_serialization=True):
         is_unified_checkpoint_type = False
-        weights_index_name = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
+        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+            weights_index_name = (
+                PADDLE_PEFT_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_PEFT_WEIGHTS_INDEX_NAME
+            )
+        else:
+            weights_index_name = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
         master_weights_index_name = (
             PADDLE_MASTER_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_MASTER_WEIGHTS_INDEX_NAME
         )

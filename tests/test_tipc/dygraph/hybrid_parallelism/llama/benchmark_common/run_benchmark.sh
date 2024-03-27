@@ -143,6 +143,7 @@ function _train(){
     --tensor_parallel_config ${tensor_parallel_config} ${pipeline_parallel_config_args} \
     --recompute ${recompute} \
     --recompute_use_reentrant ${recompute_use_reentrant} \
+    --skip_memory_metrics 0 \
     --data_cache ./data_cache"
 
     if [ ${PADDLE_TRAINER_ID} ]

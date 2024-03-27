@@ -28,6 +28,7 @@ class WebSearch(BaseComponent):
 
     WebSerach currently supports the following search engines providers (bridges):
     - SerperDev (default)
+    - SearchApi
     - SerpAPI
     - BingAPI
 

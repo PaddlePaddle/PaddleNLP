@@ -29,6 +29,7 @@ import random
 import re
 import threading
 import time
+from contextlib import contextmanager
 from enum import Enum
 from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
@@ -164,6 +165,24 @@ def set_seed(seed: int = 1234, topo=None):
     )
 
 
+def _switch_mode(mode="dynamic"):
+    assert mode in ["dynamic", "static"]
+    if mode == "dynamic":
+        paddle.disable_static()
+    else:
+        paddle.enable_static()
+
+
+@contextmanager
+def _exec_mode_guard(mode="dynamic"):
+    origin_mode = "dynamic" if paddle.in_dynamic_mode() else "static"
+    _switch_mode(mode)
+    try:
+        yield
+    finally:
+        _switch_mode(origin_mode)
+
+
 class ExplicitEnum(Enum):
     """
     Enum with more explicit error message for missing values.
@@ -290,7 +309,7 @@ def total_processes_number(local_rank):
     return 1
 
 
-def speed_metrics(split, start_time, num_samples=None, num_steps=None):
+def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_length=None):
     """
     Measure and return speed performance metrics.
 
@@ -307,10 +326,13 @@ def speed_metrics(split, start_time, num_samples=None, num_steps=None):
     result = {f"{split}_runtime": round(runtime, 4)}
     if num_samples is not None:
         samples_per_second = num_samples / runtime
-        result[f"{split}_samples_per_second"] = samples_per_second
+        result[f"{split}_samples_per_second"] = round(samples_per_second, 4)
+        if seq_length is not None:
+            tokens_per_second_per_device = samples_per_second * seq_length / paddle.distributed.get_world_size()
+            result[f"{split}_tokens_per_second_per_device"] = round(tokens_per_second_per_device, 4)
     if num_steps is not None:
         steps_per_second = num_steps / runtime
-        result[f"{split}_steps_per_second"] = steps_per_second
+        result[f"{split}_steps_per_second"] = round(steps_per_second, 4)
     return result
 
 

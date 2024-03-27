@@ -27,6 +27,8 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import map_structure
 
+from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
+
 from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
@@ -442,12 +444,21 @@ class ChatGLMStack(nn.Layer):
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
         self.num_attention_heads = config.num_attention_heads
-        self.rotary_embeddings = RotaryEmbeddings(
-            self.hidden_size // (self.num_attention_heads * 2)
-            if self.position_encoding_2d
-            else self.hidden_size // self.num_attention_heads,
-            base=10000.0,
-        )
+
+        if config.use_long_sequence_strategies:
+            self.rotary_embeddings = LongSequenceStrategies.build_long_sequence_strategy(
+                config.long_sequence_strategy_type,
+                config.long_sequence_strategy_name,
+                **config.long_sequence_init_args,
+            )
+
+        else:
+            self.rotary_embeddings = RotaryEmbeddings(
+                self.hidden_size // (self.num_attention_heads * 2)
+                if self.position_encoding_2d
+                else self.hidden_size // self.num_attention_heads,
+                base=10000.0,
+            )
         # self.embedding_dropout = nn.Dropout(config.embedding_dropout_prob)
 
         if self.config.tensor_parallel_degree > 1:
@@ -530,7 +541,6 @@ class ChatGLMStack(nn.Layer):
         cache: Optional[Tensor] = None,
         use_cache: bool = False,
     ):
-
         if input_ids is not None and inputs_embeds is not None:
             input_ids = None
             logger.warning("Specify both input_ids and inputs_embeds at the same time, will use inputs_embeds")
@@ -544,8 +554,17 @@ class ChatGLMStack(nn.Layer):
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
         inputs_embeds = inputs_embeds.transpose([1, 0, 2])
-
-        rotary_embeds = self.rotary_embeddings(position_ids)
+        if self.config.use_long_sequence_strategies:
+            cos, sin = self.rotary_embeddings(seq_len=seq_length)
+            block_position_ids = position_ids[:, 1, :].transpose([1, 0])
+            position_ids = position_ids[:, 0, :].transpose([1, 0])
+            block_rotary_embeds = paddle.stack(
+                [cos[block_position_ids].unsqueeze(2), sin[block_position_ids].unsqueeze(2)]
+            )
+            position_rotary_embeds = paddle.stack([cos[position_ids].unsqueeze(2), sin[position_ids].unsqueeze(2)])
+            rotary_embeds = paddle.stack([position_rotary_embeds, block_rotary_embeds], axis=0)
+        else:
+            rotary_embeds = self.rotary_embeddings(position_ids)
 
         if cache is None:
             if self.config.pre_seq_len is not None:
@@ -789,7 +808,7 @@ class ChatGLMHead(nn.Layer):
 
 class ChatGLMForCausalLM(ChatGLMPretrainedModel):
     _keys_to_ignore_on_save = [r"lm_head.decoder_weight"]
-    _tied_weights_keys = ["lm_head.weight"]
+    _tied_weights_keys = ["lm_head.decoder_weight"]
 
     def __init__(self, config: ChatGLMConfig):
         super(ChatGLMForCausalLM, self).__init__(config)

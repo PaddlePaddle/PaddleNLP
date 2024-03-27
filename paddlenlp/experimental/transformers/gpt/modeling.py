@@ -444,12 +444,10 @@ class GPTForCausalLMInferenceModel(GenerationInferenceModel, GPTPretrainedModel)
         self.gpt = GPTInferenceModel(config)
 
     @classmethod
-    def from_pretrained(
-        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
-    ):
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         # TODO: Support safetensors loading.
         kwargs["use_safetensors"] = False
-        return super().from_pretrained(pretrained_model_name_or_path, from_hf_hub, subfolder, *args, **kwargs)
+        return super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
