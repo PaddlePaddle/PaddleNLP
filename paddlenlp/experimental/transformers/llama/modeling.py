@@ -792,6 +792,7 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         super().__init__(config)
         self.max_seq_len = config.max_seq_len
         self.block_size = config.block_size
+        self.alibi = config.alibi
 
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
@@ -833,6 +834,8 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         kwargs["max_input_length"] = self.max_seq_len
 
         inputs_embeds = self.embed_tokens(ids_remove_padding)
+        if self.alibi is True:
+            rope_emb = None
 
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
