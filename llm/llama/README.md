@@ -32,6 +32,7 @@
 | baichuan-inc/Baichuan2-13B-Chat   |
 | FlagAlpha/Llama2-Chinese-7b-Chat  |
 | FlagAlpha/Llama2-Chinese-13b-Chat |
+| openlm-research/open_llama_3b     |
 
 
 
