@@ -51,7 +51,6 @@ from paddle.nn import Embedding, Layer
 from paddle.utils.download import is_url as is_remote_url
 from tqdm.auto import tqdm
 
-from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from paddlenlp.utils.env import (
     CONFIG_NAME,
     LEGACY_CONFIG_NAME,
@@ -66,13 +65,13 @@ from paddlenlp.utils.log import logger
 
 from ..generation import GenerationConfig, GenerationMixin
 from ..utils import device_guard
+from ..utils.download import resolve_file_path
 from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
 from .utils import (  # convert_ndarray_dtype,
     ContextManagers,
     InitTrackerMeta,
     adapt_stale_fwd_patch,
-    cached_file,
     cached_file_for_hf_hub,
     convert_file_size_to_int,
     dtype_byte_size,
@@ -81,7 +80,6 @@ from .utils import (  # convert_ndarray_dtype,
     is_paddle_support_lazy_init,
     is_safetensors_available,
     paddlenlp_load,
-    resolve_cache_dir,
     weight_name_suffix,
 )
 
@@ -1461,30 +1459,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         is_sharded = False
         sharded_metadata = None
 
-        # -1. when it's from HF
-        if from_hf_hub or convert_from_torch:
-            resolved_archive_file, is_sharded = resolve_weight_file_from_hf_hub(
-                pretrained_model_name_or_path,
-                cache_dir=cache_dir,
-                convert_from_torch=convert_from_torch,
-                subfolder=subfolder,
-                use_safetensors=use_safetensors,
-            )
-            # We'll need to download and cache each checkpoint shard if the checkpoint is sharded.
-            resolved_sharded_files = None
-            if is_sharded:
-                # resolved_archive_file becomes a list of files that point to the different checkpoint shards in this case.
-                resolved_sharded_files, sharded_metadata = get_checkpoint_shard_files(
-                    pretrained_model_name_or_path,
-                    resolved_archive_file,
-                    from_aistudio=from_aistudio,
-                    from_hf_hub=from_hf_hub,
-                    cache_dir=cache_dir,
-                    subfolder=subfolder,
-                )
-
-            return resolved_archive_file, resolved_sharded_files, sharded_metadata, is_sharded
-
         if pretrained_model_name_or_path is not None:
             # the following code use a lot of os.path.join, hence setting subfolder to empty str if None
             if subfolder is None:
@@ -1495,21 +1469,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             def get_file_path(pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_NAME, variant):
                 return os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(SAFE_WEIGHTS_NAME, variant))
 
+            # pretrained_model_name_or_path is file
+            if os.path.isfile(pretrained_model_name_or_path):
+                archive_file = pretrained_model_name_or_path
+                is_local = True
             # pretrained_model_name_or_path is dir
-            if is_local:
+            elif is_local:
                 if use_safetensors is not False and os.path.isfile(
-                    get_file_path(pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_NAME, variant)
-                ):
-                    # Load from a safetensors checkpoint
-                    archive_file = get_file_path(pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_NAME, variant)
-                elif use_safetensors is not False and os.path.isfile(
-                    get_file_path(pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_NAME, weight_name_suffix())
-                ):
-                    # Load from a safetensors checkpoint
-                    archive_file = get_file_path(
-                        pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_NAME, weight_name_suffix()
-                    )
-                elif use_safetensors is not False and os.path.isfile(
                     get_file_path(pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_INDEX_NAME, variant)
                 ):
                     # Load from a sharded safetensors checkpoint
@@ -1527,12 +1493,17 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_INDEX_NAME, weight_name_suffix()
                     )
                     is_sharded = True
-                elif os.path.isfile(
-                    get_file_path(pretrained_model_name_or_path, subfolder, PADDLE_WEIGHTS_NAME, variant)
+                elif use_safetensors is not False and os.path.isfile(
+                    get_file_path(pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_NAME, variant)
                 ):
-                    # Load from a PaddlePaddle checkpoint
+                    # Load from a safetensors checkpoint
+                    archive_file = get_file_path(pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_NAME, variant)
+                elif use_safetensors is not False and os.path.isfile(
+                    get_file_path(pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_NAME, weight_name_suffix())
+                ):
+                    # Load from a safetensors checkpoint
                     archive_file = get_file_path(
-                        pretrained_model_name_or_path, subfolder, PADDLE_WEIGHTS_NAME, variant
+                        pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_NAME, weight_name_suffix()
                     )
                 elif os.path.isfile(
                     get_file_path(pretrained_model_name_or_path, subfolder, PADDLE_WEIGHTS_INDEX_NAME, variant)
@@ -1553,6 +1524,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
                     is_sharded = True
                 elif os.path.isfile(
+                    get_file_path(pretrained_model_name_or_path, subfolder, PADDLE_WEIGHTS_NAME, variant)
+                ):
+                    # Load from a PaddlePaddle checkpoint
+                    archive_file = get_file_path(
+                        pretrained_model_name_or_path, subfolder, PADDLE_WEIGHTS_NAME, variant
+                    )
+                elif os.path.isfile(
                     get_file_path(
                         pretrained_model_name_or_path,
                         subfolder,
@@ -1567,108 +1545,98 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         PADDLE_WEIGHTS_NAME,
                         weight_name_suffix(),
                     )
-                # At this stage we don't have a weight file so we will raise an error.
+                elif os.path.isfile(
+                    os.path.join(
+                        pretrained_model_name_or_path, subfolder, _add_variant(PYTORCH_WEIGHTS_INDEX_NAME, variant)
+                    )
+                ):
+                    if from_hf_hub or convert_from_torch:
+                        archive_file = os.path.join(
+                            pretrained_model_name_or_path, subfolder, _add_variant(PYTORCH_WEIGHTS_INDEX_NAME, variant)
+                        )
+                    else:
+                        raise ValueError(
+                            f"Found {_add_variant(PYTORCH_WEIGHTS_INDEX_NAME, variant)} in directory"
+                            f" {pretrained_model_name_or_path}. Please set convert_from_torch=True in from_pretrained. eg, Model.from_pretrained(model_name, convert_from_torch=True) "
+                        )
                 elif os.path.isfile(
                     os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(PYTORCH_WEIGHTS_NAME, variant))
                 ):
-                    raise ValueError(
-                        f"Found {_add_variant(PYTORCH_WEIGHTS_NAME, variant)} in directory"
-                        f" {pretrained_model_name_or_path}. Please set convert_from_torch=True in from_pretrained. eg, Model.from_pretrained(model_name, convert_from_torch=True) "
-                    )
+                    if from_hf_hub or convert_from_torch:
+                        archive_file = os.path.join(
+                            pretrained_model_name_or_path, subfolder, _add_variant(PYTORCH_WEIGHTS_NAME, variant)
+                        )
+                    else:
+                        raise ValueError(
+                            f"Found {_add_variant(PYTORCH_WEIGHTS_NAME, variant)} in directory"
+                            f" {pretrained_model_name_or_path}. Please set convert_from_torch=True in from_pretrained. eg, Model.from_pretrained(model_name, convert_from_torch=True) "
+                        )
                 else:
                     raise EnvironmentError(
                         f"Error no file named {_add_variant(PADDLE_WEIGHTS_NAME, variant)}, found in directory"
                         f" {pretrained_model_name_or_path}."
                     )
-            # pretrained_model_name_or_path is file
-            elif os.path.isfile(pretrained_model_name_or_path):
-                archive_file = pretrained_model_name_or_path
-                is_local = True
             elif is_remote_url(pretrained_model_name_or_path):
-                filename = pretrained_model_name_or_path
-                resolved_archive_file = get_path_from_url_with_filelock(pretrained_model_name_or_path)
+                resolved_archive_file = resolve_file_path(
+                    pretrained_model_name_or_path,
+                    pretrained_model_name_or_path,
+                    subfolder,
+                    cache_dir=cache_dir,
+                    from_aistudio=from_aistudio,
+                    from_hf_hub=from_hf_hub,
+                )
+
+            elif pretrained_model_name_or_path in cls.pretrained_init_configuration:
+                # fetch the weight url from the `pretrained_resource_files_map`
+                resource_file_url = cls.pretrained_resource_files_map["model_state"][pretrained_model_name_or_path]
+                resolved_archive_file = resolve_file_path(
+                    pretrained_model_name_or_path,
+                    [resource_file_url],
+                    subfolder,
+                    cache_dir=cache_dir,
+                    from_aistudio=from_aistudio,
+                    from_hf_hub=from_hf_hub,
+                )
             else:
-
-                # set correct filename
-                if use_safetensors is not False:
-                    filename = _add_variant(SAFE_WEIGHTS_NAME, variant)
+                if use_safetensors is True:
+                    filenames = [
+                        _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant),
+                        _add_variant(SAFE_WEIGHTS_NAME, variant),
+                    ]
+                elif use_safetensors is None:
+                    filenames = [
+                        _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant),
+                        _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant),
+                        _add_variant(SAFE_WEIGHTS_NAME, variant),
+                        _add_variant(PADDLE_WEIGHTS_NAME, variant),
+                        _add_variant(PYTORCH_WEIGHTS_INDEX_NAME, variant),
+                        _add_variant(PYTORCH_WEIGHTS_NAME, variant),
+                    ]
                 else:
-                    filename = _add_variant(PADDLE_WEIGHTS_NAME, variant)
-
-                try:
-                    # Load from URL or cache if already cached
-                    cached_file_kwargs = dict(
-                        cache_dir=cache_dir,
-                        subfolder=subfolder,
-                        from_aistudio=from_aistudio,
-                        _raise_exceptions_for_missing_entries=False,
-                    )
-                    resolved_archive_file = None
-                    if pretrained_model_name_or_path in cls.pretrained_init_configuration:
-                        # fetch the weight url from the `pretrained_resource_files_map`
-                        resource_file_url = cls.pretrained_resource_files_map["model_state"][
-                            pretrained_model_name_or_path
-                        ]
-                        resolved_archive_file = cached_file(
-                            resource_file_url,
-                            _add_variant(PADDLE_WEIGHTS_NAME, variant),
-                            pretrained_model_name_or_path=pretrained_model_name_or_path,
-                            **cached_file_kwargs,
-                        )
-
-                    if resolved_archive_file is None:
-                        resolved_archive_file = cached_file(
-                            pretrained_model_name_or_path, filename, **cached_file_kwargs
-                        )
-                    else:
-                        # xxx.pdparams in pretrained_resource_files_map renamed model_state.pdparams
-                        filename = _add_variant(PADDLE_WEIGHTS_NAME, variant)
-
-                    # Since we set _raise_exceptions_for_missing_entries=False, we don't get an exception but a None
-                    # result when internet is up, the repo and revision exist, but the file does not.
-                    if resolved_archive_file is None and filename == _add_variant(SAFE_WEIGHTS_NAME, variant):
-                        # Maybe the checkpoint is sharded, we try to grab the index name in this case.
-                        resolved_archive_file = cached_file(
-                            pretrained_model_name_or_path,
-                            _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant),
-                            **cached_file_kwargs,
-                        )
-                        if resolved_archive_file is not None:
-                            is_sharded = True
-                        elif use_safetensors:
-                            raise EnvironmentError(
-                                f" {_add_variant(SAFE_WEIGHTS_NAME, variant)} or {_add_variant(SAFE_WEIGHTS_INDEX_NAME, variant)} and thus cannot be loaded with `safetensors`. Please make sure that the model has been saved with `safe_serialization=True` or do not set `use_safetensors=True`."
-                            )
-                        else:
-                            # This repo has no safetensors file of any kind, we switch to PyTorch.
-                            filename = _add_variant(PADDLE_WEIGHTS_NAME, variant)
-                            resolved_archive_file = cached_file(
-                                pretrained_model_name_or_path, filename, **cached_file_kwargs
-                            )
-                    if resolved_archive_file is None and filename == _add_variant(PADDLE_WEIGHTS_NAME, variant):
-                        # Maybe the checkpoint is sharded, we try to grab the index name in this case.
-                        resolved_archive_file = cached_file(
-                            pretrained_model_name_or_path,
-                            _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant),
-                            **cached_file_kwargs,
-                        )
-                        # raise ValueError(resolved_archive_file)
-                        if resolved_archive_file is not None:
-                            is_sharded = True
-                    if resolved_archive_file is None:
-                        # Otherwise, maybe there is a TF or Flax model file.  We try those to give a helpful error
-                        # message.
-                        raise EnvironmentError(
-                            f"{pretrained_model_name_or_path} does not appear to have a file named"
-                            f" {_add_variant(PADDLE_WEIGHTS_NAME, variant)}."
-                        )
-                except Exception as e:
-                    logger.info(e)
-                    # For any other exception, we throw a generic error.
+                    filenames = [
+                        _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant),
+                        _add_variant(PADDLE_WEIGHTS_NAME, variant),
+                        _add_variant(PYTORCH_WEIGHTS_INDEX_NAME, variant),
+                        _add_variant(PYTORCH_WEIGHTS_NAME, variant),
+                    ]
+                resolved_archive_file = resolve_file_path(
+                    pretrained_model_name_or_path,
+                    filenames,
+                    subfolder,
+                    cache_dir=cache_dir,
+                    from_aistudio=from_aistudio,
+                    from_hf_hub=from_hf_hub,
+                )
+                if resolved_archive_file is None:
                     raise EnvironmentError(
-                        f"Can't load the model for '{pretrained_model_name_or_path}'. If you were trying to load it"
-                        " from 'https://paddlenlp.bj.bcebos.com'"
+                        f"Error no files {filenames} found in repo {pretrained_model_name_or_path}."
                     )
+                elif "pytorch_model.bin" in str(resolved_archive_file):
+                    if not from_hf_hub and not convert_from_torch:
+                        raise ValueError(
+                            f"Download pytorch wight in "
+                            f" {resolved_archive_file}. Please set convert_from_torch=True in from_pretrained. eg, Model.from_pretrained(model_name, convert_from_torch=True) "
+                        )
 
             if is_local:
                 logger.info(f"Loading weights file {archive_file}")
@@ -1680,6 +1648,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # We'll need to download and cache each checkpoint shard if the checkpoint is sharded.
         resolved_sharded_files = None
+        if str(resolved_archive_file).endswith(".json"):
+            is_sharded = True
         if is_sharded:
             # resolved_archive_file becomes a list of files that point to the different checkpoint shards in this case.
             resolved_sharded_files, sharded_metadata = get_checkpoint_shard_files(
@@ -2093,6 +2063,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         model_kwargs = kwargs
 
+        if convert_from_torch is None and os.environ.get("from_modelscope", False):
+            logger.warning(
+                "If you are attempting to load weights from ModelScope Hub and want to disable the default behavior of considering torch weights,"
+                " you can set ·convert_from_torch=False·. By default, `convert_from_torch` is set to `True`. "
+            )
+            convert_from_torch = True
+
         # from_hf_hub defalut enable convert_from_torch
         if from_hf_hub and convert_from_torch is None:
             logger.warning(
@@ -2104,7 +2081,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if convert_from_torch is None:
             convert_from_torch = False
 
-        cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
         # 1. get the PretrainedConfig to init model
         if not isinstance(config, PretrainedConfig):
             config_path = config if config is not None else pretrained_model_name_or_path
@@ -2120,9 +2096,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if "from_aistudio" in model_kwargs:
             model_kwargs.pop("from_aistudio")
 
-        if not from_hf_hub and not from_aistudio:
-            if not os.path.exists(os.path.join(cache_dir, pretrained_model_name_or_path, subfolder, CONFIG_NAME)):
-                config.save_pretrained(os.path.join(cache_dir, pretrained_model_name_or_path, subfolder))
+        # if not from_hf_hub and not from_aistudio:
+        #     if not os.path.exists(os.path.join(cache_dir, pretrained_model_name_or_path, subfolder, CONFIG_NAME)):
+        #         config.save_pretrained(os.path.join(cache_dir, pretrained_model_name_or_path, subfolder))
 
         # refine options for config
         convert_from_torch = cls.support_conversion(config) and convert_from_torch
@@ -2186,15 +2162,23 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 or resolved_archive_file.endswith(SAFE_WEIGHTS_INDEX_NAME)
             ):
                 # try to get the name-mapping info
+                convert_dir = os.path.dirname(resolved_archive_file)
                 logger.info(
                     f"Starting to convert pytorch weight file<{resolved_archive_file}> to "
-                    f"paddle weight file<{os.path.join(cache_dir, pretrained_model_name_or_path, subfolder, PADDLE_WEIGHTS_NAME)}> ..."
+                    f"paddle weight file<{convert_dir}> ..."
                 )
                 state_dict = cls.convert(
                     resolved_archive_file,
                     config,
-                    cache_dir=os.path.join(cache_dir, pretrained_model_name_or_path, subfolder),
+                    # cache_dir=os.path.join(cache_dir, pretrained_model_name_or_path, subfolder),
+                    cache_dir=convert_dir,
                 )
+            elif (
+                resolved_archive_file.endswith(PADDLE_WEIGHTS_NAME)
+                or resolved_archive_file.endswith(PADDLE_WEIGHTS_INDEX_NAME)
+                or resolved_archive_file.endswith(".pdparams")
+            ):
+                print(f"file: {resolved_archive_file} is paddle weight.")
             else:
                 raise ValueError(f"Unexpected file: {resolved_archive_file} for weight conversion.")
             # load pt weights early so that we know which dtype to init the model under
@@ -2282,7 +2266,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     subfolder=subfolder,
                     **kwargs,
                 )
-            except OSError:
+            except:
                 logger.info(
                     "Generation config file not found, using a generation config created from the model config."
                 )
@@ -2457,20 +2441,26 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
 
 class PipelinePretrainedModel(PretrainedModel):
-    _sequential_layers = []
-    _single_to_pp_mapping = None
-    _pp_to_single_mapping = None
+    def __init_hook__(self):
+        if not hasattr(self, "_sequential_layers"):
+            self._sequential_layers = []
+            self._single_to_pp_mapping = None
+            self._pp_to_single_mapping = None
 
     def __init__(self, config, *args, **kwargs):
+        self.__init_hook__()
         super().__init__(config, *args, **kwargs)
 
     def add_sequential_layer(self, layer_desc, name_prefix=""):
+        self.__init_hook__()
         self._sequential_layers.append({"layer": layer_desc, "name_prefix": name_prefix})
 
     def get_sequential_layers(self):
+        self.__init_hook__()
         return [x["layer"] for x in self._sequential_layers]
 
     def get_sequential_name_prefixes(self):
+        self.__init_hook__()
         return {str(index): x["name_prefix"] for index, x in enumerate(self._sequential_layers)}
 
     def _set_pipeline_name_mapping(self, mappings=None):

@@ -35,6 +35,9 @@ function _set_params(){
 
     fp_item="bf16"
     workerlog_id=0
+    ip_lists=($(echo $TRAINER_INSTANCES | tr ',' ' '))
+    master_ip=${ip_lists[0]}
+    nnodes=${nnodes:-1}
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -74,24 +77,23 @@ function _train(){
         log_file=${train_log_file}
     fi
 
-    if [ ${PADDLE_TRAINER_ID} ]
-    then
-        PADDLE_RANK_OPTION=" --rank ${PADDLE_TRAINER_ID}"
-    else
-        PADDLE_RANK_OPTION=""
-    fi
     # 以下为通用执行命令，无特殊可不用修改
     case ${device_num} in
     N1C1) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --gpus=0 ${PADDLE_RANK_OPTION}\
+        train_cmd="python -m paddle.distributed.launch --gpus=0 \
             --auto_tuner_json ${autoconfig_json_file} finetune_generation.py ${modle_json_file}"
         ;;
-    N1C8|N2C16) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
+    N1C8) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
+        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --auto_tuner_json ${autoconfig_json_file} finetune_generation.py ${modle_json_file}"
+        ;;
+    N2C16) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
+        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
+            --auto_tuner_json ${autoconfig_json_file} --master etcd://$master_ip:2379 --nnodes $nnodes:$nnodes \
+            finetune_generation.py ${modle_json_file}"
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
+        train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --auto_tuner_json ${autoconfig_json_file} finetune_generation.py ${modle_json_file}"
         ;;
     esac
@@ -123,6 +125,13 @@ function _train(){
 }
 
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
+unset PADDLE_ELASTIC_JOB_ID
+unset PADDLE_TRAINER_ENDPOINTS
+unset DISTRIBUTED_TRAINER_ENDPOINTS
+unset FLAGS_START_PORT
+unset PADDLE_ELASTIC_TIMEOUT
+unset PADDLE_TRAINERS_NUM
+unset PADDLE_TRAINER_ID
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@
 #_train       # 如果只产出训练log,不解析,可取消注释
