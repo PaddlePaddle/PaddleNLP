@@ -32,6 +32,7 @@ from .trainer import SCALER_NAME, SCHEDULER_NAME, TRAINER_STATE_NAME, TRAINING_A
 from .trainer_callback import TrainerState
 from .trainer_utils import (  # set_hyrbid_parallel_seed,
     PREFIX_CHECKPOINT_DIR,
+    ShardingOption,
     TrainOutput,
     _exec_mode_guard,
     get_last_checkpoint,
@@ -111,6 +112,13 @@ class AutoTrainer(Trainer):
     def _wrap_for_auto(self, model, train_dataloader):
         dist_loader = self._wrap_for_dist_loader(train_dataloader)
 
+        if ShardingOption.SHARD_OP in self.args.sharding:
+            self.optimizer = dist.shard_optimizer(self.optimizer, dist.ShardingStage1())
+        elif ShardingOption.SHARD_GRAD_OP in self.args.sharding:
+            self.optimizer = dist.shard_optimizer(self.optimizer, dist.ShardingStage2())
+        elif ShardingOption.FULL_SHARD in self.args.sharding:
+            self.optimizer = dist.shard_optimizer(self.optimizer, dist.ShardingStage3())
+
         if self.args.to_static:
             unified_strategy = dist.Strategy()
             unified_strategy._from_legacy_strategy(self.args.strategy)
@@ -119,7 +127,6 @@ class AutoTrainer(Trainer):
                 dist_loader,
             )
         else:
-            self.optimizer = dist.shard_optimizer(self.optimizer)
             return model, dist_loader
 
     def _wrap_amp_model(self, args, model):
