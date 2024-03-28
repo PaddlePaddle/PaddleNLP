@@ -94,6 +94,16 @@ __all__ = [
 ]
 
 
+def is_fused_rope_valid():
+    current_device = get_env_device()
+    if current_device == "gpu":
+        return fused_rotary_position_embedding is not None
+    elif current_device == "npu":
+        return True
+    else:
+        return False
+
+
 def _get_interleave(n):
     def _get_interleave_power_of_2(n):
         start = 2 ** (-(2 ** -(math.log2(n) - 3)))
@@ -671,7 +681,7 @@ class LlamaAttention(nn.Layer):
 
         self.use_fused_rope = config.use_fused_rope
         if self.use_fused_rope:
-            if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
+            if not is_fused_rope_valid():
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
                     "Will disable fuse rope. Try using latest gpu version of Paddle."
