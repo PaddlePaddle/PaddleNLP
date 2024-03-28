@@ -257,7 +257,8 @@ class GPTConfig(PretrainedConfig):
         ignore_index: int = 0,
         use_flash_attention: bool = False,
         use_fused_dropout_add: bool = False,
-        fused_linear: bool = False,
+        use_fast_layer_norm: bool = False,
+        use_fused_linear: bool = False,
         fuse_attention_qkv: bool = False,
         fuse_attention_ffn: bool = False,
         fused_softmax_with_triangular: bool = False,
@@ -298,7 +299,8 @@ class GPTConfig(PretrainedConfig):
         self.tensor_parallel_output = tensor_parallel_output
         self.output_attentions = output_attentions
         self.ignore_index = ignore_index
-        self.fused_linear = fused_linear
+        self.use_fast_layer_norm = use_fast_layer_norm
+        self.use_fused_linear = use_fused_linear
         self.use_fused_dropout_add = use_fused_dropout_add
         self.fused_softmax_with_triangular = fused_softmax_with_triangular
         self.virtual_pp_degree = virtual_pp_degree
