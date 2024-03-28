@@ -17,6 +17,7 @@ from __future__ import annotations
 import inspect
 import json
 import os
+import re
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import (
@@ -487,6 +488,24 @@ def splited_qkv_to_tensor_parallel_qkv(weight_list, num_attention_heads):
     ), f"weight_list length is not equal 3, it should be Q K V list. but got length {len(weight_list)}"
     weight = np.concatenate(weight_list, axis=-1)
     return naive_merged_qkv_to_tensor_parallel_qkv(weight)
+
+
+def merged_as_tensor_parallel_qkv(state_dict, q_name, k_name, v_name, num_hidden_layers):
+    q = state_dict[q_name]
+    k = state_dict[k_name]
+    v = state_dict[v_name]
+
+    naive_merged_qkv = np.concatenate((q, k, v), axis=-1)
+
+    return naive_merged_qkv_to_tensor_parallel_qkv(naive_merged_qkv, num_hidden_layers)
+
+
+def merge_as_naive_merged_qkv():
+    pass
+
+
+def merge_as_splited_qkv():
+    pass
 
 
 def get_tensor_parallel_merge_func(tensor_parallel_degree, tensor_parallel_rank, num_attention_heads=None):
@@ -1082,10 +1101,19 @@ class ConversionMixin:
 
     @classmethod
     def get_tensor_parallel_convert_actions(
-        cls, config: PretrainedConfig, loaded_state_dict_keys, is_split=True, ignore_error=False
+        cls, config: PretrainedConfig, loaded_state_dict_keys, is_split=True, ignore_error=False, ignore_params=[]
     ):
         name_action_mappings = cls._get_tensor_parallel_mappings(config, is_split=is_split)
+
+        # avoid act on fuse parameters (qkv/gate-up), they are not consistant between config and loaded_state_dict_keys
+        name_map_list = cls._get_name_mappings(config)
+        for key in ignore_params:
+            for name_map in name_map_list:
+                if name_map.target_name == key:
+                    name_action_mappings.pop(name_map.source_name.split("model.")[-1], None)
+
         state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), loaded_state_dict_keys, ignore_error)
+
         for k, v in state_keys_map.items():
             name_action_mappings[v] = name_action_mappings.pop(k)
         return name_action_mappings
@@ -1100,26 +1128,67 @@ class ConversionMixin:
             weight_file (str | None): the weight file path of `model_state.pdparams` file
             config (PretrainedConfig): the PretrainedConfig instance of model
         """
-        name_action_mappings = cls._get_tensor_parallel_mappings(config)
+
+        def _apply_tp_action(name_action_mappings):
+            state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys(), ignore_error)
+
+            for k, v in state_keys_map.items():
+                name_action_mappings[v] = name_action_mappings.pop(k)
+
+            for name, action in name_action_mappings.items():
+                if name not in state_dict:
+                    if not ignore_error:
+                        logger.warning(f"Key <{name}> not in the model state weight file.")
+                    continue
+                tensor = state_dict.pop(name)
+                new_tensor = action(tensor)
+                with device_guard("cpu"):
+                    state_dict[name] = paddle.Tensor(new_tensor, zero_copy=True)
+
         if state_dict is None:
             with device_guard("cpu"):
                 state_dict = paddle.load(weight_file, return_numpy=False)
             logger.info("Starting to convert orignal state_dict to tensor parallel state_dict.")
 
-        state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys(), ignore_error)
+        from paddlenlp.transformers.model_utils import select_fuse_parameter
 
-        for k, v in state_keys_map.items():
-            name_action_mappings[v] = name_action_mappings.pop(k)
+        do_fuse_parameter_list, do_separate_parameter_list = select_fuse_parameter(cls, state_dict.keys(), config)
+        if "attention_qkv_proj" in do_fuse_parameter_list:
+            state_dict, fuse_success = cls.fuse_attention_parameters(
+                state_dict, ["attention_qkv_proj"], config
+            )  # design: q, k, v => qkv
 
-        for name, action in name_action_mappings.items():
-            if name not in state_dict:
-                if not ignore_error:
-                    logger.warning(f"Key <{name}> not in the model state weight file.")
-                continue
-            tensor = state_dict.pop(name)
-            new_tensor = action(tensor)
-            with device_guard("cpu"):
-                state_dict[name] = paddle.Tensor(new_tensor, zero_copy=True)
+        name_action_mappings = cls._get_tensor_parallel_mappings(config)
+
+        # avoid act on fuse parameters (qkv/gate-up), they are not consistant between config and loaded_state_dict_keys
+        # pop qkv tp actions and apply the rest actions
+        if "attention_qkv_proj" in do_fuse_parameter_list:
+
+            name_map_list = [
+                lambda layer_id: re.sub(r"\d+", str(layer_id), "layers.0.self_attn.q_proj.weight"),
+                lambda layer_id: re.sub(r"\d+", str(layer_id), "layers.0.self_attn.k_proj.weight"),
+                lambda layer_id: re.sub(r"\d+", str(layer_id), "layers.0.self_attn.v_proj.weight"),
+                lambda layer_id: re.sub(r"\d+", str(layer_id), "layers.0.self_attn.qkv_proj.weight"),
+            ]
+            tp_action_keys = list(name_action_mappings.keys())
+            poped_param_names = []
+            for key in tp_action_keys:
+                for name_map in name_map_list:
+                    if re.sub(r"\d+", "0", key) == name_map(0):
+                        name_action_mappings.pop(key, None)
+                        poped_param_names.append(key)
+
+        _apply_tp_action(name_action_mappings)
+
+        # tail processing qkv parameters
+        if "attention_qkv_proj" in do_fuse_parameter_list:
+            name_action_mappings_fuse = cls._get_tensor_parallel_mappings(config)
+            tp_action_fuse_keys = list(name_action_mappings_fuse.keys())
+            for key in tp_action_fuse_keys:
+                if key not in poped_param_names:
+                    name_action_mappings_fuse.pop(key, None)
+
+            _apply_tp_action(name_action_mappings_fuse)
 
         return state_dict
 

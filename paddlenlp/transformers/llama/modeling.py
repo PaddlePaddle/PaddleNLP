@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import math
+import re
 import warnings
 from functools import partial
 from typing import Optional, Tuple
@@ -1198,11 +1199,13 @@ class LlamaPretrainedModel(PretrainedModel):
                 [f"layers.{layer_index}.self_attn.q_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.k_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.v_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.qkv_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.o_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.rotary_emb.inv_freq"],
                 [f"layers.{layer_index}.mlp.gate_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.mlp.down_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.mlp.up_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.mlp.gate_up_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.input_layernorm.weight"],
                 [f"layers.{layer_index}.post_attention_layernorm.weight"],
             ]
@@ -1246,7 +1249,7 @@ class LlamaPretrainedModel(PretrainedModel):
                 base_actions.pop("lm_head.weight")
                 base_actions.pop("embed_tokens.weight")
             # Column Linear
-            if config.fuse_attention_qkv:
+            if config.fuse_attention_qkv:  # notice: config content here is not descriptive but commanding
                 base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
             else:
                 base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
@@ -1272,6 +1275,34 @@ class LlamaPretrainedModel(PretrainedModel):
             return final_actions
 
         mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+
+        return mappings
+
+    @classmethod
+    def _get_fused_param_mappings(cls):
+        # return parameter fuse utils
+        from paddlenlp.transformers.conversion_utils import (
+            merged_as_tensor_parallel_qkv,
+        )
+
+        # attention: q,k,v -> qkv, ffn: gate, up -> gate_up
+        mappings = {
+            "fuse_action": [merged_as_tensor_parallel_qkv, None],
+            "split_action": [None, None],
+            "attn_param_names": {
+                "qkv_proj": lambda layer_id: re.sub(r"\d+", str(layer_id), "llama.layers.0.self_attn.qkv_proj.weight"),
+                "q_proj": lambda layer_id: re.sub(r"\d+", str(layer_id), "llama.layers.0.self_attn.q_proj.weight"),
+                "k_proj": lambda layer_id: re.sub(r"\d+", str(layer_id), "llama.layers.0.self_attn.k_proj.weight"),
+                "v_proj": lambda layer_id: re.sub(r"\d+", str(layer_id), "llama.layers.0.self_attn.v_proj.weight"),
+            },
+            "ffn_param_names": {
+                "gate_up_proj": lambda layer_id: re.sub(
+                    r"\d+", str(layer_id), "llama.layers.0.mlp.gate_up_proj.weight"
+                ),
+                "gate_proj": lambda layer_id: re.sub(r"\d+", str(layer_id), "llama.layers.0.mlp.gate_proj.weight"),
+                "up_proj": lambda layer_id: re.sub(r"\d+", str(layer_id), "llama.layers.0.mlp.up_proj.weight"),
+            },
+        }
 
         return mappings
 
