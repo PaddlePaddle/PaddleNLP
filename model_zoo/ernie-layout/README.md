@@ -415,7 +415,7 @@ python export_model.py --task_type cls --model_path ./ernie-layoutx-base-uncased
 
 #### 5.2 Python Deploy
 
-We provide the deploy example on Key Information Extraction, Document Question Answering and Document Image Classification, please follow the [ERNIE-Layout Python Deploy Guide](./deploy/python/README.md)
+We provide the deploy example on Key Information Extraction, Document Question Answering and Document Image Classification based on **FastDeploy**, please follow the [ERNIE-Layout Python Deploy Guide](./deploy/python/README.md)
 
 
 <a name="References"></a>

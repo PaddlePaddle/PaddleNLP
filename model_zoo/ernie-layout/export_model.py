@@ -16,10 +16,12 @@ import argparse
 import os
 
 import paddle
+
 from paddlenlp.transformers import (
-    AutoModelForSequenceClassification,
     AutoModelForQuestionAnswering,
+    AutoModelForSequenceClassification,
     AutoModelForTokenClassification,
+    AutoTokenizer,
 )
 
 # yapf: disable
@@ -31,6 +33,7 @@ args = parser.parse_args()
 # yapf: enable
 
 if __name__ == "__main__":
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
     if args.task_type == "ner":
         model = AutoModelForTokenClassification.from_pretrained(args.model_path)
     elif args.task_type == "mrc":
@@ -46,8 +49,8 @@ if __name__ == "__main__":
         model,
         input_spec=[
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
-            paddle.static.InputSpec(shape=[None, None, None], dtype="int64", name="bbox"),
-            paddle.static.InputSpec(shape=[None, None, None, None], dtype="int64", name="image"),
+            paddle.static.InputSpec(shape=[None, None, 4], dtype="int64", name="bbox"),
+            paddle.static.InputSpec(shape=[None, 3, 224, 224], dtype="float32", name="image"),
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="attention_mask"),
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
@@ -56,3 +59,4 @@ if __name__ == "__main__":
     # Save in static graph model.
     save_path = os.path.join(args.output_path, "inference")
     paddle.jit.save(model, save_path)
+    tokenizer.save_pretrained(args.output_path)

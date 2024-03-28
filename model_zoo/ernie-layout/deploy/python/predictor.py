@@ -14,10 +14,11 @@
 
 import base64
 import collections
+import os
 
 import cv2
+import fastdeploy as fd
 import numpy as np
-import paddle
 import scipy
 import six
 from paddleocr import PaddleOCR
@@ -26,45 +27,14 @@ from seqeval.metrics.sequence_labeling import get_entities
 
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.image_utils import ppocr2example
-from paddlenlp.utils.log import logger
-
-
-class InferBackend(object):
-    def __init__(self, model_path_prefix, device="cpu"):
-        logger.info(">>> [InferBackend] Creating Engine ...")
-        config = paddle.inference.Config(
-            model_path_prefix + ".pdmodel",
-            model_path_prefix + ".pdiparams",
-        )
-        if device == "gpu":
-            config.enable_use_gpu(100, 0)
-            config.switch_ir_optim(False)
-        else:
-            config.disable_gpu()
-            config.enable_mkldnn()
-        config.switch_use_feed_fetch_ops(False)
-        config.disable_glog_info()
-        config.enable_memory_optim()
-        self.predictor = paddle.inference.create_predictor(config)
-        self.input_names = [name for name in self.predictor.get_input_names()]
-        self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
-        self.output_handles = [self.predictor.get_output_handle(name) for name in self.predictor.get_output_names()]
-        logger.info(">>> [InferBackend] Engine Created ...")
-
-    def infer(self, input_dict: dict):
-        for idx, input_name in enumerate(self.input_names):
-            self.input_handles[idx].copy_from_cpu(input_dict[input_name])
-        self.predictor.run()
-        outputs = [output_handle.copy_to_cpu() for output_handle in self.output_handles]
-        return outputs
 
 
 class Predictor(object):
     def __init__(self, args):
         use_gpu = True if args.device == "gpu" else False
-        self.tokenizer = AutoTokenizer.from_pretrained("ernie-layoutx-base-uncased")
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
         self.batch_size = args.batch_size
-        self.max_seq_length = args.max_seq_length
+        self.max_length = args.max_length
         self.task_type = args.task_type
         self.lang = args.lang
         self.ocr = PaddleOCR(use_angle_cls=True, lang=self.lang, show_log=False, use_gpu=use_gpu)
@@ -74,7 +44,7 @@ class Predictor(object):
         self._PrelimPrediction = collections.namedtuple(
             "PrelimPrediction", ["feature_index", "start_index", "end_index", "start_logit", "end_logit"]
         )
-        self.inference_backend = InferBackend(args.model_path_prefix, device=args.device)
+        self.runtime = self.create_fd_runtime(args)
         if self.task_type == "ner":
             self.label_dict = {
                 "O": 0,
@@ -114,6 +84,53 @@ class Predictor(object):
             self.postprocess = self.postprocess_mrc
         else:
             raise ValueError("Unspport task type: {}".format(args.task_type))
+
+    def create_fd_runtime(self, args):
+        option = fd.RuntimeOption()
+        model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
+        params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
+        option.set_model_path(model_path, params_path)
+        if args.device == "cpu":
+            option.use_cpu()
+            option.set_cpu_thread_num(args.cpu_threads)
+        else:
+            option.use_gpu(args.device_id)
+        if args.backend == "paddle":
+            option.use_paddle_infer_backend()
+        elif args.backend == "onnx_runtime":
+            option.use_ort_backend()
+        elif args.backend == "openvino":
+            option.use_openvino_backend()
+        else:
+            option.use_trt_backend()
+            if args.backend == "paddle_tensorrt":
+                option.use_paddle_infer_backend()
+                option.paddle_infer_option.collect_trt_shape = True
+                option.paddle_infer_option.enable_trt = True
+            trt_file = os.path.join(args.model_dir, "model.trt")
+            option.trt_option.set_shape(
+                "input_ids", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
+            )
+            option.trt_option.set_shape(
+                "token_type_ids", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
+            )
+            option.trt_option.set_shape(
+                "attention_mask", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
+            )
+            option.trt_option.set_shape(
+                "position_ids", [1, 1], [args.batch_size, args.max_length], [args.batch_size, args.max_length]
+            )
+            option.trt_option.set_shape(
+                "image", [1, 3, 224, 224], [args.batch_size, 3, 224, 224], [args.batch_size, 3, 224, 224]
+            )
+            option.trt_option.set_shape(
+                "bbox", [1, 1, 4], [args.batch_size, args.max_length, 4], [args.batch_size, args.max_length, 4]
+            )
+            if args.use_fp16:
+                option.trt_option.enable_fp16 = True
+                trt_file = trt_file + ".fp16"
+            option.trt_option.serialize_file = trt_file
+        return fd.Runtime(option)
 
     def _check_is_max_context(self, doc_spans, cur_span_index, position):
         """Check if this is the 'max context' doc span for the token."""
@@ -247,7 +264,7 @@ class Predictor(object):
                     all_doc_token_boxes.append(box)
                     all_doc_token_labels.append(label)
 
-            max_tokens_for_doc = self.max_seq_length - 2
+            max_tokens_for_doc = self.max_length - 2
             doc_spans = []
             start_offset = 0
             while start_offset < len(all_doc_tokens):
@@ -291,7 +308,7 @@ class Predictor(object):
                 sentence_ids.append(0)
                 input_mask = [1] * len(tokens)
 
-                while len(tokens) < self.max_seq_length:
+                while len(tokens) < self.max_length:
                     token_is_max_context[str(len(tokens))] = False
                     token_to_orig_map[str(len(tokens))] = -1
                     tokens.append(self.tokenizer.pad_token)
@@ -316,19 +333,19 @@ class Predictor(object):
                 tokenized_examples["token_to_orig_map"].append(token_to_orig_map)
         for input_id in tokenized_examples["input_ids"]:
             input_id = input_id + [1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]] * (
-                self.max_seq_length - len(input_id)
+                self.max_length - len(input_id)
             )
 
         for att_mask in tokenized_examples["attention_mask"]:
             att_mask = att_mask + [1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]] * (
-                self.max_seq_length - len(att_mask)
+                self.max_length - len(att_mask)
             )
 
         for bbox in tokenized_examples["bbox"]:
-            bbox = bbox + [[0, 0, 0, 0] for _ in range(self.max_seq_length - len(bbox))]
+            bbox = bbox + [[0, 0, 0, 0] for _ in range(self.max_length - len(bbox))]
 
         for label in tokenized_examples["labels"]:
-            label = label + [1 * ignore_label_id] * (self.max_seq_length - len(label))
+            label = label + [1 * ignore_label_id] * (self.max_length - len(label))
 
         self.examples_cache["name"] = list(range(len(examples["text"])))
         self.examples_cache["text"] = [item for item in examples["text"]]
@@ -433,7 +450,7 @@ class Predictor(object):
                     all_doc_tokens.append(sub_token)
                     all_doc_token_boxes.append(box)
 
-            max_tokens_for_doc = self.max_seq_length - 2
+            max_tokens_for_doc = self.max_length - 2
             doc_spans = []
             start_offset = 0
             while start_offset < len(all_doc_tokens):
@@ -465,7 +482,7 @@ class Predictor(object):
                 sentence_ids.append(0)
                 input_mask = [1] * len(tokens)
 
-                while len(tokens) < self.max_seq_length:
+                while len(tokens) < self.max_length:
                     tokens.append(self.tokenizer.pad_token)
                     input_mask.append(0)
                     sentence_ids.append(0)
@@ -484,16 +501,16 @@ class Predictor(object):
                 tokenized_examples["image"].append(image)
         for input_id in tokenized_examples["input_ids"]:
             input_id = input_id + [1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]] * (
-                self.max_seq_length - len(input_id)
+                self.max_length - len(input_id)
             )
 
         for att_mask in tokenized_examples["attention_mask"]:
             att_mask = att_mask + [1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]] * (
-                self.max_seq_length - len(att_mask)
+                self.max_length - len(att_mask)
             )
 
         for bbox in tokenized_examples["bbox"]:
-            bbox = bbox + [[0, 0, 0, 0] for _ in range(self.max_seq_length - len(bbox))]
+            bbox = bbox + [[0, 0, 0, 0] for _ in range(self.max_length - len(bbox))]
 
         self.examples_cache["name"] = list(range(len(examples["text"])))
         self.features_cache["id"] = [item for item in tokenized_examples["id"]]
@@ -565,7 +582,7 @@ class Predictor(object):
 
                 start_offset = 0
                 doc_spans = []
-                max_tokens_for_doc = self.max_seq_length - len(query_tokens) - 3
+                max_tokens_for_doc = self.max_length - len(query_tokens) - 3
                 while start_offset < len(all_doc_tokens):
                     length = len(all_doc_tokens) - start_offset
                     if length > max_tokens_for_doc:
@@ -608,7 +625,7 @@ class Predictor(object):
                     sentence_ids.append(seg_a)
                     input_mask = [1] * len(tokens)
 
-                    while len(tokens) < self.max_seq_length - len(query_tokens) - 1:
+                    while len(tokens) < self.max_length - len(query_tokens) - 1:
                         token_is_max_context[str(len(tokens))] = False
                         token_to_orig_map[str(len(tokens))] = -1
                         tokens.append(self.tokenizer.pad_token)
@@ -660,16 +677,16 @@ class Predictor(object):
                     tokenized_examples["token_to_orig_map"].append(token_to_orig_map)
         for input_id in tokenized_examples["input_ids"]:
             input_id = input_id + [1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]] * (
-                self.max_seq_length - len(input_id)
+                self.max_length - len(input_id)
             )
 
         for att_mask in tokenized_examples["attention_mask"]:
             att_mask = att_mask + [1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]] * (
-                self.max_seq_length - len(att_mask)
+                self.max_length - len(att_mask)
             )
 
         for bbox in tokenized_examples["bbox"]:
-            bbox = bbox + [[0, 0, 0, 0] for _ in range(self.max_seq_length - len(bbox))]
+            bbox = bbox + [[0, 0, 0, 0] for _ in range(self.max_length - len(bbox))]
         self.examples_cache["name"] = list(range(len(examples["text"])))
         self.examples_cache["text"] = [item for item in examples["text"]]
         self.features_cache["id"] = [item for item in tokenized_examples["id"]]
@@ -750,7 +767,7 @@ class Predictor(object):
         return formatted_predictions
 
     def infer(self, data):
-        return self.inference_backend.infer(data)
+        return self.runtime.infer(data)
 
     def predict(self, docs):
         input_data = []
@@ -771,7 +788,8 @@ class Predictor(object):
         for idx in range(0, len(preprocess_result["id"]), self.batch_size):
             l, r = idx, idx + self.batch_size
             input_dict = {}
-            for input_name in self.inference_backend.input_names:
+            for i in range(self.runtime.num_inputs()):
+                input_name = self.runtime.get_input_info(i).name
                 input_dict[input_name] = np.array(preprocess_result[input_name][l:r], dtype="int64")
             output = self.infer(input_dict)
             if self.task_type != "mrc":
