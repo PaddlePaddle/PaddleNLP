@@ -235,10 +235,11 @@ def scaled_dot_product_attention(
                     key_states,
                     value_states,
                     None,
-                    attention_mask,
+                    attention_mask.astype("bool") if attention_mask is not None else None,
                     0.0,
                     attention_mask is None,
                     True,
+                    False,
                     False,
                 )[0]
             else:
@@ -1427,7 +1428,7 @@ class LlamaModel(LlamaPretrainedModel):
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
-        if self.config.use_flash_attention:
+        if self.config.use_flash_attention and get_env_device != "npu":
             is_casual = is_casual_mask(attention_mask)
             if is_casual and alibi is None:
                 attention_mask = None
@@ -1533,9 +1534,11 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
             if self.config.sep_parallel_degree > 1:
                 _hcg = fleet.get_hybrid_communicate_group()
                 masked_lm_loss = ConcatSePMaskedLoss.apply(masked_lm_loss, axis=1, group=_hcg.get_sep_parallel_group())
-            # skip ignore_index which loss == 0
-            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
-            loss = paddle.mean(masked_lm_loss)
+            # support dynamic padding
+            binary_sequence = paddle.where(
+                masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
+            )
+            loss = paddle.sum(masked_lm_loss * binary_sequence) / paddle.sum(binary_sequence)
 
         return loss
 
