@@ -38,5 +38,6 @@
 	"recompute_granularity": "full",
 	"save_total_limit": 2,
 	"sharding_parallel_degree": 1,
-	"autotuner_benchmark": 1
+	"autotuner_benchmark": 1,
+	"skip_memory_metrics": 0
 }

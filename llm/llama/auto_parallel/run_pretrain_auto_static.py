@@ -552,7 +552,8 @@ def main():
     #     if training_args.bf16:
     #         dtype = "bfloat16"
 
-    model = model_class._from_config(config)
+    # The `amp` of static graph model can't accept a model initialized with `dtype float16 or bfloat16`
+    model = model_class._from_config(config, dtype="float32")
 
     if training_args.recompute:
 

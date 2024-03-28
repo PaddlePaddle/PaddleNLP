@@ -133,7 +133,7 @@ function _train(){
     rm -rf mylog && rm -rf checkpoints
     
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
-    ${train_cmd} > ${log_file} 2>&1
+    timeout 15m ${train_cmd} > ${log_file} 2>&1
 
     if [ $? -ne 0 ];then
         echo -e "${model_name}, FAIL"

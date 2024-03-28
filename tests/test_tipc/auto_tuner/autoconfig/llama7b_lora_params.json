@@ -34,5 +34,6 @@
 	"sharding": "stage3",
 	"recompute_granularity": "full_attn",
 	"autotuner_benchmark": 1,
+	"skip_memory_metrics": 0,
 	"benchmark": 1
 }

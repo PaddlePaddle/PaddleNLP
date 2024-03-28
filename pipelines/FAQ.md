@@ -221,3 +221,48 @@ click版本过高导致：
 ```
 pip install click==8.0
 ```
+
+#### 怎么样新增最新的pytorch的检索模型
+
+PaddleNLP-Pipelines 提供了可自动将 PyTorch 相关的权重转化为 Paddle 权重的接口，以BAAI/bge-large-zh-v1.5为例，代码如下：
+
+```python
+from paddlenlp.transformers import AutoModel, AutoTokenizer
+model = AutoModel.from_pretrained("BAAI/bge-large-zh-v1.5", from_hf_hub=True, convert_from_torch=True)
+tokenizer = AutoTokenizer.from_pretrained('BAAI/bge-large-zh-v1.5', from_hf_hub=True)
+
+model.save_pretrained("BAAI/bge-large-zh-v1.5")
+tokenizer.save_pretrained("BAAI/bge-large-zh-v1.5")
+```
+
+然后在这里像这样注册一下即可使用：
+
+```
+"BAAI/bge-large-zh-v1.5": {
+                "task_class": SentenceFeatureExtractionTask,
+                "task_flag": "feature_extraction-BAAI/bge-large-zh-v1.5",
+                "task_priority_path": "BAAI/bge-large-zh-v1.5",
+            },
+```
+
+[taskflow 注册地址](https://github.com/PaddlePaddle/PaddleNLP/blob/b6dcb4e19efd85911b13a0fc587fef33578cfebf/paddlenlp/taskflow/taskflow.py#L680)
+
+使用方式示例如下：
+
+```
+document_store = FAISSDocumentStore.load(your_index_name)
+retriever = DensePassageRetriever(
+    document_store=document_store,
+    query_embedding_model="BAAI/bge-large-zh-v1.5",
+    passage_embedding_model="BAAI/bge-large-zh-v1.5",
+    output_emb_size=None,
+    max_seq_len_query=64,
+    max_seq_len_passage=256,
+    batch_size=16,
+    use_gpu=True,
+    embed_title=False,
+    pooling_mode="mean_tokens",
+)
+```
+
+**注意** bge-m3的底座模型是XLMRobertaModel，paddlenlp没有实现，不推荐使用。

@@ -193,6 +193,8 @@ class BlenderbotDecoderLayer(nn.TransformerDecoderLayer):
         normalize_before=True,
         weight_attr=None,
         bias_attr=None,
+        *args,
+        **kwargs,
     ):
         super(BlenderbotDecoderLayer, self).__init__(
             d_model=d_model,
@@ -205,6 +207,8 @@ class BlenderbotDecoderLayer(nn.TransformerDecoderLayer):
             normalize_before=normalize_before,
             weight_attr=weight_attr,
             bias_attr=bias_attr,
+            *args,
+            **kwargs,
         )
 
     def forward(self, tgt, memory=None, tgt_mask=None, memory_mask=None, cache=None):

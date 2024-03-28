@@ -29,6 +29,13 @@ import paddle.tensor as tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
+from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+    ColumnSequenceParallelLinear,
+    GatherOp,
+    RowSequenceParallelLinear,
+    ScatterOp,
+    mark_as_sequence_parallel_parameter,
+)
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
 from ...utils.converter import StateDictNameMapping
@@ -41,13 +48,6 @@ from ..model_outputs import (
     TokenClassifierOutput,
 )
 from ..model_utils import dy2st_nocheck_guard_context
-from ..sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    GatherOp,
-    RowSequenceParallelLinear,
-    ScatterOp,
-    mark_as_sequence_parallel_parameter,
-)
 from .configuration import GPT_PRETRAINED_INIT_CONFIGURATION, GPTConfig
 
 try:

@@ -50,6 +50,10 @@ class QWenConfig(PretrainedConfig):
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
+        long_sequence_strategy_type=None,
+        long_sequence_strategy_name=None,
+        long_sequence_init_args=None,
+        use_long_sequence_strategies=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -74,6 +78,11 @@ class QWenConfig(PretrainedConfig):
         self.use_fused_rms_norm = use_fused_rms_norm
         self.use_fused_rope = use_fused_rope
         self.no_bias = no_bias
+
+        self.long_sequence_strategy_type = long_sequence_strategy_type
+        self.long_sequence_strategy_name = long_sequence_strategy_name
+        self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args
+        self.use_long_sequence_strategies = use_long_sequence_strategies
 
         super().__init__(
             pad_token_id=pad_token_id,

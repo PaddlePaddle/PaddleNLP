@@ -126,6 +126,14 @@ class ModelArgument:
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
     lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
     lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
+    use_quick_lora: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use quick lora, The use of Quick LoRa will only take effect when lora_dropout is set to 0."
+        },
+    )
+    rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
+    lora_plus_scale: float = field(default=1.0, metadata={"help": "Lora B scale in LoRA+ technique"})
 
     # prefix tuning related parameters
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})

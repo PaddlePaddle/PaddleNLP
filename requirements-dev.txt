@@ -1,4 +1,3 @@
-paddlepaddle
 paddleocr<2.7
 pre-commit
 pytest

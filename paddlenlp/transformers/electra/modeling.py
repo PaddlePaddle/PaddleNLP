@@ -1051,7 +1051,7 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
         mask_positions = paddle.where(generator_labels == -100, umask_positions, mask_positions)
         updated_inputs = self.update_inputs(inputs, sampled_tokids, mask_positions)
         # use inputs and updated_input to get discriminator labels
-        labels = mask_positions * (paddle.ones_like(inputs) - paddle.equal(updated_inputs, raw_inputs).astype("int32"))
+        labels = mask_positions * (paddle.ones_like(inputs) - paddle.equal(updated_inputs, raw_inputs).astype("int64"))
         return updated_inputs, labels, sampled_tokids
 
     def sample_from_softmax(self, logits, use_softmax_sample=True):

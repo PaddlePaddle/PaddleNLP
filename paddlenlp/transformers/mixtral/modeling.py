@@ -33,6 +33,14 @@ try:
 except ImportError:
     fused_rotary_position_embedding = None
 
+from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+    ColumnSequenceParallelLinear,
+    GatherOp,
+    RowSequenceParallelLinear,
+    ScatterOp,
+    mark_as_sequence_parallel_parameter,
+)
+
 from paddlenlp.transformers.conversion_utils import (
     StateDictNameMapping,
     init_name_mappings,
@@ -45,13 +53,6 @@ from paddlenlp.transformers.model_utils import PretrainedModel, register_base_mo
 from paddlenlp.utils.log import logger
 
 from ..activations import ACT2FN
-from ..sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    GatherOp,
-    RowSequenceParallelLinear,
-    ScatterOp,
-    mark_as_sequence_parallel_parameter,
-)
 from .configuration import MixtralConfig
 
 try:
