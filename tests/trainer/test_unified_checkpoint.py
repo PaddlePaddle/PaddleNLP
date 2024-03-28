@@ -51,8 +51,9 @@ environment_variables = {
     "test_ci_no_save_model": "1",
 }
 
+#    "model_name_or_path": "./tests/trainer/unified-ckpt-llama-170m",
 pretrain_arguments = {
-    "model_name_or_path": "./tests/trainer/unified-ckpt-llama-170m",
+    "model_name_or_path": "facebook/llama-7b",
     "tokenizer_name_or_path": "facebook/llama-7b",
     "input_dir": "./unified_checkpoint/data/llama",
     "output_dir": "./unified_checkpoint/checkpoints/llama_pretrain_ckpts",
@@ -65,7 +66,7 @@ pretrain_arguments = {
     "sharding": "",
     "virtual_pp_degree": 1,
     "sequence_parallel": 0,
-    "use_flash_attention": "false",
+    "use_flash_attention": "true",
     "use_fused_rms_norm": "false",
     "max_seq_length": 1024,
     "learning_rate": 3e-04,
@@ -1130,6 +1131,80 @@ class TestUnifiedCheckpointOnN1C8EnableAll(TestUnifiedCheckpointBase):
             self.configs[config_key]["unified_checkpoint_config"] = "enable_all_options"
 
         self.need_allclose = True
+        self.rtol = 1e-7
+
+    def runfrist(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, **train_args)
+
+    def rerun(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, **train_args)
+
+
+class TestUnifiedCheckpointOnN1C8SaveLoadSpeed(TestUnifiedCheckpointBase):
+    def setUp(self):
+        super().setUp()
+        for config_key in self.configs:
+            self.configs[config_key]["skip_profile_timer"] = 0
+            self.configs[config_key]["unified_checkpoint"] = 1
+            self.configs[config_key]["unified_checkpoint_config"] = "skip_save_model_weight master_weight_compatible"
+
+        self.need_allclose = False
+        self.rtol = 1e-7
+
+    def runfrist(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, log_dir="log_uc", **train_args)
+
+    def rerun(self, train_args):
+        pass
+        # self.run_n1c8(self.run_pretrain_file, log_dir="log_uc", **train_args)
+
+
+class TestPaddleCheckpointOnN1C8SaveLoadSpeed(TestUnifiedCheckpointFull):
+    def setUp(self):
+        super().setUp()
+        for config_key in self.configs:
+            self.configs[config_key]["skip_profile_timer"] = 0
+            self.configs[config_key]["unified_checkpoint"] = 0
+
+        self.need_allclose = False
+        self.rtol = 1e-7
+
+    def runfrist(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, log_dir="log_pd", **train_args)
+
+    def rerun(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, log_dir="log_pd", **train_args)
+
+
+class TestUnifiedCheckpointOnN1C8SaveLoadSpeedNoOptimizer(TestUnifiedCheckpointBase):
+    def setUp(self):
+        super().setUp()
+        for config_key in self.configs:
+            self.configs[config_key]["skip_profile_timer"] = 0
+            self.configs[config_key]["unified_checkpoint"] = 1
+            self.configs[config_key]["unified_checkpoint_config"] = "master_weight_compatible"
+            self.configs[config_key]["ignore_load_lr_and_optim"] = 1
+            self.configs[config_key]["ignore_save_lr_and_optim"] = 1
+        self.need_allclose = False
+        self.rtol = 1e-7
+
+    def runfrist(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, **train_args)
+
+    def rerun(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, **train_args)
+
+
+class TestPaddleCheckpointOnN1C8SaveLoadSpeedNoOptimizer(TestUnifiedCheckpointBase):
+    def setUp(self):
+        super().setUp()
+        for config_key in self.configs:
+            self.configs[config_key]["skip_profile_timer"] = 0
+            self.configs[config_key]["unified_checkpoint"] = 0
+            self.configs[config_key]["ignore_load_lr_and_optim"] = 1
+            self.configs[config_key]["ignore_save_lr_and_optim"] = 1
+
+        self.need_allclose = False
         self.rtol = 1e-7
 
     def runfrist(self, train_args):
