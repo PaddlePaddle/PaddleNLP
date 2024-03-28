@@ -14,5 +14,6 @@
 
 from .configuration import *
 from .modeling import *
+from .modeling_auto import *
 from .modeling_pp import *
 from .tokenizer import *

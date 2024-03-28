@@ -22,3 +22,4 @@ from .trainer_seq2seq import *
 from .trainer_utils import *
 from .training_args import *
 from .training_args_seq2seq import *
+from .auto_trainer import *
