@@ -636,8 +636,12 @@ class PrefixConstrainedLogitsProcessor(LogitsProcessor):
 
     def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor) -> paddle.Tensor:
         mask = paddle.full_like(scores, paddle.finfo(scores.dtype).min)
-        for batch_id, beam_sent in enumerate(input_ids.reshape([-1, self._num_beams, input_ids.shape[-1]])):
+
+        input_ids = input_ids.reshape([input_ids.shape[0], -1, input_ids.shape[-1]])
+
+        for batch_id, beam_sent in enumerate(input_ids):
             for beam_id, sent in enumerate(beam_sent):
-                mask[batch_id * self._num_beams + beam_id, self._prefix_allowed_tokens_fn(batch_id, sent)] = 0
+                prefix_allowed_tokens = self._prefix_allowed_tokens_fn(batch_id, sent)
+                mask[batch_id * self._num_beams + beam_id, prefix_allowed_tokens] = 0
 
         return scores + mask
