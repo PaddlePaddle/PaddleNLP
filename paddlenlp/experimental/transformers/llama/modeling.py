@@ -978,12 +978,6 @@ class LlamaSpecuInferenceModel(LlamaPretrainedModel):
         )
 
         ids_remove_padding = ids_remove_padding.squeeze(axis=0)
-        print("-----input_ids's shape", input_ids.shape)
-        print("-----ids_remove_padding's shape", ids_remove_padding.shape)
-        print("-----padding_offset", padding_offset)
-        print("-----cum_offsets", cum_offsets)
-        print("-----cu_seqlens_q", cu_seqlens_q)
-        print("-----cu_seqlens_k", cu_seqlens_k)
 
         kwargs["cu_seqlens_q"] = cu_seqlens_q
         kwargs["cu_seqlens_k"] = cu_seqlens_k
@@ -992,7 +986,8 @@ class LlamaSpecuInferenceModel(LlamaPretrainedModel):
         kwargs["max_input_length"] = self.max_seq_len
 
         inputs_embeds = self.embed_tokens(ids_remove_padding)
-
+        if kwargs.get("cache", None) is not None:
+            kwargs["cu_seqlens_k"][1] = kwargs.get("seq_lens_decoder")[0][0]
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
                 input_ids=input_ids,
@@ -1358,8 +1353,8 @@ class LlamaForCausalLMSpecuInferenceModel(GenerationInferenceModel, LlamaPretrai
                 [
                     2,
                     max_batch_size,
-                    config.num_attention_heads // max(config.tensor_parallel_degree, 1),
                     max_length,
+                    config.num_attention_heads // max(config.tensor_parallel_degree, 1),
                     config.hidden_size // config.num_attention_heads,
                 ]
             )
@@ -1657,8 +1652,6 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         k_dequant_scales=None,
         v_dequant_scales=None,
     ):
-        input_ids[0][40:45] = paddle.to_tensor([29871, 15043, 29991, 306  , 29915])
-        print("-----inital input_ids: ", input_ids)
         outputs = self.llama(
             input_ids,
             src_mask=src_mask,

@@ -1763,8 +1763,10 @@ class FusedSpecuMultiTransformer(Layer):
     ):
         cache_k = caches[i][0]
         cache_v = caches[i][1]
-
-        hidden_size = cache_k.shape[1] * cache_k.shape[3]
+        bsz = cache_k.shape[0]
+        head_num = cache_k.shape[2]
+        head_size = cache_k.shape[3]
+        hidden_dim = head_num * head_size
         seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
         seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
         cu_seqlens_k = kwargs.get("cu_seqlens_k", None)
@@ -1776,15 +1778,7 @@ class FusedSpecuMultiTransformer(Layer):
             token_num_in_cache = 0
         else:
             cur_seq_len = seq_lens_decoder[0][0]
-            cu_seqlens_k[1] = cur_seq_len + gamma
             token_num_in_cache = cur_seq_len - gamma
-        print("--------cu_seqlens_q: ", kwargs.get("cu_seqlens_q", None))
-        print("--------cu_seqlens_k: ", cu_seqlens_k)
-        print("--------seq_lens_encoder: ", seq_lens_encoder)
-        print("--------seq_lens_decoder: ", seq_lens_decoder)
-        print("--------seq_lens_this_time: ", kwargs.get("seq_lens_this_time", None))
-        print("--------cum_offsets: ", kwargs.get("cum_offsets", None))
-        print("--------padding_offsets: ", kwargs.get("padding_offsets", None))
 
         # qkv_out: [token_num, 3*hidden_dim]
         fmha_out, qkv_out_specu, _, _ = paddle.incubate.nn.functional.speculative_decoding_multihead_attention(
@@ -1798,30 +1792,37 @@ class FusedSpecuMultiTransformer(Layer):
             kwargs.get("cum_offsets", None),
             kwargs.get("cu_seqlens_q", None),
             cu_seqlens_k,
-            None,  # pre_key_cache
-            None,  # pre_value_cache
             rotary_embs, # rotary_embs
-            None,
+            None,  # attn_mask
             None,  # qkv_bias
             token_num_in_cache, # token_num_in_cache
             kwargs.get("max_input_length", -1), # max_seq_len
             self.use_neox_rotary_style,
         )
 
-        # # 更新 cache
-        # # qkv_out_specu: (cur_token_num, 3*hidden_dim)
-        # # caches[2*i]: (bsz, num_heads, max_seqlen, head_dim)
-        # # k: [seq_len, hidden_dim]
-        # k = qkv_out_specu[:, hidden_size:2*hidden_size]
-        # v = qkv_out_specu[:, 2*hidden_size:]
-        # # prefill stage
-        # if cache is None:
-        #     cache_k[:, :, :cur_seq_len, :] = k.reshape(cache_k[:, :, :cur_seq_len, :].shape)
-        #     cache_v[:, :, :cur_seq_len, :] = v.reshape(cache_v[:, :, :cur_seq_len, :].shape)
-        # # decode stage
-        # else:
-        #     cache_k[:, :, cur_seq_len - gamma : cur_seq_len, :] = k.reshape(cache_k[:, :, cur_seq_len - gamma : cur_seq_len, :].shape)
-        #     cache_v[:, :, cur_seq_len - gamma : cur_seq_len, :] = v.reshape(cache_v[:, :, cur_seq_len - gamma : cur_seq_len, :].shape)
+        # 更新 cache
+        # qkv_out_specu: (cur_token_num, 3*hidden_dim)
+        # caches[2*i]: (bsz, num_heads, max_seqlen, head_dim)
+        # k: [seq_len, hidden_dim]
+        
+        k = qkv_out_specu[:, hidden_dim:2*hidden_dim]
+        v = qkv_out_specu[:, 2*hidden_dim:]
+        # q_out, k_out, v_out = qkv_transpose_split(
+        #     qkv_out, padding_offset, seq_lens, input_ids, self.num_heads, self.head_dim
+        # )
+        # prefill stage
+        if cache is None:
+            # [seq_len, hidden_dim] -> [bsz, head_num, seq_len, hidden_dim]
+            k = k.reshape([bsz, cur_seq_len, head_num, head_size])
+            v = v.reshape([bsz, cur_seq_len, head_num, head_size])
+            cache_k[:, :cur_seq_len, :, :] = k
+            cache_v[:, :cur_seq_len, :, :] = v
+        # decode stage
+        else:
+            k = k.reshape([bsz, gamma, head_num, head_size])
+            v = v.reshape([bsz, gamma, head_num, head_size])
+            cache_k[:, cur_seq_len - gamma : cur_seq_len, :, :] = k
+            cache_v[:, cur_seq_len - gamma : cur_seq_len, :, :] = v
         out_linear_out = self.compute_out_linear(fmha_out, i)
 
         return out_linear_out
@@ -1950,12 +1951,9 @@ class FusedSpecuMultiTransformer(Layer):
 
         assert self.num_layers == len(self.qkv_weights)
 
-        print("------input_ids's shape: ", input_ids.shape)
-        print("------src's shape: ", src.shape)
         residual_input = src
         for i in range(self.num_layers):
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
-            print("------qkv_out's shape: ", qkv_out.shape)
             out_linear_out = self.compute_attn(
                 time_step,
                 qkv_out,

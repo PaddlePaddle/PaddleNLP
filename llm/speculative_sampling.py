@@ -1,3 +1,4 @@
+from configparser import ConfigParser
 from paddlenlp.transformers import (
     AutoConfig,
     AutoTokenizer,
@@ -105,19 +106,19 @@ class SpeculativeSamplingPredictor(InferencePredictorMixin, BasePredictor):
     def __init__(
         self,
         config: PredictorArgument,
-        model: GenerationInferenceModel = None,
+        target_model: GenerationInferenceModel = None,
         assistant_model: GenerationInferenceModel = None,
         tokenizer: PretrainedTokenizer = None,
         **kwargs
     ):
-        self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size, config.total_max_length)
+        self.cache_kvs_shape = target_model.get_cache_kvs_shape(target_model.config, config.batch_size, config.total_max_length)
         BasePredictor.__init__(self, config, tokenizer)
         InferencePredictorMixin.__init__(self, config, tokenizer)
-        self.model = model
-        self.head_dim = self.cache_kvs_shape[0][-1]
+        self.target_model = target_model
         self.total_max_length = config.src_length + config.max_length
+        self.cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.cache_kvs_shape]
         self.assistant_model = assistant_model
-        self.assistant_model_cache_kvs_shape = self.cache_kvs_shape
+        self.assistant_model_cache_kvs_shape = assistant_model.get_cache_kvs_shape(assistant_model.config, config.batch_size, config.total_max_length)
         self.assistant_model_cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.assistant_model_cache_kvs_shape]
         self.gamma = config.gamma
 
@@ -261,14 +262,15 @@ class SpeculativeSamplingPredictor(InferencePredictorMixin, BasePredictor):
         assistant_model_inputs = model_inuts.copy()
         assistant_model_inputs["cache_kvs"] = self.assistant_model_cache_kvs
         stop_criter = StoppingCriteriaList([
-                MaxLengthCriteria(max_length=60),
+                MaxLengthCriteria(max_length=90),
             ])
-        output_ids = self.model.assisted_decoding(
+        output_ids = self.target_model.assisted_decoding(
             input_ids,
             model_inuts,
             assistant_model_inputs,
             self.assistant_model,
-            stopping_criteria=stop_criter
+            stopping_criteria=stop_criter,
+            gamma = self.gamma
         )
         return output_ids
 
@@ -389,12 +391,12 @@ def create_predictor(
     config.gamma = predictor_args.gamma
     config.max_seq_len = predictor_args.total_max_length
 
-    model = LlamaForCausalLMSpecuInferenceModel.from_pretrained(
+    target_model = LlamaForCausalLMSpecuInferenceModel.from_pretrained(
         predictor_args.model_name_or_path,
         config=config,
         dtype=predictor_args.dtype,
     )
-    model.eval()
+    target_model.eval()
 
     from paddlenlp.experimental.transformers import LlamaForCausalLMInferenceModel
 
@@ -406,7 +408,11 @@ def create_predictor(
     assistant_model.eval()
 
     # predictor
-    predictor = SpeculativeSamplingPredictor(predictor_args, model=model, assistant_model=assistant_model, tokenizer=tokenizer)
+    predictor = SpeculativeSamplingPredictor(
+                    predictor_args, 
+                    target_model=target_model, 
+                    assistant_model=assistant_model, 
+                    tokenizer=tokenizer)
     return predictor
 
 
