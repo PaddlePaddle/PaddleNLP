@@ -18,6 +18,7 @@ from __future__ import annotations
 import collections
 import contextlib
 import math
+import re
 from functools import partial
 
 import numpy as np
@@ -800,6 +801,36 @@ class GPTPretrainedModel(PretrainedModel):
             return final_actions
 
         mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+
+        return mappings
+
+    @classmethod
+    def _get_fused_param_mappings(cls):
+        # return parameter fuse utils
+        from paddlenlp.transformers.conversion_utils import (
+            merged_as_tensor_parallel_qkv,
+        )
+
+        # attention: q,k,v -> qkv, ffn: gate, up -> gate_up
+        mappings = {
+            "fuse_action": [merged_as_tensor_parallel_qkv, None],
+            "split_action": [None, None],
+            "attn_param_names": {
+                "qkv_proj": lambda layer_id: re.sub(
+                    r"\d+", str(layer_id), "gpt.decoder.layers.0.self_attn.qkv_proj.weight"
+                ),
+                "q_proj": lambda layer_id: re.sub(
+                    r"\d+", str(layer_id), "gpt.decoder.layers.0.self_attn.q_proj.weight"
+                ),
+                "k_proj": lambda layer_id: re.sub(
+                    r"\d+", str(layer_id), "gpt.decoder.layers.0.self_attn.k_proj.weight"
+                ),
+                "v_proj": lambda layer_id: re.sub(
+                    r"\d+", str(layer_id), "gpt.decoder.layers.0.self_attn.v_proj.weight"
+                ),
+            },
+            "ffn_param_names": {"gate_up_proj": None, "gate_proj": None, "up_proj": None},
+        }
 
         return mappings
 

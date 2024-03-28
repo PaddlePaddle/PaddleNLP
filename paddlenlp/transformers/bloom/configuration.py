@@ -129,6 +129,8 @@ class BloomConfig(PretrainedConfig):
         long_sequence_strategy_name=None,
         long_sequence_init_args=None,
         use_long_sequence_strategies=False,
+        fuse_attention_qkv: bool = False,
+        fuse_attention_ffn: bool = False,
         **kwargs,
     ):
 
@@ -159,3 +161,5 @@ class BloomConfig(PretrainedConfig):
         self.long_sequence_strategy_name = long_sequence_strategy_name
         self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args
         self.use_long_sequence_strategies = use_long_sequence_strategies
+        self.fuse_attention_qkv = fuse_attention_qkv
+        self.fuse_attention_ffn = fuse_attention_ffn
