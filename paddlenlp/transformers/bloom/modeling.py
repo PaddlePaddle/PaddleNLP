@@ -26,6 +26,7 @@ from paddle.autograd import PyLayer
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
+from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
@@ -153,7 +154,9 @@ def build_alibi_tensor(attention_mask: Tensor, num_heads: int, dtype) -> Tensor:
     # => the query_length dimension will then be broadcasted correctly
     # This is more or less identical to T5's relative position bias:
     # https://github.com/huggingface/transformers/blob/f681437203baa7671de3174b0fa583c349d9d5e1/src/transformers/models/t5/modeling_t5.py#L527
-    arange_tensor = ((attention_mask.astype(paddle.float32).cumsum(axis=-1) - 1) * attention_mask)[:, None, :]
+    arange_tensor = (
+        (attention_mask.astype(paddle.float32).cumsum(axis=-1) - 1) * attention_mask.astype(paddle.float32)
+    )[:, None, :]
     alibi = slopes[..., None] * arange_tensor
     # return alibi
     return paddle.cast(alibi, dtype)
@@ -944,10 +947,27 @@ class BloomModel(BloomPreTrainedModel):
             attention_mask = paddle.cast(attention_mask, "bool")
         if len(attention_mask.shape) > 2:
             _attention_mask = paddle.ones([batch_size, seq_length_with_past], dtype="bool")
-            alibi = build_alibi_tensor(_attention_mask, self.config.n_head, dtype=hidden_states.dtype)
+            if self.config.use_long_sequence_strategies:
+                alibi_layer = LongSequenceStrategies.build_long_sequence_strategy(
+                    self.config.long_sequence_strategy_type,
+                    self.config.long_sequence_strategy_name,
+                    **self.config.long_sequence_init_args,
+                )
+                alibi = alibi_layer(_attention_mask, self.config.n_head, dtype=hidden_states.dtype)
+                alibi = paddle.squeeze(alibi)
+            else:
+                alibi = build_alibi_tensor(_attention_mask, self.config.n_head, dtype=hidden_states.dtype)
         else:
-            alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
-
+            if self.config.use_long_sequence_strategies:
+                alibi_layer = LongSequenceStrategies.build_long_sequence_strategy(
+                    self.config.long_sequence_strategy_type,
+                    self.config.long_sequence_strategy_name,
+                    **self.config.long_sequence_init_args,
+                )
+                alibi = alibi_layer(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
+                alibi = paddle.squeeze(alibi)
+            else:
+                alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
         if self.config.tensor_parallel_degree > 1:
             block_size = self.config.n_head // self.config.tensor_parallel_degree
             alibi = alibi[

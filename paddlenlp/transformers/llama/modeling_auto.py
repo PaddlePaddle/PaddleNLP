@@ -1071,14 +1071,6 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                 )
                 self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
-        # Force Replicated to match dy & st
-        prediction_scores = dist.reshard(
-            prediction_scores,
-            get_mesh(-1),
-            [dist.Replicate(), dist.Replicate(), dist.Replicate()],
-        )
-        masked_lm_labels = dist.reshard(masked_lm_labels, get_mesh(-1), [dist.Replicate(), dist.Replicate()])
-
         # Force entropy same kernel
         with paddle.amp.auto_cast(False):
             if isinstance(prediction_scores, paddle.Tensor):

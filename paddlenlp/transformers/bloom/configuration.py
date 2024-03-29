@@ -125,6 +125,10 @@ class BloomConfig(PretrainedConfig):
         use_recompute=False,
         use_pure_fp16=False,
         use_flash_attention=False,
+        long_sequence_strategy_type=None,
+        long_sequence_strategy_name=None,
+        long_sequence_init_args=None,
+        use_long_sequence_strategies=False,
         **kwargs,
     ):
 
@@ -150,3 +154,8 @@ class BloomConfig(PretrainedConfig):
         self.use_recompute = use_recompute
         self.use_pure_fp16 = use_pure_fp16
         self.use_flash_attention = use_flash_attention
+
+        self.long_sequence_strategy_type = long_sequence_strategy_type
+        self.long_sequence_strategy_name = long_sequence_strategy_name
+        self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args
+        self.use_long_sequence_strategies = use_long_sequence_strategies

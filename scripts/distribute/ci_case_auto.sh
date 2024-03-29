@@ -1507,7 +1507,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
     mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.38257694
+    loss_base=9.38256836
     ips_base=13.6743
     mem_base=3347
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
