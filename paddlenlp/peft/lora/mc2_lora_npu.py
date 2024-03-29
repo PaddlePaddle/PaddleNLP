@@ -40,12 +40,12 @@ class MC2LoRaRowParallelLinear(PyLayer):
         input_, weight = ctx.saved_tensor()
         out_grad = dy
         sub_grad = out_grad.reshape([-1, out_grad.shape[-1]])
-        input_grad = paddle.matmul(sub_grad, weight.t())
+        input_grad = paddle.matmul(sub_grad, weight, transpose_y=True)
         if weight.stop_gradient:
             return input_grad.reshape(input_.shape)
         else:
             input_reshape = input_.reshape([-1, input_.shape[-1]])
-            weight_grad = input_reshape.t().matmul(sub_grad)
+            weight_grad = paddle.matmul(input_reshape, sub_grad, transpose_x=True)
             return input_grad.reshape(input_.shape), weight_grad
 
 
@@ -65,7 +65,11 @@ class MC2LoRaColumnParallelLinear(PyLayer):
         rank = paddle.distributed.get_rank()
         hcom_name = ctx.group.process_group.get_comm_name(rank)
 
-        d_weight = input_.reshape([-1, input_.shape[-1]]).t().matmul(sub_grad) if not weight.stop_gradient else None
+        d_weight = (
+            paddle.matmul(input_.reshape([-1, input_.shape[-1]]), sub_grad, transpose_x=True)
+            if not weight.stop_gradient
+            else None
+        )
         d_input = paddle_custom_device.npu.fused_mm_allreduce(
             sub_grad, weight.t(), bias=None, hcom=hcom_name, reduce_op="sum", comm_turn=0
         )
