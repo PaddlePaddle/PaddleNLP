@@ -25,6 +25,7 @@ from argument import (
     TrainingArguments,
 )
 from data import get_convert_example
+from galore_adamw import set_galore_optimizer
 from utils import (
     CausalLMTrainer,
     InTokensIterDatasetCallback,
@@ -495,6 +496,7 @@ def main():
         gen_args=gen_args,
         data_args=data_args,
     )
+    set_galore_optimizer(trainer=trainer, model=model)
 
     # Train
     if training_args.do_train:
