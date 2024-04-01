@@ -31,9 +31,13 @@ with open(logfile, "r") as file:
 total_samples_per_second = 0
 count = 0
 
-
+skip_row = 2
+row = 0
 # 遍历每一行日志
 for line in lines:
+    row = row + 1
+    if row <= skip_row:
+        continue
     # 检查当前行是否包含 interval_samples_per_second 字段
     if "interval_samples_per_second" in line:
         # 使用字符串分割找到 interval_samples_per_second 字段的值
@@ -49,3 +53,4 @@ if count > 0:
     print("Average interval_samples_per_second:", average_samples_per_second)
 else:
     print("No interval_samples_per_second found in the log file.")
+
