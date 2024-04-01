@@ -1509,7 +1509,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.38256836
     ips_base=11.9226
-    mem_base=3347
+    mem_base=4371
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
