@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import math
-import re
 import warnings
 from functools import partial
 from typing import Optional, Tuple
@@ -1279,32 +1278,37 @@ class LlamaPretrainedModel(PretrainedModel):
         return mappings
 
     @classmethod
-    def _get_fused_param_mappings(cls):
+    def _get_fuse_or_split_param_mappings(cls, config: LlamaConfig, is_fuse=False):
         # return parameter fuse utils
-        from paddlenlp.transformers.conversion_utils import (
-            merged_as_tensor_parallel_qkv,
-        )
+        from paddlenlp.transformers.conversion_utils import split_or_fuse_func
 
-        # attention: q,k,v -> qkv, ffn: gate, up -> gate_up
-        mappings = {
-            "fuse_action": [merged_as_tensor_parallel_qkv, None],
-            "split_action": [None, None],
-            "attn_param_names": {
-                "qkv_proj": lambda layer_id: re.sub(r"\d+", str(layer_id), "llama.layers.0.self_attn.qkv_proj.weight"),
-                "q_proj": lambda layer_id: re.sub(r"\d+", str(layer_id), "llama.layers.0.self_attn.q_proj.weight"),
-                "k_proj": lambda layer_id: re.sub(r"\d+", str(layer_id), "llama.layers.0.self_attn.k_proj.weight"),
-                "v_proj": lambda layer_id: re.sub(r"\d+", str(layer_id), "llama.layers.0.self_attn.v_proj.weight"),
-            },
-            "ffn_param_names": {
-                "gate_up_proj": lambda layer_id: re.sub(
-                    r"\d+", str(layer_id), "llama.layers.0.mlp.gate_up_proj.weight"
-                ),
-                "gate_proj": lambda layer_id: re.sub(r"\d+", str(layer_id), "llama.layers.0.mlp.gate_proj.weight"),
-                "up_proj": lambda layer_id: re.sub(r"\d+", str(layer_id), "llama.layers.0.mlp.up_proj.weight"),
-            },
-        }
+        fn = split_or_fuse_func(is_fuse=is_fuse)
 
-        return mappings
+        final_actions = {}
+        if config.fuse_attention_qkv:
+            # last key is fused key, other keys are to be fused.
+            base_keys = (
+                "layers.0.self_attn.q_proj.weight",
+                "layers.0.self_attn.k_proj.weight",
+                "layers.0.self_attn.v_proj.weight",
+                "layers.0.self_attn.qkv_proj.weight",
+            )
+
+            for i in range(config.num_hidden_layers):
+                keys = (key.replace("layers.0.", f"layers.{i}.") for key in base_keys)
+                final_actions[keys] = fn
+
+        if config.fuse_attention_ffn:
+            base_keys = (
+                "llama.layers.0.mlp.gate_proj.weight",
+                "llama.layers.0.mlp.up_proj.weight",
+                "llama.layers.0.mlp.gate_up_proj.weight",
+            )
+            for i in range(config.num_hidden_layers):
+                keys = (key.replace("layers.0.", f"layers.{i}.") for key in base_keys)
+                final_actions[keys] = fn
+
+        return final_actions
 
     def _init_weights(self, layer):
         """Initialization hook"""
