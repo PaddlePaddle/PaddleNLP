@@ -358,62 +358,6 @@ def load_state_dict(
     return state_dict
 
 
-def get_param_name_from_name_mappings(name_patt, name_map_list):
-    # extract param name from name_mappings, using regular-expression pattern
-    for name_map in name_map_list:
-        if name_patt.search(name_map.source_name):
-            return name_map.target_name
-
-
-def select_fuse_parameter(model, loaded_keys, config=None):
-    # select target attention parameters for fusing
-    if config is None:
-        config = model.config
-
-    from collections import Iterable
-
-    # fail-fast: check supporting models
-    if not (
-        hasattr(config, "architectures")
-        and isinstance(config.architectures, Iterable)
-        and (
-            config.architectures[0].lower().startswith("llama")
-            or (
-                config.architectures[0].lower().startswith("gpt")
-                and not config.architectures[0].lower().startswith("gptj")
-            )
-            or config.architectures[0].lower().startswith("qwen")
-        )
-    ):
-        logger.warning(
-            f"{model.__class__.__name__} does not support fuse-parameter, "
-            + "fuse_atten_qkv or fuse_atten_ffn will be ignored, the program will run in its original state."
-        )
-        return [], []
-
-    # determine whether parameter already fused
-    fuse_parameter_mappings = model._get_fused_param_mappings()
-    fuse_attn_param_name_map = fuse_parameter_mappings["attn_param_names"]["qkv_proj"]
-    fuse_ffn_param_name_map = fuse_parameter_mappings["ffn_param_names"]["gate_up_proj"]
-
-    source_fuse_qkv = fuse_attn_param_name_map(0) in loaded_keys if fuse_attn_param_name_map else False
-    source_fuse_ffn = fuse_ffn_param_name_map(0) in loaded_keys if fuse_ffn_param_name_map else False
-
-    do_fuse_parameter_list, do_separate_parameter_list = [], []
-
-    # logic: wether do fuse-parameter action
-    if fuse_attn_param_name_map and not source_fuse_qkv and config.fuse_attention_qkv:
-        do_fuse_parameter_list.append("attention_qkv_proj")
-    if fuse_ffn_param_name_map and not source_fuse_ffn and config.fuse_attention_ffn:
-        do_fuse_parameter_list.append("attention_ffn_proj")
-    if fuse_attn_param_name_map and source_fuse_qkv and not config.fuse_attention_qkv:
-        do_separate_parameter_list.append("attention_qkv_proj")
-    if fuse_ffn_param_name_map and source_fuse_ffn and not config.fuse_attention_ffn:
-        do_separate_parameter_list.append("attention_ffn_proj")
-
-    return do_fuse_parameter_list, do_separate_parameter_list
-
-
 def resolve_weight_file_from_hf_hub(
     repo_id: str, cache_dir: str, convert_from_torch: bool, subfolder=None, use_safetensors=False
 ):
@@ -2043,60 +1987,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         return model, missing_keys, unexpected_keys, mismatched_keys
 
     @classmethod
-    def fuse_attention_parameters(cls, state_dict, do_fuse_parameter_list, config):
-        # fuse weight tensor specified by do_fuse_parameter_list
-
-        # get target parameter names and fuse method from model
-        fuse_parameter_mappings = cls._get_fused_param_mappings()
-
-        q_param_name_map = fuse_parameter_mappings["attn_param_names"]["q_proj"]
-        k_param_name_map = fuse_parameter_mappings["attn_param_names"]["k_proj"]
-        v_param_name_map = fuse_parameter_mappings["attn_param_names"]["v_proj"]
-        qkv_param_name_map = fuse_parameter_mappings["attn_param_names"]["qkv_proj"]
-        qkv_fuse_action, ffn_fuse_action = fuse_parameter_mappings["fuse_action"]
-
-        # do fuse action on each attention block, raise error on any failure
-        logger.info("Fusing attention parameter")
-        num_hidden_layers = config["num_hidden_layers"]
-        num_attention_heads = config["num_attention_heads"]
-
-        for layer_index in range(num_hidden_layers):
-            if "attention_qkv_proj" in do_fuse_parameter_list:  # TODO: check fuse target [weight, bias]
-                q_param_name = q_param_name_map(layer_index)
-                k_param_name = k_param_name_map(layer_index)
-                v_param_name = v_param_name_map(layer_index)
-                qkv_param_name = qkv_param_name_map(layer_index)
-
-                fused_qkv_param = qkv_fuse_action(
-                    state_dict, q_param_name, k_param_name, v_param_name, num_attention_heads
-                )
-                state_dict[qkv_param_name] = fused_qkv_param
-
-                del state_dict[q_param_name]  # TODO: validate gpu memory freed
-                del state_dict[k_param_name]
-                del state_dict[v_param_name]
-                # gc.collect()
-
-            if "attention_ffn_proj" in do_fuse_parameter_list:
-                pass  # TODO: implement parameter fuse for ffn
-
-        return state_dict, True
-
-    @classmethod
-    def _get_fused_param_mappings(cls):
-        """provide parameter fuse (for attention qkv or ffn gate-up) utils: parameter names, fuse/split actions, this method should be overrited overwrited by downstream models
-
-        Args:
-            None
-        Raises:
-            NotImplementedError: when called and not be implemented
-        """
-        raise NotImplementedError(
-            f"`_get_fused_param_mappings` is not implemented for {cls.__name__}`. To implement it, you should "
-            f"overwrite this method in the class {cls.__name__} in `{cls.__module__}.py`"
-        )
-
-    @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
@@ -2252,19 +2142,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         use_keep_in_fp32_modules = False
 
         # resolve model_weight file
-
-        # 3. init the model
-        init_args = config["init_args"] or ()
-        with ContextManagers(init_contexts):
-            model = cls(config, *init_args, **model_kwargs)
-
-        fuse_attention_qkv = model.config.fuse_attention_qkv if hasattr(model.config, "fuse_attention_qkv") else False
-        fuse_attention_ffn = model.config.fuse_attention_ffn if hasattr(model.config, "fuse_attention_ffn") else False
-        if low_cpu_mem_usage and (fuse_attention_qkv or fuse_attention_ffn):
-            raise ValueError("'low_cpu_mem_usage' is forbidden when fuse attention qkv or ffn is enabled")
-        if convert_from_torch and (fuse_attention_qkv or fuse_attention_ffn):
-            raise ValueError("'convert_from_torch' is forbidden when fuse attention qkv or ffn is enabled")
-
         resolved_archive_file, resolved_sharded_files, sharded_metadata, is_sharded = cls._resolve_model_file_path(
             pretrained_model_name_or_path,
             cache_dir=cache_dir,
@@ -2313,47 +2190,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             elif config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model.safetensors"):
                 with safe_open(resolved_archive_file, framework="np", device="cpu") as f:
                     loaded_keys = f.keys()
-
-                do_fuse_parameter_list, do_separate_parameter_list = select_fuse_parameter(model, loaded_keys)
-                if "attention_qkv_proj" in do_fuse_parameter_list:
-                    separate_keys, fused_keys = set(), set()
-                    sep_qkv_name_mappings = model._get_fused_param_mappings()["attn_param_names"]
-                    for idx, key in enumerate(loaded_keys):
-                        for name_map in (
-                            sep_qkv_name_mappings["q_proj"],
-                            sep_qkv_name_mappings["k_proj"],
-                            sep_qkv_name_mappings["v_proj"],
-                        ):
-                            if re.sub(r"\d+", "0", key) == name_map(0):  # TODO: simplify this code
-                                separate_keys.add(
-                                    loaded_keys.pop(idx)
-                                )  # skip searching q,k,v tp_action when configured as qkv
-                                fused_keys.add(sep_qkv_name_mappings["qkv_proj"](re.search("\d+", key).group(0)))
-
-                # load weight tensors without tensor-parallel action on qkv/gate_up tensors
-                tp_actions = cls.get_tensor_parallel_convert_actions(
-                    config, loaded_keys, ignore_params=separate_keys | fused_keys
-                )
+                tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
                 state_dict = load_state_dict(resolved_archive_file, tp_actions)
-
-                # apply qkv/gate_up fuse action and tensor-parallel action sequentially
-                if "attention_qkv_proj" in do_fuse_parameter_list:
-                    state_dict, fuse_success = cls.fuse_attention_parameters(
-                        state_dict, ["attention_qkv_proj"], model.config
-                    )  # q, k, v => qkv
-                    tp_actions = cls.get_tensor_parallel_convert_actions(
-                        config, fused_keys, ignore_params=set(state_dict.keys()) - fused_keys
-                    )  # get tp-action for qkv
-                    for qkv_name in tp_actions.keys():
-                        state_dict[qkv_name] = tp_actions[qkv_name](state_dict[qkv_name])  # apply tp-action for qkv
+                state_dict = cls.convert_fuse_and_split(config, state_dict, tp_actions)
             else:
                 state_dict = load_state_dict(resolved_archive_file)
-
-                do_fuse_parameter_list, do_separate_parameter_list = select_fuse_parameter(model, state_dict.keys())
-                if do_fuse_parameter_list:
-                    state_dict, fuse_success = model.fuse_attention_parameters(
-                        state_dict, do_fuse_parameter_list, model.config
-                    )
+                state_dict = cls.convert_fuse_and_split(config, state_dict)
 
             logger.info("Loaded weights file from disk, setting weights to model.")
 
@@ -2376,6 +2218,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 if not isinstance(state_dict[k], paddle.Tensor):
                     with device_guard():
                         state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+        # 3. init the model
+        init_args = config["init_args"] or ()
+        with ContextManagers(init_contexts):
+            model = cls(config, *init_args, **model_kwargs)
 
         if use_keep_in_fp32_modules:
             # low_cpu_mem_usage = True
