@@ -288,7 +288,7 @@ def naive_fuse_merge_tp(weight_list, is_column=True, fuse_tensor_parts=2):
     else:
         tensor = paddle.concat([reorder[i] for i in index], axis=axis)
 
-        if tensor.is_gpu_place():
+        if tensor.place.is_gpu_place():
             tensor = tensor._copy_to(paddle.CUDAPinnedPlace(), False)
         return tensor
 
@@ -366,7 +366,7 @@ def normal_fuse_merge_tp(weight_list, is_column=True):
             return np.concatenate(weight_list, axis=-1)
         else:
             tensor = paddle.concat(weight_list, axis=-1)
-            if tensor.is_gpu_place():
+            if tensor.place.is_gpu_place():
                 tensor = tensor._copy_to(paddle.CUDAPinnedPlace(), False)
             return tensor
     else:
@@ -374,7 +374,7 @@ def normal_fuse_merge_tp(weight_list, is_column=True):
             return np.concatenate(weight_list, axis=0)
         else:
             tensor = paddle.concat(weight_list, axis=0)
-            if tensor.is_gpu_place():
+            if tensor.place.is_gpu_place():
                 tensor = tensor._copy_to(paddle.CUDAPinnedPlace(), False)
             return tensor
 
