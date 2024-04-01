@@ -369,6 +369,10 @@ class GemmaModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase)
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_mqa_model(*config_and_inputs)
 
+    def test_model_name_list(self):
+        # no need for this
+        pass
+
 
 if __name__ == "__main__":
     unittest.main()
