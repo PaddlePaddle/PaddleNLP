@@ -67,6 +67,137 @@ __all__ = [
 ]
 
 
+
+import triton
+import triton.language as tl
+
+
+@triton.jit()
+def col_major(pid,
+              m, n, num_tokens_post_padded,
+              block_m: tl.constexpr, block_n: tl.constexpr):
+    
+    grid_m = tl.cdiv(m, block_m)    
+    grid_n = tl.cdiv(n, block_n)
+
+    pid_m_max = (num_tokens_post_padded // block_m) * 2
+
+    pid_m = (pid % grid_n) % pid_m_max
+    pid_n = pid // grid_m
+
+    return pid_m, pid_n
+
+
+@triton.jit()
+def fused_moe_kernel_splitk(
+    a_ptr,
+    b_ptr,
+    c_ptr,
+    topk_weights_ptr,
+    sorted_token_ids_ptr,
+    expert_ids_ptr,
+    num_tokens_post_padded_ptr,
+    N,
+    K,
+    EM,
+    num_valid_tokens,
+    stride_am,
+    stride_ak,
+    stride_be,
+    stride_bk,
+    stride_bn,
+    stride_cm,
+    stride_cn,
+    stride_weight,
+    stride_token_id,
+    # Meta-parameters
+    block_m: tl.constexpr,
+    block_n: tl.constexpr,
+    block_k: tl.constexpr,
+    group_m: tl.constexpr,
+    split_k: tl.constexpr,
+    MUL_ROUTED_WEIGHT: tl.constexpr,
+    top_k: tl.constexpr,
+    compute_type: tl.constexpr,
+):
+    # -----------------------------------------------------------
+    # Map program ids `pid` to the block of C it should compute.
+    # This is done in a grouped ordering to promote L2 data reuse.
+    
+    # Scheduling Problem
+    pid = tl.program_id(axis=0)
+    pid_k = tl.program_id(axis=1)
+    
+    # num_tokens_post_padded = tl.load(num_tokens_post_padded_ptr)
+    # tl.device_print("num_tokens_post_padded", num_tokens_post_padded)
+
+    # print("num_tokens_post_padded: ", num_tokens_post_padded)
+
+    # pid_m, pid_n = col_major(pid,
+    #                          EM, N, num_tokens_post_padded,
+    #                          block_m, block_n)
+
+    # pid_m, pid_n = swizzle_tile(pid,
+    #                             EM, N,
+    #                             block_m, block_n, group_m)
+    
+    total_blocks_k = tl.cdiv(K, block_k*split_k)
+    
+    # num_tokens_post_padded = tl.load(num_tokens_post_padded_ptr)
+
+    # if pid_m * block_m >= num_tokens_post_padded:
+    #     return
+    
+    grid_n = tl.cdiv(N, block_n)
+    pid_m = pid // (grid_n)
+    pid_n = pid % (grid_n)
+
+
+    offs_token_id = pid_m * block_m + tl.arange(0, block_m)
+    offs_token = tl.load(sorted_token_ids_ptr + offs_token_id)
+    token_mask = offs_token < num_valid_tokens
+   
+    offs_bn = (pid_n * block_n + tl.arange(0, block_n)) % N
+    offs_k = pid_k*block_k + tl.arange(0, block_k)
+    a_ptrs = a_ptr + (offs_token[:, None] // top_k * stride_am + offs_k[None, :] * stride_ak)
+    
+    off_experts = tl.load(expert_ids_ptr + pid_m * block_m)
+    
+    if off_experts < 0:
+        return 
+    
+    b_ptrs = b_ptr + off_experts * stride_be + (offs_k[:, None] * stride_bk + offs_bn[None, :] * stride_bn)
+
+    accumulator = tl.zeros((block_m, block_n), dtype=tl.float32)
+
+    for k in range(0, total_blocks_k):
+        a = tl.load(a_ptrs,
+                    mask=token_mask[:, None] & (offs_k[None, :] < K - k * (block_k * split_k)),
+                    other=0.0)
+        b = tl.load(b_ptrs,
+                    mask=offs_k[:, None] < K - k * (block_k * split_k),
+                    other=0.0)
+        # We accumulate along the K dimension.
+        accumulator += tl.dot(a, b)
+        # Advance the ptrs to the next K block.
+        a_ptrs += block_k * stride_ak * split_k
+        b_ptrs += block_k * stride_bk * split_k
+
+    if MUL_ROUTED_WEIGHT == 1:
+        moe_weight = tl.load(topk_weights_ptr + offs_token * stride_weight,
+                             mask=token_mask,
+                             other=0)
+        accumulator = accumulator * moe_weight[:, None]
+
+    accumulator = accumulator.to(tl.float16)
+    # -----------------------------------------------------------
+    # Write back the block of the output
+    offs_cn = pid_n * block_n + tl.arange(0, block_n)
+    c_ptrs = c_ptr + stride_cm * offs_token[:, None] + stride_cn * offs_cn[None, :]
+    c_mask = token_mask[:, None] & (offs_cn[None, :] < N)
+    tl.atomic_add(c_ptrs, accumulator, mask=c_mask)
+
+
 def load_balancing_loss_func(gate_logits, num_experts, top_k=2, attention_mask=None):
     """
     Computes auxiliary load balancing loss as in Switch Transformer - implemented in Paddle.
@@ -499,6 +630,7 @@ class MixtralSparseMoeBlock(nn.Layer):
         self.top_k = config.num_experts_per_tok
         self.gate = nn.Linear(self.hidden_dim, self.num_experts, bias_attr=False)
         self.experts = nn.LayerList([MixtralMLP(config) for _ in range(self.num_experts)])
+        self.first_forward = True
 
     def forward(self, hidden_states):
         batch_size, seq_len, hidden_dim = hidden_states.shape
@@ -512,6 +644,277 @@ class MixtralSparseMoeBlock(nn.Layer):
         routing_weights /= routing_weights.sum(axis=-1, keepdim=True)
         # we cast back to input dtype
         routing_weights = routing_weights.astype(hidden_states.dtype)
+
+        if self.first_forward :
+            print("self.first_forward")
+            all_inputs = []
+            for i in range(self.num_experts):
+                all_inputs.append(self.experts[i].w1.weight)
+                del self.experts[i].w1.weight
+            self.all_experts_weight1 = paddle.stack(all_inputs, axis=0)
+            all_inputs = []
+            for i in range(self.num_experts):
+                all_inputs.append(self.experts[i].w3.weight)
+                del self.experts[i].w3.weight
+            self.all_experts_weight3 = paddle.stack(all_inputs, axis=0)
+            all_inputs = []
+            for i in range(self.num_experts):
+                all_inputs.append(self.experts[i].w2.weight)
+                del self.experts[i].w2.weight
+            self.all_experts_weight2 = paddle.stack(all_inputs, axis=0)
+            self.first_forward = False
+
+
+        def triton_moe():
+
+            M = hidden_states.shape[0]
+            K = hidden_states.shape[1]
+            N = self.experts[0].intermediate_size // self.experts[0].tensor_parallel_degree
+            N2 = K
+
+            intermediate_cache1 = paddle.zeros((M, self.top_k, N), dtype=hidden_states.dtype)
+            intermediate_cache3 = paddle.zeros((M, self.top_k, N), dtype=hidden_states.dtype)
+            intermediate_cache2 = paddle.zeros((M, self.top_k, N2), dtype=hidden_states.dtype)
+            
+            # max_token_num_by_one_expert = 0
+            # for expert_id in range(self.num_experts):
+            #     token_id, _ = paddle.where(selected_experts == expert_id)
+            #     max_token_num_by_one_expert = max(max_token_num_by_one_expert, (int)(token_id.numel()))
+
+            max_token_num_by_one_expert = -1
+            all_nums = self.num_experts * max_token_num_by_one_expert
+            num_tokens_post_padded_ptr = paddle.to_tensor([all_nums], dtype="int32")
+
+            # token_ids = paddle.full([all_nums], (int)(selected_experts.numel()), dtype='int32')
+            # token_weight = paddle.full([all_nums], 0, dtype='float16')
+            # expert_ids_ptr = paddle.full([all_nums], -1, dtype='int32')
+            
+            # start = 0
+            # for expert_id in range(self.num_experts):
+            #     token_id, token_topkid_in_this_expert = paddle.where(selected_experts == expert_id)
+            #     this_num = int(token_id.numel())
+            #     token_id = token_id.reshape([this_num])
+            #     if this_num > 0:
+            #         token_topkid_in_this_expert = token_topkid_in_this_expert.reshape([this_num])
+            #         token_ids[start:start+this_num] = token_id * self.top_k + token_topkid_in_this_expert
+            #         token_weight[start:start+this_num] = routing_weights[token_id, token_topkid_in_this_expert].squeeze()
+            #         expert_ids_ptr[start:start+this_num] = expert_id
+            #     start += max_token_num_by_one_expert
+            
+            from triton_ops import triton_moe_preposs
+            token_ids, token_weight, expert_ids_ptr = triton_moe_preposs(routing_weights, selected_experts.astype("int32"), self.num_experts)
+
+
+            # EM 是所有的专家的所有的token的总和！，当然啦，也包括了pad的哦！
+            EM =  token_ids.shape[0]
+            grid1 = lambda META: (triton.cdiv(EM, META['block_m']) * triton.cdiv(N, META['block_n']), META['split_k'])
+            grid2 = lambda META: (triton.cdiv(EM, META['block_m']) * triton.cdiv(N2, META['block_n']), META['split_k'])
+
+            config_w1 = {
+                'block_m': 16,
+                'block_n': 64,
+                'block_k': 128,
+                'group_m': -1,
+                'split_k' : 2,
+                "MUL_ROUTED_WEIGHT" : 0,
+                "top_k" : self.top_k,
+                "compute_type" : tl.float16,
+            }
+
+            config_w2 = {
+                'block_m': 16,
+                'block_n': 64,
+                'block_k': 128,
+                'group_m': -1,
+                'split_k' : 2,
+                "MUL_ROUTED_WEIGHT" : 1,
+                "top_k" : 1,
+                "compute_type" : tl.float16,
+            }
+
+            from triton_ops import triton_moe
+            triton_moe(
+                hidden_states,
+                self.all_experts_weight1,
+                intermediate_cache1,
+                token_weight,
+                token_ids,
+                expert_ids_ptr,
+                num_tokens_post_padded_ptr, # num_tokens_post_padded
+                N, # N
+                K, # K
+                EM, # EM
+                (int)(selected_experts.numel()), # num_valid_tokens
+                K, # stride_am
+                1, # stride_ak
+                K * N, # stride_be
+                N, # stride_bk
+                1, # stride_bn
+                N, # stride_cm
+                1, # stride_cn
+                1,
+                0)
+
+            triton_moe(
+                hidden_states,
+                self.all_experts_weight3,
+                intermediate_cache3,
+                token_weight,
+                token_ids,
+                expert_ids_ptr,
+                num_tokens_post_padded_ptr, # num_tokens_post_padded
+                N, # N
+                K, # K
+                EM, # EM
+                (int)(selected_experts.numel()), # num_valid_tokens
+                K, # stride_am
+                1, # stride_ak
+                K * N, # stride_be
+                N, # stride_bk
+                1, # stride_bn
+                N, # stride_cm
+                1, # stride_cn
+                1, # stride_weight
+                0)
+
+            tmp = self.experts[0].act_fn(intermediate_cache1) * intermediate_cache3
+            
+            from triton_ops import triton_moe2
+            triton_moe2(
+                tmp,
+                self.all_experts_weight2,
+                intermediate_cache2,
+                routing_weights,
+                token_ids,
+                expert_ids_ptr,
+                num_tokens_post_padded_ptr, # num_tokens_post_padded
+                N2, # N
+                N, # K
+                EM, # EM
+                (int)(selected_experts.numel()), # num_valid_tokens
+                N, # stride_am
+                1, # stride_ak
+                N * N2, # stride_be
+                N2, # stride_bk
+                1, # stride_bn
+                N2, # stride_cm
+                1, # stride_cn
+                1,
+                0)
+
+
+            # fused_moe_kernel_splitk[grid1](
+            #     hidden_states,
+            #     self.all_experts_weight1,
+            #     intermediate_cache1,
+            #     token_weight,
+            #     token_ids,
+            #     expert_ids_ptr,
+            #     num_tokens_post_padded_ptr, # num_tokens_post_padded
+            #     N, # N
+            #     K, # K
+            #     EM, # EM
+            #     (int)(selected_experts.numel()), # num_valid_tokens
+            #     K, # stride_am
+            #     1, # stride_ak
+            #     K * N, # stride_be
+            #     N, # stride_bk
+            #     1, # stride_bn
+            #     N, # stride_cm
+            #     1, # stride_cn
+            #     1,
+            #     0,
+            #     **config_w1,
+            # )
+
+            # fused_moe_kernel_splitk[grid1](
+            #     hidden_states,
+            #     self.all_experts_weight3,
+            #     intermediate_cache3,
+            #     token_weight,
+            #     token_ids,
+            #     expert_ids_ptr,
+            #     num_tokens_post_padded_ptr, # num_tokens_post_padded
+            #     N, # N
+            #     K, # K
+            #     EM, # EM
+            #     (int)(selected_experts.numel()), # num_valid_tokens
+            #     K, # stride_am
+            #     1, # stride_ak
+            #     K * N, # stride_be
+            #     N, # stride_bk
+            #     1, # stride_bn
+            #     N, # stride_cm
+            #     1, # stride_cn
+            #     1, # stride_weight
+            #     0,
+            #     **config_w1,
+            # )
+
+            # tmp = self.experts[0].act_fn(intermediate_cache1) * intermediate_cache3
+
+            # fused_moe_kernel_splitk[grid2](
+            #     tmp,
+            #     self.all_experts_weight2,
+            #     intermediate_cache2,
+            #     routing_weights,
+            #     token_ids,
+            #     expert_ids_ptr,
+            #     num_tokens_post_padded_ptr, # num_tokens_post_padded
+            #     N2, # N
+            #     N, # K
+            #     EM, # EM
+            #     (int)(selected_experts.numel()), # num_valid_tokens
+            #     N, # stride_am
+            #     1, # stride_ak
+            #     N * N2, # stride_be
+            #     N2, # stride_bk
+            #     1, # stride_bn
+            #     N2, # stride_cm
+            #     1, # stride_cn
+            #     1,
+            #     0,
+            #     **config_w2,
+            # )
+            return intermediate_cache2
+
+
+        intermediate_cache2 = triton_moe()
+
+        import paddle.distributed as dist
+        dist.all_reduce(intermediate_cache2)
+        intermediate_cache2 = paddle.sum(intermediate_cache2, axis=1)
+        intermediate_cache2 = intermediate_cache2.reshape([batch_size, seq_len, hidden_dim])
+
+        return intermediate_cache2, router_logits
+
+        def baseline():
+
+            M = hidden_states.shape[0]
+            K = hidden_states.shape[1]
+            N = self.experts[0].intermediate_size // self.experts[0].tensor_parallel_degree
+            N2 = K
+
+            baseline_cache2 = paddle.zeros((M, self.top_k, N2), dtype=hidden_states.dtype)
+            for expert_id in range(self.num_experts):
+                token_id, token_topkid_in_this_expert = paddle.where(selected_experts == expert_id)
+                this_num = int(token_id.numel())
+                token_id = token_id.reshape([this_num])
+                token_topkid_in_this_expert = token_topkid_in_this_expert.reshape([this_num])
+                current_state = paddle.gather(hidden_states, token_id)
+                tmp1 = paddle.matmul(current_state, self.experts[expert_id].w1.weight)
+                tmp3 = paddle.matmul(current_state, self.experts[expert_id].w3.weight)
+                tmp = self.experts[expert_id].act_fn(tmp1) * tmp3
+                tmp = paddle.matmul(tmp, self.experts[expert_id].w2.weight)
+                tmp = tmp * routing_weights[token_id, token_topkid_in_this_expert][:,None]
+                import paddle.distributed as dist
+                dist.all_reduce(tmp)
+                baseline_cache2[token_id,token_topkid_in_this_expert,:] = tmp
+            return baseline_cache2
+        
+        # baseline_cache2 = baseline()
+        # baseline_cache2 = paddle.sum(baseline_cache2, axis=1)
+        # return baseline_cache2, router_logits
 
         final_hidden_states = paddle.zeros(
             [batch_size * seq_len, hidden_dim],
@@ -535,6 +938,7 @@ class MixtralSparseMoeBlock(nn.Layer):
                 top_x = paddle.to_tensor([top_x.item()])
             final_hidden_states.index_add_(top_x, 0, current_hidden_states.astype(hidden_states.dtype))
 
+        #print("intermediate_cache1 - baseline_cache", paddle.max(paddle.abs((final_hidden_states - intermediate_cache2))))
         final_hidden_states = final_hidden_states.reshape([batch_size, seq_len, hidden_dim])
         return final_hidden_states, router_logits
 

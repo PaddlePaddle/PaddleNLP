@@ -26,7 +26,7 @@ import numpy as np
 import paddle
 import paddle.distributed.fleet.base.topology as tp
 import paddle.incubate.multiprocessing as mp
-from paddle.base.framework import in_cinn_mode, in_pir_executor_mode
+#from paddle.base.framework import in_cinn_mode, in_pir_executor_mode
 from paddle.distributed import fleet
 from utils import (
     dybatch_preprocess,
@@ -79,7 +79,7 @@ class PredictorArgument:
     src_length: int = field(default=None, metadata={"help": "The max length of source text."})
     max_length: int = field(default=None, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
-    top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
+    top_p: float = field(default=0.0, metadata={"help": "top_p parameter for generation"})
     temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
     repetition_penalty: float = field(default=1.0, metadata={"help": "repetition penalty parameter for generation"})
     device: str = field(default="gpu", metadata={"help": "Device"})
@@ -305,18 +305,41 @@ class DygraphPredictor(BasePredictor):
 
     @paddle.no_grad()
     def _infer(self, inputs: dict[str, paddle.Tensor]):
-        result = self.model.generate(
-            **inputs,
-            max_new_tokens=self.config.max_length,
-            bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
-            pad_token_id=self.tokenizer.pad_token_id,
-            decode_strategy=self.config.decode_strategy,
-            temperature=self.config.temperature,
-            top_k=self.config.top_k,
-            top_p=self.config.top_p,
-            repetition_penalty=self.config.repetition_penalty,
-        )
+        def f():
+            result = self.model.generate(
+                **inputs,
+                max_new_tokens=self.config.max_length,
+                bos_token_id=self.tokenizer.bos_token_id,
+                eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
+                pad_token_id=self.tokenizer.pad_token_id,
+                decode_strategy=self.config.decode_strategy,
+                temperature=self.config.temperature,
+                top_k=self.config.top_k,
+                top_p=self.config.top_p,
+                repetition_penalty=self.config.repetition_penalty,
+            )
+            return result
+        
+        for i in range(1):
+            result = f()
+        paddle.device.cuda.synchronize()
+
+        import datetime
+        
+
+        for i in range(2):
+            
+            starttime = datetime.datetime.now()
+            
+            result = f()
+            
+            paddle.device.cuda.synchronize()
+
+            endtime = datetime.datetime.now()
+            duringtime = endtime - starttime
+            time_ms = duringtime.seconds * 1000 + duringtime.microseconds / 1000.0
+            print("time : ", time_ms, "ms")
+
         result = result[0]
         return result
 
