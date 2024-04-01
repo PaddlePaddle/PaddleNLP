@@ -22,55 +22,11 @@ __all__ = [
     "GEMMA_PRETRAINED_RESOURCE_FILES_MAP",
 ]
 
-GEMMA_PRETRAINED_INIT_CONFIGURATION = {
-    "google/gemma-7b": {
-        "architectures": ["GemmaForCausalLM"],
-        "hidden_size": 3072,
-        "initializer_range": 0.02,
-        "intermediate_size": 24576,
-        "max_position_embeddings": 8192,
-        "model_type": "gemma",
-        "num_attention_heads": 16,
-        "num_key_value_heads": 16,
-        "num_hidden_layers": 28,
-        "rms_norm_eps": 1e-06,
-        "vocab_size": 256000,
-        "bos_token_id": 2,
-        "eos_token_id": 1,
-        "pad_token_id": 0,
-        "use_cache": True,
-        "use_recompute": False,
-        "use_flash_attention": False,
-    },
-    "google/gemma-2b": {
-        "architectures": ["GemmaForCausalLM"],
-        "hidden_size": 2048,
-        "initializer_range": 0.02,
-        "intermediate_size": 16384,
-        "max_position_embeddings": 8192,
-        "model_type": "gemma",
-        "num_attention_heads": 8,
-        "num_key_value_heads": 1,
-        "num_hidden_layers": 28,
-        "rms_norm_eps": 1e-06,
-        "vocab_size": 256000,
-        "bos_token_id": 2,
-        "eos_token_id": 1,
-        "pad_token_id": 0,
-        "use_cache": True,
-        "use_recompute": False,
-        "use_flash_attention": False,
-    },
-}
+GEMMA_PRETRAINED_INIT_CONFIGURATION = {}
 
 
 GEMMA_PRETRAINED_RESOURCE_FILES_MAP = {
-    "model_state": {
-        "google/gemma-7b": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-7b/model_state.pdparams",
-        "google/gemma-2b": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-2b/model_state.pdparams",
-        "google/gemma-7b-it": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-7b-it/model_state.pdparams",
-        "google/gemma-2b-it": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-2b-it/model_state.pdparams",
-    },
+    "model_state": {},
 }
 
 
