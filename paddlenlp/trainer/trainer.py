@@ -893,9 +893,9 @@ class Trainer:
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
-                from .paperf import profile_paddle
-                profile_paddle.switch_profile(step, 1, 3, enable_layerwise_event=True)
-                profile_paddle.push_record_event("forward-backward")
+                # from .paperf import profile_paddle
+                # profile_paddle.switch_profile(step, 1, 3, enable_layerwise_event=True)
+                # profile_paddle.push_record_event("forward-backward")
                 if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim(inputs)
                 self.timers and self.timers("read-data").stop()
@@ -1021,8 +1021,8 @@ class Trainer:
                                     p.main_grad.scale_(1.0 / self.args.gradient_accumulation_steps)
                                 elif p.grad is not None:
                                     p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
-                    profile_paddle.pop_record_event()
-                    profile_paddle.push_record_event("optimizer")
+                    # profile_paddle.pop_record_event()
+                    # profile_paddle.push_record_event("optimizer")
                     # Optimizer step
                     self.callback_handler.on_optimizer_begin(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
@@ -1049,7 +1049,7 @@ class Trainer:
                     else:
                         self.optimizer.step()
                         
-                    profile_paddle.pop_record_event()
+                    # profile_paddle.pop_record_event()
 
                     self.timers and self.timers("optimizer-step").stop()
 
@@ -1743,6 +1743,7 @@ class Trainer:
 
         # Pipeline mode
         if in_pipeline_parallel_mode:
+            print("1"*200)
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
             # hack for pipeline model mini batch to batch
@@ -1790,11 +1791,10 @@ class Trainer:
             if self.args.amp_master_grad:
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
-            print("self.optimizer", self.optimizer)
-            self.optimizer._set_broadcast_overlap(True, model)
 
         # No pipeline mode, sharding only
         if not in_pipeline_parallel_mode and in_sharding_parallel_mode:
+            print("2"*200)
             # Sharded DDP!
             if self.args.tensor_parallel_degree > 1:
                 hcg = fleet.get_hybrid_communicate_group()
@@ -1810,6 +1810,9 @@ class Trainer:
                 if self.args.amp_master_grad:
                     self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
                 self.optimizer = fleet.distributed_optimizer(self.optimizer)
+                # stage1 overlap 测试
+                print("self.optimizer", self.optimizer)
+                self.optimizer._set_broadcast_overlap(True, model)
             else:
                 cpu_offload = ShardingOption.OFFLOAD in self.args.sharding
                 assert self.optimizer is not None, "optimizer is empty!"
@@ -1843,6 +1846,7 @@ class Trainer:
                     offload=cpu_offload,
                     **extra_kwargs,
                 )
+
                 if ShardingOption.SHARD_GRAD_OP in self.args.sharding and self.args.amp_master_grad:
                     assert hasattr(optimizer, "use_main_grad"), (
                         "Current installed paddle doesn't support sharding stage 2 with main grad, "
@@ -1862,6 +1866,7 @@ class Trainer:
             and not in_sharding_parallel_mode
             and (in_tensor_parallel_mode or in_sep_parallel_mode)
         ):
+            print("3"*200)
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
 
