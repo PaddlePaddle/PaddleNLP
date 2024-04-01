@@ -20,6 +20,7 @@ from contextlib import contextmanager
 
 import paddle
 import paddle.distributed as dist
+from comm_utils import cleanup_tensor_space, offload_tensor_to_cpu, reload_tensor_to_gpu
 from paddle.utils import try_import
 from trainer_utils import guard_set_args
 
@@ -280,6 +281,31 @@ class InferEvalModel:
         eval_model = getattr(trainer, "_inner_eval_model", None)
         self.model: PretrainedModel = trainer.model if eval_model is None else eval_model
         self.tokenizer: PretrainedTokenizer = trainer.tokenizer
+        self.trainer = trainer
+
+    def enable(self):
+        trainer = self.trainer
+        if trainer.model is not self.model:
+            trainer.export_evaluate_model(
+                trainer.model,
+                self.model,
+                with_offload="train_model" in trainer.args.offload_level,
+            )
+        else:
+            reload_tensor_to_gpu(self.model.state_dict())
+
+    def disable(self):
+        trainer = self.trainer
+        if trainer.model is not self.model:
+            cleanup_tensor_space(self.model.state_dict())
+        else:
+            offload_tensor_to_cpu(self.model.state_dict())
+
+    def __getattr__(self, name):
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            return getattr(self.model, name)
 
     def eval(self):
         self.model.eval()

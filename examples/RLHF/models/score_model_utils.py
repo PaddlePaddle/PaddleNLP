@@ -180,9 +180,16 @@ class ScoreModelMixin:
             # Take left padding into account, which has 0s in left and max_len
             # in right.
             left_pad_mask = position_ids == 0
-            position_ids = paddle.where(
-                left_pad_mask, position_ids, position_ids + left_pad_mask.sum(-1, keepdim=True) - 1
+            # position_ids = paddle.where(
+            #     left_pad_mask, position_ids, position_ids + left_pad_mask.sum(-1, keepdim=True) - 1
+            # )
+            # the above limits right padding must not be 0s, the following suits
+            # to both left and right padding with 0s
+            left_pad_num = (
+                paddle.where(left_pad_mask, position_ids.shape[-1] + 100, position_ids).argmin(axis=-1, keepdim=True)
+                - 1
             )
+            position_ids = left_pad_num + position_ids
             second_pos = paddle.max(position_ids, axis=-1, keepdim=True)
             end_pos = paddle.stack([first_pos, second_pos], axis=-1).squeeze(1)
             end_score = scores.gather_nd(end_pos)
