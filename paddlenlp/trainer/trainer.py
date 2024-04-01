@@ -893,6 +893,9 @@ class Trainer:
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
+                from .paperf import profile_paddle
+                profile_paddle.switch_profile(step, 1, 3, enable_layerwise_event=True)
+                profile_paddle.push_record_event("forward-backward")
                 if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim(inputs)
                 self.timers and self.timers("read-data").stop()
@@ -1018,7 +1021,8 @@ class Trainer:
                                     p.main_grad.scale_(1.0 / self.args.gradient_accumulation_steps)
                                 elif p.grad is not None:
                                     p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
-
+                    profile_paddle.pop_record_event()
+                    profile_paddle.push_record_event("optimizer")
                     # Optimizer step
                     self.callback_handler.on_optimizer_begin(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
@@ -1044,6 +1048,8 @@ class Trainer:
                         self.optimizer._step(parameters_list)
                     else:
                         self.optimizer.step()
+                        
+                    profile_paddle.pop_record_event()
 
                     self.timers and self.timers("optimizer-step").stop()
 
@@ -1784,6 +1790,8 @@ class Trainer:
             if self.args.amp_master_grad:
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
+            print("self.optimizer", self.optimizer)
+            self.optimizer._set_broadcast_overlap(True, model)
 
         # No pipeline mode, sharding only
         if not in_pipeline_parallel_mode and in_sharding_parallel_mode:

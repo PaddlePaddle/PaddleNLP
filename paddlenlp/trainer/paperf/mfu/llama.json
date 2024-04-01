@@ -1,0 +1,37 @@
+[{
+    "model_name": "facebook/llama-7b",
+    "max_seqlen": 2048,
+    "num_hidden_layers": 32,
+    "num_attention_heads": 32,
+    "hidden_size": 4096,
+    "intermediate_size": 11008,
+    "has_gate_linear": true,
+    "vocab_size": 32000
+}, {
+    "model_name": "facebook/llama-13b",
+    "max_seqlen": 2048,
+    "num_hidden_layers": 40,
+    "num_attention_heads": 40,
+    "hidden_size": 5120,
+    "intermediate_size": 13824,
+    "has_gate_linear": true,
+    "vocab_size": 32000
+}, {
+    "model_name": "facebook/llama-65b",
+    "max_seqlen": 2048,
+    "num_hidden_layers": 80,
+    "num_attention_heads": 64,
+    "hidden_size": 8192,
+    "intermediate_size": 22016,
+    "has_gate_linear": true,
+    "vocab_size": 32000
+}, {
+    "model_name": "meta-llama/Llama-2-13b",
+    "max_seqlen": 4096,
+    "num_hidden_layers": 40,
+    "num_attention_heads": 40,
+    "hidden_size": 5120,
+    "intermediate_size": 13824,
+    "has_gate_linear": true,
+    "vocab_size": 32000
+}]
