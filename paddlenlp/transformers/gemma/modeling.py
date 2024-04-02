@@ -459,7 +459,6 @@ class GemmaMLP(nn.Layer):
 class GemmaAttention(nn.Layer):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    # Ignore copy
     def __init__(self, config: GemmaConfig, layerwise_recompute: bool = False):
         super().__init__()
 
