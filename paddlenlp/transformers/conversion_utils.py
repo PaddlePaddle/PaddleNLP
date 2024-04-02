@@ -1244,8 +1244,10 @@ class ConversionMixin:
 
         if tp_actions is not None:
             for key in fused_and_split_keys:
-                if key in tp_actions:
-                    state_dict[key] = tp_actions[key](state_dict.pop(key))
+                for name in tp_actions.keys():
+                    if key.endswith(name):
+                        state_dict[key] = tp_actions[name](state_dict.pop(key))
+                        break
         return state_dict
 
     @classmethod
@@ -1291,10 +1293,11 @@ class ConversionMixin:
         Returns:
             List[StateDictNameMapping]: the name-mappings for tensor_parallel
         """
-        raise NotImplementedError(
-            f"`_get_fused_param_mappings` is not implemented for {cls.__name__}`. To implement it, you should "
-            f"overwrite this method in the class {cls.__name__} in `{cls.__module__}.py`"
-        )
+        # raise NotImplementedError(
+        #     f"`_get_fuse_or_split_param_mappings` is not implemented for {cls.__name__}`. To implement it, you should "
+        #     f"overwrite this method in the class {cls.__name__} in `{cls.__module__}.py`"
+        # )
+        return {}
 
     @staticmethod
     def _resolve_prefix_keys_for_fuse_and_split(state_keys_base, state_keys_real, ignore_error=False, is_fuse=True):
