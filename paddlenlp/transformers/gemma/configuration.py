@@ -47,8 +47,8 @@ GEMMA_PRETRAINED_INIT_CONFIGURATION = {
 
 GEMMA_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
-        "google/gemma-2b": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-2b/model_state.pdparams",
-        "google/gemma-2b-it": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-2b-it/model_state.pdparams",
+        "google/gemma-2b": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-2b/model.safetensors",
+        "google/gemma-2b-it": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-2b-it/model.safetensors",
     },
 }
 
