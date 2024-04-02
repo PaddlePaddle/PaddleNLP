@@ -2410,8 +2410,7 @@ class Trainer:
 
         if self.state.epoch is not None:
             logs["progress_or_epoch"] = round(self.state.epoch, 4)
-        output = {**logs, **{"step": self.state.global_step}}
-        self.state.log_history.append(output)
+        self.state.log_history = []
         self.control = self.callback_handler.on_log(self.args, self.state, self.control, logs, **kwargs)
 
     def evaluate(
