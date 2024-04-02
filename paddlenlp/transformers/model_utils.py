@@ -1987,46 +1987,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         return model, missing_keys, unexpected_keys, mismatched_keys
 
     @classmethod
-    def fuse_attention_parameters(cls, state_dict, do_fuse_parameter_list, config):
-        # fuse weight tensor specified by do_fuse_parameter_list
-
-        # get target parameter names and fuse method from model
-        fuse_parameter_mappings = cls._get_fused_param_mappings()
-
-        q_param_name_map = fuse_parameter_mappings["attn_param_names"]["q_proj"]
-        k_param_name_map = fuse_parameter_mappings["attn_param_names"]["k_proj"]
-        v_param_name_map = fuse_parameter_mappings["attn_param_names"]["v_proj"]
-        qkv_param_name_map = fuse_parameter_mappings["attn_param_names"]["qkv_proj"]
-        qkv_fuse_action, ffn_fuse_action = fuse_parameter_mappings["fuse_action"]
-
-        # do fuse action on each attention block, raise error on any failure
-        logger.info("Fusing attention parameter")
-        num_hidden_layers = config["num_hidden_layers"]
-        num_attention_heads = config["num_attention_heads"]
-
-        for layer_index in range(num_hidden_layers):
-            if "attention_qkv_proj" in do_fuse_parameter_list:  # TODO: check fuse target [weight, bias]
-                q_param_name = q_param_name_map(layer_index)
-                k_param_name = k_param_name_map(layer_index)
-                v_param_name = v_param_name_map(layer_index)
-                qkv_param_name = qkv_param_name_map(layer_index)
-
-                fused_qkv_param = qkv_fuse_action(
-                    state_dict, q_param_name, k_param_name, v_param_name, num_attention_heads
-                )
-                state_dict[qkv_param_name] = fused_qkv_param
-
-                del state_dict[q_param_name]  # TODO: validate gpu memory freed
-                del state_dict[k_param_name]
-                del state_dict[v_param_name]
-                # gc.collect()
-
-            if "attention_ffn_proj" in do_fuse_parameter_list:
-                pass  # TODO: implement parameter fuse for ffn
-
-        return state_dict, True
-
-    @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
@@ -2182,12 +2142,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         use_keep_in_fp32_modules = False
 
         # resolve model_weight file
-
-        # 3. init the model
-        init_args = config["init_args"] or ()
-        with ContextManagers(init_contexts):
-            model = cls(config, *init_args, **model_kwargs)
-
         resolved_archive_file, resolved_sharded_files, sharded_metadata, is_sharded = cls._resolve_model_file_path(
             pretrained_model_name_or_path,
             cache_dir=cache_dir,
@@ -2264,6 +2218,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 if not isinstance(state_dict[k], paddle.Tensor):
                     with device_guard():
                         state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+        # 3. init the model
+        init_args = config["init_args"] or ()
+        with ContextManagers(init_contexts):
+            model = cls(config, *init_args, **model_kwargs)
 
         if use_keep_in_fp32_modules:
             # low_cpu_mem_usage = True

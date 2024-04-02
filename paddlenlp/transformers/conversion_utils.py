@@ -1119,28 +1119,26 @@ class ConversionMixin:
             config (PretrainedConfig): the PretrainedConfig instance of model
         """
 
-        def _apply_tp_action(name_action_mappings):
-            state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys(), ignore_error)
-
-            for k, v in state_keys_map.items():
-                name_action_mappings[v] = name_action_mappings.pop(k)
-
-            for name, action in name_action_mappings.items():
-                if name not in state_dict:
-                    if not ignore_error:
-                        logger.warning(f"Key <{name}> not in the model state weight file.")
-                    continue
-                tensor = state_dict.pop(name)
-                new_tensor = action(tensor)
-                with device_guard("cpu"):
-                    state_dict[name] = paddle.Tensor(new_tensor, zero_copy=True)
-
+        name_action_mappings = cls._get_tensor_parallel_mappings(config)
         if state_dict is None:
             with device_guard("cpu"):
                 state_dict = paddle.load(weight_file, return_numpy=False)
             logger.info("Starting to convert orignal state_dict to tensor parallel state_dict.")
-        name_action_mappings = cls._get_tensor_parallel_mappings(config)
-        _apply_tp_action(name_action_mappings)
+
+        state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys(), ignore_error)
+
+        for k, v in state_keys_map.items():
+            name_action_mappings[v] = name_action_mappings.pop(k)
+
+        for name, action in name_action_mappings.items():
+            if name not in state_dict:
+                if not ignore_error:
+                    logger.warning(f"Key <{name}> not in the model state weight file.")
+                continue
+            tensor = state_dict.pop(name)
+            new_tensor = action(tensor)
+            with device_guard("cpu"):
+                state_dict[name] = paddle.Tensor(new_tensor, zero_copy=True)
         state_dict = cls.convert_fuse_and_split(config, state_dict, name_action_mappings)
 
         return state_dict
