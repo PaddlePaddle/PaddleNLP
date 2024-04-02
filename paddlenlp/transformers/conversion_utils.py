@@ -490,21 +490,21 @@ def splited_qkv_to_tensor_parallel_qkv(weight_list, num_attention_heads):
 
 
 def fuse_param_func():
-    def fn(fuse_params: List[np.array]):
+    def fn(fuse_params):
         return np.concatenate(fuse_params, axis=-1)
 
     return fn
 
 
-def split_param_func(split_nums):
-    def fn(fused_param):
+def split_param_func():
+    def fn(fused_param, split_nums=2):
         return np.split(fused_param, split_nums, axis=-1)
 
     return fn
 
 
 def split_or_fuse_func(is_fuse=True):
-    return fuse_param_func if is_fuse else split_param_func
+    return fuse_param_func() if is_fuse else split_param_func()
 
 
 def get_tensor_parallel_merge_func(tensor_parallel_degree, tensor_parallel_rank, num_attention_heads=None):
@@ -1221,23 +1221,26 @@ class ConversionMixin:
 
         return state_keys_map
 
+    @classmethod
     def convert_fuse_and_split(cls, config: PretrainedConfig, state_dict, tp_actions=None):
         loaded_keys = state_dict.keys()
         # collect and convert fuse/split action
         fused_and_split_keys = []
         fuse_actions = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=True)
         for keys, action in fuse_actions.items():
-            origin_states = [state_dict[key] for key in keys]
+            origin_states = [state_dict.pop(key) for key in keys[:-1]]
             state_dict[keys[-1]] = action(origin_states)
             fused_and_split_keys.append(keys[-1])
+            logger.info(f"Fusing parameter: {keys[:-1]} into {keys[-1]}")
 
         split_actions = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=False)
         for keys, action in split_actions.items():
-            origin_state = state_dict[keys[-1]]
+            origin_state = state_dict.pop(keys[-1])
             split_states = action(origin_state)
             for key, key_idx in enumerate(keys[:-1]):
                 state_dict[key] = split_states[key_idx]
                 fused_and_split_keys.append(key)
+            logger.info(f"Splitting parameter: {keys[-1]} into {keys[:-1]}")
 
         if tp_actions is not None:
             for key in fused_and_split_keys:
@@ -1245,6 +1248,7 @@ class ConversionMixin:
                     state_dict[key] = tp_actions[key](state_dict.pop(key))
         return state_dict
 
+    @classmethod
     def get_fuse_or_split_param_convert_actions(
         cls,
         config: PretrainedConfig,
@@ -1259,6 +1263,9 @@ class ConversionMixin:
         for k, v in state_keys_map.items():
             name_action_mappings[v] = name_action_mappings.pop(k)
 
+        # filter name_action_mappings with corresponding weights
+        # fusing: verify all of the keys in name_action_mappings are in loaded_state_dict_keys
+        # splitting: verify the last key in name_action_mappings is in loaded_state_dict_keys
         filter_name_action = {}
         for k, v in name_action_mappings.items():
             if is_fuse:
@@ -1271,6 +1278,7 @@ class ConversionMixin:
 
         return filter_name_action
 
+    @classmethod
     def _get_fuse_or_split_param_mappings(cls, config: PretrainedConfig, is_fuse=True) -> List[StateDictNameMapping]:
         """get fused parameter mapping of PretrainedModel
 
@@ -1292,14 +1300,18 @@ class ConversionMixin:
     def _resolve_prefix_keys_for_fuse_and_split(state_keys_base, state_keys_real, ignore_error=False, is_fuse=True):
         state_keys_map = {}
 
+        # is_fuse: True -> fuse, False -> split
+        # True: [x1,x2,x3,x4] -> [x1,x2,x3] are exist in state_keys_real, x4 is not exist in state_keys_real
+        # False: [x1,x2,x3,x4] -> [x1,x2,x3] are not exist in state_keys_real, x4 is exist in state_keys_real
+
         for keys in state_keys_base:
             base_key = keys[0] if is_fuse else keys[-1]
             prefix = ""
             for x in state_keys_real:
                 if x.endswith(base_key):
-                    prefix = x.replace(x, base_key)
+                    prefix = x.replace(base_key, "")
                     break
-            new_keys = (prefix + key for key in keys)
+            new_keys = tuple([prefix + key for key in keys])
 
             state_keys_map[keys] = new_keys
 

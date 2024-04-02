@@ -1284,30 +1284,39 @@ class LlamaPretrainedModel(PretrainedModel):
 
         fn = split_or_fuse_func(is_fuse=is_fuse)
 
+        # last key is fused key, other keys are to be fused.
+        fuse_qkv_keys = (
+            "layers.0.self_attn.q_proj.weight",
+            "layers.0.self_attn.k_proj.weight",
+            "layers.0.self_attn.v_proj.weight",
+            "layers.0.self_attn.qkv_proj.weight",
+        )
+
+        fuse_gate_up_keys = (
+            "llama.layers.0.mlp.gate_proj.weight",
+            "llama.layers.0.mlp.up_proj.weight",
+            "llama.layers.0.mlp.gate_up_proj.weight",
+        )
+
         final_actions = {}
-        if config.fuse_attention_qkv:
-            # last key is fused key, other keys are to be fused.
-            base_keys = (
-                "layers.0.self_attn.q_proj.weight",
-                "layers.0.self_attn.k_proj.weight",
-                "layers.0.self_attn.v_proj.weight",
-                "layers.0.self_attn.qkv_proj.weight",
-            )
-
-            for i in range(config.num_hidden_layers):
-                keys = (key.replace("layers.0.", f"layers.{i}.") for key in base_keys)
-                final_actions[keys] = fn
-
-        if config.fuse_attention_ffn:
-            base_keys = (
-                "llama.layers.0.mlp.gate_proj.weight",
-                "llama.layers.0.mlp.up_proj.weight",
-                "llama.layers.0.mlp.gate_up_proj.weight",
-            )
-            for i in range(config.num_hidden_layers):
-                keys = (key.replace("layers.0.", f"layers.{i}.") for key in base_keys)
-                final_actions[keys] = fn
-
+        if is_fuse:
+            if config.fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
+                    final_actions[keys] = fn
+            if config.fuse_attention_ffn:
+                for i in range(config.num_hidden_layers):
+                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
+                    final_actions[keys] = fn
+        else:
+            if not config.fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
+                    final_actions[keys] = partial(fn, split_nums=3)
+            if not config.fuse_attention_ffn:
+                for i in range(config.num_hidden_layers):
+                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
+                    final_actions[keys] = partial(fn, split_nums=2)
         return final_actions
 
     def _init_weights(self, layer):
