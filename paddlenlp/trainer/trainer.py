@@ -34,7 +34,6 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
-import hashlib
 import paddle
 import paddle.amp.auto_cast as autocast
 import paddle.distributed as dist
@@ -1273,8 +1272,6 @@ class Trainer:
                     seq_length=seq_length,
                 )
             )
-            logs["loss_md5"] = hashlib.md5(
-                np.array(tr_loss_scalar).tobytes()).hexdigest()
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step

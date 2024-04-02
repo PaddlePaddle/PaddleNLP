@@ -30,42 +30,42 @@ unset CUDA_VISIBLE_DEVICES
 
 function gpt_case_list_auto() {
     gpt_auto_recompute_bs16_fp32_DP1-MP1-PP1
-    # gpt_auto_recompute_bs16_fp16_o2_DP1-MP1-PP8
-    # gpt_auto_recompute_bs16_fp16_o2_DP1-MP2-PP4
-    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2
-    # gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage1
-    # gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage2
-    # gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage3
-    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage1
-    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage2
-    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage3
-    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage1
-    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2
-    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3
-    # gpt_auto_sp_acc_check
+    gpt_auto_recompute_bs16_fp16_o2_DP1-MP1-PP8
+    gpt_auto_recompute_bs16_fp16_o2_DP1-MP2-PP4
+    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2
+    gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage1
+    gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage2
+    gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage3
+    gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage1
+    gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage2
+    gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage3
+    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage1
+    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2
+    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3
+    gpt_auto_sp_acc_check
 }
 
 function llama_case_list_auto() {
     llama_dygraph_auto_bs8_fp32_DP2
-    # llama_dygraph_auto_bs8_fp32_DP2-MP2
-    # llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
-    # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
+    llama_dygraph_auto_bs8_fp32_DP2-MP2
+    llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
+    llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
 
-    # llama_static_auto_recompute_bs8_fp32_DP1-MP1-PP1
-    # llama_static_auto_recompute_bs16_fp32_DP2-MP1-PP1
-    # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP1
-    # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2
-    # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
-    # llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
+    llama_static_auto_recompute_bs8_fp32_DP1-MP1-PP1
+    llama_static_auto_recompute_bs16_fp32_DP2-MP1-PP1
+    llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP1
+    llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2
+    llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
+    llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
 }
 
 function gpt_case_list_auto_pir() {
     gpt_auto_recompute_bs16_fp16_o2_DP1-MP1-PP8_pir
-    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_pir
-    # gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage1_pir
-    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage1_pir
-    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2_pir
-    # gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3_pir
+    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_pir
+    gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage1_pir
+    gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage1_pir
+    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2_pir
+    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3_pir
 }
 
 function llm_gpt_case_list_auto() {
@@ -1536,7 +1536,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2() {
         run_pretrain_auto.py \
         --model_name_or_path gpt2-medium-en \
         --tokenizer_name_or_path gpt2-medium-en \
-        --input_dir "../data" \
+        --input_dir "$gpt_data_path/data" \
         --output_dir "output/$task_name" \
         --split 949,50,1 \
         --max_seq_length 1024 \
@@ -1578,11 +1578,11 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.57663822
-    loss_md5_base=86a59936c56ae83ce556dec0833ca35e
+    loss_base=10.57664108
+    loss_md5_base=0ebf68698887b33b33a46518621cf412
     ips_base=-1
     mem_base=-1
-    check_result $FUNCNAME ${loss_base} ${loss} ${loss_md5_base} ${loss_md5} ${mem_base} ${mem}
+    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -1606,7 +1606,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2() {
         run_pretrain_auto.py \
         --model_name_or_path gpt2-medium-en \
         --tokenizer_name_or_path gpt2-medium-en \
-        --input_dir "../data" \
+        --input_dir "$gpt_data_path/data" \
         --output_dir $case_out_dir  \
         --split 949,50,1 \
         --max_seq_length 1024 \
@@ -1648,11 +1648,11 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.57694435
-    loss_md5_base=42649563a5ae2af87b9322d33f75deb1
+    loss_base=10.57694054
+    loss_md5_base=6df87d01bd08113a92930f6349514b35
     ips_base=-1
     mem_base=-1
-    check_result $FUNCNAME ${loss_base} ${loss} ${loss_md5_base} ${loss_md5} ${mem_base} ${mem}
+    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -1676,7 +1676,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
         run_pretrain_auto.py \
         --model_name_or_path gpt2-medium-en \
         --tokenizer_name_or_path gpt2-medium-en \
-        --input_dir "../data" \
+        --input_dir "$gpt_data_path/data" \
         --output_dir $case_out_dir  \
         --split 949,50,1 \
         --max_seq_length 1024 \
@@ -1718,11 +1718,11 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.57580185
-    loss_md5_base=9751dab0842de5905a8c0b87d1f06d67
+    loss_base=10.5758028
+    loss_md5_base=6cb4e151b35f026190df90ab240d9a95
     ips_base=-1
     mem_base=-1
-    check_result $FUNCNAME ${loss_base} ${loss} ${loss_md5_base} ${loss_md5} ${mem_base} ${mem}
+    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -1746,7 +1746,7 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
         run_pretrain_auto.py \
         --model_name_or_path gpt2-medium-en \
         --tokenizer_name_or_path gpt2-medium-en \
-        --input_dir "../data" \
+        --input_dir "$gpt_data_path/data" \
         --output_dir $case_out_dir  \
         --split 949,50,1 \
         --max_seq_length 1024 \
@@ -1792,7 +1792,7 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     loss_md5_base=e82a1f5668870d18a2d45b3ee0a25386
     ips_base=-1
     mem_base=-1
-    check_result $FUNCNAME ${loss_base} ${loss} ${loss_md5_base} ${loss_md5} ${mem_base} ${mem}
+    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -1866,7 +1866,7 @@ function before_hook_for_gpt() {
             echo "GPT data downloaded"
         else
             # download data for gpt
-            mkdir ${gpt_data_path}/data;
+            mkdir -p ${gpt_data_path}/data;
             wget -O ${gpt_data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
             wget -O ${gpt_data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
         fi
