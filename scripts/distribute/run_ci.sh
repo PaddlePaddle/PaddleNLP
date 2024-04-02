@@ -27,7 +27,9 @@ target_lists_for_gpt=(
 
 target_lists_for_llama=(
     "llm/llama/auto_parallel"
+    "paddlenlp/trainer/auto_trainer.py"
     "paddlenlp/transformers/llama/modeling_auto_static.py"
+    "paddlenlp/transformers/llama/modeling_auto.py"
     "scripts/distribute"
 )
 
