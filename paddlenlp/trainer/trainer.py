@@ -2092,6 +2092,11 @@ class Trainer:
             # recover unified_checkpoint_config for not trine stage
             if not self.is_in_train:
                 self.args.unified_checkpoint_config = unified_checkpoint_config_backup
+        if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
+            # save checkpoint_done file to ensure checkpoint is complete
+            if self.args.should_save_model_state and self.args.should_save:
+                # For ckpt integrity
+                paddle.save(self.state.global_step, os.path.join(output_dir, ".checkpoint_done"))
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
