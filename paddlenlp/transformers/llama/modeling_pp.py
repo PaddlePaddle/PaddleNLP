@@ -20,9 +20,11 @@ from paddle.distributed.fleet.utils import recompute
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
 
+from ...utils.transformer_engine_utils import TransformerEngineHelper
 from .modeling import (
     LlamaConfig,
     LlamaDecoderLayer,
+    LlamaDecoderLayerWithNVTEBackend,
     LlamaLMHead,
     LlamaModel,
     LlamaPretrainedModel,
@@ -163,6 +165,40 @@ class LlamaEmbeddingPipe(nn.Layer):
         return return_args(input_embeds, attention_mask, position_ids, alibi)
 
 
+class LlamaDecoderLayerPipeWithNVTEBackend(LlamaDecoderLayerWithNVTEBackend):
+    def __init__(self, config, layerwise_recompute: bool = False):
+        strategy = fleet.fleet._user_defined_strategy
+        self.num_steps = strategy.pipeline_configs["accumulate_steps"]
+        self._micro_batch_id = 0
+        super().__init__(config, layerwise_recompute=layerwise_recompute)
+
+    def forward(self, args):
+        is_first_microbatch = (self._micro_batch_id % self.num_steps) == 0
+        if paddle.is_grad_enabled() and self.training:
+            self._micro_batch_id += 1
+        hidden_states, attention_mask, _, _ = parse_args(args)
+        assert self.config.alibi is False, "alibi is not support in NVTE backend"
+        if self.config.use_recompute and self.config.recompute_granularity == "full":
+            recompute_func = TransformerEngineHelper.get_te_recompute_func()
+            inputs = (
+                hidden_states,
+                None,  # position_ids
+                attention_mask,
+                False,  # output_attentions
+                None,  # past_key_value
+                False,  # use_cache
+                None,  # alibi
+                is_first_microbatch,  # is_first_microbatch
+            )
+            hidden_states = recompute_func(super().forward, *inputs)
+        else:
+            hidden_states = super().forward(
+                hidden_states, attention_mask=attention_mask, is_first_microbatch=is_first_microbatch
+            )
+
+        return return_args(hidden_states, attention_mask)
+
+
 class LlamaDecoderLayerPipe(LlamaDecoderLayer):
     def forward(self, args):
         hidden_states, attention_mask, position_ids, alibi = parse_args(args)
@@ -238,10 +274,18 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         config.tensor_parallel_degree = tensor_parallel_degree
         config.tensor_parallel_rank = tensor_parallel_rank
 
+        self.use_fp8 = config.use_fp8
+        self.fp8_group = TransformerEngineHelper.get_fp8_group()
+
         self.add_sequential_layer(LayerDesc(LlamaEmbeddingPipe, config=config), "llama")
+        DecoderLayerPipe = (
+            LlamaDecoderLayerPipe
+            if config.transformer_engine_backend is None
+            else LlamaDecoderLayerPipeWithNVTEBackend
+        )
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
-                LayerDesc(LlamaDecoderLayerPipe, config=config, layerwise_recompute=i not in self.no_recompute_layers),
+                LayerDesc(DecoderLayerPipe, config=config, layerwise_recompute=i not in self.no_recompute_layers),
                 f"llama.layers.{i}",
             )
         self.add_sequential_layer(LayerDesc(LlamaRMSNormPipe, config=config), "llama")
@@ -271,3 +315,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self.apply(self._init_weights)
         # DON'T init PipelinePretrainedModel
         # PipelinePretrainedModel.__init__(self.super(), config=config)
+
+    def forward(self, *args, **kwargs):
+        with TransformerEngineHelper.fp8_autocast(enabled=self.use_fp8, fp8_group=self.fp8_group):
+            return super().forward(*args, **kwargs)
