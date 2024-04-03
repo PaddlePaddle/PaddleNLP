@@ -48,11 +48,6 @@ from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
 
-from paddle.base.reader import use_pinned_memory
-use_pinned_memory(False)
-
-print("==============use_pinned_memory(False)==============")
-
 def add_start_docstrings(*docstr):
     def docstring_decorator(fn):
         fn.__doc__ = "".join(docstr) + (fn.__doc__ if fn.__doc__ is not None else "")
@@ -598,4 +593,8 @@ def main():
 
 
 if __name__ == "__main__":
+    from paddle.base.reader import use_pinned_memory
+    use_pinned_memory(False)
+
+    print("==============use_pinned_memory(False)==============")
     main()

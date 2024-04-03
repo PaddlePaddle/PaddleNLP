@@ -893,29 +893,31 @@ class Trainer:
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
 
-            print("epoch_iterator", epoch_iterator)
-            input_data = np.random.uniform(1000, 2000, [1, 2048]).astype('int64')
-            input_data = paddle.to_tensor(input_data, place=paddle.CUDAPinnedPlace())
-            label_data = np.random.uniform(1000, 2000, [1, 2048]).astype('int64')
-            label_data = paddle.to_tensor(label_data, place=paddle.CUDAPinnedPlace())
-            datas = {'input_ids': input_data, 'labels': label_data}
-            # for step, inputs in enumerate(epoch_iterator):
-            for step in range(5):
-                inputs = datas
-                print("step", step)
-                print("inputs", inputs)
-
-
-                from .paperf import profile_paddle
-                profile_paddle.switch_profile(step, 1, 5, enable_layerwise_event=True)
-                profile_paddle.push_record_event("forward1")
+            # print("epoch_iterator", epoch_iterator)
+            # input_data = paddle.randint(low=1000, high=2000, shape=[1, 2048], dtype='int64')
+            # input_data = paddle.to_tensor(input_data)
+            # label_data = paddle.randint(low=1000, high=2000, shape=[1, 2048], dtype='int64')
+            # label_data = paddle.to_tensor(label_data)
+            # datas = {'input_ids': input_data, 'labels': label_data}
+            profile = False
+            for step, inputs in enumerate(epoch_iterator):
+            # for step in range(5):
+                # inputs = datas
+                # print("step", step)
+                # print("inputs", inputs)
+                
+                if profile:
+                    from .paperf import profile_paddle
+                    profile_paddle.switch_profile(step, 1, 5, enable_layerwise_event=True)
+                    profile_paddle.push_record_event("forward1")
                 if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim(inputs)
                 self.timers and self.timers("read-data").stop()
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
-                profile_paddle.pop_record_event()
-                profile_paddle.push_record_event("forward2")
+                if profile:
+                    profile_paddle.pop_record_event()
+                    profile_paddle.push_record_event("forward2")
 
                 # Skip past any already trained steps if resuming training
                 # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
@@ -988,13 +990,15 @@ class Trainer:
                     tr_loss_step = self.training_step(model, inputs)
                 
                 tr_loss += tr_loss_step
-                profile_paddle.pop_record_event()
+                if profile:
+                    profile_paddle.pop_record_event()
                 if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
                     # last step in epoch but step is always smaller than gradient_accumulation_steps
                     steps_in_epoch <= args.gradient_accumulation_steps
                     and (step + 1) == steps_in_epoch
                 ):
-                    profile_paddle.push_record_event("forward3")
+                    if profile:
+                        profile_paddle.push_record_event("forward3")
 
                     if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
                         tr_loss /= self.args.gradient_accumulation_steps
@@ -1034,8 +1038,9 @@ class Trainer:
 
                             if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
                                 fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
-                    profile_paddle.pop_record_event()
-                    profile_paddle.push_record_event("forward4")
+                    if profile:
+                        profile_paddle.pop_record_event()
+                        profile_paddle.push_record_event("forward4")
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
 
@@ -1047,8 +1052,9 @@ class Trainer:
                                     p.main_grad.scale_(1.0 / self.args.gradient_accumulation_steps)
                                 elif p.grad is not None:
                                     p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
-                    profile_paddle.pop_record_event()
-                    profile_paddle.push_record_event("optimizer")
+                    if profile:
+                        profile_paddle.pop_record_event()
+                        profile_paddle.push_record_event("optimizer")
                     # Optimizer step
                     self.callback_handler.on_optimizer_begin(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
@@ -1099,7 +1105,8 @@ class Trainer:
                     # self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
                     # self._print_timer()
                     step_control = 0
-                    profile_paddle.pop_record_event()
+                    if profile:
+                        profile_paddle.pop_record_event()
                 else:
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
                     step_control += 1
