@@ -28,6 +28,8 @@ from paddle.framework import core
 from paddle.nn import functional as F
 from paddle.nn.layer.layers import Layer
 
+from paddlenlp.utils.log import logger
+
 __all__ = [
     "GatherOp",
     "ScatterOp",
@@ -333,7 +335,10 @@ def register_sequence_parallel_allreduce_hooks(model, accumulation_steps, fuse_s
     params = []
     for p in model.parameters():
         if is_sequence_parallel_parameter(p):
-            params.append(p)
+            if p.stop_gradient:
+                logger.warning(f"{p.name} has no gradient, skipping register sp hook for it.")
+            else:
+                params.append(p)
 
     if fuse_sequence_parallel_allreduce:
         hook = create_fused_allreduce_gradient_hook(params, accumulation_steps)

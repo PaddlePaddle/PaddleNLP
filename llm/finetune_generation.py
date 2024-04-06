@@ -45,6 +45,7 @@ from paddlenlp.transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     LlamaTokenizer,
+    register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.utils.log import logger
 
@@ -449,6 +450,11 @@ def main():
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
+
+    if model_args.sequence_parallel:
+        register_sequence_parallel_allreduce_hooks(
+            model, training_args.gradient_accumulation_steps, model_args.fuse_sequence_parallel_allreduce
+        )
 
     def compute_metrics_do_generation(eval_preds):
         rouge1 = Rouge1()

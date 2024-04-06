@@ -32,6 +32,7 @@ from paddlenlp.transformers.sequence_parallel_utils import (
     MC2RowSeqParallelLinear,
     ReduceScatterOp,
     RowSequenceParallelLinear,
+    mark_as_sequence_parallel_parameter,
 )
 
 
@@ -255,6 +256,8 @@ class RowSequenceParallelLoRALinear(RowSequenceParallelLinear):
         self.lora_A.is_distributed = True
         self.lora_A.split_axis = 0
         self.lora_B.is_distributed = False
+        mark_as_sequence_parallel_parameter(self.lora_B)
+
         self.scaling = self.lora_alpha / self.r
 
         # Freezing the pre-trained weight matrix
@@ -283,12 +286,9 @@ class RowSequenceParallelLoRALinear(RowSequenceParallelLinear):
             input_mp = x
 
         if not int(os.getenv("MC2", 0)):
-            if self.is_mp:
-                output_parallel = self.linear(input_mp, self.weight, name=self._name)
-                output_ = ReduceScatterOp.apply(output_parallel)
-                result_mp = output_ + self.bias if self.bias is not None else output_
-            else:
-                result_mp = self.linear(input_mp, self.weight, self.bias, name=self._name)
+            output_parallel = self.linear(input_mp, self.weight, name=self._name)
+            output_ = ReduceScatterOp.apply(output_parallel)
+            result_mp = output_ + self.bias if self.bias is not None else output_
         else:
             output_ = MC2RowSeqParallelLinear.apply(input_mp, self.weight, self.model_parallel_group)
             result_mp = output_ + self.bias if self.bias is not None else output_
@@ -297,8 +297,7 @@ class RowSequenceParallelLoRALinear(RowSequenceParallelLinear):
             input_mp = self.lora_dropout(input_mp)
             if not int(os.getenv("MC2", 0)):
                 input_mp = input_mp @ self.lora_A
-                if self.is_mp:
-                    input_mp = ReduceScatterOp.apply(input_mp)
+                input_mp = ReduceScatterOp.apply(input_mp)
             else:
                 input_mp = MC2RowSeqParallelLinear.apply(input_mp, self.lora_A, self.model_parallel_group)
             delta_mp = (input_mp @ self.lora_B) * self.scaling
@@ -434,6 +433,8 @@ class ColumnSequenceParallelLoRALinear(ColumnSequenceParallelLinear):
             attr=lora_A_weight_attr,
         )
         self.lora_A.is_distributed = False
+        mark_as_sequence_parallel_parameter(self.lora_A)
+
         self.lora_B = self.create_parameter(
             shape=[r, self.output_size_per_partition],
             dtype=self._dtype,
@@ -478,8 +479,7 @@ class ColumnSequenceParallelLoRALinear(ColumnSequenceParallelLinear):
         if not self.merged:
             input_a = self.lora_dropout(x) @ self.lora_A
             if not int(os.getenv("MC2", 0)):
-                if self.is_mp:
-                    input_a = AllGatherOp.apply(input_a)
+                input_a = AllGatherOp.apply(input_a)
                 delta_mp = (input_a @ self.lora_B) * self.scaling
             else:
                 input_a = MC2ColumnSeqParallelLinear.apply(input_a, self.lora_B, self.model_parallel_group)
