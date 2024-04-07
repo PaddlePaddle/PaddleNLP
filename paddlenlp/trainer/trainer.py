@@ -894,14 +894,14 @@ class Trainer:
 
 
             # print("epoch_iterator", epoch_iterator)
-            # input_data = paddle.randint(low=1000, high=2000, shape=[1, 2048], dtype='int64')
-            # input_data = paddle.to_tensor(input_data)
-            # label_data = paddle.randint(low=1000, high=2000, shape=[1, 2048], dtype='int64')
-            # label_data = paddle.to_tensor(label_data)
-            # datas = {'input_ids': input_data, 'labels': label_data}
-            profile = False
-            for step, inputs in enumerate(epoch_iterator):
-            # for step in range(5):
+            input_data = paddle.randint(low=1000, high=2000, shape=[1, 2048], dtype='int64')
+            input_data = paddle.to_tensor(input_data)
+            label_data = paddle.randint(low=1000, high=2000, shape=[1, 2048], dtype='int64')
+            label_data = paddle.to_tensor(label_data)
+            inputs = {'input_ids': input_data, 'labels': label_data}
+            profile = True
+            # for step, inputs in enumerate(epoch_iterator):
+            for step in range(5):
                 # inputs = datas
                 # print("step", step)
                 # print("inputs", inputs)
@@ -910,6 +910,8 @@ class Trainer:
                     from .paperf import profile_paddle
                     profile_paddle.switch_profile(step, 1, 5, enable_layerwise_event=True)
                     profile_paddle.push_record_event("forward1")
+                # print("self.args.use_hybrid_parallel", self.args.use_hybrid_parallel)
+                # print("self.args.sep_parallel_degree", self.args.sep_parallel_degree)
                 if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim(inputs)
                 self.timers and self.timers("read-data").stop()
@@ -929,15 +931,15 @@ class Trainer:
                 if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
                     train_dataloader.batch_sampler, NlpDistributedBatchSampler
                 ):
-                    print("Dataload load data")
-                    print("steps_trained_in_current_epoch", steps_trained_in_current_epoch)
-                    print("steps_trained_progress_bar", steps_trained_progress_bar)
+                    # print("Dataload load data")
+                    # print("steps_trained_in_current_epoch", steps_trained_in_current_epoch)
+                    # print("steps_trained_progress_bar", steps_trained_progress_bar)
                     if step == 0:
                         if steps_trained_progress_bar is not None:
                             steps_trained_progress_bar.update(steps_trained_in_current_epoch)
                             steps_trained_progress_bar.close()
                             steps_trained_progress_bar = None
-                        print("resume_from_checkpoint", resume_from_checkpoint)
+                        # print("resume_from_checkpoint", resume_from_checkpoint)
                         self._load_rng_state(resume_from_checkpoint)
                     step += steps_trained_in_current_epoch
                 elif steps_trained_in_current_epoch > 0:
@@ -1102,7 +1104,7 @@ class Trainer:
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
-                    # self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+                    self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
                     # self._print_timer()
                     step_control = 0
                     if profile:
@@ -1124,7 +1126,7 @@ class Trainer:
                 self.control.should_training_stop = True
 
             self.control = self.callback_handler.on_epoch_end(args, self.state, self.control)
-            # self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+            self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
 
             if self.control.should_training_stop:
                 break

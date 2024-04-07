@@ -37,8 +37,8 @@ export FLAGS_embedding_deterministic=1
 #python setup.py install
 
 #export FLAGS_use_stride_kernel=0
-#export FLAGS_cudnn_deterministic=1
-#export FLAGS_embedding_deterministic=1
+export FLAGS_cudnn_deterministic=1
+export FLAGS_embedding_deterministic=1
 #export GLOG_vmodule=dygraph_functions=6,utils=6
 #export GLOG_vmodule=layer=4
 
@@ -52,6 +52,7 @@ DP=1
 VPP=1
 SD=$(($WORLD_SIZE / ($MP * $PP * $DP)))
 ACC_STEPS=$(($GBS / ($SD * $MBS)))
+MAX_STEP=5
 
 COMPANY_NAME="facebook"
 # COMPANY_NAME="meta-llama"
@@ -89,9 +90,9 @@ if [ "$autoconfig_args" = "" ]; then
     extra_pp_config="disable_partial_send_recv"
   fi
   if [ "$Overlap" = "1" ]; then
-    OUTPUT_FILENAME=./20240401/paddle_${MODEL_TYPE}.gbs${GBS}_mp${MP}_sp${SP}_pp${PP}sd${SD}_vpp${VPP}_mbs${MBS}_acc${ACC_STEPS}_overlap${Overlap}
+    OUTPUT_FILENAME=./20240407/paddle_${MODEL_TYPE}.gbs${GBS}_mp${MP}_sp${SP}_pp${PP}sd${SD}_vpp${VPP}_mbs${MBS}_acc${ACC_STEPS}_overlap${Overlap}_maxstep_${MAX_STEP}
   else
-    OUTPUT_FILENAME=./20240401/paddle_${MODEL_TYPE}.gbs${GBS}_mp${MP}_sp${SP}_pp${PP}sd${SD}_vpp${VPP}_mbs${MBS}_acc${ACC_STEPS}_overlap${Overlap}
+    OUTPUT_FILENAME=./20240407/paddle_${MODEL_TYPE}.gbs${GBS}_mp${MP}_sp${SP}_pp${PP}sd${SD}_vpp${VPP}_mbs${MBS}_acc${ACC_STEPS}_overlap${Overlap}_maxstep_${MAX_STEP}
   fi
 else
   OUTPUT_FILENAME=paddle_${MODEL_TYPE}_gbs${GBS}_autoconfig.20231117
@@ -103,7 +104,7 @@ rm -rf output
 # nsys_args="nsys profile --stats true -w true -t cuda,nvtx,osrt,cudnn,cublas --capture-range=cudaProfilerApi -x true --force-overwrite true -o ${OUTPUT_FILENAME}"
 
 
-# nsys_args="nsys profile --stats true -w true -t cuda,nvtx,cudnn,cublas -x true --force-overwrite true -o ${OUTPUT_FILENAME}"
+nsys_args="nsys profile --stats true -w true -t cuda,nvtx,cudnn,cublas -x true --force-overwrite true -o ${OUTPUT_FILENAME}"
 ${nsys_args} python -u -m paddle.distributed.launch \
         --gpus "0,1,2,3,4,5,6,7" ${autoconfig_args} \
         --log_dir log_${MODEL_TYPE} \
@@ -130,7 +131,7 @@ ${nsys_args} python -u -m paddle.distributed.launch \
         --warmup_ratio 0.01 \
         --max_grad_norm 1.0 \
         --do_train \
-        --max_steps 50 \
+        --max_steps ${MAX_STEP} \
         --eval_steps 1000 \
         --save_steps 5000 \
         --logging_steps 2 \

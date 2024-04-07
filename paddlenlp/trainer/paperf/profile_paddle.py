@@ -56,7 +56,7 @@ def switch_profile(iter_id, start, end, event_name=None, enable_layerwise_event=
     if event_name is None:
         event_name = "iter_{}".format(iter_id)
     if iter_id == start:
-        paddle.device.cuda.synchronize()
+        paddle.device.synchronize()
         paddle.base.core.nvprof_start()
         _PROFILER_ENABLED = True
         if enable_layerwise_event:
