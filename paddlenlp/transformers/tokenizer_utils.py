@@ -641,7 +641,8 @@ class ChatTemplateMixin:
         if not self.chat_template:
             raise ValueError("chat_template is not set, please set chat_template first.")
         elif isinstance(self.chat_template, Template):
-            query = self._apply_chat_template(conversation, context_data)
+            add_generation_prompt = tokenizer_kwargs.pop("add_generation_prompt", True)
+            query = self._apply_chat_template(conversation, context_data, add_generation_prompt=add_generation_prompt)
         elif isinstance(self.chat_template, ChatTemplate):
             query = self._apply_chat_template_paddle(conversation, context_data)
 
@@ -706,7 +707,7 @@ class ChatTemplateMixin:
         )
         return query
 
-    def encode_chat_inputs(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}):
+    def encode_chat_inputs(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}, **kwargs):
         """Encodes conversation to pairs of token ids.
         Turn 0: bos + system + sep + user     bot + eos
         Turn t: sep + bot + query             bot + eos
@@ -721,7 +722,8 @@ class ChatTemplateMixin:
         if not self.chat_template:
             raise ValueError("chat_template is not set, please set chat_template first.")
         elif isinstance(self.chat_template, Template):
-            query = self._encode_chat_inputs(conversations, context_data)
+            add_generation_prompt = kwargs.pop("add_generation_prompt", True)
+            query = self._encode_chat_inputs(conversations, context_data, add_generation_prompt=add_generation_prompt)
         elif isinstance(self.chat_template, ChatTemplate):
             query = self._encode_chat_inputs_paddle(conversations, context_data)
         return query
@@ -752,18 +754,21 @@ class ChatTemplateMixin:
         return result
 
     def _encode_chat_inputs(
-        self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}, add_generation_prompt=False
+        self,
+        conversations: List[List[str, str]],
+        context_data: Dict[str, Any] = {},
+        system: str = None,
+        add_generation_prompt=True,
     ):
         result = {}
         # conversation = []
         # if origin_msg[0]['role'] == 'system':
         #     system = origin_msg.pop(0)
-        try:
-            self.chat_template.render({"role": "system", "content": ""})
-        except Exception as e:
-            # some tokenizer do not support chat_template, they raise error in jinja string
-            system = None
-            logger.debug(e)
+        if system:
+            try:
+                self.chat_template.render(messages={"role": "system", "content": system})
+            except Exception as e:
+                raise ValueError("System is not supported in this tokenizer.", e)
 
         conversation_dict = []
         origin_msg = []
@@ -778,7 +783,7 @@ class ChatTemplateMixin:
 
         for conv in conversation_dict:
             roundi = [system] + conv if system else conv
-            roundi_str = self.chat_template.render(messages=roundi, add_generation_prompt=add_generation_prompt)
+            roundi_str = self.chat_template.render(messages=roundi, add_generation_prompt=False)
             roundi_no_ans = [system] + [conv[0]] if system else [conv[0]]
             roundi_no_ans_str = self.chat_template.render(
                 messages=roundi_no_ans, add_generation_prompt=add_generation_prompt
@@ -789,7 +794,7 @@ class ChatTemplateMixin:
         regex_pattern = "|".join(map(re.escape, ans))
         non_learnable_parts = re.split(
             r"(?:%s)" % regex_pattern,
-            self.chat_template.render(messages=origin_msg, add_generation_prompt=add_generation_prompt),
+            self.chat_template.render(messages=origin_msg, add_generation_prompt=False),
         )
         if non_learnable_parts[-1] == "":
             non_learnable_parts.pop()
