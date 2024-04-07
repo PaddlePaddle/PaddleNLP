@@ -674,24 +674,36 @@ class ChatTemplateMixin:
         self,
         conversation: List[List[str, str] | Dict[str, str]] | str,
         context_data: Dict[str, Any] = {},
+        add_generation_prompt=True,
     ) -> str | dict[str, numpy.ndarray | paddle.Tensor]:
         if isinstance(conversation, str):
-            conversation = [{"role": "user", "content": conversation}]
+            conversations = [{"role": "user", "content": conversation}]
         elif isinstance(conversation, list):
+            conversations = []
             for index, item in enumerate(conversation):
                 if isinstance(item, dict):
+                    conversations = conversation
                     break
-                elif isinstance(item, str):
-                    if index % 2 == 0:
-                        conversation[index] = {"role": "user", "content": item}
+                elif isinstance(item, list):
+                    assert 1 <= len(item) <= 2
+                    if isinstance(item[0], str):
+                        conversations.append({"role": "user", "content": item[0]})
+                        if len(item) == 2 and isinstance(item[1], str):
+                            conversations.append({"role": "assistant", "content": item[1]})
+                        else:
+                            # item里只有一个元素，说明为最后一轮
+                            if index != len(conversation) - 1:
+                                raise ValueError(f"Round {index} has error round")
                     else:
-                        conversation[index] = {"role": "assistant", "content": item}
+                        raise ValueError("Each round in list should be string")
                 else:
                     raise ValueError(
                         "apply_chat_template do not support appling batch conversations, "
                         "so you should apply the conversation one by one."
                     )
-        query = self.chat_template.render(messages=conversation, **self.special_tokens_map)
+        query = self.chat_template.render(
+            messages=conversations, **self.special_tokens_map, add_generation_prompt=add_generation_prompt
+        )
         return query
 
     def encode_chat_inputs(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}):
