@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from .argparser import *
-from .auto_trainer import *
 from .compression_args import *
 from .plugins.timer import *
 from .trainer import *
