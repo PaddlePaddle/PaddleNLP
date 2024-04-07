@@ -95,7 +95,7 @@ class ChatTemplateContextDataTest(unittest.TestCase):
         self.assertEqual(final_query, expected_query)
 
 
-class TemplateIntegrationTest(unittest.TestCase):
+class ChatTemplateIntegrationTest(unittest.TestCase):
     def test_linlyai_chinese_llama_2_chat_template(self):
         tokenizer = AutoTokenizer.from_pretrained("linly-ai/chinese-llama-2-7b")
         query = "你好"
@@ -284,7 +284,7 @@ class TestChatTemplateTruncation(unittest.TestCase):
         self.assertEqual(final_query, expected_query)
 
 
-class ChatTemplateIntegrationTest(unittest.TestCase):
+class TemplateIntegrationTest(unittest.TestCase):
     class DataArg:
         def __init__(self, max_length, src_length: Optional[int] = None):
             self.max_length: int = max_length
