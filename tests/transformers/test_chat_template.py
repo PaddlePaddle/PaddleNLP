@@ -326,6 +326,16 @@ class TemplateIntegrationTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.tokenizer.apply_chat_template(query, tokenize=False)
 
+    def test_jinja_syntax_error(self):
+        # test system messaage error
+        error_jinja = (
+            "{ bos_token }{% if messages[0]['role'] == 'system' %}{ raise_exception('System role not supported')}"
+        )
+        from jinja2.exceptions import TemplateSyntaxError
+
+        with self.assertRaises(TemplateSyntaxError):
+            self.tokenizer.init_chat_template(error_jinja)
+
     def test_train_format(self):
         from data import tokenize_rounds_example
 
