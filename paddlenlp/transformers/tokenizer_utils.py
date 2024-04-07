@@ -749,6 +749,7 @@ class ChatTemplateMixin:
         try:
             self.chat_template.render({"role": "system", "content": ""})
         except Exception as e:
+            # some tokenizer do not support chat_template, they raise error in jinja string
             system = None
             logger.debug(e)
 
@@ -786,9 +787,11 @@ class ChatTemplateMixin:
         conversation_ids = []
         for i in range(len(non_learnable_parts)):
             conversation_ids.append(
-                self.batch_encode([non_learnable_parts[i], ans[i]], add_special_tokens=False, padding=False)[
-                    "input_ids"
-                ]
+                self.batch_encode(
+                    [non_learnable_parts[i], ans[i]],
+                    add_special_tokens=False,
+                    padding=False,
+                )["input_ids"]
             )
             # print(self.batch_decode(conversation_ids[i]))
 
