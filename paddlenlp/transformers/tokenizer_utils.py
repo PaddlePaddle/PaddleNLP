@@ -715,7 +715,6 @@ class ChatTemplateMixin:
         return query
 
     def _encode_chat_inputs_paddle(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}):
-        breakpoint()
         context_data = self.chat_template._init_context_data(context_data)
         # encode system
         result = {}
@@ -747,14 +746,13 @@ class ChatTemplateMixin:
         # conversation = []
         # if origin_msg[0]['role'] == 'system':
         #     system = origin_msg.pop(0)
-        #     try:
-        #         self.chat_template.render(system)
-        #     except Exception as e:
-        #         raise RuntimeError("System is not supported", e)
-        # else:
-        #     system = None
+        try:
+            self.chat_template.render({"role": "system", "content": ""})
+        except Exception as e:
+            system = None
+            logger.debug(e)
 
-        conversation = []
+        conversation_dict = []
         origin_msg = []
         for round in conversations:
             round_role = [
@@ -762,10 +760,10 @@ class ChatTemplateMixin:
                 {"role": "assistant", "content": round[1]},
             ]
             origin_msg.extend(round_role)
-            conversation.append(round_role)
+            conversation_dict.append(round_role)
         ans = []
-        system = None
-        for conv in conversation:
+
+        for conv in conversation_dict:
             roundi = [system] + conv if system else conv
             roundi_str = self.chat_template.render(messages=roundi, add_generation_prompt=add_generation_prompt)
             roundi_no_ans = [system] + [conv[0]] if system else [conv[0]]
@@ -792,7 +790,7 @@ class ChatTemplateMixin:
                     "input_ids"
                 ]
             )
-            print(self.batch_decode(conversation_ids[i]))
+            # print(self.batch_decode(conversation_ids[i]))
 
         result["conversations"] = conversation_ids
         return result
