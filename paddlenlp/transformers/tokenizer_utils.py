@@ -856,7 +856,8 @@ class ChatTemplateMixin:
                 except TemplateSyntaxError:
                     # It is neither jinjia string nor path string
                     raise TemplateSyntaxError(
-                        "The chat-template in json is not valid jinja string: {}".format(chat_template)
+                        "The chat-template in json is not valid jinja string: {}".format(chat_template),
+                        lineno=0,  # fake lineno, useless required msg
                     )
             else:
                 self.chat_template = ChatTemplate.from_file(chat_template)
