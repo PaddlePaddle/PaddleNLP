@@ -274,14 +274,14 @@ def create_pretrained_dataset(
 
     train_val_test_num_samples = [
         training_args.per_device_train_batch_size
-        * training_args.data_parallel_degree
+        * training_args.dataset_world_size
         * training_args.max_steps
         * training_args.gradient_accumulation_steps,
         training_args.per_device_eval_batch_size
-        * training_args.data_parallel_degree
+        * training_args.dataset_world_size
         * training_args.eval_iters
         * (training_args.max_steps // training_args.eval_steps + 1),
-        training_args.per_device_eval_batch_size * training_args.data_parallel_degree * training_args.test_iters,
+        training_args.per_device_eval_batch_size * training_args.dataset_world_size * training_args.test_iters,
     ]
 
     print_rank_0(" > datasets target sizes (minimum size):")
@@ -421,7 +421,7 @@ def init_seed(seed: int = 1234, args=None):
             topo = Topology(
                 dist.get_rank(),
                 dist.get_world_size(),
-                dp_degree=args.data_parallel_degree,
+                dp_degree=args.dataset_world_size,
                 pp_degree=args.pipeline_parallel_degree,
                 mp_degree=args.tensor_parallel_degree,
                 sharding_degree=1,  # auto_parallel's sharding is not orthogonal with dp, mp and pp
@@ -552,7 +552,8 @@ def main():
     #     if training_args.bf16:
     #         dtype = "bfloat16"
 
-    model = model_class._from_config(config)
+    # The `amp` of static graph model can't accept a model initialized with `dtype float16 or bfloat16`
+    model = model_class._from_config(config, dtype="float32")
 
     if training_args.recompute:
 
@@ -599,9 +600,7 @@ def main():
     def loss_func(loss, outputs):
         return loss
 
-    total_train_batch_size_per_acc_step = (
-        training_args.per_device_train_batch_size * training_args.data_parallel_degree
-    )
+    total_train_batch_size_per_acc_step = training_args.per_device_train_batch_size * training_args.dataset_world_size
     total_train_batch_size = total_train_batch_size_per_acc_step * training_args.gradient_accumulation_steps
 
     print_config(training_args)

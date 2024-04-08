@@ -253,6 +253,7 @@ class TrainingArguments:
               enable_release_grads, reduce peak memory usage by releasing gradients after each iteration. The creation of gradients will be postponed until backward propagation of the next iteration.
               enable_overlap_p2p_comm, overlap p2p communication with computation.
               enable_clear_every_step_cache, clear every step cache for pipeline parallel.
+              disable_non_batch_p2p_comm, disable batched send/recv in pipeline parallel mode.
         sharding_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
             following config is support:
@@ -616,6 +617,7 @@ class TrainingArguments:
                 "enable_sharding_comm_overlap, fuse sharding stage 1 parallel gradient communication. \n"
                 "enable_overlap_p2p_comm, overlap p2p communication with computation. \n"
                 "enable_clear_every_step_cache, clear every step cache for pipeline parallel. \n"
+                "disable_batch_p2p_comm, disable batched send/recv in pipeline parallel mode. \n"
             )
         },
     )
@@ -993,6 +995,7 @@ class TrainingArguments:
                                 "enable_dp_comm_overlap",
                                 "enable_clear_every_step_cache",
                                 "enable_overlap_p2p_comm",
+                                "disable_batch_p2p_comm",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -1025,6 +1028,7 @@ class TrainingArguments:
                         "release_gradients": "enable_release_grads" in pipeline_parallel_config,
                         "overlap_p2p_comm": "enable_overlap_p2p_comm" in pipeline_parallel_config,
                         "clear_every_step_cache": "enable_clear_every_step_cache" in pipeline_parallel_config,
+                        "use_batch_p2p_comm": "disable_batch_p2p_comm" not in pipeline_parallel_config,
                     }
                     if dygraph_pp_configs["dp_comm_overlap"]:
                         raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
@@ -1194,28 +1198,36 @@ class TrainingArguments:
 
         elif self.enable_auto_parallel:
             self.tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
+            self.sep_parallel_degree = max(self.sep_parallel_degree, 1)
             self.pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
 
             assert (
                 world_size % (self.tensor_parallel_degree * self.pipeline_parallel_degree) == 0
             ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
 
-            self.data_parallel_degree = world_size // (self.tensor_parallel_degree * self.pipeline_parallel_degree)
-
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
-                    self.sharding_parallel_degree = self.data_parallel_degree
+                    self.sharding_parallel_degree = world_size // (
+                        self.tensor_parallel_degree * self.sep_parallel_degree * self.pipeline_parallel_degree
+                    )
 
             self.sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
             if self.sharding_parallel_degree == 1 and len(self.sharding) > 0:
                 logger.warning("sharding_parallel_degree=1 means no sharding, please set sharding to empty!")
                 self.sharding = []
 
+            self.data_parallel_degree = world_size // (
+                self.sharding_parallel_degree
+                * self.tensor_parallel_degree
+                * self.sep_parallel_degree
+                * self.pipeline_parallel_degree
+            )
+
             if ShardingOption.OFFLOAD in self.sharding:
                 warnings.warn("`offload` is not supported NOW!")
 
             strategy = fleet.auto.Strategy()
-            if self.data_parallel_degree > 1:
+            if self.dataset_world_size > 1:
                 data_parallel_config = set(self.data_parallel_config.split(" "))
                 for x in data_parallel_config:
                     if len(x) > 0:
@@ -1241,6 +1253,7 @@ class TrainingArguments:
                             # "enable_dp_comm_overlap",       # no implemenation for auto_parallel
                             # "enable_sharding_comm_overlap", # no implemenation for auto_parallel
                             # "enable_timer",                 # no implemenation for auto_parallel
+                            # "disable_batch_p2p_comm",       # no implemenation for auto_parallel
                         ]:
                             raise ValueError(
                                 f"Found unknown pipeline mode config {x}, accpet config is enable_send_recv_overlap."
@@ -1356,10 +1369,10 @@ class TrainingArguments:
             self.strategy = strategy
             if self.hybrid_parallel_topo_order == "pp_first":
                 order = ["pp", "dp", "mp"]
-                degree = [self.pipeline_parallel_degree, self.data_parallel_degree, self.tensor_parallel_degree]
+                degree = [self.pipeline_parallel_degree, self.dataset_world_size, self.tensor_parallel_degree]
             elif self.hybrid_parallel_topo_order == "sharding_first":
                 order = ["dp", "pp", "mp"]
-                degree = [self.data_parallel_degree, self.pipeline_parallel_degree, self.tensor_parallel_degree]
+                degree = [self.dataset_world_size, self.pipeline_parallel_degree, self.tensor_parallel_degree]
             mesh_dims = list(zip(order, degree))
             fleet.auto.create_mesh(mesh_dims)
 
@@ -1371,7 +1384,7 @@ class TrainingArguments:
 
             strategy = fleet.DistributedStrategy()
             strategy.hybrid_configs = {
-                "dp_degree": self.data_parallel_degree,
+                "dp_degree": self.dataset_world_size,
                 "mp_degree": self.tensor_parallel_degree,
                 "pp_degree": self.pipeline_parallel_degree,
                 "order": order,
@@ -1526,7 +1539,7 @@ class TrainingArguments:
         if self.use_hybrid_parallel:
             return max(self.sharding_parallel_degree, 1) * max(self.data_parallel_degree, 1)
         elif self.enable_auto_parallel:
-            return max(self.data_parallel_degree, 1)
+            return max(self.sharding_parallel_degree, 1) * max(self.data_parallel_degree, 1)
         else:
             return paddle.distributed.get_world_size()
 
