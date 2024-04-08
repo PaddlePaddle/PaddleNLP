@@ -1,0 +1,12 @@
+[{
+    "id": 0,
+    "model_json_path": "llama.json",
+    "model_name": "facebook/llama-65b",
+    "precision": "bf16",
+    "global_batch_size": 2048,
+    "speed_per_device": 380,
+    "num_gpus": 2048,
+    "device_type": "80G-A100",
+    "parallel_method": "unknown",
+    "from": "https://arxiv.org/pdf/2302.13971.pdf"
+}]

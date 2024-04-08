@@ -882,34 +882,64 @@ class Trainer:
             npu_accelerate_plugin(self.optimizer)
 
         self.timers and self.timers("read-data").start()
-
+        
         for epoch in range(epochs_trained, num_train_epochs):
-            if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
-                train_dataloader.batch_sampler, DistributedBatchSampler
-            ):
-                train_dataloader.batch_sampler.set_epoch(epoch)
+        #     if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
+        #         train_dataloader.batch_sampler, DistributedBatchSampler
+        #     ):
+        #         train_dataloader.batch_sampler.set_epoch(epoch)
 
             step_control = 0  # used in loop control, reset to 0 after every step
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
-            for step, inputs in enumerate(epoch_iterator):
+
+            # print("epoch_iterator", epoch_iterator)
+            input_data = paddle.randint(low=1000, high=2000, shape=[1, 2048], dtype='int64')
+            input_data = paddle.to_tensor(input_data)
+            label_data = paddle.randint(low=1000, high=2000, shape=[1, 2048], dtype='int64')
+            label_data = paddle.to_tensor(label_data)
+            inputs = {'input_ids': input_data, 'labels': label_data}
+            profile = True
+            # for step, inputs in enumerate(epoch_iterator):
+            for step in range(5):
+                # inputs = datas
+                # print("step", step)
+                # print("inputs", inputs)
+                
+                if profile:
+                    from .paperf import profile_paddle
+                    profile_paddle.switch_profile(step, 1, 5, enable_layerwise_event=True)
+                    profile_paddle.push_record_event("forward1")
+                # print("self.args.use_hybrid_parallel", self.args.use_hybrid_parallel)
+                # print("self.args.sep_parallel_degree", self.args.sep_parallel_degree)
                 if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim(inputs)
                 self.timers and self.timers("read-data").stop()
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
+                if profile:
+                    profile_paddle.pop_record_event()
+                    profile_paddle.push_record_event("forward2")
 
                 # Skip past any already trained steps if resuming training
                 # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
                 # We use consumed_samples to reset the status
+                # print("train_dataloader", train_dataloader)
+                # print("paddle.io.DataLoader", paddle.io.DataLoader)
+                # print("train_dataloader.batch_sampler", train_dataloader.batch_sampler)
+                # print("NlpDistributedBatchSampler", NlpDistributedBatchSampler)
                 if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
                     train_dataloader.batch_sampler, NlpDistributedBatchSampler
                 ):
+                    # print("Dataload load data")
+                    # print("steps_trained_in_current_epoch", steps_trained_in_current_epoch)
+                    # print("steps_trained_progress_bar", steps_trained_progress_bar)
                     if step == 0:
                         if steps_trained_progress_bar is not None:
                             steps_trained_progress_bar.update(steps_trained_in_current_epoch)
                             steps_trained_progress_bar.close()
                             steps_trained_progress_bar = None
+                        # print("resume_from_checkpoint", resume_from_checkpoint)
                         self._load_rng_state(resume_from_checkpoint)
                     step += steps_trained_in_current_epoch
                 elif steps_trained_in_current_epoch > 0:
@@ -960,14 +990,18 @@ class Trainer:
                         tr_loss_step = self.training_step(model, inputs)
                 else:
                     tr_loss_step = self.training_step(model, inputs)
-
+                
                 tr_loss += tr_loss_step
-
+                if profile:
+                    profile_paddle.pop_record_event()
                 if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
                     # last step in epoch but step is always smaller than gradient_accumulation_steps
                     steps_in_epoch <= args.gradient_accumulation_steps
                     and (step + 1) == steps_in_epoch
                 ):
+                    if profile:
+                        profile_paddle.push_record_event("forward3")
+
                     if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
                         tr_loss /= self.args.gradient_accumulation_steps
 
@@ -994,7 +1028,7 @@ class Trainer:
                     )
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
                     enable_release_grads = "enable_release_grads" in pipeline_parallel_config
-
+                    
                     # Case 3: Pipeline parallel mode, overlap with dp
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
                         parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
@@ -1006,7 +1040,9 @@ class Trainer:
 
                             if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
                                 fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
-
+                    if profile:
+                        profile_paddle.pop_record_event()
+                        profile_paddle.push_record_event("forward4")
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
 
@@ -1018,7 +1054,9 @@ class Trainer:
                                     p.main_grad.scale_(1.0 / self.args.gradient_accumulation_steps)
                                 elif p.grad is not None:
                                     p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
-
+                    if profile:
+                        profile_paddle.pop_record_event()
+                        profile_paddle.push_record_event("optimizer")
                     # Optimizer step
                     self.callback_handler.on_optimizer_begin(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
@@ -1044,6 +1082,7 @@ class Trainer:
                         self.optimizer._step(parameters_list)
                     else:
                         self.optimizer.step()
+                        
 
                     self.timers and self.timers("optimizer-step").stop()
 
@@ -1066,8 +1105,10 @@ class Trainer:
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
-                    self._print_timer()
+                    # self._print_timer()
                     step_control = 0
+                    if profile:
+                        profile_paddle.pop_record_event()
                 else:
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
                     step_control += 1
@@ -1737,6 +1778,7 @@ class Trainer:
 
         # Pipeline mode
         if in_pipeline_parallel_mode:
+            print("1"*200)
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
             # hack for pipeline model mini batch to batch
@@ -1787,6 +1829,7 @@ class Trainer:
 
         # No pipeline mode, sharding only
         if not in_pipeline_parallel_mode and in_sharding_parallel_mode:
+            print("2"*200)
             # Sharded DDP!
             if self.args.tensor_parallel_degree > 1:
                 hcg = fleet.get_hybrid_communicate_group()
@@ -1802,6 +1845,9 @@ class Trainer:
                 if self.args.amp_master_grad:
                     self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
                 self.optimizer = fleet.distributed_optimizer(self.optimizer)
+                # stage1 overlap 测试
+                print("self.optimizer", self.optimizer)
+                self.optimizer._set_broadcast_overlap(True, model)
             else:
                 cpu_offload = ShardingOption.OFFLOAD in self.args.sharding
                 assert self.optimizer is not None, "optimizer is empty!"
@@ -1835,6 +1881,7 @@ class Trainer:
                     offload=cpu_offload,
                     **extra_kwargs,
                 )
+
                 if ShardingOption.SHARD_GRAD_OP in self.args.sharding and self.args.amp_master_grad:
                     assert hasattr(optimizer, "use_main_grad"), (
                         "Current installed paddle doesn't support sharding stage 2 with main grad, "
@@ -1854,6 +1901,7 @@ class Trainer:
             and not in_sharding_parallel_mode
             and (in_tensor_parallel_mode or in_sep_parallel_mode)
         ):
+            print("3"*200)
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
 

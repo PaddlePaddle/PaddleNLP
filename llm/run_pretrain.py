@@ -593,4 +593,8 @@ def main():
 
 
 if __name__ == "__main__":
+    from paddle.base.reader import use_pinned_memory
+    use_pinned_memory(False)
+
+    print("==============use_pinned_memory(False)==============")
     main()
