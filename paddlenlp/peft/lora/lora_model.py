@@ -613,6 +613,10 @@ class LoRAModel(nn.Layer):
                         weight.stop_gradient = False
                     else:
                         weight.stop_gradient = True
+            elif self.lora_config.ln_trainable and "Norm" in type(layer).__name__:
+                for name, weight in layer.state_dict().items():
+                    logger.info(f"{layer} layer parameters trainable.")
+                    weight.stop_gradient = False
             else:
                 for name, weight in layer.state_dict().items():
                     if self.lora_config.trainable_bias == "all" and "bias" in name:

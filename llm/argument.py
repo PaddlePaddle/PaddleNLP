@@ -195,6 +195,7 @@ class ModelArgument:
         },
     )
     rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
+    ln_trainable: bool = field(default=False, metadata={"help": "Whether to train layernorm"})
     lora_plus_scale: float = field(default=1.0, metadata={"help": "Lora B scale in LoRA+ technique"})
 
     # prefix tuning related parameters

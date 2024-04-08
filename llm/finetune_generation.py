@@ -452,6 +452,7 @@ def main():
                 do_qat=quant_args.do_qat,
                 base_model_name_or_path=model_args.model_name_or_path,
                 use_quick_lora=model_args.use_quick_lora,
+                ln_trainable=model_args.ln_trainable,
             )
             model = LoRAModel(model, lora_config)
         else:
