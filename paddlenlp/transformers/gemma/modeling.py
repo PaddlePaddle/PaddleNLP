@@ -399,7 +399,7 @@ def rotate_half(x):
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
 
     if position_ids is None:
-        # Note: Only for LlamaForCausalLMPipe model pretraining
+        # Note: Only for ForCausalLMPipe model pretraining
         cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
         sin = sin[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
     else:
