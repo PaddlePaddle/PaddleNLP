@@ -446,6 +446,7 @@ def main():
                 lora_alpha=2 * model_args.lora_rank if not model_args.rslora else 4,
                 rslora=model_args.rslora,
                 lora_plus_scale=model_args.lora_plus_scale,
+                pissa=model_args.pissa,
                 merge_weights=False,
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 dtype=dtype,

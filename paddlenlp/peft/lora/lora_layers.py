@@ -47,6 +47,7 @@ class LoRALinear(nn.Linear):
         use_quick_lora: bool = False,
         rslora: bool = False,
         lora_plus_scale: float = 1.0,
+        pissa: bool = False,
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
@@ -79,9 +80,13 @@ class LoRALinear(nn.Linear):
                 learning_rate=lora_plus_scale,
             ),
         )
+        if pissa:
+            self.pissa_init(r)
 
-        if not rslora:
+        if not rslora and not pissa:
             self.scaling = self.lora_alpha / self.r
+        elif pissa:
+            self.scaling = 1.0
         else:
             self.scaling = self.lora_alpha / math.sqrt(self.r)
 
@@ -92,6 +97,25 @@ class LoRALinear(nn.Linear):
     @property
     def use_quick_lora(self):
         return self._use_quick_lora and self.training and not self.merged
+
+    def pissa_init(self, rank):
+        weight = self.weight
+        dtype = weight.dtype
+        if dtype != paddle.float32:
+            weight = weight.astype(paddle.float32)
+
+        U, S, Vh = paddle.linalg.svd(weight.data, full_matrices=False)
+        Ur = U[:, :rank]
+        Sr = S[:rank]
+        Vhr = Vh[:rank]
+
+        lora_A = paddle.diag(paddle.sqrt(Sr)) @ Vhr
+        lora_B = Ur @ paddle.diag(paddle.sqrt(Sr))
+        self.lora_A.data = lora_A
+        self.lora_B.data = lora_B
+        res = weight.data - lora_B @ lora_A
+        weight = res.astype(dtype)
+        self.weight.data = weight
 
     def train(self):
         super().train()
