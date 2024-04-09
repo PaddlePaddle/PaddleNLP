@@ -322,7 +322,7 @@ class TemplateIntegrationTest(unittest.TestCase):
             self.tokenizer.apply_chat_template([{"role": "system", "content": ""}])
 
     def test_round_error(self):
-        # error round, 1 is not a valid role
+        # error round, 1 is not a valid role.
         query = [["你好", "您好，我是个人人工智能助手"], ["今天吃啥"], ["你好", "您好"]]
         with self.assertRaises(ValueError):
             self.tokenizer.apply_chat_template(query, tokenize=False)
