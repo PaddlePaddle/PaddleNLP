@@ -544,6 +544,11 @@ def main():
         tokenizer,
         need_data=training_args.should_load_dataset,
     )
+    print("train_dataset", train_dataset)
+    print("eval_dataset", eval_dataset)
+    print("test_dataset", test_dataset)
+    print("data_collator", data_collator)
+
 
     total_effective_tokens = (
         training_args.per_device_train_batch_size
@@ -593,8 +598,8 @@ def main():
 
 
 if __name__ == "__main__":
-    from paddle.base.reader import use_pinned_memory
+    from paddle.io.reader import use_pinned_memory
     use_pinned_memory(False)
 
-    print("==============use_pinned_memory(False)==============")
+    # print("==============use_pinned_memory(False)==============")
     main()

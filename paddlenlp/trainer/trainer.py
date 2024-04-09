@@ -884,28 +884,30 @@ class Trainer:
         self.timers and self.timers("read-data").start()
         
         for epoch in range(epochs_trained, num_train_epochs):
-        #     if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
-        #         train_dataloader.batch_sampler, DistributedBatchSampler
-        #     ):
-        #         train_dataloader.batch_sampler.set_epoch(epoch)
+            if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
+                train_dataloader.batch_sampler, DistributedBatchSampler
+            ):
+                train_dataloader.batch_sampler.set_epoch(epoch)
 
             step_control = 0  # used in loop control, reset to 0 after every step
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
 
             # print("epoch_iterator", epoch_iterator)
-            input_data = paddle.randint(low=1000, high=2000, shape=[1, 2048], dtype='int64')
-            input_data = paddle.to_tensor(input_data)
-            label_data = paddle.randint(low=1000, high=2000, shape=[1, 2048], dtype='int64')
-            label_data = paddle.to_tensor(label_data)
-            inputs = {'input_ids': input_data, 'labels': label_data}
-            profile = True
-            # for step, inputs in enumerate(epoch_iterator):
-            for step in range(5):
+            # input_data = paddle.randint(low=1000, high=2000, shape=[1, 2048], dtype='int64')
+            # input_data = paddle.to_tensor(input_data)
+            # label_data = paddle.randint(low=1000, high=2000, shape=[1, 2048], dtype='int64')
+            # label_data = paddle.to_tensor(label_data)
+            # inputs = {'input_ids': input_data, 'labels': label_data}
+            # print("inputs", inputs)
+            profile = False
+            for step, inputs in enumerate(epoch_iterator):
+                # print("inputs.place.is_cuda_pinned_place()", inputs.place.is_cuda_pinned_place())
+                # print("inputs",inputs)
+            # for step in range(5):
                 # inputs = datas
                 # print("step", step)
                 # print("inputs", inputs)
-                
                 if profile:
                     from .paperf import profile_paddle
                     profile_paddle.switch_profile(step, 1, 5, enable_layerwise_event=True)
@@ -984,6 +986,7 @@ class Trainer:
                 if dp_master_grad:
                     is_no_sync = True
 
+                # print("is_no_sync", is_no_sync)
                 if is_no_sync:
                     # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
                     with model.no_sync():
@@ -1105,7 +1108,7 @@ class Trainer:
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
-                    # self._print_timer()
+                    self._print_timer()
                     step_control = 0
                     if profile:
                         profile_paddle.pop_record_event()
@@ -1283,6 +1286,7 @@ class Trainer:
         return loss.item()
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
+        # print("self.control", self.control)
         if self.control.should_log:
 
             logs: Dict[str, float] = {}
@@ -1918,12 +1922,16 @@ class Trainer:
         Prepares one `data` before feeding it to the model, be it a tensor or a nested list/dictionary of tensors.
         """
         if isinstance(data, Mapping):
+            # print("1"*10)
             return type(data)({k: self._prepare_input(v) for k, v in data.items()})
         elif isinstance(data, (tuple, list)):
+            # print("2"*10)
             return type(data)(self._prepare_input(v) for v in data)
         elif isinstance(data, paddle.Tensor):
+            # print("3"*10)
             # kwargs = dict(device=self.args.current_device)
             # update data type for pure fp16
+            # print("data.place.is_cuda_pinned_place()", data.place.is_cuda_pinned_place())
             if data.place.is_cuda_pinned_place():
                 return data.cuda()
             return data

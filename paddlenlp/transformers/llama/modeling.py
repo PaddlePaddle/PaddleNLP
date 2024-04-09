@@ -341,7 +341,7 @@ def is_casual_mask(attention_mask):
     """
     Upper triangular of attention_mask equals to attention_mask is casual
     """
-    return (paddle.triu(attention_mask) == attention_mask).all().item()
+    return sum((paddle.triu(attention_mask) == attention_mask).all()) > 0
 
 
 def _make_causal_mask(input_ids_shape, past_key_values_length):
@@ -1450,6 +1450,8 @@ class LlamaModel(LlamaPretrainedModel):
         return_dict=False,
         **kwargs,
     ):
+        # from paddlenlp.trainer.paperf import profile_paddle
+        # profile_paddle.push_record_event("llama_mode_forward1")
         if self.sequence_parallel and use_cache:
             raise ValueError("We currently only support sequence parallel without cache.")
 
@@ -1475,7 +1477,8 @@ class LlamaModel(LlamaPretrainedModel):
             past_key_values = tuple([None] * len(self.layers))
         # NOTE: to make cache can be clear in-time
         past_key_values = list(past_key_values)
-
+        # profile_paddle.pop_record_event()
+        # profile_paddle.push_record_event("llama_mode_forward2")
         seq_length_with_past = seq_length
         cache_length = 0
         if past_key_values[0] is not None:
@@ -1483,7 +1486,8 @@ class LlamaModel(LlamaPretrainedModel):
             seq_length_with_past += cache_length
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
-
+        # profile_paddle.pop_record_event()
+        # profile_paddle.push_record_event("llama_mode_forward3")
         if self.sequence_parallel:
             # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
             bs, seq_len, hidden_size = inputs_embeds.shape
@@ -1518,24 +1522,33 @@ class LlamaModel(LlamaPretrainedModel):
                 alibi = alibi.reshape([batch_size * self.config.num_attention_heads, 1, seq_length_with_past])
         else:
             alibi = None
-
+        # profile_paddle.pop_record_event()
+        # profile_paddle.push_record_event("llama_mode_forward4")
         if position_ids is None:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
-
+        # profile_paddle.pop_record_event()
+        # profile_paddle.push_record_event("llama_mode_forward5")
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
+        # profile_paddle.pop_record_event()
         if self.config.use_flash_attention:
+            # profile_paddle.push_record_event("llama_mode_forward8")
             is_casual = is_casual_mask(attention_mask)
+            # profile_paddle.pop_record_event()
             if is_casual and alibi is None:
                 attention_mask = None
+       
+        # profile_paddle.push_record_event("llama_mode_forward9")
         hidden_states = inputs_embeds
-
+        # profile_paddle.pop_record_event()
+        # profile_paddle.push_record_event("llama_mode_forward10")
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
-
+        # profile_paddle.pop_record_event()
+        # profile_paddle.push_record_event("llama_mode_forward6")
         for idx, (decoder_layer) in enumerate(self.layers):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
@@ -1581,7 +1594,8 @@ class LlamaModel(LlamaPretrainedModel):
 
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
-
+        # profile_paddle.pop_record_event()
+        # profile_paddle.push_record_event("llama_mode_forward7")
         hidden_states = self.norm(hidden_states)
 
         # add hidden states from the last decoder layer
@@ -1589,6 +1603,8 @@ class LlamaModel(LlamaPretrainedModel):
             all_hidden_states += (hidden_states,)
 
         next_cache = next_decoder_cache if use_cache else None
+
+    # profile_paddle.pop_record_event()
 
         if not return_dict:
             return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None)
