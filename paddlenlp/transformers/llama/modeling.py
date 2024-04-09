@@ -1550,7 +1550,7 @@ class LlamaModel(LlamaPretrainedModel):
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
         if self.config.use_flash_attention:
-            if get_env_device != "npu":
+            if get_env_device() != "npu":
                 is_casual = is_casual_mask(attention_mask)
                 if is_casual and alibi is None:
                     attention_mask = None
