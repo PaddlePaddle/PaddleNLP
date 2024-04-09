@@ -40,9 +40,6 @@ import paddle.distributed as dist
 import paddle.nn as nn
 from packaging import version
 from paddle.distributed import fleet
-from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
-    DygraphShardingOptimizer,
-)
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
     HybridParallelOptimizer,
 )
@@ -416,9 +413,9 @@ class Trainer:
             self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
             if self.amp_dtype == "float16" or self.amp_dtype == "bfloat16":
                 if ShardingOption.SHARD_OP in self.args.sharding:
-                    self.scaler = fleet.distributed_scaler(self.scaler)
                     if self.args.amp_master_grad:
                         mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
+                    self.scaler = fleet.distributed_scaler(self.scaler)
                 else:
                     # scaler for stage2 and stage3
                     from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
@@ -1538,38 +1535,14 @@ class Trainer:
             if hasattr(optimizer_cls, "_create_master_weight") and self.args.fp16_opt_level == "O2":
                 optimizer_kwargs["multi_precision"] = True
 
-            def is_new_version_sharding_stage1_optimizer():
-                signature_keys = set(inspect.signature(DygraphShardingOptimizer).parameters.keys())
-                return "inner_optimizer_class" not in signature_keys
-
-            if ShardingOption.SHARD_OP in self.args.sharding and not is_new_version_sharding_stage1_optimizer():
-                # for backward compatibility.
-                # this call will raise, if sharding stage1 is supported in HybridParallelOptimizer,
-                # in which case, the logic follows will handle it
-                self.optimizer = DygraphShardingOptimizer(
-                    hcg=fleet.get_hybrid_communicate_group(),
-                    user_defined_strategy=None,
-                    params=params,
-                    inner_optimizer_class=optimizer_cls,
-                    learning_rate=self.lr_scheduler if lr_scheduler is None else lr_scheduler,
-                    apply_decay_param_fun=apply_decay_param_fun,
-                    weight_decay=self.args.weight_decay,
-                    grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm)
-                    if self.args.max_grad_norm > 0
-                    else None,
-                    **optimizer_kwargs,
-                )
-            else:
-                self.optimizer = optimizer_cls(
-                    learning_rate=self.lr_scheduler if lr_scheduler is None else lr_scheduler,
-                    apply_decay_param_fun=apply_decay_param_fun,
-                    parameters=params,
-                    weight_decay=self.args.weight_decay,
-                    grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm)
-                    if self.args.max_grad_norm > 0
-                    else None,
-                    **optimizer_kwargs,
-                )
+            self.optimizer = optimizer_cls(
+                learning_rate=self.lr_scheduler if lr_scheduler is None else lr_scheduler,
+                apply_decay_param_fun=apply_decay_param_fun,
+                parameters=params,
+                weight_decay=self.args.weight_decay,
+                grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm) if self.args.max_grad_norm > 0 else None,
+                **optimizer_kwargs,
+            )
 
         return self.optimizer
 
@@ -2119,6 +2092,11 @@ class Trainer:
             # recover unified_checkpoint_config for not trine stage
             if not self.is_in_train:
                 self.args.unified_checkpoint_config = unified_checkpoint_config_backup
+        if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
+            # save checkpoint_done file to ensure checkpoint is complete
+            if self.args.should_save_model_state and self.args.should_save:
+                # For ckpt integrity
+                paddle.save(self.state.global_step, os.path.join(output_dir, ".checkpoint_done"))
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
