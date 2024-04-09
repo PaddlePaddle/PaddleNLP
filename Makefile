@@ -35,6 +35,7 @@ lint:
 test: unit-test
 
 unit-test:
+	export HF_ENDPOINT=https://hf-mirror.com
 	PYTHONPATH=$(shell pwd) pytest -v \
 		-n auto \
 		--durations 20 \
