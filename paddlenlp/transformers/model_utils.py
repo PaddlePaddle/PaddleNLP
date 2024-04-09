@@ -1877,11 +1877,21 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     assert loaded_keys is not None, "loaded_keys is not None."
                     tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
                 # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
+                filter_dict_keys = set(expected_keys)
+                if (
+                    config.quantization_config.is_weight_quantize()
+                    or config.fuse_attention_qkv
+                    or config.fuse_attention_ffn
+                ):
+                    filter_dict_keys = None
+
                 state_dict = load_state_dict(
-                    shard_file,
-                    tp_actions if pre_tensor_parallel_split else None,
-                    None if config.quantization_config.is_weight_quantize() else set(expected_keys),
+                    shard_file, tp_actions if pre_tensor_parallel_split else None, filter_dict_keys
                 )
+
+                if config.fuse_attention_qkv or config.fuse_attention_ffn:
+                    state_dict = cls.convert_fuse_and_split(config, state_dict, tp_actions)
+
                 if config.quantization_config.is_weight_quantize():
                     state_dict = convert_to_quantize_state_dict(
                         state_dict,
@@ -2173,6 +2183,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     # cache_dir=os.path.join(cache_dir, pretrained_model_name_or_path, subfolder),
                     cache_dir=convert_dir,
                 )
+                state_dict = cls.convert_fuse_and_split(config, state_dict)
             elif (
                 resolved_archive_file.endswith(PADDLE_WEIGHTS_NAME)
                 or resolved_archive_file.endswith(PADDLE_WEIGHTS_INDEX_NAME)
@@ -2187,6 +2198,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # 4. loading non-sharded ckpt from the state dict
             if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
                 state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
+                tp_actions = cls.get_tensor_parallel_convert_actions(config, state_dict.keys())
+                state_dict = cls.convert_fuse_and_split(config, state_dict, tp_actions)
             elif config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model.safetensors"):
                 with safe_open(resolved_archive_file, framework="np", device="cpu") as f:
                     loaded_keys = f.keys()

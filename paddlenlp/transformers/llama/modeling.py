@@ -1198,13 +1198,11 @@ class LlamaPretrainedModel(PretrainedModel):
                 [f"layers.{layer_index}.self_attn.q_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.k_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.v_proj.weight", None, "transpose"],
-                [f"layers.{layer_index}.self_attn.qkv_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.o_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.rotary_emb.inv_freq"],
                 [f"layers.{layer_index}.mlp.gate_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.mlp.down_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.mlp.up_proj.weight", None, "transpose"],
-                [f"layers.{layer_index}.mlp.gate_up_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.input_layernorm.weight"],
                 [f"layers.{layer_index}.post_attention_layernorm.weight"],
             ]
@@ -1248,7 +1246,7 @@ class LlamaPretrainedModel(PretrainedModel):
                 base_actions.pop("lm_head.weight")
                 base_actions.pop("embed_tokens.weight")
             # Column Linear
-            if config.fuse_attention_qkv:  # notice: config content here is not descriptive but commanding
+            if config.fuse_attention_qkv:
                 base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
             else:
                 base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
@@ -1293,17 +1291,21 @@ class LlamaPretrainedModel(PretrainedModel):
         )
 
         fuse_gate_up_keys = (
-            "llama.layers.0.mlp.gate_proj.weight",
-            "llama.layers.0.mlp.up_proj.weight",
-            "llama.layers.0.mlp.gate_up_proj.weight",
+            "layers.0.mlp.gate_proj.weight",
+            "layers.0.mlp.up_proj.weight",
+            "layers.0.mlp.gate_up_fused_proj.weight",
         )
+        num_heads = config.num_attention_heads
+        num_key_value_heads = getattr(config, "num_key_value_heads", num_heads)
 
         final_actions = {}
         if is_fuse:
             if config.fuse_attention_qkv:
                 for i in range(config.num_hidden_layers):
                     keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
-                    final_actions[keys] = fn
+                    final_actions[keys] = partial(
+                        fn, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                    )
             if config.fuse_attention_ffn:
                 for i in range(config.num_hidden_layers):
                     keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
@@ -1312,7 +1314,9 @@ class LlamaPretrainedModel(PretrainedModel):
             if not config.fuse_attention_qkv:
                 for i in range(config.num_hidden_layers):
                     keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
-                    final_actions[keys] = partial(fn, split_nums=3)
+                    final_actions[keys] = partial(
+                        fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                    )
             if not config.fuse_attention_ffn:
                 for i in range(config.num_hidden_layers):
                     keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
