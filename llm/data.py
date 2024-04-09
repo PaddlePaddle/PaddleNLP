@@ -58,36 +58,42 @@ class DataFormatError(ValueError):
 
 def tokenize_example(tokenizer, example, data_args):
     if "src" in example and "tgt" in example:
-        source = example["src"][0] if isinstance(example["src"], list) else example["src"]
-        target = example["tgt"][0] if isinstance(example["tgt"], list) else example["tgt"]
+        sources = example["src"] if isinstance(example["src"], list) else [example["src"]]
+        targets = example["tgt"] if isinstance(example["tgt"], list) else [example["tgt"]]
     else:
         raise DataFormatError(
             f"Example format is wrong, please check: {example} or rewrite tokenize_example in data.py "
         )
-    tokenized_source = tokenizer(
-        source,
-        max_length=data_args.src_length,
-        truncation=True,
-        truncation_side="left",
-        add_special_tokens=True,
-    )
+    source_input_ids, target_input_ids = [], []
+    for index, source in enumerate(sources):
+        target = targets[index]
+        tokenized_source_ids = tokenizer(
+            source,
+            max_length=data_args.src_length,
+            truncation=True,
+            truncation_side="left",
+            add_special_tokens=index == 0,
+        )["input_ids"]
 
-    tgt_max_length = data_args.max_length - len(tokenized_source["input_ids"])
-    tokenized_target = tokenizer(
-        target,
-        max_length=tgt_max_length,
-        truncation=True,
-        truncation_side="right",
-        add_special_tokens=False,
-    )
+        tgt_max_length = data_args.max_length - len(tokenized_source_ids)
+        tokenized_target_ids = tokenizer(
+            target,
+            max_length=tgt_max_length,
+            truncation=True,
+            truncation_side="right",
+            add_special_tokens=index == 0 and not source,
+        )["input_ids"]
 
-    tokenized_target_input_ids = tokenized_target["input_ids"]
-    # Add eos_token_id at the end of sequence if the sentence is not truncated.
-    # Attention! In some cases(ex. ChatGLMv2), tokenized eos_token is not equal to eos_token_id.
-    if len(tokenized_target_input_ids) < tgt_max_length:
-        tokenized_target_input_ids += [tokenizer.eos_token_id]
+        if len(tokenized_source_ids) + len(tokenized_target_ids) > data_args.max_length:
+            break
 
-    return tokenized_source, tokenized_target_input_ids
+        source_input_ids += tokenized_source_ids
+        target_input_ids += [-100] * len(tokenized_source_ids)
+
+        source_input_ids += tokenized_target_ids
+        target_input_ids += tokenized_target_ids
+
+    return {"input_ids": source_input_ids}, target_input_ids
 
 
 def tokenize_rounds_example(tokenizer, example, data_args):
@@ -107,7 +113,7 @@ def tokenize_rounds_example(tokenizer, example, data_args):
     # 0. prepare data
     context_data = example.get("context", {})
     context_data["is_training"] = True
-    
+
     example["src"] = example["src"] if isinstance(example["src"], list) else [example["src"]]
     example["tgt"] = example["tgt"] if isinstance(example["tgt"], list) else [example["tgt"]]
 
@@ -169,14 +175,14 @@ def convert_example_common(example, tokenizer, data_args, is_test=True, intokens
 
     tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
     if is_test:
+        # TODO(wj-Mcat): to disbale multi-turns testing
         return {
             **tokenized_source,
             "labels": tokenized_target_input_ids,
         }
     else:
-        input_ids = tokenized_source["input_ids"] + tokenized_target_input_ids
-        source_length = len(tokenized_source["input_ids"])
-        labels = [-100] * source_length + input_ids[source_length:]
+        input_ids = tokenized_source["input_ids"]
+        labels = tokenized_target_input_ids
         # shift input_ids and labels
         input_ids, labels = input_ids[:-1], labels[1:]
         seq_length = len(input_ids)

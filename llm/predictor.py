@@ -48,8 +48,8 @@ from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
-    ChatGLMv2Tokenizer,
     ChatGLMTokenizer,
+    ChatGLMv2Tokenizer,
     LlamaTokenizer,
     PretrainedModel,
     PretrainedTokenizer,
@@ -162,6 +162,32 @@ def batchfy_text(texts, batch_size):
     return batch_texts
 
 
+from pydantic import BaseModel, Field
+
+
+class AnswerFormat(BaseModel):
+    start_location: str = Field(description="出发地")
+    end_location: str = Field(description="目的地")
+    time: str = Field(description="时间")
+
+
+from lmformatenforcer import JsonSchemaParser
+
+from paddlenlp.generation.format_enforce import build_prefix_allowed_tokens_fn
+from paddlenlp.generation.logits_process import (
+    LogitsProcessorList,
+    PrefixConstrainedLogitsProcessor,
+)
+
+
+def get_logits_processors(tokenizer):
+    parser = JsonSchemaParser(AnswerFormat.model_json_schema())
+    prefix_function = build_prefix_allowed_tokens_fn(tokenizer, parser)
+
+    logits_processors = LogitsProcessorList([PrefixConstrainedLogitsProcessor(prefix_function, num_beams=1)])
+    return logits_processors
+
+
 def init_dist_env():
     tensor_parallel_degree = paddle.distributed.get_world_size()
     tensor_parallel_rank = paddle.distributed.get_rank()
@@ -241,7 +267,8 @@ class BasePredictor:
             padding=True,
             # when use chat_template, it should not add special tokens
             # chatglm2 prefix-tokens can not be tokenized into ids
-            add_special_tokens=self.tokenizer.chat_template is None or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
+            add_special_tokens=self.tokenizer.chat_template is None
+            or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
         )
         return tokenized_source
 
@@ -303,19 +330,68 @@ class DygraphPredictor(BasePredictor):
         self.model.eval()
 
     @paddle.no_grad()
+    def _infer_steps(self, inputs: dict[str, paddle.Tensor]):
+        from paddlenlp.experimental.transformers.generation_utils import Choices, Json
+
+        steps = [
+            # f'我想预定一个今天从深圳到北京的飞机，回复内容需要按照这个 json schema 格式进行解码：{str(AnswerFormat.schema())} :\n',
+            "我想预定一个今天从深圳到北京的飞机:\n",
+            Json(schema=AnswerFormat.model_json_schema(), tokenizer=self.tokenizer),
+            "\n\n\n\n对以上结果满意吗? 请回答:[满意, 不满意]\n 答案:",
+            Choices(["满意", "不满意"], tokenizer=self.tokenizer),
+        ]
+        from datetime import datetime
+
+        from tqdm import trange
+
+        from paddlenlp.experimental.transformers.generation_utils import steps_generate
+
+        count = 0
+        for i in trange(100):
+            if i == 20:
+                start_time = datetime.now()
+            result_ids = steps_generate(self.model, self.tokenizer, steps)
+            if i >= 20:
+                count += result_ids.shape[1]
+        seconds = (datetime.now() - start_time).seconds
+        ips = count / seconds
+        print("final ips ->", ips)
+        return ips
+
+    @paddle.no_grad()
     def _infer(self, inputs: dict[str, paddle.Tensor]):
-        result = self.model.generate(
-            **inputs,
-            max_new_tokens=self.config.max_length,
-            bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
-            pad_token_id=self.tokenizer.pad_token_id,
-            decode_strategy=self.config.decode_strategy,
-            temperature=self.config.temperature,
-            top_k=self.config.top_k,
-            top_p=self.config.top_p,
-            repetition_penalty=self.config.repetition_penalty,
-        )
+        from datetime import datetime
+
+        from tqdm import trange
+
+        count = 0
+        for i in trange(100):
+            if i == 20:
+                start_time = datetime.now()
+            result = self.model.generate(
+                **inputs,
+                max_new_tokens=self.config.max_length,
+                bos_token_id=self.tokenizer.bos_token_id,
+                eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
+                pad_token_id=self.tokenizer.pad_token_id,
+                decode_strategy=self.config.decode_strategy,
+                temperature=self.config.temperature,
+                top_k=self.config.top_k,
+                top_p=self.config.top_p,
+                repetition_penalty=self.config.repetition_penalty,
+                max_length=100,
+                # logits_processors=get_logits_processors(self.tokenizer)
+            )[0]
+            if i >= 20:
+                # print("result ->", result)
+                # sentence = self.tokenizer.decode(result.tolist()[0])
+                # print("sentence ->", sentence)
+                count += result.shape[1]
+        seconds = (datetime.now() - start_time).seconds
+        ips = count / seconds
+        print("final ips ->", ips)
+        return result
+
         result = result[0]
         return result
 
@@ -716,9 +792,23 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
                 inputs[key] = paddle.to_tensor(inputs[key])
 
         inputs["cache_kvs"] = self.cache_kvs
-        self.model.generate(
-            **inputs,
-        )
+
+        from paddlenlp.experimental.transformers.generation_utils import Choices
+
+        steps = [
+            # JsonSchemaParser(schema=schema),
+            JsonSchemaParser(schema={}),
+            "\n\n\n\n对以上结果满意吗? 请回答:[满意, 不满意]\n 答案:",
+            Choices(["满意", "不满意"], tokenizer=self.tokenizer),
+        ]
+        from paddlenlp.experimental.transformers.generation_utils import steps_generate
+
+        result = steps_generate(self.model, self.tokenizer, steps, inputs)
+        return result
+        # self.model.generate(
+        #     **inputs,
+        #     logits_processors=get_logits_processors(self.tokenizer)
+        # )
         return None
 
 
@@ -981,9 +1071,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor
 
     @paddle.no_grad()
     def _infer(self, inputs: dict[str, paddle.Tensor]):
-        self.model.generate(
-            **inputs,
-        )
+        self.model.generate(**inputs, logits_processors=get_logits_processors(self.tokenizer))
 
     @paddle.no_grad()
     def predict(self, input_texts: str | list[str]):
@@ -1226,6 +1314,7 @@ def create_predictor(
         predictor_args.temperature = 1.0
 
     tensor_parallel_rank, tensor_parallel_degree = init_dist_env()
+    print("predictor_args ->", predictor_args)
     if not predictor_args.inference_model:
         tokenizer.padding_side = "left"
         if predictor_args.mode == "dynamic":
@@ -1544,13 +1633,25 @@ def predict():
         source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
         target_texts = ["", ""]
 
+    source_texts = [f"我想预定一个今天从深圳到北京的飞机，回复内容需要按照这个 json schema 格式进行解码：{str(AnswerFormat.schema())} :\n"] * 200
+    target_texts = [""] * 200
+
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
 
+    from datetime import datetime
+
+    start_time = datetime.now()
     with open(model_args.output_file, "w", encoding="utf-8") as f:
+        count = 0
         for bs, batch_source_text in enumerate(batch_source_texts):
+            count += 1
+            if count == 20:
+                start_time = datetime.now()
             logger.info("Start predict")
             outputs = predictor.predict(batch_source_text)
+
+            break
             logger.info("End predict")
 
             if predictor.tensor_parallel_rank > 0:
@@ -1565,6 +1666,8 @@ def predict():
                 out = {"src": source, "tgt": target, "output": output}
                 f.write(json.dumps(out, ensure_ascii=False) + "\n")
 
+    end_time = datetime.now()
+    print("seconds ->", (end_time - start_time).seconds)
     if predictor_args.benchmark:
         benchmark(predictor, predictor_args, model_args)
 

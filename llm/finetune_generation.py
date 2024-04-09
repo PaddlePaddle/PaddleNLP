@@ -600,7 +600,14 @@ def main():
 
     # Evaluation dev set
     if training_args.do_eval:
-        eval_result = trainer.evaluate(dev_ds)
+        import pdb
+
+        from qwen.react import eval_function_call
+
+        pdb.set_trace()
+        file_path = os.path.join(data_args.dataset_name_or_path, "dev.json")
+        eval_result = eval_function_call(trainer.model, file_path)
+        # eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("eval", eval_result)
 
     # Evaluation test set

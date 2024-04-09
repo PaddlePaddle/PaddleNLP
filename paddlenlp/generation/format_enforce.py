@@ -23,6 +23,7 @@ from lmformatenforcer import (
     TokenEnforcer,
     TokenEnforcerTokenizerData,
 )
+from lmformatenforcer.consts import WHITESPACE_CHARACTERS
 
 from paddlenlp.generation.logits_process import (
     LogitsWarper,
@@ -102,7 +103,8 @@ class TransformersPrefixAllowedTokensFn:
 
     def __call__(self, batch_id: int, sent: paddle.Tensor) -> List[int]:
         token_sequence = sent.tolist()
-        return self.token_enforcer.get_allowed_tokens(token_sequence)
+        allowed_tokens = self.token_enforcer.get_allowed_tokens(token_sequence)
+        return allowed_tokens
 
 
 def build_prefix_allowed_tokens_fn(
@@ -157,6 +159,45 @@ def generate_enforced(
         output = model.generate(**kwargs, prefix_allowed_tokens_fn=transformers_filter_allowed_tokens)
 
     return output
+
+
+class NumberParser(CharacterLevelParser):
+    def __init__(
+        self,
+        allow_floating_point: bool,
+    ):
+        self.allow_floating_point = allow_floating_point
+        self.seen_decimal_point = False
+        self.seen_whitespace_after_digits = False
+
+    def add_character(self, new_character: str) -> CharacterLevelParser:
+        if not self.parsed_string and new_character in WHITESPACE_CHARACTERS:
+            return self
+        from typing import cast
+
+        self = cast(NumberParser, super().add_character(new_character))
+        if new_character in WHITESPACE_CHARACTERS:
+            if self.parsed_string:
+                self.seen_whitespace_after_digits = True
+            return self
+        if new_character == ".":
+            self.seen_decimal_point = True
+        return self
+
+    def get_allowed_characters(self) -> str:
+        if self.seen_whitespace_after_digits:
+            return WHITESPACE_CHARACTERS
+        allowed_characters = "0123456789"
+        if not self.parsed_string:
+            allowed_characters += "-" + WHITESPACE_CHARACTERS
+        if self.allow_floating_point and not self.seen_decimal_point:
+            allowed_characters += "."
+        if self.parsed_string and self.parsed_string[-1].isdigit():
+            allowed_characters += WHITESPACE_CHARACTERS
+        return allowed_characters
+
+    def can_end(self) -> bool:
+        return bool(self.parsed_string) and (self.parsed_string[-1].isdigit() or self.seen_whitespace_after_digits)
 
 
 __all__ = ["build_prefix_allowed_tokens_fn", "generate_enforced", "build_token_enforcer_tokenizer_data"]
