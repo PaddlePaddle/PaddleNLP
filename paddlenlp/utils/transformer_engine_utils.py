@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from contextlib import contextmanager
+from contextlib import nullcontext
 
 import paddle
 from paddle.distributed import fleet
@@ -95,15 +95,13 @@ class TransformerEngineHelper:
         return dp_group
 
     @staticmethod
-    @contextmanager
     def fp8_autocast(enabled=False, fp8_group=None):
-        if TransformerEngineHelper.is_installed():
-            fp8_format = Format.HYBRID  # E4M3 during forward pass, E5M2 during backward pass
-            fp8_recipe = DelayedScaling(fp8_format=fp8_format, amax_history_len=1, amax_compute_algo="most_recent")
-            with te.fp8_autocast(enabled=enabled, fp8_group=fp8_group, fp8_recipe=fp8_recipe):
-                yield
-        else:  # null context
-            yield
+        if not TransformerEngineHelper.is_installed():
+            return nullcontext()
+
+        fp8_format = Format.HYBRID  # E4M3 during forward pass, E5M2 during backward pass
+        fp8_recipe = DelayedScaling(fp8_format=fp8_format, amax_history_len=1, amax_compute_algo="most_recent")
+        return te.fp8_autocast(enabled=enabled, fp8_group=fp8_group, fp8_recipe=fp8_recipe)
 
     @staticmethod
     def te_init_weights(layer, config):
