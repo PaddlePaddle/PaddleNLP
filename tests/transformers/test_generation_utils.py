@@ -74,6 +74,10 @@ class GenerationTesterMixin:
         max_batch_size = 2
         sequence_length = input_ids.shape[-1] // 2
         input_ids = input_ids[:max_batch_size, :sequence_length]
+        # For test_sample_generate such as: NVIDIA_TF32_OVERRIDE=0 FLAGS_cudnn_deterministic=1 python3.10 -m pytest -svv tests/transformers/bloom/test_modeling.py::BloomModelTest_0::test_sample_generate
+        # There are serious memory bug for this tensor slice. which use the original tensor mem ptr for cold start
+        # Here we just clone the tensor to avoid this problem.
+        input_ids = input_ids.clone()
         attention_mask = attention_mask[:max_batch_size, :sequence_length].unsqueeze([1, 2])
 
         attention_mask = attention_mask * attention_mask.transpose([0, 1, 3, 2])
@@ -270,6 +274,7 @@ class GenerationTesterMixin:
         logits_warper,
         process_kwargs,
     ):
+
         with paddle.no_grad():
             output_generate = model.generate(
                 input_ids,
@@ -440,9 +445,9 @@ class GenerationTesterMixin:
             self.assertListEqual(output_greedy[0].tolist(), output_generate[0].tolist())
 
     def test_sample_generate(self):
-
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
+            input_ids = input_ids.clone()
             paddle.seed(124)
             model = self._make_model_instance(config, model_class)
             model.eval()
@@ -1122,6 +1127,24 @@ class GenerationUtilsTestCase(unittest.TestCase):
             generation_config=GenerationConfig(max_new_tokens=20, eos_token_id=[124, 635]),
         )[0].tolist()[0]
         self.assertEqual(decoded_ids, [520, 8, 9, 59, 124])
+
+
+class TinyRandomGenerationTest(unittest.TestCase):
+    def test_generation_config_min_new_tokens_warning(self):
+
+        with self.assertLogs("PaddleNLP", level="WARNING") as log_info:
+            GenerationConfig(min_new_token=10)
+            self.assertTrue(any(["<min_new_token> field is deprecated." in item for item in log_info.output]))
+
+    def test_min_new_tokens(self):
+        article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
+
+        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/micro-random-llama")
+        model = AutoModelForCausalLM.from_pretrained("__internal_testing__/micro-random-llama")
+        input_ids = paddle.to_tensor(tokenizer(article)["input_ids"]).unsqueeze([0])
+        attention_mask = paddle.ones_like(input_ids)
+        result = model.generate(input_ids, attention_mask=attention_mask, min_new_tokens=10)[0]
+        self.assertGreater(result.shape[1], 10)
 
 
 # TODO (wj-Mcat: enable the unit test after fix)
