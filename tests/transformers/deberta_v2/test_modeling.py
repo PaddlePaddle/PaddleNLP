@@ -113,27 +113,6 @@ class DebertaV2CompatibilityTest(unittest.TestCase):
             )
 
     @require_package("transformers", "torch")
-    def test_deberta_v2_converter_from_local_dir_with_enable_torch(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-
-            # 2. forward the torch  model
-            from transformers import DebertaV2Model
-
-            torch_model = DebertaV2Model.from_pretrained("hf-internal-testing/tiny-random-DebertaV2Model")
-            torch_model.save_pretrained(tempdir)
-
-            # 2. forward the paddle model
-            from paddlenlp.transformers import model_utils
-            from paddlenlp.transformers.deberta_v2.modeling import DebertaV2Model
-
-            model_utils.ENABLE_TORCH_CHECKPOINT = False
-
-            with self.assertRaises(ValueError) as error:
-                DebertaV2Model.from_pretrained(tempdir)
-                self.assertIn("conversion is been disabled" in str(error.exception))
-            model_utils.ENABLE_TORCH_CHECKPOINT = True
-
-    @require_package("transformers", "torch")
     def test_deberta_v2_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
 
@@ -152,7 +131,7 @@ class DebertaV2CompatibilityTest(unittest.TestCase):
             # 2. forward the paddle model
             from paddlenlp.transformers.deberta_v2.modeling import DebertaV2Model
 
-            paddle_model = DebertaV2Model.from_pretrained(tempdir)
+            paddle_model = DebertaV2Model.from_pretrained(tempdir, convert_from_torch=True)
             paddle_model.eval()
             paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
 

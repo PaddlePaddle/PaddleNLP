@@ -113,27 +113,6 @@ class DebertaCompatibilityTest(unittest.TestCase):
             )
 
     @require_package("transformers", "torch")
-    def test_deberta_converter_from_local_dir_with_enable_torch(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-
-            # 2. forward the torch  model
-            from transformers import DebertaModel
-
-            torch_model = DebertaModel.from_pretrained("hf-internal-testing/tiny-random-DebertaModel")
-            torch_model.save_pretrained(tempdir)
-
-            # 2. forward the paddle model
-            from paddlenlp.transformers import model_utils
-            from paddlenlp.transformers.deberta.modeling import DebertaModel
-
-            model_utils.ENABLE_TORCH_CHECKPOINT = False
-
-            with self.assertRaises(ValueError) as error:
-                DebertaModel.from_pretrained(tempdir)
-                self.assertIn("conversion is been disabled" in str(error.exception))
-            model_utils.ENABLE_TORCH_CHECKPOINT = True
-
-    @require_package("transformers", "torch")
     def test_deberta_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
 

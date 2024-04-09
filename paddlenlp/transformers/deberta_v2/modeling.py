@@ -765,9 +765,13 @@ class DebertaV2PreTrainedModel(PretrainedModel):
                 ],
             ]
             model_mappings.extend(layer_mappings)
-        for mapping in model_mappings:
-            mapping[0] = "deberta." + mapping[0]
-            mapping[1] = "deberta." + mapping[1]
+        # adapt for hf-tiny-model-private/tiny-random-DebertaV2Model
+        if config.architectures is not None and "DebertaV2Model" in config.architectures:
+            pass
+        else:
+            for mapping in model_mappings:
+                mapping[0] = "deberta." + mapping[0]
+                mapping[1] = "deberta." + mapping[1]
         if config.architectures is not None and "DebertaV2ForQuestionAnswering" in config.architectures:
             model_mappings.extend(
                 [["qa_outputs.weight", "qa_outputs.weight", "transpose"], ["qa_outputs.bias", "qa_outputs.bias"]]
