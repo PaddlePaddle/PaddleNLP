@@ -37,11 +37,11 @@ def validate_model_file(path: str, tp_degree: int, pp_degree: int) -> None:
     files = os.listdir(path)
     pattern = r"model_state\.tp0\d*_pp0\d*\.pdparams|model_state\.tp0\d*\.pdparams|model_state\.pp0\d*\.pdparams"
     if pp_degree == 0:
-        target_file = [f"model_state.tp{tp:0>2d}.pdparams" for tp in range(tp_degree)]
+        target_files = [f"model_state.tp{tp:0>2d}.pdparams" for tp in range(tp_degree)]
     elif tp_degree == 0:
-        target_file = [f"model_state.pp{pp:0>2d}.pdparams" for pp in range(pp_degree)]
+        target_files = [f"model_state.pp{pp:0>2d}.pdparams" for pp in range(pp_degree)]
     else:
-        target_file = [
+        target_files = [
             f"model_state.tp{tp:0>2d}_pp{pp:0>2d}.pdparams" for tp in range(tp_degree) for pp in range(pp_degree)
         ]
 
@@ -50,9 +50,9 @@ def validate_model_file(path: str, tp_degree: int, pp_degree: int) -> None:
         if re.match(pattern, file):
             exist_required_files.append(file)
 
-    missing_files = set(target_file) - set(exist_required_files)
+    missing_files = set(target_files) - set(exist_required_files)
     if len(missing_files) > 0:
-        raise FileNotFoundError(f"missing files {list(missing_files)}")
+        raise FileNotFoundError(f"Please check your pp/tp degree, missing files {list(missing_files)}")
 
 
 def load_tp_params(tp_degree, path):
