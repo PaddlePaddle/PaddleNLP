@@ -496,6 +496,8 @@ def main():
             "paddle",
             "transformer_engine",
         ], "Only support paddle and transformer_engine backend"
+        if not TransformerEngineHelper.is_installed():
+            raise ValueError("TransformerEngine is not installed. Please install it first or disable it.")
     config.transformer_engine_backend = training_args.transformer_engine_backend
     config.use_fp8 = training_args.use_fp8
 

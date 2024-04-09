@@ -68,16 +68,14 @@ class TransformerEngineHelper:
 
     @staticmethod
     def get_te_recompute_func():
-        assert (
-            TransformerEngineHelper.is_installed()
-        ), "TransformerEngine is not installed. Please install it first or disable it."
+        if not TransformerEngineHelper.is_installed():
+            return None
         return te.recompute
 
     @staticmethod
     def get_fp8_group():
-        assert (
-            TransformerEngineHelper.is_installed()
-        ), "TransformerEngine is not installed. Please install it first or disable it."
+        if not TransformerEngineHelper.is_installed():
+            return None
 
         try:
             hcg = fleet.get_hybrid_communicate_group()
