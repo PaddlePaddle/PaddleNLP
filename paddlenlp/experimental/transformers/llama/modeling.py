@@ -106,10 +106,11 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.num_layers = config.num_hidden_layers
         self.epsilon = config.rms_norm_eps
         self.max_position_embeddings = config.max_position_embeddings
-        self.quant_type = config.quant_type
-
+        self.quant_type = config.quant_type if hasattr(config, "quant_type") else None
+        self.use_cachekv_int8 = config.use_cachekv_int8 if hasattr(config, "use_cachekv_int8") else False
+        self.single_card_ptq = config.single_card_ptq if hasattr(config, "single_card_ptq") else True
         self.use_weight_only = False
-        self.weight_only_quant_bits = config.weight_only_quant_bits
+        self.weight_only_quant_bits = config.weight_only_quant_bits if hasattr(config, "weight_only_quant_bits") else -1
 
         if self.quant_type is not None and "weight_only_int" in self.quant_type:
             self.use_weight_only = True
@@ -268,7 +269,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         cache_k_out_scale_attrs = None
         cache_v_out_scale_attrs = None
 
-        if config.use_cachekv_int8 == "static":
+        if self.use_cachekv_int8 == "static":
             cache_k_scale_attrs = [
                 paddle.ParamAttr(name="fusellama.{}.cache_k_scale".format(i)) for i in range(self.num_layers)
             ]
@@ -322,7 +323,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             epsilon=self.epsilon,
             norm_type="rmsnorm",
             use_neox_rotary_style=True,
-            use_dynamic_cachekv_quant=config.use_cachekv_int8 == "dynamic",
+            use_dynamic_cachekv_quant=self.use_cachekv_int8 == "dynamic",
             rank_id=config.tensor_parallel_rank,
         )
 
@@ -693,7 +694,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
                 act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
                 weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
-                if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
+                if self.config.tensor_parallel_degree > 1 and not self.single_card_ptq:
                     act_scale_json_path = os.path.join(
                         self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json"
                     )
@@ -715,7 +716,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
                 if self.config.use_cachekv_int8 == "static":
                     cache_scale_json_path = os.path.join(self.quant_model_path, "cachekv_act_scales.json")
-                    if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
+                    if self.config.tensor_parallel_degree > 1 and not self.single_card_ptq:
                         cache_scale_json_path = os.path.join(
                             self.quant_model_path, f"cachekv_act_scales_{self.config.tensor_parallel_rank}.json"
                         )
@@ -747,7 +748,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                                 )  # [3 * num_head * dim_head]
                             ).reshape([-1])
 
-                            if self.config.tensor_parallel_degree > 1 and self.config.single_card_ptq:
+                            if self.config.tensor_parallel_degree > 1 and self.single_card_ptq:
                                 tmp = (
                                     tmp.reshape([3, self.num_attention_heads, head_size])
                                     .split(self.config.tensor_parallel_degree, axis=1)[
@@ -768,7 +769,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                             tmp = paddle.to_tensor(
                                 weight_scale / (127.0 * 127.0 * act_scale_loader.scale["ffn1_in_scale"][i_layer])
                             )
-                            if self.config.tensor_parallel_degree > 1 and self.config.single_card_ptq:
+                            if self.config.tensor_parallel_degree > 1 and self.single_card_ptq:
                                 tmp = paddle.split(tmp, self.config.tensor_parallel_degree * 2)
                                 tmp = paddle.concat(
                                     [

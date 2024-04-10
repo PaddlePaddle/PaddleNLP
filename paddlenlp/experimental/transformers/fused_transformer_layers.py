@@ -37,7 +37,6 @@ if is_paddlenlp_ops_available():
         quant_int8,
         rebuild_padding,
         rebuild_padding_v2,
-        rebuild_padding_specu,
         transpose_remove_padding,
         write_cache_kv,
     )
@@ -865,7 +864,6 @@ class  FusedMultiTransformerBase(Layer):
         kwargs["input_ids"] = input_ids
 
         out = self.post_process(**kwargs)
-        # print("-------!!!generated a new token!!!--------")
         return out, caches
 
 
@@ -1769,6 +1767,7 @@ class FusedSpecuMultiTransformer(Layer):
         hidden_dim = head_num * head_size
         seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
         seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
+        seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
         cu_seqlens_k = kwargs.get("cu_seqlens_k", None)
         cache = kwargs.get("cache", None)
         gamma = kwargs.get("gamma", None)
@@ -1787,7 +1786,7 @@ class FusedSpecuMultiTransformer(Layer):
             cache_v,
             seq_lens_encoder,
             seq_lens_decoder,
-            kwargs.get("seq_lens_this_time", None),
+            seq_lens_this_time,
             kwargs.get("padding_offsets", None),
             kwargs.get("cum_offsets", None),
             kwargs.get("cu_seqlens_q", None),
@@ -1807,9 +1806,7 @@ class FusedSpecuMultiTransformer(Layer):
         
         k = qkv_out_specu[:, hidden_dim:2*hidden_dim]
         v = qkv_out_specu[:, 2*hidden_dim:]
-        # q_out, k_out, v_out = qkv_transpose_split(
-        #     qkv_out, padding_offset, seq_lens, input_ids, self.num_heads, self.head_dim
-        # )
+
         # prefill stage
         if cache is None:
             # [seq_len, hidden_dim] -> [bsz, head_num, seq_len, hidden_dim]
@@ -1819,10 +1816,10 @@ class FusedSpecuMultiTransformer(Layer):
             cache_v[:, :cur_seq_len, :, :] = v
         # decode stage
         else:
-            k = k.reshape([bsz, gamma, head_num, head_size])
-            v = v.reshape([bsz, gamma, head_num, head_size])
-            cache_k[:, cur_seq_len - gamma : cur_seq_len, :, :] = k
-            cache_v[:, cur_seq_len - gamma : cur_seq_len, :, :] = v
+            k = k.reshape([bsz, seq_lens_this_time, head_num, head_size])
+            v = v.reshape([bsz, seq_lens_this_time, head_num, head_size])
+            cache_k[:, token_num_in_cache : token_num_in_cache + seq_lens_this_time, :, :] = k
+            cache_v[:, token_num_in_cache : token_num_in_cache + seq_lens_this_time, :, :] = v
         out_linear_out = self.compute_out_linear(fmha_out, i)
 
         return out_linear_out

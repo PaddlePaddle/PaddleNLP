@@ -33,7 +33,7 @@ import paddle
 @dataclass
 class PredictorArgument:
     model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
-    assistant_model_name_or_path: str = field(default="meta-llama/Llama-2-7b-chat", metadata={"help": "The directory of model."})
+    assistant_model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
     src_length: int = field(default=None, metadata={"help": "The max length of source text."})
     max_length: int = field(default=None, metadata={"help": "the max length for decoding."})
@@ -64,10 +64,6 @@ class PredictorArgument:
         default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
-    quant_type: str = field(
-        default=None,
-        metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"},
-    )
 
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     benchmark: bool = field(
@@ -75,10 +71,6 @@ class PredictorArgument:
         metadata={
             "help": "If benchmark set as `True`, we will force model decode to max_length, which is helpful to compute throughput. "
         },
-    )
-    cachekv_int8: bool = field(
-        default=False,
-        metadata={"help": "If cachekv_int8 set as `True`, cache kv would be quantized to int8 dynamically. "},
     )
     chat_template: str = field(
         default=None,
@@ -99,7 +91,6 @@ class PredictorArgument:
     @property
     def use_cachekv_int8(self):
         return "dynamic" if self.cachekv_int8 else "None"
-
 
 
 class SpeculativeSamplingPredictor(InferencePredictorMixin, BasePredictor):
@@ -241,7 +232,6 @@ class SpeculativeSamplingPredictor(InferencePredictorMixin, BasePredictor):
         )
         return input_ids, model_kwargs
 
-
     @paddle.no_grad()
     def _infer(self, inputs):
         for key in inputs.keys():
@@ -261,16 +251,16 @@ class SpeculativeSamplingPredictor(InferencePredictorMixin, BasePredictor):
         input_ids, model_inuts = self.prepare_inputs(**inputs)
         assistant_model_inputs = model_inuts.copy()
         assistant_model_inputs["cache_kvs"] = self.assistant_model_cache_kvs
-        stop_criter = StoppingCriteriaList([
-                MaxLengthCriteria(max_length=90),
-            ])
         output_ids = self.target_model.assisted_decoding(
             input_ids,
             model_inuts,
             assistant_model_inputs,
             self.assistant_model,
-            stopping_criteria=stop_criter,
-            gamma = self.gamma
+            max_output_length=200,
+            do_sample=True,
+            gamma=self.gamma,
+            eos_token_id=inputs["eos_token_id"],
+            r_probability=0.6,
         )
         return output_ids
 
@@ -363,30 +353,7 @@ def create_predictor(
     config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
     config.tensor_parallel_degree = tensor_parallel_degree
     config.tensor_parallel_rank = tensor_parallel_rank
-    config.weight_only_quant_bits = -1
-    config.quant_type = None
     config.model_name_or_path = ""
-    config.use_cachekv_int8 = predictor_args.use_cachekv_int8
-    config.single_card_ptq = True
-
-    if predictor_args.quant_type is not None and predictor_args.quant_type.startswith("weight_only_int"):
-        weight_only_quant_bits = int(predictor_args.quant_type[-1])
-        config.weight_only_quant_bits = weight_only_quant_bits
-        config.quant_type = predictor_args.quant_type
-
-    if config.quantization_config.quant_type is not None and "a8w8" in config.quantization_config.quant_type:
-        config.model_name_or_path = predictor_args.model_name_or_path
-        config.quant_type = config.quantization_config.quant_type
-
-        ptq_multicards_num = get_ptq_multicards_num(config.model_name_or_path)
-        logger.info(f"PTQ from {ptq_multicards_num} cards, so we will not split")
-        if ptq_multicards_num > 1:
-            config.single_card_ptq = False
-
-        # Turn on GEMM int8 kernel tuning
-        paddle.base.core.enable_autotune()
-        paddle.base.core.update_autotune_status()
-
     from paddlenlp.experimental.transformers import LlamaForCausalLMSpecuInferenceModel
     config.gamma = predictor_args.gamma
     config.max_seq_len = predictor_args.total_max_length
@@ -399,10 +366,13 @@ def create_predictor(
     target_model.eval()
 
     from paddlenlp.experimental.transformers import LlamaForCausalLMInferenceModel
-
+    assistant_model_config = AutoConfig.from_pretrained(predictor_args.assistant_model_name_or_path)
+    assistant_model_config.model_name_or_path = ""
+    assistant_model_config.tensor_parallel_degree = tensor_parallel_degree
+    assistant_model_config.tensor_parallel_rank = tensor_parallel_rank
     assistant_model = LlamaForCausalLMInferenceModel.from_pretrained(
         predictor_args.assistant_model_name_or_path,
-        config=config,
+        config=assistant_model_config,
         dtype=predictor_args.dtype,
     )
     assistant_model.eval()
