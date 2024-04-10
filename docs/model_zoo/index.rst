@@ -84,8 +84,8 @@ PaddleNLP的Transformer预训练模型包含从 `huggingface.co`_ 直接转换�
    ChineseBert <transformers/ChineseBert/contents>
    ConvBert <transformers/ConvBert/contents>
    CTRL <transformers/CTRL/contents>
+   DebertaV2 <transformers/DebertaV2/contents>
    DistilBert <transformers/DistilBert/contents>
-   DebertaV2 <transformers/DebertaV2/content>
    ELECTRA <transformers/ELECTRA/contents>
    ERNIE <transformers/ERNIE/contents>
    ERNIE-CTM <transformers/ERNIE-CTM/contents>
@@ -223,7 +223,7 @@ Transformer预训练模型适用任务汇总
 .. _ChineseBert: https://arxiv.org/abs/2106.16038
 .. _ConvBert: https://arxiv.org/abs/2008.02496
 .. _CTRL: https://arxiv.org/abs/1909.05858
-.. _DebertaV2:https://arxiv.org/abs/2111.09543
+.. _DebertaV2: https://arxiv.org/abs/2111.09543
 .. _DistilBert: https://arxiv.org/abs/1910.01108
 .. _ELECTRA: https://arxiv.org/abs/2003.10555
 .. _ERNIE: https://arxiv.org/abs/1904.09223

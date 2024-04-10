@@ -1,4 +1,4 @@
-dallebart
+deberta_v2
 ========================================
 
 .. automodule:: paddlenlp.transformers.deberta_v2

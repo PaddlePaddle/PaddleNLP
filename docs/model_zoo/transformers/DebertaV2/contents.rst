@@ -12,19 +12,19 @@ DebertaV2模型汇总
 | Pretrained Weight                                                                | Language     | Details of the model                                                             |
 +==================================================================================+==============+==================================================================================+
 |``deepset/deberta-v3-large-squad2``                                               | English      | 24-layer, 1024-hidden,                                                           |
-|                                                                                  |              | 16-heads, 304M parameters.                                                      |
-|                                                                                  |              | The deberta-v3-large model fine-tuned using the SQuAD2.0 dataset.                                                             |
+|                                                                                  |              | 16-heads, 304M parameters.                                                       |
+|                                                                                  |              | The deberta-v3-large model fine-tuned using the SQuAD2.0 dataset.                |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``microsoft/deberta-v2-xlarge``                                                   | English      | 24-layer, 1536-hidden,                                                              |
-|                                                                                  |              | 24-heads, 900M parameters.                                                          |
-|                                                                                  |              | The deberta-v2 model.                                                             |
+|``microsoft/deberta-v2-xlarge``                                                   | English      | 24-layer, 1536-hidden,                                                           |
+|                                                                                  |              | 24-heads, 900M parameters.                                                       |
+|                                                                                  |              | The deberta-v2 model.                                                            |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``microsoft/deberta-v3-base``                                                     | English      | 12-layer, 768-hidden,                                                              |
-|                                                                                  |              | 12-heads, 86M parameters.                                                          |
-|                                                                                  |              | The deberta-v2 model.                                                             |
+|``microsoft/deberta-v3-base``                                                     | English      | 12-layer, 768-hidden,                                                            |
+|                                                                                  |              | 12-heads, 86M parameters.                                                        |
+|                                                                                  |              | The deberta-v2 model.                                                            |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
-|``microsoft/deberta-v3-large``                                                    | English      | 24-layer, 1024-hidden,                                                              |
-|                                                                                  |              | 16-heads, 304M parameters.                                                          |
-|                                                                                  |              | The deberta-v2 model.                                                             |
+|``microsoft/deberta-v3-large``                                                    | English      | 24-layer, 1024-hidden,                                                           |
+|                                                                                  |              | 16-heads, 304M parameters.                                                       |
+|                                                                                  |              | The deberta-v2 model.                                                            |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 
