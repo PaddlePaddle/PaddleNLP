@@ -19,7 +19,7 @@ from typing import Dict
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
-__all__ = ["DEBERTA_V2_PRETRAINED_INIT_CONFIGURATION", "DebertaV2Config"]
+__all__ = ["DEBERTA_V2_PRETRAINED_INIT_CONFIGURATION", "DebertaV2Config", "DEBERTA_V2_PRETRAINED_RESOURCE_FILES_MAP"]
 
 DEBERTA_V2_PRETRAINED_INIT_CONFIGURATION = {
     "microsoft/deberta-v3-base": {
@@ -118,6 +118,15 @@ DEBERTA_V2_PRETRAINED_INIT_CONFIGURATION = {
         "type_vocab_size": 0,
         "vocab_size": 128100,
     },
+}
+
+DEBERTA_V2_PRETRAINED_RESOURCE_FILES_MAP = {
+    "model_state": {
+        "microsoft/deberta-v2-xlarge": "https://paddlenlp.bj.bcebos.com/models/community/microsoft/deberta-v2-xlarge/model_state.pdparams",
+        "microsoft/deberta-v3-base": "https://paddlenlp.bj.bcebos.com/models/community/microsoft/deberta-v3-base/model_state.pdparams",
+        "microsoft/deberta-v3-large": "https://paddlenlp.bj.bcebos.com/models/community/microsoft/deberta-v3-large/model_state.pdparams",
+        "deepset/deberta-v3-large-squad2": "https://paddlenlp.bj.bcebos.com/models/community/deepset/deberta-v3-large-squad2/model_state.pdparams",
+    }
 }
 
 

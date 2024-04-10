@@ -19,7 +19,7 @@ from typing import Dict, List
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
-__all__ = ["DEBERTA_PRETRAINED_INIT_CONFIGURATION", "DebertaConfig"]
+__all__ = ["DEBERTA_PRETRAINED_INIT_CONFIGURATION", "DebertaConfig", "DEBERTA_PRETRAINED_RESOURCE_FILES_MAP"]
 
 DEBERTA_PRETRAINED_INIT_CONFIGURATION = {
     "deberta-base": {
@@ -67,6 +67,8 @@ DEBERTA_PRETRAINED_INIT_CONFIGURATION = {
         "num_labels": 2,
     },
 }
+
+DEBERTA_PRETRAINED_RESOURCE_FILES_MAP = {"model_state": {"-": "-"}}
 
 
 class DebertaConfig(PretrainedConfig):
