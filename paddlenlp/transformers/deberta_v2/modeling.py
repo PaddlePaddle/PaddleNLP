@@ -54,6 +54,106 @@ def softmax_with_mask(x, mask, axis):
     return F.softmax(paddle.where(rmask, y, x), axis=axis)
 
 
+class DropoutContext(object):
+    def __init__(self):
+        self.dropout = 0
+        self.mask = None
+        self.scale = 1
+        self.reuse_mask = True
+
+
+def get_mask(input, local_context):
+    if not isinstance(local_context, DropoutContext):
+        dropout = local_context
+        mask = None
+    else:
+        dropout = local_context.dropout
+        dropout *= local_context.scale
+        mask = local_context.mask if local_context.reuse_mask else None
+
+    if dropout > 0 and mask is None:
+        # mask = (1 - torch.empty_like(input).bernoulli_(1 - dropout)).to(torch.bool)
+        probability_matrix = paddle.full(paddle.empty_like(input).shape, 1 - dropout)
+        mask = (1 - paddle.bernoulli(probability_matrix)).cast("bool")
+
+    if isinstance(local_context, DropoutContext):
+        if local_context.mask is None:
+            local_context.mask = mask
+
+    return mask, dropout
+
+
+class XDropout(paddle.autograd.PyLayer):
+    """Optimized dropout function to save computation and memory by using mask operation instead of multiplication."""
+
+    @staticmethod
+    def forward(ctx, input, local_ctx):
+        mask, dropout = get_mask(input, local_ctx)
+        ctx.scale = 1.0 / (1 - dropout)
+        if dropout > 0:
+            ctx.save_for_backward(mask)
+            return input.masked_fill(mask, 0) * ctx.scale
+        else:
+            return input
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        if ctx.scale > 1:
+            (mask,) = ctx.saved_tensor()
+            return grad_output.masked_fill(mask, 0) * ctx.scale, None
+        else:
+            return grad_output, None
+
+
+class StableDropout(nn.Layer):
+    """
+    Optimized dropout module for stabilizing the training
+
+    Args:
+        drop_prob (float): the dropout probabilities
+    """
+
+    def __init__(self, drop_prob):
+        super().__init__()
+        self.drop_prob = drop_prob
+        self.count = 0
+        self.context_stack = None
+
+    def forward(self, x):
+        """
+        Call the module
+
+        Args:
+            x (`paddle.Tensor`): The input tensor to apply dropout
+        """
+        if self.training and self.drop_prob > 0:
+            return XDropout.apply(x, self.get_context())
+        return x
+
+    def clear_context(self):
+        self.count = 0
+        self.context_stack = None
+
+    def init_context(self, reuse_mask=True, scale=1):
+        if self.context_stack is None:
+            self.context_stack = []
+        self.count = 0
+        for c in self.context_stack:
+            c.reuse_mask = reuse_mask
+            c.scale = scale
+
+    def get_context(self):
+        if self.context_stack is not None:
+            if self.count >= len(self.context_stack):
+                self.context_stack.append(DropoutContext())
+            ctx = self.context_stack[self.count]
+            ctx.dropout = self.drop_prob
+            self.count += 1
+            return ctx
+        else:
+            return self.drop_prob
+
+
 class GELUActivation(nn.Layer):
     """
     Original Implementation of the GELU activation function in Google BERT repo when initially created. For
@@ -95,7 +195,7 @@ class DebertaV2Embeddings(nn.Layer):
         if self.embedding_size != config.hidden_size:
             self.embed_proj = nn.Linear(self.embedding_size, config.hidden_size, bias_attr=False)
         self.LayerNorm = nn.LayerNorm(config.hidden_size, config.layer_norm_eps)
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.dropout = StableDropout(config.hidden_dropout_prob)
         self.config = config
 
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None, mask=None, inputs_embeds=None):
@@ -125,10 +225,12 @@ class DebertaV2Embeddings(nn.Layer):
         if self.embedding_size != self.config.hidden_size:
             embeddings = self.embed_proj(embeddings)
         embeddings = self.LayerNorm(embeddings)
-        # TO DO: mask needs to be modified
         if mask is not None:
-            embeddings = embeddings * mask.unsqueeze(-1).astype(embeddings.dtype)
-        # TO DO: dropout needs to be modified
+            if mask.dim() != embeddings.dim():
+                if mask.dim() == 4:
+                    mask = mask.squeeze(1).squeeze(1)
+                mask = mask.unsqueeze(2)
+            embeddings = embeddings * mask.astype(embeddings.dtype)
         embeddings = self.dropout(embeddings)
         return embeddings
 
@@ -138,7 +240,7 @@ class DebertaV2SelfOutput(nn.Layer):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.LayerNorm = nn.LayerNorm(config.hidden_size, config.layer_norm_eps)
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.dropout = StableDropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states, input_tensor):
         hidden_states = self.dense(hidden_states)
@@ -203,7 +305,7 @@ class DebertaV2Output(nn.Layer):
         super().__init__()
         self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
         self.LayerNorm = nn.LayerNorm(config.hidden_size, config.layer_norm_eps)
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.dropout = StableDropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states, input_tensor):
         hidden_states = self.dense(hidden_states)
@@ -260,7 +362,7 @@ class ConvLayer(nn.Layer):
             groups=groups,
         )
         self.LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
-        self.dropout = nn.Dropout(p=config.hidden_dropout_prob)
+        self.dropout = StableDropout(config.hidden_dropout_prob)
         self.config = config
 
     def forward(self, hidden_states, residual_states, input_mask):
@@ -389,7 +491,7 @@ class DisentangledSelfAttention(nn.Layer):
             if self.position_buckets > 0:
                 self.pos_ebd_size = self.position_buckets
 
-            self.pos_dropout = nn.Dropout(config.hidden_dropout_prob)
+            self.pos_dropout = StableDropout(config.hidden_dropout_prob)
 
             if not self.share_att_key:
                 if "c2p" in self.pos_att_type:
@@ -397,7 +499,7 @@ class DisentangledSelfAttention(nn.Layer):
                 if "p2c" in self.pos_att_type:
                     self.pos_query_proj = nn.Linear(config.hidden_size, self.all_head_size)
 
-        self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
+        self.dropout = StableDropout(config.attention_probs_dropout_prob)
 
     def transpose_for_scores(self, x, attention_heads):
         new_x_shape = x.shape[:-1] + [attention_heads, -1]
@@ -995,9 +1097,8 @@ class ContextPooler(nn.Layer):
     def __init__(self, config):
         super().__init__()
         hidden_size = config.pooler_hidden_size if config.pooler_hidden_size is not None else config.hidden_size
-        dropout = config.pooler_dropout if config.pooler_dropout is not None else config.hidden_dropout_prob
         self.dense = nn.Linear(config.hidden_size, hidden_size)
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = StableDropout(config.pooler_dropout)
         self.config = config
 
     def forward(self, hidden_states):
@@ -1029,7 +1130,7 @@ class DebertaV2ForSequenceClassification(DebertaV2PreTrainedModel):
         drop_out = getattr(config, "cls_dropout", None)
         drop_out = self.config.hidden_dropout_prob if drop_out is None else drop_out
 
-        self.dropout = nn.Dropout(drop_out)
+        self.dropout = StableDropout(drop_out)
 
     def get_input_embeddings(self):
         return self.deberta.get_input_embeddings()
@@ -1231,7 +1332,7 @@ class DebertaV2ForMultipleChoice(DebertaV2PreTrainedModel):
     def __init__(self, config: DebertaV2Config):
         super(DebertaV2ForMultipleChoice, self).__init__(config)
         self.deberta = DebertaV2Model(config)
-        self.dropout = nn.Dropout(
+        self.dropout = StableDropout(
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.pooler = ContextPooler(config)
@@ -1365,7 +1466,6 @@ class DebertaV2ForMultipleChoice(DebertaV2PreTrainedModel):
         pooled_output = self.pooler(outputs[0])
         pooled_output = self.dropout(pooled_output)
 
-        pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
         reshaped_logits = logits.reshape((-1, num_choices))
 
