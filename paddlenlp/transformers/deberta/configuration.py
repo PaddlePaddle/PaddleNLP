@@ -147,7 +147,7 @@ class DebertaConfig(PretrainedConfig):
         self,
         vocab_size: int = 50265,
         hidden_size: int = 768,
-        embedding_size: int = 32,
+        embedding_size: int = 768,
         num_hidden_layers: int = 12,
         num_attention_heads: int = 12,
         intermediate_size: int = 3072,

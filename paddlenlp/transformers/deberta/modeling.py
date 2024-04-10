@@ -765,7 +765,12 @@ class DebertaPreTrainedModel(PretrainedModel):
                 ],
             ]
             model_mappings.extend(layer_mappings)
-
+        if config.architectures is not None and "DebertaModel" in config.architectures:
+            pass
+        else:
+            for mapping in model_mappings:
+                mapping[0] = "deberta." + mapping[0]
+                mapping[1] = "deberta." + mapping[1]
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
 
