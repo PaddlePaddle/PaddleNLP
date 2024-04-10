@@ -1862,7 +1862,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             error_msgs = []
             mismatched_keys = []
-
+            resume_state_dict = {}
             if len(resolved_archive_file) > 1:
                 resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
 
@@ -1890,7 +1890,16 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
 
                 if config.fuse_attention_qkv or config.fuse_attention_ffn:
-                    state_dict = cls.convert_fuse_and_split(config, state_dict, tp_actions)
+                    state_dict.update(resume_state_dict)
+                    before_fuse_keys = list(state_dict.keys())
+                    state_dict, resume_state_dict = cls.convert_fuse_and_split(
+                        config, state_dict, tp_actions if pre_tensor_parallel_split else None
+                    )
+                    after_fuse_keys = list(state_dict.keys())
+                    fused_keys = list(set(before_fuse_keys) - set(after_fuse_keys))
+                    new_keys = list(set(after_fuse_keys) - set(before_fuse_keys))
+                    missing_keys = list(set(missing_keys) - set(new_keys))
+                    unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
 
                 if config.quantization_config.is_weight_quantize():
                     state_dict = convert_to_quantize_state_dict(
@@ -2183,7 +2192,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     # cache_dir=os.path.join(cache_dir, pretrained_model_name_or_path, subfolder),
                     cache_dir=convert_dir,
                 )
-                state_dict = cls.convert_fuse_and_split(config, state_dict)
+                state_dict, _ = cls.convert_fuse_and_split(config, state_dict)
             elif (
                 resolved_archive_file.endswith(PADDLE_WEIGHTS_NAME)
                 or resolved_archive_file.endswith(PADDLE_WEIGHTS_INDEX_NAME)
@@ -2199,16 +2208,16 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
                 state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
                 tp_actions = cls.get_tensor_parallel_convert_actions(config, state_dict.keys())
-                state_dict = cls.convert_fuse_and_split(config, state_dict, tp_actions)
+                state_dict, _ = cls.convert_fuse_and_split(config, state_dict, tp_actions)
             elif config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model.safetensors"):
                 with safe_open(resolved_archive_file, framework="np", device="cpu") as f:
                     loaded_keys = f.keys()
                 tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
                 state_dict = load_state_dict(resolved_archive_file, tp_actions)
-                state_dict = cls.convert_fuse_and_split(config, state_dict, tp_actions)
+                state_dict, _ = cls.convert_fuse_and_split(config, state_dict, tp_actions)
             else:
                 state_dict = load_state_dict(resolved_archive_file)
-                state_dict = cls.convert_fuse_and_split(config, state_dict)
+                state_dict, _ = cls.convert_fuse_and_split(config, state_dict)
 
             logger.info("Loaded weights file from disk, setting weights to model.")
 

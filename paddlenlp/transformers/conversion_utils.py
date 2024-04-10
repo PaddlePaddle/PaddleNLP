@@ -532,6 +532,19 @@ def fuse_param_func():
 
 def split_param_func():
     def fn(fused_param, split_nums=2, is_qkv=False, num_heads=None, num_key_value_heads=None):
+        """TODO 参数变换形式、支持类型
+        排列转换适配兼容说明
+
+        Args:
+            fused_param (_type_): _description_
+            split_nums (int, optional): _description_. Defaults to 2.
+            is_qkv (bool, optional): _description_. Defaults to False.
+            num_heads (_type_, optional): _description_. Defaults to None.
+            num_key_value_heads (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
         concat_fn = np.concatenate
         split_fn = np.split
         if isinstance(fused_param, paddle.Tensor):
@@ -1288,14 +1301,14 @@ class ConversionMixin:
         loaded_keys = state_dict.keys()
         # collect and convert fuse/split action
         fused_and_split_keys = []
-        fuse_actions = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=True)
+        fuse_actions, resume_keys = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=True)
         for keys, action in fuse_actions.items():
             origin_states = [state_dict.pop(key) for key in keys[:-1]]
             state_dict[keys[-1]] = action(origin_states)
             fused_and_split_keys.append(keys[-1])
             logger.info(f"Fusing parameter: {keys[:-1]} into {keys[-1]}")
 
-        split_actions = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=False)
+        split_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=False)
         for keys, action in split_actions.items():
             origin_state = state_dict.pop(keys[-1])
             split_states = action(origin_state)
@@ -1311,7 +1324,12 @@ class ConversionMixin:
                         with device_guard():
                             state_dict[key] = paddle.Tensor(tp_actions[name](state_dict.pop(key)), zero_copy=True)
                         break
-        return state_dict
+
+        # when shard file split the weight as follows, some weights need to be resumed for next shard file
+        # shard-001-file: q_weight, k_weight
+        # shard_002-file: v_weight
+        resume_state_dict = {k: state_dict[k] for k in resume_keys if k in state_dict}
+        return state_dict, resume_state_dict
 
     @classmethod
     def get_fuse_or_split_param_convert_actions(
@@ -1332,16 +1350,22 @@ class ConversionMixin:
         # fusing: verify all of the keys in name_action_mappings are in loaded_state_dict_keys
         # splitting: verify the last key in name_action_mappings is in loaded_state_dict_keys
         filter_name_action = {}
-        for k, v in name_action_mappings.items():
-            if is_fuse:
-                cond = all(item in loaded_state_dict_keys for item in k[:-1])
-            else:
-                cond = k[-1] in loaded_state_dict_keys
+        resume_keys = []
+        if is_fuse:
+            for k, v in name_action_mappings.items():
+                cond = True
+                if not all(item in loaded_state_dict_keys for item in k[:-1]):
+                    # resume keys for next fuse
+                    resume_keys += k[:-1]
+                    cond = False
+                if cond:
+                    filter_name_action[k] = v
+        else:
+            for k, v in name_action_mappings.items():
+                if k[-1] in loaded_state_dict_keys:
+                    filter_name_action[k] = v
 
-            if cond:
-                filter_name_action[k] = v
-
-        return filter_name_action
+        return filter_name_action, resume_keys
 
     @classmethod
     def _get_fuse_or_split_param_mappings(cls, config: PretrainedConfig, is_fuse=True) -> List[StateDictNameMapping]:
@@ -1371,14 +1395,23 @@ class ConversionMixin:
         # False: [x1,x2,x3,x4] -> [x1,x2,x3] are not exist in state_keys_real, x4 is exist in state_keys_real
 
         for keys in state_keys_base:
-            base_key = keys[0] if is_fuse else keys[-1]
             prefix = ""
-            for x in state_keys_real:
-                if x.endswith(base_key):
-                    prefix = x.replace(base_key, "")
-                    break
-            new_keys = tuple([prefix + key for key in keys])
+            if is_fuse:
+                for x in state_keys_real:
+                    for base_key in keys[:-1]:
+                        if x.endswith(base_key):
+                            prefix = x.replace(base_key, "")
+                            break
+                    if prefix != "":
+                        break
+            else:
+                base_key = keys[-1]
+                for x in state_keys_real:
+                    if x.endswith(base_key):
+                        prefix = x.replace(base_key, "")
+                        break
 
+            new_keys = tuple([prefix + key for key in keys])
             state_keys_map[keys] = new_keys
 
         return state_keys_map
