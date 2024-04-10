@@ -164,11 +164,16 @@ class RowParallelLoRALinear(RowParallelLinear):
         lora_plus_scale: float = 1.0,
         merge_weights: bool = True,
         use_quick_lora: bool = False,
+        pissa: bool = False,
         **kwargs
     ):
         RowParallelLinear.__init__(self, in_features, out_features, **kwargs)
         if not isinstance(r, int) or r <= 0:
             raise ValueError("Lora rank r should be a positive integer")
+
+        if pissa:
+            raise ValueError("Pissa is not supported in model parallel by now")
+
         self.r = r
         self.lora_alpha = lora_alpha
         # Optional dropout
@@ -306,11 +311,16 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         merge_weights: bool = True,
         lora_A_weight_attr: Optional[paddle.ParamAttr] = None,
         use_quick_lora: bool = False,
+        pissa: bool = False,
         **kwargs
     ):
         ColumnParallelLinear.__init__(self, in_features, out_features, **kwargs)
         if not isinstance(r, int) or r <= 0:
             raise ValueError("Lora rank r should be a positive integer")
+
+        if pissa:
+            raise ValueError("Pissa is not supported in model parallel by now")
+
         self.r = r
         self.lora_alpha = lora_alpha
         # Optional dropout
