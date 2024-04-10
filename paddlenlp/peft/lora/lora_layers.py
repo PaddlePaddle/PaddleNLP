@@ -84,8 +84,7 @@ class LoRALinear(nn.Linear):
         self.apply_pissa = False
 
         if not rslora and not pissa:
-            self.scaling = 1.0
-            # self.scaling = self.lora_alpha / self.r
+            self.scaling = self.lora_alpha / self.r
         elif pissa:
             self.scaling = 1.0
         else:

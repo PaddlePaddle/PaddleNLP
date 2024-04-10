@@ -418,7 +418,6 @@ class LoRAModel(nn.Layer):
                     lora_dropout=lora_config.lora_dropout,
                     rslora=lora_config.rslora,
                     lora_plus_scale=lora_config.lora_plus_scale,
-                    pissa=lora_config.pissa,
                     merge_weights=lora_config.merge_weights,
                     lora_A_weight_attr=paddle.ParamAttr(
                         initializer=nn.initializer.KaimingUniform(
@@ -447,7 +446,6 @@ class LoRAModel(nn.Layer):
                     lora_dropout=lora_config.lora_dropout,
                     rslora=lora_config.rslora,
                     lora_plus_scale=lora_config.lora_plus_scale,
-                    pissa=lora_config.pissa,
                     merge_weights=lora_config.merge_weights,
                     use_quick_lora=lora_config.use_quick_lora,
                 )
