@@ -27,7 +27,7 @@ __all__ = [
 
 # false
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
-    "Deberta-base": 512,
+    "deberta-base": 512,
 }
 
 
@@ -108,20 +108,18 @@ class DebertaTokenizer(PretrainedTokenizer):
     """
 
     resource_files_names = {"vocab_file": "vocab.json", "merges_file": "merges.txt"}  # for save_pretrained
-    deberta_vocab_link = "https://huggingface.co/microsoft/deberta-base/resolve/main/vocab.json"
-    deberta_merges_link = "https://huggingface.co/microsoft/deberta-base/resolve/main/merges.txt"
     pretrained_resource_files_map = {
         "vocab_file": {
-            "DeBERTa-base": deberta_vocab_link,
+            "deberta-base": "https://paddlenlp.bj.bcebos.com/models/community/microsoft/deberta-base/vocab.json",
         },
         "merges_file": {
-            "DeBERTa-base": deberta_merges_link,
+            "deberta-base": "https://paddlenlp.bj.bcebos.com/models/community/microsoft/deberta-base/merges.txt",
         },
     }
 
     # TODO: Add pretrained init configuration
     pretrained_init_configuration = {
-        "DeBERTa-base": {"do_lower_case": True},
+        "deberta-base": {"do_lower_case": True},
     }
 
     def __init__(

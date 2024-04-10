@@ -313,6 +313,10 @@ class DisentangledSelfAttention(nn.Layer):
         )
         self.pos_att_type = config.pos_att_type if config.pos_att_type is not None else []
 
+        # To transform c2p|p2c" into ["c2p","p2c"]
+        if isinstance(self.pos_att_type, str):
+            self.pos_att_type = self.pos_att_type.split("|")
+
         self.relative_attention = getattr(config, "relative_attention", True)
         self.talking_head = getattr(config, "talking_head", False)
 
@@ -765,6 +769,7 @@ class DebertaPreTrainedModel(PretrainedModel):
                 ],
             ]
             model_mappings.extend(layer_mappings)
+        # adapt for hf-internal-testing/tiny-random-DebertaModel
         if config.architectures is not None and "DebertaModel" in config.architectures:
             pass
         else:

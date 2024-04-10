@@ -23,52 +23,35 @@ __all__ = ["DEBERTA_PRETRAINED_INIT_CONFIGURATION", "DebertaConfig", "DEBERTA_PR
 
 DEBERTA_PRETRAINED_INIT_CONFIGURATION = {
     "deberta-base": {
-        "vocab_size": 50265,
-        "hidden_size": 768,
-        "num_hidden_layers": 12,
-        "num_attention_heads": 12,
-        "intermediate_size": 3072,
-        "hidden_act": "gelu",
-        "hidden_dropout_prob": 0.1,
         "attention_probs_dropout_prob": 0.1,
-        "max_position_embeddings": 512,
-        "type_vocab_size": 0,
-        "initializer_range": 0.02,
-        "layer_norm_eps": 1e-12,
-        "pad_token_id": 0,
-        "position_biased_input": False,
-        "pos_att_type": ["p2c", "c2p"],
-        "output_attentions": False,
-        "output_hidden_states": True,
         "embedding_size": 768,
-        "relative_attention": True,
-        "num_labels": 2,
-    },
-    "deberta-large": {
-        "vocab_size": 50265,
-        "hidden_size": 1024,
-        "num_hidden_layers": 24,
-        "num_attention_heads": 16,
-        "intermediate_size": 4096,
         "hidden_act": "gelu",
         "hidden_dropout_prob": 0.1,
-        "attention_probs_dropout_prob": 0.1,
-        "max_position_embeddings": 512,
-        "type_vocab_size": 0,
+        "hidden_size": 768,
         "initializer_range": 0.02,
-        "layer_norm_eps": 1e-12,
-        "pad_token_id": 0,
-        "position_biased_input": False,
-        "pos_att_type": ["p2c", "c2p"],
-        "output_attentions": False,
+        "intermediate_size": 3072,
+        "layer_norm_eps": 1e-07,
+        "max_position_embeddings": 512,
+        "max_relative_positions": -1,
+        "model_type": "deberta",
+        "num_attention_heads": 12,
+        "num_hidden_layers": 12,
         "output_hidden_states": True,
-        "embedding_size": 1024,
+        "pad_token_id": 0,
+        "paddlenlp_version": None,
+        "pos_att_type": ["c2p", "p2c"],
+        "position_biased_input": False,
         "relative_attention": True,
-        "num_labels": 2,
+        "type_vocab_size": 0,
+        "vocab_size": 50265,
     },
 }
 
-DEBERTA_PRETRAINED_RESOURCE_FILES_MAP = {"model_state": {"-": "-"}}
+DEBERTA_PRETRAINED_RESOURCE_FILES_MAP = {
+    "model_state": {
+        "microsoft/deberta-base": "https://paddlenlp.bj.bcebos.com/models/community/microsoft/deberta-base/model_state.pdparams"
+    }
+}
 
 
 class DebertaConfig(PretrainedConfig):
@@ -147,7 +130,6 @@ class DebertaConfig(PretrainedConfig):
         self,
         vocab_size: int = 50265,
         hidden_size: int = 768,
-        embedding_size: int = 768,
         num_hidden_layers: int = 12,
         num_attention_heads: int = 12,
         intermediate_size: int = 3072,
@@ -157,7 +139,7 @@ class DebertaConfig(PretrainedConfig):
         max_position_embeddings: int = 512,
         type_vocab_size: int = 0,
         initializer_range: float = 0.02,
-        layer_norm_eps: float = 1e-12,
+        layer_norm_eps: float = 1e-7,
         pad_token_id: int = 0,
         position_biased_input: bool = False,
         pos_att_type: List[str] = ["p2c", "c2p"],
@@ -169,7 +151,7 @@ class DebertaConfig(PretrainedConfig):
         super().__init__(**kwargs)
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
-        self.embedding_size = embedding_size
+        self.embedding_size = kwargs.get("embedding_size", hidden_size)
         self.num_hidden_layers = num_hidden_layers
         self.num_attention_heads = num_attention_heads
         self.intermediate_size = intermediate_size
