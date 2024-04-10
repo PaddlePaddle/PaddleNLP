@@ -18,6 +18,10 @@ import os
 import tempfile
 import unittest
 
+import paddle
+
+input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+
 
 def prepare_config(config):
     config.hidden_size = 512
@@ -31,10 +35,20 @@ def prepare_config(config):
     return config
 
 
-def common_test_load(model_class, config, tempdir):
+def common_test_load(model, model_class, config, tempdir):
+    model.eval()
+    with paddle.no_grad():
+        first = model(input_ids)[0]
+
     config.fuse_attention_qkv = True
     config.fuse_attention_ffn = True
-    model_class.from_pretrained(tempdir, config=config)
+    model = model_class.from_pretrained(tempdir, config=config)
+
+    model.eval()
+    with paddle.no_grad():
+        second = model(input_ids)[0]
+    assert paddle.allclose(paddle.mean(first), paddle.mean(second), atol=1e-7)
+
     files = glob.glob(tempdir + "/*")
     for f in files:
         os.remove(f)
@@ -44,19 +58,19 @@ def common_test_save(model, config, model_class=None):
     with tempfile.TemporaryDirectory() as tempdir:
         # test load pdparams: model.pdparams
         model.save_pretrained(save_dir=tempdir)
-        common_test_load(model_class, config, tempdir)
+        common_test_load(model, model_class, config, tempdir)
 
         # test load shard pdparams: model-001-0f-008.pdparams
         model.save_pretrained(tempdir, max_shard_size="5MB")
-        common_test_load(model_class, config, tempdir)
+        common_test_load(model, model_class, config, tempdir)
 
         # test save safetensors: model.safetensors
         model.save_pretrained(tempdir, safe_serialization=True)
-        common_test_load(model_class, config, tempdir)
+        common_test_load(model, model_class, config, tempdir)
 
         # test load shard safetensors: model-001-0f-008.safetensors
         model.save_pretrained(tempdir, max_shard_size="5MB", safe_serialization=True)
-        common_test_load(model_class, config, tempdir)
+        common_test_load(model, model_class, config, tempdir)
 
 
 def _test_llama():
