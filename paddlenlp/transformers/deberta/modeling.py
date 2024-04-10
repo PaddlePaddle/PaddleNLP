@@ -932,7 +932,6 @@ class DebertaForMaskedLM(DebertaPreTrainedModel):
         self.deberta = DebertaModel(config)
         self.cls = DebertaOnlyMLMHead(config)
 
-        # TODO: need to be modified
         self.post_init()
 
     def get_output_embeddings(self):
@@ -1009,7 +1008,6 @@ class DebertaForSequenceClassification(DebertaPreTrainedModel):
         self.num_labels = config.num_labels
         self.deberta = DebertaModel(config)
 
-        # TODO: need to be modified
         self.pooler = ContextPooler(config)
         output_dim = self.pooler.output_dim if self.pooler is not None else config.hidden_size
         self.classifier = nn.Linear(output_dim, config.num_labels)
