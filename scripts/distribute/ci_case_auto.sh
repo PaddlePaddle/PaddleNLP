@@ -1567,6 +1567,7 @@ function before_hook_for_gpt() {
     if [[ $FLAGS_install_deps == 0 ]];then
         echo -e "\033[31m ---- Install requirements for GPT auto cases  \033[0m"
         python -m pip install -r requirements.txt --force-reinstall
+        python -m pip install -r requirements-dev.txt --force-reinstall
         python -m pip install --no-cache-dir https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl --force-reinstall --no-dependencies
         python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
     else
