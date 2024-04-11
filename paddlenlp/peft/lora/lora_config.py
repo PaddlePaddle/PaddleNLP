@@ -85,7 +85,6 @@ class LoRAConfig:
             "help": "Whether to use quick lora, The use of Quick LoRa will only take effect when lora_dropout is set to 0."
         },
     )
-    scaling: float = field(default=1.0, metadata={"help": "Lora scaling. Inference Only"})
 
     def __post_init__(self):
         if self.use_quick_lora and self.lora_dropout > 0:
@@ -94,17 +93,17 @@ class LoRAConfig:
                 "We will automatically set `use_quick_lora` to `False` to avoid potential inconsistencies."
             )
             self.use_quick_lora = False
-        self.scaling_update()
-
-    def scaling_update(self):
+    
+    @property
+    def scaling(self):
         if not self.rslora:
-            self.scaling = self.lora_alpha / self.r
+            return self.lora_alpha / self.r
         else:
-            self.scaling = self.lora_alpha / math.sqrt(self.r)
+            return self.lora_alpha / math.sqrt(self.r)
+
 
     @property
     def __dict__(self):
-        self.scaling_update()
         return asdict(self)
 
     def to_dict(self):
@@ -123,6 +122,7 @@ class LoRAConfig:
         os.makedirs(save_directory, exist_ok=True)
 
         output_dict = self.__dict__
+        output_dict["scaling"] = self.scaling
         output_path = os.path.join(save_directory, LORA_CONFIG_NAME)
 
         # save it
@@ -145,7 +145,7 @@ class LoRAConfig:
             raise ValueError(f"Can't find lora_config.json at '{pretrained_model_name_or_path}'")
 
         loaded_attributes = cls.from_json_file(config_file)
-
+        loaded_attributes.pop("scaling", None)
         config = cls(**kwargs)
 
         for key, value in loaded_attributes.items():
