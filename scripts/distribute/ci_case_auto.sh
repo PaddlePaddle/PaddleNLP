@@ -36,6 +36,7 @@ function is_a100() {
     fi
 }
 
+IS_A100=$(is_a100)
 
 function gpt_case_list_auto() {
     gpt_auto_recompute_bs16_fp32_DP1-MP1-PP1
@@ -117,7 +118,7 @@ function gpt_auto_recompute_bs16_fp32_DP1-MP1-PP1() {
     loss_base=10.507633305
     ips_base=3518
     mem_base=11750.6
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.530449009
         ips_base=16763
         mem_base=11750.6
@@ -158,7 +159,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP1-MP1-PP8() {
     loss_base=10.570028400
     ips_base=35050
     mem_base=1988.9
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.559662151
         ips_base=83918
         mem_base=2022.7
@@ -200,7 +201,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP1-MP1-PP8_pir() {
     loss_base=10.570028400
     ips_base=35050
     mem_base=1988.9
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.559662151
         ips_base=83918
         mem_base=2022.7
@@ -241,7 +242,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP1-MP2-PP4() {
     loss_base=10.700293922
     ips_base=32518
     mem_base=1535.7
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.679453373
         ips_base=79116
         mem_base=1488.2
@@ -282,7 +283,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2() {
     loss_base=10.672543240
     ips_base=18681
     mem_base=2135.7
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.651049423
         ips_base=41174
         mem_base=2064.5
@@ -324,7 +325,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_pir() {
     loss_base=10.672543240
     ips_base=18681
     mem_base=2135.7
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.651049423
         ips_base=41174
         mem_base=2064.5
@@ -365,7 +366,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage1() {
     loss_base=10.720068359
     ips_base=15232
     mem_base=1999.2
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.657777309
         ips_base=30027
         mem_base=2002.0
@@ -407,7 +408,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage1_pir() {
     loss_base=10.720068359
     ips_base=15232
     mem_base=1999.2
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.657777309
         ips_base=30027
         mem_base=2002.0
@@ -448,7 +449,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage2() {
     loss_base=10.720078850
     ips_base=15571
     mem_base=1999.2
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.657803535
         ips_base=29166
         mem_base=2002.0
@@ -489,7 +490,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage3() {
     loss_base=10.681921577
     ips_base=13813
     mem_base=1747.6
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.662137604
         ips_base=24700
         mem_base=1750.5
@@ -530,7 +531,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage1() {
     loss_base=10.579057693
     ips_base=19822
     mem_base=1709.8
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.586785984
         ips_base=42813
         mem_base=1743.8
@@ -572,7 +573,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage1_pir() {
     loss_base=10.579057693
     ips_base=19822
     mem_base=1709.8
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.586785984
         ips_base=42813
         mem_base=1743.8
@@ -613,7 +614,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage2() {
     loss_base=10.579057693
     ips_base=20170
     mem_base=1709.8
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.586785984
         ips_base=42995
         mem_base=1743.8
@@ -654,7 +655,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage3() {
     loss_base=10.585316849
     ips_base=15742
     mem_base=1591.6
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.555718899
         ips_base=34688
         mem_base=1625.6
@@ -695,7 +696,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage1() {
     loss_base=10.672568035
     ips_base=19461
     mem_base=1384.7
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.651032448
         ips_base=42435
         mem_base=1377.5
@@ -736,7 +737,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2() {
     loss_base=10.672568035
     ips_base=19652
     mem_base=1384.7
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.651032448
         ips_base=43008
         mem_base=1377.5
@@ -778,7 +779,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2_pir() {
     loss_base=10.672568035
     ips_base=19652
     mem_base=1384.7
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.651032448
         ips_base=43008
         mem_base=1377.5
@@ -819,7 +820,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3() {
     loss_base=10.696336079
     ips_base=16613
     mem_base=1280.5
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.705118465
         ips_base=37104
         mem_base=1217.3
@@ -861,7 +862,7 @@ function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3_pir() {
     loss_base=10.696336079
     ips_base=16613
     mem_base=1280.5
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.705118465
         ips_base=37104
         mem_base=1217.3
@@ -1012,7 +1013,7 @@ function llama_static_auto_recompute_bs8_fp32_DP1-MP1-PP1() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.52110565
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=9.44003963
     fi
     ips_base=-1
@@ -1081,7 +1082,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP1-PP1() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.42011833
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=9.44003963
     fi
     ips_base=-1
@@ -1150,7 +1151,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP1() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.44299471
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=9.45633757
     fi
     ips_base=-1
@@ -1219,7 +1220,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.45936012
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=9.46121407
     fi
     ips_base=-1
@@ -1290,7 +1291,7 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.46707726
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=9.44474411
     fi
     ips_base=-1
@@ -1362,7 +1363,7 @@ function llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=10.0859375
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=10.125
     fi
     ips_base=-1
@@ -1432,7 +1433,7 @@ function llama_dygraph_auto_bs8_fp32_DP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.53389835
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=9.54253578
     fi
     ips_base=-1
@@ -1502,7 +1503,7 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.39066124
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=9.41613197
     fi
     ips_base=-1
@@ -1572,7 +1573,7 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.38235474
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=9.4053154
     fi
     ips_base=-1
@@ -1643,7 +1644,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.38256836
-    if [ $(is_a100) ];then
+    if [ $IS_A100 -ne 0 ];then
         loss_base=9.4055137
     fi
     ips_base=-1
