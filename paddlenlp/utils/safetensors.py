@@ -14,6 +14,7 @@
 
 import copy
 import json
+import mmap
 from collections import OrderedDict
 
 import numpy as np
@@ -121,9 +122,10 @@ def readinto_numpy(meta, buffer, base_ptr):
 
 
 class PySafeSlice:
-    def __init__(self, info, bufferfile, base_ptr):
+    def __init__(self, info, bufferfile, base_ptr, buffermmap):
         self.info = info
         self.bufferfile = bufferfile
+        self.buffermmap = buffermmap
         self.base_ptr = base_ptr
 
         self.start = [0 for dim in self.shape]
@@ -213,13 +215,24 @@ class PySafeSlice:
             merge_indices.append((last_start, last_end))
         tensor = np.empty(shape=[1] if len(target_shape) == 0 else np.prod(target_shape), dtype=self.dtype)
 
+        tensor_view = memoryview(tensor.view(np.uint8))
+        # print(self.key, len(merge_indices), f"{self.nelements:,}")
         curr_data_ptr = 0
-        for start, end in indices:
-            data_len = (end - start) // self.bits
-            self.bufferfile.seek(self.start_offset + start)
-            view = memoryview(tensor)[curr_data_ptr : curr_data_ptr + data_len]
-            self.bufferfile.readinto(view)
-            curr_data_ptr += data_len
+        # if to many slice and each slice < 1M
+        if len(merge_indices) > 128 and (merge_indices[0][1] - merge_indices[0][0] < 1024 * 1024):
+            for start, end in merge_indices:
+                data_len = end - start
+                tensor_view[curr_data_ptr : curr_data_ptr + data_len] = self.buffermmap[
+                    self.start_offset + start : self.start_offset + end
+                ]
+                curr_data_ptr += data_len
+        else:
+            for start, end in merge_indices:
+                data_len = end - start
+                self.bufferfile.seek(self.start_offset + start)
+                view = tensor_view[curr_data_ptr : curr_data_ptr + data_len]
+                self.bufferfile.readinto(view)
+                curr_data_ptr += data_len
         return tensor.reshape(target_shape)
 
     def get(self, *args, **kwargs):
@@ -231,6 +244,9 @@ class PySafeSlice:
     @property
     def start_offset(self):
         return self.base_ptr + self.info["data_offsets"][0]
+
+    def get_shape(self):
+        return self.shape
 
     @property
     def shape(self):
@@ -259,15 +275,18 @@ class fast_safe_open:
         self.filename = filename
         self.framework = framework
         self.file = open(self.filename, "rb")
+        self.file_mmap = mmap.mmap(self.file.fileno(), 0, flags=mmap.MAP_PRIVATE)
         self.base, self.tensors_decs, self.__metadata__ = read_metadata(self.file)
         self.tensors = OrderedDict()
         for key, info in self.tensors_decs.items():
-            self.tensors[key] = PySafeSlice(info, self.file, self.base)
+            self.tensors[key] = PySafeSlice(info, self.file, self.base, self.file_mmap)
+            self.tensors[key].key = key
 
     def __enter__(self):
         return self
 
     def __exit__(self, *args):
+        self.file_mmap.close()
         self.file.close()
 
     def metadata(self):

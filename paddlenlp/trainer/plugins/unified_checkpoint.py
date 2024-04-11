@@ -248,9 +248,6 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
     if not isinstance(resolved_archive_file, list):
         resolved_archive_file = [resolved_archive_file]
 
-    rng = np.random.default_rng(paddle.distributed.get_rank())
-    rng.shuffle(resolved_archive_file)
-    logger.info(resolved_archive_file)
     error_msgs = []
 
     if len(resolved_archive_file) > 1:
@@ -503,10 +500,6 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
     if not isinstance(resolved_archive_file, list):
         resolved_archive_file = [resolved_archive_file]
 
-    rng = np.random.default_rng(paddle.distributed.get_rank())
-    rng.shuffle(resolved_archive_file)
-    logger.info(resolved_archive_file)
-
     if len(resolved_archive_file) > 1:
         resolved_archive_file = tqdm(resolved_archive_file, desc="Loading optimizer shards")
 
@@ -528,7 +521,6 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
         expected_keys_mw = get_expected_keys(sharded_metadata_mw, model, optimizer)
         if not isinstance(resolved_archive_file_mw, list):
             resolved_archive_file_mw = [resolved_archive_file_mw]
-        rng.shuffle(resolved_archive_file_mw)
         logger.info(resolved_archive_file_mw)
         if len(resolved_archive_file_mw) > 1:
             resolved_archive_file_mw = tqdm(resolved_archive_file_mw, desc="Loading master weights shards")
