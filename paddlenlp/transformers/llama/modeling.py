@@ -1295,29 +1295,42 @@ class LlamaPretrainedModel(PretrainedModel):
             "layers.0.mlp.up_proj.weight",
             "layers.0.mlp.gate_up_fused_proj.weight",
         )
+
+        convert_fast_ffn_keys = (
+            "layers.0.mlp.gate_up_fused_proj.weight",
+            "layers.0.mlp.gate_up_fused_proj.weight",
+        )
         num_heads = config.num_attention_heads
         num_key_value_heads = getattr(config, "num_key_value_heads", num_heads)
+        fuse_attention_qkv = getattr(config, "fuse_attention_qkv", False)
+        fuse_attention_ffn = getattr(config, "fuse_attention_ffn", False)
+        use_fast_ffn = getattr(config, "use_fast_ffn", True)
 
         final_actions = {}
         if is_fuse:
-            if config.fuse_attention_qkv:
+            if fuse_attention_qkv:
                 for i in range(config.num_hidden_layers):
                     keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
                     final_actions[keys] = partial(
                         fn, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
                     )
-            if config.fuse_attention_ffn:
+            if fuse_attention_ffn:
                 for i in range(config.num_hidden_layers):
                     keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
                     final_actions[keys] = fn
+            if not use_fast_ffn:
+                # convert when use_fast_ffn is False
+                for i in range(config.num_hidden_layers):
+                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in convert_fast_ffn_keys])
+                    final_actions[keys] = partial(fn, is_fast_ffn=False)
         else:
-            if not config.fuse_attention_qkv:
+            if fuse_attention_qkv:
                 for i in range(config.num_hidden_layers):
                     keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
                     final_actions[keys] = partial(
                         fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
                     )
-            if not config.fuse_attention_ffn:
+            if fuse_attention_ffn:
                 for i in range(config.num_hidden_layers):
                     keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
                     final_actions[keys] = partial(fn, split_nums=2)

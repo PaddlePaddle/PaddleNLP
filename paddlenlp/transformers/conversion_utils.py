@@ -490,7 +490,7 @@ def splited_qkv_to_tensor_parallel_qkv(weight_list, num_attention_heads):
 
 
 def fuse_param_func():
-    def fn(fuse_params, is_qkv=False, num_heads=None, num_key_value_heads=None):
+    def fn(fuse_params, is_qkv=False, num_heads=None, num_key_value_heads=None, is_fast_ffn=True):
         concat_fn = np.concatenate
         split_fn = np.split
         if isinstance(fuse_params[0], paddle.Tensor):
@@ -522,7 +522,11 @@ def fuse_param_func():
                 qkv_pairs.append(k_list[i])
                 qkv_pairs.append(v_list[i])
             return concat_fn(qkv_pairs, axis=-1)
-
+        elif not is_fast_ffn:
+            # fast_ffn
+            first = fuse_params[:, ::2]
+            second = fuse_params[:, 1::2]
+            return concat_fn([first, second], axis=-1)
         else:
             # fuse_attention_ffn
             return concat_fn(fuse_params, axis=-1)
