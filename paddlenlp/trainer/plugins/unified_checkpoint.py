@@ -65,9 +65,10 @@ from paddlenlp.utils.env import (
 from paddlenlp.utils.log import logger
 
 if is_safetensors_available():
-    from safetensors import safe_open
+    # from safetensors import safe_open
     from safetensors.numpy import save_file as safe_save_file
 
+    from paddlenlp.utils.safetensors import fast_safe_open as safe_open
 
 FP32_MASTER = "fp32_master_0"
 optimizer_scalar_name = [
