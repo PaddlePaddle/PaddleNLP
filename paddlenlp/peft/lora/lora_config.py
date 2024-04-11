@@ -93,16 +93,18 @@ class LoRAConfig:
                 "We will automatically set `use_quick_lora` to `False` to avoid potential inconsistencies."
             )
             self.use_quick_lora = False
+        self.scaling_update()
+
+    def scaling_update(self):
+        if not self.rslora:
+            self.scaling = self.lora_alpha / self.r
+        else:
+            self.scaling = self.lora_alpha / math.sqrt(self.r)
 
     @property
     def __dict__(self):
-        config_dict = asdict(self)
-        if not self.rslora:
-            scaling = self.lora_alpha / self.r
-        else:
-            scaling = self.lora_alpha / math.sqrt(self.r)
-        config_dict["scaling"] = scaling
-        return config_dict
+        self.scaling_update()
+        return asdict(self)
 
     def to_dict(self):
         return self.__dict__
