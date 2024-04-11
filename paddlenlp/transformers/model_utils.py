@@ -1829,10 +1829,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 state_dict.update(resume_state_dict)
 
             before_fuse_keys = list(state_dict.keys())
-            tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True)
-            state_dict, resume_state_dict = cls.convert_fuse_and_split(
-                config, state_dict, tp_actions if pre_tensor_parallel_split else None
-            )
+            if pre_tensor_parallel_split:
+                tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True)
+            else:
+                tp_actions = None
+            state_dict, resume_state_dict = cls.convert_fuse_and_split(config, state_dict, tp_actions)
             after_fuse_keys = list(state_dict.keys())
 
             fused_keys = list(set(before_fuse_keys) - set(after_fuse_keys))
