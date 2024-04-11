@@ -1160,7 +1160,6 @@ class DebertaV2ForSequenceClassification(DebertaV2PreTrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        # TODO: need to use pooler
         pooled_output = self.pooler(outputs[0])
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
