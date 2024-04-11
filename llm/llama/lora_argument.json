@@ -27,6 +27,7 @@
     "tensor_parallel_degree": 1,
     "pipeline_parallel_degree": 1,
     "lora": true,
+    "pissa": false,
     "zero_padding": false,
     "use_flash_attention": false
   }
