@@ -147,6 +147,7 @@ class LoRAConfig:
             raise ValueError(f"Can't find lora_config.json at '{pretrained_model_name_or_path}'")
 
         loaded_attributes = cls.from_json_file(config_file)
+        loaded_attributes.pop("scaling", None)
 
         config = cls(**kwargs)
 
