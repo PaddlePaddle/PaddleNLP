@@ -14,6 +14,7 @@
 
 import json
 import os
+import math
 from dataclasses import asdict, dataclass, field
 from typing import List, Optional, Union
 
@@ -93,7 +94,15 @@ class LoRAConfig:
                 "We will automatically set `use_quick_lora` to `False` to avoid potential inconsistencies."
             )
             self.use_quick_lora = False
-        self.lora_scaling = self.lora_alpha / self.r
+
+    @property
+    def scaling(self):
+        if not self.rslora and not self.pissa:
+            return self.lora_alpha / self.r
+        elif self.pissa:
+            return 1.0
+        else:
+            return self.lora_alpha / math.sqrt(self.r)
 
     @property
     def __dict__(self):
@@ -115,6 +124,7 @@ class LoRAConfig:
         os.makedirs(save_directory, exist_ok=True)
 
         output_dict = self.__dict__
+        output_dict["scaling"] = self.scaling
         output_path = os.path.join(save_directory, LORA_CONFIG_NAME)
 
         # save it
