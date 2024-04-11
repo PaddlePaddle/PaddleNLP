@@ -93,6 +93,7 @@ class LoRAConfig:
                 "We will automatically set `use_quick_lora` to `False` to avoid potential inconsistencies."
             )
             self.use_quick_lora = False
+        self.lora_scaling = self.lora_alpha / self.r
 
     @property
     def __dict__(self):
