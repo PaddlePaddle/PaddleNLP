@@ -658,10 +658,16 @@ class OPTPretrainedModel(PretrainedModel):
 
         # last key is fused key, other keys are to be fused.
         fuse_qkv_keys = (
-            "layers.0.self_attn.q_proj.weight",
-            "layers.0.self_attn.k_proj.weight",
-            "layers.0.self_attn.v_proj.weight",
-            "layers.0.self_attn.qkv_proj.weight",
+            "decoder.layers.0.self_attn.q_proj.weight",
+            "decoder.layers.0.self_attn.k_proj.weight",
+            "decoder.layers.0.self_attn.v_proj.weight",
+            "decoder.layers.0.self_attn.qkv_proj.weight",
+        )
+        fuse_qkv_bias_keys = (
+            "decoder.layers.0.self_attn.q_proj.bias",
+            "decoder.layers.0.self_attn.k_proj.bias",
+            "decoder.layers.0.self_attn.v_proj.bias",
+            "decoder.layers.0.self_attn.qkv_proj.bias",
         )
         num_heads = config.num_attention_heads
         num_key_value_heads = getattr(config, "num_key_value_heads", num_heads)
@@ -671,15 +677,23 @@ class OPTPretrainedModel(PretrainedModel):
         if is_fuse:
             if fuse_attention_qkv:
                 for i in range(config.num_hidden_layers):
-                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
-                    final_actions[keys] = partial(
+                    weight_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
+                    final_actions[weight_keys] = partial(
+                        fn, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                    )
+                    bias_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_bias_keys])
+                    final_actions[bias_keys] = partial(
                         fn, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
                     )
         else:
             if fuse_attention_qkv:
                 for i in range(config.num_hidden_layers):
-                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
-                    final_actions[keys] = partial(
+                    weight_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
+                    final_actions[weight_keys] = partial(
+                        fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                    )
+                    bias_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_bias_keys])
+                    final_actions[bias_keys] = partial(
                         fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
                     )
         return final_actions
@@ -721,10 +735,6 @@ class OPTPretrainedModel(PretrainedModel):
                 [
                     f"decoder.layers.{layer_index}.self_attn.q_proj.bias",
                     f"decoder.layers.{layer_index}.self_attn.q_proj.bias",
-                ],
-                [
-                    f"decoder.layers.{layer_index}.self_attn.qkv_proj.weight",
-                    f"decoder.layers.{layer_index}.self_attn.qkv_proj.weight",
                 ],
                 [
                     f"decoder.layers.{layer_index}.self_attn.out_proj.weight",

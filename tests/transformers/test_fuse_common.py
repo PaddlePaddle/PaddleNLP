@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+import copy
 import glob
 import os
 import tempfile
@@ -40,14 +41,13 @@ def common_test_load(model, model_class, config, tempdir):
     with paddle.no_grad():
         first = model(input_ids)[0]
 
-    config.fuse_attention_qkv = True
-    config.fuse_attention_ffn = True
-    model = model_class.from_pretrained(tempdir, config=config)
+    model_fused = model_class.from_pretrained(tempdir, config=config)
 
-    model.eval()
+    model_fused.eval()
     with paddle.no_grad():
-        second = model(input_ids)[0]
+        second = model_fused(input_ids)[0]
     assert paddle.allclose(paddle.mean(first), paddle.mean(second), atol=1e-7)
+    assert paddle.allclose(first, second, atol=1e-4)
 
     files = glob.glob(tempdir + "/*")
     for f in files:
@@ -55,6 +55,10 @@ def common_test_load(model, model_class, config, tempdir):
 
 
 def common_test_save(model, config, model_class=None):
+    config = copy.deepcopy(config)
+    config.fuse_attention_qkv = True
+    config.fuse_attention_ffn = True
+
     with tempfile.TemporaryDirectory() as tempdir:
         # test load pdparams: model.pdparams
         model.save_pretrained(save_dir=tempdir)
@@ -82,34 +86,28 @@ def _test_llama():
     common_test_save(model, config, LlamaForCausalLM)
 
 
-def _test_chatglm():
-    from paddlenlp.transformers import ChatGLMConfig, ChatGLMForCausalLM
+def _test_gpt():
+    from paddlenlp.transformers import GPTConfig, GPTForCausalLM
 
-    config = ChatGLMConfig()
+    config = GPTConfig()
     config = prepare_config(config)
-    model = ChatGLMForCausalLM.from_config(config)
-    common_test_save(model, ChatGLMForCausalLM)
+    model = GPTForCausalLM.from_config(config)
+    common_test_save(model, config, GPTForCausalLM)
 
 
-def _test_bloom():
-    from paddlenlp.transformers import BloomConfig, BloomForCausalLM
+def _test_opt():
+    from paddlenlp.transformers import OPTConfig, OPTForCausalLM
 
-    config = BloomConfig()
+    config = OPTConfig()
     config = prepare_config(config)
-    model = BloomForCausalLM.from_config(config)
-    common_test_save(model, BloomForCausalLM)
+    config.intermediate_size = 512
+    config.word_embed_proj_dim = 512
+    model = OPTForCausalLM.from_config(config)
+    common_test_save(model, config, OPTForCausalLM)
 
 
 class TestTensorParallel(unittest.TestCase):
     def test_model_load_merge(self):
         _test_llama()
-        # _test_chatglm()
-        # _test_bloom()
-
-
-import unittest
-
-suit = unittest.TestSuite()
-suit.addTest(TestTensorParallel("test_model_load_merge"))
-runner = unittest.TextTestRunner(verbosity=2)
-runner.run(suit)
+        _test_gpt()
+        _test_opt()
