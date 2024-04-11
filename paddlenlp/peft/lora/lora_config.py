@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import json
+import math
 import os
 from dataclasses import asdict, dataclass, field
 from typing import List, Optional, Union
@@ -92,11 +93,16 @@ class LoRAConfig:
                 "We will automatically set `use_quick_lora` to `False` to avoid potential inconsistencies."
             )
             self.use_quick_lora = False
-        self.lora_scaling = self.lora_alpha / self.r
 
     @property
     def __dict__(self):
-        return asdict(self)
+        config_dict = asdict(self)
+        if not self.rslora:
+            scaling = self.lora_alpha / self.r
+        else:
+            scaling = self.lora_alpha / math.sqrt(self.r)
+        config_dict["scaling"] = scaling
+        return config_dict
 
     def to_dict(self):
         return self.__dict__
