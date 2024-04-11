@@ -1822,6 +1822,24 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         del state_dict[checkpoint_key]
             return mismatched_keys
 
+        def _fuse_or_split_keys(
+            state_dict, config, loaded_keys, pre_tensor_parallel_split=False, resume_state_dict=None
+        ):
+            if resume_state_dict is not None:
+                state_dict.update(resume_state_dict)
+
+            before_fuse_keys = list(state_dict.keys())
+            tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True)
+            state_dict, resume_state_dict = cls.convert_fuse_and_split(
+                config, state_dict, tp_actions if pre_tensor_parallel_split else None
+            )
+            after_fuse_keys = list(state_dict.keys())
+
+            fused_keys = list(set(before_fuse_keys) - set(after_fuse_keys))
+            new_keys = list(set(after_fuse_keys) - set(before_fuse_keys))
+
+            return state_dict, resume_state_dict, fused_keys, new_keys
+
         if state_dict is not None:
             # DONT Hold tensor parallel here, only hold afer load state dict.
             # Whole checkpoint
@@ -1830,6 +1848,16 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             import paddlenlp.ops.fast_transformer.transformer.decoding as ft_decoding
 
             state_dict = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_dict)
+
+            # have loaded all state_dict, no resume state_dict
+            state_dict, _, fused_keys, new_keys = _fuse_or_split_keys(
+                state_dict,
+                config,
+                loaded_keys,
+                pre_tensor_parallel_split=True if config.tensor_parallel_degree > 1 else False,
+            )
+            missing_keys = list(set(missing_keys) - set(new_keys))
+            unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
 
             mismatched_keys = _find_mismatched_keys(
                 state_dict,
@@ -1878,28 +1906,27 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
                 # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
                 filter_dict_keys = set(expected_keys)
-                if (
-                    config.quantization_config.is_weight_quantize()
-                    or config.fuse_attention_qkv
-                    or config.fuse_attention_ffn
-                ):
+                fuse_or_split_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys)
+                fuse_or_split_keys = fuse_or_split_actions.keys()
+                for k in fuse_or_split_keys:
+                    filter_dict_keys |= set(k)
+                if config.quantization_config.is_weight_quantize():
                     filter_dict_keys = None
 
                 state_dict = load_state_dict(
                     shard_file, tp_actions if pre_tensor_parallel_split else None, filter_dict_keys
                 )
 
-                if config.fuse_attention_qkv or config.fuse_attention_ffn:
-                    state_dict.update(resume_state_dict)
-                    before_fuse_keys = list(state_dict.keys())
-                    state_dict, resume_state_dict = cls.convert_fuse_and_split(
-                        config, state_dict, tp_actions if pre_tensor_parallel_split else None
-                    )
-                    after_fuse_keys = list(state_dict.keys())
-                    fused_keys = list(set(before_fuse_keys) - set(after_fuse_keys))
-                    new_keys = list(set(after_fuse_keys) - set(before_fuse_keys))
-                    missing_keys = list(set(missing_keys) - set(new_keys))
-                    unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
+                # convert for fusing or splitting weights
+                state_dict, resume_state_dict, fused_keys, new_keys = _fuse_or_split_keys(
+                    state_dict,
+                    config,
+                    loaded_keys,
+                    pre_tensor_parallel_split=pre_tensor_parallel_split,
+                    resume_state_dict=resume_state_dict,
+                )
+                missing_keys = list(set(missing_keys) - set(new_keys))
+                unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
 
                 if config.quantization_config.is_weight_quantize():
                     state_dict = convert_to_quantize_state_dict(
@@ -2192,7 +2219,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     # cache_dir=os.path.join(cache_dir, pretrained_model_name_or_path, subfolder),
                     cache_dir=convert_dir,
                 )
-                state_dict, _ = cls.convert_fuse_and_split(config, state_dict)
             elif (
                 resolved_archive_file.endswith(PADDLE_WEIGHTS_NAME)
                 or resolved_archive_file.endswith(PADDLE_WEIGHTS_INDEX_NAME)
@@ -2207,17 +2233,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # 4. loading non-sharded ckpt from the state dict
             if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
                 state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
-                tp_actions = cls.get_tensor_parallel_convert_actions(config, state_dict.keys())
-                state_dict, _ = cls.convert_fuse_and_split(config, state_dict, tp_actions)
             elif config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model.safetensors"):
                 with safe_open(resolved_archive_file, framework="np", device="cpu") as f:
                     loaded_keys = f.keys()
                 tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
                 state_dict = load_state_dict(resolved_archive_file, tp_actions)
-                state_dict, _ = cls.convert_fuse_and_split(config, state_dict, tp_actions)
             else:
                 state_dict = load_state_dict(resolved_archive_file)
-                state_dict, _ = cls.convert_fuse_and_split(config, state_dict)
 
             logger.info("Loaded weights file from disk, setting weights to model.")
 
