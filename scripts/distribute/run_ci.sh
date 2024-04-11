@@ -50,6 +50,7 @@ install_paddlenlp(){
     python -m pip uninstall paddlenlp -y
     rm -rf build/ && rm -rf paddlenlp.egg-info/ && rm -rf dist/
     python -m pip install --ignore-installed -r requirements.txt
+    python -m pip install --ignore-installed -r requirements-dev.txt
     python setup.py install
     python setup.py build_ext
     python setup.py bdist_wheel
