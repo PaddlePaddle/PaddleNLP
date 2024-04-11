@@ -247,7 +247,7 @@ class OPTInferenceModel(OPTPretrainedModel):
                 seq_lens=seq_lens,
                 rotary_embs=None,
                 rotary_emb_dims=0,
-                time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
+                time_step=paddle.increment(attention_mask.shape[-1], -1) if is_decoder else None,
             )
 
         output = hidden_states

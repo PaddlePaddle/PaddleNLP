@@ -279,7 +279,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                 pre_caches=pre_caches,
                 pre_caches_length=position_offset,
                 seq_lens=seq_len,
-                time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
+                time_step=paddle.increment(attention_mask.shape[-1], -1) if is_decoder else None,
             )
 
         # Add last hidden state

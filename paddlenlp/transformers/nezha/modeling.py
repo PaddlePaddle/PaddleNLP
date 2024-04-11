@@ -234,7 +234,7 @@ class NeZhaEmbeddings(nn.Layer):
         if input_ids is not None:
             inputs_embeds = self.word_embeddings(input_ids)
 
-        input_shape = paddle.shape(inputs_embeds)[:-1]
+        input_shape = inputs_embeds.shape[:-1]
 
         ones = paddle.ones(input_shape, dtype="int64")
         seq_length = paddle.cumsum(ones, axis=1)
@@ -823,7 +823,7 @@ class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
             if end_positions.ndim > 1:
                 end_positions = end_positions.squeeze(-1)
             # sometimes the start/end positions are outside our model inputs, we ignore these terms
-            ignored_index = paddle.shape(start_logits)[1]
+            ignored_index = start_logits.shape[1]
             start_positions = start_positions.clip(0, ignored_index)
             end_positions = end_positions.clip(0, ignored_index)
 
