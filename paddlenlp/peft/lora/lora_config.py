@@ -85,7 +85,7 @@ class LoRAConfig:
             "help": "Whether to use quick lora, The use of Quick LoRa will only take effect when lora_dropout is set to 0."
         },
     )
-    scaling: float = field(default=1.0, metadata={"help": "Lora scaling"})
+    scaling: float = field(default=1.0, metadata={"help": "Lora scaling. Inference Only"})
 
     def __post_init__(self):
         if self.use_quick_lora and self.lora_dropout > 0:
