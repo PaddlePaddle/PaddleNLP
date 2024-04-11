@@ -75,6 +75,12 @@ class LoRAConfig:
     base_model_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "The name of the base model to use."}
     )
+    lora_scaling: float = field(default=1.0, metadata={"help": "Lora scaling"})
+
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+        self.lora_scaling = self.lora_alpha / self.r
 
     @property
     def __dict__(self):
