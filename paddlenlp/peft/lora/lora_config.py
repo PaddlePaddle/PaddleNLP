@@ -75,12 +75,10 @@ class LoRAConfig:
     base_model_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "The name of the base model to use."}
     )
-    lora_scaling: float = field(default=1.0, metadata={"help": "Lora scaling"})
 
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-        self.lora_scaling = self.lora_alpha / self.r
+    @property
+    def scaling(self):
+        return self.lora_alpha / self.r
 
     @property
     def __dict__(self):
@@ -102,6 +100,7 @@ class LoRAConfig:
         os.makedirs(save_directory, exist_ok=True)
 
         output_dict = self.__dict__
+        output_dict["scaling"] = self.scaling
         output_path = os.path.join(save_directory, LORA_CONFIG_NAME)
 
         # save it
@@ -124,6 +123,7 @@ class LoRAConfig:
             raise ValueError(f"Can't find lora_config.json at '{pretrained_model_name_or_path}'")
 
         loaded_attributes = cls.from_json_file(config_file)
+        loaded_attributes.pop("scaling", None)
 
         config = cls(**kwargs)
 
