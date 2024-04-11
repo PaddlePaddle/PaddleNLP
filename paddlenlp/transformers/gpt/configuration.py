@@ -18,7 +18,7 @@ from typing import Dict
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
-__all__ = ["GPT_PRETRAINED_INIT_CONFIGURATION", "GPTConfig"]
+__all__ = ["GPT_PRETRAINED_INIT_CONFIGURATION", "GPTConfig", "GPT_PRETRAINED_RESOURCE_FILES_MAP"]
 
 GPT_PRETRAINED_INIT_CONFIGURATION = {
     "gpt-cpm-large-cn": {  # 2.6B
@@ -145,6 +145,17 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
         "eos_token_id": 50256,
         "eol_token_id": 198,
     },
+}
+
+GPT_PRETRAINED_RESOURCE_FILES_MAP = {
+    "model_state": {
+        "gpt-cpm-large-cn": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
+        "gpt-cpm-small-cn-distill": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
+        "gpt2-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-en.pdparams",
+        "gpt2-medium-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-medium-en.pdparams",
+        "gpt2-large-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-large-en.pdparams",
+        "gpt2-xl-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-xl-en.pdparams",
+    }
 }
 
 
