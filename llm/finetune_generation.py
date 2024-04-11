@@ -14,6 +14,7 @@
 import json
 import os
 import sys
+from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
@@ -49,6 +50,23 @@ from paddlenlp.transformers import (
 from paddlenlp.utils.log import logger
 
 
+def add_start_docstrings(*docstr):
+    def docstring_decorator(fn):
+        fn.__doc__ = "".join(docstr) + (fn.__doc__ if fn.__doc__ is not None else "")
+        return fn
+
+    return docstring_decorator
+
+
+@dataclass
+@add_start_docstrings(TrainingArguments.__doc__)
+class FinetuneArguments(TrainingArguments):
+    decay_steps: int = field(
+        default=0,
+        metadata={"help": "The steps use to control the learing rate."},
+    )
+
+
 def read_local_dataset(path):
     with open(path, "r", encoding="utf-8") as fp:
         for line in fp:
@@ -57,7 +75,7 @@ def read_local_dataset(path):
 
 def main():
     # Arguments
-    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
+    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, FinetuneArguments))
     # Support format as "args.json --arg1 value1 --arg2 value2.”
     # In case of conflict, command line arguments take precedence.
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
@@ -154,6 +172,30 @@ def main():
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
 
+        model_config.use_fused_rms_norm = model_args.use_fused_rms_norm
+        model_config.fuse_attention_qkv = model_args.fuse_attention_qkv
+        model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
+        model_config.recompute_granularity = model_args.recompute_granularity
+        model_config.virtual_pp_degree = model_args.virtual_pp_degree
+        model_config.sequence_parallel = model_args.sequence_parallel
+        model_config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
+        model_config.use_fused_rope = model_args.use_fused_rope
+
+        model_config.no_recompute_layers = model_args.no_recompute_layers
+        model_config.pp_recompute_interval = model_args.pp_recompute_interval
+        model_config.recompute_use_reentrant = model_args.recompute_use_reentrant
+        model_config.use_recompute = training_args.recompute
+
+        model_config.tensor_parallel_degree = training_args.tensor_parallel_degree
+        model_config.tensor_parallel_rank = training_args.tensor_parallel_rank
+
+        # Config for model using dropout, such as GPT.
+        model_config.hidden_dropout_prob = model_args.hidden_dropout_prob
+        model_config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
+
+        model_config.sep_parallel_degree = training_args.sep_parallel_degree
+        model_config.tensor_parallel_output = True
+        model_config.seq_length = data_args.max_length
         if not training_args.autotuner_benchmark:
             model = AutoModelForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
@@ -422,6 +464,7 @@ def main():
                 lora_alpha=2 * model_args.lora_rank if not model_args.rslora else 4,
                 rslora=model_args.rslora,
                 lora_plus_scale=model_args.lora_plus_scale,
+                pissa=model_args.pissa,
                 merge_weights=False,
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 dtype=dtype,
@@ -494,6 +537,7 @@ def main():
             padding=padding,
             max_label_length=max_length,
             return_tensors="np",
+            pad_to_multiple_of=data_args.pad_to_multiple_of,
         ),
         do_generation=data_args.eval_with_do_generation,
         callbacks=[InTokensIterDatasetCallback()] if isinstance(train_ds, InTokensIterableDataset) else None,

@@ -23,6 +23,7 @@ from paddlenlp.utils.log import logger
 from tests.testing_utils import slow
 
 
+@unittest.skip("skipping due to connection error!")
 class ModelLoadTester(unittest.TestCase):
     @pytest.mark.skip
     def test_config_diff(self, config_1, config_2):

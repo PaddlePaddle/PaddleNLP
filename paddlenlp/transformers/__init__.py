@@ -283,6 +283,12 @@ from .rw.tokenizer import *
 from .qwen import *
 from .mixtral.modeling import *
 from .mixtral.configuration import *
+from .deberta.modeling import *
+from .deberta.tokenizer import *
+from .deberta.configuration import *
+from .deberta_v2.modeling import *
+from .deberta_v2.tokenizer import *
+from .deberta_v2.configuration import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available
