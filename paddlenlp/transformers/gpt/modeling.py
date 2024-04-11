@@ -18,7 +18,6 @@ from __future__ import annotations
 import collections
 import contextlib
 import math
-import re
 from functools import partial
 
 import numpy as np
@@ -805,34 +804,39 @@ class GPTPretrainedModel(PretrainedModel):
         return mappings
 
     @classmethod
-    def _get_fused_param_mappings(cls):
+    def _get_fuse_or_split_param_mappings(cls, config: GPTConfig, is_fuse=False):
         # return parameter fuse utils
-        from paddlenlp.transformers.conversion_utils import (
-            merged_as_tensor_parallel_qkv,
+        from paddlenlp.transformers.conversion_utils import split_or_fuse_func
+
+        fn = split_or_fuse_func(is_fuse=is_fuse)
+
+        # last key is fused key, other keys are to be fused.
+        fuse_qkv_keys = (
+            "layers.0.self_attn.q_proj.weight",
+            "layers.0.self_attn.k_proj.weight",
+            "layers.0.self_attn.v_proj.weight",
+            "layers.0.self_attn.qkv_proj.weight",
         )
+        num_heads = config.num_attention_heads
+        num_key_value_heads = getattr(config, "num_key_value_heads", num_heads)
+        fuse_attention_qkv = getattr(config, "fuse_attention_qkv", False)
 
-        # attention: q,k,v -> qkv, ffn: gate, up -> gate_up
-        mappings = {
-            "fuse_action": [merged_as_tensor_parallel_qkv, None],
-            "split_action": [None, None],
-            "attn_param_names": {
-                "qkv_proj": lambda layer_id: re.sub(
-                    r"\d+", str(layer_id), "gpt.decoder.layers.0.self_attn.qkv_proj.weight"
-                ),
-                "q_proj": lambda layer_id: re.sub(
-                    r"\d+", str(layer_id), "gpt.decoder.layers.0.self_attn.q_proj.weight"
-                ),
-                "k_proj": lambda layer_id: re.sub(
-                    r"\d+", str(layer_id), "gpt.decoder.layers.0.self_attn.k_proj.weight"
-                ),
-                "v_proj": lambda layer_id: re.sub(
-                    r"\d+", str(layer_id), "gpt.decoder.layers.0.self_attn.v_proj.weight"
-                ),
-            },
-            "ffn_param_names": {"gate_up_proj": None, "gate_proj": None, "up_proj": None},
-        }
-
-        return mappings
+        final_actions = {}
+        if is_fuse:
+            if fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
+                    final_actions[keys] = partial(
+                        fn, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                    )
+        else:
+            if fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
+                    final_actions[keys] = partial(
+                        fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                    )
+        return final_actions
 
     @classmethod
     def _get_name_mappings(cls, config: GPTConfig) -> list[StateDictNameMapping]:

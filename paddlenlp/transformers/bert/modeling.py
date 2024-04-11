@@ -13,7 +13,6 @@
 # limitations under the License.
 from __future__ import annotations
 
-# import re
 import warnings
 from typing import Optional, Tuple
 
@@ -193,14 +192,6 @@ class BertPretrainedModel(PretrainedModel):
                     f"encoder.layers.{layer_index}.self_attn.v_proj.bias",
                 ],
                 [
-                    f"encoder.layer.{layer_index}.attention.self.query-key-value.weight",
-                    f"encoder.layers.{layer_index}.self_attn.qkv_proj.weight",
-                ],
-                [
-                    f"encoder.layer.{layer_index}.attention.self.query-key-value.bias",
-                    f"encoder.layers.{layer_index}.self_attn.qkv_proj.bias",
-                ],
-                [
                     f"encoder.layer.{layer_index}.attention.output.dense.weight",
                     f"encoder.layers.{layer_index}.self_attn.out_proj.weight",
                     "transpose",
@@ -256,36 +247,6 @@ class BertPretrainedModel(PretrainedModel):
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
-
-    # @classmethod
-    # def _get_fused_param_mappings(cls):
-    #     # return parameter fuse utils
-    #     from paddlenlp.transformers.conversion_utils import (
-    #         merged_as_tensor_parallel_qkv,
-    #     )
-
-    #     # attention: q,k,v -> qkv, ffn: gate, up -> gate_up
-    #     mappings = {
-    #         "fuse_action": [merged_as_tensor_parallel_qkv, None],
-    #         "split_action": [None, None],
-    #         "attn_param_names": {
-    #             "qkv_proj": lambda layer_id: re.sub(
-    #                 r"\d+", str(layer_id), "bert.encoder.layers.0.self_attn.qkv_proj.weight"
-    #             ),
-    #             "q_proj": lambda layer_id: re.sub(
-    #                 r"\d+", str(layer_id), "bert.encoder.layers.0.self_attn.q_proj.weight"
-    #             ),
-    #             "k_proj": lambda layer_id: re.sub(
-    #                 r"\d+", str(layer_id), "bert.encoder.layers.0.self_attn.k_proj.weight"
-    #             ),
-    #             "v_proj": lambda layer_id: re.sub(
-    #                 r"\d+", str(layer_id), "bert.encoder.layers.0.self_attn.v_proj.weight"
-    #             ),
-    #         },
-    #         "ffn_param_names": {"gate_up_proj": None, "gate_proj": None, "up_proj": None},
-    #     }
-
-    #     return mappings
 
     def _init_weights(self, layer):
         """Initialization hook"""
