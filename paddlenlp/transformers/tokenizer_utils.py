@@ -31,7 +31,8 @@ import numpy
 import numpy as np
 import paddle
 import six
-from jinja2.exceptions import TemplateError
+from jinja2 import Template
+from jinja2.exceptions import TemplateError, TemplateSyntaxError
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 from paddle.utils import try_import
 
@@ -516,7 +517,7 @@ class ChatTemplate:
 
     @staticmethod
     @lru_cache()
-    def _compile_jinja_template(chat_template):
+    def _compile_jinja_template(chat_template) -> Template:
         def raise_exception(message):
             raise TemplateError(message)
 
@@ -598,7 +599,6 @@ class ChatTemplate:
             raise ValueError(
                 "The length of last conversation must be one, eg: [[user-query, bot-answer], [user-query, bot-answer], ..., [user-query]]"
             )
-
         if len(conversations[-1]) > 1:
             logger.warning(
                 f"The last conversation is not a single-round, chat-template will skip the conversation: {conversations[-1][1:]}"
@@ -623,7 +623,7 @@ class ChatTemplateMixin:
 
     def apply_chat_template(
         self,
-        conversation: List[List[str, str]] | str,
+        conversation: List[List[str, str] | Dict[str, str]] | str,
         tokenize: bool = True,
         context_data: Dict[str, Any] = {},
         **tokenizer_kwargs
@@ -638,6 +638,26 @@ class ChatTemplateMixin:
         Returns:
             str | dict[str, numpy.ndarray | paddle.Tensor]: return the result of applied data
         """
+        if not self.chat_template:
+            raise ValueError("chat_template is not set, please set chat_template first.")
+        elif isinstance(self.chat_template, Template):
+            add_generation_prompt = tokenizer_kwargs.pop("add_generation_prompt", True)
+            query = self._apply_chat_template(conversation, context_data, add_generation_prompt=add_generation_prompt)
+        elif isinstance(self.chat_template, ChatTemplate):
+            query = self._apply_chat_template_paddle(conversation, context_data)
+
+        if not tokenize:
+            return query
+
+        # chat_template should not add special tokens
+        tokenizer_kwargs["add_special_tokens"] = False
+        return self(query, **tokenizer_kwargs)
+
+    def _apply_chat_template_paddle(
+        self,
+        conversation: List[List[str, str]] | str,
+        context_data: Dict[str, Any] = {},
+    ) -> str | dict[str, numpy.ndarray | paddle.Tensor]:
         context_data = self.chat_template._init_context_data(context_data)
 
         if isinstance(conversation, str):
@@ -649,14 +669,45 @@ class ChatTemplateMixin:
             )
 
         query = self.chat_template(conversation, context_data=context_data)
-        if not tokenize:
-            return query
+        return query
 
-        # chat_template should not add special tokens
-        tokenizer_kwargs["add_special_tokens"] = False
-        return self(query, **tokenizer_kwargs)
+    def _apply_chat_template(
+        self,
+        conversation: List[List[str, str] | Dict[str, str]] | str,
+        context_data: Dict[str, Any] = {},
+        add_generation_prompt=True,
+    ) -> str | dict[str, numpy.ndarray | paddle.Tensor]:
+        if isinstance(conversation, str):
+            conversations = [{"role": "user", "content": conversation}]
+        elif isinstance(conversation, list):
+            conversations = []
+            for index, item in enumerate(conversation):
+                if isinstance(item, dict):
+                    conversations = conversation
+                    break
+                elif isinstance(item, list):
+                    assert 1 <= len(item) <= 2
+                    if isinstance(item[0], str):
+                        conversations.append({"role": "user", "content": item[0]})
+                        if len(item) == 2 and isinstance(item[1], str):
+                            conversations.append({"role": "assistant", "content": item[1]})
+                        else:
+                            # item里只有一个元素，说明为最后一轮
+                            if index != len(conversation) - 1:
+                                raise ValueError(f"Round {index} has error round")
+                    else:
+                        raise ValueError("Each round in list should be string")
+                else:
+                    raise ValueError(
+                        "apply_chat_template do not support appling batch conversations, "
+                        "so you should apply the conversation one by one."
+                    )
+        query = self.chat_template.render(
+            messages=conversations, **self.special_tokens_map, add_generation_prompt=add_generation_prompt
+        )
+        return query
 
-    def encode_chat_inputs(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}):
+    def encode_chat_inputs(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}, **kwargs):
         """Encodes conversation to pairs of token ids.
         Turn 0: bos + system + sep + user     bot + eos
         Turn t: sep + bot + query             bot + eos
@@ -668,6 +719,16 @@ class ChatTemplateMixin:
         Returns:
             List[list[int], list[int]]: the pair of input_ids and target_ids
         """
+        if not self.chat_template:
+            raise ValueError("chat_template is not set, please set chat_template first.")
+        elif isinstance(self.chat_template, Template):
+            add_generation_prompt = kwargs.pop("add_generation_prompt", True)
+            query = self._encode_chat_inputs(conversations, context_data, add_generation_prompt=add_generation_prompt)
+        elif isinstance(self.chat_template, ChatTemplate):
+            query = self._encode_chat_inputs_paddle(conversations, context_data)
+        return query
+
+    def _encode_chat_inputs_paddle(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}):
         context_data = self.chat_template._init_context_data(context_data)
         # encode system
         result = {}
@@ -688,6 +749,68 @@ class ChatTemplateMixin:
             user_ids = self.encode(user_input, add_special_tokens=False)["input_ids"]
             bot_ids = self.encode(bot_output, add_special_tokens=False)["input_ids"]
             conversation_ids.append([user_ids, bot_ids])
+
+        result["conversations"] = conversation_ids
+        return result
+
+    def _encode_chat_inputs(
+        self,
+        conversations: List[List[str, str]],
+        context_data: Dict[str, Any] = {},
+        system: str = None,
+        add_generation_prompt=True,
+    ):
+        result = {}
+        # conversation = []
+        # if origin_msg[0]['role'] == 'system':
+        #     system = origin_msg.pop(0)
+        if system:
+            try:
+                self.chat_template.render(messages={"role": "system", "content": system})
+            except Exception as e:
+                raise ValueError("System is not supported in this tokenizer.", e)
+
+        conversation_dict = []
+        origin_msg = []
+        for round in conversations:
+            round_role = [
+                {"role": "user", "content": round[0]},
+                {"role": "assistant", "content": round[1]},
+            ]
+            origin_msg.extend(round_role)
+            conversation_dict.append(round_role)
+        ans = []
+
+        for conv in conversation_dict:
+            roundi = [system] + conv if system else conv
+            roundi_str = self.chat_template.render(messages=roundi, add_generation_prompt=False)
+            roundi_no_ans = [system] + [conv[0]] if system else [conv[0]]
+            roundi_no_ans_str = self.chat_template.render(
+                messages=roundi_no_ans, add_generation_prompt=add_generation_prompt
+            )
+            ans_roundi = roundi_str[len(roundi_no_ans_str) :]
+            ans.append(ans_roundi)
+
+        regex_pattern = "|".join(map(re.escape, ans))
+        non_learnable_parts = re.split(
+            r"(?:%s)" % regex_pattern,
+            self.chat_template.render(messages=origin_msg, add_generation_prompt=False),
+        )
+        if non_learnable_parts[-1] == "":
+            non_learnable_parts.pop()
+
+        assert len(non_learnable_parts) == len(ans)
+
+        conversation_ids = []
+        for i in range(len(non_learnable_parts)):
+            conversation_ids.append(
+                self.batch_encode(
+                    [non_learnable_parts[i], ans[i]],
+                    add_special_tokens=False,
+                    padding=False,
+                )["input_ids"]
+            )
+            # print(self.batch_decode(conversation_ids[i]))
 
         result["conversations"] = conversation_ids
         return result
@@ -713,6 +836,10 @@ class ChatTemplateMixin:
         if not os.path.exists(chat_template_file):
             return tokenizer
 
+        if tokenizer.chat_template is not None:
+            logger.warning(
+                "Chat-template already exists in config file, it will be overwritten by chat_template.json file."
+            )
         tokenizer.init_chat_template(chat_template_file)
         return tokenizer
 
@@ -724,9 +851,16 @@ class ChatTemplateMixin:
         """
         if isinstance(chat_template, str):
             if not os.path.exists(chat_template):
-                raise FileNotFoundError("The chat-template file does not exist: {}".format(chat_template))
-
-            self.chat_template = ChatTemplate.from_file(chat_template)
+                try:
+                    self.chat_template: Template = ChatTemplate._compile_jinja_template(chat_template)
+                except TemplateSyntaxError:
+                    # It is neither jinjia string nor path string
+                    raise TemplateSyntaxError(
+                        "The chat-template in json is not valid jinja string: {}".format(chat_template),
+                        lineno=0,  # fake lineno, useless required msg
+                    )
+            else:
+                self.chat_template = ChatTemplate.from_file(chat_template)
         elif isinstance(chat_template, dict):
             self.chat_template = ChatTemplate.from_dict(chat_template)
         elif isinstance(chat_template, ChatTemplate):
