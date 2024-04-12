@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import math
+import os
 import warnings
 from functools import partial
 from typing import Optional, Tuple
@@ -78,8 +79,6 @@ from .configuration import (
 
 try:
     if get_env_device() == "npu":
-        import os
-
         from paddle.base import core
 
         for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
@@ -95,6 +94,13 @@ __all__ = [
     "LlamaForCausalLM",
     "LlamaPretrainingCriterion",
 ]
+
+
+def is_mc2_valid():
+    current_device = get_env_device()
+    if current_device == "npu":
+        return True
+    return False
 
 
 def _get_interleave(n):
@@ -568,8 +574,17 @@ class LlamaMLP(nn.Layer):
         self.fuse_attention_ffn = config.fuse_attention_ffn
 
         if config.sequence_parallel:
-            ColumnParallelLinear = ColumnSequenceParallelLinear
-            RowParallelLinear = RowSequenceParallelLinear
+            if is_mc2_valid and int(os.getenv("FLAGS_NPU_MC2", 0)):
+                from paddlenlp.transformers.mc2_seqence_parallel_linear import (
+                    MC2ColumnSeqParallelLinear,
+                    MC2RowSeqParallelLinear,
+                )
+
+                ColumnParallelLinear = MC2ColumnSeqParallelLinear
+                RowParallelLinear = MC2RowSeqParallelLinear
+            else:
+                ColumnParallelLinear = ColumnSequenceParallelLinear
+                RowParallelLinear = RowSequenceParallelLinear
         else:
             ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
             RowParallelLinear = fleet.meta_parallel.RowParallelLinear
@@ -673,7 +688,7 @@ class LlamaAttention(nn.Layer):
                 )
 
         self.use_fused_rope = config.use_fused_rope
-        if self.use_fused_rope:
+        if self.use_fused_rope and get_env_device() != "npu":
             if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
@@ -682,8 +697,17 @@ class LlamaAttention(nn.Layer):
                 self.use_fused_rope = False
 
         if config.sequence_parallel:
-            ColumnParallelLinear = ColumnSequenceParallelLinear
-            RowParallelLinear = RowSequenceParallelLinear
+            if is_mc2_valid and int(os.getenv("FLAGS_NPU_MC2", 0)):
+                from paddlenlp.transformers.mc2_seqence_parallel_linear import (
+                    MC2ColumnSeqParallelLinear,
+                    MC2RowSeqParallelLinear,
+                )
+
+                ColumnParallelLinear = MC2ColumnSeqParallelLinear
+                RowParallelLinear = MC2RowSeqParallelLinear
+            else:
+                ColumnParallelLinear = ColumnSequenceParallelLinear
+                RowParallelLinear = RowSequenceParallelLinear
         else:
             ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
             RowParallelLinear = fleet.meta_parallel.RowParallelLinear
@@ -1529,9 +1553,12 @@ class LlamaModel(LlamaPretrainedModel):
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
         if self.config.use_flash_attention:
-            is_casual = is_casual_mask(attention_mask)
-            if is_casual and alibi is None:
-                attention_mask = None
+            if get_env_device() != "npu":
+                is_casual = is_casual_mask(attention_mask)
+                if is_casual and alibi is None:
+                    attention_mask = None
+            else:
+                attention_mask = attention_mask.astype("bool")
         hidden_states = inputs_embeds
 
         # decoder layers

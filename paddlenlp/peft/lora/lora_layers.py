@@ -47,6 +47,7 @@ class LoRALinear(nn.Linear):
         use_quick_lora: bool = False,
         rslora: bool = False,
         lora_plus_scale: float = 1.0,
+        pissa: bool = False,
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
@@ -62,6 +63,7 @@ class LoRALinear(nn.Linear):
         # Mark the weight as unmerged
         self.merged = False
         self.merge_weights = merge_weights
+        self.pissa = pissa
 
         # Actual trainable parameters
         self.lora_A = self.create_parameter(
@@ -79,9 +81,12 @@ class LoRALinear(nn.Linear):
                 learning_rate=lora_plus_scale,
             ),
         )
+        self.apply_pissa = False
 
-        if not rslora:
+        if not rslora and not pissa:
             self.scaling = self.lora_alpha / self.r
+        elif pissa:
+            self.scaling = 1.0
         else:
             self.scaling = self.lora_alpha / math.sqrt(self.r)
 
@@ -92,6 +97,25 @@ class LoRALinear(nn.Linear):
     @property
     def use_quick_lora(self):
         return self._use_quick_lora and self.training and not self.merged
+
+    def pissa_init(self, rank):
+        weight = self.weight
+        dtype = weight.dtype
+        if dtype != paddle.float32:
+            weight = weight.astype(paddle.float32)
+
+        U, S, Vh = paddle.linalg.svd(weight.data, full_matrices=False)
+        Ur = U[:, :rank]
+        Sr = S[:rank]
+        Vhr = Vh[:rank]
+
+        lora_A = Ur @ paddle.diag(paddle.sqrt(Sr))
+        lora_B = paddle.diag(paddle.sqrt(Sr)) @ Vhr
+        self.lora_A.set_value(lora_A.astype(dtype))
+        self.lora_B.set_value(lora_B.astype(dtype))
+        res = weight.data - lora_A @ lora_B
+        weight = res.astype(dtype)
+        self.weight.set_value(weight)
 
     def train(self):
         super().train()
@@ -110,6 +134,10 @@ class LoRALinear(nn.Linear):
             self.merged = True
 
     def forward(self, input: paddle.Tensor, *args, **kwargs):
+        if not self.apply_pissa and self.pissa:
+            self.pissa_init(self.r)
+            self.apply_pissa = True
+
         if self.use_quick_lora:
             # Use the quick lora implementation
             result = quick_lora(input, self.lora_A, self.lora_B, self.weight, self.bias, self.scaling)
@@ -136,11 +164,16 @@ class RowParallelLoRALinear(RowParallelLinear):
         lora_plus_scale: float = 1.0,
         merge_weights: bool = True,
         use_quick_lora: bool = False,
+        pissa: bool = False,
         **kwargs
     ):
         RowParallelLinear.__init__(self, in_features, out_features, **kwargs)
         if not isinstance(r, int) or r <= 0:
             raise ValueError("Lora rank r should be a positive integer")
+
+        if pissa:
+            raise ValueError("Pissa is not supported in model parallel by now")
+
         self.r = r
         self.lora_alpha = lora_alpha
         # Optional dropout
@@ -278,11 +311,16 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         merge_weights: bool = True,
         lora_A_weight_attr: Optional[paddle.ParamAttr] = None,
         use_quick_lora: bool = False,
+        pissa: bool = False,
         **kwargs
     ):
         ColumnParallelLinear.__init__(self, in_features, out_features, **kwargs)
         if not isinstance(r, int) or r <= 0:
             raise ValueError("Lora rank r should be a positive integer")
+
+        if pissa:
+            raise ValueError("Pissa is not supported in model parallel by now")
+
         self.r = r
         self.lora_alpha = lora_alpha
         # Optional dropout
