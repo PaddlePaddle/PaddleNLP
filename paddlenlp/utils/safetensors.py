@@ -215,11 +215,12 @@ class PySafeSlice:
             merge_indices.append((last_start, last_end))
         tensor = np.empty(shape=[1] if len(target_shape) == 0 else np.prod(target_shape), dtype=self.dtype)
 
-        tensor_view = memoryview(tensor.view(np.uint8))
+        tensor_view = memoryview(tensor.view(np.uint8).reshape(-1))
         # print(self.key, len(merge_indices), f"{self.nelements:,}")
         curr_data_ptr = 0
         # if to many slice and each slice < 1M
         if len(merge_indices) > 128 and (merge_indices[0][1] - merge_indices[0][0] < 1024 * 1024):
+            # Use mmap for random access
             for start, end in merge_indices:
                 data_len = end - start
                 tensor_view[curr_data_ptr : curr_data_ptr + data_len] = self.buffermmap[
@@ -227,12 +228,14 @@ class PySafeSlice:
                 ]
                 curr_data_ptr += data_len
         else:
+            # Use file read for sequence access
             for start, end in merge_indices:
                 data_len = end - start
                 self.bufferfile.seek(self.start_offset + start)
                 view = tensor_view[curr_data_ptr : curr_data_ptr + data_len]
                 self.bufferfile.readinto(view)
                 curr_data_ptr += data_len
+
         return tensor.reshape(target_shape)
 
     def get(self, *args, **kwargs):
