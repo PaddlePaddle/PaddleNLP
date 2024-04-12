@@ -27,7 +27,6 @@ class TrainingArguments(TrainingArguments):
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
     )
-    do_function_call: bool = field(default=False, metadata={"help": "Whether run function_call training"})
 
     def __post_init__(self):
         super().__post_init__()
