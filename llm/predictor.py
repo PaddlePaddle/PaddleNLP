@@ -221,10 +221,13 @@ def get_eos_token_id(
     """
     eos_token_ids = []
     if tokenizer.eos_token_id is not None:
-        eos_token_ids.append(tokenizer.eos_token_id)
+        eos_token_ids.append([tokenizer.eos_token_id])
 
     if generation_config is not None and generation_config.eos_token_id is not None:
+        # format the eos_token_id to list[list[int]] dtype
         if isinstance(generation_config.eos_token_id, int):
+            eos_token_ids.append([generation_config.eos_token_id])
+        elif isinstance(generation_config.eos_token_id, list) and isinstance(generation_config.eos_token_id[0], int):
             eos_token_ids.append(generation_config.eos_token_id)
         else:
             eos_token_ids.extend(generation_config.eos_token_id)
@@ -331,33 +334,44 @@ class DygraphPredictor(BasePredictor):
         self.model.eval()
 
     @paddle.no_grad()
-    def _infer_steps(self, inputs: dict[str, paddle.Tensor]):
-        from paddlenlp.experimental.transformers.generation_utils import Choices, Json
+    def predict_json_result(self, source: str, json_schema: Optional[str] = None):
+        from paddlenlp.experimental.transformers.generation_utils import (
+            Json,
+            set_tokenizer,
+            steps_generate,
+        )
 
+        source = [source] if isinstance(source, str) else source
+        if json_schema is not None:
+            # WARNING(wj-Mcat): 同一个 batch 中目前只能有同一个 json schema
+            system_prompt = "你是一个文档助手, 非常擅长于从文本中解析出结构化的数据,比如输出Enum 数据类型，Float 数据类型以及JSON 数据类型等.\n\n"
+            system_prompt += f"请在以下文本中按照以下格式接下内容:\n\n **数据格式**\n{json_schema}\n\n**用户原始文本内容**\n"
+            for batch_index in range(len(source)):
+                if isinstance(source[batch_index], str):
+                    source[batch_index] = system_prompt + source[batch_index]
+                else:
+                    # 属于多轮对话的范畴,后续可添加到system字段当中去,当下处理就直接拼接到第一轮用户对话上
+                    source[batch_index][0][0] = system_prompt + source[batch_index][0][0]
+
+        if self.tokenizer.chat_template is not None:
+            source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
+
+        set_tokenizer(self.tokenizer)
+        logger.info("start to building json parser ...")
         steps = [
-            # f'我想预定一个今天从深圳到北京的飞机，回复内容需要按照这个 json schema 格式进行解码：{str(AnswerFormat.schema())} :\n',
-            "我想预定一个今天从深圳到北京的飞机:\n",
-            Json(schema=AnswerFormat.model_json_schema(), tokenizer=self.tokenizer),
-            "\n\n\n\n对以上结果满意吗? 请回答:[满意, 不满意]\n 答案:",
-            Choices(["满意", "不满意"], tokenizer=self.tokenizer),
+            source[0],
+            Json(schema=json.loads(json_schema), dtype=self.config.dtype),
         ]
-        from datetime import datetime
 
-        from tqdm import trange
-
-        from paddlenlp.experimental.transformers.generation_utils import steps_generate
-
-        count = 0
-        for i in trange(100):
-            if i == 20:
-                start_time = datetime.now()
-            result_ids = steps_generate(self.model, self.tokenizer, steps)
-            if i >= 20:
-                count += result_ids.shape[1]
-        seconds = (datetime.now() - start_time).seconds
-        ips = count / seconds
-        print("final ips ->", ips)
-        return ips
+        logger.info("start to generate ...")
+        result_ids = steps_generate(self.model, self.tokenizer, steps)
+        result = self.tokenizer.decode(result_ids.tolist()[0], skip_special_tokens=True)
+        # JSON Model will add some <br> and black string
+        while True:
+            if len(result.strip().strip("<br>")) == len(result):
+                break
+            result = result.strip().strip("<br>")
+        return result
 
     @paddle.no_grad()
     def _infer(self, inputs: dict[str, paddle.Tensor]):
@@ -414,6 +428,7 @@ class DygraphPredictor(BasePredictor):
             top_p=self.config.top_p,
             repetition_penalty=self.config.repetition_penalty,
         )
+        print("eos-token-id ->", generation_kwargs["eos_token_id"])
         thread = Thread(target=self.model.generate, kwargs=generation_kwargs)
         thread.start()
 
@@ -1637,9 +1652,6 @@ def predict():
     else:
         source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
         target_texts = ["", ""]
-
-    source_texts = [f"我想预定一个今天从深圳到北京的飞机，回复内容需要按照这个 json schema 格式进行解码：{str(AnswerFormat.schema())} :\n"] * 200
-    target_texts = [""] * 200
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)

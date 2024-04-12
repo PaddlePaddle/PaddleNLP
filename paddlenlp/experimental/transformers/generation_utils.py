@@ -13,7 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
-from typing import Callable, List, Union
+from typing import Callable, List, Optional, Union
 
 import paddle
 import paddle.nn.functional as F
@@ -818,17 +818,16 @@ class String(GenerationStep):
 
 class Constant(GenerationStep):
     def __init__(self, value: Union[str, int, float], tokenizer):
-        tokens = tokenizer.tokenize(str(value))
-        self.input_ids = paddle.to_tensor([tokenizer.convert_tokens_to_ids(tokens)])
+        self.inputs = tokenizer(str(value), return_tensors="pd")
 
     def prepare_inputs_for_generation(self, **kwargs):
-        kwargs["input_ids"] = self.input_ids
+        kwargs.update(self.inputs)
         return super().prepare_inputs_for_generation(**kwargs)
 
     def forward(self, model, **model_inputs):
         result = model(**model_inputs)
         past_key_values = self.clip_past_key_values(result[1])
-        return self.input_ids, past_key_values
+        return self.inputs["input_ids"], past_key_values
 
 
 class Json(GenerationStep):
@@ -838,6 +837,7 @@ class Json(GenerationStep):
         top_p: float = 0.1,
         temperature: float = 1.0,
         eos_token_ids: int | list[int] | list[list[int]] = None,
+        dtype: Optional[str] = None,
     ):
         from lmformatenforcer import JsonSchemaParser
 
@@ -848,7 +848,7 @@ class Json(GenerationStep):
         prefix_function = build_prefix_allowed_tokens_fn(self.tokenizer, parser)
 
         self.logits_processors = LogitsProcessorList([PrefixConstrainedNoBeamLogitsProcessor(prefix_function)])
-        self.top_p = paddle.to_tensor([top_p])
+        self.top_p = paddle.to_tensor([top_p], dtype=dtype)
         self.temperature = temperature
         if eos_token_ids is None:
             self.eos_token_ids = self.tokenizer.eos_token_id
@@ -903,14 +903,22 @@ def steps_generate(model, tokenizer, steps):
     past_key_values = None
     result_ids = paddle.to_tensor([[0]], dtype=paddle.int64)
     input_ids = None
+    last_input_ids = None
     for index, step in enumerate(steps):
         if isinstance(step, (int, str, float)):
             step = Constant(step, tokenizer)
+
         model_inputs = step.prepare_inputs_for_generation(
             input_ids=input_ids, past_key_values=past_key_values, use_cache=True
         )
+
         next_token_ids, past_key_values = step(model, **model_inputs)
         result_ids = paddle.concat([result_ids, next_token_ids], axis=1)
         input_ids = next_token_ids[:, -1:]
+        last_input_ids = next_token_ids
 
-    return result_ids
+    return last_input_ids
+
+
+def set_tokenizer(tokenizer):
+    GenerationStep.tokenizer = tokenizer
