@@ -783,10 +783,12 @@ class ChatTemplateMixin:
 
         for conv in conversation_dict:
             roundi = [system] + conv if system else conv
-            roundi_str = self.chat_template.render(messages=roundi, add_generation_prompt=False)
+            roundi_str = self.chat_template.render(
+                messages=roundi, add_generation_prompt=False, **self.special_tokens_map
+            )
             roundi_no_ans = [system] + [conv[0]] if system else [conv[0]]
             roundi_no_ans_str = self.chat_template.render(
-                messages=roundi_no_ans, add_generation_prompt=add_generation_prompt
+                messages=roundi_no_ans, add_generation_prompt=add_generation_prompt, **self.special_tokens_map
             )
             ans_roundi = roundi_str[len(roundi_no_ans_str) :]
             ans.append(ans_roundi)
@@ -794,7 +796,7 @@ class ChatTemplateMixin:
         regex_pattern = "|".join(map(re.escape, ans))
         non_learnable_parts = re.split(
             r"(?:%s)" % regex_pattern,
-            self.chat_template.render(messages=origin_msg, add_generation_prompt=False),
+            self.chat_template.render(messages=origin_msg, add_generation_prompt=False, **self.special_tokens_map),
         )
         if non_learnable_parts[-1] == "":
             non_learnable_parts.pop()
