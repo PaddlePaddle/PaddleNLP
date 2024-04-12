@@ -17,7 +17,7 @@ import os
 import shutil
 from functools import lru_cache
 
-from paddle.utils import try_import
+import regex as re
 
 from .. import AddedToken, PretrainedTokenizer
 
@@ -178,9 +178,8 @@ class DebertaTokenizer(PretrainedTokenizer):
         self.cache = {}
         self.add_prefix_space = add_prefix_space
         self.add_bos_token = add_bos_token
-        self.re = try_import("regex")
 
-        self.pat = self.re.compile(r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""")
+        self.pat = re.compile(r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""")
 
     @property
     def vocab_size(self):
@@ -239,7 +238,7 @@ class DebertaTokenizer(PretrainedTokenizer):
     def _tokenize(self, text):
         """Tokenize a string."""
         bpe_tokens = []
-        for token in self.re.findall(self.pat, text):
+        for token in re.findall(self.pat, text):
             token = "".join(
                 self.byte_encoder[b] for b in token.encode("utf-8")
             )  # Maps all our bytes to unicode strings, avoiding control tokens of the BPE (spaces in our case)
