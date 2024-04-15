@@ -365,7 +365,7 @@ class Trainer:
                     models=model,
                     level=self.args.fp16_opt_level,
                     dtype=self.amp_dtype,
-                    excluded_layers=QuantizationLinear,
+                    excluded_layers=[QuantizationLinear] + self._decorate_exclude_layers(model),
                 )
             # for pipeline mode and pure tensor parallel
             if self.args.pipeline_parallel_degree > 1 or (
@@ -1635,6 +1635,17 @@ class Trainer:
         except (NameError, AttributeError, TypeError):  # no dataset or length, estimate by length of dataloader
             return len(dataloader) * self.args.per_device_train_batch_size
 
+    def _decorate_exclude_layers(self, model: nn.Layer):
+        """
+        Exclude layers from the model for paddle.amp.decorate.
+        Args:
+            model (`nn.Layer`): The model to exclude layers from.
+        Returns:
+            A list of excluded layers.
+        """
+        exclude_layers = []
+        return exclude_layers
+
     def _wrap_model(self, model, training=True):
 
         # train/eval could be run multiple-times - if already wrapped, don't re-wrap it again
@@ -1654,7 +1665,7 @@ class Trainer:
                 optimizers=self.optimizer,
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
-                excluded_layers=QuantizationLinear,
+                excluded_layers=[QuantizationLinear] + self._decorate_exclude_layers(model),
             )
 
             if self.optimizer is None:
