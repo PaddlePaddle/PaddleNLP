@@ -265,7 +265,7 @@ class GPTInferenceModel(GPTPretrainedModel):
                 attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
                 caches=cache_kvs,
                 seq_lens=seq_lens,
-                time_step=paddle.increment(attention_mask.shape[-1], -1) if is_decoder else None,
+                time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
             )
 
         hidden_states = self.norm(hidden_states)

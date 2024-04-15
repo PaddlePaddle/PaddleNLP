@@ -340,7 +340,7 @@ class QWenInferenceModel(QWenPretrainedModel):
                 seq_lens=seq_lens,
                 rotary_embs=new_rope,
                 rotary_emb_dims=1,
-                time_step=paddle.increment(attention_mask.shape[-1], -1) if is_decoder else None,
+                time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
             )
 
         hidden_states = self.ln_f(hidden_states)
