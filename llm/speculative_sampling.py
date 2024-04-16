@@ -1,3 +1,4 @@
+from cgi import print_form
 from configparser import ConfigParser
 from paddlenlp.transformers import (
     AutoConfig,
@@ -29,22 +30,25 @@ from paddlenlp.trainer import PdArgumentParser
 from predictor import init_dist_env, InferencePredictorMixin, BasePredictor, PredictorArgument, ModelArgument, get_ptq_multicards_num, batchfy_text
 from utils import init_chat_template
 import paddle
+import time
+from paddlenlp.utils.log import logger
+import paddle.profiler as profiler
+from copy import deepcopy
 
 @dataclass
 class PredictorArgument:
-    model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
-    assistant_model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
+    model_name_or_path: str = field(default="meta-llama/Llama-2-13b", metadata={"help": "The directory of model."})
+    assistant_model_name_or_path: str = field(default="meta-llama/Llama-2-7b", metadata={"help": "The directory of model."})
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
     src_length: int = field(default=None, metadata={"help": "The max length of source text."})
-    max_length: int = field(default=None, metadata={"help": "the max length for decoding."})
-    gamma: int = field(default=5, metadata={"help": "gamma parameter for speculative sampling"})
-    max_length: int = field(default=None, metadata={"help": "the max length for decoding."})
+    max_length: int = field(default=1024, metadata={"help": "the max length for decoding."})
+    gamma: int = field(default=4, metadata={"help": "gamma parameter for speculative sampling"})
     top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
     top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
     temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
     repetition_penalty: float = field(default=1.0, metadata={"help": "repetition penalty parameter for generation"})
     device: str = field(default="gpu", metadata={"help": "Device"})
-    dtype: str = field(default=None, metadata={"help": "Model dtype"})
+    dtype: str = field(default="float16", metadata={"help": "Model dtype"})
     lora_path: str = field(default=None, metadata={"help": "The directory of LoRA parameters. Default to None"})
     export_precache: bool = field(default=False, metadata={"help": "whether use prefix weight to do infer"})
     prefix_path: str = field(
@@ -63,7 +67,7 @@ class PredictorArgument:
     mode: str = field(
         default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
     )
-    inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
+    inference_model: bool = field(default=True, metadata={"help": "whether use InferenceModel to do generation"})
 
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     benchmark: bool = field(
@@ -107,6 +111,7 @@ class SpeculativeSamplingPredictor(InferencePredictorMixin, BasePredictor):
         InferencePredictorMixin.__init__(self, config, tokenizer)
         self.target_model = target_model
         self.total_max_length = config.src_length + config.max_length
+        self.max_length = config.max_length
         self.cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.cache_kvs_shape]
         self.assistant_model = assistant_model
         self.assistant_model_cache_kvs_shape = assistant_model.get_cache_kvs_shape(assistant_model.config, config.batch_size, config.total_max_length)
@@ -249,26 +254,36 @@ class SpeculativeSamplingPredictor(InferencePredictorMixin, BasePredictor):
             , 1], fill_value=0, dtype="int32")
 
         input_ids, model_inuts = self.prepare_inputs(**inputs)
-        assistant_model_inputs = model_inuts.copy()
+        assistant_model_inputs = deepcopy(model_inuts)
         assistant_model_inputs["cache_kvs"] = self.assistant_model_cache_kvs
-        output_ids = self.target_model.assisted_decoding(
+
+        output_ids, accept_rate = self.target_model.assisted_decoding(
             input_ids,
             model_inuts,
             assistant_model_inputs,
             self.assistant_model,
-            max_output_length=200,
+            max_generate_length=self.max_length,
             do_sample=True,
             gamma=self.gamma,
             eos_token_id=inputs["eos_token_id"],
-            r_probability=0.6,
+            r_probability=0.5,
         )
-        return output_ids
-
+        
+        return output_ids, accept_rate
+ 
     def _postprocess(self, predictions):
-        decoded_predictions = self.tokenizer.batch_decode(
+        output = self.tokenizer.batch_decode(
             predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False
         )
-        return decoded_predictions
+        # # hard code for humaneval
+        # output = '    ' + output[0].lstrip()
+        # if 'def' in output:
+        #     idx = output.index('def')
+        #     output = output[:idx]
+        # if '\n\n\n' in output:
+        #     output = output.replace('\n\n\n', '\n')
+        return output
+        # return decoded_predictions
 
     def _get_rotary_position_embedding(self, position_ids, head_dim):
         """
@@ -386,7 +401,63 @@ def create_predictor(
     return predictor
 
 
+# parser = PdArgumentParser((PredictorArgument, ModelArgument))
+# predictor_args, model_args = parser.parse_args_into_dataclasses()
+# paddle.set_device(predictor_args.device)
+# paddle.set_default_dtype(predictor_args.dtype)
+
+# predictor = create_predictor(predictor_args, model_args)
+# def my_predict(source_texts):
+#     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
+#     for bs, batch_source_text in enumerate(batch_source_texts):
+#         logger.info("Start predict")
+#         outputs, accept_rate = predictor.predict(batch_source_text)
+#         logger.info("End predict")
+#         return outputs, accept_rate
+
+# if __name__ == '__main__':
+#     parser = PdArgumentParser((PredictorArgument, ModelArgument))
+#     predictor_args, model_args = parser.parse_args_into_dataclasses()
+#     paddle.set_device(predictor_args.device)
+#     paddle.set_default_dtype(predictor_args.dtype)
+
+#     predictor = create_predictor(predictor_args, model_args)
+
+#     source_texts = ["from typing import List\n\n\ndef below_zero(operations: List[int]) -> bool:\n    \"\"\" You're given a list of deposit and withdrawal operations on a bank account that starts with\n    zero balance. Your task is to detect if at any point the balance of account fallls below zero, and\n    at that point function should return True. Otherwise it should return False.\n    >>> below_zero([1, 2, 3])\n    False\n    >>> below_zero([1, 2, -4, 5])\n    True\n    \"\"\"\n"]
+#     target_texts = [""]
+#     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
+#     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
+
+#     # warm up
+#     for _ in range(3):
+#         for bs, batch_source_text in enumerate(batch_source_texts):
+#             outputs, accept_rate = predictor.predict(batch_source_text)
+
+#     logger.info("Start predict")
+#     repeat_times = 5
+#     outputs_total = []
+#     accept_rates = []
+#     tic = time.perf_counter()
+#     for _ in range(repeat_times):
+#         for bs, batch_source_text in enumerate(batch_source_texts):
+#             outputs, accept_rate = predictor.predict(batch_source_text)
+#             outputs_total.append(outputs)
+#             accept_rates.append(accept_rate)
+#     toc = time.perf_counter()
+#     print("outputs_total: ", outputs_total)
+#     print("***********average accept_rate**********")
+#     print(sum(accept_rates) / repeat_times)
+#     print(f"---Average predict time: {(toc - tic) / 5}---")
+#     logger.info("End predict")
+    
+
 if __name__ == '__main__':
+    from Human_eval.data import read_problems
+    problems = read_problems()
+
+    task_ids = [key for key in problems.keys()]
+    input_texts = [[problems[key]["prompt"]] for key in problems.keys()]
+
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
     paddle.set_device(predictor_args.device)
@@ -394,22 +465,44 @@ if __name__ == '__main__':
 
     predictor = create_predictor(predictor_args, model_args)
 
-    source_texts = ["你好，请问你是谁?"]
-    target_texts = [""]
+    # warm up   
+    warm_up_times = 3
+    source_texts = input_texts[0]
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
-    batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
 
-    for bs, batch_source_text in enumerate(batch_source_texts):
+    for _ in range(warm_up_times):
+        for bs, batch_source_text in enumerate(batch_source_texts):
+            outputs, accept_rate, _ = predictor.predict(batch_source_text)
+
+    n_task = 50
+    for i in range(n_task):
+        logger.info(f"------[{i + 1}/{n_task}]个任务------")
+        source_texts = input_texts[i]
+        task_id = task_ids[i]
+        batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
+        accept_rates = []
+        n_tokens = []
         logger.info("Start predict")
-        outputs = predictor.predict(batch_source_text)
+        repeat_times = 5
+        tic = time.perf_counter()
+        for _ in range(repeat_times):
+            for bs, batch_source_text in enumerate(batch_source_texts):
+                outputs, accept_rate, n_token = predictor.predict(batch_source_text)
+                n_tokens.append(n_token)
+                print(f"{outputs}, {n_token}")
+                accept_rates.append(accept_rate)
+        toc = time.perf_counter()
         logger.info("End predict")
 
-        if predictor.tensor_parallel_rank > 0:
-            continue
-        for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
-            print("***********Source**********")
-            print(source)
-            print("***********Target**********")
-            print(target)
-            print("***********Output**********")
-            print(output)
+        out_dict = {"task_id": task_id, "outputs": outputs, "average_accept_rate": sum(accept_rates) / repeat_times, "average_predict_time": (toc - tic) / repeat_times, "average_token_num": sum(n_tokens) / (toc - tic)}
+        print(out_dict)
+        # print("***********task_id**********")
+        # print(task_id)
+        # print("***********Output**********")
+        # print(outputs)
+        # print("***********average accept_rate**********")
+        # print(sum(accept_rates) / repeat_times)
+        # print("***********average predict time**********")
+        # print((toc - tic) / repeat_times)
+        # print("***********average tokens/s**********")
+        # print(sum(n_tokens) / (toc - tic))

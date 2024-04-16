@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 from functools import partial
+from re import T
 
 import numpy as np
 import paddle
@@ -58,7 +59,7 @@ from paddlenlp.transformers.model_utils import (
     register_base_model,
 )
 from paddlenlp.utils.log import logger
-
+from paddlenlp.transformers.utils import resolve_cache_dir
 __all__ = [
     "LlamaInferenceModel",
     "LlamaForCausalLMInferenceModel",
@@ -979,16 +980,22 @@ class LlamaSpecuInferenceModel(LlamaPretrainedModel):
         )
 
         ids_remove_padding = ids_remove_padding.squeeze(axis=0)
-
+        if kwargs.get("cache", None) is None:
+            token_num_in_cache = 0
+        else:
+            token_num_in_cache = kwargs.get("seq_lens_decoder")[0][0]
+            cu_seqlens_k[1] += token_num_in_cache
         kwargs["cu_seqlens_q"] = cu_seqlens_q
         kwargs["cu_seqlens_k"] = cu_seqlens_k
         kwargs["padding_offsets"] = padding_offset
         kwargs["gamma"] = self.gamma
         kwargs["max_input_length"] = self.max_seq_len
+        kwargs["token_num_in_cache"] = token_num_in_cache
+
 
         inputs_embeds = self.embed_tokens(ids_remove_padding)
-        if kwargs.get("cache", None) is not None:
-            kwargs["cu_seqlens_k"][1] = kwargs.get("seq_lens_decoder")[0][0]
+        # if kwargs.get("cache", None) is not None:
+        #     kwargs["cu_seqlens_k"][1] = kwargs.get("seq_lens_decoder")[0][0]
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
                 input_ids=input_ids,
@@ -1152,6 +1159,98 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
             attentions=None,
         )
 
+# def _convert_safe_tensors_to_paddle( pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs):
+#     cache_dir = kwargs.pop("cache_dir", None)
+#     from_aistudio = kwargs.pop("from_aistudio", None)
+#     cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
+
+#     def _change_file_extension(file_path, new_extension):
+#         file_dir, file_name = os.path.split(file_path)
+#         file_name_without_extension, old_extension = os.path.splitext(file_name)
+#         new_file_name = file_name_without_extension + new_extension
+#         new_file_path = os.path.join(file_dir, new_file_name)
+#         return new_file_path
+
+#     def _find_safe_tensors_files(folder_path):
+#         safe_tensors_files = []
+#         for root, dirs, files in os.walk(folder_path):
+#             for file in files:
+#                 if file.endswith('.safetensors'):
+#                     safe_tensors_files.append(os.path.join(root, file))
+
+#         return safe_tensors_files
+
+#     model_dir = os.path.join(cache_dir, pretrained_model_name_or_path)
+#     logger.info(f"Loading model from {model_dir}")
+#     safetensors_file_path_list = _find_safe_tensors_files(model_dir)
+#     logger.info("Converting safetensors to pdparams and remove the safetensors files")
+#     from safetensors.numpy import load_file as safe_load_file
+#     from paddlenlp.utils.env import PADDLE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_INDEX_NAME
+#     for safetensors_file_path in safetensors_file_path_list:
+#         if os.path.isfile(safetensors_file_path):
+#             state_dict = safe_load_file(safetensors_file_path)
+#         for key in list(state_dict.keys()):
+#             if isinstance(state_dict[key], np.ndarray):
+#                 state_dict[key] = paddle.Tensor(state_dict.pop(key), zero_copy=True)
+#         # 将 safetensors 后缀转换成 pdparams 后缀
+#         paddle_weights_name = _change_file_extension(safetensors_file_path, ".pdparams")
+#         # NOTE: 删除原有 safetensors 文件
+#         os.remove(safetensors_file_path)
+#         paddle.save(state_dict, paddle_weights_name)
+
+#     logger.info("Converting the model.safetensors.index.json")
+#     import json
+#     safe_tensor_index_file_path = os.path.join(model_dir, SAFE_WEIGHTS_INDEX_NAME)
+#     assert os.path.isfile(safe_tensor_index_file_path), f"index file {safe_tensor_index_file_path} does not exist."
+#     with open(safe_tensor_index_file_path, "r+") as f:
+#         index = json.loads(f.read())
+#         for weight, file in index["weight_map"].items():
+#             new_file = _change_file_extension(file, ".pdparams")
+#             index["weight_map"][weight] = new_file
+#     paddl_index_file_path = os.path.join(cache_dir, PADDLE_WEIGHTS_INDEX_NAME)
+#     os.rename(safe_tensor_index_file_path, paddl_index_file_path)
+
+def _convert_safe_tensors_to_paddle( pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs):
+    cache_dir = kwargs.pop("cache_dir", None)
+    from_aistudio = kwargs.pop("from_aistudio", None)
+    cache_dir = resolve_cache_dir(from_hf_hub, from_aistudio, cache_dir)
+
+    def _change_file_extension(file_path, new_extension):
+        file_dir, file_name = os.path.split(file_path)
+        file_name_without_extension, old_extension = os.path.splitext(file_name)
+        new_file_name = file_name_without_extension + new_extension
+        new_file_path = os.path.join(file_dir, new_file_name)
+        return new_file_path
+
+    def _find_safe_tensors_files(folder_path):
+        safe_tensors_files = []
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                if file.endswith('.safetensors'):
+                    safe_tensors_files.append(os.path.join(root, file))
+
+        return safe_tensors_files
+
+    model_dir = os.path.join(cache_dir, pretrained_model_name_or_path)
+    logger.info(f"Loading model from {model_dir}")
+    safetensors_file_path_list = _find_safe_tensors_files(model_dir)
+    logger.info("Converting safetensors to pdparams and remove the safetensors files")
+    from safetensors.numpy import load_file as safe_load_file
+    from paddlenlp.utils.env import PADDLE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_INDEX_NAME
+    total_state_dict = {}
+    for safetensors_file_path in safetensors_file_path_list:
+        if os.path.isfile(safetensors_file_path):
+            state_dict = safe_load_file(safetensors_file_path)
+        for key in list(state_dict.keys()):
+            if isinstance(state_dict[key], np.ndarray):
+                state_dict[key] = paddle.Tensor(state_dict.pop(key), zero_copy=True)
+        # 将 safetensors 后缀转换成 pdparams 后缀
+        paddle_weights_name = _change_file_extension(safetensors_file_path, ".pdparams")
+        paddle.save(state_dict, paddle_weights_name)
+        # NOTE: 删除原有 safetensors 文件
+        os.remove(safetensors_file_path)
+
+
 
 class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedModel):
     """
@@ -1170,8 +1269,12 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
     ):
         # TODO: Support safetensors loading.
+        # if kwargs.get("use_safetensors") == True:
+        # _convert_safe_tensors_to_paddle(pretrained_model_name_or_path, from_hf_hub, subfolder, *args, **kwargs)
+        # else:
         kwargs["use_safetensors"] = False
         return super().from_pretrained(pretrained_model_name_or_path, from_hf_hub, subfolder, *args, **kwargs)
+
 
     @classmethod
     def get_cache_kvs_shape(

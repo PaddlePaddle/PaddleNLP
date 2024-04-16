@@ -74,16 +74,16 @@ MAX_BSZ = 512
 
 @dataclass
 class PredictorArgument:
-    model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
+    model_name_or_path: str = field(default="meta-llama/Llama-2-13b", metadata={"help": "The directory of model."})
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
     src_length: int = field(default=None, metadata={"help": "The max length of source text."})
-    max_length: int = field(default=None, metadata={"help": "the max length for decoding."})
+    max_length: int = field(default=40, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
     top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
     temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
     repetition_penalty: float = field(default=1.0, metadata={"help": "repetition penalty parameter for generation"})
     device: str = field(default="gpu", metadata={"help": "Device"})
-    dtype: str = field(default=None, metadata={"help": "Model dtype"})
+    dtype: str = field(default="float16", metadata={"help": "Model dtype"})
     lora_path: str = field(default=None, metadata={"help": "The directory of LoRA parameters. Default to None"})
     export_precache: bool = field(default=False, metadata={"help": "whether use prefix weight to do infer"})
     prefix_path: str = field(
@@ -103,7 +103,7 @@ class PredictorArgument:
     mode: str = field(
         default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
     )
-    inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
+    inference_model: bool = field(default=True, metadata={"help": "whether use InferenceModel to do generation"})
     quant_type: str = field(
         default=None,
         metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"},
@@ -259,9 +259,9 @@ class BasePredictor:
 
     def predict(self, input_texts: str | list[str]):
         tokenized_source = self._preprocess(input_texts)
-        predictions = self._infer(tokenized_source)
+        predictions, accept_rate = self._infer(tokenized_source)
         decoded_predictions = self._postprocess(predictions)
-        return decoded_predictions
+        return decoded_predictions, accept_rate, len(predictions[0])
 
 
 class DygraphPredictor(BasePredictor):
@@ -465,10 +465,18 @@ class InferencePredictorMixin:
     def _postprocess(self, predictions):
         if paddle.distributed.get_rank() == 0:
             tokens: np.ndarray = load_real_time_tokens()
-            decoded_predictions = self.tokenizer.batch_decode(
+            output = self.tokenizer.batch_decode(
                 tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
             )
-            return decoded_predictions
+            # # hard code for humaneval
+            # output = '    ' + output[0].lstrip()
+            # if 'def' in output:
+            #     idx = output.index('def')
+            #     output = output[:idx]
+            # if '\n\n\n' in output:
+            #     output = output.replace('\n\n\n', '\n')
+            return output
+            # return decoded_predictions
         else:
             return None
 
@@ -1512,71 +1520,143 @@ def create_predictor(
     return predictor
 
 
+# def predict():
+#     parser = PdArgumentParser((PredictorArgument, ModelArgument))
+#     predictor_args, model_args = parser.parse_args_into_dataclasses()
+
+#     paddle.set_device(predictor_args.device)
+#     paddle.set_default_dtype(predictor_args.dtype)
+
+#     tensor_parallel_degree = paddle.distributed.get_world_size()
+#     if tensor_parallel_degree > 1:
+#         strategy = fleet.DistributedStrategy()
+#         strategy.hybrid_configs = {
+#             "dp_degree": 1,
+#             "mp_degree": tensor_parallel_degree,
+#             "pp_degree": 1,
+#             "sharding_degree": 1,
+#         }
+#         fleet.init(is_collective=True, strategy=strategy)
+
+#     predictor = create_predictor(predictor_args, model_args)
+#     source_texts = []
+#     target_texts = []
+#     if model_args.data_file:
+#         with open(model_args.data_file, "r", encoding="utf-8") as f:
+#             for line in f:
+#                 example = json.loads(line)
+#                 if isinstance(example["src"], str) or predictor.tokenizer.chat_template is None:
+#                     if isinstance(example["src"], str):
+#                         source_texts.append(example["src"])
+#                         target_texts.append(example["tgt"])
+#                     else:
+#                         # load multi-rounds dataset
+#                         source_texts.append(example["src"][0])
+#                         target_texts.append(example["tgt"][0])
+#                 else:
+#                     source_texts.append(list(zip(example["src"], example["tgt"])))
+#                     target_texts.append("")
+
+#     else:
+#         source_texts = ["你好，请问你是谁?"]
+#         target_texts = ["", ""]
+
+#     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
+#     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
+
+#     with open(model_args.output_file, "w", encoding="utf-8") as f:
+#         for bs, batch_source_text in enumerate(batch_source_texts):
+#             logger.info("Start predict")
+#             outputs = predictor.predict(batch_source_text)
+#             logger.info("End predict")
+
+#             if predictor.tensor_parallel_rank > 0:
+#                 continue
+#             for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
+#                 print("***********Source**********")
+#                 print(source)
+#                 print("***********Target**********")
+#                 print(target)
+#                 print("***********Output**********")
+#                 print(output)
+#                 out = {"src": source, "tgt": target, "output": output}
+#                 f.write(json.dumps(out, ensure_ascii=False) + "\n")
+
+#     if predictor_args.benchmark:
+#         benchmark(predictor, predictor_args, model_args)
+
+
 def predict():
+    from Human_eval.data import read_problems
+    problems = read_problems()
+
+    task_ids = [key for key in problems.keys()]
+    input_texts = [[problems[key]["prompt"]] for key in problems.keys()]
+    
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
 
     paddle.set_device(predictor_args.device)
     paddle.set_default_dtype(predictor_args.dtype)
 
-    tensor_parallel_degree = paddle.distributed.get_world_size()
-    if tensor_parallel_degree > 1:
-        strategy = fleet.DistributedStrategy()
-        strategy.hybrid_configs = {
-            "dp_degree": 1,
-            "mp_degree": tensor_parallel_degree,
-            "pp_degree": 1,
-            "sharding_degree": 1,
-        }
-        fleet.init(is_collective=True, strategy=strategy)
-
     predictor = create_predictor(predictor_args, model_args)
-    source_texts = []
-    target_texts = []
-    if model_args.data_file:
-        with open(model_args.data_file, "r", encoding="utf-8") as f:
-            for line in f:
-                example = json.loads(line)
-                if isinstance(example["src"], str) or predictor.tokenizer.chat_template is None:
-                    if isinstance(example["src"], str):
-                        source_texts.append(example["src"])
-                        target_texts.append(example["tgt"])
-                    else:
-                        # load multi-rounds dataset
-                        source_texts.append(example["src"][0])
-                        target_texts.append(example["tgt"][0])
-                else:
-                    source_texts.append(list(zip(example["src"], example["tgt"])))
-                    target_texts.append("")
 
-    else:
-        source_texts = ["你好，请问你是谁?"]
-        target_texts = ["", ""]
+    for i in range(50):
+        logger.info(f"------进度：[{i+1}/50]-------")
+        source_texts = input_texts[i]
+        task_id = task_ids[i]
+        batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
 
-    batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
-    batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
+        # warm up
+        warm_up_times = 3
+        for _ in range(warm_up_times):
+            for bs, batch_source_text in enumerate(batch_source_texts):
+                outputs = predictor.predict(batch_source_text)
+                
+        # predict
+        repeat_times = 5
+        logger.info("Start predict")
+        tic = time.perf_counter()
+        for _ in range(repeat_times):
+            for bs, batch_source_text in enumerate(batch_source_texts):
+                outputs = predictor.predict(batch_source_text)
+                print(outputs)
+        toc = time.perf_counter()
+        logger.info("End predict")
+        out_dict = {"task_id": task_id, "outputs": outputs, "average_predict_time" : (toc - tic) / repeat_times}
+        print(out_dict)
 
-    with open(model_args.output_file, "w", encoding="utf-8") as f:
-        for bs, batch_source_text in enumerate(batch_source_texts):
-            logger.info("Start predict")
-            outputs = predictor.predict(batch_source_text)
-            logger.info("End predict")
+# def predict():
+#     parser = PdArgumentParser((PredictorArgument, ModelArgument))
+#     predictor_args, model_args = parser.parse_args_into_dataclasses()
 
-            if predictor.tensor_parallel_rank > 0:
-                continue
-            for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
-                print("***********Source**********")
-                print(source)
-                print("***********Target**********")
-                print(target)
-                print("***********Output**********")
-                print(output)
-                out = {"src": source, "tgt": target, "output": output}
-                f.write(json.dumps(out, ensure_ascii=False) + "\n")
+#     paddle.set_device(predictor_args.device)
+#     paddle.set_default_dtype(predictor_args.dtype)
 
-    if predictor_args.benchmark:
-        benchmark(predictor, predictor_args, model_args)
+#     predictor = create_predictor(predictor_args, model_args)
+#     source_texts = [""]
+#     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
 
+#     # warm up
+#     warm_up_times = 3
+#     for _ in range(warm_up_times):
+#         for bs, batch_source_text in enumerate(batch_source_texts):
+#             outputs = predictor.predict(batch_source_text)
+                
+#     # predict
+#     repeat_times = 5
+#     n_tokens = []
+#     logger.info("Start predict")
+#     tic = time.perf_counter()
+#     for _ in range(repeat_times):
+#         for bs, batch_source_text in enumerate(batch_source_texts):
+#             outputs, n_token = predictor.predict(batch_source_text)
+#             n_tokens.append(n_token)
+#             print("***********Output**********\n", outputs)
+#     logger.info("n_token: {}".format(n_token))
+#     toc = time.perf_counter()
+#     logger.info("End predict")
+#     logger.info("Average predict time: {}".format((toc - tic) / repeat_times))
 
 def benchmark(predictor, predictor_args, model_args):
     # Just construct a simple benchmark input. We pad input to the src_length.

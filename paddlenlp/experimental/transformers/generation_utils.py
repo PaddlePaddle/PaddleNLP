@@ -20,6 +20,7 @@ from typing import List, Union, Optional
 import paddle
 import paddle.nn.functional as F
 from paddlenlp_ops import (
+    erase_cache_kv,
     get_token_penalty_multi_scores,
     get_token_penalty_multi_scores_v2,
     save_output,
@@ -279,7 +280,7 @@ class GenerationInferenceModel(GenerationMixin):
         assistant_model: GenerationInferenceModel = None,
         do_sample: bool = False,
         logits_processor: Optional[LogitsProcessorList] = None,
-        max_output_length: int = 20,
+        max_generate_length: int = 20,
         eos_token_id: int = None,
         gamma=5,
         r_probability=None,
@@ -304,8 +305,8 @@ class GenerationInferenceModel(GenerationMixin):
             logits_processor (`LogitsProcessorList`, *optional*):
                 An instance of [`LogitsProcessorList`]. List of instances of class derived from [`LogitsProcessor`]
                 used to modify the prediction scores of the language modeling head applied at each generation step.
-            max_output_length (`int`, *optional*):
-                The max output token number of assisted decoding.
+            max_generate_length (`int`, *optional*):
+                The max generate token number of assisted decoding.
             eos_token_id (`Union[int, List[int]]`, *optional*):
                 The id of the *end-of-sequence* token. Optionally, use a list to set multiple *end-of-sequence* tokens.
             gamma (`int`, *optional*):
@@ -327,15 +328,10 @@ class GenerationInferenceModel(GenerationMixin):
         logits_processor = logits_processor if logits_processor is not None else LogitsProcessorList()
         eos_token_id = eos_token_id if eos_token_id is not None else self.generation_config.eos_token_id
 
-        inputs_embeds = target_model_inputs.get("inputs_embeds", None)
         target_model_inputs["gamma"] = gamma
         step_idx_ori = paddle.full(shape=[1], dtype="int64", fill_value=1)
-        batch = input_ids.shape[0] if input_ids is not None else inputs_embeds.shape[0]
         target_model_inputs["all_input_ids"] = input_ids
         assistant_model_inputs["all_input_ids"] = input_ids
-        # get cache_kvs and attention_mask
-        target_model_cache_kvs = target_model_inputs.pop("cache_kvs", None)
-        assistant_model_cache_kvs = assistant_model_inputs.pop("cache_kvs", None)
 
         def update_draft_model_kwargs_for_generation(cache, just_decoder, next_tokens, eos_token_id, model_kwargs):
             if cache is None:
@@ -421,7 +417,6 @@ class GenerationInferenceModel(GenerationMixin):
                     model_kwargs["step_idx"],
                     model_kwargs["step_idx"] + 1,
                 )
-                model_kwargs["seq_len_decoder"][:] = model_kwargs["seq_len_encoder"]
                 model_kwargs["seq_len_encoder"][:] = 0
             else:
                 model_kwargs["step_idx"] = paddle.where(
@@ -429,15 +424,14 @@ class GenerationInferenceModel(GenerationMixin):
                     model_kwargs["step_idx"],
                     model_kwargs["step_idx"] + 1,
                 )
-                model_kwargs["seq_len_decoder"] += model_kwargs["candidate_length"]
             length_cond = paddle.greater_equal(model_kwargs["step_idx"], model_kwargs["max_dec_len"])
             model_kwargs["stop_flags"] = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
 
             return model_kwargs
 
-        def _forward_(model, input_ids, cache_kvs, **args):
-            # cache_kvs is never empty because it is passed as a parameter in def sample.
-            model_inputs = model.prepare_inputs_for_generation(input_ids, cache_kvs, **args)
+        def _forward_(model, input_ids, **kwargs):
+            model_inputs = model.prepare_inputs_for_generation(input_ids, **kwargs)
+
             return model(**model_inputs)
 
         def _post_process_(outputs, step_idx_ori, is_target_model, model_kwargs):
@@ -477,42 +471,38 @@ class GenerationInferenceModel(GenerationMixin):
                 next_tokens = model_kwargs["next_tokens"]
                 return logits, next_tokens
 
-
         eos_token_id_tensor = paddle.to_tensor(eos_token_id) if eos_token_id is not None else None
         candidate_input_ids = input_ids.clone()
         output_ids = input_ids.clone()
-        if do_sample:
-            logger.info("use sampling method")
-        else:
-            logger.info("use greedy search method")
 
+        sum_accpet_tokens = 0
+        total_output_tokens = 0
+        assistant_model_total_generated_tokens = 0
+        # print("----original input: ", input_ids)
         while True:
             # Assistant: main logic start
             cur_len = output_ids.shape[-1]
 
             assistant_model_output_logits = None            
             # 👉 小模型推理
-            for _ in range(int(gamma)):
+            for i in range(int(gamma)):
                 # 1.1. use the assistant model to obtain the next candidate logits
-                print("------draft model's seq_len_decoder: ", assistant_model_inputs["seq_len_decoder"][0])
-                print("------draft model's tgt_pos: ", assistant_model_inputs["tgt_pos"])
                 draft_model_logits, next_tokens = _post_process_(
-                    _forward_(assistant_model, input_ids, assistant_model_cache_kvs, **assistant_model_inputs),
+                    _forward_(assistant_model, input_ids, **assistant_model_inputs),
                     step_idx_ori,
                     False, # is_target_model
                     assistant_model_inputs,
                 ) # assistant_model_logits: [bsz, vocab_size]
-                # gives it a value, means we will entered into decoder phase.
+
                 step_idx_ori += 1
                 # 因为投机采样小模型需要输出 gamma 个 token 的 logits，所以需要在 seq_len 维度进行拼接
                 if assistant_model_output_logits is None: # assistant_model_output_logits: [bsz, seq_len, vocab_size]
                     assistant_model_output_logits = draft_model_logits
-                    # 原来是 [bsz, vocab_size] -> [bsz, 1, vocab_size] (添加一个 seq_len 维度)
+                    # [bsz, vocab_size] -> [bsz, 1, vocab_size], add a seq_len dimension
                     assistant_model_output_logits = assistant_model_output_logits[:, None, :]
                 else:
                     assistant_model_output_logits = paddle.concat((assistant_model_output_logits, draft_model_logits[:,None]), axis=1)
-                # 1.2. greedily select the next candidate token
-   
+
                 assistant_model_output_logits[:, -1, :] = logits_processor(
                     candidate_input_ids, assistant_model_output_logits[:, -1, :]
                 )
@@ -521,7 +511,7 @@ class GenerationInferenceModel(GenerationMixin):
 
                 candidate_input_ids = paddle.concat((candidate_input_ids, next_tokens), axis=-1)
                 candidate_logits = assistant_model_output_logits
-                # 1.3. stop assistant generation on EOS
+
                 if eos_token_id_tensor is not None:
                     last_assistant_token_is_eos = next_tokens.tile(eos_token_id_tensor.shape[0], 1)
                     last_assistant_token_is_eos = (
@@ -532,9 +522,14 @@ class GenerationInferenceModel(GenerationMixin):
                 else:
                     last_assistant_token_is_eos = False
 
+                # 1.3. stop assistant generation on EOS or acceed max_output_length.
+                cum_generated_tokens_this_peer = i + 1
+                if total_output_tokens + cum_generated_tokens_this_peer >= max_generate_length:
+                    break
+
             candidate_length = candidate_input_ids.shape[1] - output_ids.shape[1]
             target_model_inputs["candidate_length"] = candidate_length
-
+            assistant_model_total_generated_tokens += candidate_length
             # 2. Use the original model to obtain the next token logits given the candidate sequence. We obtain
             # `candidate_length + 1` relevant logits from this process: in the event that all candidates are correct,
             # we use this forward pass to also pick the subsequent logits in the original model.
@@ -544,19 +539,20 @@ class GenerationInferenceModel(GenerationMixin):
             step_idx_ori = paddle.full(shape=[1], dtype="int64", fill_value=1)
 
             if target_model_inputs.get("cache") is None:
-                target_model_inputs["seq_len_encoder"][0] = candidate_input_ids.shape[1]
+                target_model_inputs["seq_len_encoder"][0] = candidate_input_ids.shape[-1]
                 target_model_inputs["seq_len_decoder"] *= 0
-                target_model_inputs["seq_lens_this_time"][0] = candidate_input_ids.shape[1]
+                target_model_inputs["seq_lens_this_time"][0] = candidate_input_ids.shape[-1]
             else:
-                target_model_inputs["seq_len_encoder"] *= 0
-                target_model_inputs["seq_len_decoder"][0] = candidate_input_ids.shape[1] - 1
+                # target_model_inputs["seq_len_encoder"] *= 0
+                target_model_inputs["seq_len_decoder"][:] =  candidate_input_ids.shape[-1] - candidate_length - 1
                 target_model_inputs["seq_lens_this_time"][0] = candidate_length
-            print("---------candidate_input_ids: ", candidate_input_ids)
+            # print("---------candidate_input_ids: ", candidate_input_ids)
+            # print("---------candidate_length: ", candidate_length)
+
             target_model_outputs_logits = _post_process_(
                 _forward_(
                     self, 
                     candidate_input_ids if target_model_inputs.get("cache") is None else candidate_input_ids[:, -candidate_length-1:-1], 
-                    target_model_cache_kvs, 
                     **target_model_inputs),
                 step_idx_ori,
                 True, # is_target_model
@@ -573,9 +569,8 @@ class GenerationInferenceModel(GenerationMixin):
                 new_logits = target_model_outputs_logits
 
             # 3. Obtain the next tokens from the original model logits.
-            max_matches = max_output_length - cur_len - 1
-            # valid_tokens = new_token[:,None]
-            # n_matches = gamma
+            max_matches = max_generate_length - total_output_tokens
+
             valid_tokens, n_matches = _speculative_decoding(
                 candidate_input_ids,
                 candidate_logits,
@@ -586,10 +581,11 @@ class GenerationInferenceModel(GenerationMixin):
                 max_matches,
                 r_probability=r_probability,
             )
+            # print(f"n_matches: {n_matches}")
+            # print("valid_tokens: ", valid_tokens)
+            sum_accpet_tokens += int(n_matches)
 
-            print(f"------candidate_length: {candidate_length}-------")
-            print(f"------本轮接受 {n_matches} 个 token")
-            print("-------valid_tokens: ", valid_tokens)
+            total_output_tokens += int(valid_tokens.shape[-1])
 
             # 4. Update variables according to the number of matching assistant tokens. Remember: the token generated
             # by the model after the last candidate match is also valid, as it is generated from a correct sequence.
@@ -603,7 +599,6 @@ class GenerationInferenceModel(GenerationMixin):
                 candidate_input_ids = paddle.concat((candidate_input_ids, valid_tokens), axis=-1)
 
             output_ids = paddle.concat((output_ids, valid_tokens), axis=-1)
-            # remove_seq_len_decoder_num = candidate_length - valid_tokens.shape[-1]
 
             cur_len = output_ids.shape[-1]
 
@@ -613,17 +608,19 @@ class GenerationInferenceModel(GenerationMixin):
                     assistant_model_inputs["seq_len_decoder"][0] = cur_len - 1
                     assistant_model_inputs["tgt_pos"][0] = cur_len - 1
                     assistant_model_inputs["tgt_ids"][0] = input_ids
-                from paddlenlp_ops import erase_cache_kv
 
-                erase_token_num_in_cache = int(gamma - n_matches - 1)
+                assistant_model_cache_kvs = assistant_model_inputs.get("cache_kvs", None)
+                erase_token_num_in_cache = int(candidate_length - n_matches - 1)
+
                 for i in range(len(assistant_model_cache_kvs)):
                         erase_cache_kv(assistant_model_cache_kvs[i], assistant_model_inputs["seq_len_decoder"][0], erase_token_num_in_cache)
 
             # stop if we exceed the maximum length or target model has generated an EOS token
-            if output_ids.shape[-1] >= max_output_length or valid_tokens[:, -1].item() == eos_token_id.item():
+            if total_output_tokens >= max_generate_length or valid_tokens[:, -1].item() == eos_token_id.item():
                 break
-
-        return output_ids
+        
+        accept_rate = sum_accpet_tokens / assistant_model_total_generated_tokens
+        return output_ids[:, -total_output_tokens:], accept_rate
 
     def sample(
         self,
@@ -692,7 +689,9 @@ class GenerationInferenceModel(GenerationMixin):
             logits = logits / temperature
 
             _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
-
+            # next_tokens = probs.argmax(-1)
+            # if next_tokens.ndim == 1:
+            #     next_tokens = next_tokens.unsqueeze(0)
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
 

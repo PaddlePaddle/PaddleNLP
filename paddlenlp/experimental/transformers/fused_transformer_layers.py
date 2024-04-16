@@ -28,6 +28,7 @@ from paddle.nn.quant import weight_only_linear
 
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
+from copy import deepcopy
 
 if is_paddlenlp_ops_available():
     from paddlenlp_ops import (
@@ -1769,15 +1770,27 @@ class FusedSpecuMultiTransformer(Layer):
         seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
         seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
         cu_seqlens_k = kwargs.get("cu_seqlens_k", None)
+        token_num_in_cache = kwargs.get("token_num_in_cache", None)
+        # cu_seqlens_k_sepcu = deepcopy(cu_seqlens_k)
         cache = kwargs.get("cache", None)
-        gamma = kwargs.get("gamma", None)
+        cur_seq_len = qkv_out.shape[0]
+        # print("--------cur_seq_len: ", cur_seq_len)
+        # candidate_length = kwargs.get("candidate_length", None)
         # prefill stage
-        if cache is None:
-            cur_seq_len = seq_lens_encoder[0][0]
-            token_num_in_cache = 0
-        else:
-            cur_seq_len = seq_lens_decoder[0][0]
-            token_num_in_cache = cur_seq_len - gamma
+        # if cache is None:
+        #     # cur_seq_len = seq_lens_encoder[0][0]
+        #     token_num_in_cache = 0
+        # else:
+        #     # cur_seq_len = seq_lens_decoder[0][0]
+        #     # token_num_in_cache = cur_seq_len - seq_lens_this_time[0]
+        #     token_num_in_cache = seq_lens_decoder[0][0]
+        #     cu_seqlens_k_sepcu[1] = token_num_in_cache + cu_seqlens_k[1]
+        # print("seq_lens_encoder: ", seq_lens_encoder)
+        # print("seq_lens_decoder: ", seq_lens_decoder)
+        # print("seq_lens_this_time: ", seq_lens_this_time)
+        # print("cu_seqlens_q: ", kwargs.get("cu_seqlens_q", None))
+        # print("cu_seqlens_k: ", cu_seqlens_k)
+        # print("token_num_in_cache: ", token_num_in_cache)
 
         # qkv_out: [token_num, 3*hidden_dim]
         fmha_out, qkv_out_specu, _, _ = paddle.incubate.nn.functional.speculative_decoding_multihead_attention(
@@ -1794,8 +1807,11 @@ class FusedSpecuMultiTransformer(Layer):
             rotary_embs, # rotary_embs
             None,  # attn_mask
             None,  # qkv_bias
+            seq_lens_encoder[0],
+            seq_lens_decoder[0],
             token_num_in_cache, # token_num_in_cache
             kwargs.get("max_input_length", -1), # max_seq_len
+            cache is not None, # is_decoder
             self.use_neox_rotary_style,
         )
 
@@ -1994,7 +2010,6 @@ class FusedSpecuMultiTransformer(Layer):
         kwargs["multi_block_output"] = tmp_out
         kwargs["seq_lens"] = seq_lens
         kwargs["input_ids"] = input_ids
-
         # out = self.post_process(**kwargs)
         return tmp_out, caches
 
