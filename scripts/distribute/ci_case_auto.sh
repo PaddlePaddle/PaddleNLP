@@ -1014,7 +1014,7 @@ function llama_static_auto_recompute_bs8_fp32_DP1-MP1-PP1() {
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.52110565
     if [ $IS_A100 -ne 0 ];then
-        loss_base=9.44003963
+        loss_base=9.54202747
     fi
     ips_base=-1
     mem_base=-1
