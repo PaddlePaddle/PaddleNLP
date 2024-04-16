@@ -59,7 +59,7 @@ def tokenizer_base():
     return tokenizer
 
 
-def test_tokenizer_type(tokenizer_hf, tokenizer_fast, tokenizer_base):
+def test_tokenizer_type(tokenizer_fast, tokenizer_base):
     assert isinstance(tokenizer_fast._tokenizer, HFTokenizer)
     assert not hasattr(tokenizer_base, "_tokenizer")
 
