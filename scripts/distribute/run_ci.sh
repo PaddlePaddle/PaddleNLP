@@ -50,6 +50,7 @@ install_paddlenlp(){
     python -m pip uninstall paddlenlp -y
     rm -rf build/ && rm -rf paddlenlp.egg-info/ && rm -rf dist/
     python -m pip install --ignore-installed -r requirements.txt
+    python -m pip install --ignore-installed -r requirements-dev.txt
     python setup.py install
     python setup.py build_ext
     python setup.py bdist_wheel
@@ -149,6 +150,13 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         export FLAGS_install_deps=1
         export FLAGS_download_data="gpt ""$FLAGS_download_data"
         let case_num++
+
+        echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: gpt-3_auto \033"
+        bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh llm_gpt_case_list_auto $FLAGS_install_deps $FLAGS_download_data
+        print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` gpt-3_auto
+        export FLAGS_install_deps=1
+        export FLAGS_download_data="gpt ""$FLAGS_download_data"
+        let case_num++        
     fi
     if [[ $(contain_case gpt-3_dygraph ${case_list[@]}; echo $?) -eq 1 ]];then
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: gpt-3_dygraph \033"

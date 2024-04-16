@@ -14,6 +14,7 @@
 import json
 import os
 import sys
+from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
@@ -49,6 +50,23 @@ from paddlenlp.transformers import (
 from paddlenlp.utils.log import logger
 
 
+def add_start_docstrings(*docstr):
+    def docstring_decorator(fn):
+        fn.__doc__ = "".join(docstr) + (fn.__doc__ if fn.__doc__ is not None else "")
+        return fn
+
+    return docstring_decorator
+
+
+@dataclass
+@add_start_docstrings(TrainingArguments.__doc__)
+class FinetuneArguments(TrainingArguments):
+    decay_steps: int = field(
+        default=0,
+        metadata={"help": "The steps use to control the learing rate."},
+    )
+
+
 def read_local_dataset(path):
     with open(path, "r", encoding="utf-8") as fp:
         for line in fp:
@@ -57,7 +75,7 @@ def read_local_dataset(path):
 
 def main():
     # Arguments
-    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
+    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, FinetuneArguments))
     # Support format as "args.json --arg1 value1 --arg2 value2.”
     # In case of conflict, command line arguments take precedence.
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
@@ -446,6 +464,7 @@ def main():
                 lora_alpha=2 * model_args.lora_rank if not model_args.rslora else 4,
                 rslora=model_args.rslora,
                 lora_plus_scale=model_args.lora_plus_scale,
+                pissa=model_args.pissa,
                 merge_weights=False,
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 dtype=dtype,
