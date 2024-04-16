@@ -23,11 +23,10 @@ from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, AutoConf
 # isort: on
 from dpo_trainer import DPOTrainer
 from dpo_utils import DataArgument, DPOTrainingArguments, ModelArgument
-from dpo_data import process_example
+from dpo_data import process_example, collate_fn
 
 # fmt: on
-from paddlenlp.dataset.dpo import collate_fn, create_dataset
-from dpo_estimate_training import dpo_estimate_training
+#from dpo_estimate_training import dpo_estimate_training
 
 
 def main():
@@ -37,9 +36,6 @@ def main():
         model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
-    if model_args.fused_rotary:
-        raise NotImplementedError("The fused_rotary dosen not support for DPO.")
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -102,33 +98,18 @@ def main():
 
     logger.info("Start to load model ...")
 
-    # fused_rotary and fused_softmax_mask only support for rocm.
-    if not paddle.is_compiled_with_rocm():
-        if model_args.fused_rotary:
-            logger.warning("The fused_rotary flag is only available when using the ROCM version of paddlepaddle. ")
-            model_args.fused_rotary = False
-        if model_args.fused_softmax_mask:
-            logger.warning(
-                "The fused_softmax_mask flag is only available when using the ROCM version of paddlepaddle. "
-            )
-            model_args.fused_softmax_mask = False
     model_kwargs = dict(
         pretrained_model_name_or_path=model_args.model_name_or_path,
         dtype=dtype,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
-        recompute=training_args.recompute,
+        use_recompute=training_args.recompute,
         recompute_granularity=model_args.recompute_granularity,
         use_flash_attention=model_args.use_flash_attention,
         tensor_parallel_output=model_args.tensor_parallel_output,
-        fused_linear=model_args.fused_linear,
-        fused_rotary=model_args.fused_rotary,
-        fused_softmax_mask=model_args.fused_softmax_mask,
-        dpo=True,
-        dpo_beta=training_args.dpo_beta,
-        dpo_normalize_logps=training_args.dpo_normalize_logps,
-        use_fast_ln=model_args.use_fast_ln,
-        use_fast_ffn=model_args.use_fast_ffn,
+        #dpo=True,
+        #dpo_beta=training_args.dpo_beta,
+        #dpo_normalize_logps=training_args.dpo_normalize_logps,
     )
     if training_args.pipeline_parallel_degree > 1:
         model_class = AutoModelForCausalLMPipe
@@ -137,35 +118,35 @@ def main():
     if not data_args.autotuner_benchmark and not data_args.dpo_benchmark:
         ref_model = model_class.from_pretrained(**model_kwargs)
         config = AutoConfig.from_pretrained(**model_kwargs)
-        model = model_class._from_config(config, dtype=dtype)
+        model = model_class.from_config(config, dtype=dtype)
         model.set_state_dict(ref_model.state_dict())
         # for DPO save
-        model.config.dpo = False
+        #model.config.dpo = False
     else:
         config = AutoConfig.from_pretrained(**model_kwargs)
-        model = model_class._from_config(config, dtype=dtype)
-        ref_model = model_class._from_config(config, dtype=dtype)
+        model = model_class.from_config(config, dtype=dtype)
+        ref_model = model_class.from_config(config, dtype=dtype)
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     logger.info("Loading model & tokenizer successfully !")
 
     logger.info("Start to create dataset ...")
-    dataset_config = {
-        "tokenizer": tokenizer,
-        "max_seq_len": data_args.max_seq_length,
-        "max_prompt_len": data_args.max_prompt_len,
-        "random_seed": training_args.seed,
-        "num_replicas": training_args.dataset_world_size,
-        "rank": training_args.dataset_rank,
-        "num_samples_each_epoch": data_args.num_samples_each_epoch,
-        "greedy_intokens": data_args.greedy_intokens,
-        "buffer_size": data_args.buffer_size,
-    }
+    #dataset_config = {
+    #    "tokenizer": tokenizer,
+    #    "max_seq_len": data_args.max_seq_length,
+    #    "max_prompt_len": data_args.max_prompt_len,
+    #    "random_seed": training_args.seed,
+    #    "num_replicas": training_args.dataset_world_size,
+    #    "rank": training_args.dataset_rank,
+    #    "num_samples_each_epoch": data_args.num_samples_each_epoch,
+    #    "greedy_intokens": data_args.greedy_intokens,
+    #    "buffer_size": data_args.buffer_size,
+    #}
         
     if not data_args.autotuner_benchmark and training_args.max_steps == -1:
-        if training_args.should_load_dataset and paddle.distributed.get_rank() == 0:
+        #if training_args.should_load_dataset and paddle.distributed.get_rank() == 0:
             # NOTE(gongenlei): not to feed train_dataset, or the data will be wrong in next training.
-            training_args, res = dpo_estimate_training(tokenizer, data_args, training_args)
+            #training_args, res = dpo_estimate_training(tokenizer, data_args, training_args)
 
         if paddle.distributed.get_world_size() > 1:
             paddle.distributed.barrier()
@@ -187,30 +168,57 @@ def main():
 
     trans_func = partial(process_example, tokenizer=tokenizer, data_args=data_args)
     if training_args.should_load_dataset:
-        if data_args.train_task_config is None:
-            raise ValueError(f"Please specific dataset name or path (got {data_args.train_task_config})")
-        elif (
-            os.path.exists(os.path.join(data_args.train_task_config, "train.json"))
-        ):
-            train_ds = load_dataset(
-                "json",
-                data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
-                lazy=data_args.lazy,
-            )[0]
-            train_dataset = trans_func(train_ds)
+        if data_args.dataset_name_or_path is None or not os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")):
+            raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
+
+        train_ds = load_dataset(
+            "json",
+            data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
+        )[0]
+        #    lazy=data_args.lazy,
+        train_ds = (
+            train_ds.map(trans_func)
+            if train_ds is not None
+            else None
+        )
 
     if training_args.do_eval and training_args.should_load_dataset:
-        if data_args.eval_task_config is None:
-            raise ValueError(f"Please specific dataset name or path (got {data_args.eval_task_config})")
-        elif (
-            os.path.exists(os.path.join(data_args.eval_task_config, "eval.json"))
-        ):
-            eval_ds = load_dataset(
-                "json",
-                data_files=os.path.join(data_args.dataset_name_or_path, "eval.json"),
-                lazy=data_args.lazy,
-            )[0]
-            eval_dataset = trans_func(eval_ds)
+        if data_args.dataset_name_or_path is None or not os.path.exists(os.path.join(data_args.dataset_name_or_path, "dev.json")):
+            raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
+
+        eval_ds = load_dataset(
+            "json",
+            data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
+        )[0]
+        #    lazy=data_args.lazy,
+        eval_ds = (
+            eval_ds.map(trans_func)
+            if eval_ds is not None
+            else None
+        )
+
+    if training_args.zero_padding:
+        intoken_dataset = InTokensMapDataset
+        logger.info("Creating Zero Padding Data Stream. This may take a few minutes.")
+        train_ds = (
+            intoken_dataset(
+                train_ds,
+                tokenizer=tokenizer,
+                max_length=data_args.max_seq_length,
+            )
+            if train_ds is not None
+            else None
+        )
+
+        eval_ds = (
+            intoken_dataset(
+                eval_ds,
+                tokenizer=tokenizer,
+                max_length=data_args.max_seq_length,
+            )
+            if eval_ds is not None
+            else None
+        )
 
     logger.info("Creating dataset successfully ...")
 
@@ -218,23 +226,23 @@ def main():
         model=model,
         ref_model=ref_model,
         args=training_args,
-        train_dataset=train_dataset if training_args.do_train and training_args.should_load_dataset else None,
-        eval_dataset=eval_dataset if training_args.do_eval and training_args.should_load_dataset else None,
+        train_dataset=train_ds if training_args.do_train and training_args.should_load_dataset else None,
+        eval_dataset=eval_ds if training_args.do_eval and training_args.should_load_dataset else None,
         tokenizer=tokenizer,
         data_collator=partial(
             collate_fn,
             tokenizer=tokenizer,
-            max_seq_len=data_args.max_seq_length,
+            max_seq_length=data_args.max_seq_length,
         ),
     )
 
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
-        if data_args.dpo_benchmark and training_args.should_load_dataset and paddle.distributed.get_rank() == 0:
-            effective_tokens, total_tokens = res["effective_tokens"], res["total_tokens"]
-            effective_tokens_per_second = effective_tokens / train_result.metrics["train_runtime"]
-            logger.info("[timelog] {}: {:.2f} token/s ({}) ".format(
-               "training speed", effective_tokens_per_second, time.strftime("%Y-%m-%d %H:%M:%S")))
+        #if data_args.dpo_benchmark and training_args.should_load_dataset and paddle.distributed.get_rank() == 0:
+            #effective_tokens, total_tokens = res["effective_tokens"], res["total_tokens"]
+            #effective_tokens_per_second = effective_tokens / train_result.metrics["train_runtime"]
+            #logger.info("[timelog] {}: {:.2f} token/s ({}) ".format(
+            #   "training speed", effective_tokens_per_second, time.strftime("%Y-%m-%d %H:%M:%S")))
             # logger.info("[timelog] {}: {} tokens ({}) ".format(
             #    "Effective_Tokens", effective_tokens, time.strftime("%Y-%m-%d %H:%M:%S")))
             # logger.info("[timelog] {}: {} tokens ({}) ".format(

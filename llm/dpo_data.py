@@ -1,5 +1,7 @@
+from operator import imod
 import numpy as np
 import paddle
+from scipy.linalg import block_diag
 
 def process_example(data, tokenizer, data_args):
     """Convert raw format example to Example."""
@@ -42,7 +44,7 @@ def process_example(data, tokenizer, data_args):
 
     chosen_encode_tokens = tokenizer.encode_chat_inputs(conversations)['conversations']
 
-    # conver to rejected conversations
+    # convert to rejected conversations
     conversations[-1][-1] = rejected.strip()
 
     rejected_encode_tokens = tokenizer.encode_chat_inputs(conversations)['conversations']
@@ -54,12 +56,15 @@ def process_example(data, tokenizer, data_args):
     tokens_rejected = rejected_encode_tokens[-1][-1]
     del rejected_encode_tokens
 
-    if len(tokens_prompt) + len(tokens_chosen) + len(tokens_rejected) > data_args.max_seq_len:
+    # temporary reserve 1 token for truncation
+    data_args.max_seq_length = data_args.max_seq_length - 1
+
+    if len(tokens_prompt) + len(tokens_chosen) + len(tokens_rejected) > data_args.max_seq_length:
         # truncate prompt
         tokens_prompt = tokens_prompt[-data_args.max_prompt_len:]
-        if (len(tokens_prompt) + len(tokens_chosen) + len(tokens_rejected)) > data_args.max_seq_len:
+        if (len(tokens_prompt) + len(tokens_chosen) + len(tokens_rejected)) > data_args.max_seq_length:
             max_response_len = (
-                data_args.max_seq_len
+                data_args.max_seq_length
                 - len(tokens_prompt)
             )
             # 按比例截断
@@ -83,7 +88,7 @@ def process_example(data, tokenizer, data_args):
         tokens_target = chosen_encode_tokens[turn_index][1]
         turn_index -= 1
 
-        if len(tokens_src) + len(tokens_target) > data_args.max_seq_len - cur_len:
+        if len(tokens_src) + len(tokens_target) > data_args.max_seq_length - cur_len:
             break
         tokens_prompt = tokens_src + tokens_target + tokens_prompt
         cur_len += len(tokens_src) + len(tokens_target)
@@ -91,6 +96,7 @@ def process_example(data, tokenizer, data_args):
     concatenated_input_ids = (
         tokens_prompt
         + tokens_chosen
+        + [tokens_prompt[-1]]
         + tokens_rejected
     )
 
@@ -98,25 +104,32 @@ def process_example(data, tokenizer, data_args):
     prompt_len = len(tokens_prompt)
     concatenated_position_ids = (
         list(range(prompt_len))
-        + list(range(prompt_len, prompt_len + tokens_chosen)) 
-        + list(range(prompt_len, prompt_len + tokens_rejected))
+        + list(range(prompt_len, prompt_len + len(tokens_chosen))) 
+        + list(range(prompt_len, prompt_len + len(tokens_rejected) + 1))
     )
 
     chosen_labels = (
         [0] * len(tokens_prompt))
     chosen_labels += tokens_chosen
-    chosen_labels += [0] * len(tokens_rejected)
+    chosen_labels += [0] * (len(tokens_rejected) + 1)
 
     rejected_labels = (
         [0] * len(tokens_prompt))
-    rejected_labels += tokens_rejected[0]
+    #rejected_labels += [tokens_rejected[0]]
     rejected_labels += [0] * len(tokens_chosen)
-    rejected_labels += tokens_rejected[1:]
+    rejected_labels += [tokens_prompt[-1]]
+    rejected_labels += tokens_rejected
+
+    # shift labels
+    concatenated_input_ids = concatenated_input_ids[:-1]
+    concatenated_position_ids = concatenated_position_ids[:-1]
+    chosen_labels = chosen_labels[1:]
+    rejected_labels = rejected_labels[1:]
 
     seq_len = len(concatenated_input_ids)
 
     # ?
-    if seq_len > data_args.max_seq_len:
+    if seq_len > data_args.max_seq_length:
         return None
 
     concatenated_attention_mask = np.tri(seq_len, seq_len, dtype=bool)
@@ -127,11 +140,12 @@ def process_example(data, tokenizer, data_args):
         rejected_input_ids_start_index:, chosen_input_ids_start_index: rejected_input_ids_start_index
     ] = False
 
-    # shift labels
-    concatenated_input_ids = concatenated_input_ids[:-1]
-    chosen_labels = chosen_labels[1:]
-    rejected_labels = rejected_labels[1:]
+    chosen_labels_start_index = len(tokens_prompt)
+    rejected_labels_start_index = chosen_labels_start_index  + len(tokens_chosen)
+    response_index = [chosen_labels_start_index, rejected_labels_start_index, seq_len]
 
+    # undo change
+    data_args.max_seq_length = data_args.max_seq_length + 1
 
     return {
         "input_ids": concatenated_input_ids,
@@ -139,64 +153,74 @@ def process_example(data, tokenizer, data_args):
         "attention_mask": concatenated_attention_mask,
         "chosen_labels": chosen_labels,
         "rejected_labels": rejected_labels,
+        "response_index": response_index,
     }
     
 
-def collate_fn(batch, tokenizer, max_seq_len=None):
+def collate_fn(batch, tokenizer, max_seq_length=None):
     """Convert batch data into tensor."""
-    # max_seq_len = 4096
-    if max_seq_len is None:
-        raise ValueError("max_seq_len is None.")
+    # max_seq_length = 4096
+    if max_seq_length is None:
+        raise ValueError("max_seq_length is None.")
 
     input_dict = {
-        "concatenated_input_ids": [],
-        "concatenated_position_ids": [],
-        "concatenated_attention_mask": [],
+        "input_ids": [],
+        "position_ids": [],
+        "attention_mask": [],
         "chosen_labels": [],
         "rejected_labels": [],
         "response_indexs": [],
     }
-    for i, sequences in enumerate(batch):
-        difference = max_seq_len - sum([len(sequence.concatenated_input_ids) for sequence in sequences])
+    for i, sequence in enumerate(batch):
+        difference = max_seq_length - len(sequence['input_ids'])
 
-        input_dict["concatenated_input_ids"].append(
-            sum([sequence.concatenated_input_ids for sequence in sequences], [])
-            + [tokenizer.pad_token_id] * difference
+        input_dict["input_ids"].append(
+            sequence["input_ids"]
+            + [tokenizer.pad_token_id if tokenizer.pad_token_id else tokenizer.eos_token_id] * difference
         )
-        input_dict["concatenated_position_ids"].append(
-            sum([sequence.concatenated_position_ids for sequence in sequences], []) + [0] * difference
+        input_dict["position_ids"].append(
+            sequence["position_ids"] + [0] * difference
         )
         input_dict["chosen_labels"].append(
-            sum([sequence.chosen_labels for sequence in sequences], []) + [0] * difference
+            sequence["chosen_labels"] + [0] * difference
         )
         input_dict["rejected_labels"].append(
-            sum([sequence.rejected_labels for sequence in sequences], []) + [0] * difference
-        )
-        input_dict["concatenated_attention_mask"].append(
-            # (s,s) -> (1,s,s)
-            np.expand_dims(
-                # pad to max_loength
-                np.pad(
-                    # block attention_mask
-                    block_diag(*[sequence.concatenated_attention_mask for sequence in sequences]),
-                    pad_width=((0, difference), (0, difference)),
-                    mode="constant",
-                    constant_values=False,
-                ),
-                axis=0,
-            )
+            sequence["rejected_labels"] + [0] * difference
         )
         sequence_sum = 0
-        for sequence in sequences:
+        for sample_ri in sequence["response_index"]:
             response_index = [
-                i,  # bs
-                sequence.response_index[0] + sequence_sum,  # chosen_response_start_index
-                sequence.response_index[1] + sequence_sum,  # rejeted_response_start_index
-                sequence.response_index[2] + sequence_sum,  # rejeted_response_end_index + 1
-            ]
+                    i,  # bs
+                    sample_ri[0] + sequence_sum,  # chosen_response_start_index
+                    sample_ri[1] + sequence_sum,  # rejeted_response_start_index
+                    sample_ri[2] + sequence_sum,  # rejeted_response_end_index + 1
+                ]
             input_dict["response_indexs"].append(response_index)
-            sequence_sum += len(sequence.concatenated_input_ids)
+            sequence_sum += len(sequence["input_ids"])
+
+        input_dict["attention_mask"].append(
+            # pad to max_loength
+            np.pad(
+                sequence["attention_mask"],
+                pad_width=((0, 0), (0, difference), (0, difference)),
+                mode="constant",
+                constant_values=False,
+            )
+        )
+        #sequence_sum = 0
+        #for sequence in sequences:
+        #    response_index = [
+        #        i,  # bs
+        #        sequence.response_index[0] + sequence_sum,  # chosen_response_start_index
+        #        sequence.response_index[1] + sequence_sum,  # rejeted_response_start_index
+        #        sequence.response_index[2] + sequence_sum,  # rejeted_response_end_index + 1
+        #    ]
+        #    input_dict["response_indexs"].append(response_index)
+        #    sequence_sum += len(sequence.concatenated_input_ids)
     for key in input_dict:
-        input_dict[key] = paddle.to_tensor(input_dict[key])
-    input_dict["concatenated_attention_mask"] = input_dict["concatenated_attention_mask"].cast("float32")
+        try:
+            input_dict[key] = paddle.to_tensor(input_dict[key])
+        except:
+            import pdb; pdb.set_trace()
+    input_dict["attention_mask"] = input_dict["attention_mask"].cast("float32")
     return input_dict

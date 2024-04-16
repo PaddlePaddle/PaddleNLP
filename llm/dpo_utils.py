@@ -47,8 +47,8 @@ class DPOTrainingArguments(TrainingArguments):
 class DataArgument:
     """DataArgument"""
 
-    train_task_config: str = field(
-        default="./config/task_sft.json", metadata={"help": "Path to the training task config."}
+    dataset_name_or_path: str = field(
+        default="./data/", metadata={"help": "Path to the dataset dir."}
     )
     eval_task_config: str = field(default=None, metadata={"help": "Path to the evaluation task config."})
     max_seq_length: int = field(default=4096, metadata={"help": "Maximum sequence length."})
@@ -87,17 +87,5 @@ class ModelArgument:
             "help": "The granularity of recompute training can be selected as `full` or `full_attn` or `core_attn`."
         },
     )
-    fused_linear: bool = field(default=False, metadata={"help": "Whether to use fused_gemm_epilogue"})
-    fused_softmax_mask: bool = field(default=False, metadata={"help": "Whether to fuse softmax and add"})
-
-    use_fast_ln: bool = field(
-        default=False,
-        metadata={"help": "use_fast_ln"},
-    )
-    use_fast_ffn: bool = field(
-        default=False,
-        metadata={"help": "use_fast_ffn"},
-    )
-
     stage: str = field(default="DPO", metadata={"help": "The type of training."})
     tensor_parallel_output: bool = field(default=True, metadata={"help": "tensor_parallel_output"})

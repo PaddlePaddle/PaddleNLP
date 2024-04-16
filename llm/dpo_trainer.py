@@ -10,6 +10,8 @@ from paddle.distributed import fleet
 from paddlenlp.trainer import Trainer
 from paddlenlp.transformers.model_utils import unwrap_model
 
+global_dev_id = 0
+
 
 def disable_dropout_in_model(model: paddle.nn.Layer) -> None:
     """ "disable dropout"""
@@ -158,26 +160,41 @@ class DPOTrainer(Trainer):
         if self.args.zero_padding:
             offload_tensor_to_cpu(self.optimizer.state_dict())
             with paddle.no_grad():
-                reference_chosen_logps, reference_rejected_logps = self.ref_model(
-                    batch["concatenated_input_ids"],
-                    position_ids=batch["concatenated_position_ids"],
-                    attention_mask=batch["concatenated_attention_mask"],
-                    chosen_labels=batch["chosen_labels"],
-                    rejected_labels=batch["rejected_labels"],
-                    response_indexs=batch["response_indexs"],
-                    reference_chosen_logps=None,
-                    reference_rejected_logps=None,
-                )
+                #reference_chosen_logps, reference_rejected_logps = self.ref_model(
+                ref_logits = self.ref_model(
+                    batch["input_ids"],
+                    position_ids=batch["position_ids"],
+                    attention_mask=batch["attention_mask"],
+                    #chosen_labels=batch["chosen_labels"],
+                    #rejected_labels=batch["rejected_labels"],
+                    #response_indexs=batch["response_indexs"],
+                    #reference_chosen_logps=None,
+                    #reference_rejected_logps=None,
+                )[0]
             reload_tensor_to_gpu(self.optimizer.state_dict())
-            loss, policy_chosen_logps, policy_rejected_logps = model(
-                batch["concatenated_input_ids"],
-                position_ids=batch["concatenated_position_ids"],
-                attention_mask=batch["concatenated_attention_mask"],
-                chosen_labels=batch["chosen_labels"],
-                rejected_labels=batch["rejected_labels"],
-                response_indexs=batch["response_indexs"],
-                reference_chosen_logps=reference_chosen_logps,
-                reference_rejected_logps=reference_rejected_logps,
+            #loss, policy_chosen_logps, policy_rejected_logps = model(
+            policy_logits = model(
+                batch["input_ids"],
+                position_ids=batch["position_ids"],
+                attention_mask=batch["attention_mask"],
+                #chosen_labels=batch["chosen_labels"],
+                #rejected_labels=batch["rejected_labels"],
+                #response_indexs=batch["response_indexs"],
+                #reference_chosen_logps=reference_chosen_logps,
+                #reference_rejected_logps=reference_rejected_logps,
+            )[0]
+            policy_chosen_logps = paddle.log(paddle.take_along_axis(policy_logits, axis=2, indices=batch["chosen_labels"].unsqueeze(2)).squeeze(2))
+            policy_rejected_logps = paddle.log(paddle.take_along_axis(policy_logits, axis=2, indices=batch["rejected_labels"].unsqueeze(2)).squeeze(2))
+            reference_chosen_logps = paddle.log(paddle.take_along_axis(ref_logits, axis=2, indices=batch["chosen_labels"].unsqueeze(2)).squeeze(2))
+            reference_rejected_logps = paddle.log(paddle.take_along_axis(ref_logits, axis=2, indices=batch["rejected_labels"].unsqueeze(2)).squeeze(2))
+
+            import pdb; pdb.set_trace()
+
+            loss = self.dpo_loss(
+                policy_chosen_logps,
+                policy_rejected_logps,
+                reference_chosen_logps,
+                reference_rejected_logps,
             )
         else:
             with paddle.no_grad():
