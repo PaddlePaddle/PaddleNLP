@@ -167,7 +167,6 @@ class AutoTokenizer:
             is_support_fast_tokenizer = False
             init_class_prefix = init_class[:-9]
             for fast_tokenizer_class, name in cls._fast_name_mapping.items():
-                breakpoint()
                 fast_tokenizer_class_prefix = fast_tokenizer_class[:-9]
                 if name == class_name and fast_tokenizer_class_prefix.startswith(init_class_prefix):
                     is_support_fast_tokenizer = True
