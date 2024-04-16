@@ -27,3 +27,4 @@ ray
 loguru
 data
 wget
+huggingface_hub>=0.19.2

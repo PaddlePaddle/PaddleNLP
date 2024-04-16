@@ -29,14 +29,19 @@ import paddle.tensor as tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
-from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    GatherOp,
-    RowSequenceParallelLinear,
-    ScatterOp,
-    mark_as_sequence_parallel_parameter,
-)
+
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        ColumnSequenceParallelLinear,
+        GatherOp,
+        RowSequenceParallelLinear,
+        ScatterOp,
+        mark_as_sequence_parallel_parameter,
+    )
+except:
+    pass
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
+from paddle.utils import try_import
 
 from ...utils.converter import StateDictNameMapping
 from ...utils.log import logger
@@ -48,7 +53,11 @@ from ..model_outputs import (
     TokenClassifierOutput,
 )
 from ..model_utils import dy2st_nocheck_guard_context
-from .configuration import GPT_PRETRAINED_INIT_CONFIGURATION, GPTConfig
+from .configuration import (
+    GPT_PRETRAINED_INIT_CONFIGURATION,
+    GPT_PRETRAINED_RESOURCE_FILES_MAP,
+    GPTConfig,
+)
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
@@ -58,6 +67,9 @@ try:
     from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 except:
     FusedDropoutAdd = None
+
+OriginLayerNorm = paddle.nn.LayerNorm
+
 
 __all__ = [
     "GPTModel",
@@ -70,6 +82,7 @@ __all__ = [
     "GPTForCausalLM",
     "GPTEmbeddings",
     "GPTDecoderLayer",
+    "GPTLayerNorm",
 ]
 
 
@@ -119,6 +132,11 @@ def seed_guard_context(name=None):
         return contextlib.nullcontext()
 
 
+def fast_layer_norm(input, weight, bias, eps):
+    fast_ln_lib = try_import("fast_ln")
+    return fast_ln_lib.fast_ln(input, weight, bias, eps)[0]
+
+
 def _make_causal_mask(input_ids_shape, past_key_values_length):
     """
     Make causal mask used for self-attention
@@ -147,6 +165,11 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     expanded_mask = mask.expand([batch_size, 1, tgt_length, src_length])
 
     return expanded_mask
+
+
+def _check_normalized_shape(normalized_shape):
+    if isinstance(normalized_shape, (list, tuple)):
+        assert len(normalized_shape) == 1
 
 
 class MultiHeadAttention(nn.Layer):
@@ -196,7 +219,7 @@ class MultiHeadAttention(nn.Layer):
                     3 * config.hidden_size,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=config.fused_linear,
+                    fuse_matmul_bias=config.use_fused_linear,
                 )
             else:
                 self.q_proj = ColumnParallelLinear(
@@ -204,7 +227,7 @@ class MultiHeadAttention(nn.Layer):
                     config.hidden_size,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=config.fused_linear,
+                    fuse_matmul_bias=config.use_fused_linear,
                 )
 
                 self.k_proj = ColumnParallelLinear(
@@ -212,7 +235,7 @@ class MultiHeadAttention(nn.Layer):
                     config.hidden_size,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=config.fused_linear,
+                    fuse_matmul_bias=config.use_fused_linear,
                 )
 
                 self.v_proj = ColumnParallelLinear(
@@ -220,7 +243,7 @@ class MultiHeadAttention(nn.Layer):
                     config.hidden_size,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=config.fused_linear,
+                    fuse_matmul_bias=config.use_fused_linear,
                 )
 
             self.out_proj = RowParallelLinear(
@@ -228,7 +251,7 @@ class MultiHeadAttention(nn.Layer):
                 config.hidden_size,
                 has_bias=True,
                 input_is_parallel=True,
-                fuse_matmul_bias=config.fused_linear,
+                fuse_matmul_bias=config.use_fused_linear,
             )
         else:
             if self.config.fuse_attention_qkv:
@@ -421,7 +444,7 @@ class TransformerDecoder(nn.Layer):
 
         self.config = config
         self.layers = decoder_layers
-        self.norm = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
+        self.norm = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
 
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.norm.weight)
@@ -566,21 +589,23 @@ class GPTDecoderLayer(nn.Layer):
                 config.intermediate_size,
                 gather_output=False,
                 has_bias=True,
-                fuse_matmul_bias=self.config.fused_linear,
+                fuse_matmul_bias=self.config.use_fused_linear,
             )
+
             self.linear2 = RowParallelLinear(
                 config.intermediate_size,
                 config.hidden_size,
                 input_is_parallel=True,
                 has_bias=True,
-                fuse_matmul_bias=self.config.fused_linear,
+                fuse_matmul_bias=self.config.use_fused_linear,
             )
         else:
             self.linear1 = nn.Linear(config.hidden_size, config.intermediate_size, bias_attr=True)
             self.linear2 = nn.Linear(config.intermediate_size, config.hidden_size, bias_attr=True)
 
-        self.norm1 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
-        self.norm2 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
+        self.norm1 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
+        self.norm2 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
+
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.norm1.weight)
             mark_as_sequence_parallel_parameter(self.norm1.bias)
@@ -741,6 +766,21 @@ class GPTEmbeddings(nn.Layer):
         return embeddings
 
 
+class GPTLayerNorm(OriginLayerNorm):
+    def __init__(self, config, normalized_shape, epsilon=1e-05, weight_attr=None, bias_attr=None, name=None):
+        super().__init__(
+            normalized_shape=normalized_shape, epsilon=epsilon, weight_attr=weight_attr, bias_attr=bias_attr
+        )
+
+        self.config = config
+        _check_normalized_shape(self._normalized_shape)
+
+    def forward(self, input):
+        if self.config.use_fast_layer_norm:
+            return fast_layer_norm(input, self.weight, self.bias, self._epsilon)
+        return super().forward(input)
+
+
 class GPTPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained GPT models. It provides GPT related
@@ -755,6 +795,7 @@ class GPTPretrainedModel(PretrainedModel):
     base_model_prefix = "gpt"
     config_class = GPTConfig
     pretrained_init_configuration = GPT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = GPT_PRETRAINED_RESOURCE_FILES_MAP
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):
