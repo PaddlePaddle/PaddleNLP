@@ -333,7 +333,8 @@ def register_sequence_parallel_allreduce_hooks(model, accumulation_steps, fuse_s
     params = []
     for p in model.parameters():
         if is_sequence_parallel_parameter(p):
-            params.append(p)
+            if not p.stop_gradient:
+                params.append(p)
 
     if fuse_sequence_parallel_allreduce:
         hook = create_fused_allreduce_gradient_hook(params, accumulation_steps)
