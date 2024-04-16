@@ -70,6 +70,18 @@ class GemmaFastTokenizer(PretrainedFastTokenizer):
     slow_tokenizer_class = GemmaTokenizer
     padding_side = "left"
     model_input_names = ["input_ids", "attention_mask"]
+    pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
+    pretrained_init_configuration = (
+        slow_tokenizer_class.pretrained_init_configuration
+    )  # remind to add this to avoid fast version missing in map dict
+    pretrained_resource_files_map.update(
+        {
+            "tokenizer_file": {
+                "google/gemma-2b": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-2b/tokenizer.json",
+                "google/gemma-7b": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-7b/tokenizer.json",
+            },
+        }
+    )
 
     def __init__(
         self,

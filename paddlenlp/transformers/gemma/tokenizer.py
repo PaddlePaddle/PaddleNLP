@@ -39,14 +39,16 @@ SPIECE_UNDERLINE = "▁"
 class GemmaTokenizer(PretrainedTokenizer):
     model_input_names = ["input_ids", "attention_mask"]
     resource_files_names = VOCAB_FILES_NAMES
-    # pretrained_resource_files_map = {
-    #     "vocab_file": {
-    #         "google/gemma-7b": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-7b/tokenizer.model",
-    #         "google/gemma-2b": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-2b/tokenizer.model",
-    #     },
-    # }
+    pretrained_resource_files_map = {
+        "vocab_file": {
+            "google/gemma-7b": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-7b/tokenizer.model",
+            "google/gemma-2b": "https://bj.bcebos.com/paddlenlp/models/community/google/gemma-2b/tokenizer.model",
+        },
+    }
 
-    pretrained_init_configuration = {}
+    pretrained_init_configuration = {
+        "google/gemma-7b": {},
+    }
 
     def __init__(
         self,
