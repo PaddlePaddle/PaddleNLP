@@ -873,7 +873,7 @@ class ChatTemplateMixin:
     def save_resources(self, save_directory):
         super().save_resources(save_directory)
 
-        if self.chat_template is not None:
+        if isinstance(self.chat_template, ChatTemplate):  # Future remove if ChatTemplate is deprecated
             chat_template_file = os.path.join(save_directory, CHAT_TEMPLATE_CONFIG_NAME)
             with open(chat_template_file, "w", encoding="utf-8") as f:
                 json.dump(asdict(self.chat_template), f, ensure_ascii=False, indent=4)
