@@ -748,8 +748,8 @@ class GPTModel(GPTPretrainedModel):
         if position_ids is None:
             past_length = 0
             if cache is not None:
-                past_length = paddle.shape(cache[0].k)[-2]
-            position_ids = paddle.arange(past_length, paddle.shape(input_ids)[-1] + past_length, dtype="int64")
+                past_length = cache[0].k.shape[-2]
+            position_ids = paddle.arange(past_length, input_ids.shape[-1] + past_length, dtype="int64")
             position_ids = position_ids.unsqueeze(0)
             # .expand_as(input_ids)
             position_ids = paddle.expand_as(position_ids, input_ids)
