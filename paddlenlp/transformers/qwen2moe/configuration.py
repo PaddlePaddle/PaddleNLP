@@ -17,11 +17,11 @@
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 __all__ = [
-    "Qwen2MoeConfig",
+    "QWen2MoeConfig",
 ]
 
 
-class Qwen2MoeConfig(PretrainedConfig):
+class QWen2MoeConfig(PretrainedConfig):
     r"""
     This is the configuration class to store the configuration of a [`Qwen2MoeModel`]. It is used to instantiate a
     Qwen2MoE model according to the specified arguments, defining the model architecture. Instantiating a configuration
@@ -117,7 +117,7 @@ class Qwen2MoeConfig(PretrainedConfig):
         num_attention_heads=16,
         num_key_value_heads=16,
         hidden_act="silu",
-        max_position_embeddings=32768,
+        max_position_embeddings=8192,
         seq_length=2048,
         initializer_range=0.02,
         rms_norm_eps=1e-6,
@@ -128,16 +128,16 @@ class Qwen2MoeConfig(PretrainedConfig):
         use_flash_attention=False,
         attention_dropout=0.0,
         use_fused_rope=False,
-        rope_theta=10000.0,
+        rope_theta=1000000.0,
         tensor_parallel_output=True,
         sequence_parallel=False,
         fuse_sequence_parallel_allreduce=False,
         pad_token_id=0,
-        bos_token_id=1,
-        eos_token_id=2,
+        bos_token_id=151643,
+        eos_token_id=151643,
         tie_word_embeddings=False,
         use_sliding_window=False,
-        sliding_window=4096,
+        sliding_window=32768,
         max_window_layers=28,
         decoder_sparse_step=1,
         moe_intermediate_size=1408,
