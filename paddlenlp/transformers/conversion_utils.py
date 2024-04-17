@@ -491,6 +491,27 @@ def splited_qkv_to_tensor_parallel_qkv(weight_list, num_attention_heads):
 
 def fuse_param_func():
     def fn(fuse_params, is_qkv=False, num_heads=None, num_key_value_heads=None):
+        """fuse function for fusing weights
+
+        (1) fuse_attention_qkv
+            q => [q1,q2,q3,q4]
+            k => [k1,k2,k3,k4] or [k1,k2] for GQA
+            v => [v1,v2,v3,v4] or [v1,v2] for GQA
+            fused weight => [q1,k1,v1,q2,k2,v2,q3,k3,v3,q4,k4,v4]
+                 or for GQA [q1,q2,k1,v1,q3,q4,k2,v2]
+        (2) fuse_attention_ffn
+            directly fuse weights to 1 parts
+            [gate_weight], [up_weight] => [gate_weight, up_weight]
+
+        Args:
+            fuse_params (_type_): to be fused weights
+            is_qkv (bool, optional): for attention qkv weights. Defaults to False.
+            num_heads (_type_, optional): query heads. Defaults to None.
+            num_key_value_heads (_type_, optional): key and value heads. Defaults to None.
+
+        Returns:
+            _type_: fused weights
+        """
         concat_fn = np.concatenate
         split_fn = np.split
         if isinstance(fuse_params[0], paddle.Tensor):
@@ -499,11 +520,6 @@ def fuse_param_func():
 
         if is_qkv:
             # fuse_attention_qkv
-            # q => [q1,q2,q3,q4]
-            # k => [k1,k2,k3,k4] or [k1,k2] for GQA
-            # v => [v1,v2,v3,v4] or [v1,v2] for GQA
-            # fused weight => [q1,k1,v1,q2,k2,v2,q3,k3,v3,q4,k4,v4]
-            #      or for GQA [q1,q2,k1,v1,q3,q4,k2,v2]
             assert num_heads, f"num_heads should be number of heads for Q, but got {num_heads}"
             assert (
                 num_key_value_heads
@@ -531,18 +547,28 @@ def fuse_param_func():
 
 def split_param_func():
     def fn(fused_param, split_nums=2, is_qkv=False, num_heads=None, num_key_value_heads=None):
-        """TODO 参数变换形式、支持类型
-        排列转换适配兼容说明
+        """split function for splitting weights
+
+        (1) fuse_attention_qkv
+            fused weight => [q1,k1,v1,q2,k2,v2,q3,k3,v3,q4,k4,v4]
+                 or for GQA [q1,q2,k1,v1,q3,q4,k2,v2]
+            after split
+            q => [q1,q2,q3,q4]
+            k => [k1,k2,k3,k4] or [k1,k2] for GQA
+            v => [v1,v2,v3,v4] or [v1,v2] for GQA
+        (2) fuse_attention_ffn
+            directly split weight to 2 parts
+            [gate_weight, up_weight] => [gate_weight], [up_weight]
 
         Args:
-            fused_param (_type_): _description_
-            split_nums (int, optional): _description_. Defaults to 2.
-            is_qkv (bool, optional): _description_. Defaults to False.
-            num_heads (_type_, optional): _description_. Defaults to None.
-            num_key_value_heads (_type_, optional): _description_. Defaults to None.
+            fused_param (_type_): len(fused_param)=1, only one weight to be splitted
+            split_nums (int, optional): split_nums. Defaults to 2.
+            is_qkv (bool, optional): for attention qkv weights. Defaults to False.
+            num_heads (_type_, optional): query heads. Defaults to None.
+            num_key_value_heads (_type_, optional): key and value heads. Defaults to None.
 
         Returns:
-            _type_: _description_
+            _type_: splitted weights
         """
         concat_fn = np.concatenate
         split_fn = np.split
@@ -552,13 +578,6 @@ def split_param_func():
 
         if is_qkv:
             # fuse_attention_qkv
-            # fused weight => [q1,k1,v1,q2,k2,v2,q3,k3,v3,q4,k4,v4]
-            #      or for GQA [q1,q2,k1,v1,q3,q4,k2,v2]
-            # after split
-            # q => [q1,q2,q3,q4]
-            # k => [k1,k2,k3,k4] or [k1,k2] for GQA
-            # v => [v1,v2,v3,v4] or [v1,v2] for GQA
-
             assert num_heads, f"num_heads should be number of heads for Q, but got {num_heads}"
             assert (
                 num_key_value_heads
@@ -1389,9 +1408,13 @@ class ConversionMixin:
     def _resolve_prefix_keys_for_fuse_and_split(state_keys_base, state_keys_real, ignore_error=False, is_fuse=True):
         state_keys_map = {}
 
+        # use the tuple (x1,x2,x3,x4) as one key, and the prefix of x1,x2,x3 is used as a new key x4 or
+        # the last key x4 is used as new keys x1,x2,x3. And, the tuple also could be (a) (x1, x1) -> convert x1 to x1;
+        # (b) (x1,x2,x3) -> fuse x1 and x2 to x3; (c) (x1,x2,x3,x4) -> fuse x1, x2 and x3 to x4.
+
         # is_fuse: True -> fuse, False -> split
-        # True: [x1,x2,x3,x4] -> [x1,x2,x3] are exist in state_keys_real, x4 is not exist in state_keys_real
-        # False: [x1,x2,x3,x4] -> [x1,x2,x3] are not exist in state_keys_real, x4 is exist in state_keys_real
+        # True: (x1,x2,x3,x4) -> [x1,x2,x3] are exist in state_keys_real, x4 is not exist in state_keys_real
+        # False: (x1,x2,x3,x4) -> [x1,x2,x3] are not exist in state_keys_real, x4 is exist in state_keys_real
 
         for keys in state_keys_base:
             prefix = ""

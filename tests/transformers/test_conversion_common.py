@@ -33,7 +33,6 @@ def prepare_default_config(config):
     config.num_key_value_heads = 16
     config.intermediate_size = config.hidden_size
     config.word_embed_proj_dim = 512
-
     return config
 
 
@@ -234,32 +233,26 @@ def _test_fast_ffn():
     common_test_save_and_load(config_no_fast_ffn, config_fast_ffn, TestForCausalLM)
 
 
+from paddlenlp.transformers import (
+    GPTConfig,
+    GPTForCausalLM,
+    LlamaConfig,
+    LlamaForCausalLM,
+    OPTConfig,
+    OPTForCausalLM,
+)
+
+
 class TestFuseOrSplit(unittest.TestCase):
-    def test_model_load_merge(self):
-
-        from paddlenlp.transformers import (
-            GPTConfig,
-            GPTForCausalLM,
-            LlamaConfig,
-            LlamaForCausalLM,
-            OPTConfig,
-            OPTForCausalLM,
-        )
-
-        # _test_split_to_fuse(LlamaConfig, LlamaForCausalLM)
+    def test_model_split_to_fuse(self):
+        _test_split_to_fuse(LlamaConfig, LlamaForCausalLM)
         _test_split_to_fuse(GPTConfig, GPTForCausalLM)
         _test_split_to_fuse(OPTConfig, OPTForCausalLM)
 
+    def test_model_fuse_to_split(self):
         _test_fuse_to_split(LlamaConfig, LlamaForCausalLM)
         _test_fuse_to_split(GPTConfig, GPTForCausalLM)
         _test_fuse_to_split(OPTConfig, OPTForCausalLM)
 
+    def test_model_convert_fast_ffn(self):
         _test_fast_ffn()
-
-
-import unittest
-
-suit = unittest.TestSuite()
-suit.addTest(TestFuseOrSplit("test_model_load_merge"))
-runner = unittest.TextTestRunner(verbosity=2)
-runner.run(suit)
