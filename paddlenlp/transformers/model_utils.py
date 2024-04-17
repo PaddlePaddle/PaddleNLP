@@ -1907,9 +1907,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
                 # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
                 filter_dict_keys = set(expected_keys)
-                fuse_or_split_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys)
-                fuse_or_split_keys = fuse_or_split_actions.keys()
-                for k in fuse_or_split_keys:
+                fuse_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=True)
+                split_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=False)
+                for k in list(fuse_actions.keys()) + list(split_actions.keys()):
                     filter_dict_keys |= set(k)
                 if config.quantization_config.is_weight_quantize():
                     filter_dict_keys = None

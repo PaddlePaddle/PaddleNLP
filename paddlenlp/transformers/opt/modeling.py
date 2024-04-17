@@ -677,25 +677,19 @@ class OPTPretrainedModel(PretrainedModel):
         if is_fuse:
             if fuse_attention_qkv:
                 for i in range(config.num_hidden_layers):
-                    weight_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
-                    final_actions[weight_keys] = partial(
-                        fn, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
-                    )
-                    bias_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_bias_keys])
-                    final_actions[bias_keys] = partial(
-                        fn, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
-                    )
+                    for keys in [fuse_qkv_keys, fuse_qkv_bias_keys]:
+                        new_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in keys])
+                        final_actions[new_keys] = partial(
+                            fn, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                        )
         else:
-            if fuse_attention_qkv:
+            if not fuse_attention_qkv:
                 for i in range(config.num_hidden_layers):
-                    weight_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
-                    final_actions[weight_keys] = partial(
-                        fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
-                    )
-                    bias_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_bias_keys])
-                    final_actions[bias_keys] = partial(
-                        fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
-                    )
+                    for keys in [fuse_qkv_keys, fuse_qkv_bias_keys]:
+                        new_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in keys])
+                        final_actions[new_keys] = partial(
+                            fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                        )
         return final_actions
 
     @classmethod

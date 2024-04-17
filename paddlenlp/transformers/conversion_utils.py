@@ -490,7 +490,7 @@ def splited_qkv_to_tensor_parallel_qkv(weight_list, num_attention_heads):
 
 
 def fuse_param_func():
-    def fn(fuse_params, is_qkv=False, num_heads=None, num_key_value_heads=None, convert_fast_ffn=False):
+    def fn(fuse_params, is_qkv=False, num_heads=None, num_key_value_heads=None):
         concat_fn = np.concatenate
         split_fn = np.split
         if isinstance(fuse_params[0], paddle.Tensor):
@@ -522,11 +522,6 @@ def fuse_param_func():
                 qkv_pairs.append(k_list[i])
                 qkv_pairs.append(v_list[i])
             return concat_fn(qkv_pairs, axis=-1)
-        elif convert_fast_ffn:
-            # fast_ffn
-            first = fuse_params[0][..., ::2]
-            second = fuse_params[0][..., 1::2]
-            return concat_fn([first, second], axis=-1)
         else:
             # fuse_attention_ffn
             return concat_fn(fuse_params, axis=-1)
@@ -1316,7 +1311,7 @@ class ConversionMixin:
         for keys, action in split_actions.items():
             origin_state = state_dict.pop(keys[-1])
             split_states = action(origin_state)
-            for key, key_idx in enumerate(keys[:-1]):
+            for key_idx, key in enumerate(keys[:-1]):
                 state_dict[key] = split_states[key_idx]
                 fused_and_split_keys.append(key)
             logger.info(f"Splitting parameter: {keys[-1]} into {keys[:-1]}")
@@ -1345,7 +1340,7 @@ class ConversionMixin:
     ):
         name_action_mappings = cls._get_fuse_or_split_param_mappings(config, is_fuse)
         state_keys_map = cls._resolve_prefix_keys_for_fuse_and_split(
-            name_action_mappings.keys(), loaded_state_dict_keys, ignore_error, is_fuse=True
+            name_action_mappings.keys(), loaded_state_dict_keys, ignore_error, is_fuse
         )
         for k, v in state_keys_map.items():
             name_action_mappings[v] = name_action_mappings.pop(k)

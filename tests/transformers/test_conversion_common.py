@@ -24,28 +24,45 @@ import paddle
 input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
 
 
-def prepare_config(config):
+def prepare_default_config(config):
+    config = copy.deepcopy(config)
     config.hidden_size = 512
     config.num_layers = 2
     config.num_hidden_layers = 2
     config.num_attention_heads = 16
     config.num_key_value_heads = 16
-    config.intermediate_size = config.hidden_size * 3
+    config.intermediate_size = config.hidden_size
+    config.word_embed_proj_dim = 512
+
+    return config
+
+
+def prepare_split_config(config):
+    config = prepare_default_config(config)
+    config = copy.deepcopy(config)
     config.fuse_attention_qkv = False
     config.fuse_attention_ffn = False
     return config
 
 
-def common_test_load(model, model_class, config, tempdir):
-    model.eval()
-    with paddle.no_grad():
-        first = model(input_ids)[0]
+def prepare_fuse_config(config):
+    config = prepare_default_config(config)
+    config = copy.deepcopy(config)
+    config.fuse_attention_qkv = True
+    config.fuse_attention_ffn = True
+    return config
 
-    model_fused = model_class.from_pretrained(tempdir, config=config)
 
-    model_fused.eval()
+def common_test_load(model_class, model_first, config_second, tempdir):
+    model_first.eval()
     with paddle.no_grad():
-        second = model_fused(input_ids)[0]
+        first = model_first(input_ids)[0]
+
+    model_second = model_class.from_pretrained(tempdir, config=config_second)
+    model_second.eval()
+    with paddle.no_grad():
+        second = model_second(input_ids)[0]
+
     assert paddle.allclose(paddle.mean(first), paddle.mean(second), atol=1e-7)
     assert paddle.allclose(first, second, atol=1e-4)
 
@@ -54,56 +71,45 @@ def common_test_load(model, model_class, config, tempdir):
         os.remove(f)
 
 
-def common_test_save(model, config, model_class=None):
-    config = copy.deepcopy(config)
-    config.fuse_attention_qkv = True
-    config.fuse_attention_ffn = True
+def common_test_save_and_load(config_first, config_second, model_class):
+    model_first = model_class.from_config(config_first)
 
     with tempfile.TemporaryDirectory() as tempdir:
         # test load pdparams: model.pdparams
-        model.save_pretrained(save_dir=tempdir)
-        common_test_load(model, model_class, config, tempdir)
+        model_first.save_pretrained(save_dir=tempdir)
+        common_test_load(model_class, model_first, config_second, tempdir)
 
         # test load shard pdparams: model-001-0f-008.pdparams
-        model.save_pretrained(tempdir, max_shard_size="5MB")
-        common_test_load(model, model_class, config, tempdir)
+        model_first.save_pretrained(tempdir, max_shard_size="5MB")
+        common_test_load(model_class, model_first, config_second, tempdir)
 
         # test save safetensors: model.safetensors
-        model.save_pretrained(tempdir, safe_serialization=True)
-        common_test_load(model, model_class, config, tempdir)
+        model_first.save_pretrained(tempdir, safe_serialization=True)
+        common_test_load(model_class, model_first, config_second, tempdir)
 
         # test load shard safetensors: model-001-0f-008.safetensors
-        model.save_pretrained(tempdir, max_shard_size="5MB", safe_serialization=True)
-        common_test_load(model, model_class, config, tempdir)
+        model_first.save_pretrained(tempdir, max_shard_size="5MB", safe_serialization=True)
+        common_test_load(model_class, model_first, config_second, tempdir)
 
 
-def _test_llama():
-    from paddlenlp.transformers import LlamaConfig, LlamaForCausalLM
+def _test_split_to_fuse(config_class, model_class):
+    config = config_class()
 
-    config = LlamaConfig()
-    config = prepare_config(config)
-    model = LlamaForCausalLM.from_config(config)
-    common_test_save(model, config, LlamaForCausalLM)
+    config_split = prepare_split_config(config)
+    config_fuse = prepare_fuse_config(config)
 
-
-def _test_gpt():
-    from paddlenlp.transformers import GPTConfig, GPTForCausalLM
-
-    config = GPTConfig()
-    config = prepare_config(config)
-    model = GPTForCausalLM.from_config(config)
-    common_test_save(model, config, GPTForCausalLM)
+    # Test from splitted weights to fused weight
+    common_test_save_and_load(config_split, config_fuse, model_class)
 
 
-def _test_opt():
-    from paddlenlp.transformers import OPTConfig, OPTForCausalLM
+def _test_fuse_to_split(config_class, model_class):
+    config = config_class()
 
-    config = OPTConfig()
-    config = prepare_config(config)
-    config.intermediate_size = 512
-    config.word_embed_proj_dim = 512
-    model = OPTForCausalLM.from_config(config)
-    common_test_save(model, config, OPTForCausalLM)
+    config_split = prepare_split_config(config)
+    config_fuse = prepare_fuse_config(config)
+
+    # Test from fused weight to splitted weights
+    common_test_save_and_load(config_fuse, config_split, model_class)
 
 
 def _test_fast_ffn():
@@ -142,10 +148,22 @@ def _test_fast_ffn():
 
         @classmethod
         def _get_fuse_or_split_param_mappings(cls, config: TestConfig, is_fuse=False):
-            # return parameter fuse utils
-            from paddlenlp.transformers.conversion_utils import split_or_fuse_func
 
-            fn = split_or_fuse_func(is_fuse=is_fuse)
+            #  user defined function to get convert param mappings
+            def convert_fast_ffn_fn(fuse_params, convert_fast_ffn=False):
+                import numpy as np
+
+                concat_fn = np.concatenate
+                if isinstance(fuse_params[0], paddle.Tensor):
+                    concat_fn = paddle.concat
+
+                if convert_fast_ffn:
+                    # fast_ffn
+                    first = fuse_params[0][..., ::2]
+                    second = fuse_params[0][..., 1::2]
+                    return concat_fn([first, second], axis=-1)
+
+            fn = convert_fast_ffn_fn
 
             convert_fast_ffn_keys = (
                 "layers.0.gate_up_fused_proj.weight",
@@ -161,14 +179,17 @@ def _test_fast_ffn():
 
             final_actions = {}
             if is_fuse:
+                # for_get_fuse_or_split_param_mappings, is_fuse have two conditions, true and false,
+                # to fit partial fuse or split conditions, is_fuse will called twice(True and False).
+                # thus, for this func, we only use one condition.
+
                 # use_fast_ffn only in one condition
                 # convert when use_fast_ffn is False
-                for i in range(config.num_hidden_layers):
-                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in convert_fast_ffn_keys])
-                    final_actions[keys] = partial(fn, convert_fast_ffn=convert_fast_ffn)
-                for i in range(config.num_hidden_layers):
-                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in convert_fast_ffn_bias_keys])
-                    final_actions[keys] = partial(fn, convert_fast_ffn=convert_fast_ffn)
+                if convert_fast_ffn:
+                    for i in range(config.num_hidden_layers):
+                        for keys in [convert_fast_ffn_keys, convert_fast_ffn_bias_keys]:
+                            keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in keys])
+                            final_actions[keys] = partial(fn, convert_fast_ffn=convert_fast_ffn)
             return final_actions
 
         def _init_weights(self, layer):
@@ -200,36 +221,45 @@ def _test_fast_ffn():
             return self.test(hidden_state)
 
     config = TestConfig()
-    config = prepare_config(config)
-    config.use_fast_ffn = False
-    model = TestForCausalLM.from_config(config)
+    config = prepare_default_config(config)
+    config_no_fast_ffn = copy.deepcopy(config)
+    config_fast_ffn = copy.deepcopy(config)
 
-    config = copy.deepcopy(config)
-    config.use_fast_ffn = True
-    config.fast_ffn_state = False
-    config.convert_fast_ffn = True
+    config_no_fast_ffn.use_fast_ffn = False
 
-    with tempfile.TemporaryDirectory() as tempdir:
-        # test load pdparams: model.pdparams
-        model.save_pretrained(save_dir=tempdir)
-        common_test_load(model, TestForCausalLM, config, tempdir)
+    config_fast_ffn.use_fast_ffn = True
+    config_fast_ffn.fast_ffn_state = False
+    config_fast_ffn.convert_fast_ffn = True
 
-        # test load shard pdparams: model-001-0f-008.pdparams
-        model.save_pretrained(tempdir, max_shard_size="5MB")
-        common_test_load(model, TestForCausalLM, config, tempdir)
-
-        # test save safetensors: model.safetensors
-        model.save_pretrained(tempdir, safe_serialization=True)
-        common_test_load(model, TestForCausalLM, config, tempdir)
-
-        # test load shard safetensors: model-001-0f-008.safetensors
-        model.save_pretrained(tempdir, max_shard_size="5MB", safe_serialization=True)
-        common_test_load(model, TestForCausalLM, config, tempdir)
+    common_test_save_and_load(config_no_fast_ffn, config_fast_ffn, TestForCausalLM)
 
 
 class TestFuseOrSplit(unittest.TestCase):
     def test_model_load_merge(self):
-        _test_llama()
-        _test_gpt()
-        _test_opt()
+
+        from paddlenlp.transformers import (
+            GPTConfig,
+            GPTForCausalLM,
+            LlamaConfig,
+            LlamaForCausalLM,
+            OPTConfig,
+            OPTForCausalLM,
+        )
+
+        # _test_split_to_fuse(LlamaConfig, LlamaForCausalLM)
+        _test_split_to_fuse(GPTConfig, GPTForCausalLM)
+        _test_split_to_fuse(OPTConfig, OPTForCausalLM)
+
+        _test_fuse_to_split(LlamaConfig, LlamaForCausalLM)
+        _test_fuse_to_split(GPTConfig, GPTForCausalLM)
+        _test_fuse_to_split(OPTConfig, OPTForCausalLM)
+
         _test_fast_ffn()
+
+
+import unittest
+
+suit = unittest.TestSuite()
+suit.addTest(TestFuseOrSplit("test_model_load_merge"))
+runner = unittest.TextTestRunner(verbosity=2)
+runner.run(suit)

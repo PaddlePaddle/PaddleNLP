@@ -1340,13 +1340,13 @@ class LlamaPretrainedModel(PretrainedModel):
                     keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
                     final_actions[keys] = fn
         else:
-            if fuse_attention_qkv:
+            if not fuse_attention_qkv:
                 for i in range(config.num_hidden_layers):
                     keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
                     final_actions[keys] = partial(
                         fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
                     )
-            if fuse_attention_ffn:
+            if not fuse_attention_ffn:
                 for i in range(config.num_hidden_layers):
                     keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
                     final_actions[keys] = partial(fn, split_nums=2)
