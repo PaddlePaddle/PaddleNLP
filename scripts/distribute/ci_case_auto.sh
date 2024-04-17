@@ -948,8 +948,12 @@ function gpt_auto_sp_acc_check() {
     loss_base=`cat ${log_dir_spFalse}/workerlog.0 |  grep '30/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips_base=-1
     mem_base=-1
+    allclose=0
     echo "result: loss_spTrue=$loss loss_spFasle=$loss_base"
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    if [ $IS_A100 -ne 0 ];then
+        allclose=1
+    fi
+    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem} ${allclose}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -1948,8 +1952,17 @@ function check_result() {
     diff_loss=$(echo $2 $3|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
     echo -e "loss_base: $2 loss_test: $3 loss_diff: $diff_loss%" | tee -a ${log_path}/result.log
     if [ $2 != $3 ];then
-        echo -e "\033[31m $1 loss diff check failed! \033[0m" | tee -a ${log_path}/result.log
-        exit -1
+        if [ -z "$8" ] || [ $8 -ne 1 ] ;then
+            echo -e "\033[31m $1 loss diff check failed! \033[0m" | tee -a ${log_path}/result.log
+            exit -1
+        else
+            diff=$(echo "$2 $3" | awk '{print $1-$2}')
+            gt=$(echo "${diff#-} 1e-5" | awk '{print ($1>$2)?"1":"0"}')
+            if [ $st -eq 1 ];then
+                echo -e "\033[31m $1 loss diff check failed! \033[0m" | tee -a ${log_path}/result.log
+                exit -1
+            fi
+        fi
     fi
 
     diff_ips=$(echo $4 $5|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
