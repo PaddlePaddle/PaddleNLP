@@ -143,19 +143,6 @@ class DPOTrainer(Trainer):
 
         return (chosen_logps, rejected_logps)
 
-    def apply_normalize_logps(self, chosen_logps, rejected_logps, batch):
-        """Normalize_logprobs"""
-        chosen_loss_mask = batch["chosen_labels"] != 0
-        rejected_loss_mask = batch["rejected_labels"] != 0
-        avg_response_length = (chosen_loss_mask.sum() + rejected_loss_mask.sum()) / (
-            chosen_loss_mask.shape[0] + rejected_loss_mask.shape[0]
-        )
-        chosen_response_length = chosen_loss_mask.sum(axis=-1)
-        chosen_logps /= chosen_response_length / avg_response_length
-        rejected_response_length = rejected_loss_mask.sum(axis=-1)
-        rejected_logps /= rejected_response_length / avg_response_length
-        return chosen_logps, rejected_logps
-    
     def cal_chosen_rejected_logps(self, batch, logits):
         """DPO logprobs"""
         labels = batch["chosen_labels"] + batch["rejected_labels"]
@@ -241,13 +228,6 @@ class DPOTrainer(Trainer):
                 policy_chosen_logps,
                 policy_rejected_logps,
             ) = self.concatenated_forward(model, batch)
-            if self.args.dpo_normalize_logps:
-                policy_chosen_logps, policy_rejected_logps = self.apply_normalize_logps(
-                    policy_chosen_logps, policy_rejected_logps, batch
-                )
-                reference_chosen_logps, reference_rejected_logps = self.apply_normalize_logps(
-                    reference_chosen_logps, reference_rejected_logps, batch
-                )
             loss = self.dpo_loss(
                 policy_chosen_logps,
                 policy_rejected_logps,

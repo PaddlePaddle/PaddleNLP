@@ -29,10 +29,6 @@ class DPOTrainingArguments(TrainingArguments):
         metadata={"help": "Configs to unify hybrid parallel checkpoint.\n"},
     )
     dpo_beta: float = field(default=0.1, metadata={"help": "the beta parameter for DPO loss"})
-    dpo_normalize_logps: bool = field(
-        default=True,
-        metadata={"help": "Apply logprobs normalization."},
-    )
     zero_padding: bool = field(
         default=True,
         metadata={"help": "Apply zero-padding."},

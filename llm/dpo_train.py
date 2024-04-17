@@ -110,7 +110,6 @@ def main():
         tensor_parallel_output=True,
         #dpo=True,
         #dpo_beta=training_args.dpo_beta,
-        #dpo_normalize_logps=training_args.dpo_normalize_logps,
     )
     if training_args.pipeline_parallel_degree > 1:
         model_class = AutoModelForCausalLMPipe
