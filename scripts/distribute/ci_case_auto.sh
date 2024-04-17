@@ -1884,8 +1884,6 @@ function before_hook_for_llama() {
     env | grep FLAGS
     export http_proxy=${proxy}
     export https_proxy=${proxy}
-    python -m pip install -r $root_path/requirements.txt
-    python -m pip install -r $root_path/requirements-dev.txt
     if [[ ! $FLAGS_download_data =~ "llama" ]];then
         echo -e "\033[31m ---- Download LLaMA data  \033[0m"
         rm -rf data

@@ -611,8 +611,6 @@ function before_hook_for_llm_gpt() {
     env | grep FLAGS
     export http_proxy=${proxy}
     export https_proxy=${proxy}
-    python -m pip install -r $root_path/requirements.txt
-    python -m pip install -r $root_path/requirements-dev.txt
     if [[ ! $FLAGS_download_data =~ "llm_gpt" ]];then
         echo -e "\033[31m ---- Download llm GPT data  \033[0m"
         rm -rf data

@@ -44,18 +44,17 @@ install_paddle(){
 
 install_paddlenlp(){
     echo -e "\033[31m ---- Install paddlenlp by set PYTHONPATH  \033"
-    export PYTHONPATH=${nlp_dir}:$PYTHONPATH
     sed -i -e "s/paddlenlp/#paddlenlp/g" model_zoo/gpt-3/requirements.txt
-    # export http_proxy=${proxy} && export https_proxy=${proxy}
-    # python -m pip uninstall paddlenlp -y
+    export http_proxy=${proxy} && export https_proxy=${proxy}
+    python -m pip uninstall paddlenlp -y
+    python -m pip install --ignore-installed -r requirements.txt
+    python -m pip install --ignore-installed -r requirements-dev.txt
+    export PYTHONPATH=${nlp_dir}:$PYTHONPATH
     # rm -rf build/ && rm -rf paddlenlp.egg-info/ && rm -rf dist/
-    # python -m pip install --ignore-installed -r requirements.txt
-    # python -m pip install --ignore-installed -r requirements-dev.txt
     # python setup.py install
     # python setup.py build_ext
     # python setup.py bdist_wheel
-    # unset http_proxy && unset https_proxy
-    # cd -
+    unset http_proxy && unset https_proxy
     python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
 }
 ####################################
