@@ -4,6 +4,7 @@ from collections import OrderedDict, defaultdict
 from paddlenlp.utils.log import logger
 
 import paddle
+import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import framework
 from paddle.distributed import fleet
@@ -64,6 +65,7 @@ class DPOTrainer(Trainer):
         self.ref_model.eval()
 
         self.padding_value = padding_value
+        self.logprobs = nn.CrossEntropyLoss(reduction="none")
         self._stored_metrics = defaultdict(lambda: defaultdict(list))
 
     def concatenated_inputs(self, batch):
@@ -153,42 +155,75 @@ class DPOTrainer(Trainer):
         rejected_response_length = rejected_loss_mask.sum(axis=-1)
         rejected_logps /= rejected_response_length / avg_response_length
         return chosen_logps, rejected_logps
+    
+    def cal_chosen_rejected_logps(self, batch, logits):
+        """DPO logprobs"""
+        labels = batch["chosen_labels"] + batch["rejected_labels"]
+        logits = logits.astype("float32")
+        #print("logits: ", logits)
+        if logits.shape[:-1] != labels.shape:
+            raise ValueError("Logits (batch and sequence length dim) and labels must have the same shape.")
+        per_token_logps = -self.logprobs(logits, labels.unsqueeze(2)).squeeze(2)
+        #print("per_token_logps: ", per_token_logps)
+
+        #if len(batch["response_indexs"].shape) == 3:
+        #    response_indexs = response_indexs[0]
+        chosen_logps = paddle.stack(
+            [
+                (per_token_logps[response_index[0]][response_index[1] : response_index[2]]).sum()
+                if response_index[3] != 0
+                else paddle.zeros([])
+                for response_index in batch["response_indexs"]
+            ],
+            axis=0,
+        )
+        rejected_logps = paddle.stack(
+            [
+                (per_token_logps[response_index[0]][response_index[2] : response_index[3]]).sum()
+                if response_index[3] != 0
+                else paddle.zeros([])
+                for response_index in batch["response_indexs"]
+            ],
+            axis=0,
+        )
+        #print("chosen_logps: ", chosen_logps)
+        #print("rejected_logps: ", rejected_logps)
+        return chosen_logps, rejected_logps
 
     def get_batch_metrics(self, model, batch, train_eval="train"):
         """Compute the DPO loss and other metrics for the given batch of inputs for train or test."""
         metrics = {}
         if self.args.zero_padding:
-            offload_tensor_to_cpu(self.optimizer.state_dict())
+            if self.args.offload_strategy:
+                offload_tensor_to_cpu(self.optimizer.state_dict())
             with paddle.no_grad():
-                #reference_chosen_logps, reference_rejected_logps = self.ref_model(
                 ref_logits = self.ref_model(
                     batch["input_ids"],
                     position_ids=batch["position_ids"],
                     attention_mask=batch["attention_mask"],
-                    #chosen_labels=batch["chosen_labels"],
-                    #rejected_labels=batch["rejected_labels"],
-                    #response_indexs=batch["response_indexs"],
-                    #reference_chosen_logps=None,
-                    #reference_rejected_logps=None,
                 )[0]
-            reload_tensor_to_gpu(self.optimizer.state_dict())
-            #loss, policy_chosen_logps, policy_rejected_logps = model(
+            if self.args.offload_strategy:
+                reload_tensor_to_gpu(self.optimizer.state_dict())
             policy_logits = model(
                 batch["input_ids"],
                 position_ids=batch["position_ids"],
                 attention_mask=batch["attention_mask"],
-                #chosen_labels=batch["chosen_labels"],
-                #rejected_labels=batch["rejected_labels"],
-                #response_indexs=batch["response_indexs"],
-                #reference_chosen_logps=reference_chosen_logps,
-                #reference_rejected_logps=reference_rejected_logps,
             )[0]
-            policy_chosen_logps = paddle.log(paddle.take_along_axis(policy_logits, axis=2, indices=batch["chosen_labels"].unsqueeze(2)).squeeze(2))
-            policy_rejected_logps = paddle.log(paddle.take_along_axis(policy_logits, axis=2, indices=batch["rejected_labels"].unsqueeze(2)).squeeze(2))
-            reference_chosen_logps = paddle.log(paddle.take_along_axis(ref_logits, axis=2, indices=batch["chosen_labels"].unsqueeze(2)).squeeze(2))
-            reference_rejected_logps = paddle.log(paddle.take_along_axis(ref_logits, axis=2, indices=batch["rejected_labels"].unsqueeze(2)).squeeze(2))
+            #import numpy as np
+            #np.save("input_ids.npy", batch["input_ids"].numpy())
+            #np.save("position_ids.npy", batch["position_ids"].numpy())
+            #np.save("attention_mask.npy", batch["attention_mask"].numpy())
+            #print("ref_logits: ", ref_logits)
+            #print("policy_logits: ", policy_logits)
+            #print("position: ", batch["position_ids"])
+            #print("attention: ", batch["attention_mask"])
+            #print("origin: ", model(batch["input_ids"])[0])
+            #import pdb; pdb.set_trace()
+            policy_chosen_logps, policy_rejected_logps = self.cal_chosen_rejected_logps(batch, policy_logits)
+            reference_chosen_logps, reference_rejected_logps = self.cal_chosen_rejected_logps(batch, ref_logits)
+            #print(policy_chosen_logps, policy_rejected_logps)
+            #print(reference_chosen_logps, reference_rejected_logps)
 
-            import pdb; pdb.set_trace()
 
             loss = self.dpo_loss(
                 policy_chosen_logps,

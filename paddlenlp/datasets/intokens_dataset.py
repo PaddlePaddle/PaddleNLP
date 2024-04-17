@@ -56,9 +56,16 @@ class InTokens:
             elif "rejected_labels" in input_keys and "chosen_labels" in input_keys:
                 batched_features["rejected_labels"].extend(record["rejected_labels"])
                 batched_features["chosen_labels"].extend(record["chosen_labels"])
-                batched_features["response_index"].append(record["response_index"])
+                sequence_sum = 0
+                response_index = [
+                    record["response_index"][0] + sequence_sum,  # chosen_response_start_index
+                    record["response_index"][1] + sequence_sum,  # rejeted_response_start_index
+                    record["response_index"][2] + sequence_sum,  # rejeted_response_end_index + 1
+                ]
+                batched_features["response_index"].append(response_index)
+                sequence_sum += len(record["input_ids"])
             else:
-                raise ValueError(f"labels is required for InTokensDataset")
+                raise ValueError("labels is required for InTokensDataset")
 
             seq_length = len(record["input_ids"])
             # If attention_mask is not given, assume it's causal mask

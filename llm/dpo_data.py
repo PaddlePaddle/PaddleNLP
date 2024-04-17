@@ -187,16 +187,14 @@ def collate_fn(batch, tokenizer, max_seq_length=None):
         input_dict["rejected_labels"].append(
             sequence["rejected_labels"] + [0] * difference
         )
-        sequence_sum = 0
-        for sample_ri in sequence["response_index"]:
-            response_index = [
-                    i,  # bs
-                    sample_ri[0] + sequence_sum,  # chosen_response_start_index
-                    sample_ri[1] + sequence_sum,  # rejeted_response_start_index
-                    sample_ri[2] + sequence_sum,  # rejeted_response_end_index + 1
-                ]
-            input_dict["response_indexs"].append(response_index)
-            sequence_sum += len(sequence["input_ids"])
+
+        for ri in sequence["response_index"]:
+            input_dict["response_indexs"].append([
+                i,      # bs
+                ri[0],  # chosen_response_start_index
+                ri[1],  # rejeted_response_start_index
+                ri[2],  # rejeted_response_end_index + 1
+            ])
 
         input_dict["attention_mask"].append(
             # pad to max_loength
@@ -218,9 +216,6 @@ def collate_fn(batch, tokenizer, max_seq_length=None):
         #    input_dict["response_indexs"].append(response_index)
         #    sequence_sum += len(sequence.concatenated_input_ids)
     for key in input_dict:
-        try:
-            input_dict[key] = paddle.to_tensor(input_dict[key])
-        except:
-            import pdb; pdb.set_trace()
+        input_dict[key] = paddle.to_tensor(input_dict[key])
     input_dict["attention_mask"] = input_dict["attention_mask"].cast("float32")
     return input_dict

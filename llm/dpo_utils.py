@@ -37,6 +37,10 @@ class DPOTrainingArguments(TrainingArguments):
         default=True,
         metadata={"help": "Apply zero-padding."},
     )
+    offload_strategy: bool = field(
+        default=False,
+        metadata={"help": "Apply pinned memory offload strategy."},
+    )
     num_of_gpus: int = field(default=-1, metadata={"help": "Number of gpus."})
     pipeline_degree: int = field(default=1, metadata={"help": "pipeline_degree for estimate"})
     tensor_degree: int = field(default=1, metadata={"help": "tensor_degree for estimate"})
