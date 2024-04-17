@@ -904,11 +904,11 @@ function llama_static_auto_recompute_bs8_fp32_DP1-MP1-PP1() {
         --enable_auto_parallel 1 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=-1
+    ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.52110565
-    ips_base=-1
+    ips_base=2.639
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -970,11 +970,11 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP1-PP1() {
         --enable_auto_parallel 1 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=-1
+    ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.42011833
-    ips_base=-1
+    ips_base=4.9416
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -1036,11 +1036,11 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP1() {
         --enable_auto_parallel 1 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=-1
+    ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.44299471
-    ips_base=-1
+    ips_base=6.6257
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -1102,11 +1102,11 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2() {
         --enable_auto_parallel 1 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.4 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=-1
+    ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.45936012
-    ips_base=-1
+    ips_base=11.4289
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -1170,11 +1170,11 @@ function llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
         --enable_auto_parallel 1 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.4 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=-1
+    ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.46707726
-    ips_base=-1
+    ips_base=11.9509
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -1239,11 +1239,11 @@ function llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
         --enable_auto_parallel 1 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.4 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=-1
+    ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=10.0859375
-    ips_base=-1
+    ips_base=25.1894
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -1304,14 +1304,15 @@ function llama_dygraph_auto_bs8_fp32_DP2() {
         --enable_auto_parallel 1 \
         --to_static 0 \
         --max_grad_norm 1.0 \
+        --skip_memory_metrics 0 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=-1
-    mem=-1
+    ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
+    mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.53389835
-    ips_base=-1
-    mem_base=-1
+    ips_base=5.6019
+    mem_base=14323
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -1371,14 +1372,15 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2() {
         --enable_auto_parallel 1 \
         --to_static 0 \
         --max_grad_norm 1.0 \
+        --skip_memory_metrics 0 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=-1
-    mem=-1
+    ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
+    mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.39066124
-    ips_base=-1
-    mem_base=-1
+    ips_base=8.1928
+    mem_base=8654
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -1438,14 +1440,15 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
         --enable_auto_parallel 1 \
         --to_static 0 \
         --max_grad_norm 1.0 \
+        --skip_memory_metrics 0 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=-1
-    mem=-1
+    ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
+    mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.38235474
-    ips_base=-1
-    mem_base=-1
+    ips_base=8.0743
+    mem_base=4687
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -1506,14 +1509,15 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
         --enable_auto_parallel 1 \
         --to_static 0 \
         --max_grad_norm 1.0 \
+        --skip_memory_metrics 0 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=-1
-    mem=-1
+    ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
+    mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.38256836
-    ips_base=-1
-    mem_base=-1
+    ips_base=11.9226
+    mem_base=4371
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
