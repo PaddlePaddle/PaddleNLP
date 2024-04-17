@@ -1546,7 +1546,7 @@ class BloomForGeneration(BloomPreTrainedModel):
 
     def expand_inputs_for_generation(self, input_ids, expand_size, attention_mask=None, **model_kwargs):
 
-        index = paddle.tile(paddle.arange(paddle.shape(input_ids)[0]).unsqueeze(-1), [1, expand_size]).reshape([-1])
+        index = paddle.tile(paddle.arange(input_ids.shape[0]).unsqueeze(-1), [1, expand_size]).reshape([-1])
 
         input_ids = paddle.gather(input_ids, index)
 
@@ -1654,12 +1654,12 @@ class BloomForGeneration(BloomPreTrainedModel):
             probs = paddle.where(condition, paddle.full_like(probs, 0.0), probs)
             return probs
 
-        batch_size, cur_len = paddle.shape(input_ids)
+        batch_size, cur_len = input_ids.shape
 
         # used for compute on gpu, avoid memcpy D2H
         cur_len_gpu = paddle.full([1], cur_len)
 
-        origin_len = paddle.shape(input_ids)[1]
+        origin_len = input_ids.shape[1]
         # used for compute on gpu, avoid memcpy D2H
         origin_len_gpu = paddle.full([1], origin_len)
 
@@ -1721,7 +1721,7 @@ class BloomForGeneration(BloomPreTrainedModel):
                         raise ImportError(
                             "please install ppfleetx_ops by 'cd ppfleetx/ops && python setup_cuda.py install'!"
                         )
-                    top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0]], fill_value=top_p, dtype=probs.dtype)
+                    top_ps_tensor = paddle.full(shape=[probs.shape[0]], fill_value=top_p, dtype=probs.dtype)
                     next_tokens = topp_sampling(probs, top_ps_tensor)
                 else:
                     probs = TopPProcess(probs, top_p, min_tokens_to_keep)
@@ -1766,7 +1766,7 @@ class BloomForGeneration(BloomPreTrainedModel):
 
         attn_mask = model_kwargs["attention_mask"]
         # make the shape of attention_mask = (-1, -1, -1, -1) in dy2static.
-        model_kwargs["attention_mask"] = paddle.reshape(attn_mask, paddle.shape(attn_mask))
+        model_kwargs["attention_mask"] = paddle.reshape(attn_mask, attn_mask.shape)
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
         max_length = paddle.to_tensor(max_length)
         while cur_len < max_length:
@@ -1855,7 +1855,7 @@ class BloomForGeneration(BloomPreTrainedModel):
 
         if model_kwargs.get("position_ids", None) is None:
             model_kwargs["position_ids"] = paddle.arange(
-                0, paddle.shape(model_kwargs["attention_mask"])[-1], dtype=input_ids.dtype
+                0, model_kwargs["attention_mask"].shape[-1], dtype=input_ids.dtype
             ).unsqueeze(0)
 
         self.is_encoder_decoder = False

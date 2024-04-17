@@ -15,11 +15,11 @@
 from __future__ import print_function
 
 import numpy as np
-
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddlenlp.transformers import WordEmbedding, PositionalEmbedding
+
+from paddlenlp.transformers import PositionalEmbedding, WordEmbedding
 
 
 class CrossEntropyCriterion(nn.Layer):
@@ -190,8 +190,8 @@ class SimultaneousTransformer(nn.Layer):
             self.linear = nn.Linear(in_features=d_model, out_features=trg_vocab_size, bias_attr=False)
 
     def forward(self, src_word, trg_word):
-        src_max_len = paddle.shape(src_word)[-1]
-        trg_max_len = paddle.shape(trg_word)[-1]
+        src_max_len = src_word.shape[-1]
+        trg_max_len = trg_word.shape[-1]
         base_attn_bias = (
             paddle.cast(src_word == self.bos_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
         )
@@ -236,7 +236,7 @@ class SimultaneousTransformer(nn.Layer):
         raise NotImplementedError
 
     def greedy_search(self, src_word, max_len=256, waitk=-1):
-        src_max_len = paddle.shape(src_word)[-1]
+        src_max_len = src_word.shape[-1]
         base_attn_bias = (
             paddle.cast(src_word == self.bos_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
         )

@@ -29,16 +29,20 @@ from .processing_utils import ProcessorMixin
 from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from .image_processing_utils import ImageProcessingMixin
 from .attention_utils import create_bigbird_rand_mask_idx_list
-from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-    GatherOp,
-    ScatterOp,
-    AllGatherOp,
-    ReduceScatterOp,
-    ColumnSequenceParallelLinear,
-    RowSequenceParallelLinear,
-    mark_as_sequence_parallel_parameter,
-    register_sequence_parallel_allreduce_hooks,
-)
+
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        GatherOp,
+        ScatterOp,
+        AllGatherOp,
+        ReduceScatterOp,
+        ColumnSequenceParallelLinear,
+        RowSequenceParallelLinear,
+        mark_as_sequence_parallel_parameter,
+        register_sequence_parallel_allreduce_hooks,
+    )
+except:
+    pass
 from .export import export_model
 
 # isort: split
@@ -200,6 +204,7 @@ from .xlm.configuration import *
 from .gau_alpha.modeling import *
 from .gau_alpha.tokenizer import *
 from .gau_alpha.configuration import *
+from .gemma import *
 from .roformerv2.modeling import *
 from .roformerv2.tokenizer import *
 from .roformerv2.configuration import *

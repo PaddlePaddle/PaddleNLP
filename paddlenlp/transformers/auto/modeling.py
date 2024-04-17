@@ -119,6 +119,7 @@ MAPPING_NAMES = OrderedDict(
         ("QWen", "qwen"),
         ("Mixtral", "mixtral"),
         ("QWen2Moe", "qwen2moe"),
+        ("Gemma", "gemma"),
     ]
 )
 
