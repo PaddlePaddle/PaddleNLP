@@ -342,6 +342,7 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     return expanded_mask
 
 
+# Copied from transformers.models.llama.modeling_llama.LlamaRMSNorm with Llama->Qwen2Moe
 class QWen2MoeRMSNorm(nn.Layer):
     def __init__(self, config):
         super().__init__()
@@ -373,19 +374,7 @@ class QWen2MoeRMSNorm(nn.Layer):
         return hidden_states * self.weight
 
 
-def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
-    """
-    This is the equivalent of paddle.repeat_interleave(hidden_states, n_rep, axis=1). The hidden states go from (batch,
-    num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)
-    """
-    batch, slen, num_key_value_heads, head_dim = hidden_states.shape
-    if n_rep == 1:
-        return hidden_states
-
-    hidden_states = hidden_states.unsqueeze(-2).tile([1, 1, 1, n_rep, 1])
-    return hidden_states.reshape([batch, slen, num_key_value_heads * n_rep, head_dim])
-
-
+# Copied from transformers.models.mistral.modeling_mistral.MistralRotaryEmbedding with Mistral->Qwen2Moe
 class QWen2MoeRotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
@@ -429,8 +418,28 @@ def rotate_half(x):
 
 
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
+    """Applies Rotary Position Embedding to the query and key tensors.
+
+    Args:
+        q (`torch.Tensor`): The query tensor.
+        k (`torch.Tensor`): The key tensor.
+        cos (`torch.Tensor`): The cosine part of the rotary embedding.
+        sin (`torch.Tensor`): The sine part of the rotary embedding.
+        position_ids (`torch.Tensor`):
+            The position indices of the tokens corresponding to the query and key tensors. For example, this can be
+            used to pass offsetted position ids when working with a KV-cache.
+        unsqueeze_dim (`int`, *optional*, defaults to 1):
+            The 'unsqueeze_dim' argument specifies the dimension along which to unsqueeze cos[position_ids] and
+            sin[position_ids] so that they can be properly broadcasted to the dimensions of q and k. For example, note
+            that cos[position_ids] and sin[position_ids] have the shape [batch_size, seq_len, head_dim]. Then, if q and
+            k have the shape [batch_size, heads, seq_len, head_dim], then setting unsqueeze_dim=1 makes
+            cos[position_ids] and sin[position_ids] broadcastable to the shapes of q and k. Similarly, if q and k have
+            the shape [batch_size, seq_len, heads, head_dim], then set unsqueeze_dim=2.
+    Returns:
+        `tuple(torch.Tensor)` comprising of the query and key tensors rotated using the Rotary Position Embedding.
+    """
     if position_ids is None:
-        # Note: Only for MixtralForCausalLMPipe model pretraining
+        # Note: Only for QWen2MoeForCausalLMPipe model pretraining
         cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
         sin = sin[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
     else:
@@ -443,16 +452,13 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
     return q_embed, k_embed
 
 
+# Modified from transformers.models.mistral.modeling_mistral.MistralMLP with Mistral->Qwen2Moe
 class QWen2MoeMLP(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config, is_shared=False):
         super().__init__()
         self.hidden_size = config.hidden_size
-        self.intermediate_size = config.intermediate_size
+        self.intermediate_size = config.intermediate_size if not is_shared else config.shared_expert_intermediate_size
         self.tensor_parallel_degree = config.tensor_parallel_degree
-
-        self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w1
-        self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)  # w2
-        self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w3
 
         if config.sequence_parallel:
             ColumnParallelLinear = ColumnSequenceParallelLinear
@@ -481,9 +487,9 @@ class QWen2MoeMLP(nn.Layer):
                 has_bias=False,
             )
         else:
-            self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-            self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
-            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+            self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w1
+            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w3
+            self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)  # w2
 
         self.act_fn = ACT2FN[config.hidden_act]
 
@@ -491,77 +497,31 @@ class QWen2MoeMLP(nn.Layer):
         return self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
 
 
-class QWen2MoeSparseMoeBlock(nn.Layer):
-    def __init__(self, config: QWen2MoeConfig):
-        super().__init__()
-        self.hidden_dim = config.hidden_size
-        self.ffn_dim = config.intermediate_size
-        self.num_experts = config.num_experts
-        self.top_k = config.num_experts_per_tok
-        self.gate = nn.Linear(self.hidden_dim, self.num_experts, bias_attr=False)
-        self.experts = nn.LayerList([QWen2MoeMLP(config) for _ in range(self.num_experts)])
+# Copied from transformers.models.llama.modeling_llama.repeat_kv
+def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
+    """
+    This is the equivalent of paddle.repeat_interleave(hidden_states, n_rep, axis=1). The hidden states go from (batch,
+    num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)
+    """
+    batch, slen, num_key_value_heads, head_dim = hidden_states.shape
+    if n_rep == 1:
+        return hidden_states
 
-    def forward(self, hidden_states):
-        batch_size, seq_len, hidden_dim = hidden_states.shape
-        hidden_states = hidden_states.reshape([-1, hidden_dim])
-        # router_logits: [batch_size * seq_len, num_experts]
-        router_logits = self.gate(hidden_states)
-
-        with paddle.amp.auto_cast(False):
-            routing_weights = F.softmax(router_logits.astype("float32"), axis=1)
-        routing_weights, selected_experts = paddle.topk(routing_weights, self.top_k, axis=-1)
-        routing_weights /= routing_weights.sum(axis=-1, keepdim=True)
-        # we cast back to input dtype
-        routing_weights = routing_weights.astype(hidden_states.dtype)
-
-        final_hidden_states = paddle.zeros(
-            [batch_size * seq_len, hidden_dim],
-            dtype=hidden_states.dtype,
-        )
-
-        # One hot encode the selected experts to create an expert mask
-        # this will be used to easily index which expert is going to be sollicitated.
-        # shape: [num_experts, top_k, batch_size * seq_len]
-        expert_mask = F.one_hot(selected_experts, num_classes=self.num_experts).transpose([2, 1, 0])
-
-        # Loop over all available experts in the model and perform the computation on each expert.
-        for expert_id in range(self.num_experts):
-            expert_layer = self.experts[expert_id]
-            idx, top_x = paddle.where(expert_mask[expert_id])
-
-            if top_x.shape[0] == 0:
-                continue
-
-            current_state = paddle.gather(hidden_states, top_x.squeeze())
-            current_hidden_states = expert_layer(current_state) * routing_weights[top_x, idx]
-
-            top_x = top_x.squeeze()
-            if top_x.shape == []:
-                top_x = paddle.to_tensor([top_x.item()])
-            final_hidden_states.index_add_(top_x, 0, current_hidden_states.astype(hidden_states.dtype))
-
-        final_hidden_states = final_hidden_states.reshape([batch_size, seq_len, hidden_dim])
-        return final_hidden_states, router_logits
+    hidden_states = hidden_states.unsqueeze(-2).tile([1, 1, 1, n_rep, 1])
+    return hidden_states.reshape([batch, slen, num_key_value_heads * n_rep, head_dim])
 
 
+# Copied from transformers.models.qwen2.modeling_qwen2.Qwen2Attention with Qwen2->Qwen2Moe
 class QWen2MoeAttention(nn.Layer):
     """
-    Multi-headed attention from 'Attention Is All You Need' paper.
-    Modified to use sliding window attention: Longformer and "Generating Long Sequences with Sparse Transformers".
+    Multi-headed attention from 'Attention Is All You Need' paper. Modified to use sliding window attention: Longformer
+    and "Generating Long Sequences with Sparse Transformers".
     """
 
-    def __init__(self, config: QWen2MoeConfig, layer_idx: Optional[int] = None, layerwise_recompute: bool = True):
+    def __init__(self, config: QWen2MoeConfig, layerwise_recompute: bool = True):
         super().__init__()
 
         self.config = config
-        self.layer_idx = layer_idx
-        if layer_idx is None:
-            logger.warning_once(
-                f"Instantiating {self.__class__.__name__} without passing `layer_idx` is not recommended and will "
-                "to errors during the forward call, if caching is used. Please make sure to provide a `layer_idx` "
-                "when creating this class."
-            )
-
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
 
@@ -571,8 +531,8 @@ class QWen2MoeAttention(nn.Layer):
         assert config.num_attention_heads // config.num_key_value_heads
         self.num_key_value_groups = config.num_attention_heads // config.num_key_value_heads
         self.gqa_or_mqa = config.num_attention_heads != config.num_key_value_heads
-        self.rope_theta = config.rope_theta
         self.max_position_embeddings = config.max_position_embeddings
+        self.rope_theta = config.rope_theta
         self.is_causal = True
         self.attention_dropout = config.attention_dropout
 
@@ -612,54 +572,19 @@ class QWen2MoeAttention(nn.Layer):
             RowParallelLinear = fleet.meta_parallel.RowParallelLinear
 
         if config.tensor_parallel_degree > 1:
-            self.q_proj = ColumnParallelLinear(
-                self.hidden_size,
-                self.hidden_size,
-                has_bias=True,
-                gather_output=False,
-            )
+            self.q_proj = ColumnParallelLinear(self.hidden_size, self.hidden_size, has_bias=True, gather_output=False)
             self.k_proj = ColumnParallelLinear(
-                self.hidden_size,
-                self.config.num_key_value_heads * self.head_dim,
-                has_bias=True,
-                gather_output=False,
+                self.hidden_size, self.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False
             )
             self.v_proj = ColumnParallelLinear(
-                self.hidden_size,
-                self.config.num_key_value_heads * self.head_dim,
-                has_bias=True,
-                gather_output=False,
+                self.hidden_size, self.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False
             )
+            self.o_proj = RowParallelLinear(self.hidden_size, self.hidden_size, has_bias=False, input_is_parallel=True)
         else:
-            self.q_proj = nn.Linear(
-                self.hidden_size,
-                self.hidden_size,
-                bias_attr=True,
-            )
-            self.k_proj = nn.Linear(
-                self.hidden_size,
-                self.config.num_key_value_heads * self.head_dim,
-                bias_attr=True,
-            )
-            self.v_proj = nn.Linear(
-                self.hidden_size,
-                self.config.num_key_value_heads * self.head_dim,
-                bias_attr=True,
-            )
-
-        if config.tensor_parallel_degree > 1:
-            self.o_proj = RowParallelLinear(
-                self.hidden_size,
-                self.hidden_size,
-                has_bias=False,
-                input_is_parallel=True,
-            )
-        else:
-            self.o_proj = nn.Linear(
-                self.hidden_size,
-                self.hidden_size,
-                bias_attr=False,
-            )
+            self.q_proj = nn.Linear(self.hidden_size, self.hidden_size, bias_attr=True)
+            self.k_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias_attr=True)
+            self.v_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias_attr=True)
+            self.o_proj = nn.Linear(self.hidden_size, self.hidden_size, bias_attr=False)
 
         self.rotary_emb = QWen2MoeRotaryEmbedding(
             self.head_dim,
@@ -680,6 +605,8 @@ class QWen2MoeAttention(nn.Layer):
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
 
+        batch_size, seq_len, _ = hidden_states.shape
+
         query_states = self.q_proj(hidden_states)
         key_states = self.k_proj(hidden_states)
         value_states = self.v_proj(hidden_states)
@@ -697,14 +624,6 @@ class QWen2MoeAttention(nn.Layer):
         kv_seq_len = key_states.shape[-3]
 
         if past_key_value is not None:
-            if self.layer_idx is None:
-                raise ValueError(
-                    f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
-                    "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
-                    "with a layer index."
-                )
-            # TODO layer_idx
-            # kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
             kv_seq_len += past_key_value[0].shape[-3]
 
         if self.use_fused_rope:
@@ -725,12 +644,8 @@ class QWen2MoeAttention(nn.Layer):
 
         # [bs, seq_len, num_head, head_dim]
         if past_key_value is not None:
-            # cache_kwargs = {"sin": sin, "cos": cos}  # Specific to RoPE models
-            # key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
-            # reuse k, v, self_attention
             key_states = paddle.concat([past_key_value[0], key_states], axis=1)
             value_states = paddle.concat([past_key_value[1], value_states], axis=1)
-
         past_key_value = (key_states, value_states) if use_cache else None
 
         # TODO(wj-Mcat): use broadcast strategy when n_kv_heads = 1
@@ -794,19 +709,80 @@ class QWen2MoeAttention(nn.Layer):
         return outputs
 
 
+class QWen2MoeSparseMoeBlock(nn.Layer):
+    def __init__(self, config: QWen2MoeConfig):
+        super().__init__()
+        self.num_experts = config.num_experts
+        self.top_k = config.num_experts_per_tok
+        self.norm_topk_prob = config.norm_topk_prob
+
+        self.gate = nn.Linear(config.hidden_size, self.num_experts, bias_attr=False)
+        self.experts = nn.LayerList([QWen2MoeMLP(config) for _ in range(self.num_experts)])
+
+        self.shared_expert = QWen2MoeMLP(config, is_shared=True)
+        self.shared_expert_gate = nn.Linear(config.hidden_size, 1, bias_attr=False)
+
+    def forward(self, hidden_states):
+        batch_size, seq_len, hidden_dim = hidden_states.shape
+        hidden_states = hidden_states.reshape([-1, hidden_dim])
+        # router_logits: [batch_size * seq_len, num_experts]
+        router_logits = self.gate(hidden_states)
+
+        with paddle.amp.auto_cast(False):
+            routing_weights = F.softmax(router_logits.astype("float32"), axis=1)
+        routing_weights, selected_experts = paddle.topk(routing_weights, self.top_k, axis=-1)
+        if self.norm_topk_prob:  # Note: Mixtral is set norm as default, QWen2MoE is set to no norm
+            routing_weights /= routing_weights.sum(axis=-1, keepdim=True)
+        # we cast back to input dtype
+        routing_weights = routing_weights.astype(hidden_states.dtype)
+
+        final_hidden_states = paddle.zeros(
+            [batch_size * seq_len, hidden_dim],
+            dtype=hidden_states.dtype,
+        )
+
+        # One hot encode the selected experts to create an expert mask
+        # this will be used to easily index which expert is going to be sollicitated.
+        # shape: [num_experts, top_k, batch_size * seq_len]
+        expert_mask = F.one_hot(selected_experts, num_classes=self.num_experts).transpose([2, 1, 0])
+
+        # Loop over all available experts in the model and perform the computation on each expert.
+        for expert_id in range(self.num_experts):
+            expert_layer = self.experts[expert_id]
+            idx, top_x = paddle.where(expert_mask[expert_id])
+
+            if top_x.shape[0] == 0:
+                continue
+
+            current_state = paddle.gather(hidden_states, top_x.squeeze())
+            current_hidden_states = expert_layer(current_state) * routing_weights[top_x, idx]
+
+            top_x = top_x.squeeze()
+            if top_x.shape == []:
+                top_x = paddle.to_tensor([top_x.item()])
+            final_hidden_states.index_add_(top_x, 0, current_hidden_states.astype(hidden_states.dtype))
+
+        shared_expert_output = self.shared_expert(hidden_states)
+        shared_expert_output = F.sigmoid(self.shared_expert_gate(hidden_states)) * shared_expert_output
+
+        final_hidden_states = final_hidden_states + shared_expert_output
+
+        final_hidden_states = final_hidden_states.reshape([batch_size, seq_len, hidden_dim])
+        return final_hidden_states, router_logits
+
+
 class QWen2MoeDecoderLayer(nn.Layer):
-    def __init__(self, config: QWen2MoeConfig, layer_idx: int, layerwise_recompute: bool = False):
+    def __init__(self, config: QWen2MoeConfig, layerwise_recompute: bool = False):
         super().__init__()
         self.config = config
-        self.hidden_size = config.hidden_size
 
-        self.self_attn = QWen2MoeAttention(config, layer_idx)
+        self.self_attn = QWen2MoeAttention(config, layerwise_recompute)
 
-        if config.num_experts > 0 and (layer_idx + 1) % config.decoder_sparse_step == 0:
+        if config.num_experts > 0:
             self.mlp = QWen2MoeSparseMoeBlock(config)
         else:
             # num_experts == 0 or this layer is not sparse layer
-            self.mlp = QWen2MoeMLP(config, intermediate_size=config.intermediate_size)
+            self.mlp = QWen2MoeMLP(config)
 
         self.input_layernorm = QWen2MoeRMSNorm(config)
         self.post_attention_layernorm = QWen2MoeRMSNorm(config)
@@ -848,6 +824,7 @@ class QWen2MoeDecoderLayer(nn.Layer):
 
         # [bs * seq_len, embed_dim] -> [seq_len * bs / n, embed_dim] (sequence_parallel)
         residual = hidden_states
+
         hidden_states = self.input_layernorm(hidden_states)
 
         # Self Attention
@@ -894,7 +871,12 @@ class QWen2MoeDecoderLayer(nn.Layer):
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states, router_logits = self.block_sparse_moe(hidden_states)
+        hidden_states = self.mlp(hidden_states)
+        if isinstance(hidden_states, tuple):
+            hidden_states, router_logits = hidden_states
+        else:
+            router_logits = None
+
         hidden_states = residual + hidden_states
 
         outputs = (hidden_states,)
@@ -917,7 +899,6 @@ class QWen2MoeDecoderLayer(nn.Layer):
 class QWen2MoePretrainedModel(PretrainedModel):
     config_class = QWen2MoeConfig
     base_model_prefix = "qwen2moe"
-    supports_gradient_checkpointing = True
     _keys_to_ignore_on_load_unexpected = [r"self_attn.rotary_emb.inv_freq"]
 
     @classmethod
@@ -941,19 +922,19 @@ class QWen2MoePretrainedModel(PretrainedModel):
 
             for expert_idx in range(config.num_experts):
                 expert_mappings = [
-                    [f"layers.{layer_index}.block_sparse_moe.experts.{expert_idx}.w1.weight", None, "transpose"],
-                    [f"layers.{layer_index}.block_sparse_moe.experts.{expert_idx}.w2.weight", None, "transpose"],
-                    [f"layers.{layer_index}.block_sparse_moe.experts.{expert_idx}.w3.weight", None, "transpose"],
+                    [f"layers.{layer_index}.mlp.experts.{expert_idx}.gate_proj.weight", None, "transpose"],
+                    [f"layers.{layer_index}.mlp.experts.{expert_idx}.down_proj.weight", None, "transpose"],
+                    [f"layers.{layer_index}.mlp.experts.{expert_idx}.up_proj.weight", None, "transpose"],
                 ]
                 model_mappings.extend(expert_mappings)
             model_mappings.append([f"layers.{layer_index}.block_sparse_moe.gate.weight", None, "transpose"])
 
         init_name_mappings(mappings=model_mappings)
-        # base-model prefix "MixtralModel"
-        if "MixtralModel" not in config.architectures:
+        # base-model prefix "QWen2MoeModel"
+        if "QWen2MoeModel" not in config.architectures:
             for mapping in model_mappings:
                 mapping[0] = "model." + mapping[0]
-                mapping[1] = "mixtral." + mapping[1]
+                mapping[1] = "qwen2moe." + mapping[1]
             model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
@@ -999,9 +980,9 @@ class QWen2MoePretrainedModel(PretrainedModel):
 
             # Add tp split for expert params.
             base_actions = {
-                "layers.0.block_sparse_moe.experts.0.w1.weight": partial(fn, is_column=True),
-                "layers.0.block_sparse_moe.experts.0.w2.weight": partial(fn, is_column=False),
-                "layers.0.block_sparse_moe.experts.0.w3.weight": partial(fn, is_column=True),
+                "layers.0.mlp.experts.0.gate_proj.weight": partial(fn, is_column=True),
+                "layers.0.mlp.experts.0.down_proj.weight": partial(fn, is_column=False),
+                "layers.0.mlp.experts.0.up_proj.weight": partial(fn, is_column=True),
             }
             for key, action in base_actions.items():
                 for i in range(num_layers):
@@ -1063,7 +1044,7 @@ class QWen2MoePretrainedModel(PretrainedModel):
         with paddle.no_grad():
             if isinstance(layer, QWen2MoeMLP):
                 factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
-                layer.w2.weight.scale_(factor)
+                layer.down_proj.weight.scale_(factor)
             if isinstance(layer, QWen2MoeAttention):
                 factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
                 layer.o_proj.weight.scale_(factor)
@@ -1102,11 +1083,10 @@ class QWen2MoeModel(QWen2MoePretrainedModel):
 
         self.layers = nn.LayerList(
             [
-                QWen2MoeDecoderLayer(config, layer_idx not in self.no_recompute_layers)
+                QWen2MoeDecoderLayer(config, layerwise_recompute=layer_idx not in self.no_recompute_layers)
                 for layer_idx in range(config.num_hidden_layers)
             ]
         )
-        self._attn_implementation = config._attn_implementation
         self.norm = QWen2MoeRMSNorm(config)
 
     def get_input_embeddings(self):
@@ -1193,11 +1173,12 @@ class QWen2MoeModel(QWen2MoePretrainedModel):
             raise ValueError("We currently only support sequence parallel without cache.")
 
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
-        )
+
         output_router_logits = (
             output_router_logits if output_router_logits is not None else self.config.output_router_logits
+        )
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         use_cache = use_cache if use_cache is not None else self.config.use_cache
 
@@ -1213,8 +1194,6 @@ class QWen2MoeModel(QWen2MoePretrainedModel):
         else:
             raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
 
-        past_key_values_length = 0
-
         if past_key_values is None:
             past_key_values = tuple([None] * len(self.layers))
         # NOTE: to make cache can be clear in-time
@@ -1223,24 +1202,8 @@ class QWen2MoeModel(QWen2MoePretrainedModel):
         seq_length_with_past = seq_length
         cache_length = 0
         if past_key_values[0] is not None:
-            cache_length = paddle.shape(past_key_values[0][0])[1]
+            cache_length = past_key_values[0][0].shape[1]
             seq_length_with_past += cache_length
-
-        # if use_cache:
-        #     use_legacy_cache = not isinstance(past_key_values, Cache)
-        #     if use_legacy_cache:
-        #         past_key_values = DynamicCache.from_legacy_cache(past_key_values)
-        #     past_key_values_length = past_key_values.get_usable_length(seq_length)
-
-        if position_ids is None:
-            device = input_ids.device if input_ids is not None else inputs_embeds.device
-            position_ids = paddle.arange(
-                past_key_values_length, seq_length + past_key_values_length, dtype=paddle.long, device=device
-            )
-            position_ids = position_ids.unsqueeze(0).view(-1, seq_length)
-        else:
-            position_ids = position_ids.view(-1, seq_length).long()
-
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
@@ -1427,7 +1390,10 @@ class QWen2MoeForCausalLM(QWen2MoePretrainedModel):
         self.num_experts = config.num_experts
         self.num_experts_per_tok = config.num_experts_per_tok
         # Initialize weights and apply final processing
-        self.post_init()
+
+        if config.sliding_window:
+            self.config.sliding_window = False
+            logger.warning("We do not support sliding window attention for now.")
 
     def get_input_embeddings(self):
         return self.model.embed_tokens
