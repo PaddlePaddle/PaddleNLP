@@ -108,7 +108,6 @@ def unwrap_optimizer(optimizer, optimizer_instances=()):
 
 
 if is_safetensors_available():
-
     from safetensors import safe_open
     from safetensors.numpy import load_file as safe_load_file
     from safetensors.numpy import save_file as safe_save_file
@@ -1904,13 +1903,24 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 ):
                     pre_tensor_parallel_split = True
                     assert loaded_keys is not None, "loaded_keys is not None."
-                    tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
+                    tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True)
                 # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
                 filter_dict_keys = set(expected_keys)
                 fuse_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=True)
                 split_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=False)
-                for k in list(fuse_actions.keys()) + list(split_actions.keys()):
-                    filter_dict_keys |= set(k)
+                for k in list(fuse_actions.keys()):
+                    need_add_except_key = k[-1] in expected_keys
+                    if need_add_except_key:
+                        filter_dict_keys |= set(k[:-1])
+                for k in list(split_actions.keys()):
+                    need_add_except_key = False
+                    for item in k[:-1]:
+                        if item in expected_keys:
+                            need_add_except_key = True
+                            break
+                    if need_add_except_key:
+                        filter_dict_keys.add(k[-1])
+
                 if config.quantization_config.is_weight_quantize():
                     filter_dict_keys = None
 
