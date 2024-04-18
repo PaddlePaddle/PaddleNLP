@@ -147,14 +147,10 @@ class DPOTrainer(Trainer):
         """DPO logprobs"""
         labels = batch["chosen_labels"] + batch["rejected_labels"]
         logits = logits.astype("float32")
-        #print("logits: ", logits)
         if logits.shape[:-1] != labels.shape:
             raise ValueError("Logits (batch and sequence length dim) and labels must have the same shape.")
-        per_token_logps = -self.logprobs(logits, labels.unsqueeze(2)).squeeze(2)
-        #print("per_token_logps: ", per_token_logps)
 
-        #if len(batch["response_indexs"].shape) == 3:
-        #    response_indexs = response_indexs[0]
+        per_token_logps = -self.logprobs(logits, labels.unsqueeze(2)).squeeze(2)
         chosen_logps = paddle.stack(
             [
                 (per_token_logps[response_index[0]][response_index[1] : response_index[2]]).sum()
@@ -173,67 +169,37 @@ class DPOTrainer(Trainer):
             ],
             axis=0,
         )
-        #print("chosen_logps: ", chosen_logps)
-        #print("rejected_logps: ", rejected_logps)
         return chosen_logps, rejected_logps
 
     def get_batch_metrics(self, model, batch, train_eval="train"):
         """Compute the DPO loss and other metrics for the given batch of inputs for train or test."""
         metrics = {}
-        if self.args.zero_padding:
-            if self.args.offload_strategy:
-                offload_tensor_to_cpu(self.optimizer.state_dict())
-            with paddle.no_grad():
-                ref_logits = self.ref_model(
-                    batch["input_ids"],
-                    position_ids=batch["position_ids"],
-                    attention_mask=batch["attention_mask"],
-                )[0]
-            if self.args.offload_strategy:
-                reload_tensor_to_gpu(self.optimizer.state_dict())
-            policy_logits = model(
+        #if self.args.zero_padding:
+        if self.args.offload_strategy:
+            offload_tensor_to_cpu(self.optimizer.state_dict())
+        with paddle.no_grad():
+            ref_logits = self.ref_model(
                 batch["input_ids"],
                 position_ids=batch["position_ids"],
                 attention_mask=batch["attention_mask"],
             )[0]
-            #import numpy as np
-            #np.save("input_ids.npy", batch["input_ids"].numpy())
-            #np.save("position_ids.npy", batch["position_ids"].numpy())
-            #np.save("attention_mask.npy", batch["attention_mask"].numpy())
-            #print("ref_logits: ", ref_logits)
-            #print("policy_logits: ", policy_logits)
-            #print("position: ", batch["position_ids"])
-            #print("attention: ", batch["attention_mask"])
-            #print("origin: ", model(batch["input_ids"])[0])
-            #import pdb; pdb.set_trace()
-            policy_chosen_logps, policy_rejected_logps = self.cal_chosen_rejected_logps(batch, policy_logits)
-            reference_chosen_logps, reference_rejected_logps = self.cal_chosen_rejected_logps(batch, ref_logits)
-            #print(policy_chosen_logps, policy_rejected_logps)
-            #print(reference_chosen_logps, reference_rejected_logps)
+        if self.args.offload_strategy:
+            reload_tensor_to_gpu(self.optimizer.state_dict())
+        policy_logits = model(
+            batch["input_ids"],
+            position_ids=batch["position_ids"],
+            attention_mask=batch["attention_mask"],
+        )[0]
+        policy_chosen_logps, policy_rejected_logps = self.cal_chosen_rejected_logps(batch, policy_logits)
+        reference_chosen_logps, reference_rejected_logps = self.cal_chosen_rejected_logps(batch, ref_logits)
 
+        loss = self.dpo_loss(
+            policy_chosen_logps,
+            policy_rejected_logps,
+            reference_chosen_logps,
+            reference_rejected_logps,
+        )
 
-            loss = self.dpo_loss(
-                policy_chosen_logps,
-                policy_rejected_logps,
-                reference_chosen_logps,
-                reference_rejected_logps,
-            )
-        else:
-            with paddle.no_grad():
-                (
-                    reference_chosen_logps,
-                    reference_rejected_logps,
-                ) = self.concatenated_forward(self.ref_model, batch)
-            (
-                policy_chosen_logps,
-                policy_rejected_logps,
-            ) = self.concatenated_forward(model, batch)
-            loss = self.dpo_loss(
-                policy_chosen_logps,
-                policy_rejected_logps,
-                reference_chosen_logps,
-                reference_rejected_logps,
-            )
         policy_chosen_logps, policy_rejected_logps = policy_chosen_logps.detach(), policy_rejected_logps.detach()
 
         chosen_rewards = self.args.dpo_beta * (policy_chosen_logps - reference_chosen_logps)

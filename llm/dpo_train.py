@@ -103,7 +103,6 @@ def main():
         dtype=dtype,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
-        use_recompute=training_args.recompute,
         recompute_granularity=model_args.recompute_granularity,
         use_flash_attention=model_args.use_flash_attention,
         #tensor_parallel_output=model_args.tensor_parallel_output,
@@ -118,6 +117,7 @@ def main():
     if not data_args.autotuner_benchmark and not data_args.dpo_benchmark:
         ref_model = model_class.from_pretrained(**model_kwargs)
         config = AutoConfig.from_pretrained(**model_kwargs)
+        config.use_recompute = training_args.recompute
         model = model_class.from_config(config, dtype=dtype)
         model.set_state_dict(ref_model.state_dict())
         # for DPO save
@@ -131,23 +131,8 @@ def main():
     logger.info("Loading model & tokenizer successfully !")
 
     logger.info("Start to create dataset ...")
-    #dataset_config = {
-    #    "tokenizer": tokenizer,
-    #    "max_seq_len": data_args.max_seq_length,
-    #    "max_prompt_len": data_args.max_prompt_len,
-    #    "random_seed": training_args.seed,
-    #    "num_replicas": training_args.dataset_world_size,
-    #    "rank": training_args.dataset_rank,
-    #    "num_samples_each_epoch": data_args.num_samples_each_epoch,
-    #    "greedy_intokens": data_args.greedy_intokens,
-    #    "buffer_size": data_args.buffer_size,
-    #}
         
     if not data_args.autotuner_benchmark and training_args.max_steps == -1:
-        #if training_args.should_load_dataset and paddle.distributed.get_rank() == 0:
-            # NOTE(gongenlei): not to feed train_dataset, or the data will be wrong in next training.
-            #training_args, res = dpo_estimate_training(tokenizer, data_args, training_args)
-
         if paddle.distributed.get_world_size() > 1:
             paddle.distributed.barrier()
             pd_max_steps = paddle.to_tensor([training_args.max_steps])
@@ -167,17 +152,23 @@ def main():
         training_args.logging_steps = int(training_args.max_steps / training_args.num_train_epochs)
 
     trans_func = partial(process_example, tokenizer=tokenizer, data_args=data_args)
+    intoken_dataset = InTokensMapDataset
     if training_args.should_load_dataset:
         if data_args.dataset_name_or_path is None or not os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")):
             raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
 
+        logger.info("Creating Zero Padding Data Stream. This may take a few minutes.")
         train_ds = load_dataset(
             "json",
             data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
         )[0]
-        #    lazy=data_args.lazy,
+
         train_ds = (
-            train_ds.map(trans_func)
+            intoken_dataset(
+                train_ds.map(trans_func),
+                tokenizer=tokenizer,
+                max_length=data_args.max_seq_length,
+            )
             if train_ds is not None
             else None
         )
@@ -192,27 +183,8 @@ def main():
         )[0]
         #    lazy=data_args.lazy,
         eval_ds = (
-            eval_ds.map(trans_func)
-            if eval_ds is not None
-            else None
-        )
-
-    if training_args.zero_padding:
-        intoken_dataset = InTokensMapDataset
-        logger.info("Creating Zero Padding Data Stream. This may take a few minutes.")
-        train_ds = (
             intoken_dataset(
-                train_ds,
-                tokenizer=tokenizer,
-                max_length=data_args.max_seq_length,
-            )
-            if train_ds is not None
-            else None
-        )
-
-        eval_ds = (
-            intoken_dataset(
-                eval_ds,
+                eval_ds.map(trans_func),
                 tokenizer=tokenizer,
                 max_length=data_args.max_seq_length,
             )

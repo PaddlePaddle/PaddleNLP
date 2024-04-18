@@ -205,16 +205,6 @@ def collate_fn(batch, tokenizer, max_seq_length=None):
                 constant_values=False,
             )
         )
-        #sequence_sum = 0
-        #for sequence in sequences:
-        #    response_index = [
-        #        i,  # bs
-        #        sequence.response_index[0] + sequence_sum,  # chosen_response_start_index
-        #        sequence.response_index[1] + sequence_sum,  # rejeted_response_start_index
-        #        sequence.response_index[2] + sequence_sum,  # rejeted_response_end_index + 1
-        #    ]
-        #    input_dict["response_indexs"].append(response_index)
-        #    sequence_sum += len(sequence.concatenated_input_ids)
     for key in input_dict:
         input_dict[key] = paddle.to_tensor(input_dict[key])
     input_dict["attention_mask"] = input_dict["attention_mask"].cast("float32")
