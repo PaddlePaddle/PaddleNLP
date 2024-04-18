@@ -910,13 +910,6 @@ class TrainingArguments:
                     "pp_degree": pipeline_parallel_degree,
                     "order": order,
                     "sharding_degree": sharding_parallel_degree,
-                    "mp_configs" : {
-                        "sync_param" : True,
-                        "sync_grad" : False,
-                        "sync_moment" : True,
-                        "sync_mode" : "broadcast",
-                        "sync_param_name" : [""],
-                    }
                 }
                 if self.enable_optimizer_timer:
                     hybrid_configs["enable_optimizer_timer"] = True
