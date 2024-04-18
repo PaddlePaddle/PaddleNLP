@@ -1710,7 +1710,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2() {
         --enable_auto_parallel 1 \
         --to_static 0 \
         --fp16 0 \
-        --fp16_opt_level "O2"
+        --fp16_opt_level "O2" \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     loss_md5=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss_md5: ' '{print $2}' | awk -F ',' '{print $1}'`
@@ -1721,6 +1721,9 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2() {
     loss_md5_base=0ebf68698887b33b33a46518621cf412
     ips_base=-1
     mem_base=-1
+    if [ $IS_A100 -ne 0 ];then
+        loss_base=10.58541679
+    fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -1780,7 +1783,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2() {
         --enable_auto_parallel 1 \
         --to_static 0 \
         --fp16 0 \
-        --fp16_opt_level "O2"
+        --fp16_opt_level "O2" \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     loss_md5=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss_md5: ' '{print $2}' | awk -F ',' '{print $1}'`
@@ -1791,6 +1794,9 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2() {
     loss_md5_base=6df87d01bd08113a92930f6349514b35
     ips_base=-1
     mem_base=-1
+    if [ $IS_A100 -ne 0 ];then
+        loss_base=10.58452606
+    fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -1850,7 +1856,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
         --enable_auto_parallel 1 \
         --to_static 0 \
         --fp16 0 \
-        --fp16_opt_level "O2"
+        --fp16_opt_level "O2" \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     loss_md5=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss_md5: ' '{print $2}' | awk -F ',' '{print $1}'`
@@ -1861,6 +1867,9 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     loss_md5_base=6cb4e151b35f026190df90ab240d9a95
     ips_base=-1
     mem_base=-1
+    if [ $IS_A100 -ne 0 ];then
+        loss_base=10.57996178
+    fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -1920,7 +1929,7 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
         --enable_auto_parallel 1 \
         --to_static 0 \
         --fp16 1 \
-        --fp16_opt_level "O2"
+        --fp16_opt_level "O2" \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     loss_md5=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss_md5: ' '{print $2}' | awk -F ',' '{print $1}'`
@@ -1931,6 +1940,9 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     loss_md5_base=e82a1f5668870d18a2d45b3ee0a25386
     ips_base=-1
     mem_base=-1
+    if [ $IS_A100 -ne 0 ];then
+        loss_base=10.58061218
+    fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
