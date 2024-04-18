@@ -1944,7 +1944,7 @@ function check_result() {
         exit -1
     fi
 
-    if [ $# -ne 7 ]; then
+    if [ $# -ne 7 ] && [ $# -ne 8 ]; then
         echo -e "\033[31m $1 parameter transfer failed: $@ \033[0m" | tee -a ${log_path}/result.log
         exit -1
     fi
@@ -1958,7 +1958,7 @@ function check_result() {
         else
             diff=$(echo "$2 $3" | awk '{print $1-$2}')
             gt=$(echo "${diff#-} 1e-5" | awk '{print ($1>$2)?"1":"0"}')
-            if [ $st -eq 1 ];then
+            if [ $gt -eq 1 ];then
                 echo -e "\033[31m $1 loss diff check failed! \033[0m" | tee -a ${log_path}/result.log
                 exit -1
             fi
