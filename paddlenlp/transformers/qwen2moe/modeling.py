@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Paddle Qwen2Moe model."""
+""" Paddle QWen2Moe model."""
 from __future__ import annotations
 
 import math
@@ -52,7 +52,7 @@ from paddlenlp.transformers.model_utils import PretrainedModel, register_base_mo
 from paddlenlp.utils.log import logger
 
 from ..activations import ACT2FN
-from .configuration import Qwen2MoeConfig
+from .configuration import QWen2MoeConfig
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
@@ -60,10 +60,10 @@ except:
     flash_attention = None
 
 __all__ = [
-    "Qwen2MoeModel",
-    "Qwen2MoePretrainedModel",
-    "Qwen2MoeForCausalLM",
-    "Qwen2MoePretrainingCriterion",
+    "QWen2MoeModel",
+    "QWen2MoePretrainedModel",
+    "QWen2MoeForCausalLM",
+    "QWen2MoePretrainingCriterion",
 ]
 
 
@@ -342,8 +342,8 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     return expanded_mask
 
 
-class Qwen2MoeRMSNorm(nn.Layer):
-    def __init__(self, config, eps=1e-6):
+class QWen2MoeRMSNorm(nn.Layer):
+    def __init__(self, config):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.weight = paddle.create_parameter(
@@ -386,7 +386,7 @@ def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
     return hidden_states.reshape([batch, slen, num_key_value_heads * n_rep, head_dim])
 
 
-class Qwen2MoeRotaryEmbedding(nn.Layer):
+class QWen2MoeRotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
         self.dim = dim
@@ -443,16 +443,16 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
     return q_embed, k_embed
 
 
-class Qwen2MoeMLP(nn.Layer):
+class QWen2MoeMLP(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
         self.tensor_parallel_degree = config.tensor_parallel_degree
 
-        self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)  # w1
-        self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias=False)  # w2
-        self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)  # w3
+        self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w1
+        self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)  # w2
+        self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w3
 
         if config.sequence_parallel:
             ColumnParallelLinear = ColumnSequenceParallelLinear
@@ -491,15 +491,15 @@ class Qwen2MoeMLP(nn.Layer):
         return self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
 
 
-class Qwen2MoeSparseMoeBlock(nn.Layer):
-    def __init__(self, config: Qwen2MoeConfig):
+class QWen2MoeSparseMoeBlock(nn.Layer):
+    def __init__(self, config: QWen2MoeConfig):
         super().__init__()
         self.hidden_dim = config.hidden_size
         self.ffn_dim = config.intermediate_size
-        self.num_experts = config.num_local_experts
+        self.num_experts = config.num_experts
         self.top_k = config.num_experts_per_tok
         self.gate = nn.Linear(self.hidden_dim, self.num_experts, bias_attr=False)
-        self.experts = nn.LayerList([Qwen2MoeMLP(config) for _ in range(self.num_experts)])
+        self.experts = nn.LayerList([QWen2MoeMLP(config) for _ in range(self.num_experts)])
 
     def forward(self, hidden_states):
         batch_size, seq_len, hidden_dim = hidden_states.shape
@@ -544,13 +544,13 @@ class Qwen2MoeSparseMoeBlock(nn.Layer):
         return final_hidden_states, router_logits
 
 
-class Qwen2MoeAttention(nn.Module):
+class QWen2MoeAttention(nn.Layer):
     """
     Multi-headed attention from 'Attention Is All You Need' paper.
     Modified to use sliding window attention: Longformer and "Generating Long Sequences with Sparse Transformers".
     """
 
-    def __init__(self, config: Qwen2MoeConfig, layer_idx: Optional[int] = None, layerwise_recompute: bool = True):
+    def __init__(self, config: QWen2MoeConfig, layer_idx: Optional[int] = None, layerwise_recompute: bool = True):
         super().__init__()
 
         self.config = config
@@ -661,7 +661,7 @@ class Qwen2MoeAttention(nn.Module):
                 bias_attr=False,
             )
 
-        self.rotary_emb = Qwen2MoeRotaryEmbedding(
+        self.rotary_emb = QWen2MoeRotaryEmbedding(
             self.head_dim,
             max_position_embeddings=self.max_position_embeddings,
             base=self.rope_theta,
@@ -794,22 +794,22 @@ class Qwen2MoeAttention(nn.Module):
         return outputs
 
 
-class Qwen2MoeDecoderLayer(nn.Module):
-    def __init__(self, config: Qwen2MoeConfig, layer_idx: int, layerwise_recompute: bool = False):
+class QWen2MoeDecoderLayer(nn.Layer):
+    def __init__(self, config: QWen2MoeConfig, layer_idx: int, layerwise_recompute: bool = False):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size
 
-        self.self_attn = Qwen2MoeAttention(config, layer_idx)
+        self.self_attn = QWen2MoeAttention(config, layer_idx)
 
         if config.num_experts > 0 and (layer_idx + 1) % config.decoder_sparse_step == 0:
-            self.mlp = Qwen2MoeSparseMoeBlock(config)
+            self.mlp = QWen2MoeSparseMoeBlock(config)
         else:
             # num_experts == 0 or this layer is not sparse layer
-            self.mlp = Qwen2MoeMLP(config, intermediate_size=config.intermediate_size)
+            self.mlp = QWen2MoeMLP(config, intermediate_size=config.intermediate_size)
 
-        self.input_layernorm = Qwen2MoeRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-        self.post_attention_layernorm = Qwen2MoeRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.input_layernorm = QWen2MoeRMSNorm(config)
+        self.post_attention_layernorm = QWen2MoeRMSNorm(config)
 
         self.sequence_parallel = config.sequence_parallel
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
@@ -914,14 +914,14 @@ class Qwen2MoeDecoderLayer(nn.Module):
         return outputs
 
 
-class Qwen2MoePretrainedModel(PretrainedModel):
-    config_class = Qwen2MoeConfig
-    base_model_prefix = "model"
+class QWen2MoePretrainedModel(PretrainedModel):
+    config_class = QWen2MoeConfig
+    base_model_prefix = "qwen2moe"
     supports_gradient_checkpointing = True
     _keys_to_ignore_on_load_unexpected = [r"self_attn.rotary_emb.inv_freq"]
 
     @classmethod
-    def _get_name_mappings(cls, config: Qwen2MoeConfig) -> list[StateDictNameMapping]:
+    def _get_name_mappings(cls, config: QWen2MoeConfig) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
             ["embed_tokens.weight"],
@@ -939,7 +939,7 @@ class Qwen2MoePretrainedModel(PretrainedModel):
             ]
             model_mappings.extend(layer_mappings)
 
-            for expert_idx in range(config.num_local_experts):
+            for expert_idx in range(config.num_experts):
                 expert_mappings = [
                     [f"layers.{layer_index}.block_sparse_moe.experts.{expert_idx}.w1.weight", None, "transpose"],
                     [f"layers.{layer_index}.block_sparse_moe.experts.{expert_idx}.w2.weight", None, "transpose"],
@@ -960,7 +960,7 @@ class Qwen2MoePretrainedModel(PretrainedModel):
         return mappings
 
     @classmethod
-    def _get_tensor_parallel_mappings(cls, config: Qwen2MoeConfig, is_split=True):
+    def _get_tensor_parallel_mappings(cls, config: QWen2MoeConfig, is_split=True):
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
         fn = split_or_merge_func(
@@ -970,7 +970,7 @@ class Qwen2MoePretrainedModel(PretrainedModel):
             num_attention_heads=config.num_attention_heads,
         )
 
-        def get_tensor_parallel_split_mappings(num_layers, num_local_experts):
+        def get_tensor_parallel_split_mappings(num_layers, num_experts):
             final_actions = {}
 
             base_actions = {
@@ -1006,13 +1006,13 @@ class Qwen2MoePretrainedModel(PretrainedModel):
             for key, action in base_actions.items():
                 for i in range(num_layers):
                     newkey = key.replace("layers.0.", f"layers.{i}.")
-                    for j in range(num_local_experts):
+                    for j in range(num_experts):
                         newkey2 = newkey.replace("experts.0.", f"experts.{j}.")
                         final_actions[newkey2] = action
 
             return final_actions
 
-        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers, config.num_local_experts)
+        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers, config.num_experts)
 
         return mappings
 
@@ -1028,7 +1028,7 @@ class Qwen2MoePretrainedModel(PretrainedModel):
                 mpu.VocabParallelEmbedding,
                 mpu.ColumnParallelLinear,
                 mpu.RowParallelLinear,
-                Qwen2MoeLMHead,
+                QWen2MoeLMHead,
                 ColumnSequenceParallelLinear,
                 RowSequenceParallelLinear,
             ),
@@ -1061,23 +1061,23 @@ class Qwen2MoePretrainedModel(PretrainedModel):
         # sublayer is init first
         # scale RowParallelLinear weight
         with paddle.no_grad():
-            if isinstance(layer, Qwen2MoeMLP):
+            if isinstance(layer, QWen2MoeMLP):
                 factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
                 layer.w2.weight.scale_(factor)
-            if isinstance(layer, Qwen2MoeAttention):
+            if isinstance(layer, QWen2MoeAttention):
                 factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
                 layer.o_proj.weight.scale_(factor)
 
 
 @register_base_model
-class Qwen2MoeModel(Qwen2MoePretrainedModel):
+class QWen2MoeModel(QWen2MoePretrainedModel):
     """
-    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`Qwen2MoeDecoderLayer`]
+    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`QWen2MoeDecoderLayer`]
     Args:
-        config: Qwen2MoeConfig
+        config: QWen2MoeConfig
     """
 
-    def __init__(self, config: Qwen2MoeConfig):
+    def __init__(self, config: QWen2MoeConfig):
         super().__init__(config)
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
@@ -1102,12 +1102,12 @@ class Qwen2MoeModel(Qwen2MoePretrainedModel):
 
         self.layers = nn.LayerList(
             [
-                Qwen2MoeDecoderLayer(config, layer_idx not in self.no_recompute_layers)
+                QWen2MoeDecoderLayer(config, layer_idx not in self.no_recompute_layers)
                 for layer_idx in range(config.num_hidden_layers)
             ]
         )
         self._attn_implementation = config._attn_implementation
-        self.norm = Qwen2MoeRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.norm = QWen2MoeRMSNorm(config)
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1346,14 +1346,14 @@ class Qwen2MoeModel(Qwen2MoePretrainedModel):
         )
 
 
-class Qwen2MoePretrainingCriterion(nn.Layer):
+class QWen2MoePretrainingCriterion(nn.Layer):
     """
     Criterion for Mixtral.
     It calculates the final loss.
     """
 
     def __init__(self, config):
-        super(Qwen2MoePretrainingCriterion, self).__init__()
+        super(QWen2MoePretrainingCriterion, self).__init__()
         self.ignore_index = getattr(config, "ignore_index", -100)
         self.config = config
         self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
@@ -1381,9 +1381,9 @@ class Qwen2MoePretrainingCriterion(nn.Layer):
         return loss
 
 
-class Qwen2MoeLMHead(nn.Layer):
-    def __init__(self, config: Qwen2MoeConfig):
-        super(Qwen2MoeLMHead, self).__init__()
+class QWen2MoeLMHead(nn.Layer):
+    def __init__(self, config: QWen2MoeConfig):
+        super(QWen2MoeLMHead, self).__init__()
         self.config = config
         if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
             vocab_size = config.vocab_size // config.tensor_parallel_degree
@@ -1412,7 +1412,7 @@ class Qwen2MoeLMHead(nn.Layer):
         return logits
 
 
-class Qwen2MoeForCausalLM(Qwen2MoePretrainedModel):
+class QWen2MoeForCausalLM(QWen2MoePretrainedModel):
     enable_to_static_method = True
     _tied_weights_keys = ["lm_head.weight"]
 
@@ -1420,9 +1420,9 @@ class Qwen2MoeForCausalLM(Qwen2MoePretrainedModel):
         super().__init__(config)
         self.config = config
 
-        self.model = Qwen2MoeModel(config)
-        self.lm_head = Qwen2MoeLMHead(config)
-        self.criterion = Qwen2MoePretrainingCriterion(config)
+        self.model = QWen2MoeModel(config)
+        self.lm_head = QWen2MoeLMHead(config)
+        self.criterion = QWen2MoePretrainingCriterion(config)
         self.router_aux_loss_coef = config.router_aux_loss_coef
         self.num_experts = config.num_experts
         self.num_experts_per_tok = config.num_experts_per_tok
