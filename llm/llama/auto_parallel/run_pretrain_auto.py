@@ -52,6 +52,8 @@ from paddlenlp.data.causal_dataset import (
     print_rank_0,
 )
 
+print("---")
+
 
 def add_start_docstrings(*docstr):
     def docstring_decorator(fn):

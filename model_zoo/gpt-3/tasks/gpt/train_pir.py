@@ -20,7 +20,7 @@ import time
 
 __dir__ = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(__dir__, "../../")))
-
+print('---')
 from ppfleetx.data import build_dataloader
 from ppfleetx.distributed.apis import env
 from ppfleetx.models import build_module
