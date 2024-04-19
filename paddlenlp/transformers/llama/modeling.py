@@ -414,7 +414,7 @@ class LlamaRMSNorm(nn.Layer):
             if get_env_device() == "npu":
                 return core.eager._run_custom_op("rms_norm_npu", hidden_states, self.weight, self.variance_epsilon)[0]
             elif get_env_device() == "xpu":
-                import paddle_xpu_nn
+                import paddle_xpu_nn  # noqa: F821
 
                 return paddle_xpu_nn.xpu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
             return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
@@ -599,18 +599,23 @@ class LlamaMLP(nn.Layer):
                 RowParallelLinear = RowSequenceParallelLinear
         else:
             if get_env_device() == "xpu":
-                import paddle_xpu  # noqa: F821
+                from paddle_xpu.layers.nn import (  # noqa: F401
+                    ColumnParallelLinear as XPUColumnParallelLinear,
+                )
+                from paddle_xpu.layers.nn import (  # noqa: F401
+                    RowParallelLinear as XPURowParallelLinear,
+                )
 
-                ColumnParallelLinear = paddle_xpu.layers.nn.ColumnParallelLinear
-                RowParallelLinear = paddle_xpu.layers.nn.RowParallelLinear
+                ColumnParallelLinear = XPUColumnParallelLinear
+                RowParallelLinear = XPURowParallelLinear
             else:
                 ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
                 RowParallelLinear = fleet.meta_parallel.RowParallelLinear
 
         if get_env_device() == "xpu":
-            import paddle_xpu  # noqa: F821
+            from paddle_xpu.layers.nn import Linear as XPULinear  # noqa: F401
 
-            Linear = paddle_xpu.layers.nn.Linear
+            Linear = XPULinear
         else:
             Linear = nn.Linear
 
@@ -722,12 +727,8 @@ class LlamaAttention(nn.Layer):
                 )
 
         self.use_fused_rope = config.use_fused_rope
-        if self.use_fused_rope and get_env_device() != "npu":
-            if (
-                "gpu" not in paddle.device.get_device()
-                or "xpu" not in paddle.device.get_device()
-                or fused_rotary_position_embedding is None
-            ):
+        if self.use_fused_rope and get_env_device() not in ["npu", "xpu"]:
+            if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
                     "Will disable fuse rope. Try using latest gpu version of Paddle."
@@ -756,18 +757,23 @@ class LlamaAttention(nn.Layer):
                 RowParallelLinear = RowSequenceParallelLinear
         else:
             if get_env_device() == "xpu":
-                import paddle_xpu  # noqa: F821
+                from paddle_xpu.layers.nn import (  # noqa: F401
+                    ColumnParallelLinear as XPUColumnParallelLinear,
+                )
+                from paddle_xpu.layers.nn import (  # noqa: F401
+                    RowParallelLinear as XPURowParallelLinear,
+                )
 
-                ColumnParallelLinear = paddle_xpu.layers.nn.ColumnParallelLinear  # noqa: F821
-                RowParallelLinear = paddle_xpu.layers.nn.RowParallelLinear  # noqa: F821
+                ColumnParallelLinear = XPUColumnParallelLinear
+                RowParallelLinear = XPURowParallelLinear
             else:
                 ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
                 RowParallelLinear = fleet.meta_parallel.RowParallelLinear
 
         if get_env_device() == "xpu":
-            import paddle_xpu  # noqa: F821
+            from paddle_xpu.layers.nn import Linear as XPULinear  # noqa: F401
 
-            Linear = paddle_xpu.layers.nn.Linear
+            Linear = XPULinear
         else:
             Linear = nn.Linear
 
@@ -1773,9 +1779,11 @@ class LlamaLMHead(nn.Layer):
         if self.weight.is_distributed:
             self.weight.split_axis = 1
         if get_env_device() == "xpu":
-            import paddle_xpu
+            from paddle_xpu.layers.nn import (  # noqa: F401
+                parallel_matmul as xpu_parallel_matmul,
+            )
 
-            self.xpu_parallel_matmul = paddle_xpu.layers.nn.parallel_matmul()
+            self.xpu_parallel_matmul = xpu_parallel_matmul()
 
     def forward(self, hidden_states, tensor_parallel_output=None):
         if self.config.sequence_parallel:
