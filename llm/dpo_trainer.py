@@ -162,7 +162,7 @@ class DPOTrainer(Trainer):
         )
         rejected_logps = paddle.stack(
             [
-                (per_token_logps[response_index[0]][response_index[2] : response_index[3]]).sum()
+                (per_token_logps[response_index[0]][response_index[2] + 1: response_index[3]]).sum()
                 if response_index[3] != 0
                 else paddle.zeros([])
                 for response_index in batch["response_indexs"]

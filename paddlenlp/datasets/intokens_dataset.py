@@ -48,15 +48,14 @@ class InTokens:
                 input_keys.append(key)
 
         batched_features = {key: [] for key in input_keys}
+        sequence_sum = 0
         for record in batch_records:
             batched_features["input_ids"].extend(record["input_ids"])
-
             if "labels" in record:
                 batched_features["labels"].extend(record["labels"])
             elif "rejected_labels" in input_keys and "chosen_labels" in input_keys:
                 batched_features["rejected_labels"].extend(record["rejected_labels"])
                 batched_features["chosen_labels"].extend(record["chosen_labels"])
-                sequence_sum = 0
                 response_index = [
                     record["response_index"][0] + sequence_sum,  # chosen_response_start_index
                     record["response_index"][1] + sequence_sum,  # rejeted_response_start_index

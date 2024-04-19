@@ -41,7 +41,7 @@ def process_example(data, tokenizer, data_args):
     # chat template load
     #llama_chat_template = "{% if messages[0]['role'] == 'system' %}{% set loop_messages = messages[1:] %}{% set system_message = messages[0]['content'] %}{% else %}{% set loop_messages = messages %}{% set system_message = false %}{% endif %}{% for message in loop_messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if loop.index0 == 0 and system_message != false %}{% set content = '<<SYS>>\\n' + system_message + '\\n<</SYS>>\\n\\n' + message['content'] %}{% else %}{% set content = message['content'] %}{% endif %}{% if message['role'] == 'user' %}{{ bos_token + '[INST] ' + content.strip() + ' [/INST]' }}{% elif message['role'] == 'assistant' %}{{ ' '  + content.strip() + ' ' + eos_token }}{% endif %}{% endfor %}"
     #qwen_chat_template = "{% for message in messages %}{% if loop.first and messages[0]['role'] != 'system' %}{{ '<|im_start|>system\nYou are a helpful assistant<|im_end|>\n' }}{% endif %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}"
-    #tokenizer.init_chat_template(qwen_chat_template)
+    #tokenizer.init_chat_template(llama_chat_template)
 
     chosen_encode_tokens = tokenizer.encode_chat_inputs(conversations)['conversations']
 
@@ -105,24 +105,27 @@ def process_example(data, tokenizer, data_args):
     )
 
     # make position ids & labels
-    prompt_len = len(tokens_prompt)
+    #prompt_len = len(tokens_prompt)
+    prompt_last_but_one = len(tokens_prompt) - 1
+    chosen_with_prefix = len(tokens_chosen) + 1
+    rejected_with_prefix = len(tokens_rejected) + 1
+
     concatenated_position_ids = (
-        list(range(prompt_len))
-        + list(range(prompt_len, prompt_len + len(tokens_chosen))) 
-        + list(range(prompt_len, prompt_len + len(tokens_rejected) + 1))
+        list(range(prompt_last_but_one))
+        + list(range(prompt_last_but_one, prompt_last_but_one + chosen_with_prefix)) 
+        + list(range(prompt_last_but_one, prompt_last_but_one + rejected_with_prefix))
     )
 
     chosen_labels = (
         [0] * len(tokens_prompt))
     chosen_labels += tokens_chosen
-    chosen_labels += [0] * (len(tokens_rejected) + 1)
+    chosen_labels += [0] * rejected_with_prefix
 
     rejected_labels = (
         [0] * len(tokens_prompt))
-    #rejected_labels += [tokens_rejected[0]]
-    rejected_labels += [0] * len(tokens_chosen)
-    rejected_labels += [tokens_prompt[-1]]
+    rejected_labels += [0] * chosen_with_prefix
     rejected_labels += tokens_rejected
+
 
     # shift labels
     concatenated_input_ids = concatenated_input_ids[:-1]
@@ -137,19 +140,29 @@ def process_example(data, tokenizer, data_args):
         return None
 
     concatenated_attention_mask = np.tri(seq_len, seq_len, dtype=bool)
-    chosen_input_ids_start_index = prompt_len
-    rejected_input_ids_start_index = prompt_len + len(tokens_chosen)
+    chosen_input_ids_start_index = prompt_last_but_one
+    rejected_input_ids_start_index = chosen_input_ids_start_index + chosen_with_prefix
 
     concatenated_attention_mask[
         rejected_input_ids_start_index:, chosen_input_ids_start_index: rejected_input_ids_start_index
     ] = False
 
-    chosen_labels_start_index = len(tokens_prompt)
-    rejected_labels_start_index = chosen_labels_start_index  + len(tokens_chosen)
+    chosen_labels_start_index = prompt_last_but_one
+    rejected_labels_start_index = chosen_labels_start_index + len(tokens_chosen)
     response_index = [chosen_labels_start_index, rejected_labels_start_index, seq_len]
 
     # undo change
     data_args.max_seq_length = data_args.max_seq_length + 1
+
+    assert len(chosen_labels) == len(rejected_labels)
+    assert len(concatenated_input_ids) == len(chosen_labels)
+    assert len(concatenated_input_ids) == len(concatenated_position_ids)
+    assert len(concatenated_input_ids) == concatenated_attention_mask.shape[-1]
+    assert len(concatenated_input_ids) == response_index[2]
+    assert chosen_labels[prompt_last_but_one] == concatenated_input_ids[prompt_last_but_one+1]
+    # allow empty rejected response
+    assert len(rejected) == 0 or rejected_labels[prompt_last_but_one + chosen_with_prefix] == concatenated_input_ids[prompt_last_but_one + chosen_with_prefix + 1]
+    assert (0 not in chosen_labels[response_index[0]:response_index[1]]) and (0 not in rejected_labels[response_index[1]+1:response_index[2]])
 
     return {
         "input_ids": concatenated_input_ids,
