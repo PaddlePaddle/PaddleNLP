@@ -16,7 +16,6 @@ from __future__ import annotations
 import json
 import os
 from functools import partial
-from re import T
 
 import numpy as np
 import paddle
@@ -38,11 +37,11 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformer,
     FusedBlockMultiTransformerA8W8,
     FusedBlockMultiTransformerWeightOnly,
-    FusedSpecuMultiTransformer,
     FusedMultiTransformerA8W8,
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
+    FusedSpecuMultiTransformer,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
@@ -59,7 +58,7 @@ from paddlenlp.transformers.model_utils import (
     register_base_model,
 )
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers.utils import resolve_cache_dir
+
 __all__ = [
     "LlamaInferenceModel",
     "LlamaForCausalLMInferenceModel",
@@ -111,7 +110,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.use_cachekv_int8 = config.use_cachekv_int8 if hasattr(config, "use_cachekv_int8") else False
         self.single_card_ptq = config.single_card_ptq if hasattr(config, "single_card_ptq") else True
         self.use_weight_only = False
-        self.weight_only_quant_bits = config.weight_only_quant_bits if hasattr(config, "weight_only_quant_bits") else -1
+        self.weight_only_quant_bits = (
+            config.weight_only_quant_bits if hasattr(config, "weight_only_quant_bits") else -1
+        )
 
         if self.quant_type is not None and "weight_only_int" in self.quant_type:
             self.use_weight_only = True
@@ -823,9 +824,11 @@ class LlamaSpecuInferenceModel(LlamaPretrainedModel):
             ring_id = model_parallel_group.id
         except:
             pass
-        
+
         # rename the attrs of target model to avoid target model and draft model have the same attr name
-        ln_scale_attrs = [paddle.ParamAttr(name="fusellamaspecu.{}.ln_scale".format(i)) for i in range(self.num_layers)]
+        ln_scale_attrs = [
+            paddle.ParamAttr(name="fusellamaspecu.{}.ln_scale".format(i)) for i in range(self.num_layers)
+        ]
         qkv_weight_attrs = [
             paddle.ParamAttr(
                 name="fusellamaspecu.{}.qkv_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
@@ -992,7 +995,6 @@ class LlamaSpecuInferenceModel(LlamaPretrainedModel):
         kwargs["max_input_length"] = self.max_seq_len
         kwargs["token_num_in_cache"] = token_num_in_cache
 
-
         inputs_embeds = self.embed_tokens(ids_remove_padding)
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
@@ -1157,6 +1159,7 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
             attentions=None,
         )
 
+
 class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedModel):
     """
     Dynamic Batching for LLaMA Model with pretraining tasks on top.
@@ -1176,7 +1179,6 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         # TODO: Support safetensors loading.
         kwargs["use_safetensors"] = False
         return super().from_pretrained(pretrained_model_name_or_path, from_hf_hub, subfolder, *args, **kwargs)
-
 
     @classmethod
     def get_cache_kvs_shape(
@@ -1426,12 +1428,12 @@ class LlamaForCausalLMSpecuInferenceModel(GenerationInferenceModel, LlamaPretrai
 
         return logits
 
-
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         if "lm_head.weight" in state_dict:
             self.lm_head.weight.set_value(state_dict["lm_head.weight"])
         self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
+
 
 class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPretrainedModel):
     """

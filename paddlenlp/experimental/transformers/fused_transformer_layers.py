@@ -28,7 +28,6 @@ from paddle.nn.quant import weight_only_linear
 
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
-from copy import deepcopy
 
 if is_paddlenlp_ops_available():
     from paddlenlp_ops import (
@@ -257,7 +256,7 @@ class FusedMultiTransformerConfig:
         self.ring_id = ring_id
 
 
-class  FusedMultiTransformerBase(Layer):
+class FusedMultiTransformerBase(Layer):
     def __init__(self, config: FusedMultiTransformerConfig):
         super().__init__()
 
@@ -1413,6 +1412,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
 
         return out
 
+
 class FusedSpecuMultiTransformer(Layer):
     def __init__(self, config: FusedMultiTransformerConfig):
         super().__init__()
@@ -1786,20 +1786,20 @@ class FusedSpecuMultiTransformer(Layer):
             kwargs.get("cum_offsets", None),
             kwargs.get("cu_seqlens_q", None),
             cu_seqlens_k,
-            rotary_embs, # rotary_embs
+            rotary_embs,  # rotary_embs
             None,  # attn_mask
             None,  # qkv_bias
-            seq_lens_encoder[0], # max_enc_len_this_time
-            seq_lens_decoder[0], # max_dec_len_this_time
-            token_num_in_cache, # token_num_in_cache
-            kwargs.get("max_input_length", -1), # max_seq_len
+            seq_lens_encoder[0],  # max_enc_len_this_time
+            seq_lens_decoder[0],  # max_dec_len_this_time
+            token_num_in_cache,  # token_num_in_cache
+            kwargs.get("max_input_length", -1),  # max_seq_len
             self.use_neox_rotary_style,
         )
 
         # update cache
         # qkv_out_specu: [cur_token_num, 3*hidden_dim]
-        k = qkv_out_specu[:, hidden_dim:2*hidden_dim]
-        v = qkv_out_specu[:, 2*hidden_dim:]
+        k = qkv_out_specu[:, hidden_dim : 2 * hidden_dim]
+        v = qkv_out_specu[:, 2 * hidden_dim :]
 
         # prefill stage
         if cache is None:
@@ -1884,21 +1884,21 @@ class FusedSpecuMultiTransformer(Layer):
         return out
 
     def forward(
-            self,
-            input_ids,
-            src,
-            cum_offsets=None,
-            padding_offset=None,
-            attn_mask=None,
-            caches=None,
-            pre_caches=None,
-            pre_caches_length=0,
-            rotary_embs=None,
-            rotary_emb_dims=0,
-            seq_lens=None,
-            time_step=None,
-            **kwargs,
-        ):
+        self,
+        input_ids,
+        src,
+        cum_offsets=None,
+        padding_offset=None,
+        attn_mask=None,
+        caches=None,
+        pre_caches=None,
+        pre_caches_length=0,
+        rotary_embs=None,
+        rotary_emb_dims=0,
+        seq_lens=None,
+        time_step=None,
+        **kwargs,
+    ):
         r"""
         Applies multi transformer layers on the input.
 
@@ -1990,6 +1990,7 @@ class FusedSpecuMultiTransformer(Layer):
         kwargs["input_ids"] = input_ids
         # out = self.post_process(**kwargs)
         return tmp_out, caches
+
 
 class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMultiTransformerWeightOnly):
     def __init__(self, config: FusedMultiTransformerConfig):
