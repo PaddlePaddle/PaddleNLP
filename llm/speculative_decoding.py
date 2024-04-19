@@ -1,5 +1,3 @@
-from cgi import print_form
-from configparser import ConfigParser
 from paddlenlp.transformers import (
     AutoConfig,
     AutoTokenizer,
@@ -7,41 +5,32 @@ from paddlenlp.transformers import (
     PretrainedTokenizer,
 )
 from dataclasses import dataclass, field
-from paddlenlp.generation import StoppingCriteriaList, MaxLengthCriteria
-
-from paddlenlp.generation import GenerationConfig, LogitsProcessorList
+from paddle.distributed import fleet
+import json
+from paddlenlp.generation import LogitsProcessorList
 from utils import (
-    dybatch_preprocess,
-    get_alibi_slopes,
     get_default_max_decoding_length,
     get_default_max_encoding_length,
-    get_infer_model_path,
     get_model_max_position_embeddings,
-    get_prefix_tuning_params,
     init_chat_template,
-    load_real_time_tokens,
-    read_res,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
 from paddlenlp.utils.log import logger
 from paddlenlp.trainer import PdArgumentParser
-from predictor import init_dist_env, InferencePredictorMixin, BasePredictor, PredictorArgument, ModelArgument, get_ptq_multicards_num, batchfy_text
+from predictor import init_dist_env, InferencePredictorMixin, BasePredictor, PredictorArgument, ModelArgument, batchfy_text
 from utils import init_chat_template
 import paddle
-import time
-from paddlenlp.utils.log import logger
-import paddle.profiler as profiler
 from copy import deepcopy
 
 @dataclass
 class PredictorArgument:
-    model_name_or_path: str = field(default="meta-llama/Llama-2-13b", metadata={"help": "The directory of model."})
-    assistant_model_name_or_path: str = field(default="meta-llama/Llama-2-7b", metadata={"help": "The directory of model."})
+    model_name_or_path: str = field(default="meta-llama/Llama-2-13b-chat", metadata={"help": "The directory of model."})
+    assistant_model_name_or_path: str = field(default="meta-llama/Llama-2-7b-chat", metadata={"help": "The directory of model."})
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
     src_length: int = field(default=None, metadata={"help": "The max length of source text."})
-    max_length: int = field(default=1024, metadata={"help": "the max length for decoding."})
+    max_length: int = field(default=256, metadata={"help": "the max length for decoding."})
     gamma: int = field(default=4, metadata={"help": "gamma parameter for speculative sampling"})
     top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
     top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
@@ -257,7 +246,7 @@ class SpeculativeSamplingPredictor(InferencePredictorMixin, BasePredictor):
         assistant_model_inputs = deepcopy(model_inuts)
         assistant_model_inputs["cache_kvs"] = self.assistant_model_cache_kvs
 
-        output_ids, accept_rate = self.target_model.assisted_decoding(
+        output_ids = self.target_model.assisted_decoding(
             input_ids,
             model_inuts,
             assistant_model_inputs,
@@ -269,21 +258,13 @@ class SpeculativeSamplingPredictor(InferencePredictorMixin, BasePredictor):
             r_probability=0.5,
         )
         
-        return output_ids, accept_rate
+        return output_ids
  
     def _postprocess(self, predictions):
-        output = self.tokenizer.batch_decode(
+        decoded_predictions = self.tokenizer.batch_decode(
             predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False
         )
-        # # hard code for humaneval
-        # output = '    ' + output[0].lstrip()
-        # if 'def' in output:
-        #     idx = output.index('def')
-        #     output = output[:idx]
-        # if '\n\n\n' in output:
-        #     output = output.replace('\n\n\n', '\n')
-        return output
-        # return decoded_predictions
+        return decoded_predictions
 
     def _get_rotary_position_embedding(self, position_ids, head_dim):
         """
@@ -319,7 +300,6 @@ def create_predictor(
         predictor_args.model_name_or_path,
     )
     init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
-    # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer) and not tokenizer.pad_token:
         tokenizer.pad_token = tokenizer.unk_token
     config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
@@ -400,109 +380,66 @@ def create_predictor(
                     tokenizer=tokenizer)
     return predictor
 
-
-# parser = PdArgumentParser((PredictorArgument, ModelArgument))
-# predictor_args, model_args = parser.parse_args_into_dataclasses()
-# paddle.set_device(predictor_args.device)
-# paddle.set_default_dtype(predictor_args.dtype)
-
-# predictor = create_predictor(predictor_args, model_args)
-# def my_predict(source_texts):
-#     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
-#     for bs, batch_source_text in enumerate(batch_source_texts):
-#         logger.info("Start predict")
-#         outputs, accept_rate = predictor.predict(batch_source_text)
-#         logger.info("End predict")
-#         return outputs, accept_rate
-
-# if __name__ == '__main__':
-#     parser = PdArgumentParser((PredictorArgument, ModelArgument))
-#     predictor_args, model_args = parser.parse_args_into_dataclasses()
-#     paddle.set_device(predictor_args.device)
-#     paddle.set_default_dtype(predictor_args.dtype)
-
-#     predictor = create_predictor(predictor_args, model_args)
-
-#     source_texts = ["from typing import List\n\n\ndef below_zero(operations: List[int]) -> bool:\n    \"\"\" You're given a list of deposit and withdrawal operations on a bank account that starts with\n    zero balance. Your task is to detect if at any point the balance of account fallls below zero, and\n    at that point function should return True. Otherwise it should return False.\n    >>> below_zero([1, 2, 3])\n    False\n    >>> below_zero([1, 2, -4, 5])\n    True\n    \"\"\"\n"]
-#     target_texts = [""]
-#     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
-#     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
-
-#     # warm up
-#     for _ in range(3):
-#         for bs, batch_source_text in enumerate(batch_source_texts):
-#             outputs, accept_rate = predictor.predict(batch_source_text)
-
-#     logger.info("Start predict")
-#     repeat_times = 5
-#     outputs_total = []
-#     accept_rates = []
-#     tic = time.perf_counter()
-#     for _ in range(repeat_times):
-#         for bs, batch_source_text in enumerate(batch_source_texts):
-#             outputs, accept_rate = predictor.predict(batch_source_text)
-#             outputs_total.append(outputs)
-#             accept_rates.append(accept_rate)
-#     toc = time.perf_counter()
-#     print("outputs_total: ", outputs_total)
-#     print("***********average accept_rate**********")
-#     print(sum(accept_rates) / repeat_times)
-#     print(f"---Average predict time: {(toc - tic) / 5}---")
-#     logger.info("End predict")
-    
-
-if __name__ == '__main__':
-    from Human_eval.data import read_problems
-    problems = read_problems()
-
-    task_ids = [key for key in problems.keys()]
-    input_texts = [[problems[key]["prompt"]] for key in problems.keys()]
-
+def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
+
     paddle.set_device(predictor_args.device)
     paddle.set_default_dtype(predictor_args.dtype)
 
+    tensor_parallel_degree = paddle.distributed.get_world_size()
+    if tensor_parallel_degree > 1:
+        strategy = fleet.DistributedStrategy()
+        strategy.hybrid_configs = {
+            "dp_degree": 1,
+            "mp_degree": tensor_parallel_degree,
+            "pp_degree": 1,
+            "sharding_degree": 1,
+        }
+        fleet.init(is_collective=True, strategy=strategy)
+
     predictor = create_predictor(predictor_args, model_args)
+    source_texts = []
+    target_texts = []
+    if model_args.data_file:
+        with open(model_args.data_file, "r", encoding="utf-8") as f:
+            for line in f:
+                example = json.loads(line)
+                if isinstance(example["src"], str) or predictor.tokenizer.chat_template is None:
+                    if isinstance(example["src"], str):
+                        source_texts.append(example["src"])
+                        target_texts.append(example["tgt"])
+                    else:
+                        # load multi-rounds dataset
+                        source_texts.append(example["src"][0])
+                        target_texts.append(example["tgt"][0])
+                else:
+                    source_texts.append(list(zip(example["src"], example["tgt"])))
+                    target_texts.append("")
 
-    # warm up   
-    warm_up_times = 3
-    source_texts = input_texts[0]
+    else:
+        source_texts = ["你好，请问你是谁?"]
+        target_texts = [""]
+
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
+    batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
 
-    for _ in range(warm_up_times):
+    with open(model_args.output_file, "w", encoding="utf-8") as f:
         for bs, batch_source_text in enumerate(batch_source_texts):
-            outputs, accept_rate, _ = predictor.predict(batch_source_text)
+            logger.info("Start predict")
+            outputs = predictor.predict(batch_source_text)
+            logger.info("End predict")
 
-    n_task = 50
-    for i in range(n_task):
-        logger.info(f"------[{i + 1}/{n_task}]个任务------")
-        source_texts = input_texts[i]
-        task_id = task_ids[i]
-        batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
-        accept_rates = []
-        n_tokens = []
-        logger.info("Start predict")
-        repeat_times = 5
-        tic = time.perf_counter()
-        for _ in range(repeat_times):
-            for bs, batch_source_text in enumerate(batch_source_texts):
-                outputs, accept_rate, n_token = predictor.predict(batch_source_text)
-                n_tokens.append(n_token)
-                print(f"{outputs}, {n_token}")
-                accept_rates.append(accept_rate)
-        toc = time.perf_counter()
-        logger.info("End predict")
+            if predictor.tensor_parallel_rank > 0:
+                continue
+            for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
+                print("***********Source**********")
+                print(source)
+                print("***********Target**********")
+                print(target)
+                print("***********Output**********")
+                print(output)
 
-        out_dict = {"task_id": task_id, "outputs": outputs, "average_accept_rate": sum(accept_rates) / repeat_times, "average_predict_time": (toc - tic) / repeat_times, "average_token_num": sum(n_tokens) / (toc - tic)}
-        print(out_dict)
-        # print("***********task_id**********")
-        # print(task_id)
-        # print("***********Output**********")
-        # print(outputs)
-        # print("***********average accept_rate**********")
-        # print(sum(accept_rates) / repeat_times)
-        # print("***********average predict time**********")
-        # print((toc - tic) / repeat_times)
-        # print("***********average tokens/s**********")
-        # print(sum(n_tokens) / (toc - tic))
+
+if __name__ == '__main__':
+    predict()

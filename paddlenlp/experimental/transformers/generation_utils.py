@@ -288,7 +288,7 @@ class GenerationInferenceModel(GenerationMixin):
     ):
         r"""
         Implementation of speculative decoding. Generates sequences of token ids for target model assisted by a smaller 
-        assistant_model. Assistant model should use the same vocab as target model.
+        assistant model. Assistant model should use the same vocab as target model.
         NOTE: Only support batch_size=1 for now.
 
         Parameters:
@@ -319,7 +319,7 @@ class GenerationInferenceModel(GenerationMixin):
                 If model is an encoder-decoder model the kwargs should include `encoder_outputs`.
 
         Return:
-            Output token ids of assisted decoding.
+            Generated token ids of assisted decoding.
         """
         if r_probability is not None:
             assert do_sample is True, "do_sample must be true when r_probability is not None"
@@ -472,19 +472,21 @@ class GenerationInferenceModel(GenerationMixin):
                 return logits, next_tokens
 
         eos_token_id_tensor = paddle.to_tensor(eos_token_id) if eos_token_id is not None else None
-        candidate_input_ids = input_ids.clone()
-        output_ids = input_ids.clone()
 
-        sum_accpet_tokens = 0
-        total_output_tokens = 0
-        assistant_model_total_generated_tokens = 0
-        # print("----original input: ", input_ids)
+        # candidate ids(include promt ids).
+        candidate_input_ids = input_ids.clone()
+
+        # total generated tokens after a whole peer(include prompt ids).
+        whole_ids_before_assist = input_ids.clone()
+
+        # total generated tokens after a whole peer(exclude prompt ids).
+        total_generate_token_num = 0
+
         while True:
             # Assistant: main logic start
-            cur_len = output_ids.shape[-1]
 
-            assistant_model_output_logits = None            
-            # 👉 小模型推理
+            assistant_model_total_logits_this_peer = None            
+            # 👉 run the assistant model
             for i in range(int(gamma)):
                 # 1.1. use the assistant model to obtain the next candidate logits
                 draft_model_logits, next_tokens = _post_process_(
@@ -495,60 +497,52 @@ class GenerationInferenceModel(GenerationMixin):
                 ) # assistant_model_logits: [bsz, vocab_size]
 
                 step_idx_ori += 1
-                # 因为投机采样小模型需要输出 gamma 个 token 的 logits，所以需要在 seq_len 维度进行拼接
-                if assistant_model_output_logits is None: # assistant_model_output_logits: [bsz, seq_len, vocab_size]
-                    assistant_model_output_logits = draft_model_logits
-                    # [bsz, vocab_size] -> [bsz, 1, vocab_size], add a seq_len dimension
-                    assistant_model_output_logits = assistant_model_output_logits[:, None, :]
-                else:
-                    assistant_model_output_logits = paddle.concat((assistant_model_output_logits, draft_model_logits[:,None]), axis=1)
 
-                assistant_model_output_logits[:, -1, :] = logits_processor(
-                    candidate_input_ids, assistant_model_output_logits[:, -1, :]
+                if assistant_model_total_logits_this_peer is None:
+                    assistant_model_total_logits_this_peer = draft_model_logits
+                    # [bsz, vocab_size] -> [bsz, 1, vocab_size], add a seq_len dimension
+                    assistant_model_total_logits_this_peer = assistant_model_total_logits_this_peer[:, None, :]
+                else:
+                    assistant_model_total_logits_this_peer = paddle.concat((assistant_model_total_logits_this_peer, draft_model_logits[:,None]), axis=1)
+
+                assistant_model_total_logits_this_peer[:, -1, :] = logits_processor(
+                    candidate_input_ids, assistant_model_total_logits_this_peer[:, -1, :]
                 )
                 if next_tokens.ndim == 1:
                     next_tokens = next_tokens[None, :]
 
                 candidate_input_ids = paddle.concat((candidate_input_ids, next_tokens), axis=-1)
-                candidate_logits = assistant_model_output_logits
+                candidate_logits = assistant_model_total_logits_this_peer
 
+                # 1.2. stop assistant generation on EOS or acceed max_output_length.
                 if eos_token_id_tensor is not None:
-                    last_assistant_token_is_eos = next_tokens.tile(eos_token_id_tensor.shape[0], 1)
-                    last_assistant_token_is_eos = (
-                        ~last_assistant_token_is_eos.not_equal(eos_token_id_tensor.unsqueeze(1)).to(paddle.bool)
-                    )
+                    last_assistant_token_is_eos = paddle.equal_all(eos_token_id_tensor, next_tokens)
                     if last_assistant_token_is_eos:
                         break
                 else:
                     last_assistant_token_is_eos = False
 
-                # 1.3. stop assistant generation on EOS or acceed max_output_length.
                 cum_generated_tokens_this_peer = i + 1
-                if total_output_tokens + cum_generated_tokens_this_peer >= max_generate_length:
+                if total_generate_token_num + cum_generated_tokens_this_peer >= max_generate_length:
                     break
 
-            candidate_length = candidate_input_ids.shape[1] - output_ids.shape[1]
+            candidate_length = candidate_input_ids.shape[1] - whole_ids_before_assist.shape[1]
             target_model_inputs["candidate_length"] = candidate_length
-            assistant_model_total_generated_tokens += candidate_length
-            # 2. Use the original model to obtain the next token logits given the candidate sequence. We obtain
-            # `candidate_length + 1` relevant logits from this process: in the event that all candidates are correct,
-            # we use this forward pass to also pick the subsequent logits in the original model.
 
+            # 2. Use the original model to obtain the next token logits given the candidate sequence. 
             # 2.1. Run a forward pass on the candidate sequence
-            # 👉 大模型推理
             step_idx_ori = paddle.full(shape=[1], dtype="int64", fill_value=1)
 
+            # Since the input of target model is the candidate sequence, we need to specify the relevant parameter maunually.
             if target_model_inputs.get("cache") is None:
                 target_model_inputs["seq_len_encoder"][0] = candidate_input_ids.shape[-1]
                 target_model_inputs["seq_len_decoder"] *= 0
                 target_model_inputs["seq_lens_this_time"][0] = candidate_input_ids.shape[-1]
             else:
-                # target_model_inputs["seq_len_encoder"] *= 0
                 target_model_inputs["seq_len_decoder"][:] =  candidate_input_ids.shape[-1] - candidate_length - 1
                 target_model_inputs["seq_lens_this_time"][0] = candidate_length
-            # print("---------candidate_input_ids: ", candidate_input_ids)
-            # print("---------candidate_length: ", candidate_length)
 
+            # 👉 run the target model
             target_model_outputs_logits = _post_process_(
                 _forward_(
                     self, 
@@ -558,19 +552,17 @@ class GenerationInferenceModel(GenerationMixin):
                 True, # is_target_model
                 target_model_inputs,
             )
-            # [seq_len, vocab_size] -> [bsz, seq_len, vocab_size]
             target_model_outputs_logits = target_model_outputs_logits[None, :]
             
             # 2.2. Process the new logits
-            # encoder phase
+            # in encoder phase, we need excludes the input prompt.
             if target_model_outputs_logits.shape[1] > candidate_length:
-                new_logits = target_model_outputs_logits[:, -candidate_length-1:-1, :]  # excludes the input prompt if present
+                new_logits = target_model_outputs_logits[:, -candidate_length-1:-1, :]
             else:
                 new_logits = target_model_outputs_logits
 
-            # 3. Obtain the next tokens from the original model logits.
-            max_matches = max_generate_length - total_output_tokens
-
+            max_matches = max_generate_length - total_generate_token_num
+            # 3. verify logic of speculative decoding.
             valid_tokens, n_matches = _speculative_decoding(
                 candidate_input_ids,
                 candidate_logits,
@@ -581,11 +573,8 @@ class GenerationInferenceModel(GenerationMixin):
                 max_matches,
                 r_probability=r_probability,
             )
-            # print(f"n_matches: {n_matches}")
-            # print("valid_tokens: ", valid_tokens)
-            sum_accpet_tokens += int(n_matches)
 
-            total_output_tokens += int(valid_tokens.shape[-1])
+            total_generate_token_num += int(valid_tokens.shape[-1])
 
             # 4. Update variables according to the number of matching assistant tokens. Remember: the token generated
             # by the model after the last candidate match is also valid, as it is generated from a correct sequence.
@@ -598,11 +587,11 @@ class GenerationInferenceModel(GenerationMixin):
                 candidate_input_ids = candidate_input_ids[:, :-candidate_length]
                 candidate_input_ids = paddle.concat((candidate_input_ids, valid_tokens), axis=-1)
 
-            output_ids = paddle.concat((output_ids, valid_tokens), axis=-1)
+            # update the parameter
+            whole_ids_before_assist = paddle.concat((whole_ids_before_assist, valid_tokens), axis=-1)
+            cur_len = whole_ids_before_assist.shape[-1]
 
-            cur_len = output_ids.shape[-1]
-
-            # 小模型 cache_kvs 擦除
+            # when we refuse some tokens in the assistant model, so we need to erase the corresponding cache.
             if n_matches != candidate_length:
                 if assistant_model_inputs.get("cache", None) is not None:
                     assistant_model_inputs["seq_len_decoder"][0] = cur_len - 1
@@ -616,11 +605,10 @@ class GenerationInferenceModel(GenerationMixin):
                         erase_cache_kv(assistant_model_cache_kvs[i], assistant_model_inputs["seq_len_decoder"][0], erase_token_num_in_cache)
 
             # stop if we exceed the maximum length or target model has generated an EOS token
-            if total_output_tokens >= max_generate_length or valid_tokens[:, -1].item() == eos_token_id.item():
+            if total_generate_token_num >= max_generate_length or valid_tokens[:, -1].item() == eos_token_id.item():
                 break
-        
-        accept_rate = sum_accpet_tokens / assistant_model_total_generated_tokens
-        return output_ids[:, -total_output_tokens:], accept_rate
+
+        return whole_ids_before_assist[:, -total_generate_token_num:]
 
     def sample(
         self,
@@ -689,9 +677,7 @@ class GenerationInferenceModel(GenerationMixin):
             logits = logits / temperature
 
             _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
-            # next_tokens = probs.argmax(-1)
-            # if next_tokens.ndim == 1:
-            #     next_tokens = next_tokens.unsqueeze(0)
+
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
 

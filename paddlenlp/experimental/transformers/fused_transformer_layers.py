@@ -1771,26 +1771,8 @@ class FusedSpecuMultiTransformer(Layer):
         seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
         cu_seqlens_k = kwargs.get("cu_seqlens_k", None)
         token_num_in_cache = kwargs.get("token_num_in_cache", None)
-        # cu_seqlens_k_sepcu = deepcopy(cu_seqlens_k)
         cache = kwargs.get("cache", None)
         cur_seq_len = qkv_out.shape[0]
-        # print("--------cur_seq_len: ", cur_seq_len)
-        # candidate_length = kwargs.get("candidate_length", None)
-        # prefill stage
-        # if cache is None:
-        #     # cur_seq_len = seq_lens_encoder[0][0]
-        #     token_num_in_cache = 0
-        # else:
-        #     # cur_seq_len = seq_lens_decoder[0][0]
-        #     # token_num_in_cache = cur_seq_len - seq_lens_this_time[0]
-        #     token_num_in_cache = seq_lens_decoder[0][0]
-        #     cu_seqlens_k_sepcu[1] = token_num_in_cache + cu_seqlens_k[1]
-        # print("seq_lens_encoder: ", seq_lens_encoder)
-        # print("seq_lens_decoder: ", seq_lens_decoder)
-        # print("seq_lens_this_time: ", seq_lens_this_time)
-        # print("cu_seqlens_q: ", kwargs.get("cu_seqlens_q", None))
-        # print("cu_seqlens_k: ", cu_seqlens_k)
-        # print("token_num_in_cache: ", token_num_in_cache)
 
         # qkv_out: [token_num, 3*hidden_dim]
         fmha_out, qkv_out_specu, _, _ = paddle.incubate.nn.functional.speculative_decoding_multihead_attention(
@@ -1807,19 +1789,15 @@ class FusedSpecuMultiTransformer(Layer):
             rotary_embs, # rotary_embs
             None,  # attn_mask
             None,  # qkv_bias
-            seq_lens_encoder[0],
-            seq_lens_decoder[0],
+            seq_lens_encoder[0], # max_enc_len_this_time
+            seq_lens_decoder[0], # max_dec_len_this_time
             token_num_in_cache, # token_num_in_cache
             kwargs.get("max_input_length", -1), # max_seq_len
-            cache is not None, # is_decoder
             self.use_neox_rotary_style,
         )
 
-        # 更新 cache
-        # qkv_out_specu: (cur_token_num, 3*hidden_dim)
-        # caches[2*i]: (bsz, num_heads, max_seqlen, head_dim)
-        # k: [seq_len, hidden_dim]
-        
+        # update cache
+        # qkv_out_specu: [cur_token_num, 3*hidden_dim]
         k = qkv_out_specu[:, hidden_dim:2*hidden_dim]
         v = qkv_out_specu[:, 2*hidden_dim:]
 
