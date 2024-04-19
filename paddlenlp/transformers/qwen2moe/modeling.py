@@ -1383,7 +1383,7 @@ class QWen2MoeForCausalLM(QWen2MoePretrainedModel):
         super().__init__(config)
         self.config = config
 
-        self.model = QWen2MoeModel(config)
+        self.qwen2moe = QWen2MoeModel(config)
         self.lm_head = QWen2MoeLMHead(config)
         self.criterion = QWen2MoePretrainingCriterion(config)
         self.router_aux_loss_coef = config.router_aux_loss_coef
@@ -1396,10 +1396,10 @@ class QWen2MoeForCausalLM(QWen2MoePretrainedModel):
             logger.warning("We do not support sliding window attention for now.")
 
     def get_input_embeddings(self):
-        return self.model.embed_tokens
+        return self.qwen2moe.embed_tokens
 
     def set_input_embeddings(self, value):
-        self.model.embed_tokens = value
+        self.qwen2moe.embed_tokens = value
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -1408,10 +1408,10 @@ class QWen2MoeForCausalLM(QWen2MoePretrainedModel):
         self.lm_head = new_embeddings
 
     def set_decoder(self, decoder):
-        self.model = decoder
+        self.qwen2moe = decoder
 
     def get_decoder(self):
-        return self.model
+        return self.qwen2moe
 
     def prepare_inputs_for_generation(
         self,
@@ -1500,7 +1500,7 @@ class QWen2MoeForCausalLM(QWen2MoePretrainedModel):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
-        outputs = self.model(
+        outputs = self.qwen2moe(
             input_ids=input_ids,  # [bs, seq_len]
             position_ids=position_ids,
             attention_mask=attention_mask,
