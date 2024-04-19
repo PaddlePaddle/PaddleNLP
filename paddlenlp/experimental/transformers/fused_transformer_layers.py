@@ -1988,7 +1988,6 @@ class FusedSpecuMultiTransformer(Layer):
         kwargs["multi_block_output"] = tmp_out
         kwargs["seq_lens"] = seq_lens
         kwargs["input_ids"] = input_ids
-        # out = self.post_process(**kwargs)
         return tmp_out, caches
 
 
