@@ -21,6 +21,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 import numpy as np
 import paddle
+import paddle.distributed as dist
 import paddle.nn as nn
 import paddle.nn.functional as F
 from accelerate import PartialState
@@ -36,6 +37,7 @@ from tqdm import tqdm
 from utils import (  # peft_module_casting_to_bf16,
     DPODataCollatorWithPadding,
     disable_dropout_in_model,
+    distribute_gather,
     pad_to_length,
 )
 
@@ -631,24 +633,24 @@ class KTOTrainer(Trainer):
             }
 
             # prepare dataloader
-            data_loader = self.accelerator.prepare(DataLoader(self.train_dataset, **dataloader_params))
+            data_loader = DataLoader(self.train_dataset, **dataloader_params)
             reference_completion_logps = []
             reference_KL_logps = []
 
             for padded_batch in tqdm(iterable=data_loader, desc="Train dataset reference log probs"):
                 reference_completion_logp, reference_KL_logp = self.compute_reference_log_probs(padded_batch)
-
-                reference_completion_logp = self.accelerator.gather_for_metrics(reference_completion_logp)
+                if dist.is_initialized():
+                    reference_completion_logp = distribute_gather(reference_completion_logp)
                 reference_completion_logps.append(reference_completion_logp.cpu())
-
-                reference_KL_logp = self.accelerator.gather_for_metrics(reference_KL_logp)
+                if dist.is_initialized():
+                    reference_KL_logp = distribute_gather(reference_KL_logp)
                 reference_KL_logps.append(reference_KL_logp.cpu())
 
             self.train_dataset = self.train_dataset.add_column(
-                name="reference_logps", column=paddle.cat(reference_completion_logps).float().numpy()
+                name="reference_logps", column=paddle.concat(reference_completion_logps).float().numpy()
             )
             self.train_dataset = self.train_dataset.add_column(
-                name="reference_KL_logps", column=paddle.cat(reference_KL_logps).float().numpy()
+                name="reference_KL_logps", column=paddle.concat(reference_KL_logps).float().numpy()
             )
 
             self._precomputed_train_ref_log_probs = True
@@ -680,25 +682,26 @@ class KTOTrainer(Trainer):
             }
 
             # prepare dataloader
-            data_loader = self.accelerator.prepare(DataLoader(eval_dataset, **dataloader_params))
+            data_loader = DataLoader(eval_dataset, **dataloader_params)
 
             reference_completion_logps = []
             reference_KL_logps = []
 
             for padded_batch in tqdm(iterable=data_loader, desc="Eval dataset reference log probs"):
                 reference_completion_logp, reference_KL_logp = self.compute_reference_log_probs(padded_batch)
+                if dist.is_initialized():
+                    reference_completion_logp = distribute_gather(reference_completion_logp)
 
-                reference_completion_logp = self.accelerator.gather_for_metrics(reference_completion_logp)
                 reference_completion_logps.append(reference_completion_logp.cpu())
-
-                reference_KL_logp = self.accelerator.gather_for_metrics(reference_KL_logp)
+                if dist.is_initialized():
+                    reference_KL_logp = distribute_gather(reference_KL_logp)
                 reference_KL_logps.append(reference_KL_logp.cpu())
 
             eval_dataset = eval_dataset.add_column(
-                name="reference_logps", column=paddle.cat(reference_completion_logps).float().numpy()
+                name="reference_logps", column=paddle.concat(reference_completion_logps).float().numpy()
             )
             eval_dataset = eval_dataset.add_column(
-                name="reference_KL_logps", column=paddle.cat(reference_KL_logps).float().numpy()
+                name="reference_KL_logps", column=paddle.concat(reference_KL_logps).float().numpy()
             )
 
             # Save calculated reference_chosen_logps and reference_rejected_logps to the eval_dataset for subsequent runs
@@ -721,6 +724,7 @@ class KTOTrainer(Trainer):
                             attention_mask=padded_batch["prompt_attention_mask"],
                             decoder_input_ids=padded_batch.get("completion_decoder_input_ids"),
                             labels=padded_batch["completion_labels"],
+                            return_dict=True,
                         ).logits
 
                         KL_logits = self.model(
@@ -728,16 +732,19 @@ class KTOTrainer(Trainer):
                             attention_mask=padded_batch["KL_prompt_attention_mask"],
                             decoder_input_ids=padded_batch.get("KL_completion_decoder_input_ids"),
                             labels=padded_batch["KL_completion_labels"],
+                            return_dict=True,
                         ).logits
                     else:
                         completion_logits = self.model(
                             padded_batch["completion_input_ids"],
                             attention_mask=padded_batch["completion_attention_mask"],
+                            return_dict=True,
                         ).logits
 
                         KL_logits = self.model(
                             padded_batch["KL_completion_input_ids"],
                             attention_mask=padded_batch["KL_completion_attention_mask"],
+                            return_dict=True,
                         ).logits
             else:
                 if self.is_encoder_decoder:
@@ -746,6 +753,7 @@ class KTOTrainer(Trainer):
                         attention_mask=padded_batch["prompt_attention_mask"],
                         decoder_input_ids=padded_batch.get("completion_decoder_input_ids"),
                         labels=padded_batch["completion_labels"],
+                        return_dict=True,
                     ).logits
 
                     KL_logits = self.ref_model(
@@ -753,15 +761,19 @@ class KTOTrainer(Trainer):
                         attention_mask=padded_batch["KL_prompt_attention_mask"],
                         decoder_input_ids=padded_batch.get("KL_completion_decoder_input_ids"),
                         labels=padded_batch["KL_completion_labels"],
+                        return_dict=True,
                     ).logits
                 else:
                     completion_logits = self.ref_model(
-                        padded_batch["completion_input_ids"], attention_mask=padded_batch["completion_attention_mask"]
+                        padded_batch["completion_input_ids"],
+                        attention_mask=padded_batch["completion_attention_mask"],
+                        return_dict=True,
                     ).logits
 
                     KL_logits = self.ref_model(
                         padded_batch["KL_completion_input_ids"],
                         attention_mask=padded_batch["KL_completion_attention_mask"],
+                        return_dict=True,
                     ).logits
 
         completion_logps = self.get_batch_logps(
@@ -814,8 +826,9 @@ class KTOTrainer(Trainer):
 
         # dummy token; we'll ignore the losses on these tokens later
         labels[labels == label_pad_token_id] = 0
-
-        per_token_logps = paddle.gather(F.log_softmax(logits, axis=-1), axis=2, index=labels.unsqueeze(2)).squeeze(2)
+        per_token_logps = paddle.take_along_axis(
+            F.log_softmax(logits, axis=-1), axis=2, indices=labels.unsqueeze(2)
+        ).squeeze(2)
 
         if average_log_prob:
             return (per_token_logps * loss_mask).sum(-1) / loss_mask.sum(-1)
@@ -915,7 +928,13 @@ class KTOTrainer(Trainer):
             The KL tensor contains the detached KL divergence estimate between the policy and reference models.
         """
         kl = (policy_KL_logps - reference_KL_logps).mean().detach()
-        kl = self.accelerator.gather(kl).mean().clamp(min=0)
+        if dist.is_initialized():
+            gathered_kl_score_list = [paddle.zeros_like(kl) for _ in range(dist.get_world_size())]
+            dist.all_gather(gathered_kl_score_list, kl)
+            gathered_kl_score = paddle.concat(gathered_kl_score_list, axis=0)
+            kl = gathered_kl_score.mean().clip(min=0)
+        else:
+            kl = kl.mean().clip(min=0)
 
         if policy_chosen_logps.shape[0] != 0 or reference_chosen_logps.shape[0] != 0:
             chosen_logratios = policy_chosen_logps - reference_chosen_logps
@@ -935,7 +954,7 @@ class KTOTrainer(Trainer):
             rejected_losses = paddle.to_tensor([])
             rejected_rewards = paddle.to_tensor([])
 
-        losses = paddle.cat(
+        losses = paddle.concat(
             (self.desirable_weight * chosen_losses, self.undesirable_weight * rejected_losses),
             0,
         )
@@ -999,18 +1018,33 @@ class KTOTrainer(Trainer):
         num_chosen = paddle.to_tensor([len(chosen_rewards)])
         num_rejected = paddle.to_tensor([len(rejected_rewards)])
 
-        all_num_chosen = self.accelerator.gather(num_chosen).sum().item()
-        all_num_rejected = self.accelerator.gather(num_rejected).sum().item()
+        if dist.is_initialized():
+            # TODO test
+            all_num_chosen = distribute_gather(num_chosen).sum().item()
+            all_num_rejected = distribute_gather(num_rejected).sum().item()
+        else:
+            all_num_chosen = num_chosen.sum().item()
+            all_num_rejected = num_rejected.sum().item()
 
         if all_num_chosen > 0:
-            metrics["rewards/chosen_sum"] = self.accelerator.gather(chosen_rewards.nansum()).nansum().item()
-            metrics["logps/chosen_sum"] = self.accelerator.gather(policy_chosen_logps.nansum()).nansum().item()
-            metrics["count/chosen"] = all_num_chosen
+            if dist.is_initialized():
+                metrics["rewards/chosen_sum"] = distribute_gather(chosen_rewards.nansum()).nansum().item()
+                metrics["logps/chosen_sum"] = distribute_gather(policy_chosen_logps.nansum()).nansum().item()
+                metrics["count/chosen"] = all_num_chosen
+            else:
+                metrics["rewards/chosen_sum"] = chosen_rewards.nansum().item()
+                metrics["logps/chosen_sum"] = policy_chosen_logps.nansum().item()
+                metrics["count/chosen"] = all_num_chosen
 
         if all_num_rejected > 0:
-            metrics["rewards/rejected_sum"] = self.accelerator.gather(rejected_rewards.nansum()).nansum().item()
-            metrics["logps/rejected_sum"] = self.accelerator.gather(policy_rejected_logps.nansum()).nansum().item()
-            metrics["count/rejected"] = all_num_rejected
+            if dist.is_initialized():
+                metrics["rewards/rejected_sum"] = distribute_gather(rejected_rewards.nansum()).nansum().item()
+                metrics["logps/rejected_sum"] = distribute_gather(policy_rejected_logps.nansum()).nansum().item()
+                metrics["count/rejected"] = all_num_rejected
+            else:
+                metrics["rewards/rejected_sum"] = rejected_rewards.nansum().item()
+                metrics["logps/rejected_sum"] = policy_rejected_logps.nansum().item()
+                metrics["count/rejected"] = all_num_rejected
 
         metrics["kl"] = kl.item()
 
@@ -1034,7 +1068,9 @@ class KTOTrainer(Trainer):
 
         # Make sure to move the loss to the device the original accumulating loss is at back in the `Trainer` class:
         # force log the metrics
-        if self.accelerator.is_main_process:
+        rank = paddle.distributed.get_rank()
+        is_main_process = rank == 0
+        if is_main_process:
             self.store_metrics(metrics, train_eval="train")
 
         if return_outputs:
@@ -1138,7 +1174,9 @@ class KTOTrainer(Trainer):
             loss, metrics = self.get_batch_loss_metrics(model, inputs)
 
         # force log the metrics
-        if self.accelerator.is_main_process:
+        rank = paddle.distributed.get_rank()
+        is_main_process = rank == 0
+        if is_main_process:
             self.store_metrics(metrics, train_eval="eval")
 
         if prediction_loss_only:
@@ -1211,7 +1249,7 @@ class KTOTrainer(Trainer):
 
         return initial_output
 
-    def log(self, logs: Dict[str, float]) -> None:
+    def log(self, logs: Dict[str, float], **kwargs) -> None:
         """
         Log `logs` on the various objects watching training, including stored metrics.
 

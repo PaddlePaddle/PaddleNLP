@@ -16,6 +16,14 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
 
 import paddle
+import paddle.distributed as dist
+
+
+def distribute_gather(data):
+    gathered_list = [paddle.zeros_like(data) for _ in range(dist.get_world_size())]
+    dist.all_gather(gathered_list, data)
+    gathered_data = paddle.concat(gathered_list, axis=0)
+    return gathered_data
 
 
 def paddle_pad_sequence(sequences, padding_value=0, batch_first=False):
