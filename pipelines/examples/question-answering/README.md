@@ -111,7 +111,10 @@ curl http://localhost:9200/_aliases?pretty=true
 # 以百科城市数据为例建立 ANN 索引库
 python utils/offline_ann.py --index_name baike_cities \
                             --doc_dir data/baike \
-                            --delete_index
+                            --delete_index \
+                            --query_embedding_model rocketqa-zh-nano-query-encoder \
+                            --passage_embedding_model rocketqa-zh-nano-para-encoder \
+                            --embedding_dim 312
 ```
 参数含义说明
 * `index_name`: 索引的名称

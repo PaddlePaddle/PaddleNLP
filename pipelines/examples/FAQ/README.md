@@ -113,7 +113,11 @@ curl http://localhost:9200/_aliases?pretty=true
 python utils/offline_ann.py --index_name insurance \
                             --doc_dir data/insurance \
                             --split_answers \
-                            --delete_index
+                            --delete_index \
+                            --query_embedding_model rocketqa-zh-nano-query-encoder \
+                            --passage_embedding_model rocketqa-zh-nano-para-encoder \
+                            --embedding_dim 312
+
 ```
 参数含义说明
 * `index_name`: 索引的名称
