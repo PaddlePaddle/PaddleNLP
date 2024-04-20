@@ -141,6 +141,9 @@ curl -XGET http://localhost:9200/baike_cities/_count
 ```
 
 #### 3.4.3 启动 RestAPI 模型服务
+
+**注意** dense_qa.yaml里面的检索模型需要与前面使用offline_ann.py建库的时候使用的检索模型一致
+
 ```bash
 # 指定智能问答系统的Yaml配置文件
 export PIPELINE_YAML_PATH=rest_api/pipeline/dense_qa.yaml
