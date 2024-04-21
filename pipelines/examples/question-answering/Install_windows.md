@@ -62,7 +62,7 @@ xpack.security.enabled: false
 #### 1.4.2 文档数据写入 ANN 索引库
 ```
 # 以百科城市数据为例建立 ANN 索引库
-python utils/offline_ann.py --index_name baike_cities --doc_dir data/baike
+python utils/offline_ann.py --index_name baike_cities --doc_dir data/baike --query_embedding_model rocketqa-zh-nano-query-encoder --passage_embedding_model rocketqa-zh-nano-para-encoder --embedding_dim 312
 ```
 参数含义说明
 * `index_name`: 索引的名称
@@ -82,6 +82,9 @@ Updating embeddings: 10000 Docs [00:16, 617.76 Docs/s]
 运行结束后，可使用Kibana查看数据
 
 #### 1.4.3 启动 RestAPI 模型服务
+
+**注意** dense_qa.yaml里面的检索模型需要与前面使用offline_ann.py建库的时候使用的检索模型一致
+
 ```bash
 # 指定智能问答系统的Yaml配置文件
 $env:PIPELINE_YAML_PATH='rest_api/pipeline/dense_qa.yaml'
