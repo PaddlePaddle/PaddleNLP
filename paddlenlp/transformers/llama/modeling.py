@@ -813,24 +813,28 @@ class LlamaAttention(nn.Layer):
             self.rotary_emb = LlamaRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
+                base=self.config.rope_theta,
             )
         elif self.config.rope_scaling_type == "linear":
             self.rotary_emb = LlamaLinearScalingRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
                 scaling_factor=self.config.rope_scaling_factor,
+                base=self.config.rope_theta,
             )
         elif self.config.rope_scaling_type == "ntk":
             self.rotary_emb = LlamaNTKScalingRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
                 scaling_factor=self.config.rope_scaling_factor,
+                base=self.config.rope_theta,
             )
         elif self.config.rope_scaling_type == "dynamic_ntk":
             self.rotary_emb = LlamaDynamicNTKScalingRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
                 scaling_factor=self.config.rope_scaling_factor,
+                base=self.config.rope_theta,
             )
         else:
             raise ValueError(f"Unknown RoPE scaling type {self.config.rope_scaling_type}")
@@ -903,6 +907,7 @@ class LlamaAttention(nn.Layer):
             query_states = self.q_proj(hidden_states)
             key_states = self.k_proj(hidden_states)
             value_states = self.v_proj(hidden_states)
+
             if self.reshard_layer is not None:
                 if self.sequence_parallel:
                     assert self.seq_length % self.config.sep_parallel_degree == 0
@@ -1027,7 +1032,6 @@ class LlamaAttention(nn.Layer):
             value_states = paddle.concat([past_key_value[1], value_states], axis=1)
 
         past_key_value = (key_states, value_states) if use_cache else None
-
         if self.kv_indices is not None:
             key_states = paddle.index_select(key_states, self.kv_indices, axis=2)
             value_states = paddle.index_select(value_states, self.kv_indices, axis=2)
@@ -1036,7 +1040,7 @@ class LlamaAttention(nn.Layer):
         # repeat k/v heads if n_kv_heads < n_heads
         # paddle version > 2.6 or develop support flash-attn with gqa/mqa
         paddle_version = float(paddle.__version__[:3])
-        if (paddle_version != 0.0) and (paddle_version <= 2.6):
+        if not self.config.use_flash_attention or ((paddle_version != 0.0) and (paddle_version <= 2.6)):
             key_states = repeat_kv(key_states, self.num_key_value_groups)
             value_states = repeat_kv(value_states, self.num_key_value_groups)
 
@@ -1560,7 +1564,6 @@ class LlamaModel(LlamaPretrainedModel):
             else:
                 attention_mask = attention_mask.astype("bool")
         hidden_states = inputs_embeds
-
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
