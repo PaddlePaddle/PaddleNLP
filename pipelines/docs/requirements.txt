@@ -1,0 +1,8 @@
+mkdocs
+mkdocstrings[python]
+mkdocstrings-python
+mkdocs-material
+mkdocs-jupyter
+griffe
+mkdocs-rss-plugin
+mkdocs-material[imaging]
