@@ -16,4 +16,4 @@ loguru
 data
 wget
 huggingface_hub>=0.19.2
-tokenizers==0.15.1
+tokenizers

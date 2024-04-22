@@ -30,6 +30,17 @@ from tokenizers import (
 from tokenizers.models import BPE, Unigram, WordPiece
 
 
+# Copied from transformers, adapted for tokenizers >= 0.19.0
+def _get_prepend_scheme(add_prefix_space: bool, original_tokenizer) -> str:
+    if add_prefix_space:
+        prepend_scheme = "always"
+        if hasattr(original_tokenizer, "legacy") and not original_tokenizer.legacy:
+            prepend_scheme = "first"
+    else:
+        prepend_scheme = "never"
+    return prepend_scheme
+
+
 # Extract the vocab and merge file from sentencepiece file
 class SentencePieceExtractor:
     def __init__(self, model: str):
@@ -148,6 +159,7 @@ class SpmConverter(Converter):
         prepend_scheme = "always"
         if hasattr(self.original_tokenizer, "legacy") and not self.original_tokenizer.legacy:
             prepend_scheme = "first"
+        prepend_scheme = _get_prepend_scheme(add_prefix_space, self.original_tokenizer)
         return pre_tokenizers.Metaspace(
             replacement=replacement, add_prefix_space=add_prefix_space, prepend_scheme=prepend_scheme
         )
@@ -156,7 +168,8 @@ class SpmConverter(Converter):
         return None
 
     def decoder(self, replacement, add_prefix_space):
-        return decoders.Metaspace(replacement=replacement, add_prefix_space=add_prefix_space)
+        prepend_scheme = _get_prepend_scheme(add_prefix_space, self.original_tokenizer)
+        return decoders.Metaspace(replacement=replacement, prepend_scheme=prepend_scheme)
 
     def converted(self) -> Tokenizer:
         tokenizer = self.tokenizer(self.proto)
@@ -441,10 +454,11 @@ class ErnieMConverter(SpmConverter):
         return self.original_tokenizer.convert_tokens_to_ids(str(self.original_tokenizer.unk_token))
 
     def pre_tokenizer(self, replacement, add_prefix_space):
+        prepend_scheme = _get_prepend_scheme(add_prefix_space, self.original_tokenizer)
         return pre_tokenizers.Sequence(
             [
                 pre_tokenizers.Whitespace(),
-                pre_tokenizers.Metaspace(replacement=replacement, add_prefix_space=add_prefix_space),
+                pre_tokenizers.Metaspace(replacement=replacement, prepend_scheme=prepend_scheme),
             ]
         )
 

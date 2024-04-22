@@ -6,7 +6,7 @@ pytest-cov
 regex
 pytest-xdist
 pytest-timeout
-tokenizers==0.15.1
+tokenizers
 emoji
 ftfy
 yacs
