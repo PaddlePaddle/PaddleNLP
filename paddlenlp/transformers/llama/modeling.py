@@ -303,7 +303,6 @@ def scaled_dot_product_attention(
         # In sep mode, the attenion mask should be created in the runtime.
         if reshard_layer is not None:
             attention_mask = None
-
         # NOTE: we only call get_triangle_upper_mask under PP setup
         # FIXME ZHUI when we use pipeline parallel, the attention_mask can be None
         # we just make it triangle_upper_mask
@@ -321,7 +320,6 @@ def scaled_dot_product_attention(
         else:
             with paddle.amp.auto_cast(False):
                 attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
-
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
 
@@ -956,9 +954,9 @@ class LlamaAttention(nn.Layer):
                 query_states = query_states.reshape(shape=target_query_shape)
                 key_states = key_states.reshape(shape=target_key_value_shape)
                 value_states = value_states.reshape(shape=target_key_value_shape)
-
+        bsz, q_len, _ = hidden_states.shape
+        group_size = int(q_len * 1/4)
         kv_seq_len = key_states.shape[-3]
-
         if past_key_value is not None:
             kv_seq_len += past_key_value[0].shape[-3]
 
@@ -1039,7 +1037,23 @@ class LlamaAttention(nn.Layer):
         if (paddle_version != 0.0) and (paddle_version <= 2.6):
             key_states = repeat_kv(key_states, self.num_key_value_groups)
             value_states = repeat_kv(value_states, self.num_key_value_groups)
+        
+        def shift(qkv, bsz, q_len, group_size, num_heads, head_dim):
+            qkv[:, num_heads // 2:] = paddle.roll(qkv[:, num_heads // 2:], shifts=-group_size // 2, axis=2)
+            qkv = paddle.transpose(qkv,[0,2,1,3])
+            qkv = paddle.reshape(qkv, (bsz * (q_len // group_size), group_size, num_heads, head_dim))
+            # qkv = paddle.transpose(qkv,[0,2,1,3])
+            # print("after tp2:",qkv.shape)
+            return qkv
 
+        query_states = shift(query_states, bsz, q_len, group_size, self.num_heads, self.head_dim)
+        key_states = shift(key_states, bsz, q_len, group_size, self.num_heads, self.head_dim)
+        value_states = shift(value_states, bsz, q_len, group_size, self.num_heads, self.head_dim)
+        print("shift applied")
+        _,group_size,_,_ = query_states.shape
+        num_group = q_len // group_size
+        attention_mask = attention_mask[:, :, :group_size, :group_size]
+        attention_mask = paddle.tile(attention_mask,repeat_times=(num_group, 1, 1, 1))
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (
             self.enable_recompute
@@ -1076,7 +1090,10 @@ class LlamaAttention(nn.Layer):
             attn_output, attn_weights = outputs
         else:
             attn_output = outputs
-
+        
+        #shift back
+        attn_output[:, :, self.num_heads//2:] = attn_output[:, :, self.num_heads//2:].roll(group_size//2, axis=1)
+        attn_output = paddle.reshape(attn_output,(bsz, q_len, self.hidden_size))
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
         attn_output = self.o_proj(attn_output)

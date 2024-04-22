@@ -45,7 +45,7 @@ def get_convert_example(model):
     if base_model_prefix == "chatglm":
         return convert_example_chatglm
     elif base_model_prefix in ["chatglm_v2", "llama", "bloom", "opt", "qwen", "mixtral", "gemma"]:
-        return convert_example_common
+        return convert_example_common_text_meta
     else:
         raise ValueError(
             f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama, qwen, mixtral, gemma"
@@ -55,6 +55,22 @@ def get_convert_example(model):
 class DataFormatError(ValueError):
     pass
 
+
+def tokenize_example_text_meta(tokenizer, example, data_args):
+    if "text" in example:
+        text = tokenizer.eos_token.join(example["text"])
+    else:
+        raise DataFormatError(f"Example format is wrong, please check: {type(example), example.keys(),example}")
+    tokenized_output = tokenizer(
+        text,#Text to tokenize
+        max_length=data_args.src_length,
+        truncation=True,
+        truncation_side="left",
+        add_special_tokens=True,)
+    tokenized_input_ids = tokenized_output["input_ids"]
+        # Add eos token id at the end of sequence if the sentence is not truncated.
+        # Attention! In some cases(ex, ChatGLMv2), tokenized eos token is not equal to eos toke
+    return tokenized_output,tokenized_input_ids
 
 def tokenize_example(tokenizer, example, data_args):
     if "src" in example and "tgt" in example:
@@ -89,6 +105,26 @@ def tokenize_example(tokenizer, example, data_args):
 
     return tokenized_source, tokenized_target_input_ids
 
+
+def convert_example_common_text_meta(example, tokenizer, data_args, is_test=True, intokens=False):
+    tokenized_output, tokenized_input_ids = tokenize_example_text_meta(tokenizer, example,data_args=data_args)
+    if is_test:
+        return {**tokenized_output,"labels": tokenized_input_ids}
+    else:
+        input_ids = tokenized_output["input_ids"]+ tokenized_input_ids
+        source_length =len(tokenized_output["input_ids"])
+        labels = [-100]* source_length + input_ids[source_length:]
+        # shift input ids and labels
+        input_ids, labels = input_ids[:-1], labels[1:]
+        seq_length = len(input_ids)
+        features ={"input_ids": input_ids, "labels": labels}
+        if "position_ids" in tokenized_output:
+            features["position_ids"]= list(range(seq_length))
+        if intokens:
+            features["attention_mask"]= np.tri(seq_length, seq_length, dtype=bool)
+        print(len(features["input_ids"]))
+        print(len(features["position_ids"]))
+        return features
 
 def tokenize_rounds_example(tokenizer, example, data_args):
     """tokenize multi-rounds examples with chat_template.json

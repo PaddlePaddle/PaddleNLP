@@ -34,7 +34,7 @@ from utils import (
     get_prefix_tuning_params,
     init_chat_template,
 )
-
+# from llama_attn_replace_paddle import replace_llama_attn
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import InTokensIterableDataset, InTokensMapDataset, load_dataset
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
@@ -63,6 +63,10 @@ def add_start_docstrings(*docstr):
 class FinetuneArguments(TrainingArguments):
     decay_steps: int = field(
         default=0,
+        metadata={"help": "The steps use to control the learing rate."},
+    )
+    sparse: bool = field(
+        default=True,
         metadata={"help": "The steps use to control the learing rate."},
     )
 
@@ -113,6 +117,7 @@ def main():
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
+
 
     # Load model
     if training_args.fp16_opt_level == "O2":
@@ -296,11 +301,7 @@ def main():
         else:
             train_ds = None
         if training_args.do_eval:
-            dev_ds = load_dataset(
-                "json",
-                data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "dev", "*.json")),
-                lazy=data_args.lazy,
-            )[0]
+            dev_ds = load_dataset('/home/mg/proof-pile',splits=["test"],cache_dir='proof-pile')[0]
         else:
             dev_ds = None
         if quant_args.do_ptq or quant_args.do_gptq:
@@ -325,11 +326,11 @@ def main():
             ptq_ds = None
     else:
         if training_args.do_train or quant_args.do_qat:
-            train_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
+            train_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])
         else:
             train_ds = None
         if training_args.do_eval:
-            dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["dev"])[0]
+            dev_ds = load_dataset(data_args.dataset_name_or_path, cache_dir='valid-dataset/cache', splits=["test"])[0]
         else:
             dev_ds = None
         if quant_args.do_ptq or quant_args.do_gptq:
@@ -360,7 +361,6 @@ def main():
 
     if training_args.pipeline_parallel_degree > 1:
         from data import convert_example_common
-
         trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
     else:
         trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
@@ -387,6 +387,7 @@ def main():
             "`zero_padding` conflicts with `eval_with_do_generation`. Setting zero_padding to False for the eval_dataset."
         )
         eval_intokens = False
+    
     dev_ds = (
         dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, intokens=eval_intokens))
         if dev_ds is not None
@@ -473,9 +474,26 @@ def main():
                 use_quick_lora=model_args.use_quick_lora,
             )
             model = LoRAModel(model, lora_config)
+            # set embedding and norm trainable
+            model.mark_only_lora_as_trainable()
+            model.print_trainable_parameters()
+            for n, p in model.named_parameters():
+                if any([k in n for k in training_args.trainable_params.split(",")]):
+                    p.stop_gradient = False
+            model.config.use_cache = False
+
+            # model.enable_input_require_grads()
+            # required for gradient checkpointing
+            def make_inputs_require_grad(module, input, output):
+                output.stop_gradient = False
+            model.get_input_embeddings().register_forward_post_hook(make_inputs_require_grad)
+            # model.gradient_checkpointing_enable()  # enable gradient checkpointing
+            model.recompute_enable()
+            for param in model.parameters():
+                if not param.stop_gradient and param.grad is None:
+                    param.clear_gradient()
         else:
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
-
         model.print_trainable_parameters()
 
     def compute_metrics_do_generation(eval_preds):
@@ -537,7 +555,7 @@ def main():
             padding=padding,
             max_label_length=max_length,
             return_tensors="np",
-            pad_to_multiple_of=data_args.pad_to_multiple_of,
+            pad_to_multiple_of=data_args.max_length,
         ),
         do_generation=data_args.eval_with_do_generation,
         callbacks=[InTokensIterDatasetCallback()] if isinstance(train_ds, InTokensIterableDataset) else None,
