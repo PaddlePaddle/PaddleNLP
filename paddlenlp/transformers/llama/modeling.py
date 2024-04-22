@@ -682,7 +682,9 @@ class LlamaMLP(nn.Layer):
                     out = self.down_proj(out)
                     return out
                 except ImportError:
-                    pass
+                    gate_out, up_out = paddle.chunk(self.gate_up_fused_proj(x), chunks=2, axis=-1)
+                    out = self.down_proj(F.silu(gate_out) * up_out)
+                    return out
 
             x = swiglu(self.gate_up_fused_proj(x))
         else:
