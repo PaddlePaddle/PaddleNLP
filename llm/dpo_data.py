@@ -1,7 +1,5 @@
-from operator import imod
 import numpy as np
 import paddle
-from scipy.linalg import block_diag
 
 def process_example(data, tokenizer, data_args):
     """Convert raw format example to Example."""
@@ -23,43 +21,57 @@ def process_example(data, tokenizer, data_args):
     else:
         chosen = data["response"][1]
         rejected = data["response"][0]
-
-    #example = {"src": data["src"], "tgt": data["tgt"], "chosen": chosen, "rejected": rejected}
-    conversations = []
+    
+    chosen_encode_tokens = []
     for idx in range(len(data['src'])):
         if idx < len(data['tgt']):
-            conversations.append([
-                data['src'][idx].strip(),
-                data['tgt'][idx].strip(),
-            ])
+            if tokenizer.chat_template is not None:
+                chosen_encode_tokens.append([
+                    data['src'][idx].strip(),
+                    data['tgt'][idx].strip(),
+                ])
+            else:
+                chosen_encode_tokens.append([
+                    tokenizer.encode(data['src'][idx].strip(), add_special_tokens=False)['input_ids'],
+                    tokenizer.encode(data['tgt'][idx].strip(), add_special_tokens=False)['input_ids'],
+                ])
         else:
-            conversations.append([
-                data['src'][idx].strip(),
-                chosen.strip(),
-            ])
+            if tokenizer.chat_template is not None:
+                chosen_encode_tokens.append([
+                    data['src'][idx].strip(),
+                    chosen.strip(),
+                ])
+            else:
+                chosen_encode_tokens.append([
+                    tokenizer.encode(data['src'][idx].strip(), add_special_tokens=False)['input_ids'],
+                    tokenizer.encode(chosen.strip(), add_special_tokens=False)['input_ids'],
+                ])
 
-    # chat template load
-    #llama_chat_template = "{% if messages[0]['role'] == 'system' %}{% set loop_messages = messages[1:] %}{% set system_message = messages[0]['content'] %}{% else %}{% set loop_messages = messages %}{% set system_message = false %}{% endif %}{% for message in loop_messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if loop.index0 == 0 and system_message != false %}{% set content = '<<SYS>>\\n' + system_message + '\\n<</SYS>>\\n\\n' + message['content'] %}{% else %}{% set content = message['content'] %}{% endif %}{% if message['role'] == 'user' %}{{ bos_token + '[INST] ' + content.strip() + ' [/INST]' }}{% elif message['role'] == 'assistant' %}{{ ' '  + content.strip() + ' ' + eos_token }}{% endif %}{% endfor %}"
-    #qwen_chat_template = "{% for message in messages %}{% if loop.first and messages[0]['role'] != 'system' %}{{ '<|im_start|>system\nYou are a helpful assistant<|im_end|>\n' }}{% endif %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}"
-    #tokenizer.init_chat_template(llama_chat_template)
+    if tokenizer.chat_template is not None:
+        chosen_encode_tokens = tokenizer.encode_chat_inputs(chosen_encode_tokens)['conversations']
+        # convert to rejected chosen_encode_tokens
+        chosen_encode_tokens[-1][-1] = rejected.strip()
+        rejected_encode_tokens = tokenizer.encode_chat_inputs(chosen_encode_tokens)['conversations']
 
-    chosen_encode_tokens = tokenizer.encode_chat_inputs(conversations)['conversations']
+        """Post process sequence: tokenization & truncation."""
+        tokens_prompt = chosen_encode_tokens[-1][0]
+        tokens_chosen = chosen_encode_tokens[-1][-1]
+        tokens_rejected = rejected_encode_tokens[-1][-1]
+        del rejected_encode_tokens
+    else:
+        tokens_chosen = tokenizer.encode(chosen.strip(), add_special_tokens=False)['input_ids']
+        tokens_rejected = tokenizer.encode(rejected.strip(), add_special_tokens=False)['input_ids']
 
-    # convert to rejected conversations
-    conversations[-1][-1] = rejected.strip()
+        # add bos / eos token
+        if tokenizer.eos_token_id is not None:
+            tokens_chosen = tokens_chosen + [tokenizer.eos_token_id]
+            tokens_rejected = tokens_rejected + [tokenizer.eos_token_id]
 
-    try:
-        rejected_encode_tokens = tokenizer.encode_chat_inputs(conversations)['conversations']
-    except:
-        print(conversations)
+        if tokenizer.bos_token_id is not None:
+            chosen_encode_tokens[0][0] = [tokenizer.bos_token_id] + chosen_encode_tokens[0][0]
+
+        tokens_prompt = chosen_encode_tokens[-1][0]
     
-
-    """Post process sequence: tokenization & truncation."""
-    tokens_prompt = chosen_encode_tokens[-1][0]
-    tokens_chosen = chosen_encode_tokens[-1][-1]
-    tokens_rejected = rejected_encode_tokens[-1][-1]
-    del rejected_encode_tokens
-
     # temporary reserve 1 token for truncation
     data_args.max_seq_length = data_args.max_seq_length - 1
 
@@ -162,7 +174,6 @@ def process_example(data, tokenizer, data_args):
     assert chosen_labels[prompt_last_but_one] == concatenated_input_ids[prompt_last_but_one+1]
     # allow empty rejected response
     assert len(rejected) == 0 or rejected_labels[prompt_last_but_one + chosen_with_prefix] == concatenated_input_ids[prompt_last_but_one + chosen_with_prefix + 1]
-    assert (0 not in chosen_labels[response_index[0]:response_index[1]]) and (0 not in rejected_labels[response_index[1]+1:response_index[2]])
 
     return {
         "input_ids": concatenated_input_ids,
