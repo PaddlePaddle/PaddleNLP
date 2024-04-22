@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
 
@@ -24,6 +25,41 @@ def distribute_gather(data):
     dist.all_gather(gathered_list, data)
     gathered_data = paddle.concat(gathered_list, axis=0)
     return gathered_data
+
+
+class PaddlePartialState:
+    def __init__(self, **kwargs):
+        if dist.is_initialized():
+            self.num_processes = paddle.distributed.get_world_size()
+            self.process_index = paddle.distributed.get_rank()
+            # rank 0 as main process
+            self.local_process_index = 0
+        else:
+            self.num_processes = 1
+            self.process_index = 0
+            self.local_process_index = 0
+
+    def wait_for_everyone(self):
+        if dist.is_initialized():
+            paddle.distributed.barrier()
+
+    def _goes_first(self, is_main: bool):
+        if not is_main:
+            self.wait_for_everyone()
+
+        yield
+
+        if is_main:
+            self.wait_for_everyone()
+
+    @property
+    def is_local_main_process(self) -> bool:
+        "Returns whether the current process is the main process on the local node"
+        return self.local_process_index == 0
+
+    @contextmanager
+    def local_main_process_first(self):
+        yield from self._goes_first(self.is_local_main_process)
 
 
 def paddle_pad_sequence(sequences, padding_value=0, batch_first=False):

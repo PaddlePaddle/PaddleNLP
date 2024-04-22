@@ -24,7 +24,6 @@ import paddle
 import paddle.distributed as dist
 import paddle.nn as nn
 import paddle.nn.functional as F
-from accelerate import PartialState
 from datasets import Dataset, concatenate_datasets
 from kto_config import KTOConfig
 
@@ -36,6 +35,7 @@ from paddle.io import DataLoader, DistributedBatchSampler
 from tqdm import tqdm
 from utils import (  # peft_module_casting_to_bf16,
     DPODataCollatorWithPadding,
+    PaddlePartialState,
     disable_dropout_in_model,
     distribute_gather,
     pad_to_length,
@@ -463,7 +463,7 @@ class KTOTrainer(Trainer):
         self.desirable_weight = args.desirable_weight
         self.undesirable_weight = args.undesirable_weight
 
-        with PartialState().local_main_process_first():
+        with PaddlePartialState().local_main_process_first():
             # Shuffle the datasets
             train_dataset = train_dataset.shuffle(seed=args.data_seed)
             if eval_dataset is not None:
