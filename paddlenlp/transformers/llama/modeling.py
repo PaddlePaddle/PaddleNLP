@@ -414,9 +414,12 @@ class LlamaRMSNorm(nn.Layer):
             if get_env_device() == "npu":
                 return core.eager._run_custom_op("rms_norm_npu", hidden_states, self.weight, self.variance_epsilon)[0]
             elif get_env_device() == "xpu":
-                import paddle_xpu_nn  # noqa: F821
+                try:
+                    import paddle_xpu_nn  # noqa: F821
 
-                return paddle_xpu_nn.xpu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
+                    return paddle_xpu_nn.xpu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
+                except ImportError:
+                    pass
             return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
 
         if paddle.in_dynamic_mode():
@@ -587,35 +590,46 @@ class LlamaMLP(nn.Layer):
                 ColumnParallelLinear = MC2ColumnSeqParallelLinear
                 RowParallelLinear = MC2RowSeqParallelLinear
             elif get_env_device() == "xpu":
-                from paddle_xpu.layers.nn.sequence_parallel import (  # noqa: F401
-                    XPUColumnSequenceParallelLinear,
-                    XPURowSequenceParallelLinear,
-                )
+                try:
+                    from paddle_xpu.layers.nn.sequence_parallel import (  # noqa: F401
+                        XPUColumnSequenceParallelLinear,
+                        XPURowSequenceParallelLinear,
+                    )
 
-                ColumnParallelLinear = XPUColumnSequenceParallelLinear
-                RowParallelLinear = XPURowSequenceParallelLinear
+                    ColumnParallelLinear = XPUColumnSequenceParallelLinear
+                    RowParallelLinear = XPURowSequenceParallelLinear
+                except ImportError:
+                    ColumnParallelLinear = ColumnSequenceParallelLinear
+                    RowParallelLinear = RowSequenceParallelLinear
             else:
                 ColumnParallelLinear = ColumnSequenceParallelLinear
                 RowParallelLinear = RowSequenceParallelLinear
         else:
             if get_env_device() == "xpu":
-                from paddle_xpu.layers.nn import (  # noqa: F401
-                    ColumnParallelLinear as XPUColumnParallelLinear,
-                )
-                from paddle_xpu.layers.nn import (  # noqa: F401
-                    RowParallelLinear as XPURowParallelLinear,
-                )
+                try:
+                    from paddle_xpu.layers.nn import (  # noqa: F401
+                        ColumnParallelLinear as XPUColumnParallelLinear,
+                    )
+                    from paddle_xpu.layers.nn import (  # noqa: F401
+                        RowParallelLinear as XPURowParallelLinear,
+                    )
 
-                ColumnParallelLinear = XPUColumnParallelLinear
-                RowParallelLinear = XPURowParallelLinear
+                    ColumnParallelLinear = XPUColumnParallelLinear
+                    RowParallelLinear = XPURowParallelLinear
+                except ImportError:
+                    ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
+                    RowParallelLinear = fleet.meta_parallel.RowParallelLinear
             else:
                 ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
                 RowParallelLinear = fleet.meta_parallel.RowParallelLinear
 
         if get_env_device() == "xpu":
-            from paddle_xpu.layers.nn import Linear as XPULinear  # noqa: F401
+            try:
+                from paddle_xpu.layers.nn import Linear as XPULinear  # noqa: F401
 
-            Linear = XPULinear
+                Linear = XPULinear
+            except ImportError:
+                Linear = nn.Linear
         else:
             Linear = nn.Linear
 
@@ -660,12 +674,15 @@ class LlamaMLP(nn.Layer):
         if self.fuse_attention_ffn:
             # FIXME(yangjianbang): use paddle's native swiglu
             if get_env_device() == "xpu":
-                import paddle_xpu_nn  # noqa: F821
+                try:
+                    import paddle_xpu_nn  # noqa: F821
 
-                out = self.gate_up_fused_proj(x)
-                out = paddle_xpu_nn.xpu_swiglu(out, axis=-1, turn=True)
-                out = self.down_proj(out)
-                return out
+                    out = self.gate_up_fused_proj(x)
+                    out = paddle_xpu_nn.xpu_swiglu(out, axis=-1, turn=True)
+                    out = self.down_proj(out)
+                    return out
+                except ImportError:
+                    pass
 
             x = swiglu(self.gate_up_fused_proj(x))
         else:
@@ -745,35 +762,46 @@ class LlamaAttention(nn.Layer):
                 ColumnParallelLinear = MC2ColumnSeqParallelLinear
                 RowParallelLinear = MC2RowSeqParallelLinear
             elif get_env_device() == "xpu":
-                from paddle_xpu.layers.nn.sequence_parallel import (  # noqa: F401
-                    XPUColumnSequenceParallelLinear,
-                    XPURowSequenceParallelLinear,
-                )
+                try:
+                    from paddle_xpu.layers.nn.sequence_parallel import (  # noqa: F401
+                        XPUColumnSequenceParallelLinear,
+                        XPURowSequenceParallelLinear,
+                    )
 
-                ColumnParallelLinear = XPUColumnSequenceParallelLinear
-                RowParallelLinear = XPURowSequenceParallelLinear
+                    ColumnParallelLinear = XPUColumnSequenceParallelLinear
+                    RowParallelLinear = XPURowSequenceParallelLinear
+                except ImportError:
+                    ColumnParallelLinear = ColumnSequenceParallelLinear
+                    RowParallelLinear = RowSequenceParallelLinear
             else:
                 ColumnParallelLinear = ColumnSequenceParallelLinear
                 RowParallelLinear = RowSequenceParallelLinear
         else:
             if get_env_device() == "xpu":
-                from paddle_xpu.layers.nn import (  # noqa: F401
-                    ColumnParallelLinear as XPUColumnParallelLinear,
-                )
-                from paddle_xpu.layers.nn import (  # noqa: F401
-                    RowParallelLinear as XPURowParallelLinear,
-                )
+                try:
+                    from paddle_xpu.layers.nn import (  # noqa: F401
+                        ColumnParallelLinear as XPUColumnParallelLinear,
+                    )
+                    from paddle_xpu.layers.nn import (  # noqa: F401
+                        RowParallelLinear as XPURowParallelLinear,
+                    )
 
-                ColumnParallelLinear = XPUColumnParallelLinear
-                RowParallelLinear = XPURowParallelLinear
+                    ColumnParallelLinear = XPUColumnParallelLinear
+                    RowParallelLinear = XPURowParallelLinear
+                except ImportError:
+                    ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
+                    RowParallelLinear = fleet.meta_parallel.RowParallelLinear
             else:
                 ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
                 RowParallelLinear = fleet.meta_parallel.RowParallelLinear
 
         if get_env_device() == "xpu":
-            from paddle_xpu.layers.nn import Linear as XPULinear  # noqa: F401
+            try:
+                from paddle_xpu.layers.nn import Linear as XPULinear  # noqa: F401
 
-            Linear = XPULinear
+                Linear = XPULinear
+            except:
+                Linear = nn.Linear
         else:
             Linear = nn.Linear
 
@@ -1779,11 +1807,14 @@ class LlamaLMHead(nn.Layer):
         if self.weight.is_distributed:
             self.weight.split_axis = 1
         if get_env_device() == "xpu":
-            from paddle_xpu.layers.nn import (  # noqa: F401
-                parallel_matmul as xpu_parallel_matmul,
-            )
+            try:
+                from paddle_xpu.layers.nn import (  # noqa: F401
+                    parallel_matmul as xpu_parallel_matmul,
+                )
 
-            self.xpu_parallel_matmul = xpu_parallel_matmul()
+                self.xpu_parallel_matmul = xpu_parallel_matmul()
+            except ImportError:
+                self.xpu_parallel_matmul = None
 
     def forward(self, hidden_states, tensor_parallel_output=None):
         if self.config.sequence_parallel:
@@ -1797,7 +1828,7 @@ class LlamaLMHead(nn.Layer):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
-        if get_env_device() == "xpu":
+        if get_env_device() == "xpu" and self.xpu_parallel_matmul is not None:
             logits = self.xpu_parallel_matmul(
                 hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output, training=self.training
             )

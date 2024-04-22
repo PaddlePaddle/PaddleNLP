@@ -485,10 +485,13 @@ def main():
     ), f"num_attention_heads:{config.num_attention_heads} must be divisible by sep_parallel_degree {config.sep_parallel_degree}"
 
     if get_env_device() == "xpu" and training_args.gradient_accumulation_steps > 1:
-        from paddle_xpu.layers.nn.linear import LinearConfig  # noqa: F401
+        try:
+            from paddle_xpu.layers.nn.linear import LinearConfig  # noqa: F401
 
-        LinearConfig.enable_accumulate_steps_opt()
-        LinearConfig.set_accumulate_steps(training_args.gradient_accumulation_steps)
+            LinearConfig.enable_accumulate_steps_opt()
+            LinearConfig.set_accumulate_steps(training_args.gradient_accumulation_steps)
+        except ImportError:
+            pass
 
     print("Final pre-training config:", config)
 
