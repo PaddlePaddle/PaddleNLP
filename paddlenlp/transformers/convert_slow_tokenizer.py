@@ -17,6 +17,7 @@
 
 from typing import Dict, List, Optional, Tuple
 
+import tokenizers
 from packaging import version
 from tokenizers import (
     AddedToken,
@@ -159,15 +160,23 @@ class SpmConverter(Converter):
         prepend_scheme = "always"
         if hasattr(self.original_tokenizer, "legacy") and not self.original_tokenizer.legacy:
             prepend_scheme = "first"
-        prepend_scheme = _get_prepend_scheme(add_prefix_space, self.original_tokenizer)
-        return pre_tokenizers.Metaspace(replacement=replacement, prepend_scheme=prepend_scheme)
+        if version.parse(tokenizers.__version__) >= version.parse("0.19.0"):
+            prepend_scheme = _get_prepend_scheme(add_prefix_space, self.original_tokenizer)
+            return pre_tokenizers.Metaspace(replacement=replacement, prepend_scheme=prepend_scheme)
+        else:
+            return pre_tokenizers.Metaspace(
+                replacement=replacement, add_prefix_space=add_prefix_space, prepend_scheme=prepend_scheme
+            )
 
     def post_processor(self):
         return None
 
     def decoder(self, replacement, add_prefix_space):
-        prepend_scheme = _get_prepend_scheme(add_prefix_space, self.original_tokenizer)
-        return decoders.Metaspace(replacement=replacement, prepend_scheme=prepend_scheme)
+        if version.parse(tokenizers.__version__) >= version.parse("0.19.0"):
+            prepend_scheme = _get_prepend_scheme(add_prefix_space, self.original_tokenizer)
+            return decoders.Metaspace(replacement=replacement, prepend_scheme=prepend_scheme)
+        else:
+            return decoders.Metaspace(replacement=replacement, add_prefix_space=add_prefix_space)
 
     def converted(self) -> Tokenizer:
         tokenizer = self.tokenizer(self.proto)
@@ -312,7 +321,6 @@ class ChatGLMv2Converter(SpmConverter):
         model_type = proto.trainer_spec.model_type
         vocab_scores = self.vocab(proto)
         if model_type == 1:
-            import tokenizers
 
             if version.parse(tokenizers.__version__) < version.parse("0.14.0"):
                 tokenizer = Tokenizer(Unigram(vocab_scores, 0))
@@ -452,12 +460,20 @@ class ErnieMConverter(SpmConverter):
 
     def pre_tokenizer(self, replacement, add_prefix_space):
         prepend_scheme = _get_prepend_scheme(add_prefix_space, self.original_tokenizer)
-        return pre_tokenizers.Sequence(
-            [
-                pre_tokenizers.Whitespace(),
-                pre_tokenizers.Metaspace(replacement=replacement, prepend_scheme=prepend_scheme),
-            ]
-        )
+        if version.parse(tokenizers.__version__) >= version.parse("0.19.0"):
+            return pre_tokenizers.Sequence(
+                [
+                    pre_tokenizers.Whitespace(),
+                    pre_tokenizers.Metaspace(replacement=replacement, prepend_scheme=prepend_scheme),
+                ]
+            )
+        else:
+            return pre_tokenizers.Sequence(
+                [
+                    pre_tokenizers.Whitespace(),
+                    pre_tokenizers.Metaspace(replacement=replacement, add_prefix_space=add_prefix_space),
+                ]
+            )
 
     def post_processor(self):
         """
@@ -580,8 +596,6 @@ class LlamaConverter(SpmConverter):
         model_type = proto.trainer_spec.model_type
         vocab_scores = self.vocab(proto)
         if model_type == 1:
-            import tokenizers
-            from packaging import version
 
             if version.parse(tokenizers.__version__) < version.parse("0.14.0"):
                 tokenizer = Tokenizer(Unigram(vocab_scores, 0))
@@ -695,7 +709,6 @@ class GemmaConverter(SpmConverter):
         model_type = proto.trainer_spec.model_type
         vocab_scores = self.vocab(proto)
         if model_type == 1:
-            import tokenizers
 
             if version.parse(tokenizers.__version__) < version.parse("0.14.0"):
                 tokenizer = Tokenizer(Unigram(vocab_scores, 0))

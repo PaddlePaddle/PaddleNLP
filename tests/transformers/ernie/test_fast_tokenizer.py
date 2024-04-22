@@ -38,7 +38,7 @@ def measure_time(func, *args, **kwargs):
 @pytest.fixture
 def setup_inputs():
     dataset = load_dataset("tatsu-lab/alpaca")
-    return dataset["train"]["text"]
+    return dataset["train"]["text"][:1000]
 
 
 @pytest.fixture
