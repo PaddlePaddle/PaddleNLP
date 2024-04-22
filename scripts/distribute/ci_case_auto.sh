@@ -1744,9 +1744,9 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2() {
     ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'train_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
     mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'gpu_mem_max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.38256836
-    ips_base=-1
-    mem_base=-1
+    loss_base=7.52502594
+    ips_base=13.4647
+    mem_base=29839
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
