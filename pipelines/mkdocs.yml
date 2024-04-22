@@ -12,6 +12,16 @@ nav:
   - retriever: 'package/nodes/retriever.md'
   - ranker: 'package/nodes/ranker.md'
   - reader: 'package/nodes/reader.md'
+  - preprocessor: 'package/nodes/preprocessor.md'
+  - file_converter: 'package/nodes/file_converter.md'
+  - document_intelligence: 'package/nodes/document_intelligence.md'
+  - llm: 'package/nodes/llm.md'
+  - quetion_generator: 'package/nodes/question_generator.md'
+  - search_engine: 'package/nodes/search_engine.md'
+  - sentiment_analysis: 'package/nodes/sentiment_analysis.md'
+  - answer_extractor: 'package/nodes/answer_extractor.md'
+  - other: 'package/nodes/other.md'
+
 
 - Memory module: 
   - faiss: 'package/docstore/faiss.md'
