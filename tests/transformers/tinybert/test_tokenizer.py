@@ -23,7 +23,7 @@ from paddlenlp.transformers.bert.tokenizer import (
     _is_punctuation,
     _is_whitespace,
 )
-from paddlenlp.transformers.tinybert.fast_tokenizer import TinyBertFastTokenizer
+from paddlenlp.transformers.tinybert.fast_tokenizer import TinyBertTokenizerFast
 from paddlenlp.transformers.tinybert.tokenizer import TinyBertTokenizer
 
 from ...testing_utils import slow
@@ -33,7 +33,7 @@ from ..test_tokenizer_common import TokenizerTesterMixin, filter_non_english
 class TinyBertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = TinyBertTokenizer
-    fast_tokenizer_class = TinyBertFastTokenizer
+    fast_tokenizer_class = TinyBertTokenizerFast
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = True

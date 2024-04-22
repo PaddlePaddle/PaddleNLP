@@ -29,19 +29,19 @@ class AutoTokenizerTest(unittest.TestCase):
 
         tokenizer2 = AutoTokenizer.from_pretrained("__internal_testing__/bert", use_fast=True)
         if is_fast_tokenizer_available():
-            self.assertIsInstance(tokenizer2, paddlenlp.transformers.BertFastTokenizer)
+            self.assertIsInstance(tokenizer2, paddlenlp.transformers.BertTokenizerFast)
         else:
             self.assertIsInstance(tokenizer2, paddlenlp.transformers.BertTokenizer)
 
     def test_fast_tokenizer_non_exist(self):
         tokenizer1 = AutoTokenizer.from_pretrained("t5-small", use_fast=True)
-        # T5 FastTokenizer doesn't exist yet, so from_pretrained will return the normal tokenizer.
+        # T5 TokenizerFast doesn't exist yet, so from_pretrained will return the normal tokenizer.
         self.assertIsInstance(tokenizer1, paddlenlp.transformers.T5Tokenizer)
 
     def test_use_faster(self):
         tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/bert", use_faster=True)
         if is_fast_tokenizer_available():
-            self.assertIsInstance(tokenizer, paddlenlp.transformers.BertFastTokenizer)
+            self.assertIsInstance(tokenizer, paddlenlp.transformers.BertTokenizerFast)
         else:
             self.assertIsInstance(tokenizer, paddlenlp.transformers.BertTokenizer)
 
@@ -54,7 +54,7 @@ class AutoTokenizerTest(unittest.TestCase):
             "hf-internal-testing/tiny-random-BertModel", from_hf_hub=True, use_fast=False
         )
         if is_fast_tokenizer_available():
-            self.assertIsInstance(t1, paddlenlp.transformers.BertFastTokenizer)
+            self.assertIsInstance(t1, paddlenlp.transformers.BertTokenizerFast)
         else:
             self.assertIsInstance(t1, paddlenlp.transformers.BertTokenizer)
         self.assertIsInstance(t2, paddlenlp.transformers.BertTokenizer)

@@ -17,13 +17,13 @@ from typing import Optional, Tuple
 
 from tokenizers import AddedToken
 
-from ..tokenizer_utils_fast import PretrainedFastTokenizer
+from ..tokenizer_utils_fast import PretrainedTokenizerFast
 from .tokenizer import QWenTokenizer
 
 VOCAB_FILES_NAMES = {"vocab_file": "qwen.tiktoken", "tokenizer_file": "tokenizer.json"}
 
 
-class QWenFastTokenizer(PretrainedFastTokenizer):
+class QWenTokenizerFast(PretrainedTokenizerFast):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     slow_tokenizer_class = QWenTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map

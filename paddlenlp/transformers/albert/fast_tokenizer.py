@@ -18,14 +18,14 @@ import os
 from shutil import copyfile
 from typing import Optional, Tuple
 
-from ..tokenizer_utils_fast import PretrainedFastTokenizer
+from ..tokenizer_utils_fast import PretrainedTokenizerFast
 from .tokenizer import AlbertEnglishTokenizer
 
 VOCAB_FILES_NAMES = {"sentencepiece_model_file": "spiece.model", "tokenizer_file": "tokenizer.json"}
 logger = logging.getLogger(__name__)
 
 
-class AlbertEnglishFastTokenizer(PretrainedFastTokenizer):
+class AlbertEnglishTokenizerFast(PretrainedTokenizerFast):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     slow_tokenizer_class = AlbertEnglishTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map

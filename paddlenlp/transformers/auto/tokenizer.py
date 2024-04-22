@@ -103,21 +103,21 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
 
 FAST_TOKENIZER_MAPPING_NAMES = OrderedDict(
     [
-        ("BertFastTokenizer", "bert"),
-        ("ErnieFastTokenizer", "ernie"),
-        ("TinyBertFastTokenizer", "tinybert"),
-        ("ErnieMFastTokenizer", "ernie_m"),
-        ("NystromformerFastTokenizer", "nystromformer"),
-        ("DistilBertFastTokenizer", "distilbert"),
-        ("AlbertEnglishFastTokenizer", "albert"),
-        ("RobertaBPEFastTokenizer", "roberta"),
-        ("LlamaFastTokenizer", "llama"),
-        ("QWenFastTokenizer", "qwen"),
-        ("ChatGLMv2FastTokenizer", "chatglm_v2"),
-        ("GemmaFastTokenizer", "gemma"),
+        ("BertTokenizerFast", "bert"),
+        ("ErnieTokenizerFast", "ernie"),
+        ("TinyBertTokenizerFast", "tinybert"),
+        ("ErnieMTokenizerFast", "ernie_m"),
+        ("NystromformerTokenizerFast", "nystromformer"),
+        ("DistilBertTokenizerFast", "distilbert"),
+        ("AlbertEnglishTokenizerFast", "albert"),
+        ("RobertaBPETokenizerFast", "roberta"),
+        ("LlamaTokenizerFast", "llama"),
+        ("QWenTokenizerFast", "qwen"),
+        ("ChatGLMv2TokenizerFast", "chatglm_v2"),
+        ("GemmaTokenizerFast", "gemma"),
     ]
 )
-# For FastTokenizer
+# For TokenizerFast
 if is_fast_tokenizer_available():
     TOKENIZER_MAPPING_NAMES.update(FAST_TOKENIZER_MAPPING_NAMES)
 
@@ -131,7 +131,7 @@ def get_configurations():
         import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.{fast_name}tokenizer")
         tokenizer_name = getattr(import_class, key)
         name = tuple(tokenizer_name.pretrained_init_configuration.keys())
-        # FastTokenizer will share the same config with python tokenizer
+        # TokenizerFast will share the same config with python tokenizer
         # So same config would map more than one tokenizer
         if MAPPING_NAMES.get(name, None) is None:
             MAPPING_NAMES[name] = []
@@ -195,12 +195,16 @@ class AutoTokenizer:
         init_class = init_kwargs.pop("init_class", None)
         if init_class is None:
             init_class = init_kwargs.pop("tokenizer_class", None)
-
         if init_class:
             if "Fast" in init_class:
                 init_class = init_class.replace("Fast", "")
-            class_name = cls._name_mapping[init_class]
-            if init_class.endswith("FastTokenizer"):
+                init_class_slow = init_class.replace("Fast", "")
+                class_name = cls._name_mapping[init_class_slow]
+                del init_class_slow
+            else:
+                # Slow
+                class_name = cls._name_mapping[init_class]
+            if init_class.endswith("TokenizerFast"):
                 import_class = import_module(f"paddlenlp.transformers.{class_name}.fast_tokenizer")
             else:
                 import_class = import_module(f"paddlenlp.transformers.{class_name}.tokenizer")

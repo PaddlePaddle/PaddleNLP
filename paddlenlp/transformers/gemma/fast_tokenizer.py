@@ -20,13 +20,13 @@ from typing import Optional, Tuple
 from tokenizers import processors
 
 from ...utils.log import logger
-from ..tokenizer_utils_fast import PretrainedFastTokenizer
+from ..tokenizer_utils_fast import PretrainedTokenizerFast
 from .tokenizer import GemmaTokenizer
 
 VOCAB_FILES_NAMES = {"vocab_file": "tokenizer.model", "tokenizer_file": "tokenizer.json"}
 
 
-class GemmaFastTokenizer(PretrainedFastTokenizer):
+class GemmaTokenizerFast(PretrainedTokenizerFast):
     """
     Construct a Gemma tokenizer fast. Based on byte-level Byte-Pair-Encoding.
 

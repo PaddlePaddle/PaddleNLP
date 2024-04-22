@@ -15,7 +15,7 @@
 
 import os
 
-from ..tokenizer_utils_fast import PretrainedFastTokenizer
+from ..tokenizer_utils_fast import PretrainedTokenizerFast
 from .tokenizer import ChatGLMv2Tokenizer
 
 VOCAB_FILES_NAMES = {
@@ -25,7 +25,7 @@ VOCAB_FILES_NAMES = {
 }
 
 
-class ChatGLMv2FastTokenizer(PretrainedFastTokenizer):
+class ChatGLMv2TokenizerFast(PretrainedTokenizerFast):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     slow_tokenizer_class = ChatGLMv2Tokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map

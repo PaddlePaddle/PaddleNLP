@@ -238,7 +238,7 @@ class BatchEncoding(UserDict):
     @property
     def is_fast(self) -> bool:
         """
-        `bool`: Indicate whether this [`BatchEncoding`] was generated from the result of a [`PretrainedFastTokenizer`]
+        `bool`: Indicate whether this [`BatchEncoding`] was generated from the result of a [`PretrainedTokenizerFast`]
         or not.
         """
         return self._encodings is not None

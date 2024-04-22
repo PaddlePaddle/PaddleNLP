@@ -20,13 +20,13 @@ from typing import Optional, Tuple
 from tokenizers import processors
 
 from ...utils.log import logger
-from ..tokenizer_utils_fast import PretrainedFastTokenizer
+from ..tokenizer_utils_fast import PretrainedTokenizerFast
 from .tokenizer import LlamaTokenizer
 
 VOCAB_FILES_NAMES = {"sentencepiece_model_file": "spiece.bpe.model", "tokenizer_file": "tokenizer.json"}
 
 
-class LlamaFastTokenizer(PretrainedFastTokenizer):
+class LlamaTokenizerFast(PretrainedTokenizerFast):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     slow_tokenizer_class = LlamaTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map

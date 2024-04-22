@@ -19,7 +19,7 @@ from typing import List, Optional, Tuple, Union
 
 from ...utils.log import logger
 from ..tokenizer_utils_base import PaddingStrategy, TensorType, TruncationStrategy
-from ..tokenizer_utils_fast import PretrainedFastTokenizer
+from ..tokenizer_utils_fast import PretrainedTokenizerFast
 from .tokenizer import ErnieMTokenizer
 
 VOCAB_FILES_NAMES = {
@@ -31,7 +31,7 @@ VOCAB_FILES_NAMES = {
 SPIECE_UNDERLINE = "▁"
 
 
-class ErnieMFastTokenizer(PretrainedFastTokenizer):
+class ErnieMTokenizerFast(PretrainedTokenizerFast):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     slow_tokenizer_class = ErnieMTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
@@ -120,7 +120,7 @@ class ErnieMFastTokenizer(PretrainedFastTokenizer):
         verbose: bool = True,
         **kwargs
     ):
-        return super(ErnieMFastTokenizer, self).__call__(
+        return super(ErnieMTokenizerFast, self).__call__(
             text=text,
             text_pair=text_pair,
             max_length=max_length,

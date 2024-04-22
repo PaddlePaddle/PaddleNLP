@@ -18,13 +18,13 @@ from typing import Optional, Tuple
 
 from tokenizers import normalizers
 
-from ..tokenizer_utils_fast import PretrainedFastTokenizer
+from ..tokenizer_utils_fast import PretrainedTokenizerFast
 from .tokenizer import ErnieTokenizer
 
 VOCAB_FILES_NAMES = {"vocab_file": "vocab.txt", "tokenizer_file": "tokenizer.json"}
 
 
-class ErnieFastTokenizer(PretrainedFastTokenizer):
+class ErnieTokenizerFast(PretrainedTokenizerFast):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     slow_tokenizer_class = ErnieTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
@@ -79,7 +79,7 @@ class ErnieFastTokenizer(PretrainedFastTokenizer):
 
 
 # ernie-tiny uses ErnieTokenizer now
-# class ErnieTinyFastTokenize(PretrainedFastTokenizer):
+# class ErnieTinyFastTokenize(PretrainedTokenizerFast):
 #     resource_files_names = {
 #         "sentencepiece_model_file": "spm_cased_simp_sampled.model",
 #         "vocab_file": "vocab.txt",

@@ -15,10 +15,10 @@
 
 import unittest
 
-# from paddlenlp.transformers.ernie_m.fast_tokenizer import ErnieMFastTokenizer
+# from paddlenlp.transformers.ernie_m.fast_tokenizer import ErnieMTokenizerFast
 from paddlenlp.transformers.ernie_m.tokenizer import ErnieMTokenizer
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
-from paddlenlp.transformers.tokenizer_utils_fast import PretrainedFastTokenizer
+from paddlenlp.transformers.tokenizer_utils_fast import PretrainedTokenizerFast
 
 from ...testing_utils import get_tests_dir
 from ..test_tokenizer_common import TokenizerTesterMixin
@@ -30,7 +30,7 @@ EN_VOCAB = get_tests_dir("fixtures/test_sentencepiece_bpe.vocab.txt")
 class ErnieMEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = ErnieMTokenizer
-    # fast_tokenizer_class = ErnieMFastTokenizer
+    # fast_tokenizer_class = ErnieMTokenizerFast
     space_between_special_tokens = True
 
     def setUp(self):
@@ -44,7 +44,7 @@ class ErnieMEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     def get_tokenizer(self, **kwargs) -> PretrainedTokenizer:
         return self.tokenizer_class.from_pretrained(self.tmpdirname, **kwargs)
 
-    def get_fast_tokenizer(self, **kwargs) -> PretrainedFastTokenizer:
+    def get_fast_tokenizer(self, **kwargs) -> PretrainedTokenizerFast:
         return self.fast_tokenizer_class.from_pretrained(self.tmpdirname, **kwargs)
 
     def get_input_output_texts(self, tokenizer):
@@ -77,7 +77,7 @@ class ErnieMEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens), expected_ids)
         # self.assertListEqual(tokenizer_fast.convert_tokens_to_ids(tokens_fast), expected_ids)
 
-        # The tokenize api has difference between ErnieMTokenizer and ErnieMFastTokenizer,
+        # The tokenize api has difference between ErnieMTokenizer and ErnieMTokenizerFast,
         # skip to check tokenizer_fast
         tokens = tokenizer.tokenize("I was born in 92000, and this is falsé.")
         expected_tokens = [
