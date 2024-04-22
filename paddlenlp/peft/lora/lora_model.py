@@ -32,11 +32,6 @@ from paddle.distributed.fleet.meta_parallel import (
     RowParallelLinear,
 )
 
-from paddlenlp.transformers.sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    RowSequenceParallelLinear,
-)
-
 from ...transformers.conversion_utils import ConversionMixin
 from ...transformers.model_utils import (
     PretrainedModel,
@@ -50,16 +45,25 @@ from ...utils.distributed import distributed_gather
 from ...utils.env import LORA_WEIGHTS_NAME, SAFE_PEFT_WEIGHTS_INDEX_NAME
 from ...utils.log import logger
 from .lora_config import LoRAConfig
-from .lora_layers import (
-    ColumnParallelLoRALinear,
-    ColumnParallelLoRAMergedLinear,
-    ColumnSequenceParallelLoRALinear,
-    LoRAConv2D,
-    LoRALinear,
-    LoRAMergedLinear,
-    RowParallelLoRALinear,
-    RowSequenceParallelLoRALinear,
-)
+
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        ColumnSequenceParallelLinear,
+        RowSequenceParallelLinear,
+    )
+
+    from .lora_layers import (
+        ColumnParallelLoRALinear,
+        ColumnParallelLoRAMergedLinear,
+        ColumnSequenceParallelLoRALinear,
+        LoRAConv2D,
+        LoRALinear,
+        LoRAMergedLinear,
+        RowParallelLoRALinear,
+        RowSequenceParallelLoRALinear,
+    )
+except:
+    pass
 
 try:
     from ...quantization.quantization_linear import (

@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import math
-import os
 from typing import List, Optional
 
 import paddle
@@ -25,27 +24,25 @@ from paddle.distributed.fleet.meta_parallel import (
     RowParallelLinear,
 )
 
-from paddlenlp.transformers.sequence_parallel_utils import (
-    AllGatherOp,
-    ColumnSequenceParallelLinear,
-    MC2ColumnSeqParallelLinear,
-    MC2RowSeqParallelLinear,
-    ReduceScatterOp,
-    RowSequenceParallelLinear,
-    mark_as_sequence_parallel_parameter,
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        AllGatherOp,
+        ColumnSequenceParallelLinear,
+        ReduceScatterOp,
+        RowSequenceParallelLinear,
+        mark_as_sequence_parallel_parameter,
+    )
+except:
+    pass
+
+from paddlenlp.transformers.mc2_parallel_linear import (
+    MC2ColumnParallelCoreLinear,
+    MC2ColumnSeqParallelCoreLinear,
+    MC2RowParallelCoreLinear,
+    MC2RowSeqParallelCoreLinear,
 )
 
 from .lora_quick_layers import quick_lora
-
-if "npu" in paddle.device.get_all_custom_device_type():
-    from .mc2_lora_npu import MC2LoRaColumnParallelLinear, MC2LoRaRowParallelLinear
-else:
-    MC2LoRaRowParallelLinear = None
-    MC2LoRaColumnParallelLinear = None
-
-
-def is_mc2_valid():
-    return "npu" in paddle.device.get_all_custom_device_type() and int(os.getenv("MC2", "0"))
 
 
 class LoRALinear(nn.Linear):
@@ -280,9 +277,7 @@ class RowParallelLoRALinear(RowParallelLinear):
             )
         else:
             # x @ W : [bz, in_f / ws] ===> [bz, out_f]
-            if "npu" in paddle.device.get_all_custom_device_type() and int(os.getenv("MC2", "0")):
-                output = MC2LoRaRowParallelLinear.apply(input_mp, self.weight, self.model_parallel_group)
-            else:
+            if MC2RowParallelCoreLinear is None:
                 result_mp = F.linear(x=input_mp, weight=self.weight, name=self.name)
                 output = mp_ops._mp_allreduce(
                     result_mp,
@@ -290,6 +285,8 @@ class RowParallelLoRALinear(RowParallelLinear):
                     use_calc_stream=True,
                     use_model_parallel=True,
                 )
+            else:
+                output = MC2RowParallelCoreLinear.apply(input_mp, self.weight, self.model_parallel_group)
 
             if not self.merged:
                 # x @ A: [bz, in_f/ ws] ===> [bz, r]
@@ -402,21 +399,21 @@ class RowSequenceParallelLoRALinear(RowSequenceParallelLinear):
         else:
             input_mp = x
 
-        if not is_mc2_valid():
+        if MC2RowSeqParallelCoreLinear is None:
             output_parallel = self.linear(input_mp, self.weight, name=self._name)
             output_ = ReduceScatterOp.apply(output_parallel)
             result_mp = output_ + self.bias if self.bias is not None else output_
         else:
-            output_ = MC2RowSeqParallelLinear.apply(input_mp, self.weight, self.model_parallel_group)
+            output_ = MC2RowSeqParallelCoreLinear.apply(input_mp, self.weight, self.model_parallel_group)
             result_mp = output_ + self.bias if self.bias is not None else output_
 
         if not self.merged:
             input_mp = self.lora_dropout(input_mp)
-            if not is_mc2_valid():
+            if MC2RowSeqParallelCoreLinear is None:
                 input_mp = input_mp @ self.lora_A
                 input_mp = ReduceScatterOp.apply(input_mp)
             else:
-                input_mp = MC2RowSeqParallelLinear.apply(input_mp, self.lora_A, self.model_parallel_group)
+                input_mp = MC2RowSeqParallelCoreLinear.apply(input_mp, self.lora_A, self.model_parallel_group)
             delta_mp = (input_mp @ self.lora_B) * self.scaling
             result_mp += delta_mp
         return result_mp
@@ -528,21 +525,21 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
                 world_size=self.world_size,
             )
         else:
-            if "npu" in paddle.device.get_all_custom_device_type() and int(os.getenv("MC2", "0")):
-                res_mp = MC2LoRaColumnParallelLinear.apply(input, self.weight, self.model_parallel_group)
-                result_mp = res_mp + self.bias
-            else:
+            if MC2ColumnParallelCoreLinear is None:
                 input_mp = mp_ops._c_identity(input, group=self.model_parallel_group)
                 result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
+            else:
+                res_mp = MC2ColumnParallelCoreLinear.apply(input, self.weight, self.model_parallel_group)
+                result_mp = res_mp + self.bias
 
             if not self.merged:
                 input_a = self.lora_dropout(input) @ self.lora_A
-                if "npu" in paddle.device.get_all_custom_device_type() and int(os.getenv("MC2", "0")):
-                    tmp = MC2LoRaColumnParallelLinear.apply(input_a, self.lora_B, self.model_parallel_group)
-                    delta_mp = tmp * self.scaling
-                else:
+                if MC2ColumnParallelCoreLinear is None:
                     input_a_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
                     delta_mp = (input_a_mp @ self.lora_B) * self.scaling
+                else:
+                    tmp = MC2ColumnParallelCoreLinear.apply(input_a, self.lora_B, self.model_parallel_group)
+                    delta_mp = tmp * self.scaling
                 result_mp += delta_mp
 
         if self.gather_output and self.is_mp:
@@ -641,24 +638,24 @@ class ColumnSequenceParallelLoRALinear(ColumnSequenceParallelLinear):
             self.merged = True
 
     def forward(self, x: paddle.Tensor):
-        if not is_mc2_valid():
+        if MC2ColumnSeqParallelCoreLinear is None:
             if self.is_mp:
                 input_parallel = AllGatherOp.apply(x)
             else:
                 input_parallel = x
             result_mp = self.linear(input_parallel, self.weight, self.bias, name=self._name)
         else:
-            result_mp = MC2ColumnSeqParallelLinear.apply(x, self.weight, self.model_parallel_group)
+            result_mp = MC2ColumnSeqParallelCoreLinear.apply(x, self.weight, self.model_parallel_group)
             if self.bias is not None:
                 result_mp += self.bias
 
         if not self.merged:
             input_a = self.lora_dropout(x) @ self.lora_A
-            if not is_mc2_valid():
+            if MC2ColumnSeqParallelCoreLinear is None:
                 input_a = AllGatherOp.apply(input_a)
                 delta_mp = (input_a @ self.lora_B) * self.scaling
             else:
-                input_a = MC2ColumnSeqParallelLinear.apply(input_a, self.lora_B, self.model_parallel_group)
+                input_a = MC2ColumnSeqParallelCoreLinear.apply(input_a, self.lora_B, self.model_parallel_group)
                 delta_mp = input_a * self.scaling
             result_mp += delta_mp
 
