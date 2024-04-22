@@ -23,8 +23,6 @@ from paddlenlp.peft import LoRAConfig
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 
-# from trl import KTOConfig, KTOTrainer, ModelConfig, get_peft_config, setup_chat_format
-
 
 # Define and parse arguments.
 @dataclass

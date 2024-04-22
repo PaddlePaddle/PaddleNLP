@@ -26,12 +26,8 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from datasets import Dataset, concatenate_datasets
 from kto_config import KTOConfig
-
-# from ..import_utils import is_wandb_available
 from model_base import create_reference_model
 from paddle.io import DataLoader, DistributedBatchSampler
-
-# from accelerate.utils import is_deepspeed_available, tqdm
 from tqdm import tqdm
 from utils import (  # peft_module_casting_to_bf16,
     DPODataCollatorWithPadding,
