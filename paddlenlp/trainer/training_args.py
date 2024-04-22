@@ -208,9 +208,12 @@ class TrainingArguments:
             default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better proformance.
             Note, this need model support in source code, currently GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM is supported.
         tensor_parallel_config (`str`, *optional*) (
-           Some additional config it highly affect the usage of tensor parallel, we provide some option to config it.
-           following config is support:
-             enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.
+            Some additional config it highly affect the usage of tensor parallel, we provide some option to config it.
+            following config is support:
+                enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.
+                sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.
+                sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.
+                sync_moment, in optimizer step, use broadcast to sync momentums those attr 'is_distributed' is False.
         pipeline_parallel_degree (`int`, *optional*, defaults to `-1`)
             Pipeline parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.2 Pipeline Model Parallelism).
             Pipeline parallelism assigns multi-transformer layers to different cards, the micro batch data stream passed between cards like pipelines.
@@ -222,7 +225,7 @@ class TrainingArguments:
             following config is support:
               disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape.
               disable_partial_send_recv, optmize send speed for tensor parallel.
-              enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
+              enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
               enable_dp_comm_overlap, fuse data parallel gradient communication.
               enable_overlap_p2p_comm, overlap p2p communication with computation.
               enable_clear_every_step_cache, clear every step cache for pipeline parallel.
@@ -504,7 +507,10 @@ class TrainingArguments:
             "help": (
                 "Some additional config it highly affect the usage of tensor parallel, we provide some option to config it."
                 "following config is support:\n"
-                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.\n"
+                "enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.\n"
+                "sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.\n"
+                "sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.\n"
+                "sync_moment, in optimizer step, use broadcast to sync momentums those attr 'is_distributed' is False.\n"
             )
         },
     )
@@ -528,7 +534,7 @@ class TrainingArguments:
                 "following config is support:\n"
                 "disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape. \n"
                 "disable_partial_send_recv, optmize send speed for tensor parallel.\n"
-                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
+                "enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
                 "enable_dp_comm_overlap, fuse data parallel gradient communication. \n"
                 "enable_overlap_p2p_comm, overlap p2p communication with computation. \n"
                 "enable_clear_every_step_cache, clear cache every step. \n"
@@ -889,9 +895,9 @@ class TrainingArguments:
                     tensor_parallel_config = set(self.tensor_parallel_config.split(" "))
                     for x in tensor_parallel_config:
                         if len(x) > 0:
-                            if x not in ["enable_delay_scale_loss"]:
+                            if x not in ["enable_delay_scale_loss", "sync_param", "sync_grad", "sync_moment"]:
                                 raise ValueError(
-                                    f"Found unknown tensor parallel mode config {x} ,accept config enable_delay_scale_loss."
+                                    f"Found unknown tensor parallel mode config {x} , accept config are [enable_delay_scale_loss, sync_param, sync_grad, sync_moment]."
                                 )
                 else:
                     logger.warning("The tensor_parallel_config would be ignored when tensor parallel is not enabled.")
@@ -917,6 +923,22 @@ class TrainingArguments:
                 if pipeline_parallel_degree > 1:
                     hybrid_configs["pp_configs"] = dygraph_pp_configs
                     logger.info(f"using pipeline configs:{dygraph_pp_configs}")
+
+                if tensor_parallel_degree > 1:
+                    sync_param = "sync_param" in tensor_parallel_config
+                    sync_grad = "sync_grad" in tensor_parallel_config
+                    sync_moment = "sync_moment" in tensor_parallel_config
+                    if sync_param or sync_grad or sync_moment:
+                        # sync_param_name = [""] matches any parameter name. If mp_configs is not set, the default sync_param_name is ["embedding", "layer_norm", ".b_"].
+                        mp_configs = {
+                            "sync_param": sync_param,
+                            "sync_grad": sync_grad,
+                            "sync_moment": sync_moment,
+                            "sync_mode": "broadcast",
+                            "sync_param_name": [""],
+                        }
+                        hybrid_configs["mp_configs"] = mp_configs
+                        logger.info(f"using mp configs: {mp_configs}")
 
                 # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
                 strategy.hybrid_configs = hybrid_configs
