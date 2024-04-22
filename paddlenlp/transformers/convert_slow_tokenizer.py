@@ -160,9 +160,7 @@ class SpmConverter(Converter):
         if hasattr(self.original_tokenizer, "legacy") and not self.original_tokenizer.legacy:
             prepend_scheme = "first"
         prepend_scheme = _get_prepend_scheme(add_prefix_space, self.original_tokenizer)
-        return pre_tokenizers.Metaspace(
-            replacement=replacement, add_prefix_space=add_prefix_space, prepend_scheme=prepend_scheme
-        )
+        return pre_tokenizers.Metaspace(replacement=replacement, prepend_scheme=prepend_scheme)
 
     def post_processor(self):
         return None
@@ -244,7 +242,6 @@ class AlbertConverter(SpmConverter):
             list_normalizers.append(normalizers.Precompiled(precompiled_charsmap))
 
         list_normalizers.append(normalizers.Replace(Regex(" {2,}"), " "))
-        list_normalizers.append(normalizers.Strip())
         return normalizers.Sequence(list_normalizers)
 
     def post_processor(self):
