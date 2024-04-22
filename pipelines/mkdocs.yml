@@ -18,15 +18,16 @@ nav:
   - elasticsearch: 'package/docstore/elasticsearch.md'
   - milvus2: 'package/docstore/milvus2.md'
 
-- Agents: 'package/agents/agents.md'
+- Agents module:
+  - agent: 'package/agents/agents.md'
+  - memory: 'package/agents/memory.md'
 
 - Server module: 
   - application: 'package/rest_api/application.md'
   - controller: 'package/rest_api/controller.md'
-  - schema: 'package/rest_api/schema.md'
 
 
-copyright: Copyright &copy; 2023 - Now PaddlePaddle Community
+copyright: Copyright &copy; 2024 - Now PaddlePaddle Community
 
 
 theme:
