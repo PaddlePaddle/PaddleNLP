@@ -29,9 +29,7 @@ class QWenFastTokenizer(PretrainedFastTokenizer):
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
     pretrained_resource_files_map.update(
         {
-            "tokenizer_file": {
-                "qwen/qwen-7b": "https://bj.bcebos.com/paddlenlp/models/community/qwen/qwen-7b/tokenizer.json",
-            },
+            "tokenizer_file": {},
         }
     )
     pretrained_init_configuration = slow_tokenizer_class.pretrained_init_configuration
