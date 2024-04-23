@@ -241,13 +241,16 @@ class TrainingArguments:
               enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance.
               enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.
               enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true. It can accelerate model parallel further.
-              enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.
+              enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.
+              sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.
+              sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.
+              sync_moment, in optimizer step, use broadcast to sync momentums those attr 'is_distributed' is False.
         pipeline_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it.
             following config is support:
               disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape.
               disable_partial_send_recv, optmize send speed for tensor parallel.
-              enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
+              enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
               enable_dp_comm_overlap, fuse data parallel gradient communication.
               enable_sharding_comm_overlap, fuse sharding stage 1 parallel gradient communication.
               enable_release_grads, reduce peak memory usage by releasing gradients after each iteration. The creation of gradients will be postponed until backward propagation of the next iteration.
@@ -600,7 +603,10 @@ class TrainingArguments:
                 "enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance. \n"
                 "enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.\n"
                 "enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true.  It can accelerate model parallel further.\n"
-                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.\n"
+                "enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.\n"
+                "sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.\n"
+                "sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.\n"
+                "sync_moment, in optimizer step, use broadcast to sync momentums those attr 'is_distributed' is False.\n"
             )
         },
     )
@@ -612,7 +618,7 @@ class TrainingArguments:
                 "following config is support:\n"
                 "disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape. \n"
                 "disable_partial_send_recv, optmize send speed for tensor parallel.\n"
-                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
+                "enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
                 "enable_dp_comm_overlap, fuse data parallel gradient communication. \n"
                 "enable_sharding_comm_overlap, fuse sharding stage 1 parallel gradient communication. \n"
                 "enable_overlap_p2p_comm, overlap p2p communication with computation. \n"
@@ -1062,10 +1068,13 @@ class TrainingArguments:
                                 "enable_mp_skip_c_identity",
                                 "enable_mp_fused_linear_param_grad_add",
                                 "enable_delay_scale_loss",
+                                "sync_param",
+                                "sync_grad",
+                                "sync_moment",
                             ]:
                                 raise ValueError(
                                     f"Found unknown tensor parallell config {x}, "
-                                    f"accept config is enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add"
+                                    f"accept config is enable_mp_async_allreduce, enable_mp_skip_c_identity, enable_mp_fused_linear_param_grad_add, sync_param, sync_grad and sync_moment."
                                 )
                     try:
                         if "enable_mp_async_allreduce" in mp_config:
@@ -1083,6 +1092,25 @@ class TrainingArguments:
                                 warnings.warn(
                                     "enable_mp_fused_linear_param_grad_add only works with enable_mp_async_allreduce. It will not work."
                                 )
+
+                        sync_param = sync_grad = sync_moment = True  # For CI test
+
+                        # sync_param = "sync_param" in mp_config
+                        # sync_grad = "sync_grad" in mp_config
+                        # sync_moment = "sync_moment" in mp_config
+
+                        # sync_param_name = [""] matches any parameter name.
+                        # If sync_param, sync_grad and sync_moment are not set, the default value in Paddle is :
+                        # sync_param = True, sync_grad = False, sync_moment = False, sync_param_name = ["embedding", "layer_norm", ".b_"].
+                        if sync_param:
+                            strategy.hybrid_configs["mp_configs"].sync_param = True
+                            strategy.hybrid_configs["mp_configs"].sync_param_name = [""]
+                        if sync_grad:
+                            strategy.hybrid_configs["mp_configs"].sync_grad = True
+                            strategy.hybrid_configs["mp_configs"].sync_grad_name = [""]
+                        if sync_moment:
+                            strategy.hybrid_configs["mp_configs"].sync_moment = True
+                            strategy.hybrid_configs["mp_configs"].sync_moment_name = [""]
                     except:
                         warnings.warn(
                             "The enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add are not supported "
