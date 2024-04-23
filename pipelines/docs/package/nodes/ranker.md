@@ -1,6 +1,6 @@
 # Ranker Module
 
-::: pipelines.nodes.ranker.ernie_ranker
+::: pipelines.pipelines.nodes.ranker.ernie_ranker
     options:
         summary: true
         separate_signature: true

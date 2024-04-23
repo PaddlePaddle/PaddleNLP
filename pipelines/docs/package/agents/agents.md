@@ -1,6 +1,6 @@
 # Agent Module
 
-::: pipelines.agents.base
+::: pipelines.pipelines.agents.base
     options:
         summary: true
         separate_signature: true
@@ -12,7 +12,7 @@
         - Tool
 
 
-::: pipelines.agents.agent_step
+::: pipelines.pipelines.agents.agent_step
     options:
         summary: true
         separate_signature: true
