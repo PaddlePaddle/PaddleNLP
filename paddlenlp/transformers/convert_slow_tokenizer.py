@@ -251,6 +251,7 @@ class AlbertConverter(SpmConverter):
             list_normalizers.append(normalizers.Precompiled(precompiled_charsmap))
 
         list_normalizers.append(normalizers.Replace(Regex(" {2,}"), " "))
+        list_normalizers.append(normalizers.Strip())
         return normalizers.Sequence(list_normalizers)
 
     def post_processor(self):

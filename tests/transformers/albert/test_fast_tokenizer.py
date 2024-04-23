@@ -22,7 +22,7 @@ from tokenizers import Tokenizer as HFTokenizer
 
 from paddlenlp.transformers import AutoTokenizer
 
-MODEL_NAME = "albert-base-v1"
+MODEL_NAME = "albert-base-v2"
 
 
 def measure_time(func, *args, **kwargs):
@@ -38,7 +38,7 @@ def measure_time(func, *args, **kwargs):
 @pytest.fixture
 def setup_inputs():
     dataset = load_dataset("tatsu-lab/alpaca")
-    return dataset["train"]["text"]
+    return dataset["train"]["text"][:1000]
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ def tokenizer_hf():
 
 @pytest.fixture
 def tokenizer_fast():
-    fast_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True, from_slow=True)
+    fast_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True)
     return fast_tokenizer
 
 
