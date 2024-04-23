@@ -897,7 +897,7 @@ class TrainingArguments:
                         if len(x) > 0:
                             if x not in ["enable_delay_scale_loss", "sync_param", "sync_grad", "sync_moment"]:
                                 raise ValueError(
-                                    f"Found unknown tensor parallel mode config {x} , accept config are [enable_delay_scale_loss, sync_param, sync_grad, sync_moment]."
+                                    f"Found unknown tensor parallel mode config {x} , accept config is enable_delay_scale_loss, sync_param, sync_grad, sync_moment."
                                 )
                 else:
                     logger.warning("The tensor_parallel_config would be ignored when tensor parallel is not enabled.")
@@ -928,15 +928,22 @@ class TrainingArguments:
                     sync_param = "sync_param" in tensor_parallel_config
                     sync_grad = "sync_grad" in tensor_parallel_config
                     sync_moment = "sync_moment" in tensor_parallel_config
-                    if sync_param or sync_grad or sync_moment:
-                        # sync_param_name = [""] matches any parameter name. If mp_configs is not set, the default sync_param_name is ["embedding", "layer_norm", ".b_"].
-                        mp_configs = {
-                            "sync_param": sync_param,
-                            "sync_grad": sync_grad,
-                            "sync_moment": sync_moment,
-                            "sync_mode": "broadcast",
-                            "sync_param_name": [""],
-                        }
+
+                    # sync_param_name = [""] matches any parameter name.
+                    # If sync_param, sync_grad and sync_moment are not set, the default value in Paddle is :
+                    # sync_param = True, sync_grad = False, sync_moment = False, sync_param_name = ["embedding", "layer_norm", ".b_"].
+                    mp_configs = {}
+                    if sync_param:
+                        mp_configs["sync_param"] = True
+                        mp_configs["sync_param_name"] = [""]
+                    if sync_grad:
+                        mp_configs["sync_grad"] = True
+                        mp_configs["sync_param_name"] = [""]
+                    if sync_moment:
+                        mp_configs["sync_moment"] = True
+                        mp_configs["sync_param_name"] = [""]
+
+                    if mp_configs != {}:
                         hybrid_configs["mp_configs"] = mp_configs
                         logger.info(f"using mp configs: {mp_configs}")
 
