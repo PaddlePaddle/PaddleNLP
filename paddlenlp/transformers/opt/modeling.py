@@ -81,7 +81,7 @@ def _expand_mask(mask, tgt_length):
     tgt_length = tgt_length if tgt_length is not None else src_length
 
     expanded_mask = ~(paddle.cast(mask[:, None, None, :], "bool"))
-    expanded_mask = paddle.cast(expanded_mask, dtype=paddle.float32)
+    expanded_mask = paddle.cast(expanded_mask, dtype=paddle.get_default_dtype())
 
     expanded_mask = expanded_mask.expand([batch_size, 1, tgt_length, src_length])
     expanded_mask = expanded_mask * float(finfo(paddle.get_default_dtype()).min)
@@ -889,15 +889,15 @@ class OPTModel(OPTPretrainedModel):
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
-            input_shape = paddle.shape(input_ids)
+            input_shape = input_ids.shape
             input_ids = input_ids.reshape((-1, input_shape[-1]))
         elif inputs_embeds is not None:
-            input_shape = paddle.shape(inputs_embeds)[:-1]
+            input_shape = inputs_embeds.shape[:-1]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
         self.checkpoints = []
-        past_key_values_length = paddle.shape(cache[0].k)[2] if cache is not None else 0
+        past_key_values_length = cache[0].k.shape[2] if cache is not None else 0
 
         seq_length_with_past = input_shape[-1] + past_key_values_length
 

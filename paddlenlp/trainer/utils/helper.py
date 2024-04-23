@@ -16,11 +16,17 @@
 # This file is modified from
 #  https://github.com/huggingface/transformers/blob/main/src/transformers
 
+import collections
+import copy
+import os
 from typing import Any, Optional
 
 import numpy as np
 import paddle
 import paddle.distributed as dist
+from paddle.distributed import fleet
+
+from paddlenlp.utils.log import logger
 
 __all__ = [
     "distributed_concat",
@@ -124,3 +130,142 @@ def nested_truncate(tensors, limit):
     if isinstance(tensors, (list, tuple)):
         return type(tensors)(nested_truncate(t, limit) for t in tensors)
     return tensors[:limit]
+
+
+def distributed_isfile(filename):
+    """Check all machine nodes. return False if no machine have such file."""
+    trainers_num = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
+    if trainers_num <= 1:
+        return os.path.isfile(filename)
+    else:
+        local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+        file_count = paddle.zeros([1], dtype="int64")
+        if local_rank == 0 and os.path.isfile(filename):
+            file_count += 1
+
+        paddle.distributed.all_reduce(file_count)
+        return file_count >= 1
+
+
+def distributed_file(filename):
+    trainers_num = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
+    if trainers_num <= 1:
+        return filename
+    else:
+        local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+        found_file = paddle.to_tensor([2**20], dtype="int64")
+        if local_rank == 0 and os.path.isfile(filename):
+            found_file = paddle.to_tensor([paddle.distributed.get_rank()], dtype="int64")
+
+        tensor_list = []
+        paddle.distributed.all_gather(tensor_list, found_file)
+        src = paddle.min(paddle.concat(tensor_list)).item()
+
+        file_object_list = [None]
+        if paddle.distributed.get_rank() == src:
+            file_object_list = [open(filename, "rb").read()]
+
+        paddle.distributed.broadcast_object_list(file_object_list, src=src)
+        file_object = file_object_list[0]
+
+        if local_rank == 0 and not os.path.isfile(filename):
+            if not os.path.exists(os.path.dirname(filename)):
+                os.makedirs(os.path.dirname(filename))
+
+            with open(filename, "wb") as f:
+                f.write(file_object)
+
+        paddle.distributed.barrier()
+
+        return filename
+
+
+TensorHolder = collections.namedtuple("TensorHolder", ["shape", "dtype", "name"])
+
+
+def nested_reduce_tensor(tensor):
+    if isinstance(tensor, dict):
+        # copy tensor since it will be inplace modified dict
+        tensor = copy.copy(tensor)
+        for key in list(tensor.keys()):
+            tensor[key] = nested_reduce_tensor(tensor[key])
+    if isinstance(tensor, (tuple, list)):
+        return type(tensor)(nested_reduce_tensor(t) for t in tensor)
+
+    if isinstance(tensor, paddle.Tensor):
+        return TensorHolder(tensor.shape, tensor.dtype, tensor.name)
+
+    return tensor
+
+
+def nested_empty_tensor(tensor):
+    if isinstance(tensor, dict):
+        for key in list(tensor.keys()):
+            tensor[key] = nested_empty_tensor(tensor[key])
+    if isinstance(tensor, list):
+        return type(tensor)(nested_empty_tensor(t) for t in tensor)
+
+    # TensorHolder is tuple
+    if isinstance(tensor, TensorHolder):
+        t = paddle.empty(tensor.shape, dtype=tensor.dtype, name=tensor.name)
+        t.name = tensor.name
+        return t
+
+    return tensor
+
+
+def nested_broadcast_tensor(tensor, src=0, group=None):
+    if isinstance(tensor, dict):
+        for key in list(tensor.keys()):
+            tensor[key] = nested_broadcast_tensor(tensor[key], src=src, group=group)
+    if isinstance(tensor, list):
+        return type(tensor)(nested_broadcast_tensor(t, src=src, group=group) for t in tensor)
+
+    if isinstance(tensor, paddle.Tensor):
+        paddle.distributed.broadcast(tensor, src=src, group=group, sync_op=True)
+    return tensor
+
+
+def broadcast_dp_optimizer(state_dict):
+    if paddle.distributed.get_world_size() <= 1:
+        return state_dict
+
+    logger.info("Start broadcast optimizer in data parallel group.")
+    try:
+        hcg = fleet.get_hybrid_communicate_group()
+        dp_group = hcg.get_data_parallel_group()
+        src_rank = hcg.get_data_parallel_group_src_rank()
+        process_rank = paddle.distributed.get_rank()
+        # Don't broadcast optimizer for dp rank is 1.
+        if dp_group.nranks <= 1:
+            return state_dict
+    except:
+        dp_group = None
+        src_rank = 0
+        process_rank = paddle.distributed.get_rank()
+
+    if process_rank == src_rank:
+        if state_dict is None:
+            logger.warning(
+                f"Your local rank {paddle.distributed.get_rank()} must have a state_dict. dp_rank:{process_rank}, src_rank:{src_rank}"
+            )
+        fake_state_dict = [nested_reduce_tensor(state_dict)]
+    else:
+        if state_dict is not None:
+            logger.warning(
+                f"Your local rank {paddle.distributed.get_rank()}  are forbidden to have a state_dict. dp_rank:{process_rank}, src_rank:{src_rank}"
+            )
+        fake_state_dict = [None]
+
+    paddle.distributed.broadcast_object_list(
+        fake_state_dict,
+        src=src_rank,
+        group=dp_group,
+    )
+    fake_state_dict = fake_state_dict[0]
+    if process_rank != src_rank:
+        state_dict = nested_empty_tensor(fake_state_dict)
+
+    state_dict = nested_broadcast_tensor(state_dict, src=src_rank, group=dp_group)
+
+    return state_dict

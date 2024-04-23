@@ -18,13 +18,14 @@ pretrain:
     use_flash_attention: 0
     use_fused_rms_norm: 0
     continue_training: 1
+
   default:
     llama:
-      model_type: llama
       model_name_or_path: __internal_testing__/tiny-random-llama
-    chatglm:
-      model_type: chatglm
-      model_name_or_path: __internal_testing__/tiny-fused-chatglm
+    qwen:
+      model_name_or_path: __internal_testing__/tiny-fused-qwen
+    gpt:
+      model_name_or_path: __internal_testing__/gpt 
 
 inference-predict:
   default:
@@ -33,6 +34,7 @@ inference-predict:
     batch_size: 2
     decode_strategy: greedy_search
     dtype: float16
+    chat_template: none
 
 inference-to-static:
   default:
@@ -45,3 +47,4 @@ inference-infer:
     batch_size: 2
     decode_strategy: greedy_search
     max_length: 20
+    chat_template: none

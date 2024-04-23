@@ -14,6 +14,7 @@
 import json
 import os
 import sys
+from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
@@ -31,6 +32,7 @@ from utils import (
     compute_metrics,
     get_lora_target_modules,
     get_prefix_tuning_params,
+    init_chat_template,
 )
 
 from paddlenlp.data import DataCollatorForSeq2Seq
@@ -48,6 +50,23 @@ from paddlenlp.transformers import (
 from paddlenlp.utils.log import logger
 
 
+def add_start_docstrings(*docstr):
+    def docstring_decorator(fn):
+        fn.__doc__ = "".join(docstr) + (fn.__doc__ if fn.__doc__ is not None else "")
+        return fn
+
+    return docstring_decorator
+
+
+@dataclass
+@add_start_docstrings(TrainingArguments.__doc__)
+class FinetuneArguments(TrainingArguments):
+    decay_steps: int = field(
+        default=0,
+        metadata={"help": "The steps use to control the learing rate."},
+    )
+
+
 def read_local_dataset(path):
     with open(path, "r", encoding="utf-8") as fp:
         for line in fp:
@@ -56,11 +75,11 @@ def read_local_dataset(path):
 
 def main():
     # Arguments
-    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
-    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file(
-            json_file=os.path.abspath(sys.argv[1])
-        )
+    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, FinetuneArguments))
+    # Support format as "args.json --arg1 value1 --arg2 value2.”
+    # In case of conflict, command line arguments take precedence.
+    if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
+        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
         gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
@@ -84,11 +103,11 @@ def main():
     last_checkpoint = None
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 1:
-            raise ValueError(
-                f"Output directory ({training_args.output_dir}) already exists and is not empty. "
-                "Use --overwrite_output_dir to overcome."
-            )
+        # if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 1:
+        #     raise ValueError(
+        #         f"Output directory ({training_args.output_dir}) already exists and is not empty. "
+        #         "Use --overwrite_output_dir to overcome."
+        #     )
         if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
             logger.info(
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
@@ -105,20 +124,41 @@ def main():
             raise ValueError("Please specific dtype: --fp16 or --bf16")
     else:
         dtype = "float32"
+    quantization_config = dict(
+        weight_quantize_algo=model_args.weight_quantize_algo,
+        weight_blocksize=model_args.weight_blocksize,
+        weight_double_quant=model_args.weight_double_quant,
+        weight_double_quant_block_size=model_args.weight_double_quant_block_size,
+    )
 
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
             raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
         from paddlenlp.transformers import AutoModelForCausalLMPipe
 
-        model = AutoModelForCausalLMPipe.from_pretrained(
-            model_args.model_name_or_path,
-            tensor_parallel_output=False,
-            tensor_parallel_degree=training_args.tensor_parallel_degree,
-            tensor_parallel_rank=training_args.tensor_parallel_rank,
-            use_flash_attention=model_args.use_flash_attention,
-            dtype=dtype,
-        )
+        if not training_args.autotuner_benchmark:
+            model = AutoModelForCausalLMPipe.from_pretrained(
+                model_args.model_name_or_path,
+                tensor_parallel_output=False,
+                tensor_parallel_degree=training_args.tensor_parallel_degree,
+                tensor_parallel_rank=training_args.tensor_parallel_rank,
+                use_flash_attention=model_args.use_flash_attention,
+                dtype=dtype,
+                from_aistudio=model_args.from_aistudio,
+                quantization_config=quantization_config,
+            )
+        else:
+            # NOTE(gongenlei): new add autotuner_benchmark
+            model_config = AutoConfig.from_pretrained(
+                model_args.model_name_or_path,
+                tensor_parallel_output=False,
+                tensor_parallel_degree=training_args.tensor_parallel_degree,
+                tensor_parallel_rank=training_args.tensor_parallel_rank,
+                dtype=dtype,
+                from_aistudio=model_args.from_aistudio,
+                quantization_config=quantization_config,
+            )
+            model = AutoModelForCausalLMPipe.from_config(model_config, dtype=dtype)
     else:
         model_config = AutoConfig.from_pretrained(
             model_args.model_name_or_path,
@@ -126,60 +166,177 @@ def main():
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             tensor_parallel_rank=training_args.tensor_parallel_rank,
             dtype=dtype,
+            from_aistudio=model_args.from_aistudio,
+            quantization_config=quantization_config,
         )
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
-        model = AutoModelForCausalLM.from_pretrained(
-            model_args.model_name_or_path,
-            config=model_config,
-        )
+
+        model_config.use_fused_rms_norm = model_args.use_fused_rms_norm
+        model_config.fuse_attention_qkv = model_args.fuse_attention_qkv
+        model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
+        model_config.recompute_granularity = model_args.recompute_granularity
+        model_config.virtual_pp_degree = model_args.virtual_pp_degree
+        model_config.sequence_parallel = model_args.sequence_parallel
+        model_config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
+        model_config.use_fused_rope = model_args.use_fused_rope
+
+        model_config.no_recompute_layers = model_args.no_recompute_layers
+        model_config.pp_recompute_interval = model_args.pp_recompute_interval
+        model_config.recompute_use_reentrant = model_args.recompute_use_reentrant
+        model_config.use_recompute = training_args.recompute
+
+        model_config.tensor_parallel_degree = training_args.tensor_parallel_degree
+        model_config.tensor_parallel_rank = training_args.tensor_parallel_rank
+
+        # Config for model using dropout, such as GPT.
+        model_config.hidden_dropout_prob = model_args.hidden_dropout_prob
+        model_config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
+
+        model_config.sep_parallel_degree = training_args.sep_parallel_degree
+        model_config.tensor_parallel_output = True
+        model_config.seq_length = data_args.max_length
+        if not training_args.autotuner_benchmark:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_args.model_name_or_path,
+                config=model_config,
+                from_aistudio=model_args.from_aistudio,
+            )
+        else:
+            # NOTE(gongenlei): new add autotuner_benchmark
+            model = AutoModelForCausalLM.from_config(model_config, dtype=dtype)
+    if training_args.do_train and model_args.neftune:
+        # Inspired by https://github.com/neelsjain/NEFTune
+        if hasattr(model, "get_input_embeddings"):
+
+            def neft_post_hook(module, input, output):
+                if module.training:
+                    mag_norm = model_args.neftune_noise_alpha / paddle.sqrt(
+                        paddle.to_tensor(output.shape[0] * output.shape[1], dtype="float32")
+                    )
+                    output = output + paddle.uniform(
+                        shape=output.shape, dtype=output.dtype, min=-mag_norm, max=mag_norm
+                    )
+                return output
+
+            neft_post_hook_handle = model.get_input_embeddings().register_forward_post_hook(neft_post_hook)
+        else:
+            raise NotImplementedError("Only support neftune for model with get_input_embeddings")
 
     # Load tokenizer & dataset
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
+    # init chat_template for tokenizer
+    init_chat_template(tokenizer, model_args.model_name_or_path, data_args.chat_template)
+
+    # if using chat_template, data_args.eval_with_do_generation must be false
+    if tokenizer.chat_template is not None:
+        data_args.eval_with_do_generation = False
+
     if isinstance(tokenizer, LlamaTokenizer):
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if data_args.dataset_name_or_path is None:
         raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
-    elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) and os.path.exists(
-        os.path.join(data_args.dataset_name_or_path, "dev.json")
+    elif (
+        os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json"))
+        or os.path.exists(os.path.join(data_args.dataset_name_or_path, "dev.json"))
+        or os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json"))
     ):
-        # train_ds, dev_ds = load_dataset(
-        #     "json",
-        #     data_files={
-        #         "train": os.path.join(data_args.dataset_name_or_path, "train.json"),
-        #         "dev": os.path.join(data_args.dataset_name_or_path, "dev.json"),
-        #     },
-        #     lazy=data_args.lazy,
-        # )
-        train_ds = load_dataset(
-            read_local_dataset,
-            path=os.path.join(data_args.dataset_name_or_path, "train.json"),
-            lazy=data_args.lazy,
-        )
-        dev_ds = load_dataset(
-            read_local_dataset,
-            path=os.path.join(data_args.dataset_name_or_path, "dev.json"),
-            lazy=data_args.lazy,
-        )
-
-    elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train")) and os.path.exists(
-        os.path.join(data_args.dataset_name_or_path, "dev")
+        if training_args.do_train or quant_args.do_qat:
+            train_ds = load_dataset(
+                "json",
+                data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
+                lazy=data_args.lazy,
+            )[0]
+        else:
+            train_ds = None
+        if training_args.do_eval:
+            dev_ds = load_dataset(
+                "json",
+                data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
+                lazy=data_args.lazy,
+            )[0]
+        else:
+            dev_ds = None
+        if quant_args.do_ptq or quant_args.do_gptq:
+            if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
+                ptq_ds = load_dataset(
+                    "json",
+                    data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"),
+                    lazy=data_args.lazy,
+                )[0]
+            elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")):
+                ptq_ds = load_dataset(
+                    "json",
+                    data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
+                    lazy=data_args.lazy,
+                )[0]
+                logger.info(
+                    f"Not found quant.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
+                )
+            else:
+                raise ValueError(
+                    f"Quant strategy requires quant.json or train.json in {data_args.dataset_name_or_path}"
+                )
+        else:
+            ptq_ds = None
+    elif (
+        os.path.exists(os.path.join(data_args.dataset_name_or_path, "train"))
+        or os.path.exists(os.path.join(data_args.dataset_name_or_path, "dev"))
+        or os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant"))
     ):
         import glob
 
-        train_files = glob.glob(os.path.join(data_args.dataset_name_or_path, "train", "*.json"))
-        dev_files = glob.glob(os.path.join(data_args.dataset_name_or_path, "dev", "*.json"))
-        train_ds, dev_ds = load_dataset(
-            "json", data_files={"train": train_files, "dev": dev_files}, lazy=data_args.lazy
-        )
-    else:
-        if data_args.task_name is not None:
-            train_ds, dev_ds = load_dataset(
-                data_args.dataset_name_or_path, data_args.task_name, splits=["train", "dev"]
-            )
+        if training_args.do_train or quant_args.do_qat:
+            train_ds = load_dataset(
+                "json",
+                data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "train", "*.json")),
+                lazy=data_args.lazy,
+            )[0]
         else:
-            train_ds, dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["train", "dev"])
+            train_ds = None
+        if training_args.do_eval:
+            dev_ds = load_dataset(
+                "json",
+                data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "dev", "*.json")),
+                lazy=data_args.lazy,
+            )[0]
+        else:
+            dev_ds = None
+        if quant_args.do_ptq or quant_args.do_gptq:
+            if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant")):
+                ptq_ds = load_dataset(
+                    "json",
+                    data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "quant", "*.json")),
+                    lazy=data_args.lazy,
+                )[0]
+            elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train")):
+                ptq_ds = load_dataset(
+                    "json",
+                    data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "train", "*.json")),
+                    lazy=data_args.lazy,
+                )[0]
+                logger.info(
+                    f"Not found quant.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
+                )
+            else:
+                raise ValueError(f"Quant strategy requires quant or train folder in {data_args.dataset_name_or_path}")
+        else:
+            ptq_ds = None
+    else:
+        if training_args.do_train or quant_args.do_qat:
+            train_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
+        else:
+            train_ds = None
+        if training_args.do_eval:
+            dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["dev"])[0]
+        else:
+            dev_ds = None
+        if quant_args.do_ptq or quant_args.do_gptq:
+            ptq_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
+            logger.info("Set train dataset as PTQ calibration dataset.")
+        else:
+            ptq_ds = None
     # TODO(ZHUI & sijunhe): Temporary implementation. Generalize this logic and move to Trainer later.
     if training_args.resume_from_checkpoint is not None and data_args.lazy:
         logger.info(
@@ -207,38 +364,68 @@ def main():
         trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
     else:
         trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
-    if data_args.intokens:
+
+    if data_args.zero_padding:
         if (
             model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2", "qwen"]
             and training_args.pipeline_parallel_degree < 1
         ):
             raise NotImplementedError(
-                "InTokens data stream is only implemented for LLaMA, Bloom, ChatGLM and QWen so far."
+                "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM and QWen so far."
             )
-    train_ds = train_ds.map(partial(trans_func, is_test=False, intokens=data_args.intokens))
-    eval_intokens = data_args.intokens
-    if data_args.intokens and data_args.eval_with_do_generation:
+    train_ds = (
+        train_ds.map(partial(trans_func, is_test=False, intokens=data_args.zero_padding))
+        if train_ds is not None
+        else None
+    )
+    ptq_ds = (
+        ptq_ds.map(partial(trans_func, is_test=False, intokens=data_args.zero_padding)) if ptq_ds is not None else None
+    )
+    eval_intokens = data_args.zero_padding
+    if data_args.zero_padding and data_args.eval_with_do_generation:
         logger.warning(
-            "`intokens` conflicts with `eval_with_do_generation`. Setting intokens to False for the eval_dataset."
+            "`zero_padding` conflicts with `eval_with_do_generation`. Setting zero_padding to False for the eval_dataset."
         )
         eval_intokens = False
-    dev_ds = dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, intokens=eval_intokens))
-    if data_args.intokens:
+    dev_ds = (
+        dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, intokens=eval_intokens))
+        if dev_ds is not None
+        else None
+    )
+    if data_args.zero_padding:
         if data_args.lazy:
             intoken_dataset = InTokensIterableDataset
         else:
             intoken_dataset = InTokensMapDataset
-        logger.info("Creating InTokens Data Stream. This may take a few minutes.")
-        train_ds = intoken_dataset(
-            train_ds,
-            tokenizer=tokenizer,
-            max_length=data_args.max_length,
-        )
-        if eval_intokens:
-            dev_ds = intoken_dataset(
-                dev_ds,
+        logger.info("Creating Zero Padding Data Stream. This may take a few minutes.")
+        train_ds = (
+            intoken_dataset(
+                train_ds,
                 tokenizer=tokenizer,
                 max_length=data_args.max_length,
+            )
+            if train_ds is not None
+            else None
+        )
+        ptq_ds = (
+            intoken_dataset(
+                ptq_ds,
+                tokenizer=tokenizer,
+                max_length=data_args.max_length,
+            )
+            if ptq_ds is not None
+            else None
+        )
+
+        if eval_intokens:
+            dev_ds = (
+                intoken_dataset(
+                    dev_ds,
+                    tokenizer=tokenizer,
+                    max_length=data_args.max_length,
+                )
+                if dev_ds is not None
+                else None
             )
 
     if model_args.prefix_tuning:
@@ -254,12 +441,18 @@ def main():
             multi_query_group_num=prefix_tuning_params["multi_query_group_num"],
             dtype=dtype,
         )
-        model = PrefixModelForCausalLM(
-            model=model,
-            prefix_config=prefix_config,
-            postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
-        )
-        model.mark_only_prefix_as_trainable()
+        if model_args.prefix_path is None:
+            model = PrefixModelForCausalLM(
+                model=model,
+                prefix_config=prefix_config,
+                postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
+            )
+        else:
+            model = PrefixModelForCausalLM.from_pretrained(
+                model=model,
+                prefix_path=model_args.prefix_path,
+                postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
+            )
         model.print_trainable_parameters()
 
     if model_args.lora:
@@ -268,15 +461,21 @@ def main():
             lora_config = LoRAConfig(
                 target_modules=target_modules,
                 r=model_args.lora_rank,
-                lora_alpha=2 * model_args.lora_rank,
+                lora_alpha=2 * model_args.lora_rank if not model_args.rslora else 4,
+                rslora=model_args.rslora,
+                lora_plus_scale=model_args.lora_plus_scale,
+                pissa=model_args.pissa,
                 merge_weights=False,
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 dtype=dtype,
+                do_qat=quant_args.do_qat,
+                base_model_name_or_path=model_args.model_name_or_path,
+                use_quick_lora=model_args.use_quick_lora,
             )
             model = LoRAModel(model, lora_config)
         else:
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
-        model.mark_only_lora_as_trainable()
+
         model.print_trainable_parameters()
 
     def compute_metrics_do_generation(eval_preds):
@@ -310,8 +509,14 @@ def main():
         }
 
     # Create trainer
-    max_length = data_args.max_length if training_args.pipeline_parallel_degree > 1 else None
-    padding = "max_length" if training_args.pipeline_parallel_degree > 1 else True
+    max_length = (
+        data_args.max_length
+        if training_args.pipeline_parallel_degree > 1 or training_args.autotuner_benchmark
+        else None
+    )  # NOTE(gongenlei): new add autotuner_benchmark
+    padding = (
+        "max_length" if training_args.pipeline_parallel_degree > 1 or training_args.autotuner_benchmark else True
+    )  # NOTE(gongenlei): new add autotuner_benchmark
     if training_args.pipeline_parallel_degree > 1:
         metrics = None
     elif data_args.eval_with_do_generation:
@@ -332,6 +537,7 @@ def main():
             padding=padding,
             max_label_length=max_length,
             return_tensors="np",
+            pad_to_multiple_of=data_args.pad_to_multiple_of,
         ),
         do_generation=data_args.eval_with_do_generation,
         callbacks=[InTokensIterDatasetCallback()] if isinstance(train_ds, InTokensIterableDataset) else None,
@@ -347,6 +553,8 @@ def main():
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        if model_args.neftune:
+            neft_post_hook_handle.remove()
         if training_args.benchmark:
             total_effective_tokens = (
                 sum([len(i["input_ids"]) for i in trainer.train_dataset]) * training_args.num_train_epochs
@@ -355,20 +563,43 @@ def main():
             logger.info(f"Effective_Tokens_per_second: {effective_tokens_per_second} ")
             logger.info("Benchmark done.")
         else:
-            trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
-            trainer.log_metrics("train", train_result.metrics)
-            trainer.save_metrics("train", train_result.metrics)
-            trainer.save_state()
+            if model_args.save_to_aistudio:
+                kwargs = {}
+                if model_args.aistudio_token is not None:
+                    kwargs["token"] = model_args.aistudio_token
+                # PEFT Model only save PEFT parameters, if pretrained model obtains from aistudio
+                if model_args.from_aistudio and (model_args.lora or model_args.prefix_tuning):
+                    kwargs["base_model"] = model_args.model_name_or_path
+                else:
+                    trainer.tokenizer.save_to_aistudio(
+                        repo_id=model_args.aistudio_repo_id,
+                        private=model_args.aistudio_repo_private,
+                        license=model_args.aistudio_repo_license,
+                        exist_ok=True,
+                        **kwargs,
+                    )
+                trainer.model.save_to_aistudio(
+                    repo_id=model_args.aistudio_repo_id,
+                    private=model_args.aistudio_repo_private,
+                    license=model_args.aistudio_repo_license,
+                    merge_tensor_parallel=training_args.tensor_parallel_degree > 1,
+                    exist_ok=True,
+                    **kwargs,
+                )
+
+            if not training_args.autotuner_benchmark:
+                trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
+                trainer.log_metrics("train", train_result.metrics)
+                trainer.save_metrics("train", train_result.metrics)
+                trainer.save_state()
 
     # QAT
     if quant_args.do_qat:
-        if training_args.tensor_parallel_degree > 1:
-            raise NotImplementedError("Only support qat on single gpu.")
         from quant import create_qat_model
 
         trainer.model = create_qat_model(quant_args, trainer.model, dtype)
         train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
-        trainer.save_model()
+        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
         trainer.log_metrics("qat", train_result.metrics)
         trainer.save_metrics("qat", train_result.metrics)
         trainer.save_state()
@@ -379,25 +610,21 @@ def main():
             raise NotImplementedError(
                 "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
             )
-        from quant import apply_ptq, apply_shift, apply_smooth, get_ptq_model_config
+        from quant import (
+            apply_autoclip,
+            apply_ptq,
+            apply_shift,
+            apply_smooth,
+            get_ptq_model_config,
+        )
 
         trainer.model.eval()
-        # Prepare ptq dataloader
-        if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
-            # ptq_ds = load_dataset(
-            #     "json", data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=data_args.lazy,
-            # )[0]
-            ptq_ds = load_dataset(
-                read_local_dataset,
-                path=os.path.join(data_args.dataset_name_or_path, "quant.json"),
-                lazy=data_args.lazy,
-            )
-            ptq_ds = ptq_ds.map(partial(trans_func, is_test=False))
-        else:
-            ptq_ds = train_ds
-            logger.info(
-                f"Not found quant.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
-            )
+        trainer.model.config.quantization_config.quant_type = quant_args.quant_type
+        trainer.model.config.quantization_config.smooth = quant_args.smooth
+        trainer.model.config.quantization_config.shift = quant_args.shift
+        trainer.model.config.quantization_config.shift_smooth_all_linears = (
+            quant_args.smooth_all_linears or quant_args.shift_all_linears
+        )
         ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
         if quant_args.shift or quant_args.smooth:
             ptq_model_config = get_ptq_model_config(trainer.model)
@@ -407,6 +634,9 @@ def main():
 
         if quant_args.smooth:
             apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config)
+
+        if quant_args.auto_clip:
+            apply_autoclip(quant_args, trainer, ptq_dataloader)
 
         apply_ptq(quant_args, trainer, ptq_dataloader)
         trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
@@ -418,22 +648,6 @@ def main():
             )
         from quant import apply_gptq
 
-        # Prepare ptq dataloader
-        if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
-            # ptq_ds = load_dataset(
-            #     "json", data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=data_args.lazy,
-            # )[0]
-            ptq_ds = load_dataset(
-                read_local_dataset,
-                path=os.path.join(data_args.dataset_name_or_path, "quant.json"),
-                lazy=data_args.lazy,
-            )
-            ptq_ds = ptq_ds.map(partial(trans_func, is_test=False))
-        else:
-            ptq_ds = train_ds
-            logger.info(
-                f"Not found quant.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
-            )
         ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
         apply_gptq(quant_args, trainer, ptq_dataloader)
         trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
@@ -445,15 +659,19 @@ def main():
 
     # Evaluation test set
     if training_args.do_predict:
-        # test_ds = load_dataset(
-        #     "json", data_files=os.path.join(data_args.dataset_name_or_path, "test.json"), lazy=data_args.lazy,
-        # )[0]
         test_ds = load_dataset(
-            read_local_dataset,
-            path=os.path.join(data_args.dataset_name_or_path, "test.json"),
+            "json",
+            data_files=os.path.join(data_args.dataset_name_or_path, "test.json"),
             lazy=data_args.lazy,
-        )
+        )[0]
+
         test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
+        if eval_intokens:
+            test_ds = intoken_dataset(
+                test_ds,
+                tokenizer=tokenizer,
+                max_length=data_args.max_length,
+            )
         eval_result = trainer.predict(test_ds).metrics
         trainer.log_metrics("test", eval_result)
 

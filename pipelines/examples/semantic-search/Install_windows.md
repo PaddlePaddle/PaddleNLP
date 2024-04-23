@@ -10,7 +10,7 @@ a. 依赖安装：
 ```bash
 git clone https://github.com/tvst/htbuilder.git
 cd htbuilder/
-python setup install
+python setup.py install
 # pip 一键安装
 pip install --upgrade paddle-pipelines -i https://pypi.tuna.tsinghua.edu.cn/simple
 # 或者源码进行安装最新版本
@@ -59,7 +59,7 @@ xpack.security.enabled: false
 #### 1.4.2 文档数据写入 ANN 索引库
 ```
 # 以DuReader-Robust 数据集为例建立 ANN 索引库
-python utils/offline_ann.py --index_name dureader_robust_query_encoder --doc_dir data/dureader_dev
+python utils/offline_ann.py --index_name dureader_robust_query_encoder --doc_dir data/dureader_dev --query_embedding_model rocketqa-zh-base-query-encoder --passage_embedding_model rocketqa-zh-base-para-encoder --embedding_dim 768 --delete_index
 ```
 参数含义说明
 * `index_name`: 索引的名称
@@ -71,6 +71,9 @@ python utils/offline_ann.py --index_name dureader_robust_query_encoder --doc_dir
 运行结束后，可使用Kibana查看数据
 
 #### 1.4.3 启动 RestAPI 模型服务
+
+**注意** semantic_search.yaml里面的检索模型需要与前面使用offline_ann.py建库的时候使用的检索模型一致
+
 ```bash
 # 指定语义检索系统的Yaml配置文件
 $env:PIPELINE_YAML_PATH='rest_api/pipeline/semantic_search.yaml'

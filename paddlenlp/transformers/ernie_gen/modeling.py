@@ -20,7 +20,6 @@ import paddle
 import six
 from paddle import nn
 from paddle.nn import functional as F
-from paddle.utils.download import get_path_from_url
 
 from paddlenlp.transformers import (
     BertPretrainedModel,
@@ -28,7 +27,7 @@ from paddlenlp.transformers import (
     ErniePretrainedModel,
     RobertaPretrainedModel,
 )
-from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.download import resolve_file_path
 from paddlenlp.utils.log import logger
 
 from .. import PretrainedModel, register_base_model
@@ -281,6 +280,13 @@ class ErnieGenPretrainedModel(PretrainedModel):
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+
+        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+        cache_dir = kwargs.pop("cache_dir", None)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        from_aistudio = kwargs.pop("from_aistudio", False)
+        subfolder = kwargs.pop("subfolder", "")
+
         pretrained_models = list(cls.pretrained_init_configuration.keys())
         resource_files = {}
         init_configuration = {}
@@ -292,7 +298,8 @@ class ErnieGenPretrainedModel(PretrainedModel):
             if os.path.isdir(pretrained_model_name_or_path):
                 for file_id, file_name in cls.resource_files_names.items():
                     full_file_name = os.path.join(pretrained_model_name_or_path, file_name)
-                    resource_files[file_id] = full_file_name
+                    if os.path.isfile(full_file_name):
+                        resource_files[file_id] = full_file_name
                 resource_files["model_config_file"] = os.path.join(
                     pretrained_model_name_or_path, cls.model_config_file
                 )
@@ -303,18 +310,20 @@ class ErnieGenPretrainedModel(PretrainedModel):
                     "identifiers are as follows: {}".format(cls.__name__, cls.pretrained_init_configuration.keys())
                 )
 
-        default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        # default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_resource_files = {}
         for file_id, file_path in resource_files.items():
-            path = os.path.join(default_root, file_path.split("/")[-1])
             if file_path is None or os.path.isfile(file_path):
                 resolved_resource_files[file_id] = file_path
-            elif os.path.exists(path):
-                logger.info("Already cached %s" % path)
-                resolved_resource_files[file_id] = path
-            else:
-                logger.info("Downloading %s and saved to %s" % (file_path, default_root))
-                resolved_resource_files[file_id] = get_path_from_url(file_path, default_root)
+                continue
+            resolved_resource_files[file_id] = resolve_file_path(
+                pretrained_model_name_or_path,
+                [file_path],
+                subfolder,
+                cache_dir=cache_dir,
+                from_aistudio=from_aistudio,
+                from_hf_hub=from_hf_hub,
+            )
 
         # Prepare model initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
@@ -484,7 +493,7 @@ class ErnieModel(ErnieGenPretrainedModel):
         assert (
             attn_bias is not None if past_cache else True
         ), "if `past_cache` is specified; attn_bias should not be None"
-        d_seqlen = paddle.shape(src_ids)[1]
+        d_seqlen = src_ids.shape[1]
         if pos_ids is None:
             pos_ids = paddle.arange(0, d_seqlen, 1, dtype="int32").reshape([1, -1]).cast("int64")
         if attn_bias is None:

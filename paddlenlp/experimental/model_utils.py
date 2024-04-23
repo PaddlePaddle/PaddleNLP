@@ -19,17 +19,17 @@ import json
 import os
 from shutil import copyfile
 
+import numpy as np
 import paddle
 from paddle.framework import core
 
 from paddlenlp.transformers import PretrainedModel
+from paddlenlp.utils.download import resolve_file_path
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
-from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
-from paddlenlp.utils.env import MODEL_HOME
 from paddlenlp.utils.log import logger
 
-__all__ = ["FasterPretrainedModel"]
+__all__ = ["FasterPretrainedModel", "ActScalesLoader", "WeightScalesLoader"]
 
 
 def load_vocabulary(filepath):
@@ -95,6 +95,11 @@ class FasterPretrainedModel(PretrainedModel):
         pretrained_models = list(cls.pretrained_init_configuration.keys())
         resource_files = {}
         init_configuration = {}
+        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+        cache_dir = kwargs.pop("cache_dir", None)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        from_aistudio = kwargs.pop("from_aistudio", False)
+        subfolder = kwargs.pop("subfolder", "")
 
         # From built-in pretrained models
         if pretrained_model_name_or_path in pretrained_models:
@@ -105,40 +110,27 @@ class FasterPretrainedModel(PretrainedModel):
         elif os.path.isdir(pretrained_model_name_or_path):
             for file_id, file_name in cls.resource_files_names.items():
                 full_file_name = os.path.join(pretrained_model_name_or_path, file_name)
-                resource_files[file_id] = full_file_name
+                if os.path.isfile(full_file_name):
+                    resource_files[file_id] = full_file_name
             resource_files["model_config_file"] = os.path.join(pretrained_model_name_or_path, cls.model_config_file)
         else:
-            # Assuming from community-contributed pretrained models
             for file_id, file_name in cls.resource_files_names.items():
-                full_file_name = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, file_name])
-                resource_files[file_id] = full_file_name
-            resource_files["model_config_file"] = "/".join(
-                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
-            )
+                resource_files[file_id] = file_name
 
-        default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+        # default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_resource_files = {}
         for file_id, file_path in resource_files.items():
             if file_path is None or os.path.isfile(file_path):
                 resolved_resource_files[file_id] = file_path
                 continue
-            path = os.path.join(default_root, file_path.split("/")[-1])
-            if os.path.exists(path):
-                logger.info("Already cached %s" % path)
-                resolved_resource_files[file_id] = path
-            else:
-                logger.info("Downloading %s and saved to %s" % (file_path, default_root))
-                try:
-                    resolved_resource_files[file_id] = get_path_from_url(file_path, default_root)
-                except RuntimeError as err:
-                    logger.error(err)
-                    raise RuntimeError(
-                        f"Can't load weights for '{pretrained_model_name_or_path}'.\n"
-                        f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-                        "- a correct model-identifier of built-in pretrained models,\n"
-                        "- or a correct model-identifier of community-contributed pretrained models,\n"
-                        "- or the correct path to a directory containing relevant modeling files(model_weights and model_config).\n"
-                    )
+            resolved_resource_files[file_id] = resolve_file_path(
+                pretrained_model_name_or_path,
+                [file_path],
+                subfolder,
+                cache_dir=cache_dir,
+                from_aistudio=from_aistudio,
+                from_hf_hub=from_hf_hub,
+            )
 
         # Prepare model initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
@@ -326,3 +318,96 @@ class FasterPretrainedModel(PretrainedModel):
             dst_path = os.path.join(save_directory, file_name)
             if src_path and os.path.abspath(src_path) != os.path.abspath(dst_path):
                 copyfile(src_path, dst_path)
+
+
+class ActScalesLoader:
+    def __init__(
+        self,
+        scale_json_file_path="act_scales.json",
+        key_map_dict=None,
+        num_of_layers=None,
+    ):
+        with open(scale_json_file_path) as json_file:
+            self.scale_dict = json.load(json_file)
+        self.key_map = key_map_dict
+        self.scale = {}
+        for scale_type, key_template in self.key_map.items():
+            self.scale[scale_type] = np.full([num_of_layers], fill_value=-1.0)
+            for i in range(num_of_layers):
+                if key_template.replace("#", str(i)) in self.scale_dict.keys():
+                    self.scale[scale_type][i] = 1 / self.scale_dict[key_template.replace("#", str(i))]
+
+
+class WeightScalesLoader:
+    def __init__(
+        self,
+        scale_json_file_path="weight_scales.json",
+        key_map_dict=None,
+        num_of_layers=None,
+        concat_qkv=False,
+        concat_ffn1=False,
+    ):
+        with open(scale_json_file_path) as json_file:
+            self.scale_dict = json.load(json_file)
+        self.key_map = key_map_dict
+        self.scale = {}
+        for scale_type, key_template in self.key_map.items():
+            no_skip_layer_list = []
+            n = 1
+            for i in range(num_of_layers):
+                if key_template.replace("#", str(i)) in self.scale_dict.keys():
+                    no_skip_layer_list.append(key_template.replace("#", str(i)))
+            if len(no_skip_layer_list) > 0:
+                n = len(self.scale_dict[no_skip_layer_list[0]])
+            self.scale[scale_type] = np.full([num_of_layers, n], fill_value=-1.0, dtype="float32")
+            for i in range(num_of_layers):
+                if key_template.replace("#", str(i)) in self.scale_dict.keys():
+                    self.scale[scale_type][i, :] = self.scale_dict[key_template.replace("#", str(i))]
+
+        # concat qkv and ffn1
+        if concat_qkv:
+            self.scale["qkv_weight_scale"] = []
+
+        if concat_ffn1:
+            self.scale["ffn1_weight_scale"] = []
+
+        for i in range(num_of_layers):
+            if concat_qkv:
+                self.scale["qkv_weight_scale"].append(
+                    np.concatenate(
+                        [
+                            self.scale["q_weight_scale"][i, :],
+                            self.scale["k_weight_scale"][i, :],
+                            self.scale["v_weight_scale"][i, :],
+                        ]
+                    )
+                )
+
+            if concat_ffn1:
+                self.scale["ffn1_weight_scale"].append(
+                    np.concatenate([self.scale["ffn1_1_weight_scale"][i, :], self.scale["ffn1_2_weight_scale"][i, :]])
+                )
+
+
+class CacheScaleLoader:
+    def __init__(
+        self, scale_json_file_path="cache_scales.json", key_map_dict=None, num_of_layers=None, num_heads=None
+    ):
+        with open(scale_json_file_path) as json_file:
+            self.scale_dict = json.load(json_file)
+        self.key_map = key_map_dict
+        self.scale = {}
+        for scale_type, key_template in self.key_map.items():
+            if "cache_k" in scale_type:
+                scale_type_out = "cache_k_out_scale"
+            else:
+                scale_type_out = "cache_v_out_scale"
+            self.scale[scale_type] = np.full([num_of_layers, num_heads], fill_value=-1.0)
+            self.scale[scale_type_out] = np.full([num_of_layers, num_heads], fill_value=-1.0)
+
+            for i in range(num_of_layers):
+                if key_template.replace("#", str(i)) in self.scale_dict.keys():
+                    self.scale[scale_type][i, :] = [
+                        127.0 / num for num in self.scale_dict[key_template.replace("#", str(i))]
+                    ]
+                    self.scale[scale_type_out][i, :] = [1.0 / self.scale[scale_type][i, j] for j in range(num_heads)]

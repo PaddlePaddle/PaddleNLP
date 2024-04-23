@@ -55,5 +55,5 @@ pip install -r requirements.txt
 ```
 2. 运行评测脚本
 ```bash
-python Retrieval_benchmarks.py
+python retrieval_benchmarks.py
 ```

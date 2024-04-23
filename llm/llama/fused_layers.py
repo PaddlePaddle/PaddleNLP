@@ -58,16 +58,18 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
 
         if hasattr(weight, "main_grad") and hasattr(bias, "main_grad"):
             weight.main_grad, bias.main_grad = _C_ops.fused_linear_param_grad_add(
-                x, y_grad, weight.main_grad, bias.main_grad, True
+                x, y_grad, weight.main_grad, bias.main_grad, True, True
             )
             return x_grad, None, None
         else:
             if weight.grad is not None:
                 assert bias.grad is not None
-                weight.grad, bias.grad = _C_ops.fused_linear_param_grad_add(x, y_grad, weight.grad, bias.grad, False)
+                weight.grad, bias.grad = _C_ops.fused_linear_param_grad_add(
+                    x, y_grad, weight.grad, bias.grad, False, True
+                )
                 return x_grad, None, None
             else:
-                weight_grad, bias_grad = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False)
+                weight_grad, bias_grad = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False, True)
                 return x_grad, weight_grad, bias_grad
 
 

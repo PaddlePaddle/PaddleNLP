@@ -14,6 +14,7 @@
 
 cd ..
 sed -i -e "s/paddlepaddle/#paddlepaddle/g" requirements-dev.txt
+sed -i -e "s/pip install paddlepaddle/#pip install paddlepaddle/g" Makefile
 
 make install
 

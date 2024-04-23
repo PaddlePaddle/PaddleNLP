@@ -130,66 +130,6 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
         "eos_token_id": 50256,
         "eol_token_id": 198,
     },
-    "gpt2-xl-en": {  # 1558M
-        "vocab_size": 50257,
-        "hidden_size": 1600,
-        "num_hidden_layers": 48,
-        "num_attention_heads": 25,
-        "intermediate_size": 6400,
-        "hidden_act": "gelu",
-        "hidden_dropout_prob": 0.1,
-        "attention_probs_dropout_prob": 0.1,
-        "max_position_embeddings": 1024,
-        "type_vocab_size": 1,  # no use
-        "initializer_range": 0.02,
-        "eos_token_id": 50256,
-        "eol_token_id": 198,
-    },
-    "gpt2-large-en": {  # 774M
-        "vocab_size": 50257,
-        "hidden_size": 1280,
-        "num_hidden_layers": 36,
-        "num_attention_heads": 20,
-        "intermediate_size": 5120,
-        "hidden_act": "gelu",
-        "hidden_dropout_prob": 0.1,
-        "attention_probs_dropout_prob": 0.1,
-        "max_position_embeddings": 1024,
-        "type_vocab_size": 1,  # no use
-        "initializer_range": 0.02,
-        "eos_token_id": 50256,
-        "eol_token_id": 198,
-    },
-    "gpt2-medium-en": {  # 345M
-        "vocab_size": 50304,
-        "hidden_size": 1024,
-        "num_hidden_layers": 24,
-        "num_attention_heads": 16,
-        "intermediate_size": 4096,
-        "hidden_act": "gelu",
-        "hidden_dropout_prob": 0.1,
-        "attention_probs_dropout_prob": 0.1,
-        "max_position_embeddings": 1024,
-        "type_vocab_size": 1,  # no use
-        "initializer_range": 0.02,
-        "eos_token_id": 50256,
-        "eol_token_id": 198,
-    },
-    "gpt2-en": {  # 117M
-        "vocab_size": 50257,
-        "hidden_size": 768,
-        "num_hidden_layers": 12,
-        "num_attention_heads": 12,
-        "intermediate_size": 3072,
-        "hidden_act": "gelu",
-        "hidden_dropout_prob": 0.1,
-        "attention_probs_dropout_prob": 0.1,
-        "max_position_embeddings": 1024,
-        "type_vocab_size": 1,  # no use
-        "initializer_range": 0.02,
-        "eos_token_id": 50256,
-        "eol_token_id": 198,
-    },
     "gpt2-small-en": {  # config for CE
         "vocab_size": 50304,
         "hidden_size": 1024,
@@ -301,6 +241,7 @@ class GPTConfig(PretrainedConfig):
 
     def __init__(
         self,
+        seq_length=1024,
         vocab_size: int = 50304,
         hidden_size: int = 768,
         num_hidden_layers: int = 12,
@@ -312,6 +253,7 @@ class GPTConfig(PretrainedConfig):
         max_position_embeddings: int = 512,
         type_vocab_size: int = 16,
         initializer_range: float = 0.02,
+        layer_norm_eps=1e-5,
         pad_token_id: int = 0,
         eos_token_id: int = 7,
         bos_token_id: int = 0,
@@ -326,15 +268,18 @@ class GPTConfig(PretrainedConfig):
         ignore_index: int = 0,
         use_flash_attention: bool = False,
         use_fused_dropout_add: bool = False,
-        fused_linear: bool = False,
-        fuse_attention_qkv=False,
-        enable_fuse_transformer: bool = False,
+        use_fast_layer_norm: bool = False,
+        use_fused_linear: bool = False,
+        fuse_attention_qkv: bool = False,
+        fuse_attention_ffn: bool = False,
         fused_softmax_with_triangular: bool = False,
         virtual_pp_degree: int = 1,
+        sequence_parallel=False,
+        fuse_sequence_parallel_allreduce=False,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
-
+        self.seq_length = seq_length
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
@@ -346,6 +291,7 @@ class GPTConfig(PretrainedConfig):
         self.max_position_embeddings = max_position_embeddings
         self.type_vocab_size = type_vocab_size
         self.initializer_range = initializer_range
+        self.layer_norm_eps = layer_norm_eps
 
         self.pad_token_id = pad_token_id
         self.eos_token_id = eos_token_id
@@ -353,6 +299,7 @@ class GPTConfig(PretrainedConfig):
         self.eol_token_id = eol_token_id
 
         self.fuse_attention_qkv = fuse_attention_qkv
+        self.fuse_attention_ffn = fuse_attention_ffn
         self.use_flash_attention = use_flash_attention
 
         self.num_partitions = num_partitions
@@ -363,8 +310,15 @@ class GPTConfig(PretrainedConfig):
         self.tensor_parallel_output = tensor_parallel_output
         self.output_attentions = output_attentions
         self.ignore_index = ignore_index
-        self.fused_linear = fused_linear
-        self.enable_fuse_transformer = enable_fuse_transformer
+        self.use_fast_layer_norm = use_fast_layer_norm
+        self.use_fused_linear = use_fused_linear
         self.use_fused_dropout_add = use_fused_dropout_add
         self.fused_softmax_with_triangular = fused_softmax_with_triangular
         self.virtual_pp_degree = virtual_pp_degree
+        self.sequence_parallel = sequence_parallel
+        self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
+
+        if self.sequence_parallel:
+            assert (
+                self.tensor_parallel_degree > 1
+            ), f"senquence-parallel only works in mp, got mp={self.tensor_parallel_degree}"

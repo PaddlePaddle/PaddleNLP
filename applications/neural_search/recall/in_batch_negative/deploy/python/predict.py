@@ -252,7 +252,7 @@ if __name__ == "__main__":
         args.enable_mkldnn,
     )
 
-    # ErnieTinyTokenizer is special for ernie-tiny pretained model.
+    # ErnieTinyTokenizer is special for ernie-tiny pretrained model.
     output_emb_size = 256
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     id2corpus = {0: "国有企业引入非国有资本对创新绩效的影响——基于制造业国有上市公司的经验证据"}

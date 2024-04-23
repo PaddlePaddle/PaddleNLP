@@ -14,7 +14,9 @@
 
 from .bloom import *
 from .chatglm import *
+from .chatglm_v2 import *
 from .fused_transformer_layers import *
 from .gpt import *
 from .llama import *
 from .opt import *
+from .qwen import *

@@ -35,7 +35,7 @@ Model:
   scale_qk_by_layer_num: True
   fused_softmax_with_triangular: True
   use_flash_attn: False
-
+  sequence_parallel: False # TODO make sequence_parallel as an independent parallel and be set id Distributed
 
 Data:
   Train:

@@ -213,6 +213,10 @@ class PdArgumentParser(ArgumentParser):
                 args = fargs + args if args is not None else fargs + sys.argv[1:]
                 # in case of duplicate arguments the first one has precedence
                 # so we append rather than prepend.
+
+        return self.common_parse(args, return_remaining_strings)
+
+    def common_parse(self, args, return_remaining_strings) -> Tuple[DataClass, ...]:
         namespace, remaining_args = self.parse_known_args(args=args)
         outputs = []
         for dtype in self.dataclass_types:
@@ -233,19 +237,48 @@ class PdArgumentParser(ArgumentParser):
 
             return (*outputs,)
 
-    def parse_json_file(self, json_file: str) -> Tuple[DataClass, ...]:
+    def read_json(self, json_file: str) -> list:
+        json_file = Path(json_file)
+        if json_file.exists():
+            with open(json_file, "r") as file:
+                data = json.load(file)
+            json_args = []
+            for key, value in data.items():
+                if isinstance(value, list):
+                    json_args.extend([f"--{key}", *[str(v) for v in value]])
+                else:
+                    json_args.extend([f"--{key}", str(value)])
+            return json_args
+        else:
+            raise FileNotFoundError(f"The argument file {json_file} does not exist.")
+
+    def parse_json_file(self, json_file: str, return_remaining_strings=False) -> Tuple[DataClass, ...]:
         """
         Alternative helper method that does not use `argparse` at all, instead loading a json file and populating the
         dataclass types.
         """
-        data = json.loads(Path(json_file).read_text())
-        outputs = []
-        for dtype in self.dataclass_types:
-            keys = {f.name for f in dataclasses.fields(dtype) if f.init}
-            inputs = {k: v for k, v in data.items() if k in keys}
-            obj = dtype(**inputs)
-            outputs.append(obj)
-        return (*outputs,)
+        json_args = self.read_json(json_file)
+        return self.common_parse(json_args, return_remaining_strings)
+
+    def parse_json_file_and_cmd_lines(self, return_remaining_strings=False) -> Tuple[DataClass, ...]:
+        """
+        Extend the functionality of `parse_json_file` to handle command line arguments in addition to loading a JSON
+        file.
+
+        When there is a conflict between the command line arguments and the JSON file configuration,
+        the command line arguments will take precedence.
+
+        Returns:
+            Tuple consisting of:
+
+                - the dataclass instances in the same order as they were passed to the initializer.abspath
+        """
+        if not sys.argv[1].endswith(".json"):
+            raise ValueError(f"The first argument should be a JSON file, but it is {sys.argv[1]}")
+        json_args = self.read_json(sys.argv[1])
+        # In case of conflict, command line arguments take precedence
+        args = json_args + sys.argv[2:]
+        return self.common_parse(args, return_remaining_strings)
 
     def parse_dict(self, args: dict) -> Tuple[DataClass, ...]:
         """
