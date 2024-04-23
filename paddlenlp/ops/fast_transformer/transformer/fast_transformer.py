@@ -235,7 +235,7 @@ class FasterTransformer(TransformerModel):
         )
 
     def forward(self, src_word, trg_word=None):
-        src_max_len = paddle.shape(src_word)[-1]
+        src_max_len = src_word.shape[-1]
         src_slf_attn_bias = (
             paddle.cast(src_word == self.pad_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
         )
@@ -1619,7 +1619,7 @@ class FasterMBART(MBartPretrainedModel):
             encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(input_ids, model_kwargs)[
                 "encoder_output"
             ]
-        batch_size = paddle.shape(encoder_output)[0]
+        batch_size = encoder_output.shape[0]
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
             seq_len = paddle.sum(paddle.cast(input_ids != self.pad_token_id, dtype="int32"), axis=-1, dtype="int32")
@@ -1649,7 +1649,7 @@ class FasterMBART(MBartPretrainedModel):
             else:
                 forced_bos_token_id = paddle.zeros([0])
         elif decode_strategy == "sampling":
-            num_samples = paddle.shape(encoder_output)[0]
+            num_samples = encoder_output.shape[0]
             forced_bos_token_id = paddle.expand(forced_bos_token_id, shape=[num_samples, 1])
 
         return self.decoding(

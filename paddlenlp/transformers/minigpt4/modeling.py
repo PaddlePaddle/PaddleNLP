@@ -156,16 +156,12 @@ class MiniGPT4PretrainedModel(PretrainedModel):
             module.gradient_checkpointing = value
 
     @classmethod
-    def from_pretrained(
-        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str = "", *args, **kwargs
-    ):
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         vit_dtype = kwargs.pop("vit_dtype", "float16")
         qformer_dtype = kwargs.pop("qformer_dtype", "float32")
         llama_dtype = kwargs.pop("llama_dtype", "float16")
 
-        model = super().from_pretrained(
-            pretrained_model_name_or_path, from_hf_hub=from_hf_hub, subfolder=subfolder, *args, **kwargs
-        )
+        model = super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
 
         logger.info("Trying to convert dtype for MiniGPT4 model, it may take a while.")
         if isinstance(model, (MiniGPT4Model, MiniGPT4ForConditionalGeneration)):
@@ -207,7 +203,7 @@ class MiniGPT4VisionEmbeddings(nn.Layer):
         batch_size = pixel_values.shape[0]
         target_dtype = self.patch_embedding.weight.dtype
         patch_embeds = self.patch_embedding(pixel_values)  # shape = [*, width, grid, grid]
-        patch_embeds_shape = paddle.shape(patch_embeds)
+        patch_embeds_shape = patch_embeds.shape
         patch_embeds = paddle.reshape(
             patch_embeds, shape=[patch_embeds_shape[0], patch_embeds_shape[1], -1]
         ).transpose([0, 2, 1])
