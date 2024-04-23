@@ -2,9 +2,8 @@ parameterized
 sentencepiece
 regex
 torch>=1.5
-transformers
+transformers==4.36.0
 tool_helpers
-fast_tokenizer_python
 sacremoses
 pydantic==1.10.9
 modelscope
