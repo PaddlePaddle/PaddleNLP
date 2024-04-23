@@ -26,16 +26,16 @@ rm -rf "output/$task_name""_log"
 
 export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../../:$PYTHONPATH
-#ulimit -c unlimited
-#export GLOG_v=10
+
 
 rm -rf ./auto_3d
 
 export FLAGS_embedding_deterministic=1        
 export FLAGS_cudnn_deterministic=1
 export NVIDIA_TF32_OVERRIDE=0
+export FLAGS_enable_pir_in_executor=0
 
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "auto_3d" \
-    run_pretrain_3D_auto.py ./pretrain_argument_dp2tp2pp2.json
+    run_pretrain_3D_auto.py ./pretrain_argument_auto_dp2tp2pp2.json

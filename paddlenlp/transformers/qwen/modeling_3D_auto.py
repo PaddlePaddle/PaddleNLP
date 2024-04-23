@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import math
 import warnings
 from functools import partial
@@ -103,7 +104,7 @@ def get_triangle_upper_mask(x, mask=None):
     mask.stop_gradient = True
     return mask
 
-
+attention_cnt = 0
 class QWenAttentionAuto(nn.Layer):
     def __init__(self, config, ipp=None):
         super().__init__()
@@ -117,7 +118,9 @@ class QWenAttentionAuto(nn.Layer):
         self.inv_norm_factor = 1.0 / math.sqrt(self.head_dim)
 
         self.scale_attn_weights = True
-        self.enable_recompute = False
+        # self.enable_recompute = False
+        self.enable_recompute = config.use_recompute
+        logger.warning(f"self.enable_recompute: {self.enable_recompute}")
         self.recompute_granularity = config.recompute_granularity
 
         self.projection_size = config.kv_channels * config.num_attention_heads
@@ -142,11 +145,11 @@ class QWenAttentionAuto(nn.Layer):
         #         input_is_parallel=True,
         #     )
         # else:
-        # self.c_attn = nn.Linear(config.hidden_size, 3 * self.projection_size, bias_attr=True)
+        self.c_attn = nn.Linear(config.hidden_size, 3 * self.projection_size, bias_attr=True)
         # temperary
-        self.c_attn_q = nn.Linear(config.hidden_size, self.projection_size, bias_attr=True)
-        self.c_attn_k = nn.Linear(config.hidden_size, self.projection_size, bias_attr=True)
-        self.c_attn_v = nn.Linear(config.hidden_size, self.projection_size, bias_attr=True)
+        # self.c_attn_q = nn.Linear(config.hidden_size, self.projection_size, bias_attr=True)
+        # self.c_attn_k = nn.Linear(config.hidden_size, self.projection_size, bias_attr=True)
+        # self.c_attn_v = nn.Linear(config.hidden_size, self.projection_size, bias_attr=True)
         #
         self.c_proj = nn.Linear(config.hidden_size, self.projection_size, bias_attr=not config.no_bias)
 
@@ -167,6 +170,9 @@ class QWenAttentionAuto(nn.Layer):
 
         self.attn_dropout = nn.Dropout(config.attn_dropout_prob)
         self.ipp = ipp
+        global attention_cnt
+        self.attention_cnt = attention_cnt
+        attention_cnt += 1
 
     def _attn(self, query, key, value, attention_mask=None):
         # Support the flash attention and normal attention
@@ -216,7 +222,8 @@ class QWenAttentionAuto(nn.Layer):
             if attention_mask is None:
                 attention_mask = get_triangle_upper_mask(attn_weights)
             attn_weights = attn_weights + attention_mask
-            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(value.dtype)
+            with paddle.amp.auto_cast(False):
+                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(value.dtype)
 
             attn_weights = self.attn_dropout(attn_weights)
             attn_output = paddle.matmul(attn_weights, value)
@@ -246,13 +253,9 @@ class QWenAttentionAuto(nn.Layer):
         use_cache=False,
     ):
         # # [bz, sql, hid] ==> [bz, sql, 3*hid]
-        # mixed_x_layer = self.c_attn(hidden_states)
-        # # [bz, sql, 3*hid] ==> [bz, sql, hid]
-        # query, key, value = paddle.split(mixed_x_layer, num_or_sections=3, axis=-1)
-        # tmperary
-        query = self.c_attn_q(hidden_states)
-        key = self.c_attn_k(hidden_states)
-        value = self.c_attn_v(hidden_states)
+        mixed_x_layer = self.c_attn(hidden_states)
+        # [bz, sql, 3*hid] ==> [bz, sql, hid]
+        query, key, value = paddle.split(mixed_x_layer, num_or_sections=3, axis=-1)
 
         # [bz, sql, hid] ==> [bz, sql, nh, hdim]
         query = self._split_heads(query, self.num_heads, self.head_dim)
@@ -349,13 +352,15 @@ class QWenMLPAuto(nn.Layer):
 
 
 class QWenBlockAuto(nn.Layer):
-    def __init__(self, config, ipp=None):
+    def __init__(self, config, ipp=None, idx=None):
         super().__init__()
+        self.config = config
         self.ln_1 = QWenRMSNormAuto(config)
         self.attn = QWenAttentionAuto(config, ipp)
         self.ln_2 = QWenRMSNormAuto(config)
         self.mlp = QWenMLPAuto(config, ipp)
         self.ipp = ipp
+        self.idx = idx
 
     def forward(
         self,
@@ -554,7 +559,7 @@ class QWenModelAuto(QWenPretrainedModelAuto):
         self.vocab_size = config.vocab_size
         self.num_hidden_layers = config.num_hidden_layers
         self.embed_dim = config.hidden_size
-        self.enable_recompute = False
+        self.enable_recompute = config.use_recompute
         self.recompute_granularity = config.recompute_granularity
 
         self.wte = nn.Embedding(self.vocab_size, self.embed_dim)
@@ -575,6 +580,7 @@ class QWenModelAuto(QWenPretrainedModelAuto):
                 QWenBlockAuto(
                     config,
                     get_layer_ipp(i),
+                    i,
                 )
                 for i in range(config.num_hidden_layers)
             ]
@@ -620,7 +626,7 @@ class QWenModelAuto(QWenPretrainedModelAuto):
         )
         return hidden_states
 
-    def get_masks(self, batch_size, seq_length, past_length, padding_mask=None):
+    def get_masks(self, batch_size, seq_length, past_length, dtype, padding_mask=None):
         # casual mask
         casual_mask = paddle.tril(paddle.ones([batch_size, 1, seq_length, seq_length], dtype="bool"))
         if past_length > 0:
@@ -688,12 +694,14 @@ class QWenModelAuto(QWenPretrainedModelAuto):
         encoder_attention_mask = None
         if inputs_embeds is None:
             inputs_embeds = self.wte(input_ids)
+
         hidden_states = inputs_embeds
 
         # bool 4D mask
-        attention_mask = self.get_masks(input_shape[0], input_shape[1], past_length, padding_mask=attention_mask)
-        zero = paddle.zeros(attention_mask.shape, dtype=hidden_states.dtype)
-        neg_inf = paddle.full_like(attention_mask, paddle.finfo(hidden_states.dtype).min, dtype=hidden_states.dtype)
+        attention_mask = self.get_masks(input_shape[0], input_shape[1], past_length, dtype=hidden_states.dtype, padding_mask=attention_mask)
+        # TODO(GhostScreaming): how to fix paddle.finfo?
+        zero = paddle.zeros(attention_mask.shape, dtype=paddle.bfloat16)
+        neg_inf = paddle.full_like(attention_mask, paddle.finfo(paddle.bfloat16).min, dtype=paddle.bfloat16)
         # dtype 4D mask
         attention_mask = paddle.where(attention_mask, zero, neg_inf)
 
@@ -798,20 +806,15 @@ class QWenLMHeadAuto(nn.Layer):
             shape=[config.hidden_size, vocab_size],
             dtype=paddle.get_default_dtype(),
         )
-        # Must set distributed attr for Tensor Parallel !
-        # self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
-        # if self.weight.is_distributed:
-        #     self.weight.split_axis = 1
 
     def forward(self, hidden_states, tensor_parallel_output=None):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
-        # logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         logits = paddle.matmul(hidden_states, self.weight, transpose_y=False)
         return logits
 
-
+loss_cnt = 0
 class QWenPretrainingCriterionAuto(paddle.nn.Layer):
     """
     Criterion for Llama.
@@ -828,6 +831,7 @@ class QWenPretrainingCriterionAuto(paddle.nn.Layer):
         self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
     def forward(self, prediction_scores, masked_lm_labels):
+        global loss_cnt
         if self.enable_parallel_cross_entropy:
             if prediction_scores.shape[-1] == self.config.vocab_size:
                 warnings.warn(
@@ -835,12 +839,13 @@ class QWenPretrainingCriterionAuto(paddle.nn.Layer):
                 )
                 self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
-        # with paddle.amp.auto_cast(False):
-        masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
-        # skip ignore_index which loss == 0
-        # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
-        masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
-        loss = paddle.mean(masked_lm_loss)
+        with paddle.amp.auto_cast(False):
+            masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
+            # skip ignore_index which loss == 0
+            masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
+            loss = paddle.mean(masked_lm_loss)
+
+        loss_cnt += 1
         return loss
 
 
@@ -851,82 +856,6 @@ class QWenForCausalLM3DAuto(QWenPretrainedModelAuto):
         super().__init__(config)
         self.qwen = QWenModelAuto(config)
         self.lm_head = QWenLMHeadAuto(config)
-        self.criterion = QWenPretrainingCriterionAuto(config)
-
-    # def get_output_embeddings(self):
-    #     return self.lm_head
-
-    # def set_output_embeddings(self, new_embeddings):
-    #     self.lm_head = new_embeddings
-
-    # @staticmethod
-    # def update_model_kwargs_for_generation(outputs, model_kwargs, is_encoder_decoder=False):
-    #     # Update the model inputs during generation.
-    #     # Note that If `token_type_ids` and `attention_mask` in `model_kwargs`
-    #     # and they contain pad value, the result vectors updated by this method
-    #     # may be different from expected. In this case, you need to rewrite the
-    #     # method.
-
-    #     # update cache
-    #     if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
-    #         model_kwargs["cache"] = outputs[1]
-    #         model_kwargs["past_key_values"] = outputs[1]
-
-    #     if isinstance(outputs, ModelOutput) and "past_key_values" in outputs:
-    #         model_kwargs["cache"] = outputs.past_key_values
-    #         model_kwargs["past_key_values"] = outputs.past_key_values
-
-    #     if "position_ids" in model_kwargs and model_kwargs["position_ids"] is not None:
-    #         position_ids = model_kwargs["position_ids"]
-    #         model_kwargs["position_ids"] = paddle.concat([position_ids, position_ids[..., -1:] + 1], axis=-1)
-
-    #     # update attention_mask
-    #     if not is_encoder_decoder and "attention_mask" in model_kwargs:
-    #         attention_mask = model_kwargs["attention_mask"]
-    #         if attention_mask is not None and len(attention_mask.shape) == 2:
-    #             model_kwargs["attention_mask"] = paddle.concat(
-    #                 [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)], axis=-1
-    #             )
-    #         else:
-    #             model_kwargs["attention_mask"] = None
-
-    #     return model_kwargs
-
-    # def prepare_inputs_for_generation(self, input_ids, past_key_values=None, inputs_embeds=None, **kwargs):
-    #     attention_mask = kwargs.get("attention_mask", None)
-    #     position_ids = kwargs.get("position_ids", None)
-
-    #     if past_key_values:
-    #         input_ids = input_ids[:, -1].unsqueeze(-1)
-    #         if position_ids is not None:
-    #             position_ids = position_ids[:, -1].unsqueeze(-1)
-
-    #     if inputs_embeds is not None and past_key_values is None:
-    #         model_inputs = {"inputs_embeds": inputs_embeds}
-    #     else:
-    #         model_inputs = {"input_ids": input_ids}
-
-    #     model_inputs.update(
-    #         {
-    #             "past_key_values": past_key_values,
-    #             "use_cache": kwargs.get("use_cache"),
-    #             "attention_mask": attention_mask,
-    #             "position_ids": position_ids,
-    #         }
-    #     )
-    #     return model_inputs
-
-    # @staticmethod
-    # def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
-    #     is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(input_ids == pad_token_id).item()
-    #     is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
-    #         (eos_token_id is not None) and (pad_token_id != eos_token_id)
-    #     )
-    #     if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
-    #         attention_mask = (input_ids != pad_token_id).astype(paddle.int64)
-    #     else:
-    #         attention_mask = paddle.ones_like(input_ids, dtype=paddle.int64)
-    #     return attention_mask
 
     def forward(
         self,
@@ -968,22 +897,7 @@ class QWenForCausalLM3DAuto(QWenPretrainedModelAuto):
         )
         lm_logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
 
-        loss = None
-        if labels is not None:
-            loss = self.criterion(lm_logits, labels)
-
-        if not return_dict:
-            output = (lm_logits,) + transformer_outputs[1:]
-            return ((loss,) + output) if loss is not None else output
-
-        return CausalLMOutputWithPast(
-            loss=loss,
-            logits=lm_logits,
-            past_key_values=transformer_outputs.past_key_values,
-            hidden_states=transformer_outputs.hidden_states,
-            attentions=transformer_outputs.attentions,
-        )
-
+        return lm_logits
 
 class RotaryEmbedding(nn.Layer):
     def __init__(self, dim, base=10000):
@@ -1026,7 +940,6 @@ def rotate_half(x):
 
 
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None):
-
     if position_ids is None:
         cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
         sin = sin[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
@@ -1056,15 +969,14 @@ class QWenRMSNormAuto(nn.Layer):
             default_initializer=nn.initializer.Constant(1.0),
         )
 
-    def _norm(self, x):
-        return x * paddle.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
-
     def forward(self, x):
         if self.config.use_fused_rms_norm:
             return rms_norm_fused(x, self.weight, self.eps)
+        with paddle.amp.auto_cast(False):
+            variance = x.astype("float32").pow(2).mean(-1, keepdim=True)
+            output = paddle.rsqrt(variance + self.eps) * x
 
-        output = self._norm(x.astype(paddle.float32)).astype(x.dtype)
+        if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
+            output = paddle.cast(output, self.weight.dtype)
         return output * self.weight
 
-
-# QWenLMHeadModel = QWenForCausalLM3DAuto
