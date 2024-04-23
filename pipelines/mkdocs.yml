@@ -29,7 +29,7 @@ nav:
   - milvus2: 'package/docstore/milvus2.md'
 
 - Agents module:
-  - agent: 'package/agents/agents.md'
+  - agent: 'package/g/agents.md'
   - memory: 'package/agents/memory.md'
 
 - Server module: 
@@ -85,7 +85,7 @@ plugins:
             show_bases: false
             show_root_heading: true
             docstring_style: sphinx
-          paths: []
+          paths: [pipelines/pipelines]
           selection:
             filters:
               - "^__init__$"  # but always include __init__ modules and methods
