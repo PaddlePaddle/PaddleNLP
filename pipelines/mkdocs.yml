@@ -3,7 +3,7 @@ repo_url: https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines
 repo_name: PaddleNLP-Pipelines
 site_url: https://paddlenlp-pipelines.readthedocs.io/zh-cn/latest/
 site_description: provides an easy-to-use paddlenlp application tool suite.
-
+docs_dir: pipelines/docs
 nav:
 - Pipelines module: 
   - Pipeline: 'package/pipelines/standard_pipelines.md'
