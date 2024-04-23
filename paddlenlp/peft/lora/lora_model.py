@@ -75,10 +75,18 @@ except:
     ColumnParallelQuantizationLoRALinear = None
     RowParallelQuantizationLoRALinear = None
 
-from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    RowSequenceParallelLinear,
-)
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        ColumnSequenceParallelLinear,
+        RowSequenceParallelLinear,
+    )
+except:
+
+    class ColumnSequenceParallelLinear:
+        pass
+
+    class RowSequenceParallelLinear:
+        pass
 
 
 class LoRAModel(nn.Layer):

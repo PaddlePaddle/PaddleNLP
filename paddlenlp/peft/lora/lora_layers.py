@@ -55,7 +55,16 @@ try:
         mark_as_sequence_parallel_parameter,
     )
 except:
-    pass
+
+    class ColumnSequenceParallelLinear:
+        pass
+
+    class RowSequenceParallelLinear:
+        pass
+
+    AllGatherOp = None
+    ReduceScatterOp = None
+    mark_as_sequence_parallel_parameter = None
 
 
 class LoRALinear(nn.Linear):
