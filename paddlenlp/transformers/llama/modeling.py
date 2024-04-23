@@ -62,6 +62,10 @@ from paddlenlp.transformers.conversion_utils import (
     init_name_mappings,
 )
 from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
+from paddlenlp.transformers.mc2_parallel_linear import (
+    MC2ColumnSeqParallelLinear,
+    MC2RowSeqParallelLinear,
+)
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
@@ -94,13 +98,6 @@ __all__ = [
     "LlamaForCausalLM",
     "LlamaPretrainingCriterion",
 ]
-
-
-def is_mc2_valid():
-    current_device = get_env_device()
-    if current_device == "npu":
-        return True
-    return False
 
 
 def _get_interleave(n):
@@ -574,12 +571,7 @@ class LlamaMLP(nn.Layer):
         self.fuse_attention_ffn = config.fuse_attention_ffn
 
         if config.sequence_parallel:
-            if is_mc2_valid and int(os.getenv("FLAGS_NPU_MC2", 0)):
-                from paddlenlp.transformers.mc2_seqence_parallel_linear import (
-                    MC2ColumnSeqParallelLinear,
-                    MC2RowSeqParallelLinear,
-                )
-
+            if MC2ColumnSeqParallelLinear is not None and MC2RowSeqParallelLinear is not None:
                 ColumnParallelLinear = MC2ColumnSeqParallelLinear
                 RowParallelLinear = MC2RowSeqParallelLinear
             else:
@@ -697,12 +689,7 @@ class LlamaAttention(nn.Layer):
                 self.use_fused_rope = False
 
         if config.sequence_parallel:
-            if is_mc2_valid and int(os.getenv("FLAGS_NPU_MC2", 0)):
-                from paddlenlp.transformers.mc2_seqence_parallel_linear import (
-                    MC2ColumnSeqParallelLinear,
-                    MC2RowSeqParallelLinear,
-                )
-
+            if MC2ColumnSeqParallelLinear is not None and MC2RowSeqParallelLinear is not None:
                 ColumnParallelLinear = MC2ColumnSeqParallelLinear
                 RowParallelLinear = MC2RowSeqParallelLinear
             else:
