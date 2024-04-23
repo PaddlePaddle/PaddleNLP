@@ -29,7 +29,7 @@ nav:
   - milvus2: 'package/docstore/milvus2.md'
 
 - Agents module:
-  - agent: 'package/g/agents.md'
+  - agent: 'package/agents/agents.md'
   - memory: 'package/agents/memory.md'
 
 - Server module: 
