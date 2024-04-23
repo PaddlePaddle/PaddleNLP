@@ -1093,11 +1093,9 @@ class TrainingArguments:
                                     "enable_mp_fused_linear_param_grad_add only works with enable_mp_async_allreduce. It will not work."
                                 )
 
-                        sync_param = sync_grad = sync_moment = True  # For CI test
-
-                        # sync_param = "sync_param" in mp_config
-                        # sync_grad = "sync_grad" in mp_config
-                        # sync_moment = "sync_moment" in mp_config
+                        sync_param = "sync_param" in mp_config
+                        sync_grad = "sync_grad" in mp_config
+                        sync_moment = "sync_moment" in mp_config
 
                         # sync_param_name = [""] matches any parameter name.
                         # If sync_param, sync_grad and sync_moment are not set, the default value in Paddle is :
