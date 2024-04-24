@@ -70,6 +70,8 @@ from paddlenlp.transformers.model_utils import PretrainedModel, register_base_mo
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
 
+from .. import linear_utils
+from ..linear_utils import Linear
 from ..segment_parallel_utils import ReshardLayer
 from .configuration import (
     LLAMA_PRETRAINED_INIT_CONFIGURATION,
@@ -419,7 +421,9 @@ class LlamaRMSNorm(nn.Layer):
 
                     return paddle_xpu_nn.xpu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
                 except ImportError:
-                    pass
+                    raise NotImplementedError(
+                        f"Implementation of fused_rms_norm is not available on {get_env_device()}. Please install paddle_xpu to use this feature"
+                    )
             return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
 
         if paddle.in_dynamic_mode():
@@ -581,57 +585,11 @@ class LlamaMLP(nn.Layer):
         self.fuse_attention_ffn = config.fuse_attention_ffn
 
         if config.sequence_parallel:
-            if is_mc2_valid and int(os.getenv("FLAGS_NPU_MC2", 0)):
-                from paddlenlp.transformers.mc2_seqence_parallel_linear import (
-                    MC2ColumnSeqParallelLinear,
-                    MC2RowSeqParallelLinear,
-                )
-
-                ColumnParallelLinear = MC2ColumnSeqParallelLinear
-                RowParallelLinear = MC2RowSeqParallelLinear
-            elif get_env_device() == "xpu":
-                try:
-                    from paddle_xpu.layers.nn.sequence_parallel import (  # noqa: F401
-                        XPUColumnSequenceParallelLinear,
-                        XPURowSequenceParallelLinear,
-                    )
-
-                    ColumnParallelLinear = XPUColumnSequenceParallelLinear
-                    RowParallelLinear = XPURowSequenceParallelLinear
-                except ImportError:
-                    ColumnParallelLinear = ColumnSequenceParallelLinear
-                    RowParallelLinear = RowSequenceParallelLinear
-            else:
-                ColumnParallelLinear = ColumnSequenceParallelLinear
-                RowParallelLinear = RowSequenceParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
         else:
-            if get_env_device() == "xpu":
-                try:
-                    from paddle_xpu.layers.nn import (  # noqa: F401
-                        ColumnParallelLinear as XPUColumnParallelLinear,
-                    )
-                    from paddle_xpu.layers.nn import (  # noqa: F401
-                        RowParallelLinear as XPURowParallelLinear,
-                    )
-
-                    ColumnParallelLinear = XPUColumnParallelLinear
-                    RowParallelLinear = XPURowParallelLinear
-                except ImportError:
-                    ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-                    RowParallelLinear = fleet.meta_parallel.RowParallelLinear
-            else:
-                ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-                RowParallelLinear = fleet.meta_parallel.RowParallelLinear
-
-        if get_env_device() == "xpu":
-            try:
-                from paddle_xpu.layers.nn import Linear as XPULinear  # noqa: F401
-
-                Linear = XPULinear
-            except ImportError:
-                Linear = nn.Linear
-        else:
-            Linear = nn.Linear
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             if config.fuse_attention_ffn:
@@ -755,57 +713,11 @@ class LlamaAttention(nn.Layer):
                 self.use_fused_rope = False
 
         if config.sequence_parallel:
-            if is_mc2_valid and int(os.getenv("FLAGS_NPU_MC2", 0)):
-                from paddlenlp.transformers.mc2_seqence_parallel_linear import (
-                    MC2ColumnSeqParallelLinear,
-                    MC2RowSeqParallelLinear,
-                )
-
-                ColumnParallelLinear = MC2ColumnSeqParallelLinear
-                RowParallelLinear = MC2RowSeqParallelLinear
-            elif get_env_device() == "xpu":
-                try:
-                    from paddle_xpu.layers.nn.sequence_parallel import (  # noqa: F401
-                        XPUColumnSequenceParallelLinear,
-                        XPURowSequenceParallelLinear,
-                    )
-
-                    ColumnParallelLinear = XPUColumnSequenceParallelLinear
-                    RowParallelLinear = XPURowSequenceParallelLinear
-                except ImportError:
-                    ColumnParallelLinear = ColumnSequenceParallelLinear
-                    RowParallelLinear = RowSequenceParallelLinear
-            else:
-                ColumnParallelLinear = ColumnSequenceParallelLinear
-                RowParallelLinear = RowSequenceParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
         else:
-            if get_env_device() == "xpu":
-                try:
-                    from paddle_xpu.layers.nn import (  # noqa: F401
-                        ColumnParallelLinear as XPUColumnParallelLinear,
-                    )
-                    from paddle_xpu.layers.nn import (  # noqa: F401
-                        RowParallelLinear as XPURowParallelLinear,
-                    )
-
-                    ColumnParallelLinear = XPUColumnParallelLinear
-                    RowParallelLinear = XPURowParallelLinear
-                except ImportError:
-                    ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-                    RowParallelLinear = fleet.meta_parallel.RowParallelLinear
-            else:
-                ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-                RowParallelLinear = fleet.meta_parallel.RowParallelLinear
-
-        if get_env_device() == "xpu":
-            try:
-                from paddle_xpu.layers.nn import Linear as XPULinear  # noqa: F401
-
-                Linear = XPULinear
-            except:
-                Linear = nn.Linear
-        else:
-            Linear = nn.Linear
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             if self.fuse_attention_qkv:

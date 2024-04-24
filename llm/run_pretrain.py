@@ -491,6 +491,7 @@ def main():
             LinearConfig.enable_accumulate_steps_opt()
             LinearConfig.set_accumulate_steps(training_args.gradient_accumulation_steps)
         except ImportError:
+            # It's OK, not use accumulate_steps optimization
             pass
 
     print("Final pre-training config:", config)
