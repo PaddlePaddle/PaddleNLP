@@ -1,34 +1,34 @@
 # Controller Module
 
-::: rest_api.controller.document
+::: pipelines.rest_api.controller.document
     options:
         summary: true
         separate_signature: true
         show_signature_annotations: true
         line_length: 60
 
-::: rest_api.controller.feedback
+::: pipelines.rest_api.controller.feedback
     options:
         summary: true
         separate_signature: true
         show_signature_annotations: true
         line_length: 60
 
-::: rest_api.controller.file_upload
+::: pipelines.rest_api.controller.file_upload
     options:
         summary: true
         separate_signature: true
         show_signature_annotations: true
         line_length: 60
 
-::: rest_api.controller.router
+::: pipelines.rest_api.controller.router
     options:
         summary: true
         separate_signature: true
         show_signature_annotations: true
         line_length: 60
 
-::: rest_api.controller.search
+::: pipelines.rest_api.controller.search
     options:
         summary: true
         separate_signature: true

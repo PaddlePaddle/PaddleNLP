@@ -1,6 +1,6 @@
 # Reader Module
 
-::: pipelines.nodes.reader.ernie_dureader
+::: pipelines.pipelines.nodes.reader.ernie_dureader
     options:
         summary: true
         separate_signature: true

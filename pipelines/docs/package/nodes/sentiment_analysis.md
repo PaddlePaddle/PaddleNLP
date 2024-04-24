@@ -1,6 +1,6 @@
 # Sentiment Analysis Module
 
-::: pipelines.nodes.sentiment_analysis.senta_preprocessor
+::: pipelines.pipelines.nodes.sentiment_analysis.senta_preprocessor
     options:
         summary: true
         separate_signature: true
@@ -8,14 +8,14 @@
         line_length: 60
 
 
-::: pipelines.nodes.sentiment_analysis.senta_visualization
+::: pipelines.pipelines.nodes.sentiment_analysis.senta_visualization
     options:
         summary: true
         separate_signature: true
         show_signature_annotations: true
         line_length: 60
 
-::: pipelines.nodes.sentiment_analysis.senta
+::: pipelines.pipelines.nodes.sentiment_analysis.senta
     options:
         summary: true
         separate_signature: true

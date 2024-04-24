@@ -1,6 +1,6 @@
 # Pipeline Module
 
-::: pipelines.pipelines.standard_pipelines
+::: pipelines.pipelines.pipelines.standard_pipelines
     options:
         summary: true
         separate_signature: true

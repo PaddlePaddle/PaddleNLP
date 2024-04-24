@@ -12,9 +12,9 @@ build:
     python: "3.12"
 
 mkdocs:
-  configuration: mkdocs.yml
+  configuration: pipelines/mkdocs.yml
 
 # Optionally declare the Python requirements required to build your docs
 python:
   install:
-  - requirements: docs/requirements.txt
+  - requirements: pipelines/docs/requirements.txt

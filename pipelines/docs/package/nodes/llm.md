@@ -1,6 +1,6 @@
 # LLM Module
 
-::: pipelines.nodes.llm.chatglm
+::: pipelines.pipelines.nodes.llm.chatglm
     options:
         summary: true
         separate_signature: true
@@ -8,7 +8,7 @@
         line_length: 60
 
 
-::: pipelines.nodes.llm.ernie_bot
+::: pipelines.pipelines.nodes.llm.ernie_bot
     options:
         summary: true
         separate_signature: true
@@ -16,7 +16,7 @@
         line_length: 60
 
 
-::: pipelines.nodes.llm.history
+::: pipelines.pipelines.nodes.llm.history
     options:
         summary: true
         separate_signature: true
@@ -24,7 +24,7 @@
         line_length: 60
 
 
-::: pipelines.nodes.llm.prompt_template
+::: pipelines.pipelines.nodes.llm.prompt_template
     options:
         summary: true
         separate_signature: true

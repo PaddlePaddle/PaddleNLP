@@ -1,6 +1,6 @@
 # FAISS Module
 
-::: pipelines.document_stores.faiss
+::: pipelines.pipelines.document_stores.faiss
     options:
         summary: true
         separate_signature: true
