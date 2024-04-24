@@ -45,13 +45,16 @@ except ImportError:
         return F.silu(x) * y
 
 
-from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    GatherOp,
-    RowSequenceParallelLinear,
-    ScatterOp,
-    mark_as_sequence_parallel_parameter,
-)
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        ColumnSequenceParallelLinear,
+        GatherOp,
+        RowSequenceParallelLinear,
+        ScatterOp,
+        mark_as_sequence_parallel_parameter,
+    )
+except:
+    pass
 from paddle.utils import try_import
 
 from paddlenlp.transformers.conversion_utils import (
@@ -59,6 +62,10 @@ from paddlenlp.transformers.conversion_utils import (
     init_name_mappings,
 )
 from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
+from paddlenlp.transformers.mc2_parallel_linear import (
+    MC2ColumnSeqParallelLinear,
+    MC2RowSeqParallelLinear,
+)
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
@@ -91,13 +98,6 @@ __all__ = [
     "LlamaForCausalLM",
     "LlamaPretrainingCriterion",
 ]
-
-
-def is_mc2_valid():
-    current_device = get_env_device()
-    if current_device == "npu":
-        return True
-    return False
 
 
 def _get_interleave(n):
@@ -574,12 +574,7 @@ class LlamaMLP(nn.Layer):
         self.fuse_attention_ffn = config.fuse_attention_ffn
 
         if config.sequence_parallel:
-            if is_mc2_valid and int(os.getenv("FLAGS_NPU_MC2", 0)):
-                from paddlenlp.transformers.mc2_seqence_parallel_linear import (
-                    MC2ColumnSeqParallelLinear,
-                    MC2RowSeqParallelLinear,
-                )
-
+            if MC2ColumnSeqParallelLinear is not None and MC2RowSeqParallelLinear is not None:
                 ColumnParallelLinear = MC2ColumnSeqParallelLinear
                 RowParallelLinear = MC2RowSeqParallelLinear
             else:
@@ -697,12 +692,7 @@ class LlamaAttention(nn.Layer):
                 self.use_fused_rope = False
 
         if config.sequence_parallel:
-            if is_mc2_valid and int(os.getenv("FLAGS_NPU_MC2", 0)):
-                from paddlenlp.transformers.mc2_seqence_parallel_linear import (
-                    MC2ColumnSeqParallelLinear,
-                    MC2RowSeqParallelLinear,
-                )
-
+            if MC2ColumnSeqParallelLinear is not None and MC2RowSeqParallelLinear is not None:
                 ColumnParallelLinear = MC2ColumnSeqParallelLinear
                 RowParallelLinear = MC2RowSeqParallelLinear
             else:
@@ -813,24 +803,28 @@ class LlamaAttention(nn.Layer):
             self.rotary_emb = LlamaRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
+                base=self.config.rope_theta,
             )
         elif self.config.rope_scaling_type == "linear":
             self.rotary_emb = LlamaLinearScalingRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
                 scaling_factor=self.config.rope_scaling_factor,
+                base=self.config.rope_theta,
             )
         elif self.config.rope_scaling_type == "ntk":
             self.rotary_emb = LlamaNTKScalingRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
                 scaling_factor=self.config.rope_scaling_factor,
+                base=self.config.rope_theta,
             )
         elif self.config.rope_scaling_type == "dynamic_ntk":
             self.rotary_emb = LlamaDynamicNTKScalingRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
                 scaling_factor=self.config.rope_scaling_factor,
+                base=self.config.rope_theta,
             )
         else:
             raise ValueError(f"Unknown RoPE scaling type {self.config.rope_scaling_type}")
@@ -903,6 +897,7 @@ class LlamaAttention(nn.Layer):
             query_states = self.q_proj(hidden_states)
             key_states = self.k_proj(hidden_states)
             value_states = self.v_proj(hidden_states)
+
             if self.reshard_layer is not None:
                 if self.sequence_parallel:
                     assert self.seq_length % self.config.sep_parallel_degree == 0
@@ -1027,7 +1022,6 @@ class LlamaAttention(nn.Layer):
             value_states = paddle.concat([past_key_value[1], value_states], axis=1)
 
         past_key_value = (key_states, value_states) if use_cache else None
-
         if self.kv_indices is not None:
             key_states = paddle.index_select(key_states, self.kv_indices, axis=2)
             value_states = paddle.index_select(value_states, self.kv_indices, axis=2)
@@ -1036,7 +1030,7 @@ class LlamaAttention(nn.Layer):
         # repeat k/v heads if n_kv_heads < n_heads
         # paddle version > 2.6 or develop support flash-attn with gqa/mqa
         paddle_version = float(paddle.__version__[:3])
-        if (paddle_version != 0.0) and (paddle_version <= 2.6):
+        if not self.config.use_flash_attention or ((paddle_version != 0.0) and (paddle_version <= 2.6)):
             key_states = repeat_kv(key_states, self.num_key_value_groups)
             value_states = repeat_kv(value_states, self.num_key_value_groups)
 
@@ -1506,7 +1500,7 @@ class LlamaModel(LlamaPretrainedModel):
         seq_length_with_past = seq_length
         cache_length = 0
         if past_key_values[0] is not None:
-            cache_length = paddle.shape(past_key_values[0][0])[1]
+            cache_length = past_key_values[0][0].shape[1]
             seq_length_with_past += cache_length
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
@@ -1560,7 +1554,6 @@ class LlamaModel(LlamaPretrainedModel):
             else:
                 attention_mask = attention_mask.astype("bool")
         hidden_states = inputs_embeds
-
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None

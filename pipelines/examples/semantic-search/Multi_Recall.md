@@ -123,7 +123,10 @@ python examples/semantic-search/multi_recall_semantic_search_example.py --device
 python utils/offline_ann.py --index_name dureader_robust_query_encoder \
                             --doc_dir data/dureader_dev \
                             --search_engine elastic \
-                            --delete_index
+                            --delete_index \
+                            --query_embedding_model rocketqa-zh-base-query-encoder \
+                            --passage_embedding_model rocketqa-zh-base-para-encoder \
+                            --embedding_dim 768
 ```
 可以使用下面的命令来查看数据：
 
@@ -141,6 +144,9 @@ curl http://localhost:9200/dureader_robust_query_encoder/_search
 * `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
 
 #### 3.4.2 启动 RestAPI 模型服务
+
+**注意** multi_recall_semantic_search.yaml里面的检索模型需要与前面使用offline_ann.py建库的时候使用的检索模型一致
+
 ```bash
 # 指定语义检索系统的Yaml配置文件
 export PIPELINE_YAML_PATH=rest_api/pipeline/multi_recall_semantic_search.yaml

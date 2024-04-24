@@ -202,7 +202,8 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 
 ```
 python merge_tp_and_pp_params.py \
-    --model_name_or_path ./checkpoints/llama_sft_ckpts/checkpoint-100
+    --model_name_or_path ./checkpoints/llama_sft_ckpts/checkpoint-100 \
+    --pp 2 --tp 4
 ```
 
 <summary>&emsp; 脚本参数介绍</summary><div>

@@ -464,10 +464,10 @@ class ReformerEmbeddings(nn.Layer):
     ):
 
         if input_ids is not None:
-            input_shape = paddle.shape(input_ids)
+            input_shape = input_ids.shape
             inputs_embeds = self.word_embeddings(input_ids)
         else:
-            input_shape = paddle.shape(inputs_embeds)[:-1]
+            input_shape = inputs_embeds.shape[:-1]
 
         if position_ids is None:
             ones = paddle.ones(input_shape, dtype="int64")

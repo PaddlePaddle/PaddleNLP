@@ -45,14 +45,25 @@ from ...utils.distributed import distributed_gather
 from ...utils.env import LORA_WEIGHTS_NAME, SAFE_PEFT_WEIGHTS_INDEX_NAME
 from ...utils.log import logger
 from .lora_config import LoRAConfig
-from .lora_layers import (
-    ColumnParallelLoRALinear,
-    ColumnParallelLoRAMergedLinear,
-    LoRAConv2D,
-    LoRALinear,
-    LoRAMergedLinear,
-    RowParallelLoRALinear,
-)
+
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        ColumnSequenceParallelLinear,
+        RowSequenceParallelLinear,
+    )
+
+    from .lora_layers import (
+        ColumnParallelLoRALinear,
+        ColumnParallelLoRAMergedLinear,
+        ColumnSequenceParallelLoRALinear,
+        LoRAConv2D,
+        LoRALinear,
+        LoRAMergedLinear,
+        RowParallelLoRALinear,
+        RowSequenceParallelLoRALinear,
+    )
+except:
+    pass
 
 try:
     from ...quantization.quantization_linear import (
@@ -384,6 +395,7 @@ class LoRAModel(nn.Layer):
                     merge_weights=lora_config.merge_weights,
                     rslora=lora_config.rslora,
                     lora_plus_scale=lora_config.lora_plus_scale,
+                    pissa=lora_config.pissa,
                     bias_attr=False if module.bias is None else None,
                     use_quick_lora=lora_config.use_quick_lora,
                 )
@@ -417,6 +429,7 @@ class LoRAModel(nn.Layer):
                     lora_dropout=lora_config.lora_dropout,
                     rslora=lora_config.rslora,
                     lora_plus_scale=lora_config.lora_plus_scale,
+                    pissa=lora_config.pissa,
                     merge_weights=lora_config.merge_weights,
                     lora_A_weight_attr=paddle.ParamAttr(
                         initializer=nn.initializer.KaimingUniform(
@@ -436,6 +449,59 @@ class LoRAModel(nn.Layer):
             elif isinstance(module, RowParallelLinear):
                 # recover the original output_features
                 lora_module = RowParallelLoRALinear(
+                    in_features=module.weight.shape[0] * module.world_size,
+                    out_features=module.weight.shape[1],
+                    has_bias=module.bias is not None,
+                    input_is_parallel=module.input_is_parallel,
+                    r=lora_config.r,
+                    lora_alpha=lora_config.lora_alpha,
+                    lora_dropout=lora_config.lora_dropout,
+                    rslora=lora_config.rslora,
+                    lora_plus_scale=lora_config.lora_plus_scale,
+                    pissa=lora_config.pissa,
+                    merge_weights=lora_config.merge_weights,
+                    use_quick_lora=lora_config.use_quick_lora,
+                )
+                # Lora column parallel will spilt lora A matrix
+                self.add_lora_split_mapping(module_name + ".lora_A", is_column=False)
+
+                # for lora qat
+                if self.lora_config.do_qat:
+                    self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=False)
+                    self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
+                    self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
+            elif isinstance(module, ColumnSequenceParallelLinear):
+                # recover the original output_features
+                output_features = module.weight.shape[1] * module.world_size
+                lora_module = ColumnSequenceParallelLoRALinear(
+                    in_features=module.weight.shape[0],
+                    out_features=output_features,
+                    gather_output=module.gather_output,
+                    has_bias=module.bias is not None,
+                    r=lora_config.r,
+                    lora_alpha=lora_config.lora_alpha,
+                    lora_dropout=lora_config.lora_dropout,
+                    rslora=lora_config.rslora,
+                    lora_plus_scale=lora_config.lora_plus_scale,
+                    merge_weights=lora_config.merge_weights,
+                    lora_A_weight_attr=paddle.ParamAttr(
+                        initializer=nn.initializer.KaimingUniform(
+                            negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
+                        )
+                    ),
+                    use_quick_lora=lora_config.use_quick_lora,
+                )
+                # Lora column parallel will spilt lora B matrix
+                self.add_lora_split_mapping(module_name + ".lora_B", is_column=True)
+
+                # for lora qat
+                if self.lora_config.do_qat:
+                    self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=True)
+                    self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
+                    self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
+            elif isinstance(module, RowSequenceParallelLinear):
+                # recover the original output_features
+                lora_module = RowSequenceParallelLoRALinear(
                     in_features=module.weight.shape[0] * module.world_size,
                     out_features=module.weight.shape[1],
                     has_bias=module.bias is not None,
@@ -536,7 +602,7 @@ class LoRAModel(nn.Layer):
                 )
         if lora_module is None:
             raise ValueError(
-                f"LoRA strategy only supports paddle.nn.Linear or paddle.distributed.fleet.meta_parallel.ColumnParallelLinear. {module}({module_name}) is not supported。"
+                f"LoRA strategy only supports paddle.nn.Linear or paddle.distributed.fleet.meta_parallel.ColumnParallelLinear or paddlenlp.transformers.sequence_utils. {module}({module_name} {type(module).__name__}) is not supported。"
             )
         if getattr(lora_module, "quant_weight", None) is not None:
             lora_module.quant_weight = module.quant_weight
@@ -594,6 +660,8 @@ class LoRAModel(nn.Layer):
                 or isinstance(layer, LoRAConv2D)
                 or isinstance(layer, ColumnParallelLoRALinear)
                 or isinstance(layer, RowParallelLoRALinear)
+                or isinstance(layer, ColumnSequenceParallelLoRALinear)
+                or isinstance(layer, RowSequenceParallelLoRALinear)
                 or isinstance(layer, LoRAMergedLinear)
                 or isinstance(layer, ColumnParallelLoRAMergedLinear)
                 or (QuantizationLoRALinear is not None and isinstance(layer, QuantizationLoRALinear))
@@ -681,9 +749,11 @@ class LoRAModel(nn.Layer):
                 self._find_and_restore_module(layer_name)
             elif (
                 isinstance(layer, ColumnParallelLoRALinear)
+                or isinstance(layer, ColumnSequenceParallelLoRALinear)
                 or isinstance(layer, LoRAConv2D)
                 or isinstance(layer, ColumnParallelLoRAMergedLinear)
                 or isinstance(layer, RowParallelLoRALinear)
+                or isinstance(layer, RowSequenceParallelLoRALinear)
                 or (QuantizationLoRALinear is not None and isinstance(layer, QuantizationLoRALinear))
                 or (
                     ColumnParallelQuantizationLoRALinear is not None

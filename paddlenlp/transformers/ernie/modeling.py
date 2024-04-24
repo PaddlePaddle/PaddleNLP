@@ -97,7 +97,7 @@ class ErnieEmbeddings(nn.Layer):
         if input_ids is not None:
             inputs_embeds = self.word_embeddings(input_ids)
 
-        input_shape = inputs_embeds.shape[:-1] if in_declarative_mode() else paddle.shape(inputs_embeds)[:-1]
+        input_shape = inputs_embeds.shape[:-1] if in_declarative_mode() else inputs_embeds.shape[:-1]
 
         if position_ids is None:
             # maybe need use shape op to unify static graph and dynamic graph
@@ -611,7 +611,7 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
             if start_positions.ndim > 1:
                 end_positions = end_positions.squeeze(-1)
             # sometimes the start/end positions are outside our model inputs, we ignore these terms
-            ignored_index = paddle.shape(start_logits)[1]
+            ignored_index = start_logits.shape[1]
             start_positions = start_positions.clip(0, ignored_index)
             end_positions = end_positions.clip(0, ignored_index)
 
@@ -911,7 +911,7 @@ class ErnieForPretraining(ErniePretrainedModel):
             if labels is not None and next_sentence_label is not None:
                 loss_fct = paddle.nn.CrossEntropyLoss()
                 masked_lm_loss = loss_fct(
-                    prediction_scores.reshape((-1, paddle.shape(prediction_scores)[-1])), labels.reshape((-1,))
+                    prediction_scores.reshape((-1, prediction_scores.shape[-1])), labels.reshape((-1,))
                 )
                 next_sentence_loss = loss_fct(
                     seq_relationship_score.reshape((-1, 2)), next_sentence_label.reshape((-1,))
@@ -1088,7 +1088,7 @@ class ErnieForMaskedLM(ErniePretrainedModel):
         if labels is not None:
             loss_fct = paddle.nn.CrossEntropyLoss()  # -100 index = padding token
             masked_lm_loss = loss_fct(
-                prediction_scores.reshape((-1, paddle.shape(prediction_scores)[-1])), labels.reshape((-1,))
+                prediction_scores.reshape((-1, prediction_scores.shape[-1])), labels.reshape((-1,))
             )
         if not return_dict:
             output = (prediction_scores,) + outputs[2:]

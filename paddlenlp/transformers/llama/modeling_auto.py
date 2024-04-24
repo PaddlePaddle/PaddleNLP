@@ -181,6 +181,7 @@ def scaled_dot_product_attention(
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
+        # [bsz, q_len, num_heads, head_dim] -> [bsz, q_len, num_heads * head_dim]
         attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
         return (attn_output, attn_weights) if output_attentions else attn_output
 
@@ -399,9 +400,10 @@ class LlamaAttentionAuto(nn.Layer):
         alibi: Optional[paddle.Tensor] = None,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
-        # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
+        # [bs, seq_len, num_head * head_dim] or [seq_len / n, bs, num_head * head_dim] (if sequence_parallel)
         # enter tp region
         if self.config.sequence_parallel:
+            # [seq_len / n, bs, num_head * head_dim] -> [seq_len, bs, num_head * head_dim] (if sequence_parallel)
             hidden_states = dist.reshard(
                 hidden_states,
                 get_mesh(self.ipp),
@@ -422,6 +424,8 @@ class LlamaAttentionAuto(nn.Layer):
             value_states = self.v_proj(hidden_states).reshape(shape=target_key_value_shape)
 
         if self.config.sequence_parallel:
+            # [seq_len, bs, num_head * head_dim] -> [bs, seq_len, num_head * head_dim]  (if sequence_parallel)
+            # FA and rope not support sequence first
             query_states = paddle.transpose(query_states, [1, 0, 2, 3])
             key_states = paddle.transpose(key_states, [1, 0, 2, 3])
             value_states = paddle.transpose(value_states, [1, 0, 2, 3])
@@ -526,12 +530,12 @@ class LlamaAttentionAuto(nn.Layer):
         else:
             attn_output = outputs
 
-        # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
-        # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
+        # [bs, q_len, num_head * head_dim]
         attn_output = self.o_proj(attn_output)
 
         # enter sp region
         if self.config.sequence_parallel:
+            # [bs, q_len, num_head * head_dim] -> [q_len / n, bs, num_head * head_dim]
             attn_output = paddle.transpose(attn_output, [1, 0, 2])
             attn_output = dist.reshard(
                 attn_output,
@@ -595,7 +599,7 @@ class LlamaDecoderLayerAuto(nn.Layer):
             cache (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
         """
 
-        # [bs * seq_len, embed_dim] -> [seq_len * bs / n, embed_dim] (sequence_parallel)
+        # [bs, seq_len, embed_dim] or [seq_len / n, bs, embed_dim] (if sequence_parallel)
         residual = hidden_states
 
         hidden_states = self.input_layernorm(hidden_states)
@@ -854,7 +858,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         self.next_pp_stage_indexes = []
         for i in range(config.num_hidden_layers):
             pp_stage_id, input_need_reshard = get_layer_pp_info(i)
-            decoder_layers.append(LlamaDecoderLayerAuto(config, False, pp_stage_id))
+            decoder_layers.append(LlamaDecoderLayerAuto(config, i not in self.no_recompute_layers, pp_stage_id))
             if input_need_reshard:
                 self.next_pp_stage_indexes.append(i)
 
@@ -934,7 +938,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         seq_length_with_past = seq_length
         cache_length = 0
         if past_key_values[0] is not None:
-            cache_length = paddle.shape(past_key_values[0][0])[1]
+            cache_length = past_key_values[0][0].shape[1]
             seq_length_with_past += cache_length
 
         if inputs_embeds is None:
