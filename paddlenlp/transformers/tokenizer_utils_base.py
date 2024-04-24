@@ -1509,7 +1509,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         tokenizer_config_file_dir_list = set()
         for k, v in resolved_vocab_files.items():
-            if v is not None and os.path.isfile(v):
+            if v is not None:
                 tokenizer_config_file_dir_list.add(os.path.dirname(v))
         tokenizer_config_file_dir_list = list(tokenizer_config_file_dir_list)
         # TODO: check this
