@@ -38,9 +38,18 @@ if __name__ == "__main__":
     parser = PdArgumentParser((ScriptArguments, KTOConfig, ModelConfig))
     script_args, kto_args, model_args = parser.parse_args_into_dataclasses()
 
+    dtype = None
+    if kto_args.fp16_opt_level == "O2":
+        if kto_args.fp16:
+            dtype = "float16"
+        if kto_args.bf16:
+            dtype = "bfloat16"
+    else:
+        dtype = "float32"
+
     # Load a pretrained model
-    model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
-    model_ref = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
+    model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path, dtype=dtype)
+    model_ref = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path, dtype=dtype)
 
     # tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat")
@@ -108,4 +117,5 @@ if __name__ == "__main__":
 
     # Train and push the model to the Hub
     kto_trainer.train()
-    kto_trainer.save_model(kto_args.output_dir)
+
+    # kto_trainer.save_model(kto_args.output_dir)

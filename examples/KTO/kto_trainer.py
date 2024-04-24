@@ -29,7 +29,7 @@ from kto_config import KTOConfig
 from model_base import create_reference_model
 from paddle.io import DataLoader, DistributedBatchSampler
 from tqdm import tqdm
-from utils import (  # peft_module_casting_to_bf16,
+from utils import (
     DPODataCollatorWithPadding,
     PaddlePartialState,
     disable_dropout_in_model,
@@ -230,7 +230,7 @@ class KTOTrainer(Trainer):
             The model initializer to use for training. If None is specified, the default model initializer will be used.
         callbacks (`List[transformers.TrainerCallback]`):
             The callbacks to use for training.
-        optimizers (`Tuple[paddle.optim.Optimizer, paddle.optim.lr_scheduler.LambdaLR]`):
+        optimizers (`Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LambdaDecay]`):
             The optimizer and scheduler to use for training.
         preprocess_logits_for_metrics (`Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]`):
             The function to use to preprocess the logits before computing the metrics.
@@ -334,10 +334,8 @@ class KTOTrainer(Trainer):
 
             # get peft model with the given config
             model = LoRAModel(model, peft_config)
-            # if args.bf16 and getattr(model, "is_loaded_in_4bit", False):
-            #     peft_module_casting_to_bf16(model)
-            #     # If args.bf16 we need to explicitly call `generate` with paddle amp autocast context manager
-            #     self._peft_has_been_casted_to_bf16 = True
+            model.mark_only_lora_as_trainable()
+            model.print_trainable_parameters()
 
         # For models that use gradient_checkpointing, we need to attach a hook that enables input
         # to explicitly have `requires_grad=True`, otherwise training will either silently
@@ -606,17 +604,13 @@ class KTOTrainer(Trainer):
                     "No reference model and model is not a Peft model. Try setting `precompute_ref_log_probs=True`"
                 )
         else:
-            # if self.is_deepspeed_enabled:
-            #     self.ref_model = self._prepare_deepspeed(self.ref_model)
-            # else:
-            #     self.ref_model = self.accelerator.prepare_model(self.ref_model, evaluation_mode=True)
             self.ref_model.eval()
 
     def get_train_dataloader(self) -> DataLoader:
         """
-        Returns the training [`~paddle.utils.data.DataLoader`].
+        Returns the training [`~paddle.io.DataLoader`].
 
-        Subclass of transformers.src.transformers.trainer.get_train_dataloader to precompute `ref_log_probs`.
+        Subclass of paddlenlp.transformers.trainer.get_train_dataloader to precompute `ref_log_probs`.
         """
 
         if self.precompute_ref_log_probs and not self._precomputed_train_ref_log_probs:
@@ -655,12 +649,12 @@ class KTOTrainer(Trainer):
 
     def get_eval_dataloader(self, eval_dataset: Optional[Dataset] = None) -> DataLoader:
         """
-        Returns the evaluation [`~paddle.utils.data.DataLoader`].
+        Returns the evaluation [`~paddle.io.DataLoader`].
 
-        Subclass of transformers.src.transformers.trainer.get_eval_dataloader to precompute `ref_log_probs`.
+        Subclass of paddlenlp.transformers.trainer.get_eval_dataloader to precompute `ref_log_probs`.
 
         Args:
-            eval_dataset (`paddle.utils.data.Dataset`, *optional*):
+            eval_dataset (`paddle.io.Dataset`, *optional*):
                 If provided, will override `self.eval_dataset`. If it is a [`~datasets.Dataset`], columns not accepted
                 by the `model.forward()` method are automatically removed. It must implement `__len__`.
         """
