@@ -34,7 +34,7 @@ class SimultaneousTransformerDemo(SimultaneousTransformer):
         So, it needsprevious state(caches) and last one of generated
         tokens id last time.
         """
-        src_max_len = paddle.shape(src_word)[-1]
+        src_max_len = src_word.shape[-1]
         base_attn_bias = (
             paddle.cast(src_word == self.bos_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
         )

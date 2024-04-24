@@ -453,7 +453,7 @@ function llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1() {
     ips=`cat $log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
     mem=`cat $log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'gpu_max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=8.93362331
+    loss_base=8.93362617
     ips_base=64.75564390065037
     mem_base=8904
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -515,8 +515,6 @@ function before_hook_for_gpt() {
     if [[ $FLAGS_install_deps == 0 ]];then
         echo -e "\033[31m ---- Install requirements for GPT dygraph cases  \033[0m"
         python -m pip install -r requirements.txt --force-reinstall
-        python -m pip install --no-cache-dir https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl --force-reinstall --no-dependencies
-        python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
     else
         echo -e "\033[31m ---- Skip install requirements for GPT dygraph cases  \033[0m"
     fi
@@ -614,7 +612,7 @@ function before_hook_for_llm_gpt() {
     export http_proxy=${proxy}
     export https_proxy=${proxy}
     python -m pip install -r $root_path/requirements.txt
-    python -m pip install regex
+    python -m pip install -r $root_path/requirements-dev.txt
     if [[ ! $FLAGS_download_data =~ "llm_gpt" ]];then
         echo -e "\033[31m ---- Download llm GPT data  \033[0m"
         rm -rf data

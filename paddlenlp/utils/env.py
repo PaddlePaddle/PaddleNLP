@@ -77,6 +77,7 @@ LORA_WEIGHTS_NAME = "lora_model_state.pdparams"
 
 PREFIX_CONFIG_NAME = "prefix_config.json"
 PREFIX_WEIGHTS_NAME = "prefix_model_state.pdparams"
+PADDLE_PEFT_WEIGHTS_INDEX_NAME = "peft_model.pdparams.index.json"
 
 PAST_KEY_VALUES_FILE_NAME = "pre_caches.npy"
 
@@ -100,3 +101,6 @@ PADDLE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.pdparams.index.json"
 
 SAFE_MASTER_WEIGHTS_NAME = "master_weights.safetensors"
 SAFE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.safetensors.index.json"
+
+SAFE_PEFT_WEIGHTS_NAME = "peft_model.safetensors"
+SAFE_PEFT_WEIGHTS_INDEX_NAME = "peft_model.safetensors.index.json"

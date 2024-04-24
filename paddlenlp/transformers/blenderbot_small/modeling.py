@@ -126,6 +126,8 @@ class BlenderbotSmallDecoderLayer(nn.TransformerDecoderLayer):
         normalize_before=True,
         weight_attr=None,
         bias_attr=None,
+        *args,
+        **kwargs,
     ):
         super(BlenderbotSmallDecoderLayer, self).__init__(
             d_model=d_model,
@@ -138,6 +140,8 @@ class BlenderbotSmallDecoderLayer(nn.TransformerDecoderLayer):
             normalize_before=normalize_before,
             weight_attr=weight_attr,
             bias_attr=bias_attr,
+            *args,
+            **kwargs,
         )
 
     def forward(self, tgt, memory=None, tgt_mask=None, memory_mask=None, cache=None):
@@ -337,7 +341,7 @@ class BlenderbotSmallDecoder(BlenderbotSmallPretrainedModel):
         if decoder_input_ids is None:
             raise ValueError("Decoder_input_ids cannot be None.")
         if decoder_attention_mask is None:
-            decoder_length = paddle.shape(decoder_input_ids)[-1]
+            decoder_length = decoder_input_ids.shape[-1]
             decoder_attention_mask = paddle.tensor.triu(
                 (paddle.full((decoder_length, decoder_length), -np.inf, dtype=paddle.get_default_dtype())), 1
             )

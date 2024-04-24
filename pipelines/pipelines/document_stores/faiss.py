@@ -684,7 +684,7 @@ class FAISSDocumentStore(SQLDocumentStore):
                 init_params["index_name"] = []
                 for index in index_path:
                     faiss_index = faiss.read_index(str(index))
-                    index_name = str(index).split("/")[-1]
+                    index_name = os.path.basename(str(index))
                     init_params["index_name"].append(index_name)
                     init_params["faiss_index"][index_name] = faiss_index
                     # Add other init params to override the ones defined in the init params file
