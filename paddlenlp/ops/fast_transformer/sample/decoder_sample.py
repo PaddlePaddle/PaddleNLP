@@ -117,7 +117,7 @@ def do_predict(args):
             # For warmup.
             if 50 == i:
                 start = time.time()
-            paddle.device.cuda.synchronize()
+            paddle.device.synchronize()
             dec_output, self_cache_key, self_cache_value, mem_cache = transformer.decoder(
                 from_tensor=dec_input,
                 memory_tensor=enc_output,
@@ -129,7 +129,7 @@ def do_predict(args):
                 memory_hidden_dim=args.d_model,
                 is_fuse_qkv=False,
             )
-        paddle.device.cuda.synchronize()
+        paddle.device.synchronize()
         logger.info("Average test time for decoder is %f ms" % ((time.time() - start) / 50 * 1000))
 
 

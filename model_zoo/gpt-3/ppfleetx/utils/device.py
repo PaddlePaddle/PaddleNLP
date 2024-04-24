@@ -47,7 +47,7 @@ def synchronize():
     """
     device = paddle.get_device().split(":")[0]
     if device in ["gpu", "rocm"]:
-        paddle.device.cuda.synchronize()
+        paddle.device.synchronize()
         return True
     elif device == "xpu":
         paddle.device.xpu.synchronize()

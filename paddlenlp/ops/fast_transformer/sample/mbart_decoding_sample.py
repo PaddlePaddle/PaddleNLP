@@ -106,7 +106,7 @@ def do_predict(args):
             # For warmup.
             if 50 == i:
                 # PaddlePaddle >= 2.2
-                paddle.device.cuda.synchronize()
+                paddle.device.synchronize()
                 start = time.perf_counter()
             finished_seqs, _ = model.generate(
                 input_ids=input_ids,
@@ -120,7 +120,7 @@ def do_predict(args):
                 length_penalty=args.length_penalty,
                 use_fast=args.not_use_faster,
             )
-        paddle.device.cuda.synchronize()
+        paddle.device.synchronize()
         logger.info("Average test time for decoding is %f ms" % ((time.perf_counter() - start) / 50 * 1000))
 
         # Output
