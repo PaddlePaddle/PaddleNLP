@@ -27,11 +27,9 @@ import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
 
-from paddlenlp.ops import Topology
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.trainer.auto_trainer import AutoTrainer
-from paddlenlp.trainer.trainer_utils import speed_metrics
-from paddlenlp.trainer.trainer_utils import IntervalStrategy, _get_distributed_seeds
+from paddlenlp.trainer.trainer_utils import IntervalStrategy
 from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
@@ -51,6 +49,7 @@ from paddlenlp.data.causal_dataset import (
     check_data_split,
     print_rank_0,
 )
+
 
 def add_start_docstrings(*docstr):
     def docstring_decorator(fn):
@@ -116,7 +115,6 @@ class PreTrainingArguments(TrainingArguments):
         default=False,
         metadata={"help": "whether use lazy init for model parameters"},
     )
-    
 
     def __post_init__(self):
         super().__post_init__()
@@ -182,9 +180,7 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to pre-train from.
     """
 
-    model_type: Optional[str] = field(
-        default="qwen", metadata={"help": "Only support for qwen pre-training for now."}
-    )
+    model_type: Optional[str] = field(default="qwen", metadata={"help": "Only support for qwen pre-training for now."})
     model_name_or_path: str = field(
         default="qwen/qwen-7b",
         metadata={
@@ -269,6 +265,7 @@ class ModelArguments:
         default=False,
         metadata={"help": "recompute_use_reentrant"},
     )
+
 
 def create_pretrained_dataset(
     data_args,
@@ -402,6 +399,7 @@ def print_config(args, key=""):
 
     logger.info("")
 
+
 def init_seed(seed: int = 1234, args=None):
     if args is None:
         random.seed(seed)
@@ -429,6 +427,7 @@ def init_seed(seed: int = 1234, args=None):
             random.seed(args.seed)
             np.random.seed(args.seed)
             paddle.seed(args.seed)
+
 
 def get_mesh(pp_idx=0):
     mesh = fleet.auto.get_mesh()
@@ -531,7 +530,6 @@ def main():
     config.no_recompute_layers = model_args.no_recompute_layers
     config.pp_recompute_interval = model_args.pp_recompute_interval
     config.recompute_use_reentrant = model_args.recompute_use_reentrant
-    config.print_md5sum = model_args.print_md5sum
 
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
@@ -542,6 +540,7 @@ def main():
         pipeline.vpp_degree = config.virtual_pp_degree
         pipeline.vpp_seg_method = training_args.virtual_pipeline_seg_method
 
+    config.num_hidden_layers = 16
     config.dp_degree = training_args.data_parallel_degree
     config.mp_degree = training_args.tensor_parallel_degree
     config.pp_degree = training_args.pipeline_parallel_degree
@@ -558,12 +557,12 @@ def main():
             dtype = "float16"
         if training_args.bf16:
             dtype = "bfloat16"
-    
-    model = model_class.from_config(config, dtype="float32")
+
+    model = model_class.from_config(config, dtype=dtype)
     criterion = criterion_class(config)
 
     # load_model(model)
-    shard_model(model)
+    # shard_model(model)
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
@@ -688,7 +687,9 @@ def print_grad(model):
     for p in model.parameters():
         assert p.name in name_mapping
         if p.grad is not None:
-            print(f"{name_mapping[p.name]} {p.name}_grad shape: {p.grad.shape} values: {p.grad.numpy()} fp32 values: {paddle.cast(p.grad, paddle.float32).numpy()} md5sum: {p.grad._md5sum()}")
+            print(
+                f"{name_mapping[p.name]} {p.name}_grad shape: {p.grad.shape} values: {p.grad.numpy()} fp32 values: {paddle.cast(p.grad, paddle.float32).numpy()} md5sum: {p.grad._md5sum()}"
+            )
 
 
 def print_param(model):
@@ -697,7 +698,9 @@ def print_param(model):
     for p in model.parameters():
         assert p.name in name_mapping
         # if p.grad is not None:
-        print(f"{name_mapping[p.name]} {p.name} dtype: {p.dtype} shape: {p.shape} local_shape: {p._local_shape} values: {p.numpy()} fp32 values: {paddle.cast(p, paddle.float32).numpy()} md5sum: {p._md5sum()}")
+        print(
+            f"{name_mapping[p.name]} {p.name} dtype: {p.dtype} shape: {p.shape} local_shape: {p._local_shape} values: {p.numpy()} fp32 values: {paddle.cast(p, paddle.float32).numpy()} md5sum: {p._md5sum()}"
+        )
 
 
 def map_structure_name(k):

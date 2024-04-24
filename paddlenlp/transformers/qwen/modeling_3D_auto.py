@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import math
 import warnings
 from functools import partial
@@ -27,10 +26,7 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import try_import
 
-from paddlenlp.transformers.model_outputs import (
-    BaseModelOutputWithPast,
-    CausalLMOutputWithPast,
-)
+from paddlenlp.transformers.model_outputs import BaseModelOutputWithPast
 from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.utils.log import logger
 
@@ -104,7 +100,10 @@ def get_triangle_upper_mask(x, mask=None):
     mask.stop_gradient = True
     return mask
 
+
 attention_cnt = 0
+
+
 class QWenAttentionAuto(nn.Layer):
     def __init__(self, config, ipp=None):
         super().__init__()
@@ -698,7 +697,9 @@ class QWenModelAuto(QWenPretrainedModelAuto):
         hidden_states = inputs_embeds
 
         # bool 4D mask
-        attention_mask = self.get_masks(input_shape[0], input_shape[1], past_length, dtype=hidden_states.dtype, padding_mask=attention_mask)
+        attention_mask = self.get_masks(
+            input_shape[0], input_shape[1], past_length, dtype=hidden_states.dtype, padding_mask=attention_mask
+        )
         # TODO(GhostScreaming): how to fix paddle.finfo?
         zero = paddle.zeros(attention_mask.shape, dtype=paddle.bfloat16)
         neg_inf = paddle.full_like(attention_mask, paddle.finfo(paddle.bfloat16).min, dtype=paddle.bfloat16)
@@ -814,7 +815,10 @@ class QWenLMHeadAuto(nn.Layer):
         logits = paddle.matmul(hidden_states, self.weight, transpose_y=False)
         return logits
 
+
 loss_cnt = 0
+
+
 class QWenPretrainingCriterionAuto(paddle.nn.Layer):
     """
     Criterion for Llama.
@@ -899,6 +903,7 @@ class QWenForCausalLM3DAuto(QWenPretrainedModelAuto):
 
         return lm_logits
 
+
 class RotaryEmbedding(nn.Layer):
     def __init__(self, dim, base=10000):
         super().__init__()
@@ -979,4 +984,3 @@ class QWenRMSNormAuto(nn.Layer):
         if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
             output = paddle.cast(output, self.weight.dtype)
         return output * self.weight
-
