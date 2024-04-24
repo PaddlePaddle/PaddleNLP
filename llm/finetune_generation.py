@@ -49,6 +49,7 @@ from paddlenlp.transformers import (
     LlamaTokenizer,
 )
 from paddlenlp.utils.log import logger
+from paddlenlp.peft.lora.lqlora_utils import transform_lora_layers
 
 
 def add_start_docstrings(*docstr):
@@ -476,6 +477,9 @@ def main():
             model = LoRAModel(model, lora_config)
         else:
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
+
+        if model_args.lqlora:
+            transform_lora_layers(model)
 
         model.print_trainable_parameters()
 
