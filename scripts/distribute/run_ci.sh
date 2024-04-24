@@ -56,7 +56,7 @@ install_paddlenlp(){
     # python setup.py bdist_wheel
     # unset http_proxy && unset https_proxy
     # cd -
-    python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
+    # python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
 }
 ####################################
 get_diff_TO_case(){
