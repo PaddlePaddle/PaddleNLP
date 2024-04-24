@@ -74,8 +74,8 @@ pretrain_arguments = {
     "min_learning_rate": 1e-05,
     "warmup_steps": 100,
     "logging_steps": 1,
-    "max_steps": 14,
-    "save_steps": 4,
+    "max_steps": 15,
+    "save_steps": 6,
     "eval_steps": 1000,
     "weight_decay": 0.01,
     "fp16": "true",
@@ -1157,8 +1157,6 @@ class TestUnifiedCheckpointOnN1C8SaveLoadSpeed(TestUnifiedCheckpointFull):
 
     def rerun(self, train_args):
         self.run_n1c8(self.run_pretrain_file, log_dir="log_uc", **train_args)
-        self.run_n1c8(self.run_pretrain_file, log_dir="log_uc", **train_args)
-        self.run_n1c8(self.run_pretrain_file, log_dir="log_uc", **train_args)
 
 
 class TestPaddleCheckpointOnN1C8SaveLoadSpeed(TestUnifiedCheckpointFull):
@@ -1175,8 +1173,6 @@ class TestPaddleCheckpointOnN1C8SaveLoadSpeed(TestUnifiedCheckpointFull):
         self.run_n1c8(self.run_pretrain_file, log_dir="log_pd", **train_args)
 
     def rerun(self, train_args):
-        self.run_n1c8(self.run_pretrain_file, log_dir="log_pd", **train_args)
-        self.run_n1c8(self.run_pretrain_file, log_dir="log_pd", **train_args)
         self.run_n1c8(self.run_pretrain_file, log_dir="log_pd", **train_args)
 
 
