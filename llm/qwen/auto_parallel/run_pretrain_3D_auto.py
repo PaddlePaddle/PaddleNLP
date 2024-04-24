@@ -540,7 +540,6 @@ def main():
         pipeline.vpp_degree = config.virtual_pp_degree
         pipeline.vpp_seg_method = training_args.virtual_pipeline_seg_method
 
-    config.num_hidden_layers = 16
     config.dp_degree = training_args.data_parallel_degree
     config.mp_degree = training_args.tensor_parallel_degree
     config.pp_degree = training_args.pipeline_parallel_degree
@@ -615,7 +614,7 @@ def main():
 
     # Training
     if training_args.do_train:
-        train_result = trainer.train(resume_from_checkpoint=None)
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
 
         # NOTE(gongenlei): new add
         if not training_args.autotuner_benchmark:

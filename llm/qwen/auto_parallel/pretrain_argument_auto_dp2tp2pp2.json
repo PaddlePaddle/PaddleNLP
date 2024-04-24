@@ -35,7 +35,7 @@
     "do_predict": true,
     "disable_tqdm": true,
     "recompute": true,
-    "recompute_granularity": "full",
+    "recompute_granularity": "core_attn",
     "recompute_use_reentrant": true,
     "distributed_dataloader": 0,
     "save_total_limit": 2,
@@ -43,4 +43,3 @@
     "enable_auto_parallel": 1,
     "to_static": 0
   }
-
