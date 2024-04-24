@@ -52,18 +52,25 @@ try:
         RowSequenceParallelLinear,
     )
 
-    from .lora_layers import (
-        ColumnParallelLoRALinear,
-        ColumnParallelLoRAMergedLinear,
-        ColumnSequenceParallelLoRALinear,
-        LoRAConv2D,
-        LoRALinear,
-        LoRAMergedLinear,
-        RowParallelLoRALinear,
-        RowSequenceParallelLoRALinear,
-    )
 except:
-    pass
+
+    class ColumnSequenceParallelLinear:
+        pass
+
+    class RowSequenceParallelLinear:
+        pass
+
+
+from .lora_layers import (
+    ColumnParallelLoRALinear,
+    ColumnParallelLoRAMergedLinear,
+    ColumnSequenceParallelLoRALinear,
+    LoRAConv2D,
+    LoRALinear,
+    LoRAMergedLinear,
+    RowParallelLoRALinear,
+    RowSequenceParallelLoRALinear,
+)
 
 try:
     from ...quantization.quantization_linear import (

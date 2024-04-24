@@ -33,7 +33,16 @@ try:
         mark_as_sequence_parallel_parameter,
     )
 except:
-    pass
+    AllGatherOp = None
+    ReduceScatterOp = None
+    mark_as_sequence_parallel_parameter = None
+
+    class ColumnSequenceParallelLinear:
+        pass
+
+    class RowSequenceParallelLinear:
+        pass
+
 
 from paddlenlp.transformers.mc2_parallel_linear import (
     MC2ColumnParallelCoreLinear,
