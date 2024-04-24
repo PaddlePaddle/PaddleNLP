@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
 from paddle.distributed.fleet.meta_parallel import (
     ColumnParallelLinear,
     RowParallelLinear,
@@ -26,16 +24,12 @@ from paddle.nn import Linear
 
 from paddlenlp.utils.tools import get_env_device
 
-if get_env_device() == "npu" and int(os.getenv("FLAGS_NPU_MC2", 0)):
-    from paddlenlp.transformers.mc2_seqence_parallel_linear import (
-        MC2ColumnSeqParallelLinear,
-        MC2RowSeqParallelLinear,
-    )
+from .mc2_parallel_linear import MC2ColumnSeqParallelLinear, MC2RowSeqParallelLinear
 
+if MC2ColumnSeqParallelLinear is not None and MC2RowSeqParallelLinear is not None:
     ColumnSequenceParallelLinear = MC2ColumnSeqParallelLinear  # noqa: F811
     RowSequenceParallelLinear = MC2RowSeqParallelLinear  # noqa: F811
-
-if get_env_device() == "xpu":
+elif get_env_device() == "xpu":
     try:
         from paddle_xpu.layers.nn import ColumnParallelLinear as XPUColumnParallelLinear
         from paddle_xpu.layers.nn import Linear as XPULinear  # noqa: F401
