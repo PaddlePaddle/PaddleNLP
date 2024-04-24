@@ -216,7 +216,6 @@ class PySafeSlice:
         tensor = np.empty(shape=[1] if len(target_shape) == 0 else np.prod(target_shape), dtype=self.dtype)
 
         tensor_view = memoryview(tensor.view(np.uint8).reshape(-1))
-        # print(self.key, len(merge_indices), f"{self.nelements:,}")
         curr_data_ptr = 0
         # if to many slice and each slice < 1M
         if len(merge_indices) > 128 and (merge_indices[0][1] - merge_indices[0][0] < 1024 * 1024):
