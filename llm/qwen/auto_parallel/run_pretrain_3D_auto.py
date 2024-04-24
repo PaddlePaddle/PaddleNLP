@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-GPT/Llama auto parallel pretraining scripts.
+QWen auto parallel pretraining scripts.
 """
 import os
 import random

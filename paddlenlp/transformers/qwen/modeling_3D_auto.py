@@ -117,9 +117,7 @@ class QWenAttentionAuto(nn.Layer):
         self.inv_norm_factor = 1.0 / math.sqrt(self.head_dim)
 
         self.scale_attn_weights = True
-        # self.enable_recompute = False
         self.enable_recompute = config.use_recompute
-        logger.warning(f"self.enable_recompute: {self.enable_recompute}")
         self.recompute_granularity = config.recompute_granularity
 
         self.projection_size = config.kv_channels * config.num_attention_heads
@@ -127,29 +125,7 @@ class QWenAttentionAuto(nn.Layer):
         assert self.projection_size % config.num_attention_heads == 0
         self.hidden_size_per_attention_head = self.projection_size // config.num_attention_heads
 
-        # if config.tensor_parallel_degree > 1:
-        #     if config.num_attention_heads % config.tensor_parallel_degree != 0:
-        #         raise ValueError("num_attention_heads has to be divisible by tensor_parallel_degree")
-        #     self.num_heads = config.num_attention_heads // config.tensor_parallel_degree
-        #     self.c_attn = mpu.ColumnParallelLinear(
-        #         config.hidden_size,
-        #         3 * self.projection_size,
-        #         has_bias=True,
-        #         gather_output=False,
-        #     )
-        #     self.c_proj = mpu.RowParallelLinear(
-        #         config.hidden_size,
-        #         self.projection_size,
-        #         has_bias=not config.no_bias,
-        #         input_is_parallel=True,
-        #     )
-        # else:
         self.c_attn = nn.Linear(config.hidden_size, 3 * self.projection_size, bias_attr=True)
-        # temperary
-        # self.c_attn_q = nn.Linear(config.hidden_size, self.projection_size, bias_attr=True)
-        # self.c_attn_k = nn.Linear(config.hidden_size, self.projection_size, bias_attr=True)
-        # self.c_attn_v = nn.Linear(config.hidden_size, self.projection_size, bias_attr=True)
-        #
         self.c_proj = nn.Linear(config.hidden_size, self.projection_size, bias_attr=not config.no_bias)
 
         if config.rotary_pct == 1.0:
