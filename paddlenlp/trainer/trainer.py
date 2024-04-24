@@ -1011,6 +1011,7 @@ class Trainer:
                     self.timers and self.timers("optimizer-step").start()
 
                     if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss():
+                        paddle.device.synchronize()
                         for p in model._layers.parameters():
                             with paddle.no_grad():
                                 if hasattr(p, "main_grad") and p.main_grad is not None:
