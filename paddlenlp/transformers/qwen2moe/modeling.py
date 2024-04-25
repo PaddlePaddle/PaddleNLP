@@ -915,9 +915,9 @@ class QWen2MoePretrainedModel(PretrainedModel):
                 [f"layers.{layer_index}.self_attn.q_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.k_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.v_proj.weight", None, "transpose"],
-                [f"layers.{layer_index}.self_attn.q_proj.bias", None, "split", 1],
-                [f"layers.{layer_index}.self_attn.k_proj.bias", None, "split", 1],
-                [f"layers.{layer_index}.self_attn.v_proj.bias", None, "split", 1],
+                [f"layers.{layer_index}.self_attn.q_proj.bias", None],
+                [f"layers.{layer_index}.self_attn.k_proj.bias", None],
+                [f"layers.{layer_index}.self_attn.v_proj.bias", None],
                 [f"layers.{layer_index}.self_attn.o_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.rotary_emb.inv_freq"],
                 [f"layers.{layer_index}.input_layernorm.weight"],
@@ -1051,8 +1051,8 @@ class QWen2MoePretrainedModel(PretrainedModel):
                             shape=layer.weight.shape,
                         )
                     )
-            if isinstance(layer.bias, paddle.Tensor):
-                layer.bias.set_value(paddle.zeros_like(layer.bias.shape))
+            if hasattr(layer, "bias") and isinstance(layer.bias, paddle.Tensor):
+                layer.bias.set_value(paddle.zeros_like(layer.bias))
         # Layer.apply is DFS https://github.com/PaddlePaddle/Paddle/blob/a6f5021fcc58b21f4414bae6bf4731ef6971582c/python/paddle/nn/layer/layers.py#L527-L530
         # sublayer is init first
         # scale RowParallelLinear weight
