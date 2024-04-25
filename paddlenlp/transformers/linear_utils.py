@@ -20,9 +20,11 @@ import paddle.distributed.fleet.meta_parallel as mpu
 from paddle import nn
 from paddle.distributed.fleet.utils import sequence_parallel_utils
 
+from paddlenlp.transformers.mc2_parallel_linear import (
+    MC2ColumnSeqParallelLinear,
+    MC2RowSeqParallelLinear,
+)
 from paddlenlp.utils.tools import get_env_device
-
-from .mc2_parallel_linear import MC2ColumnSeqParallelLinear, MC2RowSeqParallelLinear
 
 Linear = nn.Linear
 ColumnParallelLinear = mpu.ColumnParallelLinear
