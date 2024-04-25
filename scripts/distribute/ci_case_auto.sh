@@ -2004,7 +2004,7 @@ function llm_qwen_dygraph_auto_bs1_fp32_DP2() {
     "enable_auto_parallel": 1,
     "to_static": 0
 }
-    EOF
+EOF
 
     unset CUDA_VISIBLE_DEVICES
 
@@ -2098,7 +2098,7 @@ function llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2() {
     "enable_auto_parallel": 1,
     "to_static": 0
 }
-    EOF
+EOF
 
     set -x
     unset CUDA_VISIBLE_DEVICES
@@ -2192,7 +2192,7 @@ function llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2-PP2() {
     "enable_auto_parallel": 1,
     "to_static": 0
 }
-    EOF
+EOF
 
     unset CUDA_VISIBLE_DEVICES
 
@@ -2286,7 +2286,7 @@ function llm_qwen_dygraph_auto_bs1_bf16_DP2-MP2-PP2() {
     "enable_auto_parallel": 1,
     "to_static": 0
 }
-    EOF
+EOF
 
     unset CUDA_VISIBLE_DEVICES
 
