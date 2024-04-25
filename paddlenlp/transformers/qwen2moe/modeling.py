@@ -342,7 +342,7 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     return expanded_mask
 
 
-# Copied from transformers.models.llama.modeling_llama.LlamaRMSNorm with Llama->Qwen2Moe
+# Copied from transformers.models.llama.modeling_llama.LlamaRMSNorm with Llama->QWen2Moe
 class QWen2MoeRMSNorm(nn.Layer):
     def __init__(self, config):
         super().__init__()
@@ -374,7 +374,7 @@ class QWen2MoeRMSNorm(nn.Layer):
         return hidden_states * self.weight
 
 
-# Copied from transformers.models.mistral.modeling_mistral.MistralRotaryEmbedding with Mistral->Qwen2Moe
+# Copied from transformers.models.mistral.modeling_mistral.MistralRotaryEmbedding with Mistral->QWen2Moe
 class QWen2MoeRotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
@@ -452,7 +452,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
     return q_embed, k_embed
 
 
-# Modified from transformers.models.mistral.modeling_mistral.MistralMLP with Mistral->Qwen2Moe
+# Modified from transformers.models.mistral.modeling_mistral.MistralMLP with Mistral->QWen2Moe
 class QWen2MoeMLP(nn.Layer):
     def __init__(self, config, is_shared=False):
         super().__init__()
@@ -511,7 +511,7 @@ def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
     return hidden_states.reshape([batch, slen, num_key_value_heads * n_rep, head_dim])
 
 
-# Copied from transformers.models.qwen2.modeling_qwen2.Qwen2Attention with Qwen2->Qwen2Moe
+# Copied from transformers.models.qwen2.modeling_qwen2.Qwen2Attention with Qwen2->QWen2Moe
 class QWen2MoeAttention(nn.Layer):
     """
     Multi-headed attention from 'Attention Is All You Need' paper. Modified to use sliding window attention: Longformer
@@ -927,7 +927,7 @@ class QWen2MoePretrainedModel(PretrainedModel):
                     [f"layers.{layer_index}.mlp.experts.{expert_idx}.up_proj.weight", None, "transpose"],
                 ]
                 model_mappings.extend(expert_mappings)
-            model_mappings.append([f"layers.{layer_index}.block_sparse_moe.gate.weight", None, "transpose"])
+            model_mappings.append([f"layers.{layer_index}.mlp.gate.weight", None, "transpose"])
 
         init_name_mappings(mappings=model_mappings)
         # base-model prefix "QWen2MoeModel"
