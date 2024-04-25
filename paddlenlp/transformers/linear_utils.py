@@ -12,38 +12,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddle.distributed.fleet.meta_parallel import (
-    ColumnParallelLinear,
-    RowParallelLinear,
-)
-from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    RowSequenceParallelLinear,
-)
-from paddle.nn import Linear
+"""
+This file is used for replacing Paddle's native Linear implementations with vendors' customized implementations
+"""
+
+import paddle.distributed.fleet.meta_parallel as mpu
+from paddle import nn
+from paddle.distributed.fleet.utils import sequence_parallel_utils
 
 from paddlenlp.utils.tools import get_env_device
 
 from .mc2_parallel_linear import MC2ColumnSeqParallelLinear, MC2RowSeqParallelLinear
 
-if MC2ColumnSeqParallelLinear is not None and MC2RowSeqParallelLinear is not None:
-    ColumnSequenceParallelLinear = MC2ColumnSeqParallelLinear  # noqa: F811
-    RowSequenceParallelLinear = MC2RowSeqParallelLinear  # noqa: F811
+Linear = nn.Linear
+ColumnParallelLinear = mpu.ColumnParallelLinear
+RowParallelLinear = mpu.RowParallelLinear
+ColumnSequenceParallelLinear = sequence_parallel_utils.ColumnSequenceParallelLinear
+RowSequenceParallelLinear = sequence_parallel_utils.RowSequenceParallelLinear
+
+if get_env_device() == "npu":
+    if MC2ColumnSeqParallelLinear is not None and MC2RowSeqParallelLinear is not None:
+        ColumnSequenceParallelLinear = MC2ColumnSeqParallelLinear
+        RowSequenceParallelLinear = MC2RowSeqParallelLinear
 elif get_env_device() == "xpu":
     try:
         from paddle_xpu.layers.nn import ColumnParallelLinear as XPUColumnParallelLinear
-        from paddle_xpu.layers.nn import Linear as XPULinear  # noqa: F401
+        from paddle_xpu.layers.nn import Linear as XPULinear
         from paddle_xpu.layers.nn import RowParallelLinear as XPURowParallelLinear
-        from paddle_xpu.layers.nn.sequence_parallel import (  # noqa: F401
+        from paddle_xpu.layers.nn.sequence_parallel import (
             XPUColumnSequenceParallelLinear,
             XPURowSequenceParallelLinear,
         )
 
-        Linear = XPULinear  # noqa: F811
-        ColumnParallelLinear = XPUColumnParallelLinear  # noqa: F811
-        RowParallelLinear = XPURowParallelLinear  # noqa: F811
-        ColumnSequenceParallelLinear = XPUColumnSequenceParallelLinear  # noqa: F811
-        RowSequenceParallelLinear = XPURowSequenceParallelLinear  # noqa: F811
+        Linear = XPULinear
+        ColumnParallelLinear = XPUColumnParallelLinear
+        RowParallelLinear = XPURowParallelLinear
+        ColumnSequenceParallelLinear = XPUColumnSequenceParallelLinear
+        RowSequenceParallelLinear = XPURowSequenceParallelLinear
     except ImportError:
-        # It's OK, just use paddle's Linear layers
+        # If paddle_xpu is not installed, just use Paddle's native Linear implementations
         pass
+else:
+    # By default, use Paddle's native Linear implementations
+    pass
