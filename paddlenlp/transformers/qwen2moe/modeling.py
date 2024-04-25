@@ -1034,7 +1034,7 @@ class QWen2MoePretrainedModel(PretrainedModel):
                                 mean=0.0,
                                 std=self.config.initializer_range
                                 if hasattr(self.config, "initializer_range")
-                                else self.mixtral.config.initializer_range,
+                                else self.qwen2moe.config.initializer_range,
                                 shape=layer.weight.shape,
                             )
                         )
@@ -1044,10 +1044,12 @@ class QWen2MoePretrainedModel(PretrainedModel):
                             mean=0.0,
                             std=self.config.initializer_range
                             if hasattr(self.config, "initializer_range")
-                            else self.mixtral.config.initializer_range,
+                            else self.qwen2moe.config.initializer_range,
                             shape=layer.weight.shape,
                         )
                     )
+            if isinstance(layer.bias, paddle.Tensor):
+                layer.bias.set_value(paddle.zeros_like(layer.bias.shape))
         # Layer.apply is DFS https://github.com/PaddlePaddle/Paddle/blob/a6f5021fcc58b21f4414bae6bf4731ef6971582c/python/paddle/nn/layer/layers.py#L527-L530
         # sublayer is init first
         # scale RowParallelLinear weight
