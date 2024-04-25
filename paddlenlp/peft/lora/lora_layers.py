@@ -530,7 +530,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
                 result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
             else:
                 res_mp = MC2ColumnParallelCoreLinear.apply(input, self.weight, self.model_parallel_group)
-                result_mp = res_mp + self.bias
+                result_mp = (res_mp + self.bias) if self.bias is not None else res_mp
 
             if not self.merged:
                 input_a = self.lora_dropout(input) @ self.lora_A
