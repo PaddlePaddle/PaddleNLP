@@ -29,14 +29,19 @@ import paddle.tensor as tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
-from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    GatherOp,
-    RowSequenceParallelLinear,
-    ScatterOp,
-    mark_as_sequence_parallel_parameter,
-)
+
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        ColumnSequenceParallelLinear,
+        GatherOp,
+        RowSequenceParallelLinear,
+        ScatterOp,
+        mark_as_sequence_parallel_parameter,
+    )
+except:
+    pass
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
+from paddle.utils import try_import
 
 from ...utils.converter import StateDictNameMapping
 from ...utils.log import logger
@@ -48,7 +53,11 @@ from ..model_outputs import (
     TokenClassifierOutput,
 )
 from ..model_utils import dy2st_nocheck_guard_context
-from .configuration import GPT_PRETRAINED_INIT_CONFIGURATION, GPTConfig
+from .configuration import (
+    GPT_PRETRAINED_INIT_CONFIGURATION,
+    GPT_PRETRAINED_RESOURCE_FILES_MAP,
+    GPTConfig,
+)
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
@@ -58,6 +67,9 @@ try:
     from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 except:
     FusedDropoutAdd = None
+
+OriginLayerNorm = paddle.nn.LayerNorm
+
 
 __all__ = [
     "GPTModel",
@@ -70,6 +82,7 @@ __all__ = [
     "GPTForCausalLM",
     "GPTEmbeddings",
     "GPTDecoderLayer",
+    "GPTLayerNorm",
 ]
 
 
@@ -119,6 +132,11 @@ def seed_guard_context(name=None):
         return contextlib.nullcontext()
 
 
+def fast_layer_norm(input, weight, bias, eps):
+    fast_ln_lib = try_import("fast_ln")
+    return fast_ln_lib.fast_ln(input, weight, bias, eps)[0]
+
+
 def _make_causal_mask(input_ids_shape, past_key_values_length):
     """
     Make causal mask used for self-attention
@@ -147,6 +165,11 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     expanded_mask = mask.expand([batch_size, 1, tgt_length, src_length])
 
     return expanded_mask
+
+
+def _check_normalized_shape(normalized_shape):
+    if isinstance(normalized_shape, (list, tuple)):
+        assert len(normalized_shape) == 1
 
 
 class MultiHeadAttention(nn.Layer):
@@ -196,7 +219,7 @@ class MultiHeadAttention(nn.Layer):
                     3 * config.hidden_size,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=config.fused_linear,
+                    fuse_matmul_bias=config.use_fused_linear,
                 )
             else:
                 self.q_proj = ColumnParallelLinear(
@@ -204,7 +227,7 @@ class MultiHeadAttention(nn.Layer):
                     config.hidden_size,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=config.fused_linear,
+                    fuse_matmul_bias=config.use_fused_linear,
                 )
 
                 self.k_proj = ColumnParallelLinear(
@@ -212,7 +235,7 @@ class MultiHeadAttention(nn.Layer):
                     config.hidden_size,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=config.fused_linear,
+                    fuse_matmul_bias=config.use_fused_linear,
                 )
 
                 self.v_proj = ColumnParallelLinear(
@@ -220,7 +243,7 @@ class MultiHeadAttention(nn.Layer):
                     config.hidden_size,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=config.fused_linear,
+                    fuse_matmul_bias=config.use_fused_linear,
                 )
 
             self.out_proj = RowParallelLinear(
@@ -228,7 +251,7 @@ class MultiHeadAttention(nn.Layer):
                 config.hidden_size,
                 has_bias=True,
                 input_is_parallel=True,
-                fuse_matmul_bias=config.fused_linear,
+                fuse_matmul_bias=config.use_fused_linear,
             )
         else:
             if self.config.fuse_attention_qkv:
@@ -421,7 +444,7 @@ class TransformerDecoder(nn.Layer):
 
         self.config = config
         self.layers = decoder_layers
-        self.norm = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
+        self.norm = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
 
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.norm.weight)
@@ -566,21 +589,23 @@ class GPTDecoderLayer(nn.Layer):
                 config.intermediate_size,
                 gather_output=False,
                 has_bias=True,
-                fuse_matmul_bias=self.config.fused_linear,
+                fuse_matmul_bias=self.config.use_fused_linear,
             )
+
             self.linear2 = RowParallelLinear(
                 config.intermediate_size,
                 config.hidden_size,
                 input_is_parallel=True,
                 has_bias=True,
-                fuse_matmul_bias=self.config.fused_linear,
+                fuse_matmul_bias=self.config.use_fused_linear,
             )
         else:
             self.linear1 = nn.Linear(config.hidden_size, config.intermediate_size, bias_attr=True)
             self.linear2 = nn.Linear(config.intermediate_size, config.hidden_size, bias_attr=True)
 
-        self.norm1 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
-        self.norm2 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
+        self.norm1 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
+        self.norm2 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
+
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.norm1.weight)
             mark_as_sequence_parallel_parameter(self.norm1.bias)
@@ -712,10 +737,10 @@ class GPTEmbeddings(nn.Layer):
 
     def forward(self, input_ids, position_ids=None, inputs_embeddings=None):
         if input_ids is not None:
-            input_shape = paddle.shape(input_ids)
+            input_shape = input_ids.shape
             inputs_embeddings = self.word_embeddings(input_ids)
         else:
-            input_shape = paddle.shape(inputs_embeddings)[:-1]
+            input_shape = inputs_embeddings.shape[:-1]
 
         if position_ids is None:
             ones = paddle.ones(input_shape, dtype="int64")
@@ -741,6 +766,21 @@ class GPTEmbeddings(nn.Layer):
         return embeddings
 
 
+class GPTLayerNorm(OriginLayerNorm):
+    def __init__(self, config, normalized_shape, epsilon=1e-05, weight_attr=None, bias_attr=None, name=None):
+        super().__init__(
+            normalized_shape=normalized_shape, epsilon=epsilon, weight_attr=weight_attr, bias_attr=bias_attr
+        )
+
+        self.config = config
+        _check_normalized_shape(self._normalized_shape)
+
+    def forward(self, input):
+        if self.config.use_fast_layer_norm:
+            return fast_layer_norm(input, self.weight, self.bias, self._epsilon)
+        return super().forward(input)
+
+
 class GPTPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained GPT models. It provides GPT related
@@ -755,6 +795,7 @@ class GPTPretrainedModel(PretrainedModel):
     base_model_prefix = "gpt"
     config_class = GPTConfig
     pretrained_init_configuration = GPT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = GPT_PRETRAINED_RESOURCE_FILES_MAP
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):
@@ -802,6 +843,49 @@ class GPTPretrainedModel(PretrainedModel):
         mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
 
         return mappings
+
+    @classmethod
+    def _get_fuse_or_split_param_mappings(cls, config: GPTConfig, is_fuse=False):
+        # return parameter fuse utils
+        from paddlenlp.transformers.conversion_utils import split_or_fuse_func
+
+        fn = split_or_fuse_func(is_fuse=is_fuse)
+
+        # last key is fused key, other keys are to be fused.
+        fuse_qkv_keys = (
+            "decoder.layers.0.self_attn.q_proj.weight",
+            "decoder.layers.0.self_attn.k_proj.weight",
+            "decoder.layers.0.self_attn.v_proj.weight",
+            "decoder.layers.0.self_attn.qkv_proj.weight",
+        )
+        fuse_qkv_bias_keys = (
+            "decoder.layers.0.self_attn.q_proj.bias",
+            "decoder.layers.0.self_attn.k_proj.bias",
+            "decoder.layers.0.self_attn.v_proj.bias",
+            "decoder.layers.0.self_attn.qkv_proj.bias",
+        )
+        num_heads = config.num_attention_heads
+        num_key_value_heads = getattr(config, "num_key_value_heads", num_heads)
+        fuse_attention_qkv = getattr(config, "fuse_attention_qkv", False)
+
+        final_actions = {}
+        if is_fuse:
+            if fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    for keys in [fuse_qkv_keys, fuse_qkv_bias_keys]:
+                        new_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in keys])
+                        final_actions[new_keys] = partial(
+                            fn, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                        )
+        else:
+            if not fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    for keys in [fuse_qkv_keys, fuse_qkv_bias_keys]:
+                        new_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in keys])
+                        final_actions[new_keys] = partial(
+                            fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                        )
+        return final_actions
 
     @classmethod
     def _get_name_mappings(cls, config: GPTConfig) -> list[StateDictNameMapping]:
@@ -1130,10 +1214,10 @@ class GPTModel(GPTPretrainedModel):
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
-            input_shape = paddle.shape(input_ids)
+            input_shape = input_ids.shape
             input_ids = input_ids.reshape((-1, input_shape[-1]))
         elif inputs_embeds is not None:
-            input_shape = paddle.shape(inputs_embeds)[:-1]
+            input_shape = inputs_embeds.shape[:-1]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
         # input_shape => bs, seq_len
@@ -1145,7 +1229,7 @@ class GPTModel(GPTPretrainedModel):
             past_length = 0
             if past_key_values[0] is not None:
                 # bs, seq_len, num_head, head_dim
-                past_length = paddle.shape(past_key_values[0][0])[1]
+                past_length = past_key_values[0][0].shape[1]
             position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype="int64")
             position_ids = position_ids.unsqueeze(0)
             position_ids = paddle.expand(position_ids, input_shape)
@@ -1156,7 +1240,7 @@ class GPTModel(GPTPretrainedModel):
         # TODO, use registered buffer
         length = input_shape[-1]
         if past_key_values[0] is not None:
-            cache_length = paddle.shape(past_key_values[0][0])[1]
+            cache_length = past_key_values[0][0].shape[1]
             length = length + cache_length
         else:
             cache_length = 0
@@ -1763,16 +1847,14 @@ class GPTForSequenceClassification(GPTPretrainedModel):
         if input_ids is not None:
             sequence_lengths = (input_ids != eos_token_id).astype("int64").sum(axis=-1) - 1
         else:
-            inputs_shape = paddle.shape(inputs_embeds)[:-1]
+            inputs_shape = inputs_embeds.shape[:-1]
             sequence_lengths = paddle.ones(inputs_shape[:-1], dtype="int64") * (inputs_shape[1] - 1)
             logger.warning(
                 f"{self.__class__.__name__} will not detect padding tokens in `inputs_embeds`. Results may be "
                 "unexpected if using padding tokens in conjunction with `inputs_embeds.`"
             )
 
-        pooled_logits = logits.gather_nd(
-            paddle.stack([paddle.arange(paddle.shape(logits)[0]), sequence_lengths], axis=-1)
-        )
+        pooled_logits = logits.gather_nd(paddle.stack([paddle.arange(logits.shape[0]), sequence_lengths], axis=-1))
 
         loss = None
 

@@ -207,7 +207,7 @@ class SelfAttention(nn.Layer):
         # Shape: (batch_size, max_seq_len, hidden_size)
         h = paddle.add_n([forward_input, backward_input])
         # Shape: (batch_size, hidden_size, 1)
-        att_weight = self.att_weight.tile(repeat_times=(paddle.shape(h)[0], 1, 1))
+        att_weight = self.att_weight.tile(repeat_times=(h.shape[0], 1, 1))
         # Shape: (batch_size, max_seq_len, 1)
         att_score = paddle.bmm(paddle.tanh(h), att_weight)
         if mask is not None:
@@ -246,20 +246,18 @@ class SelfInteractiveAttention(nn.Layer):
                 Tensor is a bool tensor, whose each element identifies whether the input word id is pad token or not.
                 Defaults to `None
         """
-        weight = self.input_weight.tile(
-            repeat_times=(paddle.shape(input)[0], 1, 1)
-        )  # tensor[batch, hidden_size, hidden_size]
-        bias = self.bias.tile(repeat_times=(paddle.shape(input)[0], 1, 1))  # tensor[batch, 1, hidden_size]
+        weight = self.input_weight.tile(repeat_times=(input.shape[0], 1, 1))  # tensor[batch, hidden_size, hidden_size]
+        bias = self.bias.tile(repeat_times=(input.shape[0], 1, 1))  # tensor[batch, 1, hidden_size]
         word_squish = paddle.bmm(input, weight) + bias  # Shape: (batch_size, seq_len, hidden_size)
         att_context_vector = self.att_context_vector.tile(
-            repeat_times=(paddle.shape(input)[0], 1, 1)
+            repeat_times=(input.shape[0], 1, 1)
         )  # Shape: (batch_size, hidden_size, 1)
         att_score = paddle.bmm(word_squish, att_context_vector)  # tensor[batch_size, seq_len, 1]
         if mask is not None:
             # mask, remove the effect of 'PAD'
             mask = paddle.cast(mask, dtype="float32")
             mask = mask.unsqueeze(axis=-1)
-            inf_tensor = paddle.full(shape=paddle.shape(mask), dtype="float32", fill_value=-INF)
+            inf_tensor = paddle.full(shape=mask.shape, dtype="float32", fill_value=-INF)
             att_score = paddle.multiply(att_score, mask) + paddle.multiply(inf_tensor, (1 - mask))
         att_weight = F.softmax(att_score, axis=1)  # tensor[batch_size, seq_len, 1]
 

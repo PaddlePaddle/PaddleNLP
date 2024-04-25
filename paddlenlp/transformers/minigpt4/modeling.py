@@ -203,7 +203,7 @@ class MiniGPT4VisionEmbeddings(nn.Layer):
         batch_size = pixel_values.shape[0]
         target_dtype = self.patch_embedding.weight.dtype
         patch_embeds = self.patch_embedding(pixel_values)  # shape = [*, width, grid, grid]
-        patch_embeds_shape = paddle.shape(patch_embeds)
+        patch_embeds_shape = patch_embeds.shape
         patch_embeds = paddle.reshape(
             patch_embeds, shape=[patch_embeds_shape[0], patch_embeds_shape[1], -1]
         ).transpose([0, 2, 1])

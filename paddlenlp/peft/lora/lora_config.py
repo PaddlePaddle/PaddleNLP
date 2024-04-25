@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import json
+import math
 import os
 from dataclasses import asdict, dataclass, field
 from typing import List, Optional, Union
@@ -74,6 +75,7 @@ class LoRAConfig:
     )
     do_qat: bool = field(default=False, metadata={"help": "Whether the lora model would do quant-aware training"})
     rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
+    pissa: bool = field(default=False, metadata={"help": "Whether to use Pissa: https://arxiv.org/pdf/2404.02948.pdf"})
     lora_plus_scale: float = field(default=1.0, metadata={"help": "Lora B scale in LoRA+"})
     base_model_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "The name of the base model to use."}
@@ -92,6 +94,15 @@ class LoRAConfig:
                 "We will automatically set `use_quick_lora` to `False` to avoid potential inconsistencies."
             )
             self.use_quick_lora = False
+
+    @property
+    def scaling(self):
+        if not self.rslora and not self.pissa:
+            return self.lora_alpha / self.r
+        elif self.pissa:
+            return 1.0
+        else:
+            return self.lora_alpha / math.sqrt(self.r)
 
     @property
     def __dict__(self):
@@ -113,6 +124,7 @@ class LoRAConfig:
         os.makedirs(save_directory, exist_ok=True)
 
         output_dict = self.__dict__
+        output_dict["scaling"] = self.scaling
         output_path = os.path.join(save_directory, LORA_CONFIG_NAME)
 
         # save it
@@ -135,6 +147,7 @@ class LoRAConfig:
             raise ValueError(f"Can't find lora_config.json at '{pretrained_model_name_or_path}'")
 
         loaded_attributes = cls.from_json_file(config_file)
+        loaded_attributes.pop("scaling", None)
 
         config = cls(**kwargs)
 

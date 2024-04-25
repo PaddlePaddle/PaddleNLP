@@ -493,7 +493,7 @@ class ErnieModel(ErnieGenPretrainedModel):
         assert (
             attn_bias is not None if past_cache else True
         ), "if `past_cache` is specified; attn_bias should not be None"
-        d_seqlen = paddle.shape(src_ids)[1]
+        d_seqlen = src_ids.shape[1]
         if pos_ids is None:
             pos_ids = paddle.arange(0, d_seqlen, 1, dtype="int32").reshape([1, -1]).cast("int64")
         if attn_bias is None:
