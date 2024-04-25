@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "5"
+os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 import sys
 import time
 from abc import abstractmethod
@@ -661,7 +661,7 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         import_module("paddlenlp_ops.rebuild_padding")
         import_module("paddlenlp_ops.transpose_remove_padding")
         import_module("paddlenlp_ops.write_cache_kv")
-        import triton_wint8_transi32i3216i3216i3216i321i321i3216i3216i321_package
+        # import triton_wint8_trans0_16_16_16_1_1_16_16_1_package
 
         infer_model_path = get_infer_model_path(predictor_args.model_name_or_path, predictor_args.model_prefix)
 
@@ -1562,8 +1562,8 @@ def predict():
                     target_texts.append("")
 
     else:
-        source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"] * 2
-        target_texts = ["", ""] * 2
+        source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"] * 16
+        target_texts = ["", ""] * 16
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
