@@ -515,7 +515,6 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
         expected_keys_mw = get_expected_keys(sharded_metadata_mw, model, optimizer)
         if not isinstance(resolved_archive_file_mw, list):
             resolved_archive_file_mw = [resolved_archive_file_mw]
-        logger.info(resolved_archive_file_mw)
         if len(resolved_archive_file_mw) > 1:
             resolved_archive_file_mw = tqdm(resolved_archive_file_mw, desc="Loading master weights shards")
 
