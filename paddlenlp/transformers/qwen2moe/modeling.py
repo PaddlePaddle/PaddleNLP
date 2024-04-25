@@ -457,7 +457,9 @@ class QWen2MoeMLP(nn.Layer):
     def __init__(self, config, is_shared=False):
         super().__init__()
         self.hidden_size = config.hidden_size
-        self.intermediate_size = config.intermediate_size if not is_shared else config.shared_expert_intermediate_size
+        self.intermediate_size = (
+            config.moe_intermediate_size if not is_shared else config.shared_expert_intermediate_size
+        )
         self.tensor_parallel_degree = config.tensor_parallel_degree
 
         if config.sequence_parallel:
@@ -928,6 +930,11 @@ class QWen2MoePretrainedModel(PretrainedModel):
                 ]
                 model_mappings.extend(expert_mappings)
             model_mappings.append([f"layers.{layer_index}.mlp.gate.weight", None, "transpose"])
+
+            model_mappings.append([f"layers.{layer_index}.mlp.shared_expert.gate_proj.weight", None, "transpose"])
+            model_mappings.append([f"layers.{layer_index}.mlp.shared_expert.down_proj.weight", None, "transpose"])
+            model_mappings.append([f"layers.{layer_index}.mlp.shared_expert.up_proj.weight", None, "transpose"])
+            model_mappings.append([f"layers.{layer_index}.mlp.shared_expert_gate.weight", None, "transpose"])
 
         init_name_mappings(mappings=model_mappings)
         # base-model prefix "QWen2MoeModel"
