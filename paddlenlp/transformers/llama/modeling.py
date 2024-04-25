@@ -246,7 +246,7 @@ def scaled_dot_product_attention(
                     attention_mask is None,
                     True,
                     False,
-                    False,
+                    True,
                 )[0]
             else:
                 attn_output = F.scaled_dot_product_attention(
