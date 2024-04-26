@@ -1004,6 +1004,18 @@ class QWen2MoePretrainedModel(PretrainedModel):
                         newkey2 = newkey.replace("experts.0.", f"experts.{j}.")
                         final_actions[newkey2] = action
 
+            # Add tp split for shared expert params.
+            base_actions = {
+                "layers.0.mlp.shared_expert.gate_proj.weight": partial(fn, is_column=True),
+                "layers.0.mlp.shared_expert.up_proj.weight": partial(fn, is_column=True),
+                "layers.0.mlp.shared_expert.down_proj.weight": partial(fn, is_column=True),
+            }
+            for key, action in base_actions.items():
+                if "layers.0." in key:
+                    for i in range(num_layers):
+                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
+                final_actions[key] = action
+
             return final_actions
 
         mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers, config.num_experts)

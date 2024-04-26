@@ -97,6 +97,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("BloomTokenizer", "bloom"),
         ("SpeechT5Tokenizer", "speecht5"),
         ("QWenTokenizer", "qwen"),
+        ("QWen2MoeTokenizer", "qwen2moe"),
         ("GemmaTokenizer", "gemma"),
     ]
 )

@@ -14,3 +14,4 @@
 
 from .configuration import QWen2MoeConfig
 from .modeling import QWen2MoeForCausalLM
+from .tokenizer import QWen2MoeTokenizer
