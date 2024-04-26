@@ -1008,7 +1008,7 @@ class QWen2MoePretrainedModel(PretrainedModel):
             base_actions = {
                 "layers.0.mlp.shared_expert.gate_proj.weight": partial(fn, is_column=True),
                 "layers.0.mlp.shared_expert.up_proj.weight": partial(fn, is_column=True),
-                "layers.0.mlp.shared_expert.down_proj.weight": partial(fn, is_column=True),
+                "layers.0.mlp.shared_expert.down_proj.weight": partial(fn, is_column=False),
             }
             for key, action in base_actions.items():
                 if "layers.0." in key:
