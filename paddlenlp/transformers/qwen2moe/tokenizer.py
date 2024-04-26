@@ -145,6 +145,29 @@ class QWen2MoeTokenizer(PretrainedTokenizer):
         split_special_tokens=False,
         **kwargs,
     ):
+        super().__init__(**kwargs)
+        # Qwen vocab does not contain control tokens; added tokens need to be special
+        bos_token = (
+            AddedToken(bos_token, lstrip=False, rstrip=False, special=True, normalized=False)
+            if isinstance(bos_token, str)
+            else bos_token
+        )
+        eos_token = (
+            AddedToken(eos_token, lstrip=False, rstrip=False, special=True, normalized=False)
+            if isinstance(eos_token, str)
+            else eos_token
+        )
+        unk_token = (
+            AddedToken(unk_token, lstrip=False, rstrip=False, special=True, normalized=False)
+            if isinstance(unk_token, str)
+            else unk_token
+        )
+        pad_token = (
+            AddedToken(pad_token, lstrip=False, rstrip=False, special=True, normalized=False)
+            if isinstance(pad_token, str)
+            else pad_token
+        )
+
         with open(vocab_file, encoding="utf-8") as vocab_handle:
             self.encoder = json.load(vocab_handle)
         self.decoder = {v: k for k, v in self.encoder.items()}
@@ -171,28 +194,10 @@ class QWen2MoeTokenizer(PretrainedTokenizer):
         #     logger.warning_once(
         #         f"{self.__class__.__name} does not support `add_prefix_space`, setting it to True has no effect."
         #     )
-
-        # Qwen vocab does not contain control tokens; added tokens need to be special
-        bos_token = (
-            AddedToken(bos_token, lstrip=False, rstrip=False, special=True, normalized=False)
-            if isinstance(bos_token, str)
-            else bos_token
-        )
-        eos_token = (
-            AddedToken(eos_token, lstrip=False, rstrip=False, special=True, normalized=False)
-            if isinstance(eos_token, str)
-            else eos_token
-        )
-        unk_token = (
-            AddedToken(unk_token, lstrip=False, rstrip=False, special=True, normalized=False)
-            if isinstance(unk_token, str)
-            else unk_token
-        )
-        pad_token = (
-            AddedToken(pad_token, lstrip=False, rstrip=False, special=True, normalized=False)
-            if isinstance(pad_token, str)
-            else pad_token
-        )
+        self.bos_token_id = kwargs["bos_token_id"] if "bos_token_id" in kwargs else None
+        self.eos_token_id = kwargs["eos_token_id"] if "eos_token_id" in kwargs else None
+        self.unk_token_id = kwargs["unk_token_id"] if "unk_token_id" in kwargs else None
+        self.pad_token_id = kwargs["pad_token_id"] if "pad_token_id" in kwargs else None
 
         super().__init__(
             errors=errors,
@@ -204,10 +209,6 @@ class QWen2MoeTokenizer(PretrainedTokenizer):
             split_special_tokens=split_special_tokens,
             **kwargs,
         )
-        if "pad_token_id" in kwargs:
-            self.pad_token_id = kwargs["pad_token_id"]
-        if "eos_token_id" in kwargs:
-            self.eos_token_id = kwargs["eos_token_id"]
 
     @property
     def vocab_size(self) -> int:
@@ -274,7 +275,7 @@ class QWen2MoeTokenizer(PretrainedTokenizer):
     # Copied from transformers.models.gpt2.tokenization_gpt2.GPT2Tokenizer._convert_token_to_id
     def _convert_token_to_id(self, token):
         """Converts a token (str) in an id using the vocab."""
-        return self.encoder.get(token, self.encoder.get(self.unk_token))
+        return self.encoder.get(token, len(self.encoder))
 
     # Copied from transformers.models.gpt2.tokenization_gpt2.GPT2Tokenizer._convert_id_to_token
     def _convert_id_to_token(self, index):
