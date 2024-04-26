@@ -52,7 +52,7 @@ if __name__ == "__main__":
     model_ref = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path, dtype=dtype)
 
     # tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat")
+    tokenizer = AutoTokenizer.from_pretrained("llama2-7b-chat")
 
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token

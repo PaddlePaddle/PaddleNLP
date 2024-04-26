@@ -313,43 +313,19 @@ class KTOTrainer(Trainer):
                 model = model.merge_and_unload()
 
             if getattr(model, "is_loaded_in_8bit", False) or getattr(model, "is_loaded_in_4bit", False):
-                _support_gc_kwargs = hasattr(args, "gradient_checkpointing_kwargs")
+                _support_gc_kwargs = hasattr(args, "recompute_kwargs")
 
-                prepare_model_kwargs = {"use_gradient_checkpointing": args.gradient_checkpointing}
+                prepare_model_kwargs = {"use_recompute": args.recompute}
 
                 if _support_gc_kwargs:
-                    prepare_model_kwargs["gradient_checkpointing_kwargs"] = args.gradient_checkpointing_kwargs
+                    prepare_model_kwargs["recompute_kwargs"] = args.recompute_kwargs
 
                 # model = prepare_model_for_kbit_training(model, **prepare_model_kwargs)
-            elif getattr(args, "gradient_checkpointing", False):
-                # For backward compatibility with older versions of transformers
-                if hasattr(model, "enable_input_require_grads"):
-                    model.enable_input_require_grads()
-                else:
-
-                    def make_inputs_require_grad(module, input, output):
-                        output.requires_grad_(True)
-
-                    model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
 
             # get peft model with the given config
             model = LoRAModel(model, peft_config)
             model.mark_only_lora_as_trainable()
             model.print_trainable_parameters()
-
-        # For models that use gradient_checkpointing, we need to attach a hook that enables input
-        # to explicitly have `requires_grad=True`, otherwise training will either silently
-        # fail or completely fail.
-        elif getattr(args, "gradient_checkpointing", False):
-            # For backward compatibility with older versions of transformers
-            if hasattr(model, "enable_input_require_grads"):
-                model.enable_input_require_grads()
-            else:
-
-                def make_inputs_require_grad(module, input, output):
-                    output.requires_grad_(True)
-
-                model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
 
         if args.generate_during_eval and not is_wandb_available():
             raise ValueError(
@@ -1190,6 +1166,7 @@ class KTOTrainer(Trainer):
         prediction_loss_only: Optional[bool] = None,
         ignore_keys: Optional[List[str]] = None,
         metric_key_prefix: str = "eval",
+        max_eval_iters: Optional[int] = -1,
     ) -> EvalLoopOutput:
         """
         Overriding built-in evaluation loop to store metrics for each batch.
@@ -1234,7 +1211,7 @@ class KTOTrainer(Trainer):
 
         # Base evaluation
         initial_output = super().evaluation_loop(
-            dataloader, description, prediction_loss_only, ignore_keys, metric_key_prefix
+            dataloader, description, prediction_loss_only, ignore_keys, metric_key_prefix, max_eval_iters
         )
 
         return initial_output
