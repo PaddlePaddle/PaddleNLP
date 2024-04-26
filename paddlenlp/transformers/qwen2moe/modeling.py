@@ -576,16 +576,16 @@ class QWen2MoeAttention(nn.Layer):
         if config.tensor_parallel_degree > 1:
             self.q_proj = ColumnParallelLinear(self.hidden_size, self.hidden_size, has_bias=True, gather_output=False)
             self.k_proj = ColumnParallelLinear(
-                self.hidden_size, self.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False
+                self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False
             )
             self.v_proj = ColumnParallelLinear(
-                self.hidden_size, self.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False
+                self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False
             )
             self.o_proj = RowParallelLinear(self.hidden_size, self.hidden_size, has_bias=False, input_is_parallel=True)
         else:
             self.q_proj = nn.Linear(self.hidden_size, self.hidden_size, bias_attr=True)
-            self.k_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias_attr=True)
-            self.v_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias_attr=True)
+            self.k_proj = nn.Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True)
+            self.v_proj = nn.Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True)
             self.o_proj = nn.Linear(self.hidden_size, self.hidden_size, bias_attr=False)
 
         self.rotary_emb = QWen2MoeRotaryEmbedding(
