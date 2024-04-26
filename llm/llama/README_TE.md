@@ -80,6 +80,10 @@ bash scripts/llama_single_node_interactive.sh  meta-llama/Llama-2-7b meta-llama/
 
 ### Convergence tests
 
+**!!!  Note**: Before convergence test, please use the Checkpoint Converter to convert the non-TE weights to TE weights.
+For example, save the checkpoint immediately after only one step of training, and then convert the checkpoint into TE checkpoint, so that you will get exactly the same weights for TE training and non-TE trainig. Then you can use the two checkpoints as the initial weight to train with or without TE. 
+**In this way, it can be observed that the loss curve of TE is almost identical to that of non-TE.**
+
 Multi-node training:
 ```bash
 # training from scratch
