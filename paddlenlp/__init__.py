@@ -18,7 +18,7 @@ import sys
 PADDLENLP_STABLE_VERSION = "PADDLENLP_STABLE_VERSION"
 
 
-__version__ = "2.7.1.post"
+__version__ = "2.8.0.post"
 if os.getenv(PADDLENLP_STABLE_VERSION):
     __version__ = __version__.replace(".post", "")
 
