@@ -1026,6 +1026,11 @@ class TrainingArguments:
                         enable_dp_comm_overlap and enable_sharding_comm_overlap
                     ), "dp_comm_overlap and sharding_comm_overlap cannot be enabled at the same time"
 
+                    if enable_sharding_comm_overlap and not self.amp_master_grad:
+                        raise ValueError(
+                            "If `enable_sharding_comm_overlap` in pipeline_parallel_configs, `amp_master_grad` must be True."
+                        )
+
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
                         "dp_comm_overlap": enable_dp_comm_overlap,
