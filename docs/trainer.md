@@ -521,6 +521,20 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better proformance.
                         Note, this need model support in source code, currently GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM is supported.
 
+  --tensor_parallel_config
+                        对于张量并行,一些选项会影响训练性能,这里将一些选项配置集中管理,以str形式传入配置.
+                        支持如下选项:
+                            enable_delay_scale_loss : 在优化器阶段做梯度累加，将所有梯度除以累加次数，而不是直接对loss除以累加次数。
+                            sync_param : 在优化器阶段使用broadcast同步所有is_distributed=False的参数
+                            sync_grad : 在优化器阶段使用broadcast同步所有is_distributed=False的梯度
+                            sync_moment : 在优化器阶段使用broadcast同步所有is_distributed=False的momentum
+
+                        Some additional config it highly affect the usage of tensor parallel, we provide some option to config it.
+                        following config is support:
+                            enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.
+                            sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.
+                            sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.
+                            sync_moment, in optimizer step, use broadcast to sync momentums those attr 'is_distributed' is False.
 
   --pipeline_parallel_degree
                         流水线并行是Megatron论文针对多层Transformer结构提出的按层划分方法.
@@ -549,7 +563,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         following config is support:
                           disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape.
                           disable_partial_send_recv, optmize send speed for tensor parallel.
-                          enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
+                          enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
                           enable_dp_comm_overlap, fuse data parallel gradient communication.
 
   --data_parallel_config

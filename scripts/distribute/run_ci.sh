@@ -56,7 +56,15 @@ install_paddlenlp(){
     # python setup.py bdist_wheel
     # unset http_proxy && unset https_proxy
     # cd -
-    python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
+    # python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
+}
+
+install_external_ops(){
+    echo -e "\033[31m ---- Install extern_ops  \033"
+    export PYTHONPATH=${nlp_dir}:$PYTHONPATH
+    cd ${nlp_dir}/model_zoo/gpt-3/external_ops
+    python setup.py install
+    python -c "import fused_ln;";
 }
 ####################################
 get_diff_TO_case(){
@@ -127,6 +135,8 @@ if [[ ${#case_list[*]} -ne 0 ]];then
     install_paddle
     # Install paddlenlp
     install_paddlenlp
+    # Install external_ops
+    install_external_ops
     
     case_num=1
     export FLAGS_install_deps=0
