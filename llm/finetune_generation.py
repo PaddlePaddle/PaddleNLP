@@ -16,7 +16,7 @@ import os
 import sys
 from dataclasses import dataclass, field
 from functools import partial
-
+import math
 import paddle
 from argument import (
     DataArgument,
@@ -34,8 +34,9 @@ from utils import (
     get_prefix_tuning_params,
     init_chat_template,
 )
+from glm.utils import GLMTrainer
 # from llama_attn_replace_paddle import replace_llama_attn
-from paddlenlp.data import DataCollatorForSeq2Seq
+from paddlenlp.data import DataCollatorForSeq2Seq, DataCollatorForLanguageModeling
 from paddlenlp.datasets import InTokensIterableDataset, InTokensMapDataset, load_dataset
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
@@ -45,7 +46,6 @@ from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
-    Llama3Tokenizer,
     LlamaTokenizer,
 )
 from paddlenlp.utils.log import logger
@@ -69,6 +69,10 @@ class FinetuneArguments(TrainingArguments):
     sparse: bool = field(
         default=True,
         metadata={"help": "The steps use to control the learing rate."},
+    )
+    trainable_params: str = field(
+        default="embed,norm",
+        metadata={"help": "Additional trainable parameters except LoRA weights, if low rank training."},
     )
 
 
@@ -198,10 +202,20 @@ def main():
         # Config for model using dropout, such as GPT.
         model_config.hidden_dropout_prob = model_args.hidden_dropout_prob
         model_config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
-
         model_config.sep_parallel_degree = training_args.sep_parallel_degree
         model_config.tensor_parallel_output = True
         model_config.seq_length = data_args.max_length
+        
+        #set RoPE scaling factor
+        orig_rope_scaling_factor = model_config.rope_scaling_factor
+        orig_ctx_len = model_config.max_position_embeddings
+        if orig_ctx_len:
+            orig_ctx_len *= orig_rope_scaling_factor
+            if data_args.max_length > orig_ctx_len:
+                scaling_factor = float(math.ceil(data_args.max_length / orig_ctx_len))
+                model_config.rope_scaling_factor = scaling_factor
+                model_config.rope_scaling_type = "linear"
+
         if not training_args.autotuner_benchmark:
             model = AutoModelForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
@@ -238,7 +252,7 @@ def main():
     if tokenizer.chat_template is not None:
         data_args.eval_with_do_generation = False
 
-    if isinstance(tokenizer, LlamaTokenizer) or isinstance(tokenizer, Llama3Tokenizer):
+    if isinstance(tokenizer, LlamaTokenizer):
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if data_args.dataset_name_or_path is None:
@@ -327,11 +341,11 @@ def main():
             ptq_ds = None
     else:
         if training_args.do_train or quant_args.do_qat:
-            train_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])
+            train_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
         else:
             train_ds = None
         if training_args.do_eval:
-            dev_ds = load_dataset(data_args.dataset_name_or_path, cache_dir='valid-dataset/cache', splits=["test"])[0]
+            dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["test"])[0]
         else:
             dev_ds = None
         if quant_args.do_ptq or quant_args.do_gptq:
@@ -459,7 +473,7 @@ def main():
 
     if model_args.lora:
         if model_args.lora_path is None:
-            target_modules = get_lora_target_modules(model)
+            target_modules = ["q_proj", "k_proj", "v_proj", "o_proj"]
             lora_config = LoRAConfig(
                 target_modules=target_modules,
                 r=model_args.lora_rank,
@@ -475,20 +489,21 @@ def main():
                 use_quick_lora=model_args.use_quick_lora,
             )
             model = LoRAModel(model, lora_config)
+            
+            # model.mark_only_lora_as_trainable()
+            # model.print_trainable_parameters()
+            trainable_keywords = ["embed","norm"]
             # set embedding and norm trainable
-            model.mark_only_lora_as_trainable()
-            model.print_trainable_parameters()
-            for n, p in model.named_parameters():
-                if any([k in n for k in training_args.trainable_params.split(",")]):
-                    p.stop_gradient = False
+            for name, param in model.named_parameters():
+                make_trainable = False
+                for keyword in trainable_keywords:
+                    if keyword in name:
+                        make_trainable = True
+                        break
+                if make_trainable:
+                    param.stop_gradient = False
             model.config.use_cache = False
 
-            # model.enable_input_require_grads()
-            # required for gradient checkpointing
-            def make_inputs_require_grad(module, input, output):
-                output.stop_gradient = False
-            model.get_input_embeddings().register_forward_post_hook(make_inputs_require_grad)
-            # model.gradient_checkpointing_enable()  # enable gradient checkpointing
             model.recompute_enable()
             for param in model.parameters():
                 if not param.stop_gradient and param.grad is None:
@@ -550,12 +565,17 @@ def main():
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
         compute_metrics=metrics,
+        # data_collator=DataCollatorForLanguageModeling(
+        #     tokenizer=tokenizer,
+        #     return_tensors="np",
+        #     mlm=False,
+        #     pad_to_multiple_of=data_args.max_length,
+        # ),
         data_collator=DataCollatorForSeq2Seq(
             tokenizer=tokenizer,
-            max_length=max_length,
-            padding=padding,
-            max_label_length=max_length,
             return_tensors="np",
+            max_length=max_length,
+            padding=True,
             pad_to_multiple_of=data_args.max_length,
         ),
         do_generation=data_args.eval_with_do_generation,
@@ -571,7 +591,8 @@ def main():
             checkpoint = training_args.resume_from_checkpoint
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        # train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        train_result = trainer.train()
         if model_args.neftune:
             neft_post_hook_handle.remove()
         if training_args.benchmark:

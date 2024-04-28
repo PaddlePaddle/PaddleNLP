@@ -62,10 +62,6 @@ from paddlenlp.transformers.conversion_utils import (
     init_name_mappings,
 )
 from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
-from paddlenlp.transformers.mc2_parallel_linear import (
-    MC2ColumnSeqParallelLinear,
-    MC2RowSeqParallelLinear,
-)
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
@@ -98,6 +94,13 @@ __all__ = [
     "LlamaForCausalLM",
     "LlamaPretrainingCriterion",
 ]
+
+
+def is_mc2_valid():
+    current_device = get_env_device()
+    if current_device == "npu":
+        return True
+    return False
 
 
 def _get_interleave(n):
@@ -310,7 +313,6 @@ def scaled_dot_product_attention(
             raise ValueError(
                 f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
             )
-
         attn_weights = attn_weights + attention_mask
         if not paddle.in_dynamic_mode():
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
@@ -319,7 +321,9 @@ def scaled_dot_product_attention(
                 attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
-
+        # attn_output = attn_output.reshape((bsz, q_len, self.num_heads, self.head_dim))
+        # shift back
+        # attn_output[:, :, num_heads//2:] = attn_output[:, :, num_heads//2:].roll(shifts=q_len//8, axis=1)
         if reshard_layer is not None:
             attn_output = reshard_layer(
                 attn_output,
@@ -328,7 +332,6 @@ def scaled_dot_product_attention(
             )
             q_len = q_len // config.sep_parallel_degree
             num_heads = num_heads * config.sep_parallel_degree
-
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
@@ -560,6 +563,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
     return q_embed, k_embed
 
 
+
 class LlamaMLP(nn.Layer):
     def __init__(self, config):
         super().__init__()
@@ -569,7 +573,12 @@ class LlamaMLP(nn.Layer):
         self.fuse_attention_ffn = config.fuse_attention_ffn
 
         if config.sequence_parallel:
-            if MC2ColumnSeqParallelLinear is not None and MC2RowSeqParallelLinear is not None:
+            if is_mc2_valid and int(os.getenv("FLAGS_NPU_MC2", 0)):
+                from paddlenlp.transformers.mc2_seqence_parallel_linear import (
+                    MC2ColumnSeqParallelLinear,
+                    MC2RowSeqParallelLinear,
+                )
+
                 ColumnParallelLinear = MC2ColumnSeqParallelLinear
                 RowParallelLinear = MC2RowSeqParallelLinear
             else:
@@ -687,7 +696,12 @@ class LlamaAttention(nn.Layer):
                 self.use_fused_rope = False
 
         if config.sequence_parallel:
-            if MC2ColumnSeqParallelLinear is not None and MC2RowSeqParallelLinear is not None:
+            if is_mc2_valid and int(os.getenv("FLAGS_NPU_MC2", 0)):
+                from paddlenlp.transformers.mc2_seqence_parallel_linear import (
+                    MC2ColumnSeqParallelLinear,
+                    MC2RowSeqParallelLinear,
+                )
+
                 ColumnParallelLinear = MC2ColumnSeqParallelLinear
                 RowParallelLinear = MC2RowSeqParallelLinear
             else:
@@ -798,28 +812,24 @@ class LlamaAttention(nn.Layer):
             self.rotary_emb = LlamaRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
-                base=self.config.rope_theta,
             )
         elif self.config.rope_scaling_type == "linear":
             self.rotary_emb = LlamaLinearScalingRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
                 scaling_factor=self.config.rope_scaling_factor,
-                base=self.config.rope_theta,
             )
         elif self.config.rope_scaling_type == "ntk":
             self.rotary_emb = LlamaNTKScalingRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
                 scaling_factor=self.config.rope_scaling_factor,
-                base=self.config.rope_theta,
             )
         elif self.config.rope_scaling_type == "dynamic_ntk":
             self.rotary_emb = LlamaDynamicNTKScalingRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
                 scaling_factor=self.config.rope_scaling_factor,
-                base=self.config.rope_theta,
             )
         else:
             raise ValueError(f"Unknown RoPE scaling type {self.config.rope_scaling_type}")
@@ -836,20 +846,34 @@ class LlamaAttention(nn.Layer):
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
+        def create_attention_mask(input_shape, dtype):
+            """
+            Prepare the decoder attention mask where the diagonal and its lower side are 0,
+            and the upper side is -inf.
 
+            Args:
+                input_shape (tuple): Shape of the input tensor, typically (batch_size, sequence_length).
+                dtype (paddle.dtype): Data type of the mask, usually 'float32' or 'float16'.
+
+            Returns:
+                paddle.Tensor: Attention mask with shape [batch_size, 1, sequence_length, sequence_length].
+            """
+            # Assuming input_shape = (batch_size, sequence_length)
+            batch_size, seq_length = input_shape
+            # Create a lower triangular matrix including the diagonal, where the diagonal and below are 0 (allowed positions)
+            lower_triangular = paddle.tril(paddle.zeros((seq_length, seq_length), dtype=dtype))
+            # Create the opposite mask for positions above the diagonal, set these to -inf
+            upper_triangular = paddle.triu(paddle.ones((seq_length, seq_length), dtype=dtype), diagonal=1)
+            # paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
+            upper_triangular = paddle.where(upper_triangular == 1, paddle.finfo(dtype).min, 0.0).astype(dtype)
+            # Combine the two masks
+            attention_mask = lower_triangular + upper_triangular
+            # Add batch and head dimensions
+            attention_mask = attention_mask[None, None, :, :]  # Expanding the dimensions to [1, 1, seq_length, seq_length]
+            attention_mask = paddle.tile(attention_mask, [batch_size, 1, 1, 1])  # Tiling for the batch size
+            return attention_mask
         if self.fuse_attention_qkv:
             mix_layer = self.qkv_proj(hidden_states)
-            # NOTE for GQA attention fusion (compatible with MHA and MQA):
-            # The weight for qkv_proj is in shape like [hidden_size, hidden_size + 2 * num_kv_heads * head_dim].
-            # After the projection, the mix_layer is in shape like [b, s, hidden_size + 2 * num_kv_heads * head_dim].
-            # Reshape the mix_layer into a shape like [b, s, num_kv_heads, (num_groups + 2) * head_dim],
-            # where num_groups = num_q_heads // num_kv_heads.
-            # Split the mix_layer on the last axis into three sections [num_groups * head_dim, head_dim, head_dim]
-            # to represent the q, k and v respectively.
-            # The q is in the shape like [b, s, num_kv_heads, num_groups * head_dim].
-            # The k and v are in the shape like [b, s, num_kv_heads, head_dim].
-            # Under MHA, the q is ready for the following calculation since num_kv_heads == num_q_heads,
-            # But for the GQA or MQA, q should be reshaped into [b, s, num_q_heads, head_dim].
             if self.reshard_layer is not None:
                 if self.sequence_parallel:
                     assert self.seq_length % self.config.sep_parallel_degree == 0
@@ -892,7 +916,6 @@ class LlamaAttention(nn.Layer):
             query_states = self.q_proj(hidden_states)
             key_states = self.k_proj(hidden_states)
             value_states = self.v_proj(hidden_states)
-
             if self.reshard_layer is not None:
                 if self.sequence_parallel:
                     assert self.seq_length % self.config.sep_parallel_degree == 0
@@ -951,7 +974,6 @@ class LlamaAttention(nn.Layer):
         kv_seq_len = key_states.shape[-3]
         if past_key_value is not None:
             kv_seq_len += past_key_value[0].shape[-3]
-
         if self.config.rope:
             if self.reshard_layer is not None:
                 batch_size, seq_length, _, _ = query_states.shape
@@ -1017,6 +1039,7 @@ class LlamaAttention(nn.Layer):
             value_states = paddle.concat([past_key_value[1], value_states], axis=1)
 
         past_key_value = (key_states, value_states) if use_cache else None
+
         if self.kv_indices is not None:
             key_states = paddle.index_select(key_states, self.kv_indices, axis=2)
             value_states = paddle.index_select(value_states, self.kv_indices, axis=2)
@@ -1025,26 +1048,27 @@ class LlamaAttention(nn.Layer):
         # repeat k/v heads if n_kv_heads < n_heads
         # paddle version > 2.6 or develop support flash-attn with gqa/mqa
         paddle_version = float(paddle.__version__[:3])
-        if not self.config.use_flash_attention or ((paddle_version != 0.0) and (paddle_version <= 2.6)):
+        if (paddle_version != 0.0) and (paddle_version <= 2.6):
             key_states = repeat_kv(key_states, self.num_key_value_groups)
             value_states = repeat_kv(value_states, self.num_key_value_groups)
         
         def shift(qkv, bsz, q_len, group_size, num_heads, head_dim):
-            qkv[:, num_heads // 2:] = paddle.roll(qkv[:, num_heads // 2:], shifts=-group_size // 2, axis=2)
-            qkv = paddle.transpose(qkv,[0,2,1,3])
+            qkv[:, :, num_heads//2:] = paddle.roll(qkv[:, :, num_heads//2:], shifts=-group_size//2, axis=1)
             qkv = paddle.reshape(qkv, (bsz * (q_len // group_size), group_size, num_heads, head_dim))
-            # qkv = paddle.transpose(qkv,[0,2,1,3])
-            # print("after tp2:",qkv.shape)
             return qkv
-
-        query_states = shift(query_states, bsz, q_len, group_size, self.num_heads, self.head_dim)
-        key_states = shift(key_states, bsz, q_len, group_size, self.num_heads, self.head_dim)
-        value_states = shift(value_states, bsz, q_len, group_size, self.num_heads, self.head_dim)
-        print("shift applied")
-        _,group_size,_,_ = query_states.shape
-        num_group = q_len // group_size
-        attention_mask = attention_mask[:, :, :group_size, :group_size]
-        attention_mask = paddle.tile(attention_mask,repeat_times=(num_group, 1, 1, 1))
+        
+        #default
+        is_shift = True
+        if is_shift:
+            query_states = shift(query_states, bsz, q_len, group_size, self.num_heads, self.head_dim)
+            key_states = shift(key_states, bsz, q_len, group_size, self.num_heads, self.head_dim)
+            value_states = shift(value_states, bsz, q_len, group_size, self.num_heads, self.head_dim)
+            _,group_size,_,_ = query_states.shape
+            # print(attention_mask)
+            num_group = q_len // group_size
+            attention_mask = create_attention_mask((bsz,q_len),dtype="float16")
+            attention_mask = attention_mask[:, :, :group_size, :group_size]
+            attention_mask = paddle.tile(attention_mask,repeat_times=(num_group, 1, 1, 1))
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (
             self.enable_recompute
@@ -1081,14 +1105,19 @@ class LlamaAttention(nn.Layer):
             attn_output, attn_weights = outputs
         else:
             attn_output = outputs
-        
         #shift back
-        attn_output[:, :, self.num_heads//2:] = attn_output[:, :, self.num_heads//2:].roll(group_size//2, axis=1)
-        attn_output = paddle.reshape(attn_output,(bsz, q_len, self.hidden_size))
+        is_shift=True
+        if is_shift:
+            attn_output = paddle.reshape(attn_output, (bsz * num_group, self.num_heads, 
+                                                        group_size, self.head_dim))
+            attn_output = paddle.transpose(attn_output, [0,2,1,3])
+            attn_output = paddle.reshape(attn_output, (bsz, q_len, self.num_heads, self.head_dim))
+            attn_output[:, :, self.num_heads//2:] = paddle.roll(attn_output[:, :, self.num_heads//2:], 
+                shifts=group_size//2, axis=1)
+            attn_output = paddle.reshape(attn_output,(bsz, q_len, self.hidden_size))
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
         attn_output = self.o_proj(attn_output)
-
         if not output_attentions:
             attn_weights = None
 
@@ -1309,56 +1338,6 @@ class LlamaPretrainedModel(PretrainedModel):
         mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
 
         return mappings
-
-    @classmethod
-    def _get_fuse_or_split_param_mappings(cls, config: LlamaConfig, is_fuse=False):
-        # return parameter fuse utils
-        from paddlenlp.transformers.conversion_utils import split_or_fuse_func
-
-        fn = split_or_fuse_func(is_fuse=is_fuse)
-
-        # last key is fused key, other keys are to be fused.
-        fuse_qkv_keys = (
-            "layers.0.self_attn.q_proj.weight",
-            "layers.0.self_attn.k_proj.weight",
-            "layers.0.self_attn.v_proj.weight",
-            "layers.0.self_attn.qkv_proj.weight",
-        )
-
-        fuse_gate_up_keys = (
-            "layers.0.mlp.gate_proj.weight",
-            "layers.0.mlp.up_proj.weight",
-            "layers.0.mlp.gate_up_fused_proj.weight",
-        )
-        num_heads = config.num_attention_heads
-        num_key_value_heads = getattr(config, "num_key_value_heads", num_heads)
-        fuse_attention_qkv = getattr(config, "fuse_attention_qkv", False)
-        fuse_attention_ffn = getattr(config, "fuse_attention_ffn", False)
-
-        final_actions = {}
-        if is_fuse:
-            if fuse_attention_qkv:
-                for i in range(config.num_hidden_layers):
-                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
-                    final_actions[keys] = partial(
-                        fn, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
-                    )
-            if fuse_attention_ffn:
-                for i in range(config.num_hidden_layers):
-                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
-                    final_actions[keys] = fn
-        else:
-            if not fuse_attention_qkv:
-                for i in range(config.num_hidden_layers):
-                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
-                    final_actions[keys] = partial(
-                        fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
-                    )
-            if not fuse_attention_ffn:
-                for i in range(config.num_hidden_layers):
-                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
-                    final_actions[keys] = partial(fn, split_nums=2)
-        return final_actions
 
     def _init_weights(self, layer):
         """Initialization hook"""
@@ -1606,7 +1585,6 @@ class LlamaModel(LlamaPretrainedModel):
 
         if position_ids is None:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
-
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
@@ -1618,6 +1596,7 @@ class LlamaModel(LlamaPretrainedModel):
             else:
                 attention_mask = attention_mask.astype("bool")
         hidden_states = inputs_embeds
+
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
@@ -1723,7 +1702,6 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
             # skip ignore_index which loss == 0
             masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
             loss = paddle.mean(masked_lm_loss)
-
         return loss
 
 

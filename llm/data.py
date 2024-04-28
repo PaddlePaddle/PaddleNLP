@@ -45,32 +45,53 @@ def get_convert_example(model):
     if base_model_prefix == "chatglm":
         return convert_example_chatglm
     elif base_model_prefix in ["chatglm_v2", "llama", "bloom", "opt", "qwen", "mixtral", "gemma"]:
-        return convert_example_common_text_meta
+        return convert_example_common_meta_text
     else:
         raise ValueError(
             f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama, qwen, mixtral, gemma"
         )
 
 
-class DataFormatError(ValueError):
+class DataFormatError( ValueError):
     pass
 
-
-def tokenize_example_text_meta(tokenizer, example, data_args):
+def tokenize_example_meta_text(tokenizer, example, data_args):
     if "text" in example:
-        text = tokenizer.eos_token.join(example["text"])
+        text = example["text"]
+        source = text
+        words = text.split(' ')
+        source = ' '.join(words)
+        if len(words) > 1:
+            # remove the first word in the sentence
+            target = ' '.join(words[1:])  
+        else:
+            target = '' 
     else:
-        raise DataFormatError(f"Example format is wrong, please check: {type(example), example.keys(),example}")
-    tokenized_output = tokenizer(
-        text,#Text to tokenize
+        raise DataFormatError(
+            f"Example format is wrong, please check: {example} or rewrite tokenize_example in data.py "
+        )
+    tokenized_source = tokenizer(
+        source,
         max_length=data_args.src_length,
         truncation=True,
         truncation_side="left",
-        add_special_tokens=True,)
-    tokenized_input_ids = tokenized_output["input_ids"]
-        # Add eos token id at the end of sequence if the sentence is not truncated.
-        # Attention! In some cases(ex, ChatGLMv2), tokenized eos token is not equal to eos toke
-    return tokenized_output,tokenized_input_ids
+        add_special_tokens=True,
+    )
+    tgt_max_length = data_args.max_length - len(tokenized_source["input_ids"])
+    tokenized_target = tokenizer(
+        target,
+        max_length=tgt_max_length,
+        truncation=True,
+        truncation_side="left",
+        add_special_tokens=False,
+    )
+    tokenized_target_input_ids = tokenized_target["input_ids"]
+    # Add eos_token_id at the end of sequence if the sentence is not truncated.
+    # Attention! In some cases(ex. ChatGLMv2), tokenized eos_token is not equal to eos_token_id.
+    if len(tokenized_target_input_ids) < tgt_max_length:
+        tokenized_target_input_ids += [tokenizer.eos_token_id]
+    return tokenized_source, tokenized_target_input_ids
+
 
 def tokenize_example(tokenizer, example, data_args):
     if "src" in example and "tgt" in example:
@@ -93,7 +114,7 @@ def tokenize_example(tokenizer, example, data_args):
         target,
         max_length=tgt_max_length,
         truncation=True,
-        truncation_side="right",
+        truncation_side="left",
         add_special_tokens=False,
     )
 
@@ -102,30 +123,31 @@ def tokenize_example(tokenizer, example, data_args):
     # Attention! In some cases(ex. ChatGLMv2), tokenized eos_token is not equal to eos_token_id.
     if len(tokenized_target_input_ids) < tgt_max_length:
         tokenized_target_input_ids += [tokenizer.eos_token_id]
-
     return tokenized_source, tokenized_target_input_ids
 
-
-def convert_example_common_text_meta(example, tokenizer, data_args, is_test=True, intokens=False):
-    tokenized_output, tokenized_input_ids = tokenize_example_text_meta(tokenizer, example,data_args=data_args)
+def convert_example_common_meta_text(example, tokenizer, data_args, is_test=True, intokens=False):
+    if tokenizer.chat_template is not None:
+        return convert_rounds_example_common(example, tokenizer, data_args, is_test, intokens)
+    tokenized_source, tokenized_target_input_ids = tokenize_example_meta_text(tokenizer, example, data_args)
     if is_test:
-        return {**tokenized_output,"labels": tokenized_input_ids}
+        return {
+            **tokenized_source,
+            "labels": tokenized_target_input_ids,
+        }
     else:
-        input_ids = tokenized_output["input_ids"]+ tokenized_input_ids
-        source_length =len(tokenized_output["input_ids"])
-        labels = [-100]* source_length + input_ids[source_length:]
-        # shift input ids and labels
+        input_ids = tokenized_source["input_ids"] + tokenized_target_input_ids
+        source_length = len(tokenized_source["input_ids"])
+        labels = [-100] * source_length + input_ids[source_length:]
+        # shift input_ids and labels
         input_ids, labels = input_ids[:-1], labels[1:]
         seq_length = len(input_ids)
-        features ={"input_ids": input_ids, "labels": labels}
-        if "position_ids" in tokenized_output:
-            features["position_ids"]= list(range(seq_length))
+        features = {"input_ids": input_ids, "labels": labels}
+        if "position_ids" in tokenized_source:
+            features["position_ids"] = list(range(seq_length))
         if intokens:
-            features["attention_mask"]= np.tri(seq_length, seq_length, dtype=bool)
-        print(len(features["input_ids"]))
-        print(len(features["position_ids"]))
+            features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
         return features
-
+    
 def tokenize_rounds_example(tokenizer, example, data_args):
     """tokenize multi-rounds examples with chat_template.json
 
