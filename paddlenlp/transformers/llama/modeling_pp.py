@@ -210,6 +210,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     config_class = LlamaConfig
 
     _get_tensor_parallel_mappings = LlamaPretrainedModel._get_tensor_parallel_mappings
+    _get_fuse_or_split_param_mappings = LlamaPretrainedModel._get_fuse_or_split_param_mappings
     _init_weights = LlamaPretrainedModel._init_weights
     _keys_to_ignore_on_load_unexpected = LlamaPretrainedModel._keys_to_ignore_on_load_unexpected
 

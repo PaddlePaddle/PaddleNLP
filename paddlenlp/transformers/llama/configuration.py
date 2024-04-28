@@ -147,6 +147,7 @@ class LlamaConfig(PretrainedConfig):
         num_key_value_heads=None,
         initializer_range=0.02,
         rms_norm_eps=1e-6,
+        rope_theta=10000.0,
         use_cache=True,
         use_recompute=False,
         recompute_granularity="full",
@@ -188,6 +189,7 @@ class LlamaConfig(PretrainedConfig):
 
         self.initializer_range = initializer_range
         self.rms_norm_eps = rms_norm_eps
+        self.rope_theta = rope_theta
 
         self.use_cache = use_cache
         self.use_recompute = use_recompute

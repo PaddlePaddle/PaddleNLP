@@ -191,13 +191,20 @@ class AutoTokenizer:
             init_class = init_kwargs.pop("tokenizer_class", None)
 
         if init_class:
-            class_name = cls._name_mapping[init_class]
-            import_class = import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
-            tokenizer_class = getattr(import_class, init_class)
-            if use_fast:
-                fast_tokenizer_class = cls._get_fast_tokenizer_class(init_class, class_name)
-                tokenizer_class = fast_tokenizer_class if fast_tokenizer_class else tokenizer_class
-            return tokenizer_class
+            if init_class in cls._name_mapping:
+                class_name = cls._name_mapping[init_class]
+                import_class = import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
+                tokenizer_class = getattr(import_class, init_class)
+                if use_fast:
+                    fast_tokenizer_class = cls._get_fast_tokenizer_class(init_class, class_name)
+                    tokenizer_class = fast_tokenizer_class if fast_tokenizer_class else tokenizer_class
+                return tokenizer_class
+            else:
+                import_class = import_module("paddlenlp.transformers")
+                tokenizer_class = getattr(import_class, init_class, None)
+                assert tokenizer_class is not None, f"Can't find tokenizer {init_class}"
+                return tokenizer_class
+
         # If no `init_class`, we use pattern recognition to recognize the tokenizer class.
         else:
             # TODO: Potential issue https://github.com/PaddlePaddle/PaddleNLP/pull/3786#discussion_r1024689810
