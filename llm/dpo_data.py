@@ -48,10 +48,11 @@ def process_example(data, tokenizer, data_args):
                 ])
 
     if tokenizer.chat_template is not None:
-        chosen_encode_tokens = tokenizer.encode_chat_inputs(chosen_encode_tokens)['conversations']
+        chat_input_list = chosen_encode_tokens
+        chosen_encode_tokens = tokenizer.encode_chat_inputs(chat_input_list)['conversations']
         # convert to rejected chosen_encode_tokens
-        chosen_encode_tokens[-1][-1] = rejected.strip()
-        rejected_encode_tokens = tokenizer.encode_chat_inputs(chosen_encode_tokens)['conversations']
+        chat_input_list[-1][-1] = rejected.strip()
+        rejected_encode_tokens = tokenizer.encode_chat_inputs(chat_input_list)['conversations']
 
         """Post process sequence: tokenization & truncation."""
         tokens_prompt = chosen_encode_tokens[-1][0]

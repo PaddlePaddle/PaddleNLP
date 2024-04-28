@@ -28,6 +28,7 @@ from .testing_utils import LLMTest
     ["model_dir"],
     [
         ["llama"],
+        ["qwen"],
     ],
 )
 class DPOTrainerTester(LLMTest, unittest.TestCase):
