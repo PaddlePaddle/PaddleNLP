@@ -99,6 +99,7 @@ __all__ = [
     "LlamaPretrainingCriterion",
 ]
 
+npu_is_casual=False
 
 def _get_interleave(n):
     def _get_interleave_power_of_2(n):
@@ -246,7 +247,7 @@ def scaled_dot_product_attention(
                     attention_mask is None,
                     True,
                     False,
-                    self.npu_is_casual,
+                    npu_is_casual,
                 )[0]
             else:
                 attn_output = F.scaled_dot_product_attention(
@@ -1600,7 +1601,7 @@ class LlamaModel(LlamaPretrainedModel):
                 if is_casual and alibi is None:
                     attention_mask = None
             else:
-                self.npu_is_casual = is_casual
+                npu_is_casual = is_casual
                 attention_mask = attention_mask.astype("bool")
         hidden_states = inputs_embeds
         # decoder layers
