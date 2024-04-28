@@ -59,7 +59,7 @@ from .tokenizer_utils_base import (
     TextInputPair,
     TruncationStrategy,
 )
-from .utils import InitTrackerMeta, convert_to_dict_chat, fn_args_to_dict
+from .utils import InitTrackerMeta, convert_to_dict_message, fn_args_to_dict
 
 __all__ = [
     "PretrainedTokenizer",
@@ -681,7 +681,7 @@ class ChatTemplateMixin:
         elif isinstance(conversation, list):
             assert len(conversation) > 0, "empty conversation is not allowed"
             if isinstance(conversation[0], list):
-                conversations = convert_to_dict_chat(conversation)
+                conversations = convert_to_dict_message(conversation)
             elif isinstance(conversation[0], dict):
                 conversations = conversation
             else:
@@ -769,7 +769,7 @@ class ChatTemplateMixin:
         ans = []
 
         # get answer in single round, then compile the chat entirely and split by single round ans
-        # https://ku.baidu-int.com/knowledge/HFVrC7hq1Q/yKeL8Lljko/YkH5mORwJ3/aeec5d5a3eb84c
+        # attention: answer should include end token!
         for conv in conversation_dict:
             roundi = [system] + conv if system else conv
             roundi_str = self.chat_template.render(
@@ -782,7 +782,7 @@ class ChatTemplateMixin:
             ans_roundi = roundi_str[len(roundi_no_ans_str) :]
             ans.append(ans_roundi)
 
-        non_learnable_parts = self._splited_by_specified_words(origin_msg, ans)
+        non_learnable_parts = self._extract_non_learnable_parts(origin_msg, ans)
         assert len(non_learnable_parts) == len(ans)
 
         conversation_ids = []
@@ -798,8 +798,8 @@ class ChatTemplateMixin:
         result["conversations"] = conversation_ids
         return result
 
-    def _splited_by_specified_words(self, origin_msg: List[Dict[str, str]], split_s: List[str]):
-        """Split the entire chat by specified words."""
+    def _extract_non_learnable_parts(self, origin_msg: List[Dict[str, str]], split_s: List[str]):
+        """Split the entire chat by specified words. Extract the non-learnable parts."""
         # distingish and replace the special words in original string to an uncompiled form: Like | -> \|
         regex_pattern = "|".join(map(re.escape, split_s))
         # splited by replaced specified words

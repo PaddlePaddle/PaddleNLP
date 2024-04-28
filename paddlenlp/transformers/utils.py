@@ -89,7 +89,7 @@ def convert_ndarray_dtype(np_array: np.ndarray, target_dtype: str) -> np.ndarray
     return np_array.astype(target_dtype)
 
 
-def convert_to_dict_chat(conversation: List[List[str]]):
+def convert_to_dict_message(conversation: List[List[str]]):
     """Convert the list of chat messages to a role dictionary chat messages."""
     conversations = []
     for index, item in enumerate(conversation):
@@ -99,7 +99,8 @@ def convert_to_dict_chat(conversation: List[List[str]]):
             if len(item) == 2 and isinstance(item[1], str):
                 conversations.append({"role": "assistant", "content": item[1]})
             else:
-                # item里只有一个元素，说明为最后一轮
+                # If there is only one element in item, it must be the last round.
+                # If it is not the last round, it must be an error.
                 if index != len(conversation) - 1:
                     raise ValueError(f"Round {index} has error round")
         else:
