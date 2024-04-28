@@ -23,6 +23,9 @@ import paddle.distributed as dist
 def distribute_gather(data):
     gathered_list = [paddle.zeros_like(data) for _ in range(dist.get_world_size())]
     dist.all_gather(gathered_list, data)
+    # 0 D tensor
+    if gathered_list[0].shape == []:
+        gathered_list = [item.unsqueeze(0) for item in gathered_list]
     gathered_data = paddle.concat(gathered_list, axis=0)
     return gathered_data
 

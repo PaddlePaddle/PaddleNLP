@@ -866,6 +866,14 @@ class KTOTrainer(Trainer):
         chosen_logits = completion_logits[chosen_idx, ...]
         rejected_logits = completion_logits[rejected_idx, ...]
 
+        if chosen_logps.shape[0] == 0:
+            chosen_logps = paddle.to_tensor([0.0])
+            chosen_logits = paddle.to_tensor([0.0])
+
+        if rejected_logps.shape[0] == 0:
+            rejected_logits = paddle.to_tensor([0.0])
+            rejected_logps = paddle.to_tensor([0.0])
+
         return (chosen_logps, rejected_logps, chosen_logits, rejected_logits, KL_logps)
 
     def kto_loss(
@@ -897,6 +905,8 @@ class KTOTrainer(Trainer):
         if dist.is_initialized():
             gathered_kl_score_list = [paddle.zeros_like(kl) for _ in range(dist.get_world_size())]
             dist.all_gather(gathered_kl_score_list, kl)
+            # ValueError: (InvalidArgument) The axis is expected to be in range of [0, 0), but got 0
+            gathered_kl_score_list = [item.unsqueeze(0) for item in gathered_kl_score_list]
             gathered_kl_score = paddle.concat(gathered_kl_score_list, axis=0)
             kl = gathered_kl_score.mean().clip(min=0)
         else:
@@ -908,8 +918,8 @@ class KTOTrainer(Trainer):
             chosen_rewards = self.beta * chosen_logratios.detach()
         else:
             # lists can't be empty -- if they are, then accelerate.gather will hang
-            chosen_losses = paddle.to_tensor([])
-            chosen_rewards = paddle.to_tensor([])
+            chosen_losses = paddle.to_tensor([0.0])
+            chosen_rewards = paddle.to_tensor([0.0])
 
         if policy_rejected_logps.shape[0] != 0 or reference_rejected_logps.shape[0] != 0:
             rejected_logratios = policy_rejected_logps - reference_rejected_logps
@@ -917,8 +927,8 @@ class KTOTrainer(Trainer):
             rejected_rewards = self.beta * rejected_logratios.detach()
         else:
             # lists can't be empty -- if they are, then accelerate.gather will hang
-            rejected_losses = paddle.to_tensor([])
-            rejected_rewards = paddle.to_tensor([])
+            rejected_losses = paddle.to_tensor([0.0])
+            rejected_rewards = paddle.to_tensor([0.0])
 
         losses = paddle.concat(
             (self.desirable_weight * chosen_losses, self.undesirable_weight * rejected_losses),
