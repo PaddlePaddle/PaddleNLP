@@ -682,7 +682,6 @@ class ChatTemplateMixin:
             assert len(conversation) > 0, "empty conversation is not allowed"
             if isinstance(conversation[0], list):
                 conversations = convert_to_dict_chat(conversation)
-                breakpoint()
             elif isinstance(conversation[0], dict):
                 conversations = conversation
             else:
