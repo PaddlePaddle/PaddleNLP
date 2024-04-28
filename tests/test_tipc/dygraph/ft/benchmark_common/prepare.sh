@@ -13,7 +13,7 @@
 # limitations under the License.
 
 python -m pip install -r ../requirements.txt
-pip install regex
+python -m pip install -r ../requirements-dev.txt
 
 cd ../llm
 

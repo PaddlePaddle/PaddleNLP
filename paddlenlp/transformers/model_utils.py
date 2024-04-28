@@ -108,7 +108,6 @@ def unwrap_optimizer(optimizer, optimizer_instances=()):
 
 
 if is_safetensors_available():
-
     from safetensors import safe_open
     from safetensors.numpy import load_file as safe_load_file
     from safetensors.numpy import save_file as safe_save_file
@@ -1822,6 +1821,25 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         del state_dict[checkpoint_key]
             return mismatched_keys
 
+        def _fuse_or_split_keys(
+            state_dict, config, loaded_keys, pre_tensor_parallel_split=False, resume_state_dict=None
+        ):
+            if resume_state_dict is not None:
+                state_dict.update(resume_state_dict)
+
+            before_fuse_keys = list(state_dict.keys())
+            if pre_tensor_parallel_split:
+                tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True)
+            else:
+                tp_actions = None
+            state_dict, resume_state_dict = cls.convert_fuse_and_split(config, state_dict, tp_actions)
+            after_fuse_keys = list(state_dict.keys())
+
+            fused_keys = list(set(before_fuse_keys) - set(after_fuse_keys))
+            new_keys = list(set(after_fuse_keys) - set(before_fuse_keys))
+
+            return state_dict, resume_state_dict, fused_keys, new_keys
+
         if state_dict is not None:
             # DONT Hold tensor parallel here, only hold afer load state dict.
             # Whole checkpoint
@@ -1830,6 +1848,16 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             import paddlenlp.ops.fast_transformer.transformer.decoding as ft_decoding
 
             state_dict = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_dict)
+
+            # have loaded all state_dict, no resume state_dict
+            state_dict, _, fused_keys, new_keys = _fuse_or_split_keys(
+                state_dict,
+                config,
+                loaded_keys,
+                pre_tensor_parallel_split=True if config.tensor_parallel_degree > 1 else False,
+            )
+            missing_keys = list(set(missing_keys) - set(new_keys))
+            unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
 
             mismatched_keys = _find_mismatched_keys(
                 state_dict,
@@ -1862,7 +1890,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             error_msgs = []
             mismatched_keys = []
-
+            resume_state_dict = {}
             if len(resolved_archive_file) > 1:
                 resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
 
@@ -1875,13 +1903,42 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 ):
                     pre_tensor_parallel_split = True
                     assert loaded_keys is not None, "loaded_keys is not None."
-                    tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
+                    tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True)
                 # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
+                filter_dict_keys = set(expected_keys)
+                fuse_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=True)
+                split_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=False)
+                for k in list(fuse_actions.keys()):
+                    need_add_except_key = k[-1] in expected_keys
+                    if need_add_except_key:
+                        filter_dict_keys |= set(k[:-1])
+                for k in list(split_actions.keys()):
+                    need_add_except_key = False
+                    for item in k[:-1]:
+                        if item in expected_keys:
+                            need_add_except_key = True
+                            break
+                    if need_add_except_key:
+                        filter_dict_keys.add(k[-1])
+
+                if config.quantization_config.is_weight_quantize():
+                    filter_dict_keys = None
+
                 state_dict = load_state_dict(
-                    shard_file,
-                    tp_actions if pre_tensor_parallel_split else None,
-                    None if config.quantization_config.is_weight_quantize() else set(expected_keys),
+                    shard_file, tp_actions if pre_tensor_parallel_split else None, filter_dict_keys
                 )
+
+                # convert for fusing or splitting weights
+                state_dict, resume_state_dict, fused_keys, new_keys = _fuse_or_split_keys(
+                    state_dict,
+                    config,
+                    loaded_keys,
+                    pre_tensor_parallel_split=pre_tensor_parallel_split,
+                    resume_state_dict=resume_state_dict,
+                )
+                missing_keys = list(set(missing_keys) - set(new_keys))
+                unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
+
                 if config.quantization_config.is_weight_quantize():
                     state_dict = convert_to_quantize_state_dict(
                         state_dict,
@@ -2202,10 +2259,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             dtype == "float16" or dtype == "bfloat16"
         )
 
-        if is_sharded:
-            loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
-        else:
+        if state_dict is not None:
             loaded_state_dict_keys = [k for k in state_dict.keys()]
+            # will only support load paddle.Tensor to model.
+            for k in list(state_dict.keys()):
+                if not isinstance(state_dict[k], paddle.Tensor):
+                    with device_guard():
+                        state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+        else:
+            if is_sharded:
+                loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
+            else:
+                loaded_state_dict_keys = [k for k in state_dict.keys()]
 
         if low_cpu_mem_usage:  # or use_keep_in_fp32_modules:
             state_dict = None

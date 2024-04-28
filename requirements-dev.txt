@@ -1,4 +1,4 @@
-paddleocr<2.7
+paddleocr
 pre-commit
 pytest
 parameterized
@@ -27,3 +27,4 @@ ray
 loguru
 data
 wget
+huggingface_hub>=0.19.2
