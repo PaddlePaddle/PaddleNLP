@@ -246,7 +246,7 @@ def scaled_dot_product_attention(
                     attention_mask is None,
                     True,
                     False,
-                    False,
+                    is_casual_mask(attention_mask),
                 )[0]
             else:
                 attn_output = F.scaled_dot_product_attention(
@@ -1704,8 +1704,10 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
                 _hcg = fleet.get_hybrid_communicate_group()
                 masked_lm_loss = ConcatSePMaskedLoss.apply(masked_lm_loss, axis=1, group=_hcg.get_sep_parallel_group())
             # skip ignore_index which loss == 0
-            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
-            loss = paddle.mean(masked_lm_loss)
+            # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
+            # loss = paddle.mean(masked_lm_loss)
+            binary_sequence = paddle.where(masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss))
+            loss = paddle.sum(masked_lm_loss * binary_sequence) / paddle.sum(binary_sequence)
 
         return loss
 
