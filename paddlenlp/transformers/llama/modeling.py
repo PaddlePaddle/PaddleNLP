@@ -246,7 +246,7 @@ def scaled_dot_product_attention(
                     attention_mask is None,
                     True,
                     False,
-                    is_casual_mask(attention_mask),
+                    self.npu_is_casual,
                 )[0]
             else:
                 attn_output = F.scaled_dot_product_attention(
@@ -1105,6 +1105,7 @@ class LlamaDecoderLayer(nn.Layer):
         self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
 
+
     def forward(
         self,
         hidden_states: paddle.Tensor,
@@ -1594,11 +1595,12 @@ class LlamaModel(LlamaPretrainedModel):
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
         if self.config.use_flash_attention:
+            is_casual = is_casual_mask(attention_mask)
             if get_env_device() != "npu":
-                is_casual = is_casual_mask(attention_mask)
                 if is_casual and alibi is None:
                     attention_mask = None
             else:
+                self.npu_is_casual = is_casual
                 attention_mask = attention_mask.astype("bool")
         hidden_states = inputs_embeds
         # decoder layers
