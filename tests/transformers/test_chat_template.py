@@ -387,7 +387,7 @@ class TemplateIntegrationTest(unittest.TestCase):
             {"role": "assistant", "content": "_回答Round 2?"},
         ]
         answer = ["|回答Round 1|<|im_end|>\n", "_回答Round 2?<|im_end|>\n"]
-        split_part = self.tokenizer._splited_by_specified_words(original_msg, answer)
+        split_part = self.tokenizer._extract_non_learnable_parts(original_msg, answer)
         self.assertEqual(len(split_part), 2)
         self.assertEqual(
             split_part[0],
