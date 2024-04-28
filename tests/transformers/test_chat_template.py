@@ -378,3 +378,18 @@ class TemplateIntegrationTest(unittest.TestCase):
         self.assertNotEqual(tgt_id[tgt_idx_1], -100)
         self.assertEqual(tgt_id[tgt_idx_2 - 1], -100)
         self.assertNotEqual(tgt_id[tgt_idx_2], -100)
+
+    def test_split_answer(self):
+        original_msg = [
+            {"role": "user", "content": "用户Round 1"},
+            {"role": "assistant", "content": "|回答Round 1|"},
+            {"role": "user", "content": "用户Round 2"},
+            {"role": "assistant", "content": "_回答Round 2?"},
+        ]
+        answer = ["|回答Round 1|<|im_end|>\n", "_回答Round 2?<|im_end|>\n"]
+        split_part = self.tokenizer._splited_by_specified_words(original_msg, answer)
+        self.assertEqual(len(split_part), 2)
+        self.assertEqual(
+            split_part[0],
+            "<|im_start|>system\nYou are a helpful assistant<|im_end|>\n<|im_start|>user\n用户Round 1<|im_end|>\n<|im_start|>assistant\n",
+        )
