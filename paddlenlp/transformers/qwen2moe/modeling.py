@@ -762,7 +762,9 @@ class QWen2MoeSparseMoeBlock(nn.Layer):
             top_x = top_x.squeeze()
             if top_x.shape == []:
                 top_x = paddle.to_tensor([top_x.item()])
-            final_hidden_states.index_add_(top_x, 0, current_hidden_states.astype(hidden_states.dtype))
+            final_hidden_states = paddle.index_add(
+                final_hidden_states, top_x, 0, current_hidden_states.astype(hidden_states.dtype)
+            )
 
         shared_expert_output = self.shared_expert(hidden_states)
         shared_expert_output = F.sigmoid(self.shared_expert_gate(hidden_states)) * shared_expert_output

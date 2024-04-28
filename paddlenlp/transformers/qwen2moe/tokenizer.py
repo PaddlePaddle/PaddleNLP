@@ -275,12 +275,12 @@ class QWen2MoeTokenizer(PretrainedTokenizer):
     # Copied from transformers.models.gpt2.tokenization_gpt2.GPT2Tokenizer._convert_token_to_id
     def _convert_token_to_id(self, token):
         """Converts a token (str) in an id using the vocab."""
-        return self.encoder.get(token, len(self.encoder))
+        return self.encoder.get(token, self.added_tokens_encoder.get(token, len(self.encoder)))
 
     # Copied from transformers.models.gpt2.tokenization_gpt2.GPT2Tokenizer._convert_id_to_token
     def _convert_id_to_token(self, index):
         """Converts an index (integer) in a token (str) using the vocab."""
-        return self.decoder.get(index)
+        return self.decoder.get(index, self.added_tokens_decoder.get(index, self.unk_token))
 
     # Copied from transformers.models.gpt2.tokenization_gpt2.GPT2Tokenizer.convert_tokens_to_string
     def convert_tokens_to_string(self, tokens):
