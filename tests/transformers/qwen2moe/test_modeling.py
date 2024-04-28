@@ -36,6 +36,7 @@ class QWen2MoeModelTester:
         hidden_size=64,
         num_hidden_layers=2,
         num_attention_heads=8,
+        num_key_value_heads=8,
         masked_softmax_fusion=True,
         layer_norm_epsilon=1e-5,
         initializer_range=0.02,
@@ -67,6 +68,7 @@ class QWen2MoeModelTester:
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
         self.num_attention_heads = num_attention_heads
+        self.num_key_value_heads = num_key_value_heads
         self.masked_softmax_fusion = masked_softmax_fusion
         self.layer_norm_epsilon = layer_norm_epsilon
         self.initializer_range = initializer_range
@@ -119,6 +121,7 @@ class QWen2MoeModelTester:
             hidden_size=self.hidden_size,
             num_hidden_layers=self.num_hidden_layers,
             num_attention_heads=self.num_attention_heads,
+            num_key_value_heads=self.num_key_value_heads,
             masked_softmax_fusion=self.masked_softmax_fusion,
             layer_norm_epsilon=self.layer_norm_epsilon,
             initializer_range=self.initializer_range,

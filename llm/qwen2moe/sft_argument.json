@@ -1,5 +1,5 @@
 {
-    "model_name_or_path": "Qwen/Qwen1.5-MoE-A2.7B",
+    "model_name_or_path": "qwen/Qwen1.5-MoE-A2.7B",
     "dataset_name_or_path": "./data",
     "output_dir": "./checkpoints/qwen2moe_sft_ckpts",
     "per_device_train_batch_size": 4,
@@ -13,7 +13,7 @@
     "evaluation_strategy": "epoch",
     "save_strategy": "epoch",
     "src_length": 1024,
-    "max_length": 2048,
+    "max_length": 32768,
     "bf16": true,
     "fp16_opt_level": "O2",
     "do_train": true,
