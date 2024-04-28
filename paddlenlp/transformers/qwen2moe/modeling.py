@@ -762,7 +762,7 @@ class QWen2MoeSparseMoeBlock(nn.Layer):
             top_x = top_x.squeeze()
             if top_x.shape == []:
                 top_x = paddle.to_tensor([top_x.item()])
-            final_hidden_states = paddle.index_add(
+            final_hidden_states = paddle.index_add_(
                 final_hidden_states, top_x, 0, current_hidden_states.astype(hidden_states.dtype)
             )
 
