@@ -1293,6 +1293,56 @@ class LlamaPretrainedModel(PretrainedModel):
 
         return mappings
 
+    @classmethod
+    def _get_fuse_or_split_param_mappings(cls, config: LlamaConfig, is_fuse=False):
+        # return parameter fuse utils
+        from paddlenlp.transformers.conversion_utils import split_or_fuse_func
+
+        fn = split_or_fuse_func(is_fuse=is_fuse)
+
+        # last key is fused key, other keys are to be fused.
+        fuse_qkv_keys = (
+            "layers.0.self_attn.q_proj.weight",
+            "layers.0.self_attn.k_proj.weight",
+            "layers.0.self_attn.v_proj.weight",
+            "layers.0.self_attn.qkv_proj.weight",
+        )
+
+        fuse_gate_up_keys = (
+            "layers.0.mlp.gate_proj.weight",
+            "layers.0.mlp.up_proj.weight",
+            "layers.0.mlp.gate_up_fused_proj.weight",
+        )
+        num_heads = config.num_attention_heads
+        num_key_value_heads = getattr(config, "num_key_value_heads", num_heads)
+        fuse_attention_qkv = getattr(config, "fuse_attention_qkv", False)
+        fuse_attention_ffn = getattr(config, "fuse_attention_ffn", False)
+
+        final_actions = {}
+        if is_fuse:
+            if fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
+                    final_actions[keys] = partial(
+                        fn, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                    )
+            if fuse_attention_ffn:
+                for i in range(config.num_hidden_layers):
+                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
+                    final_actions[keys] = fn
+        else:
+            if not fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
+                    final_actions[keys] = partial(
+                        fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                    )
+            if not fuse_attention_ffn:
+                for i in range(config.num_hidden_layers):
+                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
+                    final_actions[keys] = partial(fn, split_nums=2)
+        return final_actions
+
     def _init_weights(self, layer):
         """Initialization hook"""
         if self.config.tensor_parallel_degree > 1:

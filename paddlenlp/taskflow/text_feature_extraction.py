@@ -228,8 +228,7 @@ class TextFeatureExtractionTask(Task):
                 )
             else:
                 tokenized_inputs = self._tokenizer(
-                    text=[""] * len(batch_examples),
-                    text_pair=batch_examples,
+                    text=batch_examples,
                     padding="max_length",
                     truncation=True,
                     max_seq_len=self.max_seq_len,

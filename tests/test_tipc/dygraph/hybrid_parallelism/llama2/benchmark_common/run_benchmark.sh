@@ -105,6 +105,10 @@ function _train(){
         distributed_args="--master $master_ip:36677 --nnodes $nnodes ${PADDLE_RANK_OPTION} --run_mode=collective"
     fi
 
+    echo "==========System Env============="
+    env
+    echo "================================="
+
     # 以下为通用执行命令，无特殊可不用修改
     case ${device_num} in
     N1C8) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
