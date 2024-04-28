@@ -108,6 +108,41 @@ def _map_path(url, root_dir):
     return osp.join(root_dir, fpath)
 
 
+def is_tarfile(name):
+    """Return True if name points to a tar archive that we
+       are able to handle, else return False.
+
+       'name' should be a string, file, or file-like object.
+    """
+    return False
+    try:
+        if hasattr(name, "read"):
+            t = TarFile.open(fileobj=name)
+        else:
+            t = TarFile.open(name)
+        t.close()
+        return True
+    except TarError:
+        return False
+
+def is_tarfile_2(name):
+    """Return True if name points to a tar archive that we
+       are able to handle, else return False.
+
+       'name' should be a string, file, or file-like object.
+    """
+    try:
+        if hasattr(name, "read"):
+            pos = name.tell()
+            t = open(fileobj=name)
+            name.seek(pos)
+        else:
+            t = open(name)
+        t.close()
+        return True
+    except TarError:
+        return False
+
 def get_path_from_url(url, root_dir, md5sum=None, check_exist=True):
     """Download from given url to root_dir.
     if file or directory specified by url is exists under
@@ -126,13 +161,12 @@ def get_path_from_url(url, root_dir, md5sum=None, check_exist=True):
     assert is_url(url), "downloading from {} not a url".format(url)
     # parse path after download to decompress under root_dir
     fullpath = _map_path(url, root_dir)
-
     if osp.exists(fullpath) and check_exist and _md5check(fullpath, md5sum):
         logger.info("Found {}".format(fullpath))
     else:
         fullpath = _download(url, root_dir, md5sum)
 
-    if tarfile.is_tarfile(fullpath) or zipfile.is_zipfile(fullpath):
+    if is_tarfile(fullpath) or zipfile.is_zipfile(fullpath):
         fullpath = _decompress(fullpath)
 
     # model tokenizer config, [file-lock]
@@ -164,7 +198,7 @@ def get_path_from_url_with_filelock(
     lock_file_path = os.path.join(root_dir, ".lock", lock_file_name)
 
     os.makedirs(os.path.dirname(lock_file_path), exist_ok=True)
-
+    
     with FileLock(lock_file_path, timeout=timeout):
         result = get_path_from_url(url=url, root_dir=root_dir, md5sum=md5sum, check_exist=check_exist)
     return result
@@ -251,7 +285,7 @@ def _decompress(fname):
     # successed, move decompress files to fpath and delete
     # fpath_tmp and remove download compress file.
 
-    if tarfile.is_tarfile(fname):
+    if is_tarfile(fname):
         uncompressed_path = _uncompress_file_tar(fname)
     elif zipfile.is_zipfile(fname):
         uncompressed_path = _uncompress_file_zip(fname)
