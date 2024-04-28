@@ -89,6 +89,24 @@ def convert_ndarray_dtype(np_array: np.ndarray, target_dtype: str) -> np.ndarray
     return np_array.astype(target_dtype)
 
 
+def convert_to_dict_chat(conversation: List[List[str]]):
+    """Convert the list of chat messages to a role dictionary chat messages."""
+    conversations = []
+    for index, item in enumerate(conversation):
+        assert 1 <= len(item) <= 2, "Each Rounds in conversation should have 1 or 2 elements."
+        if isinstance(item[0], str):
+            conversations.append({"role": "user", "content": item[0]})
+            if len(item) == 2 and isinstance(item[1], str):
+                conversations.append({"role": "assistant", "content": item[1]})
+            else:
+                # item里只有一个元素，说明为最后一轮
+                if index != len(conversation) - 1:
+                    raise ValueError(f"Round {index} has error round")
+        else:
+            raise ValueError("Each round in list should be string")
+    return conversations
+
+
 def get_scale_by_dtype(dtype: str = None, return_positive: bool = True) -> float:
     """get scale value by dtype
 

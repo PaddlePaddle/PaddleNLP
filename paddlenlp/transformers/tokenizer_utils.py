@@ -59,7 +59,7 @@ from .tokenizer_utils_base import (
     TextInputPair,
     TruncationStrategy,
 )
-from .utils import InitTrackerMeta, fn_args_to_dict
+from .utils import InitTrackerMeta, convert_to_dict_chat, fn_args_to_dict
 
 __all__ = [
     "PretrainedTokenizer",
@@ -642,7 +642,7 @@ class ChatTemplateMixin:
             raise ValueError("chat_template is not set, please set chat_template first.")
         elif isinstance(self.chat_template, Template):
             add_generation_prompt = tokenizer_kwargs.pop("add_generation_prompt", True)
-            query = self._apply_chat_template(conversation, context_data, add_generation_prompt=add_generation_prompt)
+            query = self._apply_chat_template(conversation, add_generation_prompt=add_generation_prompt)
         elif isinstance(self.chat_template, ChatTemplate):
             query = self._apply_chat_template_paddle(conversation, context_data)
 
@@ -674,34 +674,22 @@ class ChatTemplateMixin:
     def _apply_chat_template(
         self,
         conversation: List[List[str, str] | Dict[str, str]] | str,
-        context_data: Dict[str, Any] = {},
         add_generation_prompt=True,
     ) -> str | dict[str, numpy.ndarray | paddle.Tensor]:
         if isinstance(conversation, str):
             conversations = [{"role": "user", "content": conversation}]
         elif isinstance(conversation, list):
-            conversations = []
-            for index, item in enumerate(conversation):
-                if isinstance(item, dict):
-                    conversations = conversation
-                    break
-                elif isinstance(item, list):
-                    assert 1 <= len(item) <= 2
-                    if isinstance(item[0], str):
-                        conversations.append({"role": "user", "content": item[0]})
-                        if len(item) == 2 and isinstance(item[1], str):
-                            conversations.append({"role": "assistant", "content": item[1]})
-                        else:
-                            # item里只有一个元素，说明为最后一轮
-                            if index != len(conversation) - 1:
-                                raise ValueError(f"Round {index} has error round")
-                    else:
-                        raise ValueError("Each round in list should be string")
-                else:
-                    raise ValueError(
-                        "apply_chat_template do not support appling batch conversations, "
-                        "so you should apply the conversation one by one."
-                    )
+            assert len(conversation) > 0, "empty conversation is not allowed"
+            if isinstance(conversation[0], list):
+                conversations = convert_to_dict_chat(conversation)
+                breakpoint()
+            elif isinstance(conversation[0], dict):
+                conversations = conversation
+            else:
+                raise ValueError(
+                    "apply_chat_template do not support appling batch conversations, "
+                    "so you should apply the conversation one by one."
+                )
         query = self.chat_template.render(
             messages=conversations, **self.special_tokens_map, add_generation_prompt=add_generation_prompt
         )
@@ -761,15 +749,15 @@ class ChatTemplateMixin:
         add_generation_prompt=True,
     ):
         result = {}
-        # conversation = []
-        # if origin_msg[0]['role'] == 'system':
-        #     system = origin_msg.pop(0)
+
+        # Some template do not support system msg, so we need to check it first.
         if system:
             try:
                 self.chat_template.render(messages={"role": "system", "content": system})
             except Exception as e:
                 raise ValueError("System is not supported in this tokenizer.", e)
 
+        # convert list msg to role dict msg
         conversation_dict = []
         origin_msg = []
         for round in conversations:
@@ -781,6 +769,8 @@ class ChatTemplateMixin:
             conversation_dict.append(round_role)
         ans = []
 
+        # get answer in single round, then compile the chat entirely and split by single round ans
+        # https://ku.baidu-int.com/knowledge/HFVrC7hq1Q/yKeL8Lljko/YkH5mORwJ3/aeec5d5a3eb84c
         for conv in conversation_dict:
             roundi = [system] + conv if system else conv
             roundi_str = self.chat_template.render(
@@ -793,14 +783,7 @@ class ChatTemplateMixin:
             ans_roundi = roundi_str[len(roundi_no_ans_str) :]
             ans.append(ans_roundi)
 
-        regex_pattern = "|".join(map(re.escape, ans))
-        non_learnable_parts = re.split(
-            r"(?:%s)" % regex_pattern,
-            self.chat_template.render(messages=origin_msg, add_generation_prompt=False, **self.special_tokens_map),
-        )
-        if non_learnable_parts[-1] == "":
-            non_learnable_parts.pop()
-
+        non_learnable_parts = self._splited_by_specified_words(origin_msg, ans)
         assert len(non_learnable_parts) == len(ans)
 
         conversation_ids = []
@@ -812,10 +795,22 @@ class ChatTemplateMixin:
                     padding=False,
                 )["input_ids"]
             )
-            # print(self.batch_decode(conversation_ids[i]))
 
         result["conversations"] = conversation_ids
         return result
+
+    def _splited_by_specified_words(self, origin_msg: List[Dict[str, str]], split_s: List[str]):
+        """Split the entire chat by specified words."""
+        # distingish and replace the special words in original string to an uncompiled form: Like | -> \|
+        regex_pattern = "|".join(map(re.escape, split_s))
+        # splited by replaced specified words
+        non_learnable_parts = re.split(
+            r"(?:%s)" % regex_pattern,
+            self.chat_template.render(messages=origin_msg, add_generation_prompt=False, **self.special_tokens_map),
+        )
+        if non_learnable_parts[-1] == "":
+            non_learnable_parts.pop()
+        return non_learnable_parts
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
@@ -841,6 +836,9 @@ class ChatTemplateMixin:
         if tokenizer.chat_template is not None:
             logger.warning(
                 "Chat-template already exists in config file, it will be overwritten by chat_template.json file."
+            )
+            logger.warning(
+                "`chat_template.json` will be deprecated in the future! Please set it in `tokenizer_config.json`."
             )
         tokenizer.init_chat_template(chat_template_file)
         return tokenizer
