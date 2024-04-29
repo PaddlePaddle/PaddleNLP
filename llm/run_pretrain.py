@@ -46,6 +46,7 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.tools import get_env_device
 
 
 def add_start_docstrings(*docstr):
@@ -489,6 +490,16 @@ def main():
     assert (
         config.num_attention_heads % config.sep_parallel_degree == 0
     ), f"num_attention_heads:{config.num_attention_heads} must be divisible by sep_parallel_degree {config.sep_parallel_degree}"
+
+    if get_env_device() == "xpu" and training_args.gradient_accumulation_steps > 1:
+        try:
+            from paddle_xpu.layers.nn.linear import LinearConfig  # noqa: F401
+
+            LinearConfig.enable_accumulate_steps_opt()
+            LinearConfig.set_accumulate_steps(training_args.gradient_accumulation_steps)
+        except ImportError:
+            # It's OK, not use accumulate_steps optimization
+            pass
 
     print("Final pre-training config:", config)
 
