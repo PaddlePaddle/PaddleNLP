@@ -1287,8 +1287,12 @@ class Trainer:
                     num_samples=total_train_batch_size * num_steps,
                     num_steps=num_steps,
                     seq_length=seq_length,
+                    effi_token_cnt=self.effi_token_cnt,
                 )
             )
+
+            if self.effi_token_cnt is not None:
+                self.effi_token_cnt = 0
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step

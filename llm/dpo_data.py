@@ -200,8 +200,12 @@ def collate_fn(batch, tokenizer, max_seq_length=None):
         "rejected_labels": [],
         "response_indexs": [],
     }
+    effi_token_cnt = 0
+    all_token_cnt = 0
     for i, sequence in enumerate(batch):
         difference = max_seq_length - len(sequence['input_ids'])
+        effi_token_cnt += len(sequence['input_ids'])
+        all_token_cnt += max_seq_length
 
         input_dict["input_ids"].append(
             sequence["input_ids"]
@@ -237,4 +241,6 @@ def collate_fn(batch, tokenizer, max_seq_length=None):
     for key in input_dict:
         input_dict[key] = paddle.to_tensor(input_dict[key])
     input_dict["attention_mask"] = input_dict["attention_mask"].cast("float32")
+    input_dict["effi_token_cnt"] = effi_token_cnt
+    input_dict["all_token_cnt"] = all_token_cnt
     return input_dict

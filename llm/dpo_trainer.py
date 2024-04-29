@@ -67,6 +67,8 @@ class DPOTrainer(Trainer):
         self.padding_value = padding_value
         self.logprobs = nn.CrossEntropyLoss(reduction="none")
         self._stored_metrics = defaultdict(lambda: defaultdict(list))
+        self.effi_token_cnt = 0
+        self.all_token_cnt = 0
 
     def concatenated_inputs(self, batch):
         """Concatenate the chosen and rejected inputs into a single tensor."""
@@ -216,6 +218,11 @@ class DPOTrainer(Trainer):
 
         for key in metrics:
             metrics[key] = self._nested_gather(paddle.tile(metrics[key], repeat_times=[1, 1])).mean().cpu()
+        
+        if train_eval == "train":
+            self.effi_token_cnt += batch["effi_token_cnt"]
+            self.all_token_cnt += batch["all_token_cnt"]
+
         return loss, metrics
 
     def compute_loss(self, model, inputs, return_outputs=False):
