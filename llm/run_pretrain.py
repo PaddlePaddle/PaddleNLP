@@ -218,6 +218,10 @@ class ModelArguments:
         default=False,
         metadata={"help": "recompute_use_reentrant"},
     )
+    num_hidden_layers: Optional[int] = field(
+        default=None,
+        metadata={"help": "num_hidden_layers."},
+    )
 
 
 def create_pretrained_dataset(
@@ -451,6 +455,9 @@ def main():
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
 
+    config.num_hidden_layers = (
+        model_args.num_hidden_layers if model_args.num_hidden_layers is not None else config.num_hidden_layers
+    )
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.use_fast_layer_norm = model_args.use_fast_layer_norm
