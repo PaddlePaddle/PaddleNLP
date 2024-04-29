@@ -62,10 +62,6 @@ from paddlenlp.transformers.conversion_utils import (
     init_name_mappings,
 )
 from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
-from paddlenlp.transformers.mc2_parallel_linear import (
-    MC2ColumnSeqParallelLinear,
-    MC2RowSeqParallelLinear,
-)
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
@@ -74,6 +70,8 @@ from paddlenlp.transformers.model_utils import PretrainedModel, register_base_mo
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
 
+from .. import linear_utils
+from ..linear_utils import Linear
 from ..segment_parallel_utils import ReshardLayer
 from .configuration import (
     LLAMA_PRETRAINED_INIT_CONFIGURATION,
@@ -413,6 +411,15 @@ class LlamaRMSNorm(nn.Layer):
         if self.config.use_fused_rms_norm:
             if get_env_device() == "npu":
                 return core.eager._run_custom_op("rms_norm_npu", hidden_states, self.weight, self.variance_epsilon)[0]
+            elif get_env_device() == "xpu":
+                try:
+                    import paddle_xpu_nn  # noqa: F821
+
+                    return paddle_xpu_nn.xpu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
+                except ImportError:
+                    raise NotImplementedError(
+                        f"Implementation of fused_rms_norm is not available on {get_env_device()}. Please install paddle_xpu to use this feature"
+                    )
             return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
 
         if paddle.in_dynamic_mode():
@@ -574,15 +581,11 @@ class LlamaMLP(nn.Layer):
         self.fuse_attention_ffn = config.fuse_attention_ffn
 
         if config.sequence_parallel:
-            if MC2ColumnSeqParallelLinear is not None and MC2RowSeqParallelLinear is not None:
-                ColumnParallelLinear = MC2ColumnSeqParallelLinear
-                RowParallelLinear = MC2RowSeqParallelLinear
-            else:
-                ColumnParallelLinear = ColumnSequenceParallelLinear
-                RowParallelLinear = RowSequenceParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
         else:
-            ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-            RowParallelLinear = fleet.meta_parallel.RowParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             if config.fuse_attention_ffn:
@@ -614,15 +617,29 @@ class LlamaMLP(nn.Layer):
             )
         else:
             if config.fuse_attention_ffn:
-                self.gate_up_fused_proj = nn.Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
+                self.gate_up_fused_proj = Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
             else:
-                self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-                self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+                self.gate_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+                self.up_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
 
-            self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
+            self.down_proj = Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
 
     def forward(self, x):
         if self.fuse_attention_ffn:
+            # FIXME(yangjianbang): use paddle's native swiglu
+            if get_env_device() == "xpu":
+                try:
+                    import paddle_xpu_nn  # noqa: F821
+
+                    out = self.gate_up_fused_proj(x)
+                    out = paddle_xpu_nn.xpu_swiglu(out, axis=-1, turn=True)
+                    out = self.down_proj(out)
+                    return out
+                except ImportError:
+                    gate_out, up_out = paddle.chunk(self.gate_up_fused_proj(x), chunks=2, axis=-1)
+                    out = self.down_proj(F.silu(gate_out) * up_out)
+                    return out
+
             x = swiglu(self.gate_up_fused_proj(x))
         else:
             x = swiglu(self.gate_proj(x), self.up_proj(x))
@@ -683,7 +700,7 @@ class LlamaAttention(nn.Layer):
                 )
 
         self.use_fused_rope = config.use_fused_rope
-        if self.use_fused_rope and get_env_device() != "npu":
+        if self.use_fused_rope and get_env_device() not in ["npu", "xpu"]:
             if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
@@ -692,15 +709,11 @@ class LlamaAttention(nn.Layer):
                 self.use_fused_rope = False
 
         if config.sequence_parallel:
-            if MC2ColumnSeqParallelLinear is not None and MC2RowSeqParallelLinear is not None:
-                ColumnParallelLinear = MC2ColumnSeqParallelLinear
-                RowParallelLinear = MC2RowSeqParallelLinear
-            else:
-                ColumnParallelLinear = ColumnSequenceParallelLinear
-                RowParallelLinear = RowSequenceParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
         else:
-            ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-            RowParallelLinear = fleet.meta_parallel.RowParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             if self.fuse_attention_qkv:
@@ -731,12 +744,12 @@ class LlamaAttention(nn.Layer):
                         gather_output=False,
                     )
                 else:
-                    self.k_proj = nn.Linear(
+                    self.k_proj = Linear(
                         self.hidden_size,
                         self.config.num_key_value_heads * self.head_dim,
                         bias_attr=False,
                     )
-                    self.v_proj = nn.Linear(
+                    self.v_proj = Linear(
                         self.hidden_size,
                         self.config.num_key_value_heads * self.head_dim,
                         bias_attr=False,
@@ -744,23 +757,23 @@ class LlamaAttention(nn.Layer):
 
         else:
             if self.fuse_attention_qkv:
-                self.qkv_proj = nn.Linear(
+                self.qkv_proj = Linear(
                     self.hidden_size,
                     self.hidden_size + 2 * self.config.num_key_value_heads * self.head_dim,
                     bias_attr=False,
                 )
             else:
-                self.q_proj = nn.Linear(
+                self.q_proj = Linear(
                     self.hidden_size,
                     self.hidden_size,
                     bias_attr=False,
                 )
-                self.k_proj = nn.Linear(
+                self.k_proj = Linear(
                     self.hidden_size,
                     self.config.num_key_value_heads * self.head_dim,
                     bias_attr=False,
                 )
-                self.v_proj = nn.Linear(
+                self.v_proj = Linear(
                     self.hidden_size,
                     self.config.num_key_value_heads * self.head_dim,
                     bias_attr=False,
@@ -774,7 +787,7 @@ class LlamaAttention(nn.Layer):
                 input_is_parallel=True,
             )
         else:
-            self.o_proj = nn.Linear(
+            self.o_proj = Linear(
                 self.hidden_size,
                 self.hidden_size,
                 bias_attr=False,
@@ -1296,6 +1309,56 @@ class LlamaPretrainedModel(PretrainedModel):
 
         return mappings
 
+    @classmethod
+    def _get_fuse_or_split_param_mappings(cls, config: LlamaConfig, is_fuse=False):
+        # return parameter fuse utils
+        from paddlenlp.transformers.conversion_utils import split_or_fuse_func
+
+        fn = split_or_fuse_func(is_fuse=is_fuse)
+
+        # last key is fused key, other keys are to be fused.
+        fuse_qkv_keys = (
+            "layers.0.self_attn.q_proj.weight",
+            "layers.0.self_attn.k_proj.weight",
+            "layers.0.self_attn.v_proj.weight",
+            "layers.0.self_attn.qkv_proj.weight",
+        )
+
+        fuse_gate_up_keys = (
+            "layers.0.mlp.gate_proj.weight",
+            "layers.0.mlp.up_proj.weight",
+            "layers.0.mlp.gate_up_fused_proj.weight",
+        )
+        num_heads = config.num_attention_heads
+        num_key_value_heads = getattr(config, "num_key_value_heads", num_heads)
+        fuse_attention_qkv = getattr(config, "fuse_attention_qkv", False)
+        fuse_attention_ffn = getattr(config, "fuse_attention_ffn", False)
+
+        final_actions = {}
+        if is_fuse:
+            if fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
+                    final_actions[keys] = partial(
+                        fn, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                    )
+            if fuse_attention_ffn:
+                for i in range(config.num_hidden_layers):
+                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
+                    final_actions[keys] = fn
+        else:
+            if not fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qkv_keys])
+                    final_actions[keys] = partial(
+                        fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                    )
+            if not fuse_attention_ffn:
+                for i in range(config.num_hidden_layers):
+                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
+                    final_actions[keys] = partial(fn, split_nums=2)
+        return final_actions
+
     def _init_weights(self, layer):
         """Initialization hook"""
         if self.config.tensor_parallel_degree > 1:
@@ -1421,6 +1484,11 @@ class LlamaModel(LlamaPretrainedModel):
             x = paddle.to_tensor(0.0, dtype="float16")
             y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float16")
             expanded_attn_mask = expanded_attn_mask.astype("float16")
+            expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
+        elif get_env_device() == "xpu":
+            x = paddle.to_tensor(0.0, dtype=dtype)
+            y = paddle.to_tensor(paddle.finfo(dtype).min, dtype=dtype)
+            expanded_attn_mask = expanded_attn_mask.astype(dtype)
             expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
         else:
             expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
@@ -1701,6 +1769,15 @@ class LlamaLMHead(nn.Layer):
         self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
         if self.weight.is_distributed:
             self.weight.split_axis = 1
+        if get_env_device() == "xpu":
+            try:
+                from paddle_xpu.layers.nn import (  # noqa: F401
+                    parallel_matmul as xpu_parallel_matmul,
+                )
+
+                self.xpu_parallel_matmul = xpu_parallel_matmul()
+            except ImportError:
+                self.xpu_parallel_matmul = None
 
     def forward(self, hidden_states, tensor_parallel_output=None):
         if self.config.sequence_parallel:
@@ -1714,7 +1791,12 @@ class LlamaLMHead(nn.Layer):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
-        logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
+        if get_env_device() == "xpu" and self.xpu_parallel_matmul is not None:
+            logits = self.xpu_parallel_matmul(
+                hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output, training=self.training
+            )
+        else:
+            logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         return logits
 
 

@@ -354,3 +354,42 @@ class TemplateIntegrationTest(unittest.TestCase):
         )
         self.assertEqual(tgt_id[tgt_idx - 1], -100)
         self.assertNotEqual(tgt_id[tgt_idx], -100)
+
+    def test_train_format_multi(self):
+        from data import tokenize_rounds_example
+
+        fake_data_args = self.DataArg(50, src_length=50)
+        example = {"src": ["用户Round 1", "用户Round 2"], "tgt": ["回答Round 1", "回答Round 2"]}
+        result, tgt_id = tokenize_rounds_example(self.tokenizer, example, fake_data_args, add_generation_prompt=True)
+
+        tgt_idx_1 = len(
+            self.tokenizer.encode(
+                "<|im_start|>system\nYou are a helpful assistant<|im_end|>\n<|im_start|>user\n用户Round 1<|im_end|>\n<|im_start|>assistant\n"
+            )["input_ids"]
+        )
+        tgt_idx_2 = len(
+            self.tokenizer.encode(
+                "<|im_start|>system\nYou are a helpful assistant<|im_end|>\n<|im_start|>user\n用户Round 1<|im_end|>\n<|im_start|>assistant\n"
+                "回答Round 1<|im_end|>\n<|im_start|>user\n用户Round 2<|im_end|>\n<|im_start|>assistant\n"
+            )["input_ids"]
+        )
+
+        self.assertEqual(tgt_id[tgt_idx_1 - 1], -100)
+        self.assertNotEqual(tgt_id[tgt_idx_1], -100)
+        self.assertEqual(tgt_id[tgt_idx_2 - 1], -100)
+        self.assertNotEqual(tgt_id[tgt_idx_2], -100)
+
+    def test_split_answer(self):
+        original_msg = [
+            {"role": "user", "content": "用户Round 1"},
+            {"role": "assistant", "content": "|回答Round 1|"},
+            {"role": "user", "content": "用户Round 2"},
+            {"role": "assistant", "content": "_回答Round 2?"},
+        ]
+        answer = ["|回答Round 1|<|im_end|>\n", "_回答Round 2?<|im_end|>\n"]
+        split_part = self.tokenizer._extract_non_learnable_parts(original_msg, answer)
+        self.assertEqual(len(split_part), 2)
+        self.assertEqual(
+            split_part[0],
+            "<|im_start|>system\nYou are a helpful assistant<|im_end|>\n<|im_start|>user\n用户Round 1<|im_end|>\n<|im_start|>assistant\n",
+        )
