@@ -1722,7 +1722,7 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
                 _hcg = fleet.get_hybrid_communicate_group()
                 masked_lm_loss = ConcatSePMaskedLoss.apply(masked_lm_loss, axis=1, group=_hcg.get_sep_parallel_group())
             # skip ignore_index which loss == 0
-            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
+            masked_lm_loss = masked_lm_loss[masked_lm_labels != self.ignore_index]
             loss = paddle.mean(masked_lm_loss)
 
         return loss
