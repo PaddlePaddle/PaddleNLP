@@ -21,6 +21,22 @@ from paddlenlp.transformers.configuration_utils import PretrainedConfig
 __all__ = ["GPT_PRETRAINED_INIT_CONFIGURATION", "GPTConfig", "GPT_PRETRAINED_RESOURCE_FILES_MAP"]
 
 GPT_PRETRAINED_INIT_CONFIGURATION = {
+    "gpt3-5B-en": {  # 5B
+        "vocab_size": 50304,
+        "hidden_size": 4096,
+        "num_hidden_layers": 24,
+        "num_attention_heads": 32,
+        "intermediate_size": 16384,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "attention_probs_dropout_prob": 0.1,
+        "max_position_embeddings": 2048,
+        "type_vocab_size": 1,  # no use
+        "initializer_range": 0.02,
+        "eos_token_id": 50256,
+        "eol_token_id": 198,
+        "num_partitions": 1,
+    },
     "gpt-cpm-large-cn": {  # 2.6B
         "vocab_size": 30000,
         "hidden_size": 2560,
@@ -276,6 +292,8 @@ class GPTConfig(PretrainedConfig):
         virtual_pp_degree: int = 1,
         sequence_parallel=False,
         fuse_sequence_parallel_allreduce=False,
+        transformer_engine_backend: str = None,
+        use_fp8: bool = False,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -322,3 +340,5 @@ class GPTConfig(PretrainedConfig):
             assert (
                 self.tensor_parallel_degree > 1
             ), f"senquence-parallel only works in mp, got mp={self.tensor_parallel_degree}"
+        self.transformer_engine_backend = transformer_engine_backend
+        self.use_fp8 = use_fp8

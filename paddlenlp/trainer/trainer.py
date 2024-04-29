@@ -1895,7 +1895,7 @@ class Trainer:
             # kwargs = dict(device=self.args.current_device)
             # update data type for pure fp16
             if data.place.is_cuda_pinned_place():
-                return data.cuda()
+                return data.cuda(blocking=False)
             return data
             # return data.to(**kwargs)
         return data

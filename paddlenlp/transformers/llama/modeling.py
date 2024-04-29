@@ -74,6 +74,7 @@ from paddlenlp.transformers.model_utils import PretrainedModel, register_base_mo
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
 
+from ...utils.transformer_engine_utils import TransformerEngineHelper
 from ..segment_parallel_utils import ReshardLayer
 from .configuration import (
     LLAMA_PRETRAINED_INIT_CONFIGURATION,
@@ -1089,6 +1090,70 @@ class LlamaAttention(nn.Layer):
         return outputs
 
 
+class LlamaDecoderLayerWithNVTEBackend(nn.Layer):
+    """
+    The llama decoder layer using Transformer Engine backend.
+    """
+
+    def __init__(self, config, layerwise_recompute: bool = False):
+
+        super().__init__()
+
+        self.config = config
+        RoPE = TransformerEngineHelper.get_rope_layer()
+        TransformerLayer = TransformerEngineHelper.get_transformer_layer()
+        self.rope = RoPE(
+            dim=config.hidden_size // config.num_attention_heads,
+            max_position_embeddings=config.max_position_embeddings,
+        )
+        self.transformer = TransformerLayer(
+            hidden_size=config.hidden_size,
+            ffn_hidden_size=config.intermediate_size,
+            num_attention_heads=config.num_attention_heads,
+            num_gqa_groups=config.num_key_value_heads,
+            layernorm_epsilon=config.rms_norm_eps,
+            hidden_dropout=0.0,  # no dropout in llama
+            attention_dropout=0.0,  # no dropout in llama
+            bias_attr=False,
+            max_sequence_length=config.seq_length,
+            self_attn_mask_type="causal",
+            layer_type="encoder",
+            normalization="RMSNorm",
+            activation="swiglu",
+            set_parallel_mode=config.tensor_parallel_degree > 1,
+            sequence_parallel=config.sequence_parallel,
+            backend=config.transformer_engine_backend,
+        )
+
+    def forward(
+        self,
+        hidden_states: paddle.Tensor,
+        position_ids: Optional[Tuple[paddle.Tensor]] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
+        output_attentions: Optional[bool] = False,
+        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
+        use_cache: Optional[bool] = False,
+        alibi: Optional[paddle.Tensor] = None,
+        is_first_microbatch: Optional[bool] = None,
+    ):
+        assert (
+            output_attentions is False
+        ), "output_attentions is not supported in llama decoder layer with nvte backend"
+        assert use_cache is False, "use_cache is not supported in llama decoder layer with nvte backend"
+        assert alibi is None, "alibi is not supported in llama decoder layer with nvte backend"
+        # assert position_ids is None, "position_ids is not supported in llama decoder layer with nvte backend"
+        assert past_key_value is None, "past_key_value is not supported in llama decoder layer with nvte backend"
+
+        rotary_pos_emb = self.rope(self.config.seq_length)
+        return self.transformer(
+            hidden_states,
+            attention_mask,
+            rotary_pos_emb=rotary_pos_emb,
+            recompute_core_attention=(self.config.use_recompute and self.config.recompute_granularity == "core_attn"),
+            is_first_microbatch=is_first_microbatch,
+        )
+
+
 class LlamaDecoderLayer(nn.Layer):
     def __init__(self, config, layerwise_recompute: bool = False):
         super().__init__()
@@ -1384,6 +1449,10 @@ class LlamaPretrainedModel(PretrainedModel):
                             shape=layer.weight.shape,
                         )
                     )
+
+        # If TE is enabled, init TE weights. Otherwise, do nothing.
+        TransformerEngineHelper.te_init_weights(layer, self.config)
+
         # Layer.apply is DFS https://github.com/PaddlePaddle/Paddle/blob/a6f5021fcc58b21f4414bae6bf4731ef6971582c/python/paddle/nn/layer/layers.py#L527-L530
         # sublayer is init first
         # scale RowParallelLinear weight
@@ -1426,13 +1495,28 @@ class LlamaModel(LlamaPretrainedModel):
                 self.vocab_size,
                 self.hidden_size,
             )
+        decoder_layer = (
+            LlamaDecoderLayer if config.transformer_engine_backend is None else LlamaDecoderLayerWithNVTEBackend
+        )
 
         self.layers = nn.LayerList(
-            [LlamaDecoderLayer(config, i not in self.no_recompute_layers) for i in range(config.num_hidden_layers)]
+            [decoder_layer(config, i not in self.no_recompute_layers) for i in range(config.num_hidden_layers)]
         )
         self.norm = LlamaRMSNorm(config)
 
         self.gradient_checkpointing = False
+
+        self.use_fp8 = config.use_fp8
+        self.fp8_group = TransformerEngineHelper.get_fp8_group()
+
+        if config.transformer_engine_backend is not None:
+            self.enable_recompute = config.use_recompute
+
+        self.recompute_func = (
+            recompute
+            if self.config.transformer_engine_backend is None
+            else TransformerEngineHelper.get_te_recompute_func()
+        )
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1491,7 +1575,7 @@ class LlamaModel(LlamaPretrainedModel):
 
             return custom_forward
 
-        hidden_states = recompute(
+        hidden_states = self.recompute_func(
             create_custom_forward(layer_module),
             hidden_states,
             position_ids,
@@ -1606,51 +1690,52 @@ class LlamaModel(LlamaPretrainedModel):
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
 
-        for idx, (decoder_layer) in enumerate(self.layers):
-            if output_hidden_states:
-                all_hidden_states += (hidden_states,)
-            past_key_value = past_key_values[idx] if past_key_values is not None else None
+        with TransformerEngineHelper.fp8_autocast(enabled=self.use_fp8, fp8_group=self.fp8_group):
+            for idx, (decoder_layer) in enumerate(self.layers):
+                if output_hidden_states:
+                    all_hidden_states += (hidden_states,)
+                past_key_value = past_key_values[idx] if past_key_values is not None else None
 
-            has_gradient = not hidden_states.stop_gradient
-            if (
-                self.enable_recompute
-                and idx not in self.no_recompute_layers
-                and has_gradient
-                and self.recompute_granularity == "full"
-            ):
-                layer_outputs = self.recompute_training_full(
-                    decoder_layer,
-                    hidden_states,
-                    position_ids,
-                    attention_mask,
-                    output_attentions,
-                    past_key_value,
-                    use_cache,
-                    alibi=alibi,
-                )
-            else:
-                layer_outputs = decoder_layer(
-                    hidden_states,
-                    position_ids,
-                    attention_mask,
-                    output_attentions,
-                    past_key_value,
-                    use_cache,
-                    alibi=alibi,
-                )
+                has_gradient = not hidden_states.stop_gradient
+                if (
+                    self.enable_recompute
+                    and idx not in self.no_recompute_layers
+                    and has_gradient
+                    and self.recompute_granularity == "full"
+                ):
+                    layer_outputs = self.recompute_training_full(
+                        decoder_layer,
+                        hidden_states,
+                        position_ids,
+                        attention_mask,
+                        output_attentions,
+                        past_key_value,
+                        use_cache,
+                        alibi=alibi,
+                    )
+                else:
+                    layer_outputs = decoder_layer(
+                        hidden_states,
+                        position_ids,
+                        attention_mask,
+                        output_attentions,
+                        past_key_value,
+                        use_cache,
+                        alibi=alibi,
+                    )
 
-            # NOTE: clear outdate cache after it has been used for memory saving
-            past_key_value = past_key_values[idx] = None
-            if type(layer_outputs) is tuple:
-                hidden_states = layer_outputs[0]
-            else:
-                hidden_states = layer_outputs
+                # NOTE: clear outdate cache after it has been used for memory saving
+                past_key_value = past_key_values[idx] = None
+                if type(layer_outputs) is tuple:
+                    hidden_states = layer_outputs[0]
+                else:
+                    hidden_states = layer_outputs
 
-            if output_attentions:
-                all_self_attns += (layer_outputs[1],)
+                if output_attentions:
+                    all_self_attns += (layer_outputs[1],)
 
-            if use_cache:
-                next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
+                if use_cache:
+                    next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
 
         hidden_states = self.norm(hidden_states)
 
