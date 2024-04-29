@@ -2,7 +2,7 @@ parameterized
 sentencepiece
 regex
 torch>=1.5
-transformers==4.36.0
+transformers
 tool_helpers
 sacremoses
 pydantic==1.10.9
