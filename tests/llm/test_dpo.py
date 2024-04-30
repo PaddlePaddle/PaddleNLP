@@ -44,7 +44,7 @@ class DPOTrainerTester(LLMTest, unittest.TestCase):
         LLMTest.tearDown(self)
         sys.path.remove(self.model_codes_dir)
 
-    def test_lora(self):
+    def test_dpo(self):
         self.disable_static()
         paddle.set_default_dtype("float32")
 
