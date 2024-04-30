@@ -1,12 +1,10 @@
 """ DPO Trainer """
-import types
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from paddlenlp.utils.log import logger
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle import framework
 from paddle.distributed import fleet
 from paddlenlp.trainer import Trainer
 from paddlenlp.transformers.model_utils import unwrap_model
