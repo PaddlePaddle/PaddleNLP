@@ -2,11 +2,9 @@
 
 import os
 import sys
-import time
-
 
 from functools import partial
-from paddlenlp.datasets import InTokensIterableDataset, InTokensMapDataset, load_dataset
+from paddlenlp.datasets import InTokensMapDataset, load_dataset
 
 import paddle
 from paddlenlp.trainer import (
@@ -19,7 +17,7 @@ from paddlenlp.utils.log import logger
 
 # isort: off
 # fmt: off
-from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig, AutoModelForCausalLMPipe
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
 # isort: on
 from dpo_trainer import DPOTrainer
 from dpo_utils import DataArgument, DPOTrainingArguments, ModelArgument
@@ -77,11 +75,6 @@ def main():
     last_checkpoint = None
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        # if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 1:
-        #     raise ValueError(
-        #         f"Output directory ({training_args.output_dir}) already exists and is not empty. "
-        #         "Use --overwrite_output_dir to overcome."
-        #     )
         if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
             logger.info(
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
@@ -105,23 +98,21 @@ def main():
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         recompute_granularity=model_args.recompute_granularity,
         use_flash_attention=model_args.use_flash_attention,
-        #tensor_parallel_output=model_args.tensor_parallel_output,
         tensor_parallel_output=True,
-        #dpo=True,
-        #dpo_beta=training_args.dpo_beta,
     )
     if training_args.pipeline_parallel_degree > 1:
-        model_class = AutoModelForCausalLMPipe
-    else:
-        model_class = AutoModelForCausalLM
+        raise ValueError(
+            "DPO does not support pipeline parallelism yet."
+        )
+
+    model_class = AutoModelForCausalLM
+
     if not data_args.autotuner_benchmark and not data_args.dpo_benchmark:
         ref_model = model_class.from_pretrained(**model_kwargs)
         config = AutoConfig.from_pretrained(**model_kwargs)
         config.use_recompute = training_args.recompute
         model = model_class.from_config(config, dtype=dtype)
         model.set_state_dict(ref_model.state_dict())
-        # for DPO save
-        #model.config.dpo = False
     else:
         config = AutoConfig.from_pretrained(**model_kwargs)
         model = model_class.from_config(config, dtype=dtype)
@@ -162,7 +153,6 @@ def main():
             "json",
             data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
         )[0]
-
         train_ds = (
             intoken_dataset(
                 train_ds.map(trans_func),
@@ -181,7 +171,6 @@ def main():
             "json",
             data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
         )[0]
-        #    lazy=data_args.lazy,
         eval_ds = (
             intoken_dataset(
                 eval_ds.map(trans_func),
@@ -210,17 +199,6 @@ def main():
 
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
-        #if data_args.dpo_benchmark and training_args.should_load_dataset and paddle.distributed.get_rank() == 0:
-            #effective_tokens, total_tokens = res["effective_tokens"], res["total_tokens"]
-            #effective_tokens_per_second = effective_tokens / train_result.metrics["train_runtime"]
-            #logger.info("[timelog] {}: {:.2f} token/s ({}) ".format(
-            #   "training speed", effective_tokens_per_second, time.strftime("%Y-%m-%d %H:%M:%S")))
-            # logger.info("[timelog] {}: {} tokens ({}) ".format(
-            #    "Effective_Tokens", effective_tokens, time.strftime("%Y-%m-%d %H:%M:%S")))
-            # logger.info("[timelog] {}: {} tokens ({}) ".format(
-            #    "Total_Tokens", total_tokens, time.strftime("%Y-%m-%d %H:%M:%S")))
-            # logger.info("[timelog] {}: {:.2f} s ({}) ".format(
-            #    "training running time", train_result.metrics["train_runtime"], time.strftime("%Y-%m-%d %H:%M:%S")))
 
         if not data_args.autotuner_benchmark and not data_args.dpo_benchmark:
             trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)

@@ -37,11 +37,6 @@ class InTokens:
         # Only consider supported input keys
         input_keys = [key for key in batch_records[0].keys() if key in cls.supported_input_keys]
 
-        # Check required_keys
-        # for key in cls.required_input_keys:
-        #    if key not in input_keys:
-        #        raise ValueError(f"feature `{key}` is required for InTokensDataset")
-
         # Output features must include all required output keys
         for key in cls.required_output_keys:
             if key not in input_keys:
