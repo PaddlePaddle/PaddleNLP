@@ -1,6 +1,5 @@
 """ DPO Trainer """
 from collections import defaultdict
-from paddlenlp.utils.log import logger
 
 import paddle
 import paddle.nn as nn
@@ -9,38 +8,11 @@ from paddle.distributed import fleet
 from paddlenlp.trainer import Trainer
 from paddlenlp.transformers.model_utils import unwrap_model
 
-global_dev_id = 0
-
-
 def disable_dropout_in_model(model: paddle.nn.Layer) -> None:
     """ "disable dropout"""
     for module in model.children():
         if isinstance(module, paddle.nn.Dropout):
             module.p = 0
-            
-def offload_tensor_to_cpu(tensors):
-    if isinstance(tensors, dict):
-        for _, v in tensors.items():
-            offload_tensor_to_cpu(v)
-    elif isinstance(tensors, paddle.Tensor):
-        if tensors.place.is_gpu_place():
-            cpu_tensor = tensors._copy_to(paddle.CUDAPinnedPlace(), False)
-            tensors.value().get_tensor()._share_data_with(cpu_tensor.value().get_tensor())
-    else:
-        logger.warning(f"Can't parse for type {type(tensors)}")
-        return tensors
-
-def reload_tensor_to_gpu(tensors):
-    if isinstance(tensors, dict):
-        for _, v in tensors.items():
-            reload_tensor_to_gpu(v)
-    elif isinstance(tensors, paddle.Tensor):
-        if not tensors.place.is_gpu_place():
-            gpu_tensor = tensors._copy_to(paddle.CUDAPlace(global_dev_id), False)
-            tensors.value().get_tensor()._share_data_with(gpu_tensor.value().get_tensor())
-    else:
-        logger.warning(f"Can't parse for type {type(tensors)}")
-        return tensors
 
 class DPOTrainer(Trainer):
     """
@@ -174,17 +146,12 @@ class DPOTrainer(Trainer):
     def get_batch_metrics(self, model, batch, train_eval="train"):
         """Compute the DPO loss and other metrics for the given batch of inputs for train or test."""
         metrics = {}
-        #if self.args.zero_padding:
-        if self.args.offload_strategy:
-            offload_tensor_to_cpu(self.optimizer.state_dict())
         with paddle.no_grad():
             ref_logits = self.ref_model(
                 batch["input_ids"],
                 position_ids=batch["position_ids"],
                 attention_mask=batch["attention_mask"],
             )[0]
-        if self.args.offload_strategy:
-            reload_tensor_to_gpu(self.optimizer.state_dict())
         policy_logits = model(
             batch["input_ids"],
             position_ids=batch["position_ids"],
