@@ -74,7 +74,7 @@ def batch_gather_2d(var, indices):
             "shape of indices error. it should be a 2-D layers. " "but got shape = %s" % (str(indices.shape),)
         )
 
-    batch_size = paddle.shape(indices)[0]
+    batch_size = indices.shape[0]
 
     zero = paddle.to_tensor([0], dtype="int64")
     one = paddle.to_tensor([1], dtype="int64")

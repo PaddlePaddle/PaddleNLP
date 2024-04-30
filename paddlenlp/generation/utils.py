@@ -412,9 +412,9 @@ class GenerationMixin(object):
     @staticmethod
     def expand_inputs_for_generation(input_ids, expand_size, attention_mask=None, **model_kwargs):
 
-        index = paddle.tile(
-            paddle.arange(paddle.shape(input_ids)[0], dtype="int64").unsqueeze(-1), [1, expand_size]
-        ).reshape([-1])
+        index = paddle.tile(paddle.arange(input_ids.shape[0], dtype="int64").unsqueeze(-1), [1, expand_size]).reshape(
+            [-1]
+        )
 
         input_ids = paddle.gather(input_ids, index)
 
@@ -1340,11 +1340,11 @@ class GenerationMixin(object):
                 "you should not specify InputSpec for top_k and top_p parameters, one of InputSpec is expected"
             )
 
-        batch_size, cur_len = paddle.shape(input_ids)
+        batch_size, cur_len = input_ids.shape
         # used for compute on gpu, avoid memcpy D2H
         cur_len_gpu = paddle.full([1], cur_len, dtype="int64")
 
-        origin_len = paddle.shape(input_ids)[1]
+        origin_len = input_ids.shape[1]
         # used for compute on gpu, avoid memcpy D2H
         origin_len_gpu = paddle.full([1], origin_len, dtype="int64")
 
@@ -1384,7 +1384,7 @@ class GenerationMixin(object):
             # compute next_tokens
             if use_top_p:
                 logits = logits / temperature
-                top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
+                top_ps_tensor = paddle.full(shape=[probs.shape[0], 1], fill_value=top_p, dtype=probs.dtype)
                 _, next_tokens = paddle.tensor.top_p_sampling(probs, top_ps_tensor)
             else:
                 probs = TopKProcess(probs, top_k, min_tokens_to_keep)
@@ -1428,7 +1428,7 @@ class GenerationMixin(object):
 
         attn_mask = model_kwargs["attention_mask"]
         # make the shape of attention_mask = (-1, -1, -1, -1) in dy2static.
-        model_kwargs["attention_mask"] = paddle.reshape(attn_mask, paddle.shape(attn_mask))
+        model_kwargs["attention_mask"] = paddle.reshape(attn_mask, attn_mask.shape)
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
         max_new_tokens = paddle.full([1], max_new_tokens + cur_len - 1, dtype="int64")
 
