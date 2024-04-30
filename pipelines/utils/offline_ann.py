@@ -140,8 +140,12 @@ def offline_ann(index_name, doc_dir):
         use_gpu=use_gpu,
         embed_title=args.embed_title,
     )
-    # Writing docs may take a while. so waitting for 3 seconds for writing docs to be completed.
-    time.sleep(3)
+    # Writing docs may take a while. so waitting until writing docs to be completed.
+    document_count = document_store.get_document_count()
+    while document_count == 0:
+        time.sleep(1)
+        print("Waiting for writing docs to be completed.")
+        document_count = document_store.get_document_count()
     # 建立索引库
     document_store.update_embeddings(retriever)
 
