@@ -1,6 +1,6 @@
 # Elasticsearch Module
 
-::: pipelines.document_stores.elasticsearch
+::: pipelines.pipelines.document_stores.elasticsearch
     options:
         summary: true
         separate_signature: true

@@ -1,6 +1,6 @@
 # Question Generator Module
 
-::: pipelines.nodes.question_generator.question_generator
+::: pipelines.pipelines.nodes.question_generator.question_generator
     options:
         summary: true
         separate_signature: true

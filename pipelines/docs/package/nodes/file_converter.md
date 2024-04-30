@@ -1,27 +1,27 @@
 # File Converter Module
 
-::: pipelines.nodes.file_converter.docx
+::: pipelines.pipelines.nodes.file_converter.docx
     options:
         summary: true
         separate_signature: true
         show_signature_annotations: true
         line_length: 60
 
-::: pipelines.nodes.file_converter.image
+::: pipelines.pipelines.nodes.file_converter.image
     options:
         summary: true
         separate_signature: true
         show_signature_annotations: true
         line_length: 60
 
-::: pipelines.nodes.file_converter.markdown
+::: pipelines.pipelines.nodes.file_converter.markdown
     options:
         summary: true
         separate_signature: true
         show_signature_annotations: true
         line_length: 60
 
-::: pipelines.nodes.file_converter.pdf
+::: pipelines.pipelines.nodes.file_converter.pdf
     options:
         summary: true
         separate_signature: true
@@ -29,7 +29,7 @@
         line_length: 60
 
 
-::: pipelines.nodes.file_converter.txt
+::: pipelines.pipelines.nodes.file_converter.txt
     options:
         summary: true
         separate_signature: true

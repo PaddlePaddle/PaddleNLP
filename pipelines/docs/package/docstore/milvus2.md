@@ -1,6 +1,6 @@
 # Milvus2 Module
 
-::: pipelines.document_stores.milvus2
+::: pipelines.pipelines.document_stores.milvus2
     options:
         summary: true
         separate_signature: true

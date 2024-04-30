@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from dataclasses import dataclass
 
 from datasets import load_dataset
@@ -22,6 +23,9 @@ from model_config import ModelConfig
 from paddlenlp.peft import LoRAConfig
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+
+os.environ["https_proxy"] = "http://10.162.37.16:8128"
+os.environ["http_proxy"] = "http://10.162.37.16:8128"
 
 
 # Define and parse arguments.
@@ -48,8 +52,8 @@ if __name__ == "__main__":
         dtype = "float32"
 
     # Load a pretrained model
-    model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path, dtype=dtype)
-    model_ref = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path, dtype=dtype)
+    model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
+    model_ref = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
 
     # tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     tokenizer = AutoTokenizer.from_pretrained("llama2-7b-chat")

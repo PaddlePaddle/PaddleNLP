@@ -1,6 +1,6 @@
 # Application Module
 
-::: rest_api.application
+::: pipelines.rest_api.application
     options:
         summary: true
         separate_signature: true

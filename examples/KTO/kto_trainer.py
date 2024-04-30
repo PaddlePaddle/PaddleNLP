@@ -867,12 +867,12 @@ class KTOTrainer(Trainer):
         rejected_logits = completion_logits[rejected_idx, ...]
 
         if chosen_logps.shape[0] == 0:
-            chosen_logps = paddle.to_tensor([0.0])
-            chosen_logits = paddle.to_tensor([0.0])
+            chosen_logps = paddle.to_tensor([0.0], dtype=completion_logps.dtype)
+            chosen_logits = paddle.to_tensor([0.0], dtype=completion_logps.dtype)
 
         if rejected_logps.shape[0] == 0:
-            rejected_logits = paddle.to_tensor([0.0])
-            rejected_logps = paddle.to_tensor([0.0])
+            rejected_logits = paddle.to_tensor([0.0], dtype=completion_logps.dtype)
+            rejected_logps = paddle.to_tensor([0.0], dtype=completion_logps.dtype)
 
         return (chosen_logps, rejected_logps, chosen_logits, rejected_logits, KL_logps)
 
@@ -918,8 +918,8 @@ class KTOTrainer(Trainer):
             chosen_rewards = self.beta * chosen_logratios.detach()
         else:
             # lists can't be empty -- if they are, then accelerate.gather will hang
-            chosen_losses = paddle.to_tensor([0.0])
-            chosen_rewards = paddle.to_tensor([0.0])
+            chosen_losses = paddle.to_tensor([0.0], dtype=kl.dtype)
+            chosen_rewards = paddle.to_tensor([0.0], dtype=kl.dtype)
 
         if policy_rejected_logps.shape[0] != 0 or reference_rejected_logps.shape[0] != 0:
             rejected_logratios = policy_rejected_logps - reference_rejected_logps
@@ -927,12 +927,12 @@ class KTOTrainer(Trainer):
             rejected_rewards = self.beta * rejected_logratios.detach()
         else:
             # lists can't be empty -- if they are, then accelerate.gather will hang
-            rejected_losses = paddle.to_tensor([0.0])
-            rejected_rewards = paddle.to_tensor([0.0])
+            rejected_losses = paddle.to_tensor([0.0], dtype=kl.dtype)
+            rejected_rewards = paddle.to_tensor([0.0], dtype=kl.dtype)
 
         losses = paddle.concat(
             (self.desirable_weight * chosen_losses, self.undesirable_weight * rejected_losses),
-            0,
+            axis=0,
         )
 
         return losses, chosen_rewards, rejected_rewards, kl
@@ -1060,9 +1060,6 @@ class KTOTrainer(Trainer):
     def _get_train_sampler(self) -> Optional[paddle.io.Sampler]:
         if self.train_dataset is None or not has_length(self.train_dataset):
             return None
-        # return SequentialSampler(self.train_dataset)
-        # if self.train_dataset is None or not has_length(self.train_dataset):
-        #     return None
 
         if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
@@ -1071,6 +1068,13 @@ class KTOTrainer(Trainer):
                 batch_size=self.args.per_device_train_batch_size,
                 drop_last=self.args.dataloader_drop_last,
             )
+
+        # sampler = paddle.io.SequenceSampler(self.train_dataset)
+        # sampler = paddle.io.BatchSampler(sampler=sampler,
+        #                                  shuffle=False,
+        #                                  batch_size=self.args.per_device_train_batch_size* self.args.world_size,
+        #                                  drop_last=self.args.dataloader_drop_last)
+        # return sampler
 
         return DistributedBatchSampler(
             self.train_dataset,
