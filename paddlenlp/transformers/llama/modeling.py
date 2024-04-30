@@ -97,7 +97,7 @@ __all__ = [
     "LlamaPretrainingCriterion",
 ]
 
-npu_is_casual=False
+npu_is_casual = False
 
 def _get_interleave(n):
     def _get_interleave_power_of_2(n):
