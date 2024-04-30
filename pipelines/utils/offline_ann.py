@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import argparse
+import time
 
 from pipelines.document_stores import (
     BaiduElasticsearchDocumentStore,
@@ -139,7 +140,8 @@ def offline_ann(index_name, doc_dir):
         use_gpu=use_gpu,
         embed_title=args.embed_title,
     )
-
+    # Writing docs may take a while. so waitting for 3 seconds for writing docs to be completed.
+    time.sleep(3)
     # 建立索引库
     document_store.update_embeddings(retriever)
 
