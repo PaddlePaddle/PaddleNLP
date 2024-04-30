@@ -1728,8 +1728,9 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
             # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
             # loss = paddle.mean(masked_lm_loss)
             binary_sequence = paddle.where(masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss))
-            loss = paddle.sum(masked_lm_loss * binary_sequence) / paddle.sum(binary_sequence)
-
+            sum_ = paddle.sum(binary_sequence)
+            loss = 0 if sum_ == 0 else paddle.sum(masked_lm_loss * binary_sequence) / sum_ 
+            
         return loss
 
 
