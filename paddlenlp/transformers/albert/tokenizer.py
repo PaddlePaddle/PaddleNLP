@@ -20,7 +20,7 @@ from shutil import copyfile
 
 import sentencepiece as spm
 
-from .. import PretrainedTokenizer, BertTokenizer, AddedToken
+from .. import AddedToken, BertTokenizer, PretrainedTokenizer
 
 __all__ = ["AlbertTokenizer"]
 
@@ -590,6 +590,7 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
         self.remove_space = remove_space
         self.keep_accents = keep_accents
         self.sentencepiece_model_file = sentencepiece_model_file
+        self.vocab_file = sentencepiece_model_file
 
         self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
         self.sp_model.Load(sentencepiece_model_file)

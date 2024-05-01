@@ -19,7 +19,7 @@ from typing import List, Optional, Tuple, Union
 
 from ...utils.log import logger
 from ..tokenizer_utils_base import PaddingStrategy, TensorType, TruncationStrategy
-from ..tokenizer_utils_fast import PretrainedFastTokenizer
+from ..tokenizer_utils_fast import PretrainedTokenizerFast
 from .tokenizer import ErnieMTokenizer
 
 VOCAB_FILES_NAMES = {
@@ -31,15 +31,26 @@ VOCAB_FILES_NAMES = {
 SPIECE_UNDERLINE = "▁"
 
 
-class ErnieMFastTokenizer(PretrainedFastTokenizer):
+class ErnieMTokenizerFast(PretrainedTokenizerFast):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     slow_tokenizer_class = ErnieMTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
+    pretrained_resource_files_map.update(
+        {
+            "tokenizer_file": {
+                "ernie-m-base": "fake/tokenizer.json",
+                "ernie-m-large": "fake/tokenizer.json",
+                "uie-m-base": "fake/tokenizer.json",
+                "uie-m-large": "fake/tokenizer.json",
+            }
+        }
+    )
     pretrained_init_configuration = slow_tokenizer_class.pretrained_init_configuration
 
     def __init__(
         self,
-        vocab_file,
+        vocab_file=None,
+        *,
         sentencepiece_model_file,
         tokenizer_file=None,
         do_lower_case=True,
@@ -109,7 +120,7 @@ class ErnieMFastTokenizer(PretrainedFastTokenizer):
         verbose: bool = True,
         **kwargs
     ):
-        return super(ErnieMFastTokenizer, self).__call__(
+        return super(ErnieMTokenizerFast, self).__call__(
             text=text,
             text_pair=text_pair,
             max_length=max_length,

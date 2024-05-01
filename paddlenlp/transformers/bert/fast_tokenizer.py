@@ -16,18 +16,46 @@
 import json
 from typing import Optional, Tuple
 
-from fast_tokenizer import normalizers
+from tokenizers import normalizers
 
-from ..tokenizer_utils_fast import PretrainedFastTokenizer
+from ..tokenizer_utils_fast import PretrainedTokenizerFast
 from .tokenizer import BertTokenizer
 
 VOCAB_FILES_NAMES = {"vocab_file": "vocab.txt", "tokenizer_file": "tokenizer.json"}
 
 
-class BertFastTokenizer(PretrainedFastTokenizer):
+class BertTokenizerFast(PretrainedTokenizerFast):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     slow_tokenizer_class = BertTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
+    pretrained_resource_files_map.update(
+        {
+            "tokenizer_file": {
+                "bert-base-uncased": "https://huggingface.co/bert-base-uncased/resolve/main/tokenizer.json",
+                "bert-large-uncased": "https://huggingface.co/bert-large-uncased/resolve/main/tokenizer.json",
+                "bert-base-cased": "https://huggingface.co/bert-base-cased/resolve/main/tokenizer.json",
+                "bert-large-cased": "https://huggingface.co/bert-large-cased/resolve/main/tokenizer.json",
+                "bert-base-multilingual-uncased": (
+                    "https://huggingface.co/bert-base-multilingual-uncased/resolve/main/tokenizer.json"
+                ),
+                "bert-base-multilingual-cased": (
+                    "https://huggingface.co/bert-base-multilingual-cased/resolve/main/tokenizer.json"
+                ),
+                "bert-base-chinese": "https://huggingface.co/bert-base-chinese/resolve/main/tokenizer.json",
+                "bert-wwm-chinese": "fake/tokenizer.json",
+                "bert-wwm-ext-chinese": "fake/tokenizer.json",
+                "macbert-large-chinese": "fake/tokenizer.json",
+                "macbert-base-chinese": "fake/tokenizer.json",
+                "simbert-base-chinese": "fake/tokenizer.json",
+                "uer/chinese-roberta-base": "fake/tokenizer.json",
+                "uer/chinese-roberta-medium": "fake/tokenizer.json",
+                "uer/chinese-roberta-6l-768h": "fake/tokenizer.json",
+                "uer/chinese-roberta-small": "fake/tokenizer.json",
+                "uer/chinese-roberta-mini": "fake/tokenizer.json",
+                "uer/chinese-roberta-tiny": "fake/tokenizer.json",
+            }
+        }
+    )
     pretrained_init_configuration = slow_tokenizer_class.pretrained_init_configuration
 
     padding_side = "right"
@@ -61,6 +89,8 @@ class BertFastTokenizer(PretrainedFastTokenizer):
         )
 
         normalizer_state = json.loads(self.backend_tokenizer.normalizer.__getstate__())
+        if "normalizers" in normalizer_state:
+            normalizer_state = normalizer_state["normalizers"][0]
         if (
             normalizer_state.get("lowercase", do_lower_case) != do_lower_case
             or normalizer_state.get("strip_accents", strip_accents) != strip_accents

@@ -299,7 +299,7 @@ from .deberta_v2.configuration import *
 from ..utils.import_utils import is_fast_tokenizer_available
 
 if is_fast_tokenizer_available():
-    from .tokenizer_utils_fast import PretrainedFastTokenizer
+    from .tokenizer_utils_fast import PretrainedTokenizerFast
     from .bert.fast_tokenizer import *
     from .ernie.fast_tokenizer import *
     from .tinybert.fast_tokenizer import *

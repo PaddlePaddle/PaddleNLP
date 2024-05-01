@@ -19,16 +19,25 @@ from typing import Optional, Tuple
 from tokenizers import normalizers
 
 from ..tokenizer_utils_fast import PretrainedTokenizerFast
-from .tokenizer import ErnieTokenizer
+from .tokenizer import DistilBertTokenizer
 
 VOCAB_FILES_NAMES = {"vocab_file": "vocab.txt", "tokenizer_file": "tokenizer.json"}
 
 
-class ErnieTokenizerFast(PretrainedTokenizerFast):
+class DistilBertTokenizerFast(PretrainedTokenizerFast):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
-    slow_tokenizer_class = ErnieTokenizer
+    slow_tokenizer_class = DistilBertTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
+    pretrained_resource_files_map.update(
+        {
+            "tokenizer_file": {
+                "distilbert-base-uncased": "https://huggingface.co/distilbert-base-uncased/resolve/main/tokenizer.json",
+                "distilbert-base-cased": "https://huggingface.co/distilbert-base-cased/resolve/main/tokenizer.json",
+            }
+        }
+    )
     pretrained_init_configuration = slow_tokenizer_class.pretrained_init_configuration
+
     padding_side = "right"
 
     def __init__(
@@ -60,6 +69,8 @@ class ErnieTokenizerFast(PretrainedTokenizerFast):
         )
 
         normalizer_state = json.loads(self.backend_tokenizer.normalizer.__getstate__())
+        if "normalizers" in normalizer_state:
+            normalizer_state = normalizer_state["normalizers"][0]
         if (
             normalizer_state.get("lowercase", do_lower_case) != do_lower_case
             or normalizer_state.get("strip_accents", strip_accents) != strip_accents
@@ -74,67 +85,5 @@ class ErnieTokenizerFast(PretrainedTokenizerFast):
         self.do_lower_case = do_lower_case
 
     def save_vocabulary(self, save_directory: str, filename_prefix: Optional[str] = None) -> Tuple[str]:
-        files = self._tokenizer.model.save(save_directory, filename_prefix)
+        files = self._tokenizer.model.save(save_directory, prefix=filename_prefix)
         return tuple(files)
-
-
-# ernie-tiny uses ErnieTokenizer now
-# class ErnieTinyFastTokenize(PretrainedTokenizerFast):
-#     resource_files_names = {
-#         "sentencepiece_model_file": "spm_cased_simp_sampled.model",
-#         "vocab_file": "vocab.txt",
-#         "word_dict": "dict.wordseg.pickle",
-#     }  # for save_pretrained
-#     slow_tokenizer_class = ErnieTinyTokenizer
-#     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
-#     pretrained_init_configuration = slow_tokenizer_class.pretrained_init_configuration
-#     padding_side = "right"
-
-#     def __init__(
-#         self,
-#         vocab_file,
-#         sentencepiece_model_file,
-#         tokenizer_file=None,
-#         do_lower_case=True,
-#         encoding="utf8",
-#         unk_token="[UNK]",
-#         sep_token="[SEP]",
-#         pad_token="[PAD]",
-#         cls_token="[CLS]",
-#         mask_token="[MASK]",
-#         **kwargs
-#     ):
-#         super().__init__(
-#             vocab_file,
-#             sentencepiece_model_file=sentencepiece_model_file,
-#             tokenizer_file=tokenizer_file,
-#             do_lower_case=do_lower_case,
-#             unk_token=unk_token,
-#             sep_token=sep_token,
-#             pad_token=pad_token,
-#             cls_token=cls_token,
-#             mask_token=mask_token,
-#             **kwargs,
-#         )
-#         self.do_lower_case = do_lower_case
-#         self.encoding = encoding
-#         self.vocab_file = vocab_file
-#         self.sentencepiece_model_file = sentencepiece_model_file
-#         self.can_save_slow_tokenizer = False if not self.vocab_file else True
-
-#     def save_vocabulary(self, save_directory: str, filename_prefix: Optional[str] = None) -> Tuple[str]:
-#         if not self.can_save_slow_tokenizer:
-#             raise ValueError(
-#                 "Your faster tokenizer does not have the necessary information to save the vocabulary for a slow "
-#                 "tokenizer."
-#             )
-#         if not os.path.isdir(save_directory):
-#             logger.error(f"Vocabulary path ({save_directory}) should be a directory")
-#             return
-#         out_sentencepiece_model_file = os.path.join(
-#             save_directory,
-#             (filename_prefix + "-" if filename_prefix else "") + VOCAB_FILES_NAMES["sentencepiece_model_file"],
-#         )
-#         if os.path.abspath(self.sentencepiece_model_file) != os.path.abspath(out_sentencepiece_model_file):
-#             copyfile(self.sentencepiece_model_file, out_sentencepiece_model_file)
-#         return (out_sentencepiece_model_file,)

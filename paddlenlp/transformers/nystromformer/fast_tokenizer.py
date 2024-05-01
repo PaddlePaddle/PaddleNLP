@@ -16,15 +16,15 @@
 import json
 from typing import Optional, Tuple
 
-from fast_tokenizer import normalizers
+from tokenizers import normalizers
 
-from ..tokenizer_utils_fast import PretrainedFastTokenizer
+from ..tokenizer_utils_fast import PretrainedTokenizerFast
 from .tokenizer import NystromformerTokenizer
 
 VOCAB_FILES_NAMES = {"vocab_file": "vocab.txt", "tokenizer_file": "tokenizer.json"}
 
 
-class NystromformerFastTokenizer(PretrainedFastTokenizer):
+class NystromformerTokenizerFast(PretrainedTokenizerFast):
     resource_files_names = VOCAB_FILES_NAMES  # for save_pretrained
     slow_tokenizer_class = NystromformerTokenizer
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map

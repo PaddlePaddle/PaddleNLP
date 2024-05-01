@@ -72,7 +72,7 @@ class Processor(ABC):
                       The task name will be used to connect with the related PredictionHead.
         :param proxies: proxy configuration to allow downloads of remote datasets.
                     Format as in  "requests" library: https://2.python-requests.org//en/latest/user/advanced/#proxies
-        :param multithreading_rust: Whether to allow multithreading in Rust, e.g. for FastTokenizers.
+        :param multithreading_rust: Whether to allow multithreading in Rust, e.g. for TokenizerFasts.
                                     Note: Enabling multithreading in Rust AND multiprocessing in python might cause
                                     deadlocks.
         """

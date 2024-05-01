@@ -19,11 +19,11 @@ import os
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from fast_tokenizer import Encoding as FastEncoding
-from fast_tokenizer import Tokenizer as FastTokenizer
+from tokenizers import Encoding as FastEncoding
+from tokenizers import Tokenizer as TokenizerFast
 
 from .convert_slow_tokenizer import convert_slow_tokenizer
-from .tokenizer_utils import PretrainedTokenizer
+from .tokenizer_utils import ChatTemplateMixin, PretrainedTokenizer
 from .tokenizer_utils_base import (
     AddedToken,
     BatchEncoding,
@@ -44,7 +44,7 @@ ADDED_TOKENS_FILE = "added_tokens.json"
 SPECIAL_TOKENS_MAP_FILE = "special_tokens_map.json"
 
 
-class PretrainedFastTokenizer(PretrainedTokenizerBase):
+class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
     resource_files_names = VOCAB_FILES_NAMES
     slow_tokenizer_class: PretrainedTokenizer = None
     can_save_slow_tokenizer: bool = True
@@ -59,7 +59,7 @@ class PretrainedFastTokenizer(PretrainedTokenizerBase):
         elif fast_tokenizer_file is not None and not from_slow:
             # We have a serialization from tokenizers which let us directly build the backend
             # From json file
-            fast_tokenizer = FastTokenizer.from_file(fast_tokenizer_file)
+            fast_tokenizer = TokenizerFast.from_file(fast_tokenizer_file)
         elif slow_tokenizer is not None:
             # We need to convert a slow tokenizer to build the backend
             fast_tokenizer = convert_slow_tokenizer(slow_tokenizer)
@@ -70,7 +70,7 @@ class PretrainedFastTokenizer(PretrainedTokenizerBase):
         else:
             raise ValueError(
                 "Couldn't instantiate the backend tokenizer from one of: \n"
-                "(1) a `fast_tokenizer` library serialization file, \n"
+                "(1) a `tokenizers` library serialization file, \n"
                 "(2) a slow tokenizer instance to convert or \n"
                 "(3) an equivalent slow tokenizer class to instantiate and convert. \n"
                 "You need to have sentencepiece installed to convert a slow tokenizer to a fast one."
@@ -93,10 +93,10 @@ class PretrainedFastTokenizer(PretrainedTokenizerBase):
         """
         `int`: Size of the base vocabulary (without the added tokens).
         """
-        return self._tokenizer.get_vocab_size(with_added_vocabulary=False)
+        return self._tokenizer.get_vocab_size(with_added_tokens=False)
 
     def get_vocab(self) -> Dict[str, int]:
-        return self._tokenizer.get_vocab(with_added_vocabulary=True)
+        return self._tokenizer.get_vocab(with_added_tokens=True)
 
     @property
     def vocab(self) -> Dict[str, int]:
@@ -109,8 +109,8 @@ class PretrainedFastTokenizer(PretrainedTokenizerBase):
         Returns:
             `Dict[str, int]`: The added tokens.
         """
-        base_vocab = self._tokenizer.get_vocab(with_added_vocabulary=False)
-        full_vocab = self._tokenizer.get_vocab(with_added_vocabulary=True)
+        base_vocab = self._tokenizer.get_vocab(with_added_tokens=False)
+        full_vocab = self.get_vocab()
         added_vocab = dict((tok, index) for tok, index in full_vocab.items() if tok not in base_vocab)
         return added_vocab
 
@@ -118,10 +118,10 @@ class PretrainedFastTokenizer(PretrainedTokenizerBase):
         """
         Size of the full vocabulary with the added tokens.
         """
-        return self._tokenizer.get_vocab_size(with_added_vocabulary=True)
+        return self.vocab_size
 
     @property
-    def backend_tokenizer(self) -> FastTokenizer:
+    def backend_tokenizer(self) -> TokenizerFast:
         return self._tokenizer
 
     def _convert_encoding(
@@ -137,7 +137,7 @@ class PretrainedFastTokenizer(PretrainedTokenizerBase):
         verbose: bool = True,
     ) -> Tuple[Dict[str, Any], List[FastEncoding]]:
         """
-        Convert the encoding representation (from low-level PaddleNLP FastTokenizer output) to a python Dict and a list
+        Convert the encoding representation (from low-level PaddleNLP TokenizerFast output) to a python Dict and a list
         of encodings, take care of building a batch from overflowing tokens.
 
         Overflowing tokens are converted to additional examples (like batches) so the output values of the dict are
