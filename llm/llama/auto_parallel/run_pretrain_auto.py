@@ -86,6 +86,12 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
         },
     )
+    eliminate_transpose: bool = field(
+        default=False,
+        metadata={
+            "help": "Enable eliminate_transpose pass, which should replace transpose with reshape when sequence parallel is enabled."
+        },
+    )
     job_schedule_profiler_start: int = field(
         default=-1,
         metadata={"help": "The step to start job_schedule_profiler."},
@@ -131,6 +137,11 @@ class PreTrainingArguments(TrainingArguments):
             fused_passes = self.strategy.fused_passes
             fused_passes.enable = True
             fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
+
+        if self.eliminate_transpose:
+            fused_passes = self.strategy.fused_passes
+            fused_passes.enable = True
+            fused_passes.fused_passes_list.append("eliminate_transpose")
 
         logger.info(self.strategy)
 
@@ -574,7 +585,11 @@ def main():
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
-    warmup_steps = training_args.warmup_ratio * training_args.max_steps
+
+    if training_args.warmup_steps > 0:
+        warmup_steps = training_args.warmup_steps
+    else:
+        warmup_steps = training_args.warmup_ratio * training_args.max_steps
 
     lr_scheduler = None
     if training_args.lr_scheduler_type.value == "cosine":

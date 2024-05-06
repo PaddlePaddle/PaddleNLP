@@ -56,7 +56,7 @@ PaddleNLP将飞桨4D并行策略加入到Trainer API中， 用户只需修改Tra
 
 此项目支持了LLaMA、GPT-3、BaiChuan、Qwen 等大模型的预训练。用户切换配置config文件，即可一键运行。
 
-数据详细制作流程可参考[此处](https://paddlenlp.readthedocs.io/zh/latest/pretraining/dataset.html) : https://paddlenlp.readthedocs.io/zh/latest/pretraining/dataset.html
+数据详细制作流程可参考[此处](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/dataset.html) : https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/dataset.html
 
 为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
 ```shell
