@@ -1324,7 +1324,7 @@ class ConversionMixin:
         for keys, action in fuse_actions.items():
             if keys[-1] in keys[:-1]:
                 assert len(keys) == 2, "only 2 keys can be converted with the same name"
-                convert_with_same_keys.append(keys)
+                convert_with_same_keys.append(keys[-1])
             origin_states = [state_dict.pop(key) for key in keys[:-1]]
             state_dict[keys[-1]] = action(origin_states)
             fused_and_split_keys.append(keys[-1])
@@ -1334,7 +1334,7 @@ class ConversionMixin:
         for keys, action in split_actions.items():
             if keys[-1] in keys[:-1]:
                 assert len(keys) == 2, "only 2 keys can be converted with the same name"
-                convert_with_same_keys.append(keys)
+                convert_with_same_keys.append(keys[-1])
             origin_state = state_dict.pop(keys[-1])
             split_states = action(origin_state)
             for key_idx, key in enumerate(keys[:-1]):
