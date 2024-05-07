@@ -213,7 +213,7 @@ def scaled_dot_product_attention(
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
-
+    global npu_is_casual
     if config.use_flash_attention and flash_attention:
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
@@ -234,7 +234,6 @@ def scaled_dot_product_attention(
                 alibi = alibi.reshape([bsz, num_heads, 1, -1])
                 attention_mask = attention_mask.cast(alibi.dtype) + alibi
             if get_env_device() == "npu":
-                global npu_is_casual
                 attn_output = core.eager._run_custom_op(
                     "flash_attention_npu",
                     query_states,
@@ -1614,13 +1613,13 @@ class LlamaModel(LlamaPretrainedModel):
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
+        global npu_is_casual
         if self.config.use_flash_attention:
             is_casual = is_casual_mask(attention_mask)
             if get_env_device() != "npu":
                 if is_casual and alibi is None:
                     attention_mask = None
             else:
-                global npu_is_casual
                 npu_is_casual = is_casual
                 attention_mask = attention_mask.astype("bool")
         hidden_states = inputs_embeds
