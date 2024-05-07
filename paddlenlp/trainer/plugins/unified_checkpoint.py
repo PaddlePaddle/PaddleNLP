@@ -62,6 +62,7 @@ from paddlenlp.utils.env import (
     SAFE_WEIGHTS_NAME,
 )
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.nested import nested_copy, nested_copy_place
 
 if is_safetensors_available():
     from safetensors import safe_open
@@ -1874,26 +1875,6 @@ def mapping_optimizer_tp_actions(tp_actions, optimizer_loaded_keys):
         if typename in optimizer_non_scaler_name and key_base in tp_actions:
             new_actions[key] = tp_actions[key_base]
     return new_actions
-
-
-def nested_copy(inputs):
-    if isinstance(inputs, dict):
-        outputs = {}
-        for key in list(inputs.keys()):
-            outputs[key] = nested_copy(inputs[key])
-        return outputs
-    return inputs
-
-
-def nested_copy_place(inputs, place=None, blocking=False):
-    if isinstance(inputs, dict):
-        outputs = {}
-        for key in list(inputs.keys()):
-            outputs[key] = nested_copy_place(inputs[key], place, blocking)
-        return outputs
-    if isinstance(inputs, paddle.Tensor):
-        inputs = inputs if inputs.place == place else inputs._copy_to(place, blocking)
-    return inputs
 
 
 def flatten_list(nested_list):
