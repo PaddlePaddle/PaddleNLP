@@ -451,7 +451,7 @@ function llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1() {
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=`cat $log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'gpu_max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
+    mem=`cat $log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=8.93362617
     ips_base=64.75564390065037

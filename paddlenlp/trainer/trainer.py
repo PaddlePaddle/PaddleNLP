@@ -101,7 +101,7 @@ from ..utils.env import (
     SAFE_PEFT_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
 )
-from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
+from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
 from .argparser import strtobool
 from .integrations import get_reporting_integration_callbacks
@@ -1259,19 +1259,27 @@ class Trainer:
             logs["learning_rate"] = float("{0:.3e}".format(self._get_learning_rate()))
             logs["global_step"] = int(self.state.global_step)
 
-            divisor = 2**30
-            # TODO(@gexiao): replace these codes with unified APIs in Paddle
-            current_device = framework._current_expected_place_()
-            if str(current_device) != "Place(cpu)":
-                device_id = current_device.get_device_id()
-                current_memory_allocated = core.device_memory_stat_current_value("Allocated", device_id)
-                current_memory_reserved = core.device_memory_stat_current_value("Reserved", device_id)
-                max_memory_allocated = core.device_memory_stat_peak_value("Allocated", device_id)
-                max_memory_reserved = core.device_memory_stat_peak_value("Reserved", device_id)
-                logs["current_memory_allocated"] = current_memory_allocated / divisor
-                logs["current_memory_reserved"] = current_memory_reserved / divisor
-                logs["max_memory_allocated"] = max_memory_allocated / divisor
-                logs["max_memory_reserved"] = max_memory_reserved / divisor
+            # Add additional memory in log.
+            if not self.args.skip_memory_metrics:
+                shift_bits_for_MB = 20
+                logs.update(
+                    {
+                        "cpu_mem_used": self._memory_tracker.cpu_mem_used() >> shift_bits_for_MB,
+                        "cpu_mem_used_peak": self._memory_tracker.cpu_mem_used_peak >> shift_bits_for_MB,
+                    }
+                )
+                # TODO(@gexiao): replace these codes with unified APIs in Paddle
+                current_device = framework._current_expected_place_()
+                if str(current_device) != "Place(cpu)":
+                    device_id = current_device.get_device_id()
+                    current_memory_allocated = core.device_memory_stat_current_value("Allocated", device_id)
+                    current_memory_reserved = core.device_memory_stat_current_value("Reserved", device_id)
+                    max_memory_allocated = core.device_memory_stat_peak_value("Allocated", device_id)
+                    max_memory_reserved = core.device_memory_stat_peak_value("Reserved", device_id)
+                    logs["current_memory_allocated"] = current_memory_allocated >> shift_bits_for_MB
+                    logs["current_memory_reserved"] = current_memory_reserved >> shift_bits_for_MB
+                    logs["max_memory_allocated"] = max_memory_allocated >> shift_bits_for_MB
+                    logs["max_memory_reserved"] = max_memory_reserved >> shift_bits_for_MB
 
             total_train_batch_size = (
                 self.args.train_batch_size * self.args.gradient_accumulation_steps * self.args.dataset_world_size
@@ -1293,22 +1301,6 @@ class Trainer:
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
             self._globalstep_last_start_time = time.time()
-
-            # Add additional memory in log.
-            if not self.args.skip_memory_metrics:
-                logs.update(
-                    {
-                        "cpu_mem_used": self._memory_tracker.cpu_mem_used() >> 20,
-                        "cpu_mem_used_peak": self._memory_tracker.cpu_mem_used_peak >> 20,
-                    }
-                )
-                if is_paddle_cuda_available():
-                    logs.update(
-                        {
-                            "gpu_max_memory_allocated": paddle.device.cuda.max_memory_allocated() >> 20,
-                            "gpu_max_memory_reserved": paddle.device.cuda.max_memory_reserved() >> 20,
-                        }
-                    )
 
             self.log(logs, **kwargs)
 
