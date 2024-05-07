@@ -125,9 +125,11 @@ def get_lora_target_modules(model):
             ".*v_proj.*",
             ".*k_proj.*",
             ".*o_proj.*",
+            ".*qkv_proj.*",
             ".*gate_proj.*",
             ".*down_proj.*",
             ".*up_proj.*",
+            ".*gate_up_fused_proj.*",
         ]
     elif model.base_model_prefix == "opt":
         target_modules = [
