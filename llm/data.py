@@ -90,7 +90,7 @@ def tokenize_example(tokenizer, example, data_args):
     return tokenized_source, tokenized_target_input_ids
 
 
-def tokenize_rounds_example(tokenizer, example, data_args):
+def tokenize_rounds_example(tokenizer, example, data_args, **kwargs):
     """tokenize multi-rounds examples with chat_template.json
 
     Args:
@@ -117,7 +117,7 @@ def tokenize_rounds_example(tokenizer, example, data_args):
 
     # 1. only tokenize input_ids
     conversation_result: list[tuple[list[int], list[int]]] = tokenizer.encode_chat_inputs(
-        conversations, context_data=context_data
+        conversations, context_data=context_data, **kwargs
     )
     system_ids = conversation_result.pop("system", []) or []
 
