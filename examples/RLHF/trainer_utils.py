@@ -14,6 +14,7 @@
 
 import inspect
 import os
+import time
 from contextlib import contextmanager
 from typing import Dict
 
@@ -235,6 +236,9 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
     ignore_keys_for_eval = kwargs.get("ignore_keys_for_eval", None)
     tr_loss = kwargs.get("tr_loss", 0.0)
     model = kwargs.get("model", self.model_wrapped)
+    # needed in _maybe_log_save_evaluate
+    self._globalstep_last_logged = getattr(self, "_globalstep_last_logged", 0)
+    self._globalstep_last_start_time = getattr(self, "_globalstep_last_start_time", time.time())
 
     args = self.args
 
@@ -397,7 +401,7 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
                 for buffer in buffers:
                     buffer._clear_grad_storage()
         else:
-            self.optimizer.clear_grad()
+            self.optimizer.clear_grad(set_to_zero=False)
 
         self.callback_handler.on_optimizer_end(
             args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None

@@ -95,7 +95,6 @@ def create_loss(loss_cls, config, extra_args, merge_labels=None):
         # create from TrainingArguments
         loss_kwargs = dict([(name, getattr(extra_args, name)) for name in loss_arg_names if hasattr(extra_args, name)])
     loss = loss_cls(config, **loss_kwargs)
-    loss_cls.forward = ori_fwd
     return loss
 
 

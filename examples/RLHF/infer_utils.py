@@ -77,8 +77,11 @@ class Predictor:
             config.use_cachekv_int8 = False
             config.single_card_ptq = True
             infer_model_cls = getattr(paddlenlp.experimental.transformers, model.__class__.__name__ + "InferenceModel")
+            # ori_init_weights = infer_model_cls.init_weights
+            # infer_model_cls.init_weights = lambda self: None
             with dtype_guard(dtype):
                 infer_model = infer_model_cls(config)
+            # infer_model_cls.init_weights = ori_init_weights
 
             if set_state:
                 state_dict = {}
@@ -94,6 +97,7 @@ class Predictor:
         def _create_param(self, *args, **kwargs):
             param = ori_creat_param(self, *args, **kwargs)
             param._clear_data()
+            # param._clear()
             return param
 
         paddle.nn.Layer.create_parameter = _create_param
@@ -101,6 +105,8 @@ class Predictor:
         eval_model = getattr(trainer, "_inner_eval_model", None)
         infer_model = create_infer_model(trainer.model if eval_model is None else eval_model, dtype=trainer.amp_dtype)
         paddle.nn.Layer.create_parameter = ori_creat_param
+        # for k, v in infer_model.state_dict().items():
+        #     v._clear()
 
         # create predictor
         parser = PdArgumentParser((PredictorArgument,))
@@ -114,7 +120,7 @@ class Predictor:
                 "batch_size": trainer.args.per_device_train_batch_size,
                 # infer model do not support top_k, and differ with non-infer model
                 # generation which gets default top_K=50 using generation_config.top_k
-                "top_p": 0.0,
+                "top_p": 0.8,
                 # trainer.args.top_p,
                 "temperature": trainer.args.temperature,
                 "repetition_penalty": trainer.args.repetition_penalty,
@@ -154,6 +160,7 @@ class Predictor:
         # clear params
         for _, param in self.model.state_dict().items():
             param._clear_data()
+            # param._clear()
         if onload_model:
             model.to(paddle.device.get_device())
         self.is_available = False
@@ -175,21 +182,63 @@ class Predictor:
         if getattr(self, "_weights_mapping", None) is None:
             self._weights_mapping = self.model.get_weights_mapping()
 
+        # non_share_params = []
         for k, v in self._weights_mapping.items():
             param, (convert_fun, args) = k, v
             args = [state_dict[name] for name in args]
             value = convert_fun(*args)
+            # non_share_params = []
+            # for arg in args:
+            #     # shared params no need to offload
+            #     if value is not arg:
+            #         non_share_params.append(arg)
+            # print("=" * 20, "name", v[1],
+            #       [(arg.shape, arg.place, arg.dtype) for arg in args],
+            #       value.shape, value.place, value.dtype,
+            #       isinstance(value.place, paddle.CUDAPlace),
+            #       value.place.is_gpu_place())
             if offload_model:
                 for arg in args:
                     # shared params no need to offload
                     if value is not arg:
-                        arg.to(offload_place, blocking=False)
+                        # arg.to(offload_place, blocking=True)
+                        # cpu_arg = arg.pin_memory()
+                        cpu_arg = arg._copy_to(offload_place, blocking=False)
+                        cpu_arg._share_buffer_to(arg)
+            #             print("=" * 20, "not share param name", v[1],
+            #                   value.place.is_gpu_place(),
+            #                   value._is_initialized(), param._is_initialized())
+            #         else:
+            #             print("=" * 20, "share param name", v[1],
+            #                   value.place.is_gpu_place(),
+            #                   value._is_initialized(), param._is_initialized())
+            # print("=" * 20, "name", v[1],
+            #       [(arg.shape, arg.place, arg.dtype) for arg in args],
+            #       value.shape, value.place, value.dtype,
+            #       isinstance(value.place, paddle.CUDAPlace),
+            #       value.place.is_gpu_place())
             if not isinstance(value, paddle.Tensor):
                 param.set_value(value)
-            elif isinstance(value.place, paddle.CUDAPlace):
-                value._share_buffer_to(param)
+            # elif isinstance(value.place, paddle.CUDAPlace):
+            elif value.place.is_gpu_place():
+                # NOTE: _share_buffer_to seems do not work
+                # value._share_buffer_to(param)
+                # value._share_underline_tensor_to(param)
+                param.get_tensor()._share_data_with(value.get_tensor())
             else:
-                param.copy_(value, False)
+                param.copy_(value, True)
+                # if offload_model:
+                #     if value is not args[0]:
+                #         value._clear_data()
+                #     else:
+                #         value.to(offload_place, blocking=True)
+
+            # if offload_model:
+            #     for param in non_share_params:
+            #         param.to(offload_place, blocking=True)
+        # if offload_model:
+        #     for param in non_share_params:
+        #         param.to(offload_place, blocking=False)
         paddle.device.cuda.synchronize()
 
     def _preprocess(self, source):
@@ -256,7 +305,9 @@ def infer_guard(trainer, offload_model=True):
     if policy_predictor is None:
         policy_predictor = Predictor.create_predictor(trainer)
     if not policy_predictor.is_available:
+        # print("="*20, "enable predictor begin")
         policy_predictor.enable(model, offload_model=offload_model)
+        # print("="*20, "enable predictor end")
 
     # TODO(guosheng): patch for dist.all_recude to use tp group, fix it later
     ori_all_reduce = dist.all_reduce
@@ -291,15 +342,19 @@ class InferEvalModel:
                 self.model,
                 with_offload="train_model" in trainer.args.offload_level,
             )
+            # print("=" * 20, "enable export_evaluate_model")
         else:
             reload_tensor_to_gpu(self.model.state_dict())
+            # print("=" * 20, "enable reload_tensor_to_gpu")
 
     def disable(self):
         trainer = self.trainer
         if trainer.model is not self.model:
             cleanup_tensor_space(self.model.state_dict())
+            # print("=" * 20, "disable cleanup_tensor_space")
         else:
             offload_tensor_to_cpu(self.model.state_dict())
+            # print("=" * 20, "disable offload_tensor_to_cpu")
 
     def __getattr__(self, name):
         try:
@@ -353,6 +408,7 @@ class InferEvalModel:
             #    cache)
             policy_predictor.input_length = input_ids.shape[-1]
             outputs = policy_predictor.predict(prompts)
+        print("=" * 20, "output shape", outputs[0].shape)
 
         if generation_config.trunc_input:
             outputs = (outputs[0][:, policy_predictor.infer_input_length :],)
