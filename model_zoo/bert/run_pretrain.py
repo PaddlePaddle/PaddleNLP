@@ -425,8 +425,9 @@ def do_train(args):
                 lr_scheduler.step()
                 optimizer.clear_grad()
 
-                if global_step % args.logging_steps == 0:
-                    loss_numpy = loss.numpy()
+                # NOTE: For accurate data statistics， please open the comments below：
+                # if global_step % args.logging_steps == 0:
+                #     loss = loss.numpy()
                 total_samples += args.batch_size
                 train_run_cost = time.time() - batch_start
                 train_cost_avg.record(train_run_cost)
@@ -453,7 +454,7 @@ def do_train(args):
                             global_step,
                             epoch,
                             step,
-                            loss_numpy,
+                            loss,
                             reader_cost_avg.get_average(),
                             train_cost_avg.get_average(),
                             total_samples / args.logging_steps,
