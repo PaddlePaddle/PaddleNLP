@@ -97,6 +97,7 @@ __all__ = [
     "LlamaForCausalLM",
     "LlamaPretrainingCriterion",
 ]
+
 npu_is_casual = False
 
 def _get_interleave(n):
