@@ -346,7 +346,7 @@ def is_casual_mask(attention_mask):
     """
     Upper triangular of attention_mask equals to attention_mask is casual
     """
-    return (paddle.triu(attention_mask) == attention_mask).all().item()
+    return sum((paddle.triu(attention_mask) == attention_mask).all()) > 0
 
 
 def _make_causal_mask(input_ids_shape, past_key_values_length):
