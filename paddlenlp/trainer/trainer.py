@@ -1280,6 +1280,14 @@ class Trainer:
             seq_length = None
             if getattr(self, "is_pretraining", False) and hasattr(self.model, "config"):
                 seq_length = getattr(self.model.config, "seq_length", None)
+
+            if self.effi_token_cnt is not None and self.args.local_rank != -1:
+                paddle.distributed.all_reduce(self.effi_token_cnt)
+                paddle.distributed.all_reduce(self.all_token_cnt)
+                if self.args.tensor_parallel_degree > 1:
+                    self.effi_token_cnt /= self.args.tensor_parallel_degree
+                    self.all_token_cnt /= self.args.tensor_parallel_degree
+
             logs.update(
                 speed_metrics(
                     "interval",
@@ -1292,7 +1300,7 @@ class Trainer:
             )
 
             if self.effi_token_cnt is not None:
-                self.effi_token_cnt = 0
+                self.effi_token_cnt = paddle.to_tensor(0)
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step

@@ -334,7 +334,7 @@ def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_lengt
         steps_per_second = num_steps / runtime
         result[f"{split}_steps_per_second"] = round(steps_per_second, 4)
     if effi_token_cnt is not None:
-        result[f"{split}_efficient_token_per_second"] = round(effi_token_cnt / runtime, 4)
+        result[f"{split}_efficient_token_per_second"] = round(effi_token_cnt.item() / runtime, 4)
     return result
 
 
