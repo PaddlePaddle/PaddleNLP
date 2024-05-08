@@ -1852,6 +1852,7 @@ class Trainer:
                 # stage1 overlap 测试
                 print("self.optimizer", self.optimizer)
                 self.optimizer._set_broadcast_overlap(True, model)
+                self.optimizer._set_all_gather_overlap_forward(True, model)
             else:
                 cpu_offload = ShardingOption.OFFLOAD in self.args.sharding
                 assert self.optimizer is not None, "optimizer is empty!"

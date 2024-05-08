@@ -17,7 +17,7 @@
 set -x
 #unset CUDA_VISIBLE_DEVICES
   
-WORK_ROOT=/root/paddlejob/workspace/yinwei
+WORK_ROOT=/workspace/yinwei/
 export PYTHONPATH=${WORK_ROOT}/PaddleNLP:$PYTHONPATH
 
 export FLAGS_selected_gpus="0,1,2,3,4,5,6,7"
@@ -104,7 +104,7 @@ rm -rf output
 # nsys_args="nsys profile --stats true -w true -t cuda,nvtx,osrt,cudnn,cublas --capture-range=cudaProfilerApi -x true --force-overwrite true -o ${OUTPUT_FILENAME}"
 
 
-nsys_args="nsys profile --stats true -w true -t cuda,nvtx,cudnn,cublas -x true --force-overwrite true -o ${OUTPUT_FILENAME}"
+# nsys_args="nsys profile --stats true -w true -t cuda,nvtx,cudnn,cublas -x true --force-overwrite true -o ${OUTPUT_FILENAME}"
 ${nsys_args} python -u -m paddle.distributed.launch \
         --gpus "0,1,2,3,4,5,6,7" ${autoconfig_args} \
         --log_dir log_${MODEL_TYPE} \
@@ -144,6 +144,7 @@ ${nsys_args} python -u -m paddle.distributed.launch \
         --use_fused_rope true \
         --enable_linear_fused_grad_add true \
         --sharding "stage1" \
+        --sharding_parallel_config "split_param"
         --sharding_degree ${SD} \
         --disable_tqdm true \
         --continue_training 0 \
