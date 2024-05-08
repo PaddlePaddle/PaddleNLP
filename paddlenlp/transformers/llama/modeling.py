@@ -1068,6 +1068,7 @@ class LlamaAttention(nn.Layer):
                 self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
                 use_reentrant=self.config.recompute_use_reentrant,
+                npu_is_casual=npu_is_casual,
             )
         else:
             outputs = scaled_dot_product_attention(
@@ -1080,6 +1081,7 @@ class LlamaAttention(nn.Layer):
                 alibi,
                 self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
+                npu_is_casual=npu_is_casual,
             )
         if output_attentions:
             attn_output, attn_weights = outputs
