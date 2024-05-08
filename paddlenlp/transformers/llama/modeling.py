@@ -1132,6 +1132,7 @@ class LlamaDecoderLayer(nn.Layer):
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
         alibi: Optional[paddle.Tensor] = None,
+        npu_is_casual: bool = False
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         """
         Args:
@@ -1168,7 +1169,7 @@ class LlamaDecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
-                npu_is_casual,
+                npu_is_casual=npu_is_casual,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
@@ -1180,7 +1181,7 @@ class LlamaDecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
-                npu_is_casual,
+                npu_is_casual=npu_is_casual,
             )
 
         if type(outputs) is tuple:
@@ -1663,7 +1664,7 @@ class LlamaModel(LlamaPretrainedModel):
                     past_key_value,
                     use_cache,
                     alibi=alibi,
-                    npu_is_casual=is_casual,
+                    is_casual,
                 )
 
             # NOTE: clear outdate cache after it has been used for memory saving
