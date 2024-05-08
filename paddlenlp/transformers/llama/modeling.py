@@ -96,8 +96,10 @@ __all__ = [
     "LlamaForCausalLM",
     "LlamaPretrainingCriterion",
 ]
-global npu_is_casual
+
+
 npu_is_casual = False
+
 
 def _get_interleave(n):
     def _get_interleave_power_of_2(n):
@@ -213,7 +215,7 @@ def scaled_dot_product_attention(
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
-    global npu_is_casual
+
     if config.use_flash_attention and flash_attention:
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
@@ -1119,7 +1121,6 @@ class LlamaDecoderLayer(nn.Layer):
         self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
 
-
     def forward(
         self,
         hidden_states: paddle.Tensor,
@@ -1613,14 +1614,12 @@ class LlamaModel(LlamaPretrainedModel):
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
-        global npu_is_casual
         if self.config.use_flash_attention:
             is_casual = is_casual_mask(attention_mask)
             if get_env_device() != "npu":
                 if is_casual and alibi is None:
                     attention_mask = None
             else:
-                npu_is_casual = is_casual
                 attention_mask = attention_mask.astype("bool")
         hidden_states = inputs_embeds
         # decoder layers
@@ -1728,10 +1727,12 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
             # skip ignore_index which loss == 0
             # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
             # loss = paddle.mean(masked_lm_loss)
-            binary_sequence = paddle.where(masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss))
+            binary_sequence = paddle.where(
+                masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
+            )
             sum_ = paddle.sum(binary_sequence)
-            loss = 0 if sum_ == 0 else paddle.sum(masked_lm_loss * binary_sequence) / sum_ 
-            
+            loss = 0 if sum_ == 0 else paddle.sum(masked_lm_loss * binary_sequence) / sum_
+
         return loss
 
 
