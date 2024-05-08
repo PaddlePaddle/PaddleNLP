@@ -23,8 +23,6 @@ from paddlenlp.utils.nested import (
     nested_reduce_tensor,
 )
 
-_MAX_DATA_DIM = 64
-
 
 class DummyDataset(paddle.io.Dataset):
     """
@@ -58,6 +56,7 @@ class DistDataLoader(paddle.io.DataLoader):
         timeout=0,
         worker_init_fn=None,
         persistent_workers=False,
+        eval=False,
     ):
 
         if dataset is None:
@@ -67,6 +66,7 @@ class DistDataLoader(paddle.io.DataLoader):
         super().__init__(dataset=dataset, batch_sampler=batch_sampler, collate_fn=collate_fn, num_workers=num_workers)
 
         self._hcg = fleet.get_hybrid_communicate_group()
+        self.eval = eval
 
         # Init pp data comm group.
         if self._hcg.get_pipe_parallel_world_size() > 1:
@@ -128,8 +128,11 @@ class DistDataLoader(paddle.io.DataLoader):
         parallel_groups = topo.get_comm_list("pipe")
 
         for group in parallel_groups:
-            # only first rank and last rank
-            ranks = [group[0], group[-1]]
+            if not self.eval:
+                # only first rank and last rank
+                ranks = [group[0], group[-1]]
+            else:
+                ranks = group
             comm_group = paddle.distributed.new_group(ranks=ranks)
             if paddle.distributed.get_rank() in ranks:
                 parallel_comm_group = comm_group
@@ -170,6 +173,9 @@ class DistDataLoader(paddle.io.DataLoader):
                 src=self._pp_data_group.ranks[0],
                 group=self._pp_data_group,
             )
+        else:
+            fake_data = [None]
+
         fake_data = fake_data[0]
 
         if self.mp_group.nranks > 1:
@@ -178,7 +184,6 @@ class DistDataLoader(paddle.io.DataLoader):
         if self._pp_data_group is not None:
             if process_rank != self._pp_data_group.ranks[0]:
                 data = nested_empty_tensor(fake_data)
-        data = nested_copy_place(data, place=paddle.framework._current_expected_place())
 
         if self.mp_group.nranks > 1 and self.pp_rank == 0:
             data = nested_broadcast_tensor(data, src=self.mp_src_rank, group=self.mp_group)
@@ -195,6 +200,7 @@ class DistDataLoader(paddle.io.DataLoader):
         if self._need_data:
             try:
                 data = next(self._dataloader_iter)
+                data = nested_copy_place(data, place=paddle.framework._current_expected_place())
             except:
                 pass
         data = self._broadcast_data(data)
