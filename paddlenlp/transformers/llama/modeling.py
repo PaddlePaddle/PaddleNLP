@@ -235,6 +235,7 @@ def scaled_dot_product_attention(
                 alibi = alibi.reshape([bsz, num_heads, 1, -1])
                 attention_mask = attention_mask.cast(alibi.dtype) + alibi
             if get_env_device() == "npu":
+                global npu_is_casual
                 attn_output = core.eager._run_custom_op(
                     "flash_attention_npu",
                     query_states,
@@ -1619,7 +1620,8 @@ class LlamaModel(LlamaPretrainedModel):
                 if is_casual and alibi is None:
                     attention_mask = None
             else:
-                npu_is_casual = copy.deepcopy(is_casual)
+                global npu_is_casual
+                npu_is_casual = is_casual
                 attention_mask = attention_mask.astype("bool")
         hidden_states = inputs_embeds
         # decoder layers
