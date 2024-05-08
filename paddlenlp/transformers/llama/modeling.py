@@ -99,6 +99,7 @@ __all__ = [
 global npu_is_casual
 npu_is_casual = False
 
+
 def _get_interleave(n):
     def _get_interleave_power_of_2(n):
         start = 2 ** (-(2 ** -(math.log2(n) - 3)))
@@ -1122,7 +1123,6 @@ class LlamaDecoderLayer(nn.Layer):
         self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
 
-
     def forward(
         self,
         hidden_states: paddle.Tensor,
@@ -1731,10 +1731,12 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
             # skip ignore_index which loss == 0
             # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
             # loss = paddle.mean(masked_lm_loss)
-            binary_sequence = paddle.where(masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss))
+            binary_sequence = paddle.where(
+                masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
+            )
             sum_ = paddle.sum(binary_sequence)
-            loss = 0 if sum_ == 0 else paddle.sum(masked_lm_loss * binary_sequence) / sum_ 
-            
+            loss = 0 if sum_ == 0 else paddle.sum(masked_lm_loss * binary_sequence) / sum_
+
         return loss
 
 
