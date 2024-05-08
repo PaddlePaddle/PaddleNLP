@@ -71,8 +71,10 @@ class DistDataLoader(paddle.io.DataLoader):
         # Init pp data comm group.
         if self._hcg.get_pipe_parallel_world_size() > 1:
             self._pp_data_group = self._init_dataloader_comm_group()
+            self._pp_group = self._hcg.get_pipe_parallel_group()
         else:
             self._pp_data_group = None
+            self._pp_group = None
 
         self.mp_group = self._hcg.get_model_parallel_group()
         self.mp_rank = self._hcg.get_model_parallel_rank()
@@ -128,11 +130,7 @@ class DistDataLoader(paddle.io.DataLoader):
         parallel_groups = topo.get_comm_list("pipe")
 
         for group in parallel_groups:
-            if not self.eval:
-                # only first rank and last rank
-                ranks = [group[0], group[-1]]
-            else:
-                ranks = group
+            ranks = [group[0], group[-1]]
             comm_group = paddle.distributed.new_group(ranks=ranks)
             if paddle.distributed.get_rank() in ranks:
                 parallel_comm_group = comm_group
@@ -152,8 +150,8 @@ class DistDataLoader(paddle.io.DataLoader):
                         f"Your local rank {paddle.distributed.get_rank()} are forbidden to have a state_dict."
                     )
                 fake_data = [None]
-        if self._pp_data_group is not None:
-            if process_rank == self._pp_data_group.ranks[0]:
+        if self._pp_group is not None:
+            if process_rank == self._pp_group.ranks[0]:
                 fake_data = [nested_reduce_tensor(data)]
             else:
                 if data is not None:
@@ -167,31 +165,34 @@ class DistDataLoader(paddle.io.DataLoader):
                 src=self.mp_src_rank,
                 group=self.mp_group,
             )
-        if self._pp_data_group is not None:
+        if self._pp_group is not None:
             paddle.distributed.broadcast_object_list(
                 fake_data,
-                src=self._pp_data_group.ranks[0],
-                group=self._pp_data_group,
+                src=self._pp_group.ranks[0],
+                group=self._pp_group,
             )
         else:
             fake_data = [None]
 
         fake_data = fake_data[0]
+        if fake_data is None:
+            raise StopIteration
 
+        dst_pp_group = self._pp_group if self.eval else self._pp_data_group
         if self.mp_group.nranks > 1:
             if process_rank != self.mp_src_rank:
                 data = nested_empty_tensor(fake_data)
-        if self._pp_data_group is not None:
-            if process_rank != self._pp_data_group.ranks[0]:
+        if dst_pp_group is not None:
+            if process_rank != dst_pp_group.ranks[0]:
                 data = nested_empty_tensor(fake_data)
 
         if self.mp_group.nranks > 1 and self.pp_rank == 0:
             data = nested_broadcast_tensor(data, src=self.mp_src_rank, group=self.mp_group)
-        if self._pp_data_group is not None:
-            data = nested_broadcast_tensor(data, src=self._pp_data_group.ranks[0], group=self._pp_data_group)
-
+        if dst_pp_group is not None:
+            data = nested_broadcast_tensor(data, src=dst_pp_group.ranks[0], group=dst_pp_group)
+        # for pp1 - pp_{n-1}, Paddle need to recevie empty dict for pipeline parallel.
         if data is None:
-            raise StopIteration
+            data = {}
 
         return data
 
