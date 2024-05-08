@@ -109,8 +109,9 @@ def main():
         labels = paddle.to_tensor(eval_preds.label_ids, dtype="int64")
         preds = paddle.to_tensor(eval_preds.predictions)
         preds = paddle.nn.functional.sigmoid(preds)
-        preds = preds[labels != -100].numpy()
-        labels = labels[labels != -100].numpy()
+        data_size = labels.shape[0]
+        preds = preds[labels != -100].numpy().reshape(data_size, -1)
+        labels = labels[labels != -100].numpy().reshape(data_size, -1)
         preds = preds > data_args.threshold
         micro_f1 = f1_score(y_pred=preds, y_true=labels, average="micro")
         macro_f1 = f1_score(y_pred=preds, y_true=labels, average="macro")
