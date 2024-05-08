@@ -465,8 +465,9 @@ class PretrainedConfig:
         # Parameters for tensor parallel
         self.tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", -1)
         self.tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
-        # Parameters for sep
+        # Parameters for sep and cp
         self.sep_parallel_degree = kwargs.pop("sep_parallel_degree", -1)
+        self.cp_parallel_degree = kwargs.pop("cp_parallel_degree", -1)
         # If set to True, this option is used with fleet.meta_parallel.ParallelCrossEntropy
         # to calculate cross-entropy loss for parallel model.
         self.tensor_parallel_output = kwargs.pop("tensor_parallel_output", False)

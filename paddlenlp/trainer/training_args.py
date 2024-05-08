@@ -230,6 +230,10 @@ class TrainingArguments:
             The paddle sequence parallel strategy. It can reduce the GPU memory of activation to 1/sep, and it is orthogonal to
             data parallel, sharding stage1, tensor parallel and pipeline parallel strategy.
         )
+        cp_parallel_degree (`int`, *optional*, defaults to `-1`)(
+            The paddle context parallel strategy. It can reduce the GPU memory of activation to 1/cp, and it is orthogonal to
+            data parallel, sharding stage1, tensor parallel and pipeline parallel strategy.
+        )
         data_parallel_config (`str`, *optional*)(
             Some additional configs which affect data parallel performance, we provide some option to config it.
             following config is support:
@@ -583,6 +587,15 @@ class TrainingArguments:
             )
         },
     )
+    cp_parallel_degree: int = field(
+        default=-1,
+        metadata={
+            "help": (
+                "The paddle context parallel strategy. It can reduce the GPU memory of activation to 1/cp, and it is orthogonal to "
+                "data parallel, sharding stage1, tensor parallel and pipeline parallel strategy. "
+            )
+        },
+    )
     data_parallel_config: str = field(
         default="",
         metadata={
@@ -918,6 +931,7 @@ class TrainingArguments:
         if world_size > 1:
             tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
             sep_parallel_degree = max(self.sep_parallel_degree, 1)
+            cp_parallel_degree = max(self.cp_parallel_degree, 1)
             pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
 
             assert (
@@ -927,7 +941,7 @@ class TrainingArguments:
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
                     self.sharding_parallel_degree = world_size // (
-                        tensor_parallel_degree * sep_parallel_degree * pipeline_parallel_degree
+                        tensor_parallel_degree * sep_parallel_degree * cp_parallel_degree * pipeline_parallel_degree
                     )
 
             sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
@@ -936,7 +950,11 @@ class TrainingArguments:
                 self.sharding = []
 
             self.data_parallel_degree = world_size // (
-                sharding_parallel_degree * tensor_parallel_degree * sep_parallel_degree * pipeline_parallel_degree
+                sharding_parallel_degree
+                * tensor_parallel_degree
+                * sep_parallel_degree
+                * cp_parallel_degree
+                * pipeline_parallel_degree
             )
 
             if (
@@ -944,12 +962,14 @@ class TrainingArguments:
                 or tensor_parallel_degree > 1
                 or pipeline_parallel_degree > 1
                 or self.sep_parallel_degree > 1
+                or self.cp_parallel_degree > 1
             ):
                 self.use_hybrid_parallel = True
                 self.sharding_parallel_degree = sharding_parallel_degree
                 self.tensor_parallel_degree = tensor_parallel_degree
                 self.pipeline_parallel_degree = pipeline_parallel_degree
                 self.sep_parallel_degree = sep_parallel_degree
+                self.cp_parallel_degree = cp_parallel_degree
 
             if not self.use_hybrid_parallel:
                 self.sharding = []
@@ -957,6 +977,7 @@ class TrainingArguments:
                 self.tensor_parallel_degree = -1
                 self.pipeline_parallel_degree = -1
                 self.sep_parallel_degree = -1
+                self.cp_parallel_degree = -1
 
         if self.hybrid_parallel_topo_order is None:
             self.hybrid_parallel_topo_order = "pp_first"
@@ -1140,18 +1161,41 @@ class TrainingArguments:
                         logger.warning("segment parallel is not supported!!!, Ignore it.")
                     return support_sep
 
+                def is_context_parallel_supported():
+                    import inspect
+
+                    members = [name for (name, date) in inspect.getmembers(fleet.HybridCommunicateGroup)]
+                    support_cp = "get_cp_parallel_world_size" in members
+                    if not support_cp:
+                        logger.warning("context parallel is not supported!!!, Ignore it.")
+                    return support_cp
+
                 if self.hybrid_parallel_topo_order == "pp_first":
-                    if is_segment_parallel_supported():
+                    if is_context_parallel_supported():
+                        order = ["dp", "pp", "sharding", "sep", "cp", "mp"]
+                    elif is_segment_parallel_supported():
                         order = ["dp", "pp", "sharding", "sep", "mp"]
                     else:
                         order = ["dp", "pp", "sharding", "mp"]
                 if self.hybrid_parallel_topo_order == "sharding_first":
-                    if is_segment_parallel_supported():
+                    if is_context_parallel_supported():
+                        order = ["dp", "sharding", "pp", "sep", "cp", "mp"]
+                    elif is_segment_parallel_supported():
                         order = ["dp", "sharding", "pp", "sep", "mp"]
                     else:
                         order = ["dp", "sharding", "pp", "mp"]
 
-                if is_segment_parallel_supported():
+                if is_context_parallel_supported():
+                    hybrid_configs = {
+                        "dp_degree": self.data_parallel_degree,
+                        "mp_degree": self.tensor_parallel_degree,
+                        "pp_degree": self.pipeline_parallel_degree,
+                        "sharding_degree": self.sharding_parallel_degree,
+                        "sep_degree": self.sep_parallel_degree,
+                        "cp_degree": self.cp_parallel_degree,
+                        "order": order,
+                    }
+                elif is_segment_parallel_supported():
                     hybrid_configs = {
                         "dp_degree": self.data_parallel_degree,
                         "mp_degree": self.tensor_parallel_degree,
@@ -1241,6 +1285,7 @@ class TrainingArguments:
         elif self.enable_auto_parallel:
             self.tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
             self.sep_parallel_degree = max(self.sep_parallel_degree, 1)
+            self.cp_parallel_degree = max(self.cp_parallel_degree, 1)
             self.pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
 
             assert (
@@ -1250,7 +1295,10 @@ class TrainingArguments:
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
                     self.sharding_parallel_degree = world_size // (
-                        self.tensor_parallel_degree * self.sep_parallel_degree * self.pipeline_parallel_degree
+                        self.tensor_parallel_degree
+                        * self.sep_parallel_degree
+                        * self.cp_parallel_degree
+                        * self.pipeline_parallel_degree
                     )
 
             self.sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
@@ -1262,6 +1310,7 @@ class TrainingArguments:
                 self.sharding_parallel_degree
                 * self.tensor_parallel_degree
                 * self.sep_parallel_degree
+                * self.cp_parallel_degree
                 * self.pipeline_parallel_degree
             )
 

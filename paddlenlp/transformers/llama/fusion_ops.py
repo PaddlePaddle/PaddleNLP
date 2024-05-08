@@ -51,14 +51,22 @@ try:
 except:
     flash_attention = None
 
+from paddlenlp.transformers.ring_flash_attention import RingFlashAttention
+from paddlenlp.transformers.context_parallel_utils import split_inputs_sequence_dim_load_balance
 
-def fusion_rope(query_states, key_states, value_states, hidden_states, position_ids, past_key_value, rotary_emb):
+def fusion_rope(query_states, key_states, value_states, hidden_states, position_ids, past_key_value, rotary_emb, cp_parallel_degree=-1):
     if get_env_device() != "gcu":
         assert past_key_value is None, "fuse rotary not support cache kv for now"
     batch_size, seq_length, num_heads, head_dim = query_states.shape
     _, kv_seq_len, num_key_value_heads, _ = key_states.shape
+    if cp_parallel_degree > 1:
+        assert get_env_device() == "gpu", "context parallel only support cuda device for now"
+        kv_seq_len *= cp_parallel_degree
     if get_env_device() != "gcu":
         cos, sin = rotary_emb(value_states, seq_len=kv_seq_len)
+    if cp_parallel_degree > 1:
+        cos = split_inputs_sequence_dim_load_balance(cos)
+        sin = split_inputs_sequence_dim_load_balance(sin)
     if get_env_device() == "npu":
         query_states = core.eager._run_custom_op("fused_rope", query_states, cos, sin)[0]
         key_states = core.eager._run_custom_op("fused_rope", key_states, cos, sin)[0]
@@ -142,6 +150,8 @@ def fusion_flash_attention(
     if version != "0.0.0" and version <= "2.5.2":
         if alibi is not None:
             raise ValueError("Flash Attention doesn't support alibi")
+        if config.cp_parallel_degree > 1:
+            raise ValueError(f"Context parallel is not implemented in version {version}")
         attn_output, attn_weights = flash_attention(
             query_states,
             key_states,
@@ -154,6 +164,8 @@ def fusion_flash_attention(
             alibi = alibi.reshape([bsz, num_heads, 1, -1])
             attention_mask = attention_mask.cast(alibi.dtype) + alibi
         if get_env_device() == "npu":
+            if config.cp_parallel_degree > 1:
+                raise ValueError(f"Context parallel is not implemented for npu")
             attn_output = core.eager._run_custom_op(
                 "flash_attention_npu",
                 query_states,
@@ -168,6 +180,8 @@ def fusion_flash_attention(
                 npu_is_casual,
             )[0]
         elif get_env_device() == "gcu":
+            if config.cp_parallel_degree > 1:
+                raise ValueError(f"Context parallel is not implemented for gcu")
             attn_output = core.eager._run_custom_op(
                 "fused_sdp_flash_attention_gcu",
                 query_states,
@@ -179,13 +193,22 @@ def fusion_flash_attention(
                 True,
             )[0]
         else:
-            attn_output = F.scaled_dot_product_attention(
-                query_states,
-                key_states,
-                value_states,
-                attn_mask=attention_mask,
-                is_causal=attention_mask is None,
-            )
+            if config.cp_parallel_degree > 1:
+                attn_output = RingFlashAttention.apply(
+                    query_states,
+                    key_states,
+                    value_states,
+                    attn_mask=None,
+                    is_causal=True,
+                )
+            else:
+                attn_output = F.scaled_dot_product_attention(
+                    query_states,
+                    key_states,
+                    value_states,
+                    attn_mask=attention_mask,
+                    is_causal=attention_mask is None,
+                )
         attn_weights = None
 
     if reshard_layer is not None:

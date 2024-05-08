@@ -99,6 +99,7 @@ __all__ = [
 ]
 
 
+
 def _get_interleave(n):
     def _get_interleave_power_of_2(n):
         start = 2 ** (-(2 ** -(math.log2(n) - 3)))
@@ -233,6 +234,9 @@ def scaled_dot_product_attention(
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
 
     else:
+        if config.cp_parallel_degree > 1:
+            raise ValueError("Context parallel requires `use_flash_attention=True`")
+
         #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
         query_states = paddle.transpose(query_states, [0, 2, 1, 3])
         # merge with the next tranpose
@@ -765,7 +769,7 @@ class LlamaAttention(nn.Layer):
             assert self.num_key_value_heads % config.sep_parallel_degree == 0
             assert self.num_heads % config.sep_parallel_degree == 0
             self.reshard_layer = ReshardLayer()
-
+        self.context_parallel = config.cp_parallel_degree > 1
         self.config = config
 
     def _init_rope(self):
@@ -932,6 +936,17 @@ class LlamaAttention(nn.Layer):
             if self.reshard_layer is not None:
                 batch_size, seq_length, _, _ = query_states.shape
                 position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
+            if self.context_parallel:
+                batch_size, seq_length, _, _ = query_states.shape
+                group = fleet.get_hybrid_communicate_group().get_cp_parallel_group()
+                chunk_size = seq_length // 2
+                chunk_num = group.nranks * 2
+                rank = group.rank
+                first_chunk_ids = paddle.arange(rank * chunk_size, (rank + 1) * chunk_size, dtype="int64")
+                second_chunk_ids = paddle.arange(
+                    (chunk_num - rank - 1) * chunk_size, (chunk_num - rank) * chunk_size, dtype="int64"
+                )
+                position_ids = paddle.concat([first_chunk_ids, second_chunk_ids]).expand((batch_size, seq_length))
             if self.use_fused_rope:
                 query_states, key_states = fusion_ops.fusion_rope(
                     query_states,
@@ -941,9 +956,12 @@ class LlamaAttention(nn.Layer):
                     position_ids,
                     past_key_value,
                     self.rotary_emb,
+                    self.cp_parallel_degree
                 )
 
             else:
+                if self.context_parallel:
+                    kv_seq_len *= self.config.cp_parallel_degree
                 if self.config.use_long_sequence_strategies:
                     cos, sin = self.rotary_emb(seq_len=kv_seq_len)
                     cos = cos[None, :, None, :]
@@ -1512,6 +1530,8 @@ class LlamaModel(LlamaPretrainedModel):
             # [seq_len * bs / n, num_head * head_dim] (n is mp parallelism)
             inputs_embeds = ScatterOp.apply(inputs_embeds)
 
+        if self.config.cp_parallel_degree > 1 and (attention_mask is not None or self.config.alibi):
+            raise NotImplementedError("Ring FlashAttention dosen't support attention_mask or alibi")
         # embed positions
         if attention_mask is None:
             # [bs, seq_len]
@@ -1657,7 +1677,10 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
 
             if self.config.sep_parallel_degree > 1:
                 _hcg = fleet.get_hybrid_communicate_group()
-                masked_lm_loss = ConcatSePMaskedLoss.apply(masked_lm_loss, axis=1, group=_hcg.get_sep_parallel_group())
+                masked_lm_loss = ConcatMaskedLoss.apply(masked_lm_loss, axis=1, group=_hcg.get_sep_parallel_group())
+            if self.config.cp_parallel_degree > 1:
+                _hcg = fleet.get_hybrid_communicate_group()
+                masked_lm_loss = ConcatMaskedLoss.apply(masked_lm_loss, axis=1, group=_hcg.get_cp_parallel_group())
             # skip ignore_index which loss == 0
             # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
             # loss = paddle.mean(masked_lm_loss)
@@ -1673,7 +1696,7 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         return loss
 
 
-class ConcatSePMaskedLoss(PyLayer):
+class ConcatMaskedLoss(PyLayer):
     @staticmethod
     def forward(ctx, inp, axis, group):
         inputs = []
@@ -1728,6 +1751,9 @@ class LlamaLMHead(nn.Layer):
             if self.config.sep_parallel_degree > 1:
                 assert seq_length % self.config.sep_parallel_degree == 0
                 seq_length = seq_length // self.config.sep_parallel_degree
+            if self.config.cp_parallel_degree > 1:
+                assert seq_length % self.config.cp_parallel_degree == 0
+                seq_length = seq_length // self.config.cp_parallel_degree
             hidden_states = paddle.reshape_(hidden_states, [-1, seq_length, self.config.hidden_size])
 
         if tensor_parallel_output is None:
