@@ -20,6 +20,7 @@ import os
 import warnings
 from functools import partial
 from typing import Optional, Tuple
+import copy
 
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
@@ -1620,7 +1621,7 @@ class LlamaModel(LlamaPretrainedModel):
                 if is_casual and alibi is None:
                     attention_mask = None
             else:
-                npu_is_casual = is_casual
+                npu_is_casual = copy.deepcopy(is_casual)
                 attention_mask = attention_mask.astype("bool")
         hidden_states = inputs_embeds
         # decoder layers
