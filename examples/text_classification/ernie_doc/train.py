@@ -110,7 +110,7 @@ def evaluate(model, metric, data_loader, memories):
         logits, labels, qids = list(map(lambda x: paddle.gather(x, gather_idxs), [logits, labels, qids]))
         # Need to collect probs for each qid, so use softmax_with_cross_entropy
         loss, probs = nn.functional.softmax_with_cross_entropy(logits, labels, return_softmax=True)
-        losses.append(loss.mean().numpy())
+        losses.append(loss.mean().item())
         # Shape: [B, NUM_LABELS]
         np_probs = probs.numpy()
         # Shape: [B, 1]
@@ -337,8 +337,8 @@ def do_train(args):
     )
     # Copy the memory
     memories = create_memory()
-    predict(model, test_dataloader, args.file_path, memories, test_ds.label_list)
-    logger.info("Done Predicting the results has been saved in file: {}".format(args.file_path))
+    predict(model, test_dataloader, args.test_results_file, memories, test_ds.label_list)
+    logger.info("Done Predicting the results has been saved in file: {}".format(args.test_results_file))
 
 
 if __name__ == "__main__":
