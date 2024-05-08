@@ -1653,7 +1653,6 @@ class LlamaModel(LlamaPretrainedModel):
                     past_key_value,
                     use_cache,
                     alibi=alibi,
-                    is_casual,
                 )
             else:
                 layer_outputs = decoder_layer(
