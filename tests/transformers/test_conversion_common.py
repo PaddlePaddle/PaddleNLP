@@ -256,6 +256,3 @@ class TestFuseOrSplit(unittest.TestCase):
 
     def test_model_convert_fast_ffn(self):
         _test_fast_ffn()
-
-if __name__ == "__main__":
-    unittest.main()
