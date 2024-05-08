@@ -110,7 +110,7 @@ def evaluate(model, metric, data_loader, memories):
         logits, labels, qids = list(map(lambda x: paddle.gather(x, gather_idxs), [logits, labels, qids]))
         # Need to collect probs for each qid, so use softmax_with_cross_entropy
         loss, probs = nn.functional.softmax_with_cross_entropy(logits, labels, return_softmax=True)
-        losses.append(loss.mean().item())
+        losses.append(loss.mean().numpy())
         # Shape: [B, NUM_LABELS]
         np_probs = probs.numpy()
         # Shape: [B, 1]
