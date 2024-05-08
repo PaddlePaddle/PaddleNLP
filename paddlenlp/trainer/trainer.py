@@ -2422,6 +2422,7 @@ class Trainer:
             self.runtime_timer.stop()
             return
 
+        logger.info("Loading optimizer and scheduler...")
         if (not self.args.should_load_sharding_stage1_model) and self.args.ignore_load_lr_and_optim:
             self.runtime_timer.stop()
             return

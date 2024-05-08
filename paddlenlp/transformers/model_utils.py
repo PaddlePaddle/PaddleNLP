@@ -109,9 +109,12 @@ def unwrap_optimizer(optimizer, optimizer_instances=()):
 
 if is_safetensors_available():
 
-    from safetensors import safe_open
-    from safetensors.numpy import load_file as safe_load_file
+    # from safetensors import safe_open
+    # from safetensors.numpy import load_file as safe_load_file
     from safetensors.numpy import save_file as safe_save_file
+
+    from paddlenlp.utils.safetensors import fast_load_file as safe_load_file
+    from paddlenlp.utils.safetensors import fast_safe_open as safe_open
 
 
 def prune_linear_layer(layer: nn.Linear, index: paddle.Tensor, dim: int = 0) -> nn.Linear:
@@ -313,7 +316,7 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
 
 
 def load_state_dict(
-    checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None, fliter_dict_keys=None
+    checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None, fliter_dict_keys=None, device="cpu"
 ):
     """
     Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
@@ -346,11 +349,16 @@ def load_state_dict(
                         weight = tensor_parallel_split_mapping[key](py_safe_slice_)
                     else:
                         weight = py_safe_slice_[:]
+                    if device == "expected":
+                        with device_guard():
+                            weight = paddle.Tensor(weight, zero_copy=True)
+                        weight = weight._copy_to(paddle.framework._current_expected_place(), False)
                     state_dict[key] = weight
 
-            for k in list(state_dict.keys()):
-                with device_guard():
-                    state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+            if device == "cpu":
+                for k in list(state_dict.keys()):
+                    with device_guard():
+                        state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
 
             return state_dict
 
@@ -672,8 +680,10 @@ def load_sharded_checkpoint(model, folder, variant=None, strict=True, prefer_saf
     return missing_keys, unexpected_keys
 
 
-def faster_set_state_dict(model, state_dict):
+def faster_set_state_dict(model, state_dict, strict_dtype=True):
     # the state_dict will be destroied.
+    unused_keys = set(state_dict.keys())
+    unset_keys = set(model.state_dict().keys())
     with paddle.no_grad():
         for k, v in model.state_dict().items():
             if k in state_dict:
@@ -683,8 +693,10 @@ def faster_set_state_dict(model, state_dict):
                         f"faster_set_state_dict need state dict with paddle.Tensor, but got {type(v_new)}"
                     )
                 # 2. cast param / Tensor to dtype
+                #
                 if v.dtype != v_new.dtype:
-                    raise ValueError(f"for key: {k}, expect dtype {v.dtype}, but got {v_new.dtype}")
+                    if strict_dtype or (not v.is_floating_point() or not v_new.is_floating_point()):
+                        raise ValueError(f"for key: {k}, expect dtype {v.dtype}, but got {v_new.dtype}")
                 # check shape
                 if list(v.shape) != list(v_new.shape):
                     raise ValueError(f"for key: {k}, expect shape {v.shape}, but got {v_new.shape}")
@@ -700,9 +712,22 @@ def faster_set_state_dict(model, state_dict):
                 else:
                     new_t = v_new
 
+                if not strict_dtype and v.dtype != new_t.dtype:
+                    new_t = new_t.astype(v.dtype)
+
                 # 4. share Tensor to origin param / Tensor
                 src_tensor = new_t.value().get_tensor()
                 dst_tensor._share_data_with(src_tensor)
+                unset_keys.remove(k)
+                unused_keys.remove(k)
+
+    error_msgs = []
+    # if len(unset_keys) > 0:
+    #    error_msgs.append(f"Those weight of model is not initialized: {list(unset_keys)}")
+    if len(unused_keys) > 0:
+        error_msgs.append(f"Those state dict keys are not using in model: {list(unused_keys)}")
+
+    return error_msgs
 
 
 def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
@@ -734,9 +759,8 @@ def _convert_state_dict_dtype_and_shape(state_dict, model_to_load):
     def is_0d_or_1d(tensor):
         return len(tensor.shape) == 0 or list(tensor.shape) == [1]
 
-    expected_place = paddle.framework._current_expected_place()
     for key, value in model_to_load.state_dict().items():
-        if key in state_dict:
+        if key in list(state_dict.keys()):
             if isinstance(state_dict[key], np.ndarray):
                 raise ValueError(
                     "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, plase convert numpy.ndarray to paddle.Tensor"
@@ -744,12 +768,7 @@ def _convert_state_dict_dtype_and_shape(state_dict, model_to_load):
             # confirm parameter cast is executed on the same device as model
             # TODO: cast(FP32 -> FP16) has diff on different devices, need to fix it
             if state_dict[key].is_floating_point() and state_dict[key].dtype != value.dtype:
-                value_pop = state_dict.pop(key)
-                value_new_place = (
-                    value_pop if value_pop.place == expected_place else value_pop._copy_to(expected_place, False)
-                )
-                state_dict[key] = paddle.cast(value_new_place, value.dtype)._copy_to(value_pop.place, False)
-                del value_new_place
+                state_dict[key] = paddle.cast(state_dict.pop(key), value.dtype)
             # unified 0d and 1d tensor
             if is_0d_or_1d(value) and is_0d_or_1d(state_dict[key]):
                 if list(value.shape) != list(state_dict[key].shape):
