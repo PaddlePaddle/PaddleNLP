@@ -1663,7 +1663,7 @@ class LlamaModel(LlamaPretrainedModel):
                     past_key_value,
                     use_cache,
                     alibi=alibi,
-                    is_casual,
+                    npu_is_casual=is_casual,
                 )
 
             # NOTE: clear outdate cache after it has been used for memory saving
