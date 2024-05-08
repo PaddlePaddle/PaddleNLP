@@ -212,6 +212,7 @@ def scaled_dot_product_attention(
     alibi=None,
     sequence_parallel=False,
     reshard_layer=None,
+    npu_is_casual=False,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
@@ -851,6 +852,7 @@ class LlamaAttention(nn.Layer):
         output_attentions: bool = False,
         use_cache: bool = False,
         alibi: Optional[paddle.Tensor] = None,
+        npu_is_casual: bool = False
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
@@ -1066,6 +1068,7 @@ class LlamaAttention(nn.Layer):
                 self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
                 use_reentrant=self.config.recompute_use_reentrant,
+                npu_is_casual=npu_is_casual,
             )
         else:
             outputs = scaled_dot_product_attention(
@@ -1078,6 +1081,7 @@ class LlamaAttention(nn.Layer):
                 alibi,
                 self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
+                npu_is_casual=npu_is_casual,
             )
         if output_attentions:
             attn_output, attn_weights = outputs
@@ -1130,6 +1134,7 @@ class LlamaDecoderLayer(nn.Layer):
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
         alibi: Optional[paddle.Tensor] = None,
+        npu_is_casual: bool = False
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         """
         Args:
@@ -1166,6 +1171,7 @@ class LlamaDecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
+                npu_is_casual=npu_is_casual,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
@@ -1177,6 +1183,7 @@ class LlamaDecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
+                npu_is_casual=npu_is_casual,
             )
 
         if type(outputs) is tuple:
@@ -1614,6 +1621,7 @@ class LlamaModel(LlamaPretrainedModel):
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
+        is_casual = False
         if self.config.use_flash_attention:
             is_casual = is_casual_mask(attention_mask)
             if get_env_device() != "npu":
@@ -1648,6 +1656,7 @@ class LlamaModel(LlamaPretrainedModel):
                     past_key_value,
                     use_cache,
                     alibi=alibi,
+                    npu_is_casual=is_casual,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -1658,6 +1667,7 @@ class LlamaModel(LlamaPretrainedModel):
                     past_key_value,
                     use_cache,
                     alibi=alibi,
+                    npu_is_casual=is_casual,
                 )
 
             # NOTE: clear outdate cache after it has been used for memory saving
