@@ -425,7 +425,7 @@ def do_train(args):
                 lr_scheduler.step()
                 optimizer.clear_grad()
 
-                # NOTE: For accurate data statistics， please open the comments below：
+                # NOTE: For accurate data statistics, please open the comments below，especially when args.logging_steps==1.
                 # if global_step % args.logging_steps == 0:
                 #     loss = loss.numpy()
                 total_samples += args.batch_size
