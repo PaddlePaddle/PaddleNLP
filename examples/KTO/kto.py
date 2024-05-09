@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 from dataclasses import dataclass
 
 from datasets import load_dataset
@@ -23,9 +22,6 @@ from model_config import ModelConfig
 from paddlenlp.peft import LoRAConfig
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
-
-os.environ["https_proxy"] = "http://10.162.37.16:8128"
-os.environ["http_proxy"] = "http://10.162.37.16:8128"
 
 
 # Define and parse arguments.
@@ -60,7 +56,7 @@ if __name__ == "__main__":
 
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-
+    # TODO(wugaosheng) adapt to chattemplte
     # If we are aligning a base model, we use ChatML as the default template
     # if tokenizer.chat_template is None:
     #     model, tokenizer = setup_chat_format(model, tokenizer)
@@ -121,5 +117,3 @@ if __name__ == "__main__":
 
     # Train and push the model to the Hub
     kto_trainer.train()
-
-    # kto_trainer.save_model(kto_args.output_dir)

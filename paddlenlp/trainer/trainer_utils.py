@@ -437,7 +437,6 @@ def get_cosine_schedule_with_warmup(
         progress = float(current_step - num_warmup_steps) / float(max(1, num_training_steps - num_warmup_steps))
         return max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
 
-    print(num_warmup_steps, num_training_steps)
     return LambdaDecay(learning_rate, lr_lambda, last_epoch)
 
 
