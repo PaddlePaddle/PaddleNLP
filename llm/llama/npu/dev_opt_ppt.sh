@@ -18,7 +18,7 @@ set -x
 ps aux | grep run_pretrain.py | grep -v grep | awk '{print $2}' | xargs kill -9
 rm -rf ./log_8.0
 rm -rf output
-export PYTHONPATH=../:$PYTHONPATH
+export PYTHONPATH=../../../:$PYTHONPATH
 export MC2=1
 export GLOG_v=0
 export FLAGS_npu_storage_format=1
