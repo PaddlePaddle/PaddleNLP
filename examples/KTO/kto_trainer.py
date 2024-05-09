@@ -945,7 +945,6 @@ class KTOTrainer(Trainer):
         """Compute the KTO loss and other metrics for the given batch of inputs for train or test."""
         metrics = {}
         batch = {k: (v if isinstance(v, paddle.Tensor) else v) for k, v in batch.items()}
-        # print(batch)
         (
             policy_chosen_logps,
             policy_rejected_logps,
