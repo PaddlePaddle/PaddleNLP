@@ -1287,7 +1287,7 @@ class TrainingArguments:
                         raise ValueError(
                             f"Found unknown sequence parallel config {x}, accpet config is enable_allreduce_avg_in_gradinent_scale."
                         )
-            if "enable_allreduce_avg_in_gradinent_scale" in data_parallel_config:
+            if "enable_allreduce_avg_in_gradinent_scale" in sequence_parallel_config:
                 strategy.gradient_scale_using_allreduce_avg = True
 
             # navie-pp: pipeline_parallel_degree > 1 and gradient_accumulation_steps == 1

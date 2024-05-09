@@ -530,13 +530,15 @@ class LlamaAttentionAuto(nn.Layer):
         else:
             attn_output = outputs
 
+        if self.config.sequence_parallel:
+            attn_output = paddle.transpose(attn_output, [1, 0, 2])
+
         # [bs, q_len, num_head * head_dim]
         attn_output = self.o_proj(attn_output)
 
         # enter sp region
         if self.config.sequence_parallel:
             # [bs, q_len, num_head * head_dim] -> [q_len / n, bs, num_head * head_dim]
-            attn_output = paddle.transpose(attn_output, [1, 0, 2])
             attn_output = dist.reshard(
                 attn_output,
                 get_mesh(self.ipp),
@@ -1001,11 +1003,14 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                 position_ids_input = position_ids
                 attention_mask_input = attention_mask
             else:
-                position_ids_input = dist.reshard(
-                    position_ids,
-                    get_mesh(ipp),
-                    [dist.Replicate(), dist.Replicate()],
-                )
+                if position_ids is not None:
+                    position_ids_input = dist.reshard(
+                        position_ids,
+                        get_mesh(ipp),
+                        [dist.Replicate(), dist.Replicate()],
+                    )
+                else:
+                    position_ids_input = position_ids
                 attention_mask_input = (
                     dist.reshard(
                         attention_mask,
