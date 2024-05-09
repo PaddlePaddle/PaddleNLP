@@ -945,7 +945,7 @@ class KTOTrainer(Trainer):
         """Compute the KTO loss and other metrics for the given batch of inputs for train or test."""
         metrics = {}
         batch = {k: (v if isinstance(v, paddle.Tensor) else v) for k, v in batch.items()}
-
+        # print(batch)
         (
             policy_chosen_logps,
             policy_rejected_logps,
@@ -1069,13 +1069,6 @@ class KTOTrainer(Trainer):
                 drop_last=self.args.dataloader_drop_last,
             )
 
-        # sampler = paddle.io.SequenceSampler(self.train_dataset)
-        # sampler = paddle.io.BatchSampler(sampler=sampler,
-        #                                  shuffle=False,
-        #                                  batch_size=self.args.per_device_train_batch_size* self.args.world_size,
-        #                                  drop_last=self.args.dataloader_drop_last)
-        # return sampler
-
         return DistributedBatchSampler(
             self.train_dataset,
             batch_size=self.args.per_device_train_batch_size,
@@ -1093,9 +1086,9 @@ class KTOTrainer(Trainer):
         generate_context_manager = nullcontext if not self._peft_has_been_casted_to_bf16 else paddle.cuda.amp.autocast
 
         with generate_context_manager():
-            policy_output = model.generate(
-                input_ids=batch["prompt_input_ids"],
-                attention_mask=batch["prompt_attention_mask"],
+            policy_output, _ = model.generate(
+                input_ids=paddle.stack(batch["prompt_input_ids"], axis=0),
+                attention_mask=paddle.stack(batch["prompt_attention_mask"], axis=0),
                 max_length=self.max_length,
                 do_sample=True,
                 pad_token_id=self.tokenizer.pad_token_id,
@@ -1107,22 +1100,21 @@ class KTOTrainer(Trainer):
             else:
                 if self.ref_model is None:
                     with self.null_ref_context():
-                        reference_output = self.model.generate(
-                            input_ids=batch["prompt_input_ids"],
-                            attention_mask=batch["prompt_attention_mask"],
+                        reference_output, _ = self.model.generate(
+                            input_ids=paddle.stack(batch["prompt_input_ids"], axis=0),
+                            attention_mask=paddle.stack(batch["prompt_attention_mask"], axis=0),
                             max_length=self.max_length,
                             do_sample=True,
                             pad_token_id=self.tokenizer.pad_token_id,
                         )
                 else:
-                    reference_output = self.ref_model.generate(
-                        input_ids=batch["prompt_input_ids"],
-                        attention_mask=batch["prompt_attention_mask"],
+                    reference_output, _ = self.ref_model.generate(
+                        input_ids=paddle.stack(batch["prompt_input_ids"], axis=0),
+                        attention_mask=paddle.stack(batch["prompt_attention_mask"], axis=0),
                         max_length=self.max_length,
                         do_sample=True,
                         pad_token_id=self.tokenizer.pad_token_id,
                     )
-
         policy_output = pad_to_length(policy_output, self.max_length, self.tokenizer.pad_token_id)
         policy_output_decoded = self.tokenizer.batch_decode(policy_output, skip_special_tokens=True)
 
@@ -1200,13 +1192,16 @@ class KTOTrainer(Trainer):
             random_batch = self.data_collator(random_batch_dataset)
             random_batch = self._prepare_inputs(random_batch)
 
-            target_indicies = [i for i in range(len(random_batch["kl"])) if random_batch["kl"][i] is False]
+            target_indicies = [i for i in range(len(random_batch["label"])) if random_batch["label"][i] is False]
             target_batch = {
                 "prompt_input_ids": itemgetter(*target_indicies)(random_batch["prompt_input_ids"]),
                 "prompt_attention_mask": itemgetter(*target_indicies)(random_batch["prompt_attention_mask"]),
                 "prompt": itemgetter(*target_indicies)(random_batch["prompt"]),
             }
-            policy_output_decoded, ref_output_decoded = self.get_batch_samples(self.model, target_batch)
+            with paddle.no_grad():
+                self.model.eval()
+                policy_output_decoded, ref_output_decoded = self.get_batch_samples(self.model, target_batch)
+                self.model.train()
 
             self.log(
                 {

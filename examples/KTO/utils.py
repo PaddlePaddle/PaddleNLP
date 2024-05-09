@@ -168,7 +168,7 @@ def pad_to_length(tensor: paddle.Tensor, length: int, pad_value: Union[int, floa
         return paddle.concat(
             [
                 tensor,
-                pad_value * paddle.ones(*pad_size, dtype=tensor.dtype),
+                pad_value * paddle.ones(pad_size, dtype=tensor.dtype),
             ],
             axis=dim,
         )
