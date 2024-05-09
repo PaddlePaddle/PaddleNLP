@@ -187,36 +187,12 @@ class Predictor:
             param, (convert_fun, args) = k, v
             args = [state_dict[name] for name in args]
             value = convert_fun(*args)
-            # non_share_params = []
-            # for arg in args:
-            #     # shared params no need to offload
-            #     if value is not arg:
-            #         non_share_params.append(arg)
-            # print("=" * 20, "name", v[1],
-            #       [(arg.shape, arg.place, arg.dtype) for arg in args],
-            #       value.shape, value.place, value.dtype,
-            #       isinstance(value.place, paddle.CUDAPlace),
-            #       value.place.is_gpu_place())
             if offload_model:
                 for arg in args:
                     # shared params no need to offload
                     if value is not arg:
-                        # arg.to(offload_place, blocking=True)
-                        # cpu_arg = arg.pin_memory()
                         cpu_arg = arg._copy_to(offload_place, blocking=False)
                         cpu_arg._share_buffer_to(arg)
-            #             print("=" * 20, "not share param name", v[1],
-            #                   value.place.is_gpu_place(),
-            #                   value._is_initialized(), param._is_initialized())
-            #         else:
-            #             print("=" * 20, "share param name", v[1],
-            #                   value.place.is_gpu_place(),
-            #                   value._is_initialized(), param._is_initialized())
-            # print("=" * 20, "name", v[1],
-            #       [(arg.shape, arg.place, arg.dtype) for arg in args],
-            #       value.shape, value.place, value.dtype,
-            #       isinstance(value.place, paddle.CUDAPlace),
-            #       value.place.is_gpu_place())
             if not isinstance(value, paddle.Tensor):
                 param.set_value(value)
             # elif isinstance(value.place, paddle.CUDAPlace):
@@ -227,18 +203,7 @@ class Predictor:
                 param.get_tensor()._share_data_with(value.get_tensor())
             else:
                 param.copy_(value, True)
-                # if offload_model:
-                #     if value is not args[0]:
-                #         value._clear_data()
-                #     else:
-                #         value.to(offload_place, blocking=True)
 
-            # if offload_model:
-            #     for param in non_share_params:
-            #         param.to(offload_place, blocking=True)
-        # if offload_model:
-        #     for param in non_share_params:
-        #         param.to(offload_place, blocking=False)
         paddle.device.cuda.synchronize()
 
     def _preprocess(self, source):
@@ -305,9 +270,7 @@ def infer_guard(trainer, offload_model=True):
     if policy_predictor is None:
         policy_predictor = Predictor.create_predictor(trainer)
     if not policy_predictor.is_available:
-        # print("="*20, "enable predictor begin")
         policy_predictor.enable(model, offload_model=offload_model)
-        # print("="*20, "enable predictor end")
 
     # TODO(guosheng): patch for dist.all_recude to use tp group, fix it later
     ori_all_reduce = dist.all_reduce
@@ -342,19 +305,15 @@ class InferEvalModel:
                 self.model,
                 with_offload="train_model" in trainer.args.offload_level,
             )
-            # print("=" * 20, "enable export_evaluate_model")
         else:
             reload_tensor_to_gpu(self.model.state_dict())
-            # print("=" * 20, "enable reload_tensor_to_gpu")
 
     def disable(self):
         trainer = self.trainer
         if trainer.model is not self.model:
             cleanup_tensor_space(self.model.state_dict())
-            # print("=" * 20, "disable cleanup_tensor_space")
         else:
             offload_tensor_to_cpu(self.model.state_dict())
-            # print("=" * 20, "disable offload_tensor_to_cpu")
 
     def __getattr__(self, name):
         try:
@@ -408,7 +367,6 @@ class InferEvalModel:
             #    cache)
             policy_predictor.input_length = input_ids.shape[-1]
             outputs = policy_predictor.predict(prompts)
-        print("=" * 20, "output shape", outputs[0].shape)
 
         if generation_config.trunc_input:
             outputs = (outputs[0][:, policy_predictor.infer_input_length :],)

@@ -17,7 +17,6 @@ import itertools
 import math
 import os
 import time
-import types
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import paddle
@@ -62,7 +61,6 @@ from paddlenlp.trainer.trainer import (
     Trainer,
     TrainerCallback,
     TrainingArguments,
-    check_memory_usage,
     logger,
     speed_metrics,
 )
@@ -535,11 +533,9 @@ class enable(paddle.no_grad.__mro__[1]):
                 obj.enable()
             else:
                 reload_tensor_to_gpu(obj.state_dict())
-                # print("=" * 20, "enable reload_tensor_to_gpu")
         # offload_tensor_to_cpu/reload_tensor_to_gpu use non-blocking copy
         if len(self.objs) > 0:
             paddle.device.cuda.synchronize()
-        check_memory_usage("enable memory")
 
     def __exit__(self, *args):
         for obj in self.objs:
@@ -547,11 +543,9 @@ class enable(paddle.no_grad.__mro__[1]):
                 obj.disable()
             else:
                 offload_tensor_to_cpu(obj.state_dict())
-                # print("=" * 20, "disable offload_tensor_to_cpu")
         # offload_tensor_to_cpu/reload_tensor_to_gpu use non-blocking copy
         if len(self.objs) > 0:
             paddle.device.cuda.synchronize()
-        check_memory_usage("disable memory")
 
 
 class PolicyTrainer(StepTrainer):
@@ -1009,66 +1003,9 @@ class PPOTrainer(Trainer):
             ):
                 # generate batches
                 self.set_eval()
-                # print("=" * 20, "gen data begin")
-
-                # self.optimizer.offload()
-                # if self.args.eval_mode is not None and "optimizer" in self.args.offload_level:
-                #     self.timers and self.timers("offload-optimizer").start()
-                #     offload_tensor_to_cpu(self.policy_trainer.optimizer.state_dict())
-                #     offload_tensor_to_cpu(self.value_trainer.optimizer.state_dict())
-                #     self.timers and self.timers("offload-optimizer").stop()
 
                 with ema(self.policy_trainer), ema(self.value_trainer):
-                    # if self.args.eval_mode is not None:
-                    #     self.timers and self.timers("export-evaluate-model").start()
-
-                    #     self.policy_trainer.export_evaluate_model(
-                    #         self.policy_trainer.model,
-                    #         self._policy_model_eval,
-                    #         with_offload="train_model" in self.args.offload_level,
-                    #     )
-                    #     self.value_trainer.export_evaluate_model(
-                    #         self.value_trainer.model,
-                    #         self._value_model_eval,
-                    #         with_offload="train_model" in self.args.offload_level,
-                    #     )
-                    # gp = (
-                    #     self.policy_trainer._policy_model_eval_group
-                    #     if hasattr(self.policy_trainer, "_policy_model_eval_group")
-                    #     else None
-                    # )
-                    # gp = getattr(self.policy_trainer, "_data_trans_group", None)
-                    # gp = create_data_trans_group(self.args.logical_process_index, paddle.distributed.get_rank(), self._policy_model_eval.config.tensor_parallel_degree)
-                    # # todo: zhui
-                    # self.timers and self.timers("export-evaluate-model").stop()
-
-                    # self.reference_model.reload()
-                    # self.reward_model.reload()
-                    # if "reward" in self.args.offload_level:
-                    #     self.timers and self.timers("reload-reward").start()
-                    #     reload_tensor_to_gpu(self.reference_model.state_dict())
-                    #     reload_tensor_to_gpu(self.reward_model.state_dict())
-                    #     self.timers and self.timers("reload-reward").stop()
-
-                    # TODO(guosheng): guard for data split/merge
-                    # self.timers and self.timers("resplit-data").start()
-                    # prompt_only_batch = data_group_split(prompt_only_batch, group=gp)
-                    # self.timers and self.timers("resplit-data").stop()
-                    # self.timers and self.timers("split-rl-micro-batches").start()
-                    check_memory_usage("split_rl_micro_batches begin memory")
                     rl_batches = self.split_rl_micro_batches(prompt_only_batch)
-                    check_memory_usage("clear_cache split_rl_micro_batches memory")
-                #     self.timers and self.timers("split-rl-micro-batches").stop()
-                # self.timers and self.timers("merge-data").start()
-                # if gp is not None:
-                #     # input_ids_length = rl_batches[0]["input_ids"].shape[-1]
-                #     # rl_batches[0]["input_ids_length"] = paddle.to_tensor(
-                #     #     [input_ids_length] * rl_batches[0]["input_ids"].shape[0], dtype="int64"
-                #     # )
-                #     rl_batches = data_group_merge(rl_batches, group=gp)
-                #     # input_ids_length_batchs = rl_batches[0].pop("input_ids_length")
-                #     # rl_batches[0] = repad_rl_batches(rl_batches[0], input_ids_length_batchs)
-                # self.timers and self.timers("merge-data").stop()
 
                 self.timers and self.timers("ptx-batch").start()
                 if self.use_ptx:
@@ -1077,21 +1014,7 @@ class PPOTrainer(Trainer):
                     ptx_batches = [None for _ in range(len(rl_batches))]
                 self.timers and self.timers("ptx-batch").stop()
 
-                check_memory_usage("gen data memory")
                 paddle.device.cuda.empty_cache()
-                check_memory_usage("clear_cache gen data memory")
-
-                # if self.args.offload_level is not None:
-                #     if self.args.eval_mode is not None and "eval" in self.args.offload_level:
-                #         self.timers and self.timers("offload-eval").start()
-                #         cleanup_tensor_space(self._policy_model_eval.state_dict())
-                #         cleanup_tensor_space(self._value_model_eval.state_dict())
-                #         self.timers and self.timers("offload-eval").stop()
-                #     if "reward" in self.args.offload_level:
-                #         self.timers and self.timers("offload-reward").start()
-                #         offload_tensor_to_cpu(self.reference_model.state_dict())
-                #         offload_tensor_to_cpu(self.reward_model.state_dict())
-                #         self.timers and self.timers("offload-reward").stop()
 
                 self.set_train()
                 for _ in range(self.args.update_iters):
@@ -1229,28 +1152,6 @@ class PPOTrainer(Trainer):
         self._globalstep_last_start_time = start_time
         # self.timers and self.timers("read-data").start()
 
-        policy_opt = self.policy_trainer.optimizer._inner_opt._inner_opt._create_accumulators
-
-        def _policy_opt(self, block, parameters):
-            check_memory_usage("before policy_trainer create accumulators")
-            policy_opt(block, parameters)
-            check_memory_usage("after policy_trainer create accumulators")
-
-        self.policy_trainer.optimizer._inner_opt._inner_opt._create_accumulators = types.MethodType(
-            _policy_opt, self.policy_trainer.optimizer._inner_opt._inner_opt
-        )
-
-        value_opt = self.value_trainer.optimizer._inner_opt._inner_opt._create_accumulators
-
-        def _value_opt(self, block, parameters):
-            check_memory_usage("before value_trainer create accumulators")
-            value_opt(block, parameters)
-            check_memory_usage("after value_trainer create accumulators")
-
-        self.value_trainer.optimizer._inner_opt._inner_opt._create_accumulators = types.MethodType(
-            _value_opt, self.value_trainer.optimizer._inner_opt._inner_opt
-        )
-
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
                 train_dataloader.batch_sampler, DistributedBatchSampler
@@ -1265,31 +1166,14 @@ class PPOTrainer(Trainer):
                 # self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
                 rl_batch, ptx_batch = inputs
                 # TODO(guosheng): make rl_step/ptx_step run with autocast_smart_context_manager
-
-                # policy_model.reload()
-                # value_model.reload()
-                # self.timers and self.timers("offload-reload").start()
-                # reload_tensor_to_gpu(self.actor_model.state_dict())
-                # reload_tensor_to_gpu(self.reward_critic_model.state_dict())
-                # self.timers and self.timers("offload-reload").stop()
-
                 logger.info("Doing rl step...")
                 self.timers and self.timers("rl_step").start()
-                check_memory_usage("startup memory")
                 with self.enable(self.policy_trainer.optimizer):
                     # with self.enable(self.value_trainer.optimizer):
                     with self.enable():
-                        check_memory_usage("startup enable memory")
                         rl_info = self.rl_step(rl_batch)
-                    check_memory_usage("rl_step end memory")
                     paddle.device.cuda.empty_cache()
-                    check_memory_usage("clear_cache rl_step memory")
                     self.timers and self.timers("rl_step").stop()
-
-                    # if "optimizer" in self.args.offload_level:
-                    #     self.timers and self.timers("offload-value-optimizer").start()
-                    #     offload_tensor_to_cpu(self.value_trainer.optimizer.state_dict())
-                    #     self.timers and self.timers("offload-value-optimizer").stop()
 
                     if self.use_ptx:
                         logger.info("Doing ptx step...")
@@ -1297,14 +1181,7 @@ class PPOTrainer(Trainer):
                         ptx_info = self.ptx_step(ptx_batch)
                         rl_info.update(ptx_info)
                         self.timers and self.timers("ptx_step").stop()
-                check_memory_usage("ptx_step end memory")
                 paddle.device.cuda.empty_cache()
-                check_memory_usage("clear_cache ptx_step memory")
-
-                # if "optimizer" in self.args.offload_level:
-                #     self.timers and self.timers("offload-policy-optimizer").start()
-                #     offload_tensor_to_cpu(self.policy_trainer.optimizer.state_dict())
-                #     self.timers and self.timers("offload-policy-optimizer").stop()
 
                 self.state.global_step += 1
                 self.state.epoch = epoch + (step + 1) / steps_in_epoch
@@ -1313,11 +1190,9 @@ class PPOTrainer(Trainer):
                     rl_info = metric.update(rl_info)
                     # on_step_end
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
-                    # print("="*20, "step end")
                 else:
                     # on_sub_step_end
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
-                    # print("=" * 20, "sub step end")
                 self._maybe_log_save_evaluate(rl_info, None, epoch, ignore_keys_for_eval, inputs=inputs)
                 self._print_timer()
 
@@ -1680,8 +1555,8 @@ class PPOTrainer(Trainer):
             reward_attention_mask = reward_tokenize_output["attention_mask"]
             reward_position_ids = make_position_ids(reward_attention_mask)
         else:
-            for text in self.tokenizer.batch_decode(input_ids, skip_special_tokens=True):
-                print(text)
+            # for text in self.tokenizer.batch_decode(input_ids, skip_special_tokens=True):
+            #     print(text)
             reward_input_ids = input_ids
             reward_attention_mask = attention_mask
             reward_position_ids = position_ids
