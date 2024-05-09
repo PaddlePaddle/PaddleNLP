@@ -28,7 +28,7 @@ from argument import (
 from data import get_convert_example
 from utils import (
     CausalLMTrainer,
-    InTokensIterDatasetCallback,
+    ZeroPaddingIterDatasetCallback,
     compute_metrics,
     get_lora_target_modules,
     get_prefix_tuning_params,
@@ -36,7 +36,11 @@ from utils import (
 )
 
 from paddlenlp.data import DataCollatorForSeq2Seq
-from paddlenlp.datasets import InTokensIterableDataset, InTokensMapDataset, load_dataset
+from paddlenlp.datasets import (
+    ZeroPaddingIterableDataset,
+    ZeroPaddingMapDataset,
+    load_dataset,
+)
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
@@ -345,8 +349,8 @@ def main():
         )
         training_args.ignore_data_skip = True
         state = TrainerState.load_from_json(os.path.join(training_args.resume_from_checkpoint, "trainer_state.json"))
-        if state.trial_params is not None and "intokens_global_step" in state.trial_params:
-            consumed_samples = state.trial_params["intokens_global_step"]
+        if state.trial_params is not None and "zero_padding_global_step" in state.trial_params:
+            consumed_samples = state.trial_params["zero_padding_global_step"]
         else:
             consumed_samples = (
                 state.global_step
@@ -375,29 +379,31 @@ def main():
                 "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM and QWen so far."
             )
     train_ds = (
-        train_ds.map(partial(trans_func, is_test=False, intokens=data_args.zero_padding))
+        train_ds.map(partial(trans_func, is_test=False, zero_padding=data_args.zero_padding))
         if train_ds is not None
         else None
     )
     ptq_ds = (
-        ptq_ds.map(partial(trans_func, is_test=False, intokens=data_args.zero_padding)) if ptq_ds is not None else None
+        ptq_ds.map(partial(trans_func, is_test=False, zero_padding=data_args.zero_padding))
+        if ptq_ds is not None
+        else None
     )
-    eval_intokens = data_args.zero_padding
+    eval_zero_padding = data_args.zero_padding
     if data_args.zero_padding and data_args.eval_with_do_generation:
         logger.warning(
             "`zero_padding` conflicts with `eval_with_do_generation`. Setting zero_padding to False for the eval_dataset."
         )
-        eval_intokens = False
+        eval_zero_padding = False
     dev_ds = (
-        dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, intokens=eval_intokens))
+        dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, zero_padding=eval_zero_padding))
         if dev_ds is not None
         else None
     )
     if data_args.zero_padding:
         if data_args.lazy:
-            intoken_dataset = InTokensIterableDataset
+            intoken_dataset = ZeroPaddingIterableDataset
         else:
-            intoken_dataset = InTokensMapDataset
+            intoken_dataset = ZeroPaddingMapDataset
         logger.info("Creating Zero Padding Data Stream. This may take a few minutes.")
         train_ds = (
             intoken_dataset(
@@ -418,7 +424,7 @@ def main():
             else None
         )
 
-        if eval_intokens:
+        if eval_zero_padding:
             dev_ds = (
                 intoken_dataset(
                     dev_ds,
@@ -541,7 +547,7 @@ def main():
             pad_to_multiple_of=data_args.pad_to_multiple_of,
         ),
         do_generation=data_args.eval_with_do_generation,
-        callbacks=[InTokensIterDatasetCallback()] if isinstance(train_ds, InTokensIterableDataset) else None,
+        callbacks=[ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
         gen_args=gen_args,
         data_args=data_args,
     )
@@ -667,7 +673,7 @@ def main():
         )[0]
 
         test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
-        if eval_intokens:
+        if eval_zero_padding:
             test_ds = intoken_dataset(
                 test_ds,
                 tokenizer=tokenizer,

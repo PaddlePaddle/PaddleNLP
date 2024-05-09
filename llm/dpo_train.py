@@ -1,12 +1,26 @@
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """ Training DPO """
 
 import os
 import sys
-
 from functools import partial
-from paddlenlp.datasets import InTokensMapDataset, load_dataset
 
 import paddle
+
+from paddlenlp.datasets import ZeroPaddingMapDataset, load_dataset
 from paddlenlp.trainer import (
     IntervalStrategy,
     PdArgumentParser,
@@ -19,12 +33,12 @@ from paddlenlp.utils.log import logger
 # fmt: off
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
 # isort: on
+from dpo_data import dpo_collate_fn, preprocess_dpo_example
 from dpo_trainer import DPOTrainer
 from dpo_utils import DataArgument, DPOTrainingArguments, ModelArgument
-from dpo_data import process_example, collate_fn
 
 # fmt: on
-#from dpo_estimate_training import dpo_estimate_training
+# from dpo_estimate_training import dpo_estimate_training
 
 
 def main():
@@ -37,7 +51,8 @@ def main():
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
-
+    if training_args.max_steps > 0:
+        training_args.num_train_epochs = 1
     if data_args.autotuner_benchmark:
         training_args.num_train_epochs = 1
         training_args.max_steps = 5
@@ -51,7 +66,6 @@ def main():
         training_args.save_strategy = IntervalStrategy.NO
         training_args.evaluation_strategy = IntervalStrategy.NO
     if data_args.dpo_benchmark:
-        training_args.max_steps = -1
         training_args.do_train = True
         training_args.do_export = False
         training_args.do_predict = False
@@ -63,7 +77,6 @@ def main():
         training_args.evaluation_strategy = IntervalStrategy.NO
 
     paddle.set_device(training_args.device)
-
     set_seed(training_args.seed)
 
     logger.warning(
@@ -89,8 +102,7 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
-    logger.info("Start to load model ...")
-
+    logger.info("Start to load model & tokenizer.")
     model_kwargs = dict(
         pretrained_model_name_or_path=model_args.model_name_or_path,
         dtype=dtype,
@@ -101,99 +113,69 @@ def main():
         tensor_parallel_output=True,
     )
     if training_args.pipeline_parallel_degree > 1:
-        raise ValueError(
-            "DPO does not support pipeline parallelism yet."
-        )
+        raise ValueError("DPO does not support pipeline parallelism yet.")
 
-    model_class = AutoModelForCausalLM
-
-    if not data_args.autotuner_benchmark and not data_args.dpo_benchmark:
-        ref_model = model_class.from_pretrained(**model_kwargs)
+    if not data_args.autotuner_benchmark:
+        ref_model = AutoModelForCausalLM.from_pretrained(**model_kwargs)
         config = AutoConfig.from_pretrained(**model_kwargs)
-        config.use_recompute = training_args.recompute
-        model = model_class.from_config(config, dtype=dtype)
+        model = AutoModelForCausalLM.from_config(config, dtype=dtype)
         model.set_state_dict(ref_model.state_dict())
     else:
         config = AutoConfig.from_pretrained(**model_kwargs)
-        model = model_class.from_config(config, dtype=dtype)
-        ref_model = model_class.from_config(config, dtype=dtype)
+        model = AutoModelForCausalLM.from_config(config, dtype=dtype)
+        ref_model = AutoModelForCausalLM.from_config(config, dtype=dtype)
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     logger.info("Loading model & tokenizer successfully !")
 
-    logger.info("Start to create dataset ...")
-        
-    if not data_args.autotuner_benchmark and training_args.max_steps == -1:
-        if paddle.distributed.get_world_size() > 1:
-            paddle.distributed.barrier()
-            pd_max_steps = paddle.to_tensor([training_args.max_steps])
-            paddle.distributed.broadcast(pd_max_steps, src=0)
-            training_args.max_steps = int(pd_max_steps.item())
-        logger.info(
-                f"Re-setting training_args.max_steps to {training_args.max_steps} ({training_args.num_train_epochs})"
-            )
-    if training_args.save_strategy == IntervalStrategy.EPOCH:
-        training_args.save_strategy = IntervalStrategy.STEPS
-        training_args.save_steps = int(training_args.max_steps / training_args.num_train_epochs)
-    if training_args.evaluation_strategy == IntervalStrategy.EPOCH:
-        training_args.evaluation_strategy = IntervalStrategy.STEPS
-        training_args.eval_steps = int(training_args.max_steps / training_args.num_train_epochs)
-    if training_args.logging_strategy == IntervalStrategy.EPOCH:
-        training_args.logging_strategy = IntervalStrategy.STEPS
-        training_args.logging_steps = int(training_args.max_steps / training_args.num_train_epochs)
-
-    trans_func = partial(process_example, tokenizer=tokenizer, data_args=data_args)
-    intoken_dataset = InTokensMapDataset
-    if training_args.should_load_dataset:
-        if data_args.dataset_name_or_path is None or not os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")):
-            raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
-
-        logger.info("Creating Zero Padding Data Stream. This may take a few minutes.")
+    logger.info("Start to create dataset")
+    logger.info("Creating Zero Padding Data Stream. This may take a few minutes.")
+    trans_func = partial(preprocess_dpo_example, tokenizer=tokenizer, data_args=data_args, model_args=model_args)
+    if training_args.do_train and training_args.should_load_dataset:
         train_ds = load_dataset(
             "json",
             data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
         )[0]
         train_ds = (
-            intoken_dataset(
+            ZeroPaddingMapDataset(
                 train_ds.map(trans_func),
                 tokenizer=tokenizer,
-                max_length=data_args.max_seq_length,
+                max_length=data_args.max_seq_len,
             )
             if train_ds is not None
             else None
         )
+    else:
+        train_ds = None
 
     if training_args.do_eval and training_args.should_load_dataset:
-        if data_args.dataset_name_or_path is None or not os.path.exists(os.path.join(data_args.dataset_name_or_path, "dev.json")):
-            raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
-
         eval_ds = load_dataset(
             "json",
             data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
         )[0]
         eval_ds = (
-            intoken_dataset(
+            ZeroPaddingMapDataset(
                 eval_ds.map(trans_func),
                 tokenizer=tokenizer,
-                max_length=data_args.max_seq_length,
+                max_length=data_args.max_seq_len,
             )
             if eval_ds is not None
             else None
         )
-
+    else:
+        eval_ds = None
     logger.info("Creating dataset successfully ...")
 
     trainer = DPOTrainer(
         model=model,
         ref_model=ref_model,
         args=training_args,
-        train_dataset=train_ds if training_args.do_train and training_args.should_load_dataset else None,
-        eval_dataset=eval_ds if training_args.do_eval and training_args.should_load_dataset else None,
+        train_dataset=train_ds,
+        eval_dataset=eval_ds,
         tokenizer=tokenizer,
         data_collator=partial(
-            collate_fn,
-            tokenizer=tokenizer,
-            max_seq_length=data_args.max_seq_length,
+            dpo_collate_fn,
+            max_seq_len=data_args.max_seq_len,
         ),
     )
 
@@ -205,6 +187,8 @@ def main():
             trainer.log_metrics("train", train_result.metrics)
             trainer.save_metrics("train", train_result.metrics)
             trainer.save_state()
+        if data_args.dpo_benchmark:
+            logger.info("effecient token count:")
 
     if training_args.do_eval:
         eval_result = trainer.evaluate()
@@ -213,5 +197,4 @@ def main():
 
 
 if __name__ == "__main__":
-    with paddle.amp.auto_cast(enable=False):
-        main()
+    main()

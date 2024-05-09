@@ -14,7 +14,7 @@
     "save_strategy": "steps",
     "eval_steps": 100,
     "save_steps": 500,
-    "max_seq_length": 2048,
+    "max_seq_len": 2048,
     "max_prompt_len": 1024,
     "bf16": true,
     "fp16_opt_level": "O2",
@@ -22,7 +22,6 @@
     "do_eval": true,
     "disable_tqdm": true,
     "load_best_model_at_end": true,
-    "tensor_parallel_degree": 8,
-    "use_flash_attention": true,
-    "metric_for_best_model": "eval_loss"
+    "tensor_parallel_degree": 1,
+    "use_flash_attention": true
   }

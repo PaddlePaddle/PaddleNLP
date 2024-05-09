@@ -17,11 +17,9 @@ from paddle.io import Dataset, IterableDataset
 from scipy.linalg import block_diag
 
 
-class InTokens:
-    required_input_keys = ["input_ids", "labels"]
-    dpo_required_input_keys = ["chosen_labels", "rejected_labels"]
+class ZeroPadding:
     required_output_keys = ["input_ids", "labels", "attention_mask"]
-    # Only supported the following keys for InTokens. Keys outside of the set will be ignored.
+    # Only supported the following keys for ZeroPadding. Keys outside of the set will be ignored.
     supported_input_keys = [
         "input_ids",
         "labels",
@@ -29,19 +27,16 @@ class InTokens:
         "position_ids",
         "chosen_labels",
         "rejected_labels",
-        "response_index",
+        "response_indexs",
+        "attn_mask_start_row_indices",
     ]
 
     @classmethod
     def _pad_batch_records(cls, batch_records):
         # Only consider supported input keys
         input_keys = [key for key in batch_records[0].keys() if key in cls.supported_input_keys]
-
-        # Output features must include all required output keys
-        for key in cls.required_output_keys:
-            if key not in input_keys:
-                input_keys.append(key)
-
+        if "attn_mask_start_row_indices" not in input_keys and "attention_mask" not in input_keys:
+            input_keys.append("attention_mask")
         batched_features = {key: [] for key in input_keys}
         sequence_sum = 0
         for record in batch_records:
@@ -51,40 +46,46 @@ class InTokens:
             elif "rejected_labels" in input_keys and "chosen_labels" in input_keys:
                 batched_features["rejected_labels"].extend(record["rejected_labels"])
                 batched_features["chosen_labels"].extend(record["chosen_labels"])
-                response_index = [
-                    record["response_index"][0] + sequence_sum,  # chosen_response_start_index
-                    record["response_index"][1] + sequence_sum,  # rejeted_response_start_index
-                    record["response_index"][2] + sequence_sum,  # rejeted_response_end_index + 1
+                response_indexs = [
+                    record["response_indexs"][0] + sequence_sum,  # chosen_response_start_index
+                    record["response_indexs"][1] + sequence_sum,  # rejeted_response_start_index
+                    record["response_indexs"][2] + sequence_sum,  # rejeted_response_end_index + 1
                 ]
-                batched_features["response_index"].append(response_index)
-                sequence_sum += len(record["input_ids"])
+                batched_features["response_indexs"].append(response_indexs)
             else:
-                raise ValueError("labels is required for InTokensDataset")
+                raise ValueError("labels is required for ZeroPadding Dataset")
 
             seq_length = len(record["input_ids"])
             # If attention_mask is not given, assume it's causal mask
-            attention_mask = record.get("attention_mask", np.tril(np.ones([seq_length, seq_length], dtype=bool)))
-            batched_features["attention_mask"].append(attention_mask)
+            if "attn_mask_start_row_indices" in record:
+                attn_mask_start_row_indices = [i + sequence_sum for i in record["attn_mask_start_row_indices"]]
+                batched_features["attn_mask_start_row_indices"].extend(attn_mask_start_row_indices)
+            else:
+                attention_mask = record.get("attention_mask", np.tril(np.ones([seq_length, seq_length], dtype=bool)))
+                batched_features["attention_mask"].append(attention_mask)
             # NOTE: position_ids is optional and not required by every model
             # We append instead of extend here to accomodate 2D position ids
             if "position_ids" in record:
                 batched_features["position_ids"].append(record["position_ids"])
-        block_attention_mask = block_diag(*batched_features["attention_mask"])
-        # convert to 3-D [batch_size(1), seq_length, seq_length]
-        batched_features["attention_mask"] = np.expand_dims(block_attention_mask, axis=0)
+            sequence_sum += len(record["input_ids"])
+
+        if "attention_mask" in batched_features:
+            block_attention_mask = block_diag(*batched_features["attention_mask"])
+            # convert to 3-D [batch_size(1), seq_length, seq_length]
+            batched_features["attention_mask"] = np.expand_dims(block_attention_mask, axis=0)
         if "position_ids" in batched_features:
             # Accomodate both 1D and 2D position ids
             batched_features["position_ids"] = np.concatenate(batched_features["position_ids"], axis=-1).tolist()
         return batched_features
 
 
-class InTokensMapDataset(InTokens, Dataset):
+class ZeroPaddingMapDataset(ZeroPadding, Dataset):
     def __init__(self, data, tokenizer, max_length):
         self.tokenizer = tokenizer
         self.max_length = max_length
-        self.new_data = self._create_intokens_data(data)
+        self.new_data = self._create_zero_padding_data(data)
 
-    def _create_intokens_data(self, data):
+    def _create_zero_padding_data(self, data):
         batch_records, max_len = [], 0
         cur_len_so_far = 0
 
@@ -120,12 +121,12 @@ class InTokensMapDataset(InTokens, Dataset):
         return len(self.new_data)
 
 
-class InTokensIterableDataset(InTokens, IterableDataset):
+class ZeroPaddingIterableDataset(ZeroPadding, IterableDataset):
     def __init__(self, data, tokenizer, max_length):
         self.data = data
         self.tokenizer = tokenizer
         self.max_length = max_length
-        self.intokens_global_step = 0
+        self.zero_padding_global_step = 0
 
     def __iter__(self):
         batch_records, max_len = [], 0
@@ -135,7 +136,7 @@ class InTokensIterableDataset(InTokens, IterableDataset):
             to_append = (cur_len_so_far + len(record["input_ids"])) <= self.max_length
             if to_append:
                 batch_records.append(record)
-                self.intokens_global_step += 1
+                self.zero_padding_global_step += 1
                 cur_len_so_far += len(record["input_ids"])
             else:
                 # exceed max length
