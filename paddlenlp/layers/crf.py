@@ -303,7 +303,7 @@ class ViterbiDecoder(nn.Layer):
         if with_start_stop_tag:
             self.start_idx = -1
             self.stop_idx = -2
-        self.num_tags = paddle.shape(transitions)[0]
+        self.num_tags = transitions.shape[0]
 
         self._initial_alpha = None
         self._index = None
@@ -312,7 +312,7 @@ class ViterbiDecoder(nn.Layer):
 
     def _initialize_alpha(self, batch_size):
         # alpha accumulate the path value to get the different next tag
-        if self._initial_alpha is None or batch_size > paddle.shape(self._initial_alpha)[0]:
+        if self._initial_alpha is None or batch_size > self._initial_alpha.shape[0]:
             # Initialized by a small value.
             initial_alpha = paddle.full([batch_size, self.num_tags - 1], dtype="float32", fill_value=-10000.0)
             # alpha_start fill_value = 0. > -10000., means the first one step START gets the most score.
@@ -336,7 +336,7 @@ class ViterbiDecoder(nn.Layer):
             The `paths` tensor containing the highest scoring tag indices.
             Its dtype is int64 and has a shape of `[batch_size, sequence_length]`.
         """
-        input_shape = paddle.shape(inputs)
+        input_shape = inputs.shape
         batch_size = input_shape[0]
         n_label = input_shape[2]
 
@@ -412,6 +412,6 @@ class ViterbiDecoder(nn.Layer):
         return scores, batch_path
 
     def _get_batch_index(self, batch_size):
-        if self._batch_index is None or batch_size != paddle.shape(self._batch_index)[0]:
+        if self._batch_index is None or batch_size != self._batch_index.shape[0]:
             self._batch_index = paddle.arange(end=batch_size, dtype="int64")
         return self._batch_index

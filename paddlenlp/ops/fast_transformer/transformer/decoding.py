@@ -2572,7 +2572,7 @@ class InferTransformerDecoding(nn.Layer):
                     memory_seq_lens, self._beam_size
                 )
             else:
-                enc_output_shape = paddle.shape(enc_output)
+                enc_output_shape = enc_output.shape
                 batch_size = enc_output_shape[0]
                 max_seq_len = enc_output_shape[1]
                 enc_output = enc_output.unsqueeze([1])
@@ -2995,7 +2995,7 @@ class InferOptDecoding(nn.Layer):
         temperature=1,
     ):
         if attention_mask is None:
-            batch_size = paddle.shape(input_ids)[0]
+            batch_size = input_ids.shape[0]
             attention_mask = paddle.tril(
                 paddle.ones(
                     [batch_size, mem_seq_len, mem_seq_len], dtype="float16" if self.use_fp16_decoding else "float32"
@@ -3042,7 +3042,7 @@ class InferOptDecoding(nn.Layer):
             use_fp16_decoding=self.use_fp16_decoding,
         )
 
-        output_ids = output_ids[paddle.shape(input_ids)[-1] :, :]
+        output_ids = output_ids[input_ids.shape[-1] :, :]
         if forced_eos_token_id is not None:
             output_ids[:, -1] = forced_eos_token_id
         return output_ids
@@ -3100,7 +3100,7 @@ class InferGptDecoding(nn.Layer):
         temperature=1,
     ):
         if attention_mask is None:
-            batch_size = paddle.shape(input_ids)[0]
+            batch_size = input_ids.shape[0]
             attention_mask = paddle.tril(
                 paddle.ones(
                     [batch_size, paddle.max(mem_seq_len), paddle.max(mem_seq_len)],
@@ -3147,7 +3147,7 @@ class InferGptDecoding(nn.Layer):
             use_fp16_decoding=self.use_fp16_decoding,
         )
 
-        output_ids = output_ids[paddle.shape(input_ids)[-1] :, :]
+        output_ids = output_ids[input_ids.shape[-1] :, :]
         if forced_eos_token_id is not None:
             output_ids[:, -1] = forced_eos_token_id
         return output_ids
@@ -4117,7 +4117,7 @@ class InferGptJDecoding(nn.Layer):
         min_length=0,
     ):
         if attention_mask is None:
-            batch_size, input_length = paddle.shape(input_ids)
+            batch_size, input_length = input_ids.shape
             attention_mask = paddle.unsqueeze((input_ids != pad_token_id).astype("float32"), axis=[1])
             causal_mask = paddle.tril(paddle.ones([batch_size, input_length, input_length], dtype="float32"))
             attention_mask = paddle.logical_and(attention_mask, causal_mask)
@@ -4161,7 +4161,7 @@ class InferGptJDecoding(nn.Layer):
             use_fp16_decoding=self.use_fp16_decoding,
         )
 
-        output_ids = output_ids[paddle.shape(input_ids)[-1] :, :]
+        output_ids = output_ids[input_ids.shape[-1] :, :]
         if forced_eos_token_id is not None:
             output_ids[:, -1] = forced_eos_token_id
         return output_ids

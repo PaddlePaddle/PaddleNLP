@@ -155,10 +155,11 @@ def uninstall_package(package_name: str, module_name: Optional[str] = None):
     """
     module_name = module_name or package_name
     for site_package_dir in site.getsitepackages():
-        for file in os.listdir(site_package_dir):
-            package_dir = os.path.join(site_package_dir, file)
-            if file.startswith(package_name) and os.path.isdir(package_dir):
-                shutil.rmtree(package_dir)
+        if os.path.exists(site_package_dir):
+            for file in os.listdir(site_package_dir):
+                package_dir = os.path.join(site_package_dir, file)
+                if file.startswith(package_name) and os.path.isdir(package_dir):
+                    shutil.rmtree(package_dir)
 
     for site_package_dir in site.getsitepackages():
         while sys.path[0] == site_package_dir:

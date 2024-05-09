@@ -56,6 +56,7 @@ class AddedToken:
     lstrip: bool = False
     rstrip: bool = False
     normalized: bool = True
+    special: bool = True
 
     def __getstate__(self):
         return self.__dict__
@@ -1574,6 +1575,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         # TODO(guosheng): avoid reduplication of position args and key word args
         tokenizer = cls(*init_args, **init_kwargs)
+        chat_template = init_kwargs.pop("chat_template", None)
+        if chat_template is not None:
+            tokenizer.init_chat_template(chat_template)
         special_tokens_map_file = resolved_vocab_files.pop("special_tokens_map_file", None)
         if special_tokens_map_file is not None:
             with open(special_tokens_map_file, encoding="utf-8") as special_tokens_map_handle:
