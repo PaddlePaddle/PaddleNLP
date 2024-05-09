@@ -511,7 +511,7 @@ class GenerationMixin(object):
     def update_scores_for_generation(scores, next_scores, length, unfinished_flag):
         # update scores
 
-        unfinished_scores = (scores * length + next_scores) / (length + 1)
+        unfinished_scores = (scores * length.astype(scores.dtype) + next_scores) / (length + 1).astype(scores.dtype)
         scores = paddle.where(unfinished_flag, unfinished_scores, scores)
         return scores
 
