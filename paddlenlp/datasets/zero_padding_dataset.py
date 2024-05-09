@@ -82,6 +82,11 @@ class ZeroPadding:
 class ZeroPaddingMapDataset(ZeroPadding, Dataset):
     def __init__(self, data, tokenizer, max_length):
         self.tokenizer = tokenizer
+        if self.tokenizer.padding_side == "right":
+            raise ValueError(
+                "ZeroPaddingMapDataset only supports left padding. Please set "
+                "`padding_side` to `left` in your tokenizer."
+            )
         self.max_length = max_length
         self.new_data = self._create_zero_padding_data(data)
 
@@ -123,10 +128,16 @@ class ZeroPaddingMapDataset(ZeroPadding, Dataset):
 
 class ZeroPaddingIterableDataset(ZeroPadding, IterableDataset):
     def __init__(self, data, tokenizer, max_length):
+
         self.data = data
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.zero_padding_global_step = 0
+        if self.tokenizer.padding_side == "right":
+            raise ValueError(
+                "ZeroPaddingMapDataset only supports left padding. Please set "
+                "`padding_side` to `left` in your tokenizer."
+            )
 
     def __iter__(self):
         batch_records, max_len = [], 0

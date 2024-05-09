@@ -16,6 +16,7 @@
 
 import os
 import sys
+import time
 from functools import partial
 
 import paddle
@@ -35,7 +36,12 @@ from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, AutoConf
 # isort: on
 from dpo_data import dpo_collate_fn, preprocess_dpo_example
 from dpo_trainer import DPOTrainer
-from dpo_utils import DataArgument, DPOTrainingArguments, ModelArgument
+from dpo_utils import (
+    DataArgument,
+    DPOTrainingArguments,
+    ModelArgument,
+    calculate_effective_tokens,
+)
 
 # fmt: on
 # from dpo_estimate_training import dpo_estimate_training
@@ -188,7 +194,27 @@ def main():
             trainer.save_metrics("train", train_result.metrics)
             trainer.save_state()
         if data_args.dpo_benchmark:
-            logger.info("effecient token count:")
+            total_effective_tokens, total_tokens = calculate_effective_tokens(
+                training_args, train_ds, data_args.max_seq_len
+            )
+            effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
+            total_tokens_per_second = total_tokens / train_result.metrics["train_runtime"]
+            effective_ratio = 100 * total_effective_tokens / total_tokens
+            logger.info(
+                "[timelog] {}: {:.2f} % ({}) ".format(
+                    "Effective ratio", effective_ratio, time.strftime("%Y-%m-%d %H:%M:%S")
+                )
+            )
+            logger.info(
+                "[timelog] {}: {:.2f} token/s ({}) ".format(
+                    "Effective tokens per second", effective_tokens_per_second, time.strftime("%Y-%m-%d %H:%M:%S")
+                )
+            )
+            logger.info(
+                "[timelog] {}: {:.2f} token/s ({}) ".format(
+                    "Tokens per second", total_tokens_per_second, time.strftime("%Y-%m-%d %H:%M:%S")
+                )
+            )
 
     if training_args.do_eval:
         eval_result = trainer.evaluate()

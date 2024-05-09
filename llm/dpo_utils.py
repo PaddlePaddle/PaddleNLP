@@ -70,3 +70,33 @@ class ModelArgument:
     use_attn_mask_start_row_indices: bool = field(
         default=False, metadata={"help": "Whether to use attn_mask_start_row_indices in flash attention."}
     )
+
+
+def calculate_effective_tokens(training_args, train_dataset, max_seq_len):
+    """
+    Caculate the effective tokens during training.
+    """
+    total_effective_tokens = 0
+    try:
+        data_parallel_degree = training_args.data_parallel_degree
+    except:
+        data_parallel_degree = 1
+    if training_args.sharding_parallel_degree > 1:
+        sharding_parallel_degree = training_args.sharding_parallel_degree
+    else:
+        sharding_parallel_degree = 1
+
+    total_batch = (
+        training_args.max_steps
+        * training_args.per_device_train_batch_size
+        * training_args.gradient_accumulation_steps
+        * sharding_parallel_degree
+        * data_parallel_degree
+    )
+    for i, data in enumerate(train_dataset):
+        if i == total_batch:
+            break
+        total_effective_tokens += len(data["input_ids"])
+    total_tokens = total_batch * max_seq_len
+
+    return total_effective_tokens, total_tokens
