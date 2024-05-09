@@ -32,7 +32,7 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 export HCCL_OP_BASE_FFTS_MODE_ENABLE=TRUE
 export MULTI_STREAM_MEMORY_REUSE=1
 
-export PYTHONPATH=../../:$PYTHONPATH
+export PYTHONPATH=../../../:$PYTHONPATH
 rm -rf sft_bf16_llama_N1C8
 rm -rf output/sft_bf16_llama_N1C8
 ps aux | grep "train.py" | grep -v grep | awk '{print $2}' | xargs kill -9
@@ -40,7 +40,7 @@ ps aux | grep "run_pretrain.py" | grep -v grep | awk '{print $2}' | xargs kill -
 python -u  -m paddle.distributed.launch \
     --devices "0,1,2,3,4,5,6,7" \
     --log_dir "./sft_bf16_llama_N1C8" \
-    ../finetune_generation.py \
+    ../../finetune_generation.py \
     --device "npu" \
     --model_name_or_path "meta-llama/Llama-2-13b" \
     --dataset_name_or_path "data/" \
