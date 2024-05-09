@@ -40,7 +40,8 @@ class DPOTrainingArguments(TrainingArguments):
 class DataArgument:
     """DataArgument"""
 
-    dataset_name_or_path: str = field(default="./data/", metadata={"help": "Path to the dataset dir."})
+    train_dataset_path: str = field(default="./data/train.jsonl", metadata={"help": "Path to the train dataset dir."})
+    dev_dataset_path: str = field(default="./data/dev.jsonl", metadata={"help": "Path to the dev dataset dir."})
     max_seq_len: int = field(default=4096, metadata={"help": "Maximum sequence length."})
     max_prompt_len: int = field(default=2048, metadata={"help": "Maximum prompt length."})
     autotuner_benchmark: bool = field(

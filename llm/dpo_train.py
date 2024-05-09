@@ -140,7 +140,7 @@ def main():
     if training_args.do_train and training_args.should_load_dataset:
         train_ds = load_dataset(
             "json",
-            data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
+            data_files=data_args.train_dataset_path,
         )[0]
         train_ds = (
             ZeroPaddingMapDataset(
@@ -157,7 +157,7 @@ def main():
     if training_args.do_eval and training_args.should_load_dataset:
         eval_ds = load_dataset(
             "json",
-            data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
+            data_files=data_args.dev_dataset_path,
         )[0]
         eval_ds = (
             ZeroPaddingMapDataset(
