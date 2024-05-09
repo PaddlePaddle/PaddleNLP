@@ -42,7 +42,7 @@ rm -rf lora_bf16_llama_N1C8
 rm -rf output/lora_bf16_llama_N1C8
 ps aux | grep "train.py" | grep -v grep | awk '{print $2}' | xargs kill -9
 ps aux | grep "run_pretrain.py" | grep -v grep | awk '{print $2}' | xargs kill -9
-export PYTHONPATH=../../:$PYTHONPATH
+export PYTHONPATH=../../../:$PYTHONPATH
 python -u  -m paddle.distributed.launch \
     --devices "0,1,2,3,4,5,6,7" \
     --log_dir "./lora_bf16_llama_N1C8" \
