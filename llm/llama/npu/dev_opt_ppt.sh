@@ -40,7 +40,7 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
 python -u  -m paddle.distributed.launch \
     --log_dir "./log_8.0" \
-    run_pretrain.py \
+    ../run_pretrain.py \
     --model_name_or_path "meta-llama/Llama-2-13b" \
     --tokenizer_name_or_path "meta-llama/Llama-2-13b" \
     --input_dir "./pre-data" \
