@@ -510,8 +510,10 @@ class GenerationMixin(object):
     @staticmethod
     def update_scores_for_generation(scores, next_scores, length, unfinished_flag):
         # update scores
+        if not isinstance(length, int):
+            length = paddle.cast(length, scores.dtype)
 
-        unfinished_scores = (scores * length.astype(scores.dtype) + next_scores) / (length + 1).astype(scores.dtype)
+        unfinished_scores = (scores * length + next_scores) / (length + 1)
         scores = paddle.where(unfinished_flag, unfinished_scores, scores)
         return scores
 
