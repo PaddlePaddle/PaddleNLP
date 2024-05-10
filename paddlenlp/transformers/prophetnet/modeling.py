@@ -71,12 +71,9 @@ def compute_relative_buckets(num_buckets, max_distance, relative_positions, is_b
         )
         inv_relative_positions = paddle.abs(inv_relative_positions)
     else:
-        inv_relative_positions = (
-            paddle.cast(
-                paddle.less_than(paddle.zeros_like(inv_relative_positions), inv_relative_positions), dtype=paddle.int32
-            )
-            * inv_relative_positions
-        )
+        inv_relative_positions = paddle.cast(
+            paddle.less_than(paddle.zeros_like(inv_relative_positions), inv_relative_positions), dtype=paddle.int32
+        ) * inv_relative_positions.astype(paddle.int32)
 
     max_exact = num_buckets // 2
     is_small = paddle.less_than(inv_relative_positions, paddle.to_tensor(max_exact).cast(dtype=paddle.int32))
