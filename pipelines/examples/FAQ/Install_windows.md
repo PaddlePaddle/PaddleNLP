@@ -58,7 +58,7 @@ xpack.security.enabled: false
 #### 1.4.2 文档数据写入 ANN 索引库
 ```
 # 以DuReader-Robust 数据集为例建立 ANN 索引库
-python utils/offline_ann.py --index_name insurance --doc_dir data/insurance --split_answers --delete_index
+python utils/offline_ann.py --index_name insurance --doc_dir data/insurance --split_answers --delete_index --query_embedding_model rocketqa-zh-nano-query-encoder --passage_embedding_model rocketqa-zh-nano-para-encoder --embedding_dim 312
 ```
 参数含义说明
 * `index_name`: 索引的名称
@@ -71,6 +71,9 @@ python utils/offline_ann.py --index_name insurance --doc_dir data/insurance --sp
 运行结束后，可使用Kibana查看数据
 
 #### 1.4.3 启动 RestAPI 模型服务
+
+**注意** dense_faq.yaml里面的检索模型需要与前面使用offline_ann.py建库的时候使用的检索模型一致
+
 ```bash
 # 指定FAQ智能问答系统的Yaml配置文件
 $env:PIPELINE_YAML_PATH='rest_api/pipeline/dense_faq.yaml'

@@ -118,6 +118,15 @@ def _test_bloom():
     common_test_merge(model, BloomForCausalLM)
 
 
+def _test_gemma():
+    from paddlenlp.transformers import GemmaConfig, GemmaForCausalLM
+
+    config = GemmaConfig()
+    config = prepare_config(config)
+    model = GemmaForCausalLM.from_config(config)
+    common_test_merge(model, GemmaForCausalLM)
+
+
 # _test_llama()
 # _test_chatglm()
 # _test_bloom()
@@ -129,3 +138,4 @@ class TestTensorParallel(unittest.TestCase):
         _test_llama()
         _test_chatglm()
         _test_bloom()
+        _test_gemma()

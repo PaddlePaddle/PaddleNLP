@@ -19,9 +19,13 @@ from paddle.distributed.fleet.meta_parallel import (
     SharedLayerDesc,
 )
 from paddle.distributed.fleet.utils import recompute
-from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-    mark_as_sequence_parallel_parameter,
-)
+
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        mark_as_sequence_parallel_parameter,
+    )
+except:
+    pass
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
 
@@ -157,6 +161,7 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     config_class = GPTConfig
 
     _get_tensor_parallel_mappings = GPTPretrainedModel._get_tensor_parallel_mappings
+    _get_fuse_or_split_param_mappings = GPTPretrainedModel._get_fuse_or_split_param_mappings
     _init_weights = GPTPretrainedModel._init_weights
 
     pretrained_init_configuration = GPTPretrainedModel.pretrained_init_configuration
