@@ -81,6 +81,7 @@ class SpeechT5FeatureExtractionTester(unittest.TestCase):
         self.fmax = fmax
         self.mel_floor = mel_floor
         self.return_attention_mask = return_attention_mask
+        super().__init__()
 
     def prepare_feat_extract_dict(self):
         return {

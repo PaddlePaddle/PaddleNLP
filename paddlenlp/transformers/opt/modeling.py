@@ -650,6 +650,49 @@ class OPTPretrainedModel(PretrainedModel):
         return actions
 
     @classmethod
+    def _get_fuse_or_split_param_mappings(cls, config: OPTConfig, is_fuse=False):
+        # return parameter fuse utils
+        from paddlenlp.transformers.conversion_utils import split_or_fuse_func
+
+        fn = split_or_fuse_func(is_fuse=is_fuse)
+
+        # last key is fused key, other keys are to be fused.
+        fuse_qkv_keys = (
+            "decoder.layers.0.self_attn.q_proj.weight",
+            "decoder.layers.0.self_attn.k_proj.weight",
+            "decoder.layers.0.self_attn.v_proj.weight",
+            "decoder.layers.0.self_attn.qkv_proj.weight",
+        )
+        fuse_qkv_bias_keys = (
+            "decoder.layers.0.self_attn.q_proj.bias",
+            "decoder.layers.0.self_attn.k_proj.bias",
+            "decoder.layers.0.self_attn.v_proj.bias",
+            "decoder.layers.0.self_attn.qkv_proj.bias",
+        )
+        num_heads = config.num_attention_heads
+        num_key_value_heads = getattr(config, "num_key_value_heads", num_heads)
+        fuse_attention_qkv = getattr(config, "fuse_attention_qkv", False)
+
+        final_actions = {}
+        if is_fuse:
+            if fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    for keys in [fuse_qkv_keys, fuse_qkv_bias_keys]:
+                        new_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in keys])
+                        final_actions[new_keys] = partial(
+                            fn, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                        )
+        else:
+            if not fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    for keys in [fuse_qkv_keys, fuse_qkv_bias_keys]:
+                        new_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in keys])
+                        final_actions[new_keys] = partial(
+                            fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                        )
+        return final_actions
+
+    @classmethod
     def _get_name_mappings(cls, config: OPTConfig) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
@@ -889,15 +932,15 @@ class OPTModel(OPTPretrainedModel):
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
-            input_shape = paddle.shape(input_ids)
+            input_shape = input_ids.shape
             input_ids = input_ids.reshape((-1, input_shape[-1]))
         elif inputs_embeds is not None:
-            input_shape = paddle.shape(inputs_embeds)[:-1]
+            input_shape = inputs_embeds.shape[:-1]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
         self.checkpoints = []
-        past_key_values_length = paddle.shape(cache[0].k)[2] if cache is not None else 0
+        past_key_values_length = cache[0].k.shape[2] if cache is not None else 0
 
         seq_length_with_past = input_shape[-1] + past_key_values_length
 

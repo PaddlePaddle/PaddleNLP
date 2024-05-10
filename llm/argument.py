@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from dataclasses import dataclass, field
+from typing import List, Optional
 
 from paddlenlp.trainer import TrainingArguments
 from paddlenlp.trainer.trainer_utils import IntervalStrategy
@@ -48,6 +49,9 @@ class DataArgument:
     dataset_name_or_path: str = field(default=None, metadata={"help": "Name or path for dataset"})
     task_name: str = field(default=None, metadata={"help": "Additional name to select a more specific task."})
     zero_padding: bool = field(default=False, metadata={"help": "Whether to use Zero Padding data stream"})
+    pad_to_multiple_of: int = field(
+        default=None, metadata={"help": "If set will pad the sequence to a multiple of the provided value."}
+    )
     src_length: int = field(default=1024, metadata={"help": "The maximum length of source(context) tokens."})
     max_length: int = field(
         default=2048,
@@ -102,6 +106,64 @@ class ModelArgument:
         default=None, metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
+    tokenizer_name_or_path: Optional[str] = field(
+        default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
+    )
+    use_fused_rms_norm: bool = field(
+        default=False,
+        metadata={"help": "llama or other model, use_fused_rms_norm"},
+    )
+    fuse_attention_qkv: bool = field(
+        default=False,
+        metadata={"help": "whether to fuse attention qkv"},
+    )
+    fuse_attention_ffn: bool = field(
+        default=False,
+        metadata={"help": "whether to fuse first up and gate proj in mlp block"},
+    )
+    recompute_granularity: str = field(
+        default="full",
+        metadata={"help": "Choose among ['full', 'core_attn', 'full_attn']"},
+    )
+    virtual_pp_degree: int = field(
+        default=1,
+        metadata={"help": "virtual_pp_degree"},
+    )
+    hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
+    attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
+
+    continue_training: bool = field(
+        default=False,
+        metadata={
+            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
+        },
+    )
+    sequence_parallel: bool = field(
+        default=False,
+        metadata={"help": "whether to use sequence parallel"},
+    )
+    fuse_sequence_parallel_allreduce: bool = field(
+        default=False,
+        metadata={"help": "whether to use fuse sequence parallel allreduce"},
+    )
+    use_fused_rope: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable rope fusion or not."},
+    )
+    no_recompute_layers: Optional[List[int]] = field(
+        default=None,
+        metadata={"help": "Specify the full transformer layers that should not be recomputed."},
+    )
+    pp_recompute_interval: int = field(
+        default=1,
+        metadata={
+            "help": "The interval for the number of layers at which recomputation occurs. A value of 0 indicates no recomputation. Default is 0."
+        },
+    )
+    recompute_use_reentrant: bool = field(
+        default=False,
+        metadata={"help": "recompute_use_reentrant"},
+    )
     weight_quantize_algo: str = field(
         default=None,
         metadata={
@@ -126,9 +188,19 @@ class ModelArgument:
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
     lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
     lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
+    use_quick_lora: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use quick lora, The use of Quick LoRa will only take effect when lora_dropout is set to 0."
+        },
+    )
+    rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
+    lora_plus_scale: float = field(default=1.0, metadata={"help": "Lora B scale in LoRA+ technique"})
+    pissa: bool = field(default=False, metadata={"help": "Whether to use Pissa: https://arxiv.org/pdf/2404.02948.pdf"})
 
     # prefix tuning related parameters
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
+    prefix_path: str = field(default=None, metadata={"help": "Initialize prefix state dict."})
     num_prefix_tokens: int = field(default=128, metadata={"help": "Number of prefix tokens"})
 
     from_aistudio: bool = field(default=False, metadata={"help": "Whether to load model from aistudio"})

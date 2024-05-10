@@ -13,7 +13,6 @@
 # limitations under the License.
 import paddle
 import paddle.distributed.fleet as fleet
-import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import (
     LayerDesc,
     PipelineLayer,
@@ -21,13 +20,20 @@ from paddle.distributed.fleet.meta_parallel import (
 )
 from paddle.distributed.fleet.utils import recompute
 
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        mark_as_sequence_parallel_parameter,
+    )
+except:
+    pass
+
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
 
-from ..sequence_parallel_utils import mark_as_sequence_parallel_parameter
 from .modeling import (
     GPTConfig,
     GPTDecoderLayer,
     GPTEmbeddings,
+    GPTLayerNorm,
     GPTLMHead,
     GPTPretrainedModel,
     GPTPretrainingCriterion,
@@ -101,15 +107,13 @@ class GPTEmbeddingPipe(GPTEmbeddings):
         embeddings = super().forward(input_ids=input_ids, position_ids=position_ids)
 
         batch_size, seq_length = input_ids.shape
-        causal_mask = self.bias[:, :, 0:seq_length, :seq_length]
         if attention_mask is not None:
             if attention_mask.dtype != paddle.int64:
                 attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
             if len(attention_mask.shape) == 2:
                 attention_mask = attention_mask[:, None, None, :]
+            causal_mask = self.bias[:, :, 0:seq_length, :seq_length]
             attention_mask = (1.0 - (attention_mask & causal_mask)) * -1e4
-        else:
-            attention_mask = (1.0 - causal_mask) * -1e4
 
         return return_args(embeddings, attention_mask, position_ids)
 
@@ -125,9 +129,9 @@ class GPTDecoderLayerPipe(GPTDecoderLayer):
         return return_args(hidden_states, attention_mask, position_ids)
 
 
-class LayerNormPipe(nn.LayerNorm):
+class LayerNormPipe(GPTLayerNorm):
     def __init__(self, config):
-        super(LayerNormPipe, self).__init__(config.hidden_size, epsilon=1e-05)
+        super(LayerNormPipe, self).__init__(config, config.hidden_size, epsilon=1e-05)
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.weight)
             mark_as_sequence_parallel_parameter(self.bias)
@@ -157,6 +161,7 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     config_class = GPTConfig
 
     _get_tensor_parallel_mappings = GPTPretrainedModel._get_tensor_parallel_mappings
+    _get_fuse_or_split_param_mappings = GPTPretrainedModel._get_fuse_or_split_param_mappings
     _init_weights = GPTPretrainedModel._init_weights
 
     pretrained_init_configuration = GPTPretrainedModel.pretrained_init_configuration

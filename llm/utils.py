@@ -125,9 +125,11 @@ def get_lora_target_modules(model):
             ".*v_proj.*",
             ".*k_proj.*",
             ".*o_proj.*",
+            ".*qkv_proj.*",
             ".*gate_proj.*",
             ".*down_proj.*",
             ".*up_proj.*",
+            ".*gate_up_fused_proj.*",
         ]
     elif model.base_model_prefix == "opt":
         target_modules = [
@@ -148,6 +150,16 @@ def get_lora_target_modules(model):
             ".*mlp.w1.*",
             ".*mlp.w2.*",
             ".*mlp.c_proj.*",
+        ]
+    elif model.base_model_prefix == "mixtral":
+        target_modules = [
+            ".*q_proj.*",
+            ".*k_proj.*",
+            ".*v_proj.*",
+            ".*o_proj.*",
+            ".*w1.*",
+            ".*w2.*",
+            ".*w3.*",
         ]
     else:
         raise ValueError(f"Unknown base_model_prefix: {model.base_model_prefix}.")

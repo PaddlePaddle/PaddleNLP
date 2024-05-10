@@ -124,6 +124,10 @@ def data_file_path(prefix_path):
     return prefix_path + ".bin"
 
 
+def loss_mask_file_path(prefix_path):
+    return prefix_path + ".lsm"
+
+
 def create_doc_idx(sizes):
     doc_idx = [0]
     for i, s in enumerate(sizes):
@@ -444,6 +448,7 @@ class MMapIndexedDataset(paddle.io.Dataset):
         self._path = None
         self._index = None
         self._bin_buffer = None
+        self._loss_mask_buffer = None
 
         self._do_init(path, skip_warmup)
 
@@ -466,12 +471,18 @@ class MMapIndexedDataset(paddle.io.Dataset):
             _warmup_mmap_file(data_file_path(self._path))
         print_rank_0("    creating numpy buffer of mmap...")
         self._bin_buffer_mmap = np.memmap(data_file_path(self._path), mode="r", order="C")
+        if os.path.exists(loss_mask_file_path(self._path)):
+            self._loss_mask_buffer_mmap = np.memmap(loss_mask_file_path(self._path), mode="r", order="C")
+            self._loss_mask_buffer = memoryview(self._loss_mask_buffer_mmap)
         print_rank_0("    creating memory view of numpy buffer...")
         self._bin_buffer = memoryview(self._bin_buffer_mmap)
 
     def __del__(self):
         self._bin_buffer_mmap._mmap.close()
+        if hasattr(self, "_loss_mask_buffer_mmap"):
+            self._loss_mask_buffer_mmap._mmap.close()
         del self._bin_buffer_mmap
+        del self._loss_mask_buffer
         del self._index
 
     def __len__(self):
@@ -507,8 +518,12 @@ class MMapIndexedDataset(paddle.io.Dataset):
         if length is None:
             length = size - offset
         ptr += offset * np.dtype(self._index.dtype).itemsize
+        mask_ptr = ptr // np.dtype(self._index.dtype).itemsize
         np_array = np.frombuffer(self._bin_buffer, dtype=self._index.dtype, count=length, offset=ptr)
-        return np_array
+        mask_array = None
+        if self._loss_mask_buffer is not None:
+            mask_array = np.frombuffer(self._loss_mask_buffer, dtype=np.uint8, count=length, offset=mask_ptr)
+        return np_array, mask_array
 
     @property
     def sizes(self):
@@ -533,19 +548,27 @@ class MMapIndexedDataset(paddle.io.Dataset):
         return os.path.exists(index_file_path(path)) and os.path.exists(data_file_path(path))
 
 
-def make_builder(out_file, impl, save_dtype):
+def make_builder(out_file, impl, save_dtype, loss_mask_file=None):
     if impl == "mmap":
-        return MMapIndexedDatasetBuilder(out_file, dtype=save_dtype)
+        return MMapIndexedDatasetBuilder(out_file, dtype=save_dtype, loss_mask_file=loss_mask_file)
     else:
         return IndexedDatasetBuilder(out_file, dtype=save_dtype)
 
 
 class MMapIndexedDatasetBuilder(object):
-    def __init__(self, out_file, dtype):
+    def __init__(self, out_file, dtype, loss_mask_file=None):
         self._data_file = open(out_file, "wb")
+        self._loss_mask_file = None
+        if loss_mask_file is not None:
+            self._loss_mask_file = open(loss_mask_file, "wb")
         self._dtype = dtype
         self._sizes = []
         self._doc_idx = [0]
+
+    def flush_loss_mask_item(self, loss_mask_lst):
+        for loss_mask in loss_mask_lst:
+            tensor = np.array(loss_mask, dtype=np.uint8)
+            self._loss_mask_file.write(tensor.tobytes(order="C"))
 
     def add_item(self, tensor):
         tensor = np.array(tensor, dtype=self._dtype)
@@ -656,7 +679,7 @@ class CompatibleIndexedDataset(paddle.io.Dataset):
             length = size - offset
         ptr += offset
         np_array = self._token_ids[ptr : ptr + length]
-        return np_array
+        return np_array, None
 
     @property
     def sizes(self):

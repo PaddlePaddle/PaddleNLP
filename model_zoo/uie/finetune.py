@@ -251,7 +251,7 @@ def main():
                 num_correct, num_infer, num_label = metric.compute(start_prob, end_prob, start_ids, end_ids)
                 metric.update(num_correct, num_infer, num_label)
             precision, recall, f1 = metric.accumulate()
-            logger.info("f1: %s, precision: %s, recall: %s" % (f1, precision, f1))
+            logger.info("f1: %s, precision: %s, recall: %s" % (f1, precision, recall))
             model.train()
             return f1
 

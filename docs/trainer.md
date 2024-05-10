@@ -321,9 +321,9 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
   --num_train_epochs
                         要执行的训练 epoch 总数（如果不是整数，将在停止训练
                         之前执行最后一个 epoch 的小数部分百分比）。
-                        (`float`, 可选, 默认为 3.0):
+                        (`float`, 可选, 默认为 1.0):
 
-                        Total number of training epochs to perform. (default:3.0)
+                        Total number of training epochs to perform. (default:1.0)
 
   --max_steps
                         如果设置为正数，则表示要执行的训练步骤总数。
@@ -521,6 +521,20 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better proformance.
                         Note, this need model support in source code, currently GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM is supported.
 
+  --tensor_parallel_config
+                        对于张量并行,一些选项会影响训练性能,这里将一些选项配置集中管理,以str形式传入配置.
+                        支持如下选项:
+                            enable_delay_scale_loss : 在优化器阶段做梯度累加，将所有梯度除以累加次数，而不是直接对loss除以累加次数。
+                            sync_param : 在优化器阶段使用broadcast同步所有is_distributed=False的参数
+                            sync_grad : 在优化器阶段使用broadcast同步所有is_distributed=False的梯度
+                            sync_moment : 在优化器阶段使用broadcast同步所有is_distributed=False的momentum
+
+                        Some additional config it highly affect the usage of tensor parallel, we provide some option to config it.
+                        following config is support:
+                            enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.
+                            sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.
+                            sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.
+                            sync_moment, in optimizer step, use broadcast to sync momentums those attr 'is_distributed' is False.
 
   --pipeline_parallel_degree
                         流水线并行是Megatron论文针对多层Transformer结构提出的按层划分方法.
@@ -549,9 +563,19 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         following config is support:
                           disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape.
                           disable_partial_send_recv, optmize send speed for tensor parallel.
-                          enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
+                          enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
                           enable_dp_comm_overlap, fuse data parallel gradient communication.
 
+  --data_parallel_config
+                        对于数据并行,一些选项会影响训练性能,这里将一些选项配置集中管理,以str形式传入配置.
+                        支持如下选项:
+                            enable_allreduce_avg_in_gradinent_scale : 在数据并行中, 替换`allreduce_sum + scale`模式为`allreduce_avg`, 以提高性能. 仅支持auto模式.
+                            gradient_sync_after_accumulate : 当梯度累积开启时, 将梯度同步操作从backward阶段移动到optimizer阶段, 以减少同步次数, 提高性能, 但会增加显存占用. 仅支持auto模式.
+
+                        Some additional configs which affect data parallel performance, we provide some option to config it.
+                        following config is support:
+                            enable_allreduce_avg_in_gradinent_scale, it replace `allreduce_sum + scale` pattern with `allreduce_avg` when scale gradient in data_parallel, which improve the performance. ONLY supported for auto mode now.
+                            gradient_sync_after_accumulate, move gradient sync operations from backward into optimizer step when gradient accumulate enabling, which reduce the sync times to improve performance, but will increase the memory usage. ONLY supported for auto mode now.
 
   --recompute
                         是否使用重计算训练。可以节省显存。

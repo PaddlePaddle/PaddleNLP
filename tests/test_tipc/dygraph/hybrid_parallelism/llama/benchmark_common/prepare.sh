@@ -13,6 +13,7 @@
 # limitations under the License.
 
 python -m pip install -r ../requirements.txt
+python -m pip install -r ../requirements-dev.txt
 
 # install fused_ln custom ops
 cd ../model_zoo/gpt-3/external_ops/

@@ -48,13 +48,16 @@ from .processor import (
     MinLengthLogitsProcessor,
     RepetitionPenaltyLogitsProcessor,
 )
-from .sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    GatherOp,
-    RowSequenceParallelLinear,
-    ScatterOp,
-    mark_as_sequence_parallel_parameter,
-)
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        ColumnSequenceParallelLinear,
+        GatherOp,
+        RowSequenceParallelLinear,
+        ScatterOp,
+        mark_as_sequence_parallel_parameter,
+    )
+except:
+    pass
 
 from paddlenlp.transformers.segment_parallel_utils  import ReshardLayer
 
@@ -62,10 +65,16 @@ try:
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
+
 try:
     from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 except:
     FusedDropoutAdd = None
+
+try:
+    from paddle.jit.api import set_dynamic_shape
+except:
+    from paddle.jit.dy2static.utils_helper import set_dynamic_shape
 
 def get_attr(layer, name):
     if getattr(layer, name, None) is not None:
@@ -828,8 +837,8 @@ class GPTModelHybrid(nn.Layer):
         if position_ids is None:
             past_length = 0
             if cache is not None:
-                past_length = paddle.shape(attention_mask)[-1] - 1
-            position_ids = paddle.arange(past_length, paddle.shape(input_ids)[-1] + past_length, dtype=input_ids.dtype)
+                past_length = attention_mask.shape[-1] - 1
+            position_ids = paddle.arange(past_length, input_ids.shape[-1] + past_length, dtype=input_ids.dtype)
             position_ids = position_ids.unsqueeze(0)
             # .expand_as(input_ids)
             position_ids = paddle.expand_as(position_ids, input_ids)
@@ -842,7 +851,7 @@ class GPTModelHybrid(nn.Layer):
         if not self.fused_softmax_with_triangular or not paddle.is_compiled_with_cuda():
             # TODO, use registered buffer
             causal_mask = paddle.tensor.triu(
-                paddle.ones((paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1])) * -1e4, diagonal=1
+                paddle.ones((input_ids.shape[-1], input_ids.shape[-1])) * -1e4, diagonal=1
             )
             if attention_mask is not None:
                 if len(attention_mask.shape) == 2:
@@ -1295,7 +1304,7 @@ class GPTForGenerationHybrid(nn.Layer):
 
     def expand_inputs_for_generation(self, input_ids, expand_size, attention_mask=None, **model_kwargs):
 
-        index = paddle.tile(paddle.arange(paddle.shape(input_ids)[0]).unsqueeze(-1), [1, expand_size]).reshape([-1])
+        index = paddle.tile(paddle.arange(input_ids.shape[0]).unsqueeze(-1), [1, expand_size]).reshape([-1])
 
         input_ids = paddle.gather(input_ids, index)
 
@@ -1501,7 +1510,7 @@ class GPTForGenerationHybrid(nn.Layer):
 
         attn_mask = model_kwargs["attention_mask"]
         # make the shape of attention_mask = (-1, -1, -1, -1) in dy2static.
-        paddle.jit.dy2static.utils_helper.set_dynamic_shape(model_kwargs["attention_mask"], [-1, -1, -1, -1])
+        set_dynamic_shape(model_kwargs["attention_mask"], [-1, -1, -1, -1])
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
         while cur_len < max_length:
             # Note(GuoxiaWang): Remove outputs = _forward_(**model_kwargs)

@@ -55,6 +55,7 @@ from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.import_utils import import_module
 from paddlenlp.utils.log import logger
 
+from ..utils.download import resolve_file_path
 from .aistudio_utils import aistudio_download
 
 HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
@@ -86,6 +87,25 @@ def convert_ndarray_dtype(np_array: np.ndarray, target_dtype: str) -> np.ndarray
         target_dtype = "uint16"
 
     return np_array.astype(target_dtype)
+
+
+def convert_to_dict_message(conversation: List[List[str]]):
+    """Convert the list of chat messages to a role dictionary chat messages."""
+    conversations = []
+    for index, item in enumerate(conversation):
+        assert 1 <= len(item) <= 2, "Each Rounds in conversation should have 1 or 2 elements."
+        if isinstance(item[0], str):
+            conversations.append({"role": "user", "content": item[0]})
+            if len(item) == 2 and isinstance(item[1], str):
+                conversations.append({"role": "assistant", "content": item[1]})
+            else:
+                # If there is only one element in item, it must be the last round.
+                # If it is not the last round, it must be an error.
+                if index != len(conversation) - 1:
+                    raise ValueError(f"Round {index} has error round")
+        else:
+            raise ValueError("Each round in list should be string")
+    return conversations
 
 
 def get_scale_by_dtype(dtype: str = None, return_positive: bool = True) -> float:
@@ -665,27 +685,17 @@ def get_checkpoint_shard_files(
     show_progress_bar = last_shard is None
     for shard_filename in tqdm.tqdm(shard_filenames, desc="Downloading shards", disable=not show_progress_bar):
         try:
-            if from_aistudio:
-                cached_filename = aistudio_download(
-                    repo_id=pretrained_model_name_or_path,
-                    filename=shard_filename,
-                    subfolder=subfolder,
-                    cache_dir=cache_dir,
-                )
-            elif from_hf_hub:
-                cached_filename = hf_hub_download(
-                    repo_id=pretrained_model_name_or_path,
-                    filename=shard_filename,
-                    subfolder=subfolder,
-                    cache_dir=cache_dir,
-                )
-            else:
-                cached_filename = paddlenlp_hub_download(
-                    pretrained_model_name_or_path,
-                    shard_filename,
-                    subfolder=None if len(subfolder) == 0 else subfolder,
-                    cache_dir=cache_dir,
-                )
+            cached_filename = resolve_file_path(
+                pretrained_model_name_or_path,
+                [shard_filename],
+                subfolder,
+                cache_dir=cache_dir,
+                from_aistudio=from_aistudio,
+                from_hf_hub=from_hf_hub,
+            )
+            assert (
+                cached_filename is not None
+            ), f"please make sure {shard_filename} under {pretrained_model_name_or_path}"
         # We have already dealt with RepositoryNotFoundError and RevisionNotFoundError when getting the index, so
         # we don't have to catch them here.
         except EntryNotFoundError:
