@@ -82,9 +82,9 @@ def compute_relative_buckets(num_buckets, max_distance, relative_positions, is_b
     ) / math.log(max_distance / max_exact) * (num_buckets - max_exact)
     val_if_large_num_buckets = paddle.ones_like(val_if_large) * (num_buckets - 1)
     val_if_large_lt = paddle.cast(paddle.less_than(val_if_large, val_if_large_num_buckets), dtype=paddle.int32)
-    val_if_large = paddle.cast(val_if_large_lt * val_if_large, dtype=paddle.int32) + paddle.cast(
-        (1 - val_if_large_lt) * val_if_large_num_buckets, dtype=paddle.int32
-    )
+    val_if_large = val_if_large_lt * val_if_large.astype(val_if_large_lt.dtype) + (
+        1 - val_if_large_lt
+    ) * val_if_large_num_buckets.astype(val_if_large_lt.dtype)
     rel_positions_bucket = rel_positions_bucket + paddle.where(
         is_small, paddle.cast(inv_relative_positions, dtype=paddle.int32), val_if_large
     )
