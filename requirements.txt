@@ -8,7 +8,7 @@ datasets >= 2.0.0
 tqdm
 paddlefsl
 sentencepiece
-huggingface_hub>=0.11.1
+huggingface_hub>=0.19.2
 onnx>=1.10.0
 protobuf>=3.20.2 ; platform_system != "Windows"
 protobuf==3.20.2 ; platform_system == "Windows"        # onnx require: protobuf<4,>=3.20.2, paddle require different version on platforms, refer to: https://github.com/PaddlePaddle/Paddle/blob/cd88156a369bbfb83d6306f89e0ae6ebd78b8040/python/requirements.txt#L3
@@ -20,6 +20,7 @@ uvicorn
 typer
 rich
 safetensors
-tool_helpers
+tool_helpers ; platform_system == "Linux"
 aistudio-sdk>=0.1.3
 jinja2
+regex

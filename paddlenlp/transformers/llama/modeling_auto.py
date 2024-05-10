@@ -181,6 +181,7 @@ def scaled_dot_product_attention(
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
+        # [bsz, q_len, num_heads, head_dim] -> [bsz, q_len, num_heads * head_dim]
         attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
         return (attn_output, attn_weights) if output_attentions else attn_output
 
@@ -366,24 +367,28 @@ class LlamaAttentionAuto(nn.Layer):
             self.rotary_emb = LlamaRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
+                base=self.config.rope_theta,
             )
         elif self.config.rope_scaling_type == "linear":
             self.rotary_emb = LlamaLinearScalingRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
                 scaling_factor=self.config.rope_scaling_factor,
+                base=self.config.rope_theta,
             )
         elif self.config.rope_scaling_type == "ntk":
             self.rotary_emb = LlamaNTKScalingRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
                 scaling_factor=self.config.rope_scaling_factor,
+                base=self.config.rope_theta,
             )
         elif self.config.rope_scaling_type == "dynamic_ntk":
             self.rotary_emb = LlamaDynamicNTKScalingRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
                 scaling_factor=self.config.rope_scaling_factor,
+                base=self.config.rope_theta,
             )
         else:
             raise ValueError(f"Unknown RoPE scaling type {self.config.rope_scaling_type}")
@@ -399,9 +404,10 @@ class LlamaAttentionAuto(nn.Layer):
         alibi: Optional[paddle.Tensor] = None,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
-        # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
+        # [bs, seq_len, num_head * head_dim] or [seq_len / n, bs, num_head * head_dim] (if sequence_parallel)
         # enter tp region
         if self.config.sequence_parallel:
+            # [seq_len / n, bs, num_head * head_dim] -> [seq_len, bs, num_head * head_dim] (if sequence_parallel)
             hidden_states = dist.reshard(
                 hidden_states,
                 get_mesh(self.ipp),
@@ -422,6 +428,8 @@ class LlamaAttentionAuto(nn.Layer):
             value_states = self.v_proj(hidden_states).reshape(shape=target_key_value_shape)
 
         if self.config.sequence_parallel:
+            # [seq_len, bs, num_head * head_dim] -> [bs, seq_len, num_head * head_dim]  (if sequence_parallel)
+            # FA and rope not support sequence first
             query_states = paddle.transpose(query_states, [1, 0, 2, 3])
             key_states = paddle.transpose(key_states, [1, 0, 2, 3])
             value_states = paddle.transpose(value_states, [1, 0, 2, 3])
@@ -434,16 +442,40 @@ class LlamaAttentionAuto(nn.Layer):
         if self.config.rope:
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
+                batch_size, seq_length, num_heads, head_dim = query_states.shape
+                _, kv_seq_len, num_key_value_heads, _ = key_states.shape
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-                query_states, key_states, _ = fused_rotary_position_embedding(
-                    query_states,
-                    key_states,
-                    v=None,
-                    sin=sin,
-                    cos=cos,
-                    position_ids=position_ids,
-                    use_neox_rotary_style=False,
-                )
+
+                paddle_version = float(paddle.__version__[:3])
+                if ((paddle_version != 0.0) and (paddle_version <= 2.6)) and (num_heads != num_key_value_heads):
+                    query_states, _, _ = fused_rotary_position_embedding(
+                        query_states,
+                        None,
+                        None,
+                        sin=sin,
+                        cos=cos,
+                        position_ids=position_ids,
+                        use_neox_rotary_style=False,
+                    )
+                    key_states, _, _ = fused_rotary_position_embedding(
+                        key_states,
+                        None,
+                        None,
+                        sin=sin,
+                        cos=cos,
+                        position_ids=position_ids,
+                        use_neox_rotary_style=False,
+                    )
+                else:
+                    query_states, key_states, _ = fused_rotary_position_embedding(
+                        query_states,
+                        key_states,
+                        v=None,
+                        sin=sin,
+                        cos=cos,
+                        position_ids=position_ids,
+                        use_neox_rotary_style=False,
+                    )
             else:
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 # hack here, because elementwise infer spmd not support broadcast now
@@ -463,8 +495,11 @@ class LlamaAttentionAuto(nn.Layer):
 
         # TODO(wj-Mcat): use broadcast strategy when n_kv_heads = 1
         # repeat k/v heads if n_kv_heads < n_heads
-        key_states = repeat_kv(key_states, self.num_key_value_groups)
-        value_states = repeat_kv(value_states, self.num_key_value_groups)
+        # paddle version > 2.6 or develop support flash-attn with gqa/mqa
+        paddle_version = float(paddle.__version__[:3])
+        if (paddle_version != 0.0) and (paddle_version <= 2.6):
+            key_states = repeat_kv(key_states, self.num_key_value_groups)
+            value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (
@@ -499,12 +534,12 @@ class LlamaAttentionAuto(nn.Layer):
         else:
             attn_output = outputs
 
-        # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
-        # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
+        # [bs, q_len, num_head * head_dim]
         attn_output = self.o_proj(attn_output)
 
         # enter sp region
         if self.config.sequence_parallel:
+            # [bs, q_len, num_head * head_dim] -> [q_len / n, bs, num_head * head_dim]
             attn_output = paddle.transpose(attn_output, [1, 0, 2])
             attn_output = dist.reshard(
                 attn_output,
@@ -568,7 +603,7 @@ class LlamaDecoderLayerAuto(nn.Layer):
             cache (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
         """
 
-        # [bs * seq_len, embed_dim] -> [seq_len * bs / n, embed_dim] (sequence_parallel)
+        # [bs, seq_len, embed_dim] or [seq_len / n, bs, embed_dim] (if sequence_parallel)
         residual = hidden_states
 
         hidden_states = self.input_layernorm(hidden_states)
@@ -827,7 +862,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         self.next_pp_stage_indexes = []
         for i in range(config.num_hidden_layers):
             pp_stage_id, input_need_reshard = get_layer_pp_info(i)
-            decoder_layers.append(LlamaDecoderLayerAuto(config, False, pp_stage_id))
+            decoder_layers.append(LlamaDecoderLayerAuto(config, i not in self.no_recompute_layers, pp_stage_id))
             if input_need_reshard:
                 self.next_pp_stage_indexes.append(i)
 
@@ -907,7 +942,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         seq_length_with_past = seq_length
         cache_length = 0
         if past_key_values[0] is not None:
-            cache_length = paddle.shape(past_key_values[0][0])[1]
+            cache_length = past_key_values[0][0].shape[1]
             seq_length_with_past += cache_length
 
         if inputs_embeds is None:

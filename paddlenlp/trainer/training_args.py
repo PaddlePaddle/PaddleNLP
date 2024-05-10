@@ -241,18 +241,22 @@ class TrainingArguments:
               enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance.
               enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.
               enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true. It can accelerate model parallel further.
-              enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.
+              enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.
+              sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.
+              sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.
+              sync_moment, in optimizer step, use broadcast to sync momentums those attr 'is_distributed' is False.
         pipeline_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it.
             following config is support:
               disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape.
               disable_partial_send_recv, optmize send speed for tensor parallel.
-              enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
+              enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
               enable_dp_comm_overlap, fuse data parallel gradient communication.
               enable_sharding_comm_overlap, fuse sharding stage 1 parallel gradient communication.
               enable_release_grads, reduce peak memory usage by releasing gradients after each iteration. The creation of gradients will be postponed until backward propagation of the next iteration.
               enable_overlap_p2p_comm, overlap p2p communication with computation.
               enable_clear_every_step_cache, clear every step cache for pipeline parallel.
+              disable_non_batch_p2p_comm, disable batched send/recv in pipeline parallel mode.
         sharding_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
             following config is support:
@@ -599,7 +603,10 @@ class TrainingArguments:
                 "enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance. \n"
                 "enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.\n"
                 "enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true.  It can accelerate model parallel further.\n"
-                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.\n"
+                "enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.\n"
+                "sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.\n"
+                "sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.\n"
+                "sync_moment, in optimizer step, use broadcast to sync momentums those attr 'is_distributed' is False.\n"
             )
         },
     )
@@ -611,11 +618,12 @@ class TrainingArguments:
                 "following config is support:\n"
                 "disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape. \n"
                 "disable_partial_send_recv, optmize send speed for tensor parallel.\n"
-                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
+                "enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
                 "enable_dp_comm_overlap, fuse data parallel gradient communication. \n"
                 "enable_sharding_comm_overlap, fuse sharding stage 1 parallel gradient communication. \n"
                 "enable_overlap_p2p_comm, overlap p2p communication with computation. \n"
                 "enable_clear_every_step_cache, clear every step cache for pipeline parallel. \n"
+                "disable_batch_p2p_comm, disable batched send/recv in pipeline parallel mode. \n"
             )
         },
     )
@@ -993,6 +1001,7 @@ class TrainingArguments:
                                 "enable_dp_comm_overlap",
                                 "enable_clear_every_step_cache",
                                 "enable_overlap_p2p_comm",
+                                "disable_batch_p2p_comm",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -1017,6 +1026,11 @@ class TrainingArguments:
                         enable_dp_comm_overlap and enable_sharding_comm_overlap
                     ), "dp_comm_overlap and sharding_comm_overlap cannot be enabled at the same time"
 
+                    if enable_sharding_comm_overlap and not self.amp_master_grad:
+                        raise ValueError(
+                            "If `enable_sharding_comm_overlap` in pipeline_parallel_configs, `amp_master_grad` must be True."
+                        )
+
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
                         "dp_comm_overlap": enable_dp_comm_overlap,
@@ -1025,6 +1039,7 @@ class TrainingArguments:
                         "release_gradients": "enable_release_grads" in pipeline_parallel_config,
                         "overlap_p2p_comm": "enable_overlap_p2p_comm" in pipeline_parallel_config,
                         "clear_every_step_cache": "enable_clear_every_step_cache" in pipeline_parallel_config,
+                        "use_batch_p2p_comm": "disable_batch_p2p_comm" not in pipeline_parallel_config,
                     }
                     if dygraph_pp_configs["dp_comm_overlap"]:
                         raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
@@ -1058,10 +1073,13 @@ class TrainingArguments:
                                 "enable_mp_skip_c_identity",
                                 "enable_mp_fused_linear_param_grad_add",
                                 "enable_delay_scale_loss",
+                                "sync_param",
+                                "sync_grad",
+                                "sync_moment",
                             ]:
                                 raise ValueError(
                                     f"Found unknown tensor parallell config {x}, "
-                                    f"accept config is enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add"
+                                    f"accept config is enable_mp_async_allreduce, enable_mp_skip_c_identity, enable_mp_fused_linear_param_grad_add, sync_param, sync_grad and sync_moment."
                                 )
                     try:
                         if "enable_mp_async_allreduce" in mp_config:
@@ -1079,6 +1097,23 @@ class TrainingArguments:
                                 warnings.warn(
                                     "enable_mp_fused_linear_param_grad_add only works with enable_mp_async_allreduce. It will not work."
                                 )
+
+                        sync_param = "sync_param" in mp_config
+                        sync_grad = "sync_grad" in mp_config
+                        sync_moment = "sync_moment" in mp_config
+
+                        # sync_param_name = [""] matches any parameter name.
+                        # If sync_param, sync_grad and sync_moment are not set, the default value in Paddle is :
+                        # sync_param = True, sync_grad = False, sync_moment = False, sync_param_name = ["embedding", "layer_norm", ".b_"].
+                        if sync_param:
+                            strategy.hybrid_configs["mp_configs"].sync_param = True
+                            strategy.hybrid_configs["mp_configs"].sync_param_name = [""]
+                        if sync_grad:
+                            strategy.hybrid_configs["mp_configs"].sync_grad = True
+                            strategy.hybrid_configs["mp_configs"].sync_grad_name = [""]
+                        if sync_moment:
+                            strategy.hybrid_configs["mp_configs"].sync_moment = True
+                            strategy.hybrid_configs["mp_configs"].sync_moment_name = [""]
                     except:
                         warnings.warn(
                             "The enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add are not supported "
@@ -1194,28 +1229,36 @@ class TrainingArguments:
 
         elif self.enable_auto_parallel:
             self.tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
+            self.sep_parallel_degree = max(self.sep_parallel_degree, 1)
             self.pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
 
             assert (
                 world_size % (self.tensor_parallel_degree * self.pipeline_parallel_degree) == 0
             ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
 
-            self.data_parallel_degree = world_size // (self.tensor_parallel_degree * self.pipeline_parallel_degree)
-
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
-                    self.sharding_parallel_degree = self.data_parallel_degree
+                    self.sharding_parallel_degree = world_size // (
+                        self.tensor_parallel_degree * self.sep_parallel_degree * self.pipeline_parallel_degree
+                    )
 
             self.sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
             if self.sharding_parallel_degree == 1 and len(self.sharding) > 0:
                 logger.warning("sharding_parallel_degree=1 means no sharding, please set sharding to empty!")
                 self.sharding = []
 
+            self.data_parallel_degree = world_size // (
+                self.sharding_parallel_degree
+                * self.tensor_parallel_degree
+                * self.sep_parallel_degree
+                * self.pipeline_parallel_degree
+            )
+
             if ShardingOption.OFFLOAD in self.sharding:
                 warnings.warn("`offload` is not supported NOW!")
 
             strategy = fleet.auto.Strategy()
-            if self.data_parallel_degree > 1:
+            if self.dataset_world_size > 1:
                 data_parallel_config = set(self.data_parallel_config.split(" "))
                 for x in data_parallel_config:
                     if len(x) > 0:
@@ -1241,6 +1284,7 @@ class TrainingArguments:
                             # "enable_dp_comm_overlap",       # no implemenation for auto_parallel
                             # "enable_sharding_comm_overlap", # no implemenation for auto_parallel
                             # "enable_timer",                 # no implemenation for auto_parallel
+                            # "disable_batch_p2p_comm",       # no implemenation for auto_parallel
                         ]:
                             raise ValueError(
                                 f"Found unknown pipeline mode config {x}, accpet config is enable_send_recv_overlap."
@@ -1356,10 +1400,10 @@ class TrainingArguments:
             self.strategy = strategy
             if self.hybrid_parallel_topo_order == "pp_first":
                 order = ["pp", "dp", "mp"]
-                degree = [self.pipeline_parallel_degree, self.data_parallel_degree, self.tensor_parallel_degree]
+                degree = [self.pipeline_parallel_degree, self.dataset_world_size, self.tensor_parallel_degree]
             elif self.hybrid_parallel_topo_order == "sharding_first":
                 order = ["dp", "pp", "mp"]
-                degree = [self.data_parallel_degree, self.pipeline_parallel_degree, self.tensor_parallel_degree]
+                degree = [self.dataset_world_size, self.pipeline_parallel_degree, self.tensor_parallel_degree]
             mesh_dims = list(zip(order, degree))
             fleet.auto.create_mesh(mesh_dims)
 
@@ -1371,7 +1415,7 @@ class TrainingArguments:
 
             strategy = fleet.DistributedStrategy()
             strategy.hybrid_configs = {
-                "dp_degree": self.data_parallel_degree,
+                "dp_degree": self.dataset_world_size,
                 "mp_degree": self.tensor_parallel_degree,
                 "pp_degree": self.pipeline_parallel_degree,
                 "order": order,
@@ -1526,7 +1570,7 @@ class TrainingArguments:
         if self.use_hybrid_parallel:
             return max(self.sharding_parallel_degree, 1) * max(self.data_parallel_degree, 1)
         elif self.enable_auto_parallel:
-            return max(self.data_parallel_degree, 1)
+            return max(self.sharding_parallel_degree, 1) * max(self.data_parallel_degree, 1)
         else:
             return paddle.distributed.get_world_size()
 
@@ -1563,20 +1607,20 @@ class TrainingArguments:
         else:
             return 0
 
+    def _format_name(self, prefix, rank, degree):
+        size = max(2, len(str(degree)))
+        return f"{prefix}{rank:0>{size}d}"
+
     @property
     def optimizer_name_suffix(self):
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
-                assert self.tensor_parallel_degree < 100, "tensor parallel degree should be less than 100."
-                name.append(f"tp{self.tensor_parallel_rank:0>2d}")
+                name.append(self._format_name("tp", self.tensor_parallel_rank, self.tensor_parallel_degree))
             if self.pipeline_parallel_degree > 1:
-                assert self.pipeline_parallel_degree < 100, "pipeline parallel degree should be less than 100."
-                name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
+                name.append(self._format_name("pp", self.pipeline_parallel_rank, self.pipeline_parallel_degree))
             if self.sharding_parallel_degree > 1:
-                assert self.sharding_parallel_degree < 100, "sharding parallel degree should be less than 100."
-                name.append(f"shard{self.sharding_parallel_rank:0>2d}")
-
+                name.append(self._format_name("shard", self.sharding_parallel_rank, self.sharding_parallel_degree))
             return "_".join(name)
         else:
             return None
@@ -1586,11 +1630,9 @@ class TrainingArguments:
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
-                assert self.tensor_parallel_rank < 100, "tensor parallel rank should be less than 100."
-                name.append(f"tp{self.tensor_parallel_rank:0>2d}")
+                name.append(self._format_name("tp", self.tensor_parallel_rank, self.tensor_parallel_degree))
             if self.pipeline_parallel_degree > 1:
-                assert self.pipeline_parallel_degree < 100, "tensor parallel rank should be less than 100."
-                name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
+                name.append(self._format_name("pp", self.pipeline_parallel_rank, self.pipeline_parallel_degree))
             return "_".join(name)
 
         else:
@@ -1600,20 +1642,17 @@ class TrainingArguments:
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
-                assert self.tensor_parallel_rank < 100, "tensor parallel rank should be less than 100."
-                name.append(f"tp{self.tensor_parallel_rank:0>2d}")
+                name.append(self._format_name("tp", self.tensor_parallel_rank, self.tensor_parallel_degree))
             if self.pipeline_parallel_degree > 1:
                 if pp_id is None:
                     pp_id = self.pipeline_parallel_rank
                 assert isinstance(pp_id, int)
-                assert pp_id < 100, "pp_id should be less than 100."
-                name.append(f"pp{pp_id:0>2d}")
+                name.append(self._format_name("pp", pp_id, self.pipeline_parallel_degree))
             if self.sharding_parallel_degree > 1:
                 if shard_id is None:
                     shard_id = self.sharding_parallel_rank
                 assert isinstance(shard_id, int)
-                assert shard_id < 100, "shard_id should be less than 100."
-                name.append(f"shard{shard_id:0>2d}")
+                name.append(self._format_name("shard", shard_id, self.sharding_parallel_degree))
             return "_".join(name)
         else:
             return None

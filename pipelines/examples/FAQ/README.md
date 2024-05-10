@@ -113,7 +113,11 @@ curl http://localhost:9200/_aliases?pretty=true
 python utils/offline_ann.py --index_name insurance \
                             --doc_dir data/insurance \
                             --split_answers \
-                            --delete_index
+                            --delete_index \
+                            --query_embedding_model rocketqa-zh-nano-query-encoder \
+                            --passage_embedding_model rocketqa-zh-nano-para-encoder \
+                            --embedding_dim 312
+
 ```
 参数含义说明
 * `index_name`: 索引的名称
@@ -134,6 +138,9 @@ curl http://localhost:9200/insurance/_search
 ```
 
 #### 3.4.3 启动 RestAPI 模型服务
+
+**注意** dense_faq.yaml里面的检索模型需要与前面使用offline_ann.py建库的时候使用的检索模型一致
+
 ```bash
 # 指定FAQ智能问答系统的Yaml配置文件
 export PIPELINE_YAML_PATH=rest_api/pipeline/dense_faq.yaml

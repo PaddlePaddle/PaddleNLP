@@ -39,10 +39,9 @@ import paddle.amp.auto_cast as autocast
 import paddle.distributed as dist
 import paddle.nn as nn
 from packaging import version
+from paddle import framework
+from paddle.base import core
 from paddle.distributed import fleet
-from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
-    DygraphShardingOptimizer,
-)
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
     HybridParallelOptimizer,
 )
@@ -416,9 +415,9 @@ class Trainer:
             self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
             if self.amp_dtype == "float16" or self.amp_dtype == "bfloat16":
                 if ShardingOption.SHARD_OP in self.args.sharding:
-                    self.scaler = fleet.distributed_scaler(self.scaler)
                     if self.args.amp_master_grad:
                         mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
+                    self.scaler = fleet.distributed_scaler(self.scaler)
                 else:
                     # scaler for stage2 and stage3
                     from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
@@ -1014,6 +1013,7 @@ class Trainer:
                     self.timers and self.timers("optimizer-step").start()
 
                     if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss():
+                        paddle.device.synchronize()
                         for p in model._layers.parameters():
                             with paddle.no_grad():
                                 if hasattr(p, "main_grad") and p.main_grad is not None:
@@ -1259,6 +1259,20 @@ class Trainer:
             logs["learning_rate"] = float("{0:.3e}".format(self._get_learning_rate()))
             logs["global_step"] = int(self.state.global_step)
 
+            divisor = 2**30
+            # TODO(@gexiao): replace these codes with unified APIs in Paddle
+            current_device = framework._current_expected_place_()
+            if str(current_device) != "Place(cpu)":
+                device_id = current_device.get_device_id()
+                current_memory_allocated = core.device_memory_stat_current_value("Allocated", device_id)
+                current_memory_reserved = core.device_memory_stat_current_value("Reserved", device_id)
+                max_memory_allocated = core.device_memory_stat_peak_value("Allocated", device_id)
+                max_memory_reserved = core.device_memory_stat_peak_value("Reserved", device_id)
+                logs["current_memory_allocated"] = current_memory_allocated / divisor
+                logs["current_memory_reserved"] = current_memory_reserved / divisor
+                logs["max_memory_allocated"] = max_memory_allocated / divisor
+                logs["max_memory_reserved"] = max_memory_reserved / divisor
+
             total_train_batch_size = (
                 self.args.train_batch_size * self.args.gradient_accumulation_steps * self.args.dataset_world_size
             )
@@ -1421,8 +1435,6 @@ class Trainer:
         if is_datasets_available() and eval_dataset is not None and isinstance(eval_dataset, datasets.Dataset):
             eval_dataset = self._remove_unused_columns(eval_dataset, description="evaluation")
 
-        _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
-
         if self._is_iterable_dataset(eval_dataset):
             if self.args.dataset_world_size > 1:
                 eval_dataset = IterableDatasetShard(
@@ -1433,24 +1445,41 @@ class Trainer:
                     process_index=self.args.dataset_rank,
                 )
 
-            return _DataLoader(
-                eval_dataset,
-                batch_size=self.args.per_device_eval_batch_size,
-                collate_fn=self.data_collator,
-                num_workers=self.args.dataloader_num_workers,
-            )
+            if self.args.distributed_dataloader:
+                return DistDataLoader(
+                    eval_dataset,
+                    batch_size=self.args.per_device_eval_batch_size,
+                    collate_fn=self.data_collator,
+                    num_workers=self.args.dataloader_num_workers,
+                    eval=True,
+                )
+            else:
+                return DataLoader(
+                    eval_dataset,
+                    batch_size=self.args.per_device_eval_batch_size,
+                    collate_fn=self.data_collator,
+                    num_workers=self.args.dataloader_num_workers,
+                )
 
         eval_sampler = self._get_eval_sampler(eval_dataset)
 
         if self.args.distributed_dataloader:
             logger.info("Eval using DistDataLoader.")
 
-        return _DataLoader(
-            eval_dataset,
-            batch_sampler=eval_sampler,
-            collate_fn=self.data_collator,
-            num_workers=self.args.dataloader_num_workers,
-        )
+            return DistDataLoader(
+                eval_dataset,
+                batch_sampler=eval_sampler,
+                collate_fn=self.data_collator,
+                num_workers=self.args.dataloader_num_workers,
+                eval=True,
+            )
+        else:
+            return DataLoader(
+                eval_dataset,
+                batch_sampler=eval_sampler,
+                collate_fn=self.data_collator,
+                num_workers=self.args.dataloader_num_workers,
+            )
 
     def get_test_dataloader(self, test_dataset: Dataset) -> DataLoader:
         """
@@ -1471,8 +1500,6 @@ class Trainer:
         if is_datasets_available() and test_dataset is not None and isinstance(test_dataset, datasets.Dataset):
             test_dataset = self._remove_unused_columns(test_dataset, description="test")
 
-        _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
-
         if self._is_iterable_dataset(test_dataset):
             if self.args.dataset_world_size > 1:
                 test_dataset = IterableDatasetShard(
@@ -1483,25 +1510,42 @@ class Trainer:
                     process_index=self.args.dataset_rank,
                 )
 
-            return _DataLoader(
-                test_dataset,
-                batch_size=self.args.per_device_eval_batch_size * self.world_size,
-                collate_fn=self.data_collator,  # _get_collator_with_removed_columns
-                num_workers=self.args.dataloader_num_workers,
-            )
+            if self.args.distributed_dataloader:
+                return DistDataLoader(
+                    test_dataset,
+                    batch_size=self.args.per_device_eval_batch_size * self.world_size,
+                    collate_fn=self.data_collator,  # _get_collator_with_removed_columns
+                    num_workers=self.args.dataloader_num_workers,
+                    eval=True,
+                )
+            else:
+                return DataLoader(
+                    test_dataset,
+                    batch_size=self.args.per_device_eval_batch_size * self.world_size,
+                    collate_fn=self.data_collator,  # _get_collator_with_removed_columns
+                    num_workers=self.args.dataloader_num_workers,
+                )
 
         test_sampler = self._get_eval_sampler(test_dataset)
 
         if self.args.distributed_dataloader:
             logger.info("Test using DistDataLoader.")
 
-        # We use the same batch_size as for eval.
-        return _DataLoader(
-            test_dataset,
-            batch_sampler=test_sampler,
-            collate_fn=self.data_collator,
-            drop_last=self.args.dataloader_drop_last,
-        )
+            # We use the same batch_size as for eval.
+            return DistDataLoader(
+                test_dataset,
+                batch_sampler=test_sampler,
+                collate_fn=self.data_collator,
+                drop_last=self.args.dataloader_drop_last,
+                eval=True,
+            )
+        else:
+            return DataLoader(
+                test_dataset,
+                batch_sampler=test_sampler,
+                collate_fn=self.data_collator,
+                drop_last=self.args.dataloader_drop_last,
+            )
 
     def create_optimizer_and_scheduler(self, num_training_steps: int):
         """
@@ -1538,38 +1582,14 @@ class Trainer:
             if hasattr(optimizer_cls, "_create_master_weight") and self.args.fp16_opt_level == "O2":
                 optimizer_kwargs["multi_precision"] = True
 
-            def is_new_version_sharding_stage1_optimizer():
-                signature_keys = set(inspect.signature(DygraphShardingOptimizer).parameters.keys())
-                return "inner_optimizer_class" not in signature_keys
-
-            if ShardingOption.SHARD_OP in self.args.sharding and not is_new_version_sharding_stage1_optimizer():
-                # for backward compatibility.
-                # this call will raise, if sharding stage1 is supported in HybridParallelOptimizer,
-                # in which case, the logic follows will handle it
-                self.optimizer = DygraphShardingOptimizer(
-                    hcg=fleet.get_hybrid_communicate_group(),
-                    user_defined_strategy=None,
-                    params=params,
-                    inner_optimizer_class=optimizer_cls,
-                    learning_rate=self.lr_scheduler if lr_scheduler is None else lr_scheduler,
-                    apply_decay_param_fun=apply_decay_param_fun,
-                    weight_decay=self.args.weight_decay,
-                    grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm)
-                    if self.args.max_grad_norm > 0
-                    else None,
-                    **optimizer_kwargs,
-                )
-            else:
-                self.optimizer = optimizer_cls(
-                    learning_rate=self.lr_scheduler if lr_scheduler is None else lr_scheduler,
-                    apply_decay_param_fun=apply_decay_param_fun,
-                    parameters=params,
-                    weight_decay=self.args.weight_decay,
-                    grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm)
-                    if self.args.max_grad_norm > 0
-                    else None,
-                    **optimizer_kwargs,
-                )
+            self.optimizer = optimizer_cls(
+                learning_rate=self.lr_scheduler if lr_scheduler is None else lr_scheduler,
+                apply_decay_param_fun=apply_decay_param_fun,
+                parameters=params,
+                weight_decay=self.args.weight_decay,
+                grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm) if self.args.max_grad_norm > 0 else None,
+                **optimizer_kwargs,
+            )
 
         return self.optimizer
 
@@ -1612,8 +1632,6 @@ class Trainer:
 
         random.setstate(checkpoint_rng_state["python"])
         np.random.set_state(checkpoint_rng_state["numpy"])
-
-        core = paddle.framework.core
 
         core.default_cpu_generator().set_state(checkpoint_rng_state["cpu"])
         if core.is_compiled_with_cuda():
@@ -1677,13 +1695,16 @@ class Trainer:
         warmup = (
             self.args.warmup_steps if self.args.warmup_steps > 0 else int(self.args.warmup_ratio * num_training_steps)
         )
+        decay_steps = num_training_steps
+        if hasattr(self.args, "decay_steps") and self.args.decay_steps > 0:
+            decay_steps = self.args.decay_steps
 
         if self.lr_scheduler is None:
             self.lr_scheduler = get_scheduler(
                 self.args.lr_scheduler_type,
                 learning_rate=self.args.learning_rate,
                 num_warmup_steps=warmup,
-                num_training_steps=num_training_steps,
+                num_training_steps=decay_steps,
                 num_cycles=self.args.num_cycles,
                 lr_end=self.args.lr_end,
                 power=self.args.power,
@@ -2119,6 +2140,11 @@ class Trainer:
             # recover unified_checkpoint_config for not trine stage
             if not self.is_in_train:
                 self.args.unified_checkpoint_config = unified_checkpoint_config_backup
+        if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
+            # save checkpoint_done file to ensure checkpoint is complete
+            if self.args.should_save_model_state and self.args.should_save:
+                # For ckpt integrity
+                paddle.save(self.state.global_step, os.path.join(output_dir, ".checkpoint_done"))
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
@@ -2410,6 +2436,7 @@ class Trainer:
             self.runtime_timer.stop()
             return
 
+        logger.info("Loading optimizer and scheduler...")
         if (not self.args.should_load_sharding_stage1_model) and self.args.ignore_load_lr_and_optim:
             self.runtime_timer.stop()
             return
@@ -2739,11 +2766,15 @@ class Trainer:
         # Number of losses has been rounded to a multiple of batch_size and in a distributed training, the number of
         # samplers has been rounded to a multiple of batch_size, so we truncate.
         if all_losses is not None:
-            all_losses = all_losses[:num_samples]
+            all_losses = all_losses[: num_samples * int(self.args.world_size / self.args.dataset_world_size)]
         if all_preds is not None:
-            all_preds = nested_truncate(all_preds, num_samples)
+            all_preds = nested_truncate(
+                all_preds, num_samples * int(self.args.world_size / self.args.dataset_world_size)
+            )
         if all_labels is not None:
-            all_labels = nested_truncate(all_labels, num_samples)
+            all_labels = nested_truncate(
+                all_labels, num_samples * int(self.args.world_size / self.args.dataset_world_size)
+            )
 
         model.train()
 
