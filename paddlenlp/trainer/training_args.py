@@ -793,6 +793,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "whether to run distributed training in auto parallel mode"},
     )
+    tensor_parallel_output: Optional[bool] = field(
+        default=False,
+        metadata={"help": "whether to output logits in distributed status"},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
