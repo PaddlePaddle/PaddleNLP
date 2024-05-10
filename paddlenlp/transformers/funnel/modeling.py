@@ -547,7 +547,7 @@ class FunnelRelMultiheadAttention(nn.Layer):
         )
 
         if cls_mask is not None:
-            token_type_attn *= cls_mask
+            token_type_attn *= cls_mask.astype(token_type_attn.dtype)
         return token_type_attn
 
     def forward(self, query, key, value, attention_inputs, output_attentions=False):
