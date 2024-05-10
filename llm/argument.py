@@ -48,6 +48,7 @@ class DataArgument:
     dataset_name_or_path: str = field(default=None, metadata={"help": "Name or path for dataset"})
     task_name: str = field(default=None, metadata={"help": "Additional name to select a more specific task."})
     zero_padding: bool = field(default=False, metadata={"help": "Whether to use Zero Padding data stream"})
+    use_sparse_mask: bool = field(default=False, metadata={"help": "Whether to use Column Sparse Mask"})
     src_length: int = field(default=1024, metadata={"help": "The maximum length of source(context) tokens."})
     max_length: int = field(
         default=2048,

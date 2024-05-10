@@ -264,6 +264,8 @@ class Trainer:
         self.args = args
         self.is_in_train = False
         # self.do_grad_scaling = args.fp16
+        self._tokens_per_sec_per_card_buffer = []
+        self.skip_first_tokens_per_sec_per_card_buffer = True
 
         # memory metrics - must set up as early as possible
         self._memory_tracker = TrainerMemoryTracker(self.args.skip_memory_metrics)
@@ -1226,6 +1228,7 @@ class Trainer:
             logs["learning_rate"] = float("{0:.3e}".format(self._get_learning_rate()))
             logs["global_step"] = int(self.state.global_step)
 
+
             total_train_batch_size = (
                 self.args.train_batch_size * self.args.gradient_accumulation_steps * self.args.dataset_world_size
             )
@@ -1238,6 +1241,13 @@ class Trainer:
                     num_steps=num_steps,
                 )
             )
+
+            logs["tokens_per_sec_per_card"] = round(
+                self.args.max_length * logs["interval_samples_per_second"] / self.args.world_size, 2
+            )
+
+            self._tokens_per_sec_per_card_buffer.append(logs["tokens_per_sec_per_card"])
+            logs["tokens_per_sec_per_card_average"] = round(np.mean(self._tokens_per_sec_per_card_buffer), 2)
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
@@ -1261,6 +1271,10 @@ class Trainer:
 
             self.log(logs, **kwargs)
 
+            if self.skip_first_tokens_per_sec_per_card_buffer and len(self._tokens_per_sec_per_card_buffer) == 5:
+                self._tokens_per_sec_per_card_buffer = []
+                self.skip_first_tokens_per_sec_per_card_buffer = False
+
         metrics = None
         if self.control.should_evaluate:
             if isinstance(self.optimizer, GroupShardedOptimizerStage2) and self.optimizer._broadcast_overlap:
@@ -1283,6 +1297,8 @@ class Trainer:
             self._save_checkpoint(model, metrics=metrics)
             logger.info(f"{self.runtime_timer.log()}")
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
+            self._tokens_per_sec_per_card_buffer = []
+            self.skip_first_tokens_per_sec_per_card_buffer = True
 
     def _get_learning_rate(self):
         return self.optimizer.get_lr()

@@ -35,7 +35,7 @@ from utils import (
 )
 
 from paddlenlp.data import DataCollatorForSeq2Seq
-from paddlenlp.datasets import InTokensIterableDataset, InTokensMapDataset, load_dataset
+from paddlenlp.datasets import InTokensIterableDataset, InTokensMapDataset, InTokensSparseMaskMapDataset, load_dataset
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
@@ -182,6 +182,7 @@ def main():
 
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
+    #tokenizer.padding_side = "right"
     # init chat_template for tokenizer
     init_chat_template(tokenizer, model_args.model_name_or_path, data_args.chat_template)
 
@@ -315,7 +316,11 @@ def main():
         )
         train_ds = train_ds.skip(consumed_samples)
 
-    if training_args.pipeline_parallel_degree > 1:
+    if data_args.use_sparse_mask:
+        from data import convert_example_using_sparse_mask
+        trans_func = partial(convert_example_using_sparse_mask, tokenizer=tokenizer, data_args=data_args)
+        print('convert_example_using_sparse_mask')
+    elif training_args.pipeline_parallel_degree > 1:
         from data import convert_example_common
 
         trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
@@ -350,11 +355,14 @@ def main():
         else None
     )
     if data_args.zero_padding:
-        if data_args.lazy:
+        if data_args.use_sparse_mask:
+            intoken_dataset = InTokensSparseMaskMapDataset
+        elif data_args.lazy:
             intoken_dataset = InTokensIterableDataset
         else:
             intoken_dataset = InTokensMapDataset
         logger.info("Creating Zero Padding Data Stream. This may take a few minutes.")
+        print('InTokensSparseMaskMapDataset', intoken_dataset)
         train_ds = (
             intoken_dataset(
                 train_ds,
@@ -471,6 +479,10 @@ def main():
     else:
         metrics = compute_metrics
 
+    padding = "max_length"
+    max_length = data_args.max_length
+    training_args.max_length = max_length
+    return_attention_mask = False if data_args.use_sparse_mask else True
     trainer = CausalLMTrainer(
         model=model,
         args=training_args,
@@ -484,6 +496,7 @@ def main():
             padding=padding,
             max_label_length=max_length,
             return_tensors="np",
+            return_attention_mask=return_attention_mask,
         ),
         do_generation=data_args.eval_with_do_generation,
         callbacks=[InTokensIterDatasetCallback()] if isinstance(train_ds, InTokensIterableDataset) else None,

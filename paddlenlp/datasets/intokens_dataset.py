@@ -57,6 +57,44 @@ class InTokens:
             batched_features["position_ids"] = np.concatenate(batched_features["position_ids"], axis=-1).tolist()
         return batched_features
 
+class InTokensSparseMask:
+    required_input_keys = ["input_ids", "labels"]
+    required_output_keys = ["input_ids", "labels", "attn_mask_start_row_indices"]
+    # Only supported the following keys for InTokens. Keys outside of the set will be ignored.
+    supported_input_keys = ["input_ids", "labels", "position_ids"]
+
+    @classmethod
+    def _pad_batch_records(cls, batch_records):
+        # Only consider supported input keys
+        input_keys = [key for key in batch_records[0].keys() if key in cls.supported_input_keys]
+
+        # Check required_keys
+        for key in cls.required_input_keys:
+            if key not in input_keys:
+                raise ValueError(f"feature `{key}` is required for InTokensDataset")
+        # Output features must include all required output keys
+        for key in cls.required_output_keys:
+            if key not in input_keys:
+                input_keys.append(key)
+
+        batched_features = {key: [] for key in input_keys}
+        cur_len_so_far = 0
+        for record in batch_records:
+            batched_features["input_ids"].extend(record["input_ids"])
+            batched_features["labels"].extend(record["labels"])
+            seq_length = len(record["input_ids"])
+            cur_len_so_far += seq_length
+            batched_features["attn_mask_start_row_indices"].extend(seq_length * [cur_len_so_far])
+            # NOTE: position_ids is optional and not required by every model
+            # We append instead of extend here to accomodate 2D position ids
+            if "position_ids" in record:
+                batched_features["position_ids"].append(record["position_ids"])
+        # convert to 2-D [num_head(1), seq_length]
+        batched_features["attn_mask_start_row_indices"] = np.array(batched_features["attn_mask_start_row_indices"], dtype=np.int32).reshape([1, -1])
+        if "position_ids" in batched_features:
+            # Accomodate both 1D and 2D position ids
+            batched_features["position_ids"] = np.concatenate(batched_features["position_ids"], axis=-1).tolist()
+        return batched_features
 
 class InTokensMapDataset(InTokens, Dataset):
     def __init__(self, data, tokenizer, max_length):
@@ -131,3 +169,44 @@ class InTokensIterableDataset(InTokens, IterableDataset):
         if batch_records:
             padded_list = self._pad_batch_records(batch_records)
             yield padded_list
+
+class InTokensSparseMaskMapDataset(InTokensSparseMask, Dataset):
+    def __init__(self, data, tokenizer, max_length):
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+        self.new_data = self._create_intokens_data(data)
+
+    def _create_intokens_data(self, data):
+        batch_records, max_len = [], 0
+        cur_len_so_far = 0
+
+        total_data = []
+        for i in range(len(data)):
+            record = data[i]
+            max_len = max(max_len, len(record["input_ids"]))
+            to_append = (cur_len_so_far + len(record["input_ids"])) <= self.max_length
+            if to_append:
+                batch_records.append(record)
+                cur_len_so_far += len(record["input_ids"])
+            else:
+                # exceed max length
+                padded_list = self._pad_batch_records(batch_records)
+                total_data.append(padded_list)
+                # reset
+                batch_records, max_len = [], 0
+                cur_len_so_far = 0
+                # append current data
+                batch_records.append(record)
+                cur_len_so_far += len(record["input_ids"])
+
+        # remaining data
+        if batch_records:
+            padded_list = self._pad_batch_records(batch_records)
+            total_data.append(padded_list)
+        return total_data
+
+    def __getitem__(self, idx):
+        return self.new_data[idx]
+
+    def __len__(self):
+        return len(self.new_data)

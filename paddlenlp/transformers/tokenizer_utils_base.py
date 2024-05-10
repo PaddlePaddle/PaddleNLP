@@ -3169,6 +3169,12 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 if return_attention_mask:
 
                     encoded_inputs["attention_mask"] = encoded_inputs["attention_mask"] + [0] * difference
+                if "attn_mask_start_row_indices" in encoded_inputs:
+                    full_value = encoded_inputs["attn_mask_start_row_indices"][-1, -1]
+                    encoded_inputs["attn_mask_start_row_indices"] = (
+                        np.concatenate([encoded_inputs["attn_mask_start_row_indices"], 
+                            np.full([1, difference], full_value, dtype=np.int32)], axis=-1)
+                    )
                 if "token_type_ids" in encoded_inputs:
                     encoded_inputs["token_type_ids"] = (
                         encoded_inputs["token_type_ids"] + [self.pad_token_type_id] * difference
@@ -3188,6 +3194,11 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             elif self.padding_side == "left":
                 if return_attention_mask:
                     encoded_inputs["attention_mask"] = [0] * difference + encoded_inputs["attention_mask"]
+                if "attn_mask_start_row_indices" in encoded_inputs:
+                    encoded_inputs["attn_mask_start_row_indices"] = (
+                        np.concatenate([np.zeros([1, difference], dtype=np.int32), 
+                            encoded_inputs["attn_mask_start_row_indices"]+difference], axis=-1)
+                    )
                 if "token_type_ids" in encoded_inputs:
                     encoded_inputs["token_type_ids"] = [self.pad_token_type_id] * difference + encoded_inputs[
                         "token_type_ids"

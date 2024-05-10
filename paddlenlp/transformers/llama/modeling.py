@@ -202,6 +202,7 @@ def scaled_dot_product_attention(
     attention_mask,
     output_attentions,
     alibi=None,
+    attn_mask_start_row_indices=None,
     sequence_parallel=False,
     reshard_layer=None,
 ):
@@ -213,7 +214,17 @@ def scaled_dot_product_attention(
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
 
         version = paddle.version.full_version
-        if version != "0.0.0" and version <= "2.5.2":
+        if attn_mask_start_row_indices is not None:
+            assert alibi is None, "flash_attention_with_sparse_mask not support alibi"
+            attn_output = F.flash_attention_with_sparse_mask(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask_start_row_indices=attn_mask_start_row_indices,
+                is_causal=True,
+            )
+            attn_weights = None
+        elif version != "0.0.0" and version <= "2.5.2":
             if alibi is not None:
                 raise ValueError("Flash Attention doesn't support alibi")
             attn_output, attn_weights = flash_attention(
@@ -808,6 +819,7 @@ class LlamaAttention(nn.Layer):
         output_attentions: bool = False,
         use_cache: bool = False,
         alibi: Optional[paddle.Tensor] = None,
+        attn_mask_start_row_indices: Optional[paddle.Tensor] = None,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
@@ -1010,6 +1022,7 @@ class LlamaAttention(nn.Layer):
                 attention_mask,
                 output_attentions,
                 alibi,
+                attn_mask_start_row_indices,
                 self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
                 use_reentrant=self.config.recompute_use_reentrant,
@@ -1023,6 +1036,7 @@ class LlamaAttention(nn.Layer):
                 attention_mask,
                 output_attentions,
                 alibi,
+                attn_mask_start_row_indices,
                 self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
             )
@@ -1077,6 +1091,7 @@ class LlamaDecoderLayer(nn.Layer):
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
         alibi: Optional[paddle.Tensor] = None,
+        attn_mask_start_row_indices: Optional[paddle.Tensor] = None,
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         """
         Args:
@@ -1113,6 +1128,7 @@ class LlamaDecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
+                attn_mask_start_row_indices,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
@@ -1124,6 +1140,7 @@ class LlamaDecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
+                attn_mask_start_row_indices,
             )
 
         if type(outputs) is tuple:
@@ -1396,6 +1413,7 @@ class LlamaModel(LlamaPretrainedModel):
         past_key_value: Tensor,
         use_cache: bool,
         alibi=None,
+        attn_mask_start_row_indices=None,
     ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
@@ -1412,6 +1430,7 @@ class LlamaModel(LlamaPretrainedModel):
             past_key_value,
             use_cache,
             alibi,
+            attn_mask_start_row_indices,
             use_reentrant=self.config.recompute_use_reentrant,
         )
 
@@ -1428,6 +1447,7 @@ class LlamaModel(LlamaPretrainedModel):
         output_attentions=False,
         output_hidden_states=None,
         return_dict=False,
+        attn_mask_start_row_indices=None,
         **kwargs,
     ):
         if self.sequence_parallel and use_cache:
@@ -1472,10 +1492,10 @@ class LlamaModel(LlamaPretrainedModel):
             inputs_embeds = ScatterOp.apply(inputs_embeds)
 
         # embed positions
-        if attention_mask is None:
+        if attn_mask_start_row_indices is None and attention_mask is None:
             # [bs, seq_len]
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
-        if self.config.alibi:
+        if attn_mask_start_row_indices is None and self.config.alibi:
             alibi = build_alibi_tensor(attention_mask, self.config.num_attention_heads, dtype=inputs_embeds.dtype)
             if self.config.tensor_parallel_degree > 1:
                 block_size = self.config.num_attention_heads // self.config.tensor_parallel_degree
@@ -1494,10 +1514,11 @@ class LlamaModel(LlamaPretrainedModel):
         if position_ids is None:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
 
-        attention_mask = self._prepare_decoder_attention_mask(
-            attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
-        )  # [bs, 1, seq_len, seq_len]
-        if self.config.use_flash_attention:
+        if attn_mask_start_row_indices is None:
+            attention_mask = self._prepare_decoder_attention_mask(
+                attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
+            )  # [bs, 1, seq_len, seq_len]
+        if attn_mask_start_row_indices is None and self.config.use_flash_attention:
             is_casual = is_casual_mask(attention_mask)
             if is_casual and alibi is None:
                 attention_mask = None
@@ -1529,6 +1550,7 @@ class LlamaModel(LlamaPretrainedModel):
                     past_key_value,
                     use_cache,
                     alibi=alibi,
+                    attn_mask_start_row_indices=attn_mask_start_row_indices,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -1539,6 +1561,7 @@ class LlamaModel(LlamaPretrainedModel):
                     past_key_value,
                     use_cache,
                     alibi=alibi,
+                    attn_mask_start_row_indices=attn_mask_start_row_indices,
                 )
 
             # NOTE: clear outdate cache after it has been used for memory saving
@@ -1763,6 +1786,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
+        attn_mask_start_row_indices=None,
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1779,6 +1803,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            attn_mask_start_row_indices=attn_mask_start_row_indices,
         )
 
         hidden_states = outputs[0]  # [bs, seq_len, dim]
