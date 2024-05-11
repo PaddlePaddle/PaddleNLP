@@ -13,17 +13,6 @@
 # limitations under the License.
 
 max_steps=${1:-1000}
-lock_seed_flag=${2:-close}
-if [[ ${lock_seed_flag} =~ "open_lock_seed" ]];then
-    export npu_deterministic=true
-    export ACL_OP_DETERMINISTIC=true
-    export ACL_OPT_DETERMINISTIC=true
-    export HCCL_DETERMINISTIC=true
-fi
-echo lock_seed_flag 
-echo $lock_seed_flag
-echo npu_deterministic ACL_OP_DETERMINISTIC ACL_OPT_DETERMINISTIC HCCL_DETERMINISTIC
-echo $npu_deterministic $ACL_OP_DETERMINISTIC $ACL_OPT_DETERMINISTIC $HCCL_DETERMINISTIC
 
 export ASCEND_RT_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
 export FLAGS_use_stride_kernel=0
@@ -35,13 +24,10 @@ export MC2=1
 export FLAGS_allocator_strategy=naive_best_fit
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
-#240411新增
-# export MC2=1
 
 rm -rf lora_bf16_llama_N1C8
 rm -rf output/lora_bf16_llama_N1C8
-ps aux | grep "train.py" | grep -v grep | awk '{print $2}' | xargs kill -9
-ps aux | grep "run_pretrain.py" | grep -v grep | awk '{print $2}' | xargs kill -9
+ps aux | grep "finetune_generation.py" | grep -v grep | awk '{print $2}' | xargs kill -9
 export PYTHONPATH=../../../:$PYTHONPATH
 python -u  -m paddle.distributed.launch \
     --devices "0,1,2,3,4,5,6,7" \
