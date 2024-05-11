@@ -105,8 +105,8 @@ function _train(){
             --recompute 0 \
             --do_train \
             --do_eval \
-            --device 'gpu' \
-            --data_impl 'mmap' \
+            --device gpu \
+            --data_impl mmap \
             --enable_auto_parallel 1 \
             --max_grad_norm 1.0 \
             --num_hidden_layers 4 \
@@ -126,6 +126,8 @@ function _train(){
     esac
 
     cd ../llm/llama/auto_parallel/
+    rm -rf ./mylog   # 注意执行前删掉log目录
+    rm -rf output/$model_item
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
 
     python -c "import paddlenlp"
