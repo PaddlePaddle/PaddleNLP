@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections.abc import Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
@@ -185,3 +186,20 @@ def trl_sanitze_kwargs_for_tagging(model, tag_names, kwargs=None):
             tag_names.append(kwargs["tags"])
             kwargs["tags"] = tag_names
     return kwargs
+
+
+def flatten_dict(nested: Dict, sep: str = "/") -> Dict:
+    """Flatten dictionary and concatenate nested keys with separator."""
+
+    def recurse(nest: Dict, prefix: str, into: Dict) -> None:
+        for k, v in nest.items():
+            if sep in k:
+                raise ValueError(f"separator '{sep}' not allowed to be in key '{k}'")
+            if isinstance(v, Mapping):
+                recurse(v, prefix + k + sep, into)
+            else:
+                into[prefix + k] = v
+
+    flat = {}
+    recurse(nested, "", flat)
+    return flat
