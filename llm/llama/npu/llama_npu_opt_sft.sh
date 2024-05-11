@@ -27,16 +27,13 @@ export MC2=1
 export FLAGS_allocator_strategy=naive_best_fit
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
-#240411新增
-# export MC2=1
 export HCCL_OP_BASE_FFTS_MODE_ENABLE=TRUE
 export MULTI_STREAM_MEMORY_REUSE=1
 
 export PYTHONPATH=../../../:$PYTHONPATH
 rm -rf sft_bf16_llama_N1C8
 rm -rf output/sft_bf16_llama_N1C8
-ps aux | grep "train.py" | grep -v grep | awk '{print $2}' | xargs kill -9
-ps aux | grep "run_pretrain.py" | grep -v grep | awk '{print $2}' | xargs kill -9
+ps aux | grep "finetune_generation.py" | grep -v grep | awk '{print $2}' | xargs kill -9
 python -u  -m paddle.distributed.launch \
     --devices "0,1,2,3,4,5,6,7" \
     --log_dir "./sft_bf16_llama_N1C8" \
