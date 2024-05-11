@@ -246,12 +246,38 @@ def launch(args, default_params: dict = {}):
                 max_length.change(max_length_change_event, inputs=[src_length, max_length], outputs=src_length)
 
                 json_mode = gr.Checkbox(label="JSON Mode", info=" 是否开启JSON Mode,让输出成为一个有效json 数据格式。", value=True)
+                default_json_schema = """{
+    "properties": {
+        "start_location": {
+            "description": "出发地",
+            "title": "Start Location",
+            "type": "string"
+        },
+        "end_location": {
+            "description": "目的地",
+            "title": "End Location",
+            "type": "string"
+        },
+        "time": {
+            "description": "时间",
+            "title": "Time",
+            "type": "string"
+        }
+    },
+    "required": [
+        "start_location",
+        "end_location",
+        "time"
+    ],
+    "title": "AnswerFormat",
+    "type": "object"
+}"""
                 json_schema = gr.Textbox(
                     label="Schema of JSON Mode",
                     info="用于解析JSON 结果的",
                     lines=10,
                     # value="{}",
-                    value="{}",
+                    value=default_json_schema,
                     visible=False,
                 )
 

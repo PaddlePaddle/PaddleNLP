@@ -336,7 +336,7 @@ class DygraphPredictor(BasePredictor):
     @paddle.no_grad()
     def predict_json_result(self, source: str, json_schema: Optional[str] = None):
         from paddlenlp.experimental.transformers.generation_utils import (
-            Json,
+            compile_json_schema_steps,
             set_tokenizer,
             steps_generate,
         )
@@ -358,14 +358,14 @@ class DygraphPredictor(BasePredictor):
 
         set_tokenizer(self.tokenizer)
         logger.info("start to building json parser ...")
-        steps = [
-            source[0],
-            Json(schema=json.loads(json_schema), dtype=self.config.dtype),
-        ]
+        steps = compile_json_schema_steps(json_schema)
+        # steps = [source[0]] + steps
+        steps[0] = source[0] + steps[0]
 
         logger.info("start to generate ...")
         result_ids = steps_generate(self.model, self.tokenizer, steps)
         result = self.tokenizer.decode(result_ids.tolist()[0], skip_special_tokens=True)
+        # result = result[len(source[0]):]
         # JSON Model will add some <br> and black string
         while True:
             if len(result.strip().strip("<br>")) == len(result):
@@ -1653,6 +1653,35 @@ def predict():
         source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
         target_texts = ["", ""]
 
+    json_schema = """{
+    "properties": {
+        "start_location": {
+            "description": "出发地",
+            "title": "Start Location",
+            "type": "string"
+        },
+        "end_location": {
+            "description": "目的地",
+            "title": "End Location",
+            "type": "string"
+        },
+        "time": {
+            "description": "时间",
+            "title": "Time",
+            "type": "string"
+        }
+    },
+    "required": [
+        "start_location",
+        "end_location",
+        "time"
+    ],
+    "title": "AnswerFormat",
+    "type": "object"
+}"""
+    input_text = "我想预定一个今天从深圳到北京的飞机，请问我其中的时间、出发地和目的地信息分别是什么，以 JSON 的格式输出："
+    result = predictor.predict_json_result(input_text, json_schema)
+    return result
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
 

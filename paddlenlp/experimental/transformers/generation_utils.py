@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import json
 from typing import Callable, List, Optional, Union
 
 import paddle
@@ -29,7 +30,12 @@ from paddlenlp_ops import (
     update_inputs,
 )
 
-from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList
+from paddlenlp.generation import (
+    GenerationConfig,
+    GenerationMixin,
+    LogitsProcessor,
+    LogitsProcessorList,
+)
 
 __all__ = ["GenerationInferenceModel", "GenerationBlockInferenceModel"]
 
@@ -735,6 +741,11 @@ class PrefixConstrainedNoBeamLogitsProcessor(LogitsProcessor):
 
 class GenerationStep:
     tokenizer = None
+    generation_config = None
+
+    def __init__(self, generation_config: Optional[GenerationConfig] = None, skip: bool = False):
+        self.generation_config = generation_config
+        self.skip = skip
 
     def forward(self, model):
         raise NotImplementedError
@@ -776,10 +787,75 @@ class GenerationStep:
                 past_key_values[kv_index][layer_index] = past_key_values[kv_index][layer_index][:, : length - 1, :, :]
         return past_key_values
 
+    def get_eos_token_id(self, custom_eos_token_id: Optional[int, list[int], list[list[int]]] = None):
+        def to_two_dim_eos_token_ids(ids):
+            if isinstance(ids, int):
+                return [[ids]]
+            if isinstance(ids, list) and isinstance(ids[0], int):
+                return [ids]
+            return ids
+
+        eos_token_id = to_two_dim_eos_token_ids(self.generation_config.eos_token_id)
+        if custom_eos_token_id is not None:
+            eos_token_id.extend(custom_eos_token_id)
+        return eos_token_id
+
+    def sample(self, model, input_ids, logits_processors=None, custom_eos_token_id=None, **model_inputs):
+        if self.generation_config is None:
+            self.generation_config = model.generation_config
+
+        eos_token_id = self.get_eos_token_id(custom_eos_token_id)
+        cur_len = 0
+        unfinished_flag = paddle.full([input_ids.shape[0], 1], True, dtype="bool")
+        from paddlenlp.generation.utils import get_unfinished_flag
+
+        generate_end = False
+
+        result_ids = input_ids
+        while True:
+            model_inputs["input_ids"] = input_ids
+            model_inputs = model.prepare_inputs_for_generation(**model_inputs)
+            # NOTE: to decrease ref-count and clear outdate cache in-time
+            outputs = model(**model_inputs)
+
+            logits = outputs[0]
+            model_inputs["past_key_values"] = outputs[-1]
+
+            # [batch_size, vocab_size]
+            logits = logits[:, -1, :]
+
+            # pre-process distribution
+            if logits_processors is not None:
+                logits = logits_processors(result_ids, logits)
+
+            # sample
+            logits = logits / self.generation_config.temperature
+            probs = F.softmax(logits)
+            _, input_ids = paddle.tensor.top_p_sampling(
+                probs, paddle.to_tensor([self.generation_config.top_p], dtype=logits.dtype)
+            )
+
+            cur_len += 1
+            result_ids = paddle.concat([result_ids, input_ids], axis=1)
+            sentence = self.tokenizer.decode(result_ids.tolist()[0])
+            print("sentence ->", sentence)
+
+            if eos_token_id is not None:
+                unfinished_flag = get_unfinished_flag(input_ids, unfinished_flag, eos_token_id)
+                if not paddle.any(unfinished_flag):
+                    generate_end = True
+
+            if generate_end:
+                break
+            model_inputs = model.update_model_kwargs_for_generation(outputs, model_inputs)
+        model_inputs["past_key_values"] = self.clip_past_key_values(model_inputs["past_key_values"])
+        return result_ids, model_inputs["past_key_values"]
+
 
 class Choices(GenerationStep):
-    def __init__(self, values: List[Union[str, int]], tokenizer):
+    def __init__(self, values: List[Union[str, int]], tokenizer, **kwargs):
         self.input_ids = [paddle.to_tensor([self.tokenizer(str(value))["input_ids"]]) for value in values]
+        super().__init__(**kwargs)
 
     def forward(self, model, input_ids, **model_inputs):
         min_probs, min_past_key_values = 1000000, None
@@ -802,32 +878,39 @@ class Choices(GenerationStep):
 
 
 class String(GenerationStep):
-    def __init__(self, value: str, generation_config=None):
-        tokens = self.tokenizer.tokenize(str(value))
-        self.input_ids = paddle.to_tensor([self.tokenizer.convert_tokens_to_ids(tokens)])
+    def __init__(self, eos_token: str | list[str], **kwargs):
+        if isinstance(eos_token, str):
+            eos_token = [eos_token]
+        eos_token = [str(i) for i in eos_token]
+        super().__init__(**kwargs)
+        self.eos_token_id = self.tokenizer(eos_token, add_special_tokens=False)["input_ids"]
 
     def forward(self, model, input_ids, **model_inputs):
-        if input_ids is not None:
-            input_ids = paddle.concat([input_ids, self.input_ids], axis=1)
-        else:
-            input_ids = self.input_ids
-        model_inputs = {"input_ids": input_ids, **model_inputs}
-        result = model(**model_inputs)
-        return self.input_ids, result[1]
+        result_ids, past_key_values = self.sample(
+            model, input_ids, custom_eos_token_id=self.eos_token_id, **model_inputs
+        )
+        past_key_values = self.clip_past_key_values(past_key_values)
+        return result_ids, past_key_values
 
 
 class Constant(GenerationStep):
-    def __init__(self, value: Union[str, int, float], tokenizer):
-        self.inputs = tokenizer(str(value), return_tensors="pd")
+    def __init__(self, value: Union[str, int, float], **kwargs):
+        self.inputs = self.tokenizer(str(value), return_tensors="pd")
 
     def prepare_inputs_for_generation(self, **kwargs):
-        kwargs.update(self.inputs)
+        if kwargs["input_ids"] is None:
+            kwargs.update(self.inputs)
+        else:
+            for key, value in self.inputs.items():
+                if key not in kwargs:
+                    continue
+                kwargs[key] = paddle.concat([kwargs[key], value], -1)
         return super().prepare_inputs_for_generation(**kwargs)
 
     def forward(self, model, **model_inputs):
         result = model(**model_inputs)
         past_key_values = self.clip_past_key_values(result[1])
-        return self.inputs["input_ids"], past_key_values
+        return model_inputs["input_ids"], past_key_values
 
 
 class Json(GenerationStep):
@@ -836,8 +919,9 @@ class Json(GenerationStep):
         schema: dict,
         top_p: float = 0.1,
         temperature: float = 1.0,
-        eos_token_ids: int | list[int] | list[list[int]] = None,
+        eos_token_id: int | list[int] | list[list[int]] = None,
         dtype: Optional[str] = None,
+        **kwargs
     ):
         from lmformatenforcer import JsonSchemaParser
 
@@ -850,74 +934,72 @@ class Json(GenerationStep):
         self.logits_processors = LogitsProcessorList([PrefixConstrainedNoBeamLogitsProcessor(prefix_function)])
         self.top_p = paddle.to_tensor([top_p], dtype=dtype)
         self.temperature = temperature
-        if eos_token_ids is None:
-            self.eos_token_ids = self.tokenizer.eos_token_id
+        if eos_token_id is None:
+            self.eos_token_id = self.tokenizer.eos_token_id
         else:
-            self.eos_token_ids = eos_token_ids
+            self.eos_token_id = eos_token_id
+        super().__init__(**kwargs)
 
     def forward(self, model, input_ids, **model_inputs):
-        cur_len = 0
-        unfinished_flag = paddle.full([input_ids.shape[0], 1], True, dtype="bool")
-        from paddlenlp.generation.utils import get_unfinished_flag
+        return self.sample(model, input_ids=input_ids, logits_processors=self.logits_processors, **model_inputs)
 
-        generate_end = False
 
-        result_ids = input_ids
-        input_length = input_ids.shape[1]
-        while True:
-            model_inputs["input_ids"] = input_ids
-            model_inputs = model.prepare_inputs_for_generation(**model_inputs)
-            # NOTE: to decrease ref-count and clear outdate cache in-time
-            outputs = model(**model_inputs)
+def compile_json_schema_steps(schema: str):
+    if isinstance(schema, str):
+        schema = json.loads(schema)
 
-            logits = outputs[0]
-            model_inputs["past_key_values"] = outputs[-1]
+    # plain json structure
+    steps = []
+    count, index = len(schema["properties"]), 0
+    for property_name, property in schema["properties"].items():
+        if index == 0:
+            steps.append("{")
 
-            # [batch_size, vocab_size]
-            logits = logits[:, -1, :]
+        steps.append(f'"{property_name}":"')
+        if property["type"] == "string":
+            if index < count - 1:
+                steps.append(String(eos_token=['","']))
+            else:
+                steps.append(String(eos_token=['"}']))
+        index += 1
 
-            # pre-process distribution
-            logits = self.logits_processors(result_ids, logits)
-
-            # sample
-            logits = logits / self.temperature
-            probs = F.softmax(logits)
-            _, input_ids = paddle.tensor.top_p_sampling(probs, self.top_p)
-
-            cur_len += 1
-            result_ids = paddle.concat([result_ids, input_ids], axis=1)
-
-            if self.eos_token_ids is not None:
-                unfinished_flag = get_unfinished_flag(input_ids, unfinished_flag, self.eos_token_ids)
-                if not paddle.any(unfinished_flag):
-                    generate_end = True
-
-            if generate_end:
-                break
-            model_inputs = model.update_model_kwargs_for_generation(outputs, model_inputs)
-        model_inputs["past_key_values"] = self.clip_past_key_values(model_inputs["past_key_values"])
-        return result_ids[:, input_length:], model_inputs["past_key_values"]
+    # join the string steps
+    joined_steps = []
+    for index, step in enumerate(steps):
+        if index == 0:
+            joined_steps.append(step)
+        elif index > 0 and isinstance(step, str) and isinstance(joined_steps[-1], str):
+            joined_steps[-1] = joined_steps[-1] + step
+        else:
+            joined_steps.append(step)
+    return joined_steps
 
 
 def steps_generate(model, tokenizer, steps):
     past_key_values = None
     result_ids = paddle.to_tensor([[0]], dtype=paddle.int64)
     input_ids = None
-    last_input_ids = None
+    # last_input_ids = None
     for index, step in enumerate(steps):
         if isinstance(step, (int, str, float)):
-            step = Constant(step, tokenizer)
+            step = Constant(step)
 
         model_inputs = step.prepare_inputs_for_generation(
             input_ids=input_ids, past_key_values=past_key_values, use_cache=True
         )
 
         next_token_ids, past_key_values = step(model, **model_inputs)
-        result_ids = paddle.concat([result_ids, next_token_ids], axis=1)
-        input_ids = next_token_ids[:, -1:]
-        last_input_ids = next_token_ids
+        print("generated result ->", tokenizer.decode(next_token_ids.tolist()[0]))
+        if index == len(steps) - 1:
+            result_ids = paddle.concat([result_ids, next_token_ids], axis=1)
+        else:
+            result_ids = paddle.concat([result_ids, next_token_ids[:, :-1]], axis=1)
+            input_ids = next_token_ids[:, -1:]
 
-    return last_input_ids
+        print("current result ->", tokenizer.decode(result_ids.tolist()[0]))
+        # last_input_ids = next_token_ids
+
+    return result_ids[:, 1:]
 
 
 def set_tokenizer(tokenizer):
