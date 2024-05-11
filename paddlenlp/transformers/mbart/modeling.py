@@ -63,7 +63,7 @@ def shift_tokens_right(input_ids, pad_token_id):
     batch_size, seq_length = shifted_input_ids.shape
     index = paddle.arange(0, batch_size, 1, dtype="int32") * seq_length
     index_of_eos = paddle.cast(shifted_input_ids != pad_token_id, dtype="int32").sum(axis=-1) - 1
-    decoder_start_tokens = paddle.gather(input_flat, index + index_of_eos)
+    decoder_start_tokens = paddle.gather(input_flat, index + index_of_eos.astype(index.dtype))
     shifted_input_ids[:, 1:] = shifted_input_ids[:, :-1].clone()
     shifted_input_ids[:, 0] = decoder_start_tokens
     return shifted_input_ids
