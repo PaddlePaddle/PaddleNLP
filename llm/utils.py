@@ -212,7 +212,7 @@ class CausalLMTrainer(Trainer):
             if isinstance(logits, (list, tuple)):
                 logits = logits[0]
             # all gather logits when enabling tensor_parallel_output
-            if self.args.tensor_parallel_degree > 1 and self.args.tensor_parallel_output:
+            if self.args.tensor_parallel_degree > 1 and getattr(self.args, "tensor_parallel_output", False):
                 hcg = fleet.get_hybrid_communicate_group()
                 model_parallel_group = hcg.get_model_parallel_group()
                 gathered_logits = []
