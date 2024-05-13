@@ -594,6 +594,16 @@ class TrainingArguments:
             )
         },
     )
+    sequence_parallel_config: str = field(
+        default="",
+        metadata={
+            "help": (
+                "Some additional configs which affect sequence parallel performance, we provide some option to config it."
+                "following config is support:\n"
+                "enable_allreduce_avg_in_gradinent_scale, it replace `allreduce_sum + scale` pattern with `allreduce_avg` when scale gradient in sequence_parallel, which improve the performance. ONLY supported for auto mode now. \n"
+            )
+        },
+    )
     tensor_parallel_config: str = field(
         default="",
         metadata={
@@ -1270,6 +1280,15 @@ class TrainingArguments:
                     strategy.gradient_scale_using_allreduce_avg = True
                 if "gradient_sync_after_accumulate" in data_parallel_config:
                     strategy.dp_optimization.gradient_sync_after_accumulate = True
+            sequence_parallel_config = set(self.sequence_parallel_config.split(" "))
+            for x in sequence_parallel_config:
+                if len(x) > 0:
+                    if x not in ["enable_allreduce_avg_in_gradinent_scale"]:
+                        raise ValueError(
+                            f"Found unknown sequence parallel config {x}, accpet config is enable_allreduce_avg_in_gradinent_scale."
+                        )
+            if "enable_allreduce_avg_in_gradinent_scale" in sequence_parallel_config:
+                strategy.gradient_scale_using_allreduce_avg = True
 
             # navie-pp: pipeline_parallel_degree > 1 and gradient_accumulation_steps == 1
             if self.pipeline_parallel_degree > 1 and self.gradient_accumulation_steps > 1:

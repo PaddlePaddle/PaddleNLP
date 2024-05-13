@@ -295,11 +295,12 @@ BEGINOFTEXT = "<|begin_of_text|>"
 ENDOFTEXT = "<|end_of_text|>"
 IMSTART = "<|start_header_id|>"
 IMEND = "<|end_header_id|>"
+EOTID = "<|eot_id|>"
 # as the default behavior is changed to allow special tokens in
 # regular texts, the surface forms of special tokens need to be
 # as different as possible to minimize the impact
-EXTRAS = tuple((f"<|reserved_special_token_{i}|>" for i in range(250)))
-SPECIAL_TOKENS = (BEGINOFTEXT, ENDOFTEXT) + EXTRAS[0:4] + (IMSTART, IMEND) + EXTRAS[4:]
+EXTRAS = tuple((f"<|reserved_special_token_{i}|>" for i in range(251)))
+SPECIAL_TOKENS = (BEGINOFTEXT, ENDOFTEXT) + EXTRAS[0:4] + (IMSTART, IMEND, EXTRAS[4], EOTID) + EXTRAS[5:]
 
 tiktoken = None
 
@@ -354,9 +355,11 @@ class Llama3Tokenizer(PretrainedTokenizer):
 
         self.tokenizer = enc  # type: tiktoken.Encoding
 
+        self.bod_id = self.special_tokens[BEGINOFTEXT]
         self.eod_id = self.special_tokens[ENDOFTEXT]
         self.start_header_id = self.special_tokens[IMSTART]
         self.end_header_id = self.special_tokens[IMEND]
+        self.eot_id = self.special_tokens[EOTID]
 
         if "pad_token_id" in kwargs:
             self.pad_token_id = kwargs["pad_token_id"]
