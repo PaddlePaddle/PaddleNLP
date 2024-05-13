@@ -16,6 +16,7 @@ import os
 import sys
 from dataclasses import dataclass, field
 from functools import partial
+from typing import Optional
 
 import paddle
 from argument import (
@@ -65,6 +66,10 @@ class FinetuneArguments(TrainingArguments):
     decay_steps: int = field(
         default=0,
         metadata={"help": "The steps use to control the learing rate."},
+    )
+    tensor_parallel_output: Optional[bool] = field(
+        default=False,
+        metadata={"help": "whether to output logits in distributed status"},
     )
 
 
@@ -140,7 +145,7 @@ def main():
         if not training_args.autotuner_benchmark:
             model = AutoModelForCausalLMPipe.from_pretrained(
                 model_args.model_name_or_path,
-                tensor_parallel_output=False,
+                tensor_parallel_output=training_args.tensor_parallel_output,
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 tensor_parallel_rank=training_args.tensor_parallel_rank,
                 use_flash_attention=model_args.use_flash_attention,
@@ -152,7 +157,7 @@ def main():
             # NOTE(gongenlei): new add autotuner_benchmark
             model_config = AutoConfig.from_pretrained(
                 model_args.model_name_or_path,
-                tensor_parallel_output=False,
+                tensor_parallel_output=training_args.tensor_parallel_output,
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 tensor_parallel_rank=training_args.tensor_parallel_rank,
                 dtype=dtype,
@@ -163,7 +168,7 @@ def main():
     else:
         model_config = AutoConfig.from_pretrained(
             model_args.model_name_or_path,
-            tensor_parallel_output=False,
+            tensor_parallel_output=training_args.tensor_parallel_output,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             tensor_parallel_rank=training_args.tensor_parallel_rank,
             dtype=dtype,
@@ -457,6 +462,10 @@ def main():
         model.print_trainable_parameters()
 
     if model_args.lora:
+        if training_args.sharding_parallel_degree > 1:
+            assert (
+                "enable_stage1_overlap" not in training_args.sharding_parallel_config
+            ), "Currently not support enabling sharding_stage1_overlap in lora mode."
         if model_args.lora_path is None:
             target_modules = get_lora_target_modules(model)
             lora_config = LoRAConfig(
