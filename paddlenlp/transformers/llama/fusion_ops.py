@@ -48,7 +48,16 @@ except:
     flash_attention = None
 
 
-def fusion_rope():
+def fusion_rope(
+    hidden_states,
+    position_ids,
+    past_key_value,
+    attention_mask,
+    output_attentions,
+    use_cache,
+    alibi,
+    npu_is_casual: bool = False,
+):
     pass
 
 
