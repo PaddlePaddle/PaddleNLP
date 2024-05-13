@@ -48,6 +48,10 @@ except:
     flash_attention = None
 
 
+def fusion_rope():
+    pass
+
+
 def rms_norm_fused(x_in, w, eps):
     fused_ln = try_import("fused_ln")
     return fused_ln.fused_rms_norm(x_in, w, eps)[0]
