@@ -172,6 +172,7 @@ class ModelArguments:
     )
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
+    initializer_range: float = field(default=None, metadata={"help": "The initializer range value."})
 
     continue_training: bool = field(
         default=False,
@@ -449,9 +450,12 @@ def main():
     config.pp_recompute_interval = model_args.pp_recompute_interval
     config.recompute_use_reentrant = model_args.recompute_use_reentrant
     config.use_recompute = training_args.recompute
+    if model_args.initializer_range is not None:
+        config.initializer_range = model_args.initializer_range
 
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
+
 
     # Config for model using dropout, such as GPT.
     config.hidden_dropout_prob = model_args.hidden_dropout_prob

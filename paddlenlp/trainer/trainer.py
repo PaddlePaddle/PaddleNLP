@@ -378,9 +378,9 @@ class Trainer:
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
                 if self.amp_dtype == "float16" or self.amp_dtype == "bfloat16":
                     if ShardingOption.SHARD_OP in self.args.sharding:
-                        self.scaler = fleet.distributed_scaler(self.scaler)
                         if self.args.amp_master_grad:
                             mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
+                        self.scaler = fleet.distributed_scaler(self.scaler)
                     else:
                         # scaler for stage2 and stage3
                         from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
@@ -838,6 +838,9 @@ class Trainer:
             npu_accelerate_plugin(self.optimizer)
 
         self.timers and self.timers("read-data").start()
+        
+        if self._globalstep_last_logged == 0 and os.getenv("SAVE_INIT_MODEL", None):
+            self.save_model(os.path.join(self.args.output_dir, "_init_model"))
 
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
@@ -2203,7 +2206,7 @@ class Trainer:
         checkpoints_to_be_deleted = checkpoints_sorted[:number_of_checkpoints_to_delete]
         for checkpoint in checkpoints_to_be_deleted:
             logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
-            shutil.rmtree(checkpoint)
+            shutil.rmtree(checkpoint, ignore_errors=True, onerror=None)
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
         output_dir = output_dir if output_dir is not None else self.args.output_dir
