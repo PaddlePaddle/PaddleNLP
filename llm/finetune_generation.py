@@ -16,6 +16,7 @@ import os
 import sys
 from dataclasses import dataclass, field
 from functools import partial
+from typing import Optional
 
 import paddle
 from argument import (
@@ -65,6 +66,10 @@ class FinetuneArguments(TrainingArguments):
     decay_steps: int = field(
         default=0,
         metadata={"help": "The steps use to control the learing rate."},
+    )
+    tensor_parallel_output: Optional[bool] = field(
+        default=False,
+        metadata={"help": "whether to output logits in distributed status"},
     )
 
 

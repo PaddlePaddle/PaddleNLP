@@ -273,7 +273,7 @@ class PySafeSlice:
 
 # a simple file writer object
 class fast_safe_open:
-    def __init__(self, filename, framework=None):
+    def __init__(self, filename, framework=None, device="cpu"):
         self.filename = filename
         self.framework = framework
         self.file = open(self.filename, "rb")
