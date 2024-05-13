@@ -216,7 +216,7 @@ def scaled_dot_product_attention(
     _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention:
-        fusion_ops.fusion_flash_attention(
+        return fusion_ops.fusion_flash_attention(
             query_states,
             config,
             key_states,
