@@ -37,6 +37,10 @@ from paddle.utils import try_import
 from paddlenlp.utils.tools import get_env_device
 
 try:
+    from paddle.incubate.nn.functional import fused_rotary_position_embedding
+except ImportError:
+    fused_rotary_position_embedding = None
+try:
     if get_env_device() == "npu":
         from paddle.base import core
 
@@ -48,17 +52,47 @@ except:
     flash_attention = None
 
 
-def fusion_rope(
-    hidden_states,
-    position_ids,
-    past_key_value,
-    attention_mask,
-    output_attentions,
-    use_cache,
-    alibi,
-    npu_is_casual: bool = False,
-):
-    pass
+def fusion_rope(query_states, key_states, value_states, hidden_states, position_ids, past_key_value, rotary_emb):
+    assert past_key_value is None, "fuse rotary not support cache kv for now"
+    batch_size, seq_length, num_heads, head_dim = query_states.shape
+    _, kv_seq_len, num_key_value_heads, _ = key_states.shape
+    cos, sin = rotary_emb(value_states, seq_len=kv_seq_len)
+    if get_env_device() == "npu":
+        query_states = core.eager._run_custom_op("fused_rope", query_states, cos, sin)[0]
+        key_states = core.eager._run_custom_op("fused_rope", key_states, cos, sin)[0]
+    else:
+        # paddle version > 2.6 or develop support q and k/v with different num_heads
+        paddle_version = float(paddle.__version__[:3])
+        if ((paddle_version != 0.0) and (paddle_version <= 2.6)) and (num_heads != num_key_value_heads):
+            query_states, _, _ = fused_rotary_position_embedding(
+                query_states,
+                None,
+                None,
+                sin=sin,
+                cos=cos,
+                position_ids=position_ids,
+                use_neox_rotary_style=False,
+            )
+            key_states, _, _ = fused_rotary_position_embedding(
+                key_states,
+                None,
+                None,
+                sin=sin,
+                cos=cos,
+                position_ids=position_ids,
+                use_neox_rotary_style=False,
+            )
+        else:
+            query_states, key_states, _ = fused_rotary_position_embedding(
+                query_states,
+                key_states,
+                v=None,
+                sin=sin,
+                cos=cos,
+                position_ids=position_ids,
+                use_neox_rotary_style=False,
+            )
+    return query_states, key_states
 
 
 def rms_norm_fused(x_in, w, eps):

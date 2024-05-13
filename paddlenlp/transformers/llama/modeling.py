@@ -930,45 +930,54 @@ class LlamaAttention(nn.Layer):
                 batch_size, seq_length, _, _ = query_states.shape
                 position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
             if self.use_fused_rope:
-                assert past_key_value is None, "fuse rotary not support cache kv for now"
-                batch_size, seq_length, num_heads, head_dim = query_states.shape
-                _, kv_seq_len, num_key_value_heads, _ = key_states.shape
-                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-                if get_env_device() == "npu":
-                    query_states = core.eager._run_custom_op("fused_rope", query_states, cos, sin)[0]
-                    key_states = core.eager._run_custom_op("fused_rope", key_states, cos, sin)[0]
-                else:
-                    # paddle version > 2.6 or develop support q and k/v with different num_heads
-                    paddle_version = float(paddle.__version__[:3])
-                    if ((paddle_version != 0.0) and (paddle_version <= 2.6)) and (num_heads != num_key_value_heads):
-                        query_states, _, _ = fused_rotary_position_embedding(
-                            query_states,
-                            None,
-                            None,
-                            sin=sin,
-                            cos=cos,
-                            position_ids=position_ids,
-                            use_neox_rotary_style=False,
-                        )
-                        key_states, _, _ = fused_rotary_position_embedding(
-                            key_states,
-                            None,
-                            None,
-                            sin=sin,
-                            cos=cos,
-                            position_ids=position_ids,
-                            use_neox_rotary_style=False,
-                        )
-                    else:
-                        query_states, key_states, _ = fused_rotary_position_embedding(
-                            query_states,
-                            key_states,
-                            v=None,
-                            sin=sin,
-                            cos=cos,
-                            position_ids=position_ids,
-                            use_neox_rotary_style=False,
-                        )
+                query_states, key_states = fusion_ops.fusion_rope(
+                    query_states,
+                    key_states,
+                    value_states,
+                    hidden_states,
+                    position_ids,
+                    past_key_value,
+                    self.rotary_emb,
+                )
+                # assert past_key_value is None, "fuse rotary not support cache kv for now"
+                # batch_size, seq_length, num_heads, head_dim = query_states.shape
+                # _, kv_seq_len, num_key_value_heads, _ = key_states.shape
+                # cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+                # if get_env_device() == "npu":
+                #     query_states = core.eager._run_custom_op("fused_rope", query_states, cos, sin)[0]
+                #     key_states = core.eager._run_custom_op("fused_rope", key_states, cos, sin)[0]
+                # else:
+                #     # paddle version > 2.6 or develop support q and k/v with different num_heads
+                #     paddle_version = float(paddle.__version__[:3])
+                #     if ((paddle_version != 0.0) and (paddle_version <= 2.6)) and (num_heads != num_key_value_heads):
+                #         query_states, _, _ = fused_rotary_position_embedding(
+                #             query_states,
+                #             None,
+                #             None,
+                #             sin=sin,
+                #             cos=cos,
+                #             position_ids=position_ids,
+                #             use_neox_rotary_style=False,
+                #         )
+                #         key_states, _, _ = fused_rotary_position_embedding(
+                #             key_states,
+                #             None,
+                #             None,
+                #             sin=sin,
+                #             cos=cos,
+                #             position_ids=position_ids,
+                #             use_neox_rotary_style=False,
+                #         )
+                #     else:
+                #         query_states, key_states, _ = fused_rotary_position_embedding(
+                #             query_states,
+                #             key_states,
+                #             v=None,
+                #             sin=sin,
+                #             cos=cos,
+                #             position_ids=position_ids,
+                #             use_neox_rotary_style=False,
+                #         )
             else:
                 if self.config.use_long_sequence_strategies:
                     cos, sin = self.rotary_emb(seq_len=kv_seq_len)
