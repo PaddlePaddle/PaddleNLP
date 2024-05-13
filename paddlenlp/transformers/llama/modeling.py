@@ -89,7 +89,7 @@ try:
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
-from funsion_ops import fusion_flash_attention
+from fusion_ops import fusion_flash_attention
 
 __all__ = [
     "LlamaModel",
