@@ -125,9 +125,11 @@ def get_lora_target_modules(model):
             ".*v_proj.*",
             ".*k_proj.*",
             ".*o_proj.*",
+            ".*qkv_proj.*",
             ".*gate_proj.*",
             ".*down_proj.*",
             ".*up_proj.*",
+            ".*gate_up_fused_proj.*",
         ]
     elif model.base_model_prefix == "opt":
         target_modules = [
@@ -209,6 +211,13 @@ class CausalLMTrainer(Trainer):
             # keepdim in order to maintain the same shape as logits
             if isinstance(logits, (list, tuple)):
                 logits = logits[0]
+            # all gather logits when enabling tensor_parallel_output
+            if self.args.tensor_parallel_degree > 1 and getattr(self.args, "tensor_parallel_output", False):
+                hcg = fleet.get_hybrid_communicate_group()
+                model_parallel_group = hcg.get_model_parallel_group()
+                gathered_logits = []
+                dist.all_gather(gathered_logits, logits, group=model_parallel_group)
+                logits = paddle.concat(gathered_logits, axis=-1)
             return (loss, logits.argmax(axis=-1, keepdim=True), labels)
 
         loss = None
