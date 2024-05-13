@@ -126,7 +126,10 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, transpose_y=True, tensor
 
 
 def seed_guard_context(name=None):
-    if name in get_rng_state_tracker().states_:
+    if (
+        not isinstance(paddle.base.framework._current_expected_place(), paddle.core.CPUPlace)
+        and name in get_rng_state_tracker().states_
+    ):
         return get_rng_state_tracker().rng_state(name)
     else:
         return contextlib.nullcontext()
