@@ -81,7 +81,6 @@ from .configuration import (
 
 try:
     if get_env_device() == "npu":
-        # from paddle.base import core
 
         for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
             if lib.endswith(".so"):
@@ -364,19 +363,6 @@ class LlamaRMSNorm(nn.Layer):
     def forward(self, hidden_states):
         if self.config.use_fused_rms_norm:
             return fusion_ops.fusion_rms_norm(hidden_states, self.weight, self.variance_epsilon)
-
-            # if get_env_device() == "npu":
-            #     return core.eager._run_custom_op("rms_norm_npu", hidden_states, self.weight, self.variance_epsilon)[0]
-            # elif get_env_device() == "xpu":
-            #     try:
-            #         import paddle_xpu_nn  # noqa: F821
-
-            #         return paddle_xpu_nn.xpu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
-            #     except ImportError:
-            #         raise NotImplementedError(
-            #             f"Implementation of fused_rms_norm is not available on {get_env_device()}. Please install paddle_xpu to use this feature"
-            #         )
-            # return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
 
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
