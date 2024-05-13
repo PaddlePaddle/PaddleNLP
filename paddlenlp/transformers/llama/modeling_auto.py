@@ -425,6 +425,8 @@ class LlamaAttentionAuto(nn.Layer):
                 num_or_sections=[self.num_key_value_groups * self.head_dim, self.head_dim, self.head_dim],
                 axis=-1,
             )
+            if self.gqa_or_mqa:
+                query_states = paddle.reshape_(query_states, [0, 0, self.num_heads, self.head_dim])
         else:
             target_query_shape = [0, 0, self.num_heads, self.head_dim]
             target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
