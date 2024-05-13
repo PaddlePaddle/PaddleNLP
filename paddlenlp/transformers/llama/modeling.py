@@ -89,6 +89,7 @@ try:
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
+from funsion_ops import fusion_flash_attention
 
 __all__ = [
     "LlamaModel",
@@ -215,67 +216,22 @@ def scaled_dot_product_attention(
     _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention:
+        fusion_flash_attention(
+            query_states,
+            config,
+            key_states,
+            value_states,
+            attention_mask,
+            output_attentions,
+            alibi,
+            sequence_parallel,
+            reshard_layer,
+            npu_is_casual,
+        )
+
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
 
-        version = paddle.version.full_version
-        if version != "0.0.0" and version <= "2.5.2":
-            if alibi is not None:
-                raise ValueError("Flash Attention doesn't support alibi")
-            attn_output, attn_weights = flash_attention(
-                query_states,
-                key_states,
-                value_states,
-                causal=True,
-                return_softmax=output_attentions,
-            )
-        else:
-            if alibi is not None:
-                alibi = alibi.reshape([bsz, num_heads, 1, -1])
-                attention_mask = attention_mask.cast(alibi.dtype) + alibi
-            if get_env_device() == "npu":
-                attn_output = core.eager._run_custom_op(
-                    "flash_attention_npu",
-                    query_states,
-                    key_states,
-                    value_states,
-                    None,
-                    attention_mask,
-                    0.0,
-                    attention_mask is None,
-                    True,
-                    False,
-                    npu_is_casual,
-                )[0]
-            else:
-                attn_output = F.scaled_dot_product_attention(
-                    query_states,
-                    key_states,
-                    value_states,
-                    attn_mask=attention_mask,
-                    is_causal=attention_mask is None,
-                )
-            attn_weights = None
-
-        if reshard_layer is not None:
-            # attn_output shape: [bs, seqlen, num_head/sep, head_dim]
-            attn_output = reshard_layer(
-                attn_output,
-                split_axis=1,
-                concat_axis=2,
-            )
-            # attn_output shape: [bs, seqlen/sep, num_head, head_dim]
-            assert (
-                config.sep_parallel_degree > 1 and q_len % config.sep_parallel_degree == 0
-            ), f"q_len:{q_len}, config.sep_parallel_degree:{config.sep_parallel_degree}"
-            q_len = q_len // config.sep_parallel_degree
-            num_heads = num_heads * config.sep_parallel_degree
-
-        if sequence_parallel:
-            attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
-        else:
-            attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
-        return (attn_output, attn_weights) if output_attentions else attn_output
     else:
         #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
         query_states = paddle.transpose(query_states, [0, 2, 1, 3])
