@@ -89,7 +89,7 @@ try:
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
-from fusion_ops import fusion_flash_attention
+import fusion_ops
 
 __all__ = [
     "LlamaModel",
@@ -216,7 +216,7 @@ def scaled_dot_product_attention(
     _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention:
-        fusion_flash_attention(
+        fusion_ops.fusion_flash_attention(
             query_states,
             config,
             key_states,
