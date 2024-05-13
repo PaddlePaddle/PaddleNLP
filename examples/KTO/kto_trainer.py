@@ -63,7 +63,6 @@ def _tokenize(batch: Dict[str, List[Any]], tokenizer: PretrainedTokenizerBase) -
     prompt_input_ids = prompt_tokenized["input_ids"]
     prompt_attention_mask = prompt_tokenized["attention_mask"]
     prompt_and_completion = [prompt + completion for prompt, completion in zip(batch["prompt"], batch["completion"])]
-    # prompt_and_completion = batch["completion"]
     full_tokenized = tokenizer(prompt_and_completion, add_special_tokens=False)
     full_input_ids = full_tokenized["input_ids"]
     full_attention_mask = full_tokenized["attention_mask"]
@@ -112,7 +111,7 @@ def _tokenize(batch: Dict[str, List[Any]], tokenizer: PretrainedTokenizerBase) -
 def _process_tokens(example: Dict[str, Any], model: "PretrainedModel" = None, **kwargs) -> Dict:
     """Process tokens of a KTO specific dataset.
 
-    At this stage, we don't convert to Pypaddle tensors yet; we just handle the truncation
+    At this stage, we don't convert to paddle tensors yet; we just handle the truncation
     in case the prompt + completion responses is/are too long. First
         we truncate the prompt; if we're still too long, we truncate the completion.
 
@@ -319,8 +318,6 @@ class KTOTrainer(Trainer):
 
                 if _support_gc_kwargs:
                     prepare_model_kwargs["recompute_kwargs"] = args.recompute_kwargs
-
-                # model = prepare_model_for_kbit_training(model, **prepare_model_kwargs)
 
             # get peft model with the given config
             model = LoRAModel(model, peft_config)
@@ -563,7 +560,6 @@ class KTOTrainer(Trainer):
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             tokenizer=tokenizer,
-            # model_init=model_init,
             compute_metrics=compute_metrics,
             callbacks=callbacks,
             optimizers=optimizers,
@@ -964,6 +960,7 @@ class KTOTrainer(Trainer):
         else:
             with paddle.no_grad():
                 if self.ref_model is None:
+                    # TODO(wugaosheng), replace self.accelerator.unwrap_model(self.model).disable_adapter()
                     with self.accelerator.unwrap_model(self.model).disable_adapter():
                         (
                             reference_chosen_logps,
