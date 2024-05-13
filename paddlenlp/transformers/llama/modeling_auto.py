@@ -272,16 +272,18 @@ class LlamaAttentionAuto(nn.Layer):
         self.head_dim = self.hidden_size // config.num_attention_heads
 
         self.num_key_value_heads = config.num_key_value_heads
+        assert config.num_attention_heads // config.num_key_value_heads
         self.num_key_value_groups = config.num_attention_heads // config.num_key_value_heads
+        self.gqa_or_mqa = config.num_attention_heads != config.num_key_value_heads
 
         self.max_position_embeddings = config.max_position_embeddings
         self.seq_length = config.seq_length
 
         self.fuse_attention_qkv = config.fuse_attention_qkv
-        if self.fuse_attention_qkv and config.num_attention_heads != config.num_key_value_heads:
-            raise ValueError(
-                f"fuse_attention_qkv can't be True when num_attention_heads {config.num_attention_heads}!= num_key_value_heads {config.num_key_value_heads}"
-            )
+        # if self.fuse_attention_qkv and config.num_attention_heads != config.num_key_value_heads:
+        #     raise ValueError(
+        #         f"fuse_attention_qkv can't be True when num_attention_heads {config.num_attention_heads}!= num_key_value_heads {config.num_key_value_heads}"
+        #     )
 
         self.kv_indices = None
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
@@ -303,7 +305,7 @@ class LlamaAttentionAuto(nn.Layer):
         if self.fuse_attention_qkv:
             self.qkv_proj = nn.Linear(
                 self.hidden_size,
-                3 * self.hidden_size,
+                self.hidden_size + 2 * self.config.num_key_value_heads * self.head_dim,
                 bias_attr=False,
             )
             self.qkv_proj.weight = dist.shard_tensor(
@@ -415,10 +417,14 @@ class LlamaAttentionAuto(nn.Layer):
             )
 
         if self.fuse_attention_qkv:
-            target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
+            target_shape = [0, 0, self.num_key_value_heads, (self.num_key_value_groups + 2) * self.head_dim]
             mix_layer = self.qkv_proj(hidden_states)
             mix_layer = paddle.reshape_(mix_layer, target_shape)
-            query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
+            query_states, key_states, value_states = paddle.split(
+                mix_layer,
+                num_or_sections=[self.num_key_value_groups * self.head_dim, self.head_dim, self.head_dim],
+                axis=-1,
+            )
         else:
             target_query_shape = [0, 0, self.num_heads, self.head_dim]
             target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
