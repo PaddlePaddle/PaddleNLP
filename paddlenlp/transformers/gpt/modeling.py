@@ -130,7 +130,11 @@ def seed_guard_context(name=None):
         not isinstance(paddle.base.framework._current_expected_place(), paddle.core.CPUPlace)
         and name in get_rng_state_tracker().states_
     ):
-        return get_rng_state_tracker().rng_state(name)
+        # todo fix it
+        #  ValueError: Length of gpu state list should be equal to the gpu device count
+        #  /usr/local/lib/python3.10/dist-packages/paddle/incubate/framework/random.py:119: ValueError
+        return contextlib.nullcontext()
+        # return get_rng_state_tracker().rng_state(name)
     else:
         return contextlib.nullcontext()
 
