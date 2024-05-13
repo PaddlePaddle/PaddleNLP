@@ -89,7 +89,7 @@ except:
     flash_attention = None
 from .. import fusion_ops
 
-rms_norm_fused = fusion_ops.fusion_ops
+rms_norm_fused = fusion_ops.rms_norm_fused
 
 __all__ = [
     "LlamaModel",
