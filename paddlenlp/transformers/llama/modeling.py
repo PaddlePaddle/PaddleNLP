@@ -81,7 +81,7 @@ from .configuration import (
 
 try:
     if get_env_device() == "npu":
-        from paddle.base import core
+        # from paddle.base import core
 
         for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
             if lib.endswith(".so"):
@@ -363,18 +363,20 @@ class LlamaRMSNorm(nn.Layer):
 
     def forward(self, hidden_states):
         if self.config.use_fused_rms_norm:
-            if get_env_device() == "npu":
-                return core.eager._run_custom_op("rms_norm_npu", hidden_states, self.weight, self.variance_epsilon)[0]
-            elif get_env_device() == "xpu":
-                try:
-                    import paddle_xpu_nn  # noqa: F821
+            return fusion_ops.fusion_rms_norm(hidden_states, self.weight, self.variance_epsilon)
 
-                    return paddle_xpu_nn.xpu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
-                except ImportError:
-                    raise NotImplementedError(
-                        f"Implementation of fused_rms_norm is not available on {get_env_device()}. Please install paddle_xpu to use this feature"
-                    )
-            return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
+            # if get_env_device() == "npu":
+            #     return core.eager._run_custom_op("rms_norm_npu", hidden_states, self.weight, self.variance_epsilon)[0]
+            # elif get_env_device() == "xpu":
+            #     try:
+            #         import paddle_xpu_nn  # noqa: F821
+
+            #         return paddle_xpu_nn.xpu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
+            #     except ImportError:
+            #         raise NotImplementedError(
+            #             f"Implementation of fused_rms_norm is not available on {get_env_device()}. Please install paddle_xpu to use this feature"
+            #         )
+            # return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
 
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
@@ -939,45 +941,7 @@ class LlamaAttention(nn.Layer):
                     past_key_value,
                     self.rotary_emb,
                 )
-                # assert past_key_value is None, "fuse rotary not support cache kv for now"
-                # batch_size, seq_length, num_heads, head_dim = query_states.shape
-                # _, kv_seq_len, num_key_value_heads, _ = key_states.shape
-                # cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-                # if get_env_device() == "npu":
-                #     query_states = core.eager._run_custom_op("fused_rope", query_states, cos, sin)[0]
-                #     key_states = core.eager._run_custom_op("fused_rope", key_states, cos, sin)[0]
-                # else:
-                #     # paddle version > 2.6 or develop support q and k/v with different num_heads
-                #     paddle_version = float(paddle.__version__[:3])
-                #     if ((paddle_version != 0.0) and (paddle_version <= 2.6)) and (num_heads != num_key_value_heads):
-                #         query_states, _, _ = fused_rotary_position_embedding(
-                #             query_states,
-                #             None,
-                #             None,
-                #             sin=sin,
-                #             cos=cos,
-                #             position_ids=position_ids,
-                #             use_neox_rotary_style=False,
-                #         )
-                #         key_states, _, _ = fused_rotary_position_embedding(
-                #             key_states,
-                #             None,
-                #             None,
-                #             sin=sin,
-                #             cos=cos,
-                #             position_ids=position_ids,
-                #             use_neox_rotary_style=False,
-                #         )
-                #     else:
-                #         query_states, key_states, _ = fused_rotary_position_embedding(
-                #             query_states,
-                #             key_states,
-                #             v=None,
-                #             sin=sin,
-                #             cos=cos,
-                #             position_ids=position_ids,
-                #             use_neox_rotary_style=False,
-                #         )
+
             else:
                 if self.config.use_long_sequence_strategies:
                     cos, sin = self.rotary_emb(seq_len=kv_seq_len)
