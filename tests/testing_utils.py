@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import copy
 import gc
 import inspect
 import json
@@ -367,10 +368,11 @@ def argv_context_guard(config: dict):
     Args:
         config (dict): the configuration to argv
     """
+    old_argv = copy.deepcopy(sys.argv)
     argv = construct_argv(config)
     sys.argv = argv
     yield
-    sys.argv = ""
+    sys.argv = old_argv[:1]
 
 
 def update_params(json_file: str, params: dict):
