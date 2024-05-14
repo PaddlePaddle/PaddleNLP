@@ -1818,7 +1818,10 @@ class LlamaForCausalLM(LlamaPretrainedModel):
 
         self.llama = LlamaModel(config)
         self.lm_head = LlamaLMHead(config)
-        self.criterion = LlamaPretrainingCriterion(config)
+        if self.config.dpo:
+            self.criterion = LlamaDPOCriterion(config)
+        else:
+            self.criterion = LlamaPretrainingCriterion(config)
 
     def get_input_embeddings(self):
         return self.llama.embed_tokens
@@ -1905,6 +1908,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
+        **kwargs
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1932,6 +1936,21 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         )
 
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+        if isinstance(self.criterion, LlamaDPOCriterion):
+            chosen_labels = kwargs.get("chosen_labels", None)
+            rejected_labels = kwargs.get("rejected_labels", None)
+            response_indexs = kwargs.get("response_indexs", None)
+            reference_chosen_logps = kwargs.get("reference_chosen_logps", None)
+            reference_rejected_logps = kwargs.get("reference_rejected_logps", None)
+            return self.criterion(
+                logits,
+                chosen_labels,
+                rejected_labels,
+                response_indexs,
+                reference_chosen_logps,
+                reference_rejected_logps,
+                loss_only=False,
+            )
 
         loss = None
         if labels is not None:
@@ -1948,3 +1967,85 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+
+
+class LlamaDPOCriterion(nn.Layer):
+    """DPO Criterion"""
+
+    def __init__(self, config: LlamaConfig):
+        super(LlamaDPOCriterion, self).__init__()
+        self.config = config
+        if self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1:
+            self.logprobs = mpu.ParallelCrossEntropy()
+        else:
+            self.logprobs = nn.CrossEntropyLoss(reduction="none")
+
+    def dpo_loss(self, policy_chosen_logps, policy_rejected_logps, reference_chosen_logps, reference_rejected_logps):
+        """DPO Loss"""
+        policy_chosen_logps = paddle.masked_select(policy_chosen_logps, policy_chosen_logps != 0)
+        policy_rejected_logps = paddle.masked_select(policy_rejected_logps, policy_rejected_logps != 0)
+        reference_chosen_logps = paddle.masked_select(reference_chosen_logps, reference_chosen_logps != 0)
+        reference_rejected_logps = paddle.masked_select(reference_rejected_logps, reference_rejected_logps != 0)
+        pi_logratios = policy_chosen_logps - policy_rejected_logps
+        ref_logratios = reference_chosen_logps - reference_rejected_logps
+        logits = pi_logratios - ref_logratios
+        loss = (-F.log_sigmoid(self.config.dpo_beta * logits)).mean()
+        return loss
+
+    def dpo_logps(self, logits, chosen_labels, rejected_labels, response_indexs):
+        """DPO logprobs"""
+        labels = chosen_labels + rejected_labels
+
+        logits = logits.astype("float32")
+        if logits.shape[:-1] != labels.shape:
+            raise ValueError("Logits (batch and sequence length dim) and labels must have the same shape.")
+        # bs, seq
+        per_token_logps = -self.logprobs(logits, labels.unsqueeze(2)).squeeze(2)
+
+        if len(response_indexs.shape) == 3:
+            response_indexs = response_indexs[0]
+
+        chosen_logps = paddle.stack(
+            [
+                (per_token_logps[response_index[0]][response_index[1] : response_index[2]]).sum()
+                if response_index[3] != 0
+                else paddle.zeros([])
+                for response_index in response_indexs
+            ],
+            axis=0,
+        )
+        rejected_logps = paddle.stack(
+            [
+                (per_token_logps[response_index[0]][response_index[2] : response_index[3]]).sum()
+                if response_index[3] != 0
+                else paddle.zeros([])
+                for response_index in response_indexs
+            ],
+            axis=0,
+        )
+        return chosen_logps, rejected_logps
+
+    def forward(
+        self,
+        logits,
+        chosen_labels,
+        rejected_labels,
+        response_indexs,
+        reference_chosen_logps,
+        reference_rejected_logps,
+        loss_only=True,
+    ):
+        """Forward"""
+        if reference_chosen_logps is None or reference_rejected_logps is None:
+            return self.dpo_logps(logits, chosen_labels, rejected_labels, response_indexs)
+        policy_chosen_logps, policy_rejected_logps = self.dpo_logps(
+            logits, chosen_labels, rejected_labels, response_indexs
+        )
+
+        loss = self.dpo_loss(
+            policy_chosen_logps, policy_rejected_logps, reference_chosen_logps, reference_rejected_logps
+        )
+        if loss_only:
+            return loss
+        else:
+            return loss, policy_chosen_logps, policy_rejected_logps

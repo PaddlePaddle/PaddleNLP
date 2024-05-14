@@ -23,6 +23,7 @@ from paddlenlp.transformers.model_utils import PipelinePretrainedModel
 from .modeling import (
     LlamaConfig,
     LlamaDecoderLayer,
+    LlamaDPOCriterion,
     LlamaLMHead,
     LlamaModel,
     LlamaPretrainedModel,
@@ -257,7 +258,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         PipelineLayer.__init__(
             self,
             layers=self.get_sequential_layers(),
-            loss_fn=LlamaPretrainingCriterion(config),
+            loss_fn=LlamaPretrainingCriterion(config) if not config.dpo else LlamaDPOCriterion(config),
             topology=get_hcg().topology(),
             seg_method=seg_method,
             recompute_interval=recompute_interval,
