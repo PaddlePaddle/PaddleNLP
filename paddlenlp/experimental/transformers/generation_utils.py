@@ -671,7 +671,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
 
             step_idx = paddle.where(model_kwargs["stop_flags"], model_kwargs["step_idx"], model_kwargs["step_idx"] + 1)
             paddle.assign(step_idx, model_kwargs["step_idx"])
-            length_cond = paddle.greater_equal(model_kwargs["step_idx"], model_kwargs["max_dec_len"])
+            length_cond = paddle.greater_equal(step_idx, model_kwargs["max_dec_len"])
             stop_flags = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
             set_stop_value_multi_ends_v2(
                 next_tokens, stop_flags, model_kwargs["seq_lens_this_time"], eos_token_id, model_kwargs["next_tokens"]
@@ -679,7 +679,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             paddle.assign(stop_flags, model_kwargs["stop_flags"])
             # update inputs
             update_inputs(
-                model_kwargs["stop_flags"],
+                stop_flags,
                 model_kwargs["not_need_stop"],
                 model_kwargs["seq_lens_this_time"],
                 model_kwargs["seq_lens_encoder"],
