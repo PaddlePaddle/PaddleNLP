@@ -87,7 +87,7 @@ try:
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
-from .. import fusion_ops
+from . import fusion_ops
 
 rms_norm_fused = fusion_ops.rms_norm_fused
 
