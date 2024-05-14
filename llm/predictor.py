@@ -49,8 +49,8 @@ from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
-    ChatGLMv2Tokenizer,
     ChatGLMTokenizer,
+    ChatGLMv2Tokenizer,
     LlamaTokenizer,
     PretrainedModel,
     PretrainedTokenizer,
@@ -202,7 +202,7 @@ def get_eos_token_id(
             eos_token_ids.append(generation_config.eos_token_id)
         else:
             eos_token_ids.extend(generation_config.eos_token_id)
-
+        return generation_config.eos_token_id
     eos_token_ids_dict = {str(item): item for item in eos_token_ids}
     return list(eos_token_ids_dict.values())
 
@@ -242,7 +242,8 @@ class BasePredictor:
             padding=True,
             # when use chat_template, it should not add special tokens
             # chatglm2 prefix-tokens can not be tokenized into ids
-            add_special_tokens=self.tokenizer.chat_template is None or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
+            add_special_tokens=self.tokenizer.chat_template is None
+            or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
         )
         return tokenized_source
 
@@ -738,6 +739,7 @@ class BlockInferencePredictorMixin:
         self.model_name_or_path = config.model_name_or_path
 
         self.architectures = self.model_config.architectures[0].lower()
+        self.alibi = self.model_config.alibi
 
         self.dtype = config.dtype or self.model_config
 
@@ -835,15 +837,16 @@ class BlockInferencePredictorMixin:
             np.array(eos_token_id * config.batch_size).reshape(-1, 1).astype("int64")
         )
         # bloom model needs src_mask and tgt_mask!
-        if "bloom" in self.architectures:
+        if "bloom" in self.architectures or self.alibi is True:
             lower_one_tril = paddle.tril(
                 paddle.ones(shape=(self.total_max_length, self.total_max_length), dtype=self.dtype)
             )
             lower_one_tril = lower_one_tril[None, None, :, :]
-            self.inputs["src_mask"] = lower_one_tril.tile([self.batch_size, 1, 1, 1])
+            self.original_src_mask = lower_one_tril.tile([self.batch_size, 1, 1, 1])
             self.inputs["tgt_mask"] = paddle.full(
                 shape=[config.batch_size, 1, 1, self.total_max_length], fill_value=1, dtype=self.dtype
             )
+
             arange_tensor_encoder = paddle.arange(self.total_max_length).astype(self.dtype)
             alibi_slopes = get_alibi_slopes(self.num_attention_heads)
             alibi = alibi_slopes[None, :, None, None] * arange_tensor_encoder
@@ -856,13 +859,15 @@ class BlockInferencePredictorMixin:
                     1,
                 ]
             )
+
             # self.inputs["src_mask/tgt_mask"] is read only, will not be updated!
-            self.inputs["src_mask"] = (
-                alibi_encoder + (1 - self.inputs["src_mask"]) * paddle.finfo(self.dtype).min
+            self.original_src_mask = (
+                alibi_encoder + (1 - self.original_src_mask) * paddle.finfo(self.dtype).min
             ).cast(self.dtype)
             self.inputs["tgt_mask"] = (
                 alibi_decoder + (1 - self.inputs["tgt_mask"]) * paddle.finfo(self.dtype).min
             ).cast(self.dtype)
+            self.inputs["src_mask"] = self.original_src_mask.clone()
 
         # need update
         self.inputs["block_tables"] = paddle.full(
@@ -922,6 +927,8 @@ class BlockInferencePredictorMixin:
             source = [source] if isinstance(source, str) else source
             source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
+        self.inputs["src_mask"] = self.original_src_mask.clone()
+
         for i, text in enumerate(source):
             tokens = self.tokenizer(
                 text,
@@ -945,6 +952,7 @@ class BlockInferencePredictorMixin:
             self.inputs["seq_lens_decoder"][i : i + 1] = 0
             self.inputs["step_idx"][i : i + 1] = 0
             self.inputs["stop_flags"][i : i + 1] = False
+
             reset_stop_value(self.inputs["not_need_stop"])
             need_block_nums = (
                 length + self.config.max_length + self.pre_cache_length + self.block_size - 1
@@ -953,6 +961,22 @@ class BlockInferencePredictorMixin:
                 bi_now = self.free_list.pop()
                 self.used_list[i].append(bi_now)
                 self.inputs["block_tables"][i : i + 1, bi] = bi_now
+
+        # special process for attention_mask
+        valid_max_encoder_len = paddle.max(self.inputs["seq_lens_encoder"])
+        min_value = paddle.finfo(self.dtype).min
+        for i in range(len(source)):
+            current_len = self.inputs["seq_lens_encoder"][i, 0]
+            if current_len == valid_max_encoder_len:
+                continue
+            tmp_mask = self.inputs["src_mask"][
+                i,
+                :,
+                valid_max_encoder_len - current_len : valid_max_encoder_len,
+                valid_max_encoder_len - current_len : valid_max_encoder_len,
+            ].clone()
+            self.inputs["src_mask"][i, :, valid_max_encoder_len - current_len : valid_max_encoder_len, :] = min_value
+            self.inputs["src_mask"][i, :, :current_len, :current_len] = tmp_mask
 
 
 class DygraphBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor):
@@ -1063,6 +1087,7 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
 
         self._share_data()
         self.seq_lens_handle = self.predictor.get_input_handle("seq_lens_this_time")
+        self.src_mask_handle = self.predictor.get_input_handle("src_mask")
 
     def _create_predictor(self, predictor_args: PredictorArgument):
         if not is_paddlenlp_ops_available():
@@ -1110,6 +1135,8 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
                 continue
             if "seq_lens_this_time" in name:
                 continue
+            if "src_mask" in name:
+                continue
             input_tensor = self.predictor.get_input_handle(name)
             input_tensor.share_external_data(self.inputs[name])
 
@@ -1122,12 +1149,13 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
         self._preprocess(input_texts)
         real_bsz = len(input_texts)
 
-        import copy
-
-        seq_lens_this_time = copy.deepcopy(self.inputs["seq_lens_this_time"][:real_bsz])
+        seq_lens_this_time = paddle.zeros_like(self.inputs["seq_lens_this_time"])
+        seq_lens_this_time[:real_bsz] = self.inputs["seq_lens_this_time"][:real_bsz]
         self.seq_lens_handle.share_external_data(seq_lens_this_time)
-        logger.info(f"preprocess spend {time.time()  -  s_time}")
 
+        self.src_mask_handle.share_external_data(self.inputs["src_mask"])
+
+        logger.info(f"preprocess spend {time.time()  -  s_time}")
         result_queue = mp.Queue()
         tensor_queue = mp.Queue()
 
@@ -1152,6 +1180,7 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
         outputs = []
         while len(outputs) < self.batch_size:
             outputs.append(result_queue.get(timeout=1)[-1])
+
         return outputs
 
     def _preprocess(self, source):

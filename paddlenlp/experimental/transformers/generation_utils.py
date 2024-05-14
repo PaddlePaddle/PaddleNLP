@@ -479,7 +479,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             src_mask_spec = None
 
         # bloom model needs src_mask and tgt_mask!
-        if "bloom" in self.config.architectures[0].lower():
+        if "bloom" in self.config.architectures[0].lower() or self.config.get("alibi", False) is True:
             src_mask_spec = paddle.static.InputSpec(shape=[None, None, None, None], dtype=dtype, name="src_mask")
             tgt_mask_spec = paddle.static.InputSpec(shape=[None, None, 1, None], dtype=dtype, name="tgt_mask")
         else:
