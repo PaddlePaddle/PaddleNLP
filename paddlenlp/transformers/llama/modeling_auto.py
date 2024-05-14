@@ -280,10 +280,6 @@ class LlamaAttentionAuto(nn.Layer):
         self.seq_length = config.seq_length
 
         self.fuse_attention_qkv = config.fuse_attention_qkv
-        # if self.fuse_attention_qkv and config.num_attention_heads != config.num_key_value_heads:
-        #     raise ValueError(
-        #         f"fuse_attention_qkv can't be True when num_attention_heads {config.num_attention_heads}!= num_key_value_heads {config.num_key_value_heads}"
-        #     )
 
         self.kv_indices = None
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
