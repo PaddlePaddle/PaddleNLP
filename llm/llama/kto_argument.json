@@ -1,7 +1,7 @@
 {
     "model_name_or_path": "meta-llama/Llama-2-7b-chat",
     "dataset_name_or_path": "./data",
-    "output_dir": "./checkpoint/llama_dpo_ckpts",
+    "output_dir": "./checkpoint/llama_kto_ckpts",
     "per_device_train_batch_size": 4,
     "gradient_accumulation_steps": 4,
     "per_device_eval_batch_size": 4,
@@ -10,12 +10,14 @@
     "learning_rate": 1e-06,
     "warmup_steps": 150,
     "logging_steps": 10,
+    "logging_first_step": true,
     "evaluation_strategy": "steps",
     "save_strategy": "steps",
     "eval_steps": 200,
     "save_steps": 200,
     "max_seq_length": 2048,
     "max_prompt_len": 1024,
+    "seed": 42,
     "bf16": true,
     "fp16_opt_level": "O2",
     "do_train": true,
@@ -27,6 +29,6 @@
     "save_total_limit": 2,
     "metric_for_best_model": "eval_loss",
     "ignore_save_lr_and_optim": true,
-    "dpo_beta": 0.1,
-    "loss_type": "sigmoid"
+    "dpo_beta": 0.8,
+    "loss_type": "kto_pair"
   }

@@ -1,3 +1,17 @@
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """ DPO Trainer """
 from collections import defaultdict
 
@@ -5,14 +19,17 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.distributed import fleet
+
 from paddlenlp.trainer import Trainer
 from paddlenlp.transformers.model_utils import unwrap_model
+
 
 def disable_dropout_in_model(model: paddle.nn.Layer) -> None:
     """ "disable dropout"""
     for module in model.children():
         if isinstance(module, paddle.nn.Dropout):
             module.p = 0
+
 
 class DPOTrainer(Trainer):
     """
@@ -33,7 +50,7 @@ class DPOTrainer(Trainer):
             if self.ref_model is not None:
                 disable_dropout_in_model(self.ref_model)
         self.ref_model.eval()
-
+        self.loss_type = self.args.loss_type
         self.padding_value = padding_value
         self.logprobs = nn.CrossEntropyLoss(reduction="none")
         self._stored_metrics = defaultdict(lambda: defaultdict(list))
@@ -68,14 +85,33 @@ class DPOTrainer(Trainer):
         """
         Compute the DPO loss for a batch of policy and reference model log probabilities.
         """
-        pi_logratios = policy_chosen_logps - policy_rejected_logps
-        ref_logratios = reference_chosen_logps - reference_rejected_logps
 
-        if reference_free:
-            ref_logratios = 0
+        if self.loss_type == "kto_pair":
+            # refers to https://github.com/huggingface/trl/blob/5aeb752053876cce64f2164a178635db08d96158/trl/trainer/dpo_trainer.py#L1008
+            # eqn (7) of the HALOs paper
+            chosen_KL = (policy_chosen_logps - reference_chosen_logps).mean().clip(min=0)
+            rejected_KL = (policy_rejected_logps - reference_rejected_logps).mean().clip(min=0)
 
-        logits = pi_logratios - ref_logratios
-        loss = (-F.log_sigmoid(self.args.dpo_beta * logits)).mean()
+            chosen_logratios = policy_chosen_logps - reference_chosen_logps
+            rejected_logratios = policy_rejected_logps - reference_rejected_logps
+            # As described in the KTO report, the KL term for chosen (rejected) is estimated using the rejected (chosen) half.
+            loss = paddle.concat(
+                (
+                    1 - F.sigmoid(self.args.dpo_beta * (chosen_logratios - rejected_KL)),
+                    1 - F.sigmoid(self.args.dpo_beta * (chosen_KL - rejected_logratios)),
+                ),
+                axis=0,
+            ).mean()
+        elif self.loss_type == "sigmoid":
+            pi_logratios = policy_chosen_logps - policy_rejected_logps
+            ref_logratios = reference_chosen_logps - reference_rejected_logps
+
+            if reference_free:
+                ref_logratios = 0
+
+            logits = pi_logratios - ref_logratios
+            loss = (-F.log_sigmoid(self.args.dpo_beta * logits)).mean()
+
         return loss
 
     def _get_batch_logps(self, logits, labels):
@@ -134,7 +170,7 @@ class DPOTrainer(Trainer):
         )
         rejected_logps = paddle.stack(
             [
-                (per_token_logps[response_index[0]][response_index[2] + 1: response_index[3]]).sum()
+                (per_token_logps[response_index[0]][response_index[2] + 1 : response_index[3]]).sum()
                 if response_index[3] != 0
                 else paddle.zeros([])
                 for response_index in batch["response_indexs"]
@@ -183,14 +219,12 @@ class DPOTrainer(Trainer):
 
         for key in metrics:
             metrics[key] = self._nested_gather(paddle.tile(metrics[key], repeat_times=[1, 1])).mean().cpu()
-        
+
         if train_eval == "train":
             self.effi_token_cnt += batch["effi_token_cnt"]
             self.all_token_cnt += batch["all_token_cnt"]
 
         return loss, metrics
-
-
 
     def compute_loss(self, model, inputs, return_outputs=False):
         """Compute the DPO loss for the given batch of inputs."""
@@ -263,6 +297,6 @@ class DPOTrainer(Trainer):
         for key, metrics in self._stored_metrics[train_eval].items():
             logs[key] = paddle.to_tensor(metrics).mean().item()
         del self._stored_metrics[train_eval]
-        if self.state.epoch is not None and train_eval == 'train':
+        if self.state.epoch is not None and train_eval == "train":
             self.state.epoch *= self.args.num_train_epochs
         return super().log(logs, **kwargs)
