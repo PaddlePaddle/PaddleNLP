@@ -438,6 +438,8 @@ class TransformerDecoder(nn.Layer):
 
         self.use_fp8 = config.use_fp8
         self.fp8_group = TransformerEngineHelper.get_fp8_group()
+        self.fp8_amax_history_len = config.fp8_amax_history_len
+        self.fp8_amax_compute_algo = config.fp8_amax_compute_algo
 
         if config.transformer_engine_backend is not None:
             self.enable_recompute = config.use_recompute
@@ -497,7 +499,9 @@ class TransformerDecoder(nn.Layer):
         all_hidden_states = () if output_hidden_states else None
         next_decoder_cache = () if use_cache else None
 
-        with TransformerEngineHelper.fp8_autocast(enabled=self.use_fp8, fp8_group=self.fp8_group):
+        with TransformerEngineHelper.fp8_autocast(
+            self.use_fp8, self.fp8_group, self.fp8_amax_history_len, self.fp8_amax_compute_algo
+        ):
             for i, mod in enumerate(self.layers):
                 has_gradient = not output.stop_gradient
                 # def forward(self, hidden_states, attention_mask=None, use_cache=False, past_key_value=None, output_attentions=False):

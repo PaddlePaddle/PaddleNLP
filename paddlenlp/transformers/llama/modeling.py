@@ -1309,6 +1309,8 @@ class LlamaModel(LlamaPretrainedModel):
 
         self.use_fp8 = config.use_fp8
         self.fp8_group = TransformerEngineHelper.get_fp8_group()
+        self.fp8_amax_history_len = config.fp8_amax_history_len
+        self.fp8_amax_compute_algo = config.fp8_amax_compute_algo
 
         if config.transformer_engine_backend is not None:
             self.enable_recompute = config.use_recompute
@@ -1470,7 +1472,9 @@ class LlamaModel(LlamaPretrainedModel):
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
 
-        with TransformerEngineHelper.fp8_autocast(enabled=self.use_fp8, fp8_group=self.fp8_group):
+        with TransformerEngineHelper.fp8_autocast(
+            self.use_fp8, self.fp8_group, self.fp8_amax_history_len, self.fp8_amax_compute_algo
+        ):
             for idx, (decoder_layer) in enumerate(self.layers):
                 if output_hidden_states:
                     all_hidden_states += (hidden_states,)

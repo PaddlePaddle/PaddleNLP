@@ -90,6 +90,19 @@ class PreTrainingArguments(TrainingArguments):
         default=False,
         metadata={"help": "gpt, whether to use fp8 training"},
     )
+    fp8_amax_history_len: int = field(
+        default=1024,
+        metadata={"help": "gpt, the amax history length for fp8 recipe"},
+    )
+    fp8_amax_compute_algo: str = field(
+        default="max",
+        metadata={"help": "gpt, the amax compute algo for fp8 recipe"},
+        choices=["max", "most_recent"],
+    )
+    fuse_wgrad_accumulation: bool = field(
+        default=False,
+        metadata={"help": "gpt, whether to fuse wgrad accumulation in transformer engine"},
+    )
 
     def __post_init__(self):
         super().__post_init__()
@@ -497,6 +510,9 @@ def main():
         ], "Only support paddle and transformer_engine backend"
     config.transformer_engine_backend = training_args.transformer_engine_backend
     config.use_fp8 = training_args.use_fp8
+    config.fp8_amax_history_len = training_args.fp8_amax_history_len
+    config.fp8_amax_compute_algo = training_args.fp8_amax_compute_algo
+    config.fuse_wgrad_accumulation = training_args.fuse_wgrad_accumulation
 
     # Config for model using dropout, such as GPT.
     config.hidden_dropout_prob = model_args.hidden_dropout_prob

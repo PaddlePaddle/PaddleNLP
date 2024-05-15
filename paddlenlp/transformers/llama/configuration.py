@@ -170,6 +170,9 @@ class LlamaConfig(PretrainedConfig):
         rope_scaling_type=None,
         transformer_engine_backend: str = None,
         use_fp8: bool = False,
+        fp8_amax_history_len: int = 1024,
+        fp8_amax_compute_algo: str = "max",
+        fuse_wgrad_accumulation: bool = False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -211,6 +214,9 @@ class LlamaConfig(PretrainedConfig):
         self.rope_scaling_type = rope_scaling_type
         self.transformer_engine_backend = transformer_engine_backend
         self.use_fp8 = use_fp8
+        self.fp8_amax_history_len = fp8_amax_history_len
+        self.fp8_amax_compute_algo = fp8_amax_compute_algo
+        self.fuse_wgrad_accumulation = fuse_wgrad_accumulation
 
         super().__init__(
             pad_token_id=pad_token_id,
