@@ -583,6 +583,12 @@ class FusedMultiTransformerBase(Layer):
         ln_out = self.compute_layernorm_before_qkv(src, i)
         qkv_out = self.compute_qkv_linear(ln_out, i)
         return qkv_out, residual_input
+    
+    def compute_max_len(self, seq_lens_encoder, seq_lens_decoder, cum_offsets):
+        return paddle.incubate.nn.functional.blha_get_max_len(seq_lens_encoder,
+                                                              seq_lens_decoder,
+                                                              cum_offsets # cum_offsets.shape[0] used as bsz
+                                                              )
 
     def compute_fmha(
         self,
@@ -815,6 +821,12 @@ class FusedMultiTransformerBase(Layer):
             assert len(caches) == len(self.qkv_weights) or len(caches) == 2 * len(self.qkv_weights)
 
         assert self.num_layers == len(self.qkv_weights)
+
+        max_enc_len_this_time, max_dec_len_this_time = self.compute_max_len(kwargs["seq_lens_encoder"],
+                                                                            kwargs["seq_lens_decoder"],
+                                                                            cum_offsets)
+        kwargs["max_enc_len_this_time"] = max_enc_len_this_time
+        kwargs["max_dec_len_this_time"] = max_dec_len_this_time
 
         residual_input = src
         for i in range(self.num_layers):
@@ -1385,6 +1397,8 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             None,  # qkv_bias
             None,  # out_shifts
             None,  # out_smooths
+            kwargs.get("max_enc_len_this_time", None),
+            kwargs.get("max_dec_len_this_time", None),
             rotary_embs,
             attn_mask,
             kwargs.get("tgt_mask", None),
@@ -1471,6 +1485,8 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
             self.qkv_biases[i] if len(self.qkv_biases) > 0 else None,
             self.linear_shifts[i] if len(self.linear_shifts) > 0 else None,
             self.linear_smooths[i] if len(self.linear_smooths) > 0 else None,
+            kwargs.get("max_enc_len_this_time", None),
+            kwargs.get("max_dec_len_this_time", None),
             rotary_embs,
             attn_mask,
             kwargs.get("tgt_mask", None),
