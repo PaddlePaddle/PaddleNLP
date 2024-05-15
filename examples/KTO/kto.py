@@ -91,7 +91,12 @@ if __name__ == "__main__":
             ".*down_proj.*",
         ]
 
-        peft_config = LoRAConfig(target_modules=target_modules, r=model_args.lora_r, lora_alpha=model_args.lora_alpha, lora_dropout=model_args.lora_dropout)
+        peft_config = LoRAConfig(
+            target_modules=target_modules,
+            r=model_args.lora_r,
+            lora_alpha=model_args.lora_alpha,
+            lora_dropout=model_args.lora_dropout,
+        )
     else:
         peft_config = None
     # Initialize the KTO trainer
