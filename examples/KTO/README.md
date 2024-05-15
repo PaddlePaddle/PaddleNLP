@@ -7,13 +7,13 @@ ContextualAI最近提出了一种有趣的替代方案，称为Kahneman-Tversky�
 项目的整体组织结构如下：
 
 ```
-├── kto_config.py
-├── kto.py
-├── kto_trainer.py
-├── model_base.py
-├── model_config.py
-├── README.md
-└── utils.py
+├── kto_config.py # KTO训练参数
+├── kto.py # 训练主函数
+├── kto_trainer.py # KTO算法的trainer实现
+├── model_base.py # 模型需要使用的基函数
+├── model_config.py # 模型的配置参数
+├── README.md # README文档
+└── utils.py # 工具类
 ```
 
 ### 环境准备
