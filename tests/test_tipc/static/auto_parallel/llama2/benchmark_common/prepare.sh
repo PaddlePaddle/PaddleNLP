@@ -33,4 +33,4 @@ mv llama_openwebtext_100k_idx.npz ./data
 
 # mv pretrain_config
 rm -rf pretrain_config_*
-cp -r ../../tests/test_tipc/static/auto_parallel/llama2/pretrain_config_* ./
+cp -r ../../../tests/test_tipc/static/auto_parallel/llama2/pretrain_config_* ./
