@@ -462,6 +462,10 @@ def main():
         model.print_trainable_parameters()
 
     if model_args.lora:
+        if training_args.sharding_parallel_degree > 1:
+            assert (
+                "enable_stage1_overlap" not in training_args.sharding_parallel_config
+            ), "Currently not support enabling sharding_stage1_overlap in lora mode."
         if model_args.lora_path is None:
             target_modules = get_lora_target_modules(model)
             lora_config = LoRAConfig(

@@ -1450,7 +1450,7 @@ class Trainer:
                     eval_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
                     collate_fn=self.data_collator,
-                    num_workers=self.args.dataloader_num_workers,
+                    num_workers=0,
                     eval=True,
                 )
             else:
@@ -1458,7 +1458,7 @@ class Trainer:
                     eval_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
                     collate_fn=self.data_collator,
-                    num_workers=self.args.dataloader_num_workers,
+                    num_workers=0,
                 )
 
         eval_sampler = self._get_eval_sampler(eval_dataset)
