@@ -38,18 +38,9 @@ if __name__ == "__main__":
     parser = PdArgumentParser((ScriptArguments, KTOConfig, ModelConfig))
     script_args, kto_args, model_args = parser.parse_args_into_dataclasses()
 
-    dtype = None
-    if kto_args.fp16_opt_level == "O2":
-        if kto_args.fp16:
-            dtype = "float16"
-        if kto_args.bf16:
-            dtype = "bfloat16"
-    else:
-        dtype = "float32"
-
     # Load a pretrained model
-    model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
-    model_ref = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
+    model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path, dtype=model_args.paddle_dtype)
+    model_ref = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path, dtype=model_args.paddle_dtype)
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
@@ -100,7 +91,7 @@ if __name__ == "__main__":
             ".*down_proj.*",
         ]
 
-        peft_config = LoRAConfig(target_modules=target_modules, r=model_args.lora_r, lora_alpha=model_args.lora_alpha)
+        peft_config = LoRAConfig(target_modules=target_modules, r=model_args.lora_r, lora_alpha=model_args.lora_alpha, lora_dropout=model_args.lora_dropout)
     else:
         peft_config = None
     # Initialize the KTO trainer
