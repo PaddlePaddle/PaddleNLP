@@ -138,10 +138,16 @@ python -u  -m paddle.distributed.launch --gpus "2,3,4,5" kto.py \
 - `sharding`: 是否使用Paddle的Sharding数据并行功能，用户的参数。支持sharding `stage1`, `stage2` or `stage3`。
 - `recompute`: 是否使用重计算训练。可以节省显存。
 
+## 推理
+模型的推理请参考[推理](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#4-%E6%8E%A8%E7%90%86)
+
+## 服务化部署
+
+模型的服务化部署请参考[服务化部署](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#5-%E6%9C%8D%E5%8A%A1%E5%8C%96%E9%83%A8%E7%BD%B2)
 
 ## Acknowledge
 
-我们借鉴了[https://github.com/huggingface/trl/tree/main)（trl）的优秀设计实现，在此对其作者表示感谢。
+我们借鉴了[trl](https://github.com/huggingface/trl/tree/main)的优秀设计实现，在此对其作者表示感谢。
 
 ## 参考文献
 
