@@ -209,7 +209,7 @@ class KTOTrainer(Trainer):
     Initialize KTOTrainer.
 
     Args:
-        model (`transformers.PretrainedModel`):
+        model (`paddlenlp.transformers.PretrainedModel`):
             The model to train, preferably an `AutoModelForSequenceClassification`.
         ref_model (`PretrainedModelWrapper`):
             Hugging Face transformer model with a casual language modelling head. Used for implicit reward computation and loss. If no
@@ -220,14 +220,14 @@ class KTOTrainer(Trainer):
             The dataset to use for training.
         eval_dataset (`datasets.Dataset`):
             The dataset to use for evaluation.
-        tokenizer (`transformers.PretrainedTokenizerBase`):
+        tokenizer (`paddlenlp.transformers.PretrainedTokenizerBase`):
             The tokenizer to use for training. This argument is required if you want to use the default data collator.
-        data_collator (`transformers.DataCollator`, *optional*, defaults to `None`):
+        data_collator (`paddlenlp.transformers.DataCollator`, *optional*, defaults to `None`):
             The data collator to use for training. If None is specified, the default data collator (`DPODataCollatorWithPadding`) will be used
             which will pad the sequences to the maximum length of the sequences in the batch, given a dataset of paired sequences.
-        model_init (`Callable[[], transformers.PretrainedModel]`):
+        model_init (`Callable[[], paddlenlp.transformers.PretrainedModel]`):
             The model initializer to use for training. If None is specified, the default model initializer will be used.
-        callbacks (`List[transformers.TrainerCallback]`):
+        callbacks (`List[paddlenlp.transformers.TrainerCallback]`):
             The callbacks to use for training.
         optimizers (`Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LambdaDecay]`):
             The optimizer and scheduler to use for training.
@@ -242,7 +242,7 @@ class KTOTrainer(Trainer):
             a dictionary string to metric values.
     """
 
-    _tag_names = ["trl", "kto"]
+    _tag_names = ["kto"]
 
     def __init__(
         self,
@@ -677,37 +677,7 @@ class KTOTrainer(Trainer):
         """Computes log probabilities of the reference model for a single padded batch of a KTO specific dataset."""
         with paddle.no_grad():
             if self.ref_model is None:
-                with self.accelerator.unwrap_model(
-                    self.model
-                ).disable_adapter() if self.is_peft_model else nullcontext():
-                    if self.is_encoder_decoder:
-                        completion_logits = self.model(
-                            padded_batch["prompt_input_ids"],
-                            attention_mask=padded_batch["prompt_attention_mask"],
-                            decoder_input_ids=padded_batch.get("completion_decoder_input_ids"),
-                            labels=padded_batch["completion_labels"],
-                            return_dict=True,
-                        ).logits
-
-                        KL_logits = self.model(
-                            padded_batch["KL_prompt_input_ids"],
-                            attention_mask=padded_batch["KL_prompt_attention_mask"],
-                            decoder_input_ids=padded_batch.get("KL_completion_decoder_input_ids"),
-                            labels=padded_batch["KL_completion_labels"],
-                            return_dict=True,
-                        ).logits
-                    else:
-                        completion_logits = self.model(
-                            padded_batch["completion_input_ids"],
-                            attention_mask=padded_batch["completion_attention_mask"],
-                            return_dict=True,
-                        ).logits
-
-                        KL_logits = self.model(
-                            padded_batch["KL_completion_input_ids"],
-                            attention_mask=padded_batch["KL_completion_attention_mask"],
-                            return_dict=True,
-                        ).logits
+                raise NotImplementedError("currently kto don't support training with no reference model")
             else:
                 if self.is_encoder_decoder:
                     completion_logits = self.ref_model(
@@ -961,14 +931,7 @@ class KTOTrainer(Trainer):
             with paddle.no_grad():
                 if self.ref_model is None:
                     # TODO(wugaosheng), replace self.accelerator.unwrap_model(self.model).disable_adapter()
-                    with self.accelerator.unwrap_model(self.model).disable_adapter():
-                        (
-                            reference_chosen_logps,
-                            reference_rejected_logps,
-                            _,
-                            _,
-                            reference_KL_logps,
-                        ) = self.forward(self.model, batch)
+                    raise NotImplementedError("currently kto don't support training with no reference model")
                 else:
                     (
                         reference_chosen_logps,
