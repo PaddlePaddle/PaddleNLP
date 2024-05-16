@@ -19,6 +19,7 @@ from paddle.distributed.fleet.meta_parallel import LayerDesc, PipelineLayer
 from paddle.distributed.fleet.utils import recompute
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
+from paddlenlp.utils.tools import get_env_device
 
 from .modeling import (
     LlamaConfig,
@@ -152,6 +153,11 @@ class LlamaEmbeddingPipe(nn.Layer):
             attention_mask = LlamaModel._prepare_decoder_attention_mask(
                 attention_mask, (batch_size, seq_length), 0, input_embeds.dtype
             )
+            attention_mask.stop_gradient = True
+            if get_env_device() == "npu":
+                attention_mask = attention_mask.astype("bool")
+        elif get_env_device() == "npu":
+            attention_mask = paddle.tril(paddle.ones((seq_length, seq_length), dtype="bool"))
             attention_mask.stop_gradient = True
 
         if self.config.alibi and attention_mask is None:
