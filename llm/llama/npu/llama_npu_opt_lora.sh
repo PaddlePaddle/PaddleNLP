@@ -49,6 +49,7 @@ python -u  -m paddle.distributed.launch \
     --logging_steps 1 \
     --evaluation_strategy "epoch" \
     --src_length 1024 \
+    --tensor_parallel_output true \
     --max_length 4096 \
     --bf16 true \
     --fp16_opt_level "O2" \
