@@ -72,6 +72,7 @@ from paddlenlp.utils.tools import get_env_device
 
 from .. import linear_utils
 from ..linear_utils import Linear
+from ..model_outputs import ModelOutput
 from ..segment_parallel_utils import ReshardLayer
 from .configuration import (
     LLAMA_PRETRAINED_INIT_CONFIGURATION,
@@ -90,12 +91,7 @@ try:
 except:
     flash_attention = None
 
-__all__ = [
-    "LlamaModel",
-    "LlamaPretrainedModel",
-    "LlamaForCausalLM",
-    "LlamaPretrainingCriterion",
-]
+__all__ = ["LlamaModel", "LlamaPretrainedModel", "LlamaForCausalLM", "LlamaPretrainingCriterion", "LlamaRM"]
 
 
 def _get_interleave(n):
@@ -1145,7 +1141,6 @@ class LlamaDecoderLayer(nn.Layer):
                 (see `cache`).
             cache (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
         """
-
         # [bs * seq_len, embed_dim] -> [seq_len * bs / n, embed_dim] (sequence_parallel)
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
@@ -2049,3 +2044,159 @@ class LlamaDPOCriterion(nn.Layer):
             return loss
         else:
             return loss, policy_chosen_logps, policy_rejected_logps
+
+
+class LlamaRMOutput(ModelOutput):
+    """
+    Output class for outputs of reward models.
+
+    Args:
+        loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `loss_mask` is provided):
+            Classification (or regression if config.num_labels==1) loss.
+        logits (`paddle.Tensor` of shape `(batch_size, config.num_labels)`):
+            Classification (or regression if config.num_labels==1) scores (before SoftMax).
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    logits: paddle.Tensor = None
+
+
+class ValueHead(nn.Layer):
+    """ValueHead is used in Reward Model."""
+
+    def __init__(
+        self,
+        input_dim=None,
+        output_dim=1,
+        weight_attr=None,
+        bias_attr=None,
+        activation="tanh",
+        use_fc_and_ln_before_out=True,
+        name="",
+    ):
+        super(ValueHead, self).__init__()
+        self.name = name
+        self.use_fc_and_ln_before_out = use_fc_and_ln_before_out
+        self.pooled = nn.Linear(
+            in_features=input_dim, out_features=input_dim, weight_attr=weight_attr, bias_attr=bias_attr
+        )
+        self.activation = activation
+        if activation == "SwiGLU":
+            self.act = paddle.nn.Silu()
+        else:
+            self.act = getattr(F, activation)
+        self.score = nn.Linear(
+            in_features=input_dim, out_features=output_dim, weight_attr=weight_attr, bias_attr=bias_attr
+        )
+
+    def forward(self, hidden):
+        """The forward process of ValueHead
+
+        Args:
+            hidden (`paddle.Tensor` of shape `(batch_size, hidden_size)`):
+                represents the hidden output of LlamaModel.
+
+        Returns:
+            logits (`paddle.Tensor` of shape `(batch_size, 1)`): represents the logits of ValueHead output.
+        """
+        if self.use_fc_and_ln_before_out:
+            hidden = self.act(self.pooled(hidden))
+        logits = self.score(hidden)
+        logits = logits.cast(paddle.float32)
+        return logits
+
+
+class LlamaRM(LlamaPretrainedModel):
+    """The Reward Model based on LlamaModel."""
+
+    def __init__(self, config: LlamaConfig):
+        super(LlamaRM, self).__init__(config)
+        self.llama = LlamaModel(config)
+        self.score = ValueHead(
+            input_dim=config.hidden_size,
+            output_dim=1,
+            use_fc_and_ln_before_out=True,
+            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=config.initializer_range)),
+        )
+        self.criterion = LlamaRewardCriterion()
+
+    def forward(
+        self,
+        input_ids,
+        position_ids=None,
+        attention_mask=None,
+        attn_mask_start_row_indices=None,
+        loss_mask=None,
+        logits_indices=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
+        """The forward process of LlamaRM."""
+        input_type = type(input_ids)
+        outputs = self.llama(
+            input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            attn_mask_start_row_indices=attn_mask_start_row_indices,
+        )
+        if isinstance(outputs, input_type):
+            hidden_states = outputs
+        else:
+            hidden_states = outputs[0]
+        if self.config.sequence_parallel:
+            hidden_states = GatherOp.apply(hidden_states)
+            hidden_states = hidden_states.reshape([-1, position_ids.shape[1], hidden_states.shape[-1]])
+        if logits_indices is not None:
+            hidden_states = paddle.take_along_axis(hidden_states, logits_indices.unsqueeze(-1), axis=1)
+            logits = self.score(hidden_states)
+            loss = self.criterion(logits, loss_mask)
+        else:
+            logits = self.score(hidden_states)
+            loss = None
+
+        if not return_dict:
+            if loss is None:
+                return logits
+            else:
+                return loss, logits
+
+        return LlamaRMOutput(
+            loss=loss,
+            logits=logits,
+        )
+
+
+class LlamaRewardCriterion(nn.Layer):
+    """
+    Criterion for EB reward model. It calculates the final loss.
+    """
+
+    def __init__(self):
+        super(LlamaRewardCriterion, self).__init__()
+
+    def forward(self, logits, loss_mask):
+        """Calculate reward modeling criterion.
+
+        Args:
+            logits (`paddle.Tensor` of shape `(batch_size * num_comparisons, 1)`):
+                represents the logits of ValueHead output.
+            loss_mask (`paddle.Tensor` of shape `(batch_size, num_comparisons, num_comparisons)`):
+                represents the reward modeling loss mask.
+        """
+        if loss_mask is None:
+            return None
+
+        num_comparisons = loss_mask.shape[-1]
+        logits = logits.reshape([-1, num_comparisons])
+        # shape: (batch_size, num_comparisons, num_comparisons)
+        score_gap = paddle.subtract(logits[:, :, None], logits[:, None, :])
+
+        score_log = paddle.nn.functional.log_sigmoid(score_gap)
+        loss = -paddle.mean(
+            paddle.multiply(loss_mask, score_log).sum(axis=[1, 2]) / (loss_mask.sum(axis=[1, 2]) + 1e-5)
+        )
+        return loss

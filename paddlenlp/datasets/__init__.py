@@ -27,7 +27,6 @@ from .drcd_cn import *
 from .dureader_robust import *
 from .glue import *
 from .imdb import *
-from .intokens_dataset import *
 from .lcqmc import *
 from .msra_ner import *
 from .nlpcc13_evsam05_hit import *
@@ -44,3 +43,4 @@ from .wos import *
 from .xnli import *
 from .xnli_cn import *
 from .yahoo_answer_100k import *
+from .zero_padding_dataset import *
