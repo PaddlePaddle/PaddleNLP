@@ -38,7 +38,7 @@ python -u  -m paddle.distributed.launch \
     --dataset_name_or_path "data/" \
     --output_dir "./output/lora_bf16_llama_N1C8" \
     --per_device_train_batch_size 2 \
-    --gradient_accumulation_steps 16 \
+    --gradient_accumulation_steps 32 \
     --per_device_eval_batch_size 1 \
     --eval_accumulation_steps 1 \
     --max_steps ${max_steps} \
@@ -58,7 +58,7 @@ python -u  -m paddle.distributed.launch \
     --eval_with_do_generation false \
     --metric_for_best_model "accuracy" \
     --recompute false \
-    --tensor_parallel_degree 8 \
+    --tensor_parallel_degree 4 \
     --pipeline_parallel_degree 1 \
     --zero_padding 0 \
     --sequence_parallel 1 \

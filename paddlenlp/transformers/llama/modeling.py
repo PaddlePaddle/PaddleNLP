@@ -1381,9 +1381,9 @@ class LlamaModel(LlamaPretrainedModel):
                         input_shape, past_key_values_length=past_key_values_length
                     )
                     if get_env_device() == "npu":
-                        expanded_attn_mask = expanded_attn_mask.astype("bool")
-                        combined_attention_mask = combined_attention_mask.astype("bool")
-                    expanded_attn_mask = expanded_attn_mask & combined_attention_mask
+                        expanded_attn_mask = expanded_attn_mask.astype("bool") & combined_attention_mask.astype("bool")
+                    else:
+                        expanded_attn_mask = expanded_attn_mask & combined_attention_mask
             # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
             elif len(attention_mask.shape) == 3:
                 expanded_attn_mask = attention_mask.unsqueeze(1).astype("bool")
@@ -1394,9 +1394,9 @@ class LlamaModel(LlamaPretrainedModel):
             expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
         # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
         if get_env_device() == "npu":
-            x = paddle.to_tensor(0.0, dtype="float16")
-            y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float16")
-            expanded_attn_mask = expanded_attn_mask.astype("float16")
+            x = paddle.to_tensor(0.0, dtype="float32")
+            y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float32")
+            expanded_attn_mask = expanded_attn_mask.astype("float32")
             expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
         elif get_env_device() == "xpu":
             x = paddle.to_tensor(0.0, dtype=dtype)
