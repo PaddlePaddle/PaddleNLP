@@ -120,8 +120,7 @@ class Predictor:
                 "batch_size": trainer.args.per_device_train_batch_size,
                 # infer model do not support top_k, and differ with non-infer model
                 # generation which gets default top_K=50 using generation_config.top_k
-                "top_p": 0.8,
-                # trainer.args.top_p,
+                "top_p": trainer.args.top_p,
                 "temperature": trainer.args.temperature,
                 "repetition_penalty": trainer.args.repetition_penalty,
             }
