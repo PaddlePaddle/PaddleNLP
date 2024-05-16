@@ -34,6 +34,8 @@
     "bf16": true,
     "fp16_opt_level": "O2",
     "amp_master_grad": true,
+    "amp_custom_black_list": ["reduce_sum", "c_softmax_with_cross_entropy"],
+    "amp_custom_white_list": ["lookup_table", "lookup_table_v2"],
     "fuse_attention_ffn": true,
     "fuse_attention_qkv": true,
     "use_fused_rope": true,
@@ -56,5 +58,5 @@
     "to_static": true,
     "eliminate_transpose": 1,
     "fuse_allreduce_split_to_reducescatter": 1,
-    "sequence_parallel_config": "enable_allreduce_avg_in_gradinent_scale",
-  }
+    "sequence_parallel_config": "enable_allreduce_avg_in_gradinent_scale"
+}
