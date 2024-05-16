@@ -68,19 +68,23 @@ def get_unfinished_flag(
     input_ids: Tensor, unfinished_flag: Tensor, eos_token_id: Union[int, list[int], list[list[int]]]
 ) -> Tensor:
     """get unfinished flag for generation step
-
     Args:
         input_ids (Tensor): the input_ids
         eos_token_id (Union[int, list[int], list[list[int]]]): the end os sentence flag, which can be:
             * single token id, eg: 10
             * multiple token ids to stop generation, eg: [10, 10]
             * some more tokens to stop generations, eg: [[10], [20, 20], [30, 30, 30]]
-
     Returns:
         Tensor: the unfinished flag tensor
     """
     if isinstance(eos_token_id, int):
         unfinished_flag = paddle.logical_and(unfinished_flag, input_ids[:, -1:] != eos_token_id)
+    elif isinstance(eos_token_id[0], int):
+        eos_token_id_tensor = paddle.to_tensor([eos_token_id])
+        is_last_tokens_equal = paddle.all(
+            paddle.equal(input_ids[:, -len(eos_token_id) :], eos_token_id_tensor), axis=-1
+        ).unsqueeze(-1)
+        unfinished_flag = paddle.logical_and(unfinished_flag, ~is_last_tokens_equal)
     else:
         batch_unfinish_flag = None
         for batch_eos_token_id in eos_token_id:
@@ -397,17 +401,10 @@ class GenerationMixin(object):
         # Add more pre_processing for distribution
 
         if logits_processors is not None:
-            custom_processors = LogitsProcessorList()
-            custom_processors_type = [type(lp) for lp in logits_processors]
+            for logits_processor in logits_processors._processors.values():
+                processors.append(logits_processor)
 
-            for processor in processors:
-                if type(processor) not in custom_processors_type:
-                    custom_processors.append(processor)
-            custom_processors.extend(logits_processors)
-
-            return custom_processors
-        else:
-            return processors
+        return processors
 
     @staticmethod
     def expand_inputs_for_generation(input_ids, expand_size, attention_mask=None, **model_kwargs):
@@ -1086,7 +1083,6 @@ class GenerationMixin(object):
 
             # [batch_size, vocab_size]
             next_token_logits = logits[:, -1, :]
-
             # pre-process distribution
             next_token_logits = self.adjust_logits_during_generation(next_token_logits)
             probs = logits_processors(input_ids, next_token_logits)

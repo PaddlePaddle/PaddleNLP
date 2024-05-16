@@ -96,7 +96,16 @@ class PredictorServer:
                 f.write(json.dumps(data) + "\n")
             print("rank: ", predictor.tensor_parallel_rank, " port info saving done.")
 
-    def predict(self, input_texts: str | list[str]):
+    def predict(self, input_texts: str | list[str], json_mode, json_schema):
+        if json_mode:
+            result = self.predictor.predict_json_result(input_texts, json_schema)
+
+            def fake_stream_response():
+                for _ in range(1):
+                    yield result
+
+            return fake_stream_response()
+
         return self.predictor.stream_predict(input_texts)
 
     def broadcast_msg(self, data):
@@ -105,7 +114,7 @@ class PredictorServer:
                 _ = requests.post(f"http://0.0.0.0:{peer_port}/api/chat", json=data)
 
     def start_flask_server(self):
-        from flask import Flask, request, stream_with_context
+        from flask import Flask, jsonify, request, stream_with_context
 
         app = Flask(__name__)
 
@@ -113,6 +122,10 @@ class PredictorServer:
         def _server():
             data = request.get_json()
             logger.info(f"Request: {json.dumps(data, indent=2, ensure_ascii=False)}")
+            if data["json_mode"] is True and (
+                self.predictor.config.inference_model or self.predictor.config.mode == "static"
+            ):
+                return jsonify(dict(error_code=1000, error_msg="JSON Mode 当前只能应用在非融合组网和动态图上"))
 
             if self.predictor.tensor_parallel_rank == 0:
                 self.broadcast_msg(data)
@@ -170,7 +183,7 @@ class PredictorServer:
                 for key, value in generation_args.items():
                     setattr(self.args, key, value)
 
-                streamer = self.predict(query)
+                streamer = self.predict(query, data.get("json_mode", False), data.get("json_schema", "{}"))
                 if self.predictor.tensor_parallel_rank == 0:
                     for new_text in streamer:
                         if not new_text:

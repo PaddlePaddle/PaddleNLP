@@ -153,6 +153,32 @@ def batchfy_text(texts, batch_size):
     return batch_texts
 
 
+from pydantic import BaseModel, Field
+
+
+class AnswerFormat(BaseModel):
+    start_location: str = Field(description="出发地")
+    end_location: str = Field(description="目的地")
+    time: str = Field(description="时间")
+
+
+from lmformatenforcer import JsonSchemaParser
+
+from paddlenlp.generation.format_enforce import build_prefix_allowed_tokens_fn
+from paddlenlp.generation.logits_process import (
+    LogitsProcessorList,
+    PrefixConstrainedLogitsProcessor,
+)
+
+
+def get_logits_processors(tokenizer):
+    parser = JsonSchemaParser(AnswerFormat.model_json_schema())
+    prefix_function = build_prefix_allowed_tokens_fn(tokenizer, parser)
+
+    logits_processors = LogitsProcessorList([PrefixConstrainedLogitsProcessor(prefix_function, num_beams=1)])
+    return logits_processors
+
+
 def init_dist_env():
     tensor_parallel_degree = paddle.distributed.get_world_size()
     tensor_parallel_rank = paddle.distributed.get_rank()
@@ -185,10 +211,13 @@ def get_eos_token_id(
     """
     eos_token_ids = []
     if tokenizer.eos_token_id is not None:
-        eos_token_ids.append(tokenizer.eos_token_id)
+        eos_token_ids.append([tokenizer.eos_token_id])
 
     if generation_config is not None and generation_config.eos_token_id is not None:
+        # format the eos_token_id to list[list[int]] dtype
         if isinstance(generation_config.eos_token_id, int):
+            eos_token_ids.append([generation_config.eos_token_id])
+        elif isinstance(generation_config.eos_token_id, list) and isinstance(generation_config.eos_token_id[0], int):
             eos_token_ids.append(generation_config.eos_token_id)
         else:
             eos_token_ids.extend(generation_config.eos_token_id)
@@ -295,19 +324,79 @@ class DygraphPredictor(BasePredictor):
         self.model.eval()
 
     @paddle.no_grad()
-    def _infer(self, inputs: dict[str, paddle.Tensor]):
-        result = self.model.generate(
-            **inputs,
-            max_new_tokens=self.config.max_length,
-            bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
-            pad_token_id=self.tokenizer.pad_token_id,
-            decode_strategy=self.config.decode_strategy,
-            temperature=self.config.temperature,
-            top_k=self.config.top_k,
-            top_p=self.config.top_p,
-            repetition_penalty=self.config.repetition_penalty,
+    def predict_json_result(self, source: str, json_schema: Optional[str] = None):
+        from paddlenlp.experimental.transformers.generation_utils import (
+            compile_json_schema_steps,
+            set_tokenizer,
+            steps_generate,
         )
+
+        source = [source] if isinstance(source, str) else source
+        if json_schema is not None:
+            # WARNING(wj-Mcat): 同一个 batch 中目前只能有同一个 json schema
+            system_prompt = "你是一个文档助手, 非常擅长于从文本中解析出结构化的数据,比如输出Enum 数据类型，Float 数据类型以及JSON 数据类型等.\n\n"
+            system_prompt += f"请在以下文本中按照以下格式接下内容:\n\n **数据格式**\n{json_schema}\n\n**用户原始文本内容**\n"
+            for batch_index in range(len(source)):
+                if isinstance(source[batch_index], str):
+                    source[batch_index] = system_prompt + source[batch_index]
+                else:
+                    # 属于多轮对话的范畴,后续可添加到system字段当中去,当下处理就直接拼接到第一轮用户对话上
+                    source[batch_index][0][0] = system_prompt + source[batch_index][0][0]
+
+        if self.tokenizer.chat_template is not None:
+            source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
+
+        set_tokenizer(self.tokenizer)
+        logger.info("start to building json parser ...")
+        steps = compile_json_schema_steps(json_schema)
+        # steps = [source[0]] + steps
+        steps[0] = source[0] + steps[0]
+
+        logger.info("start to generate ...")
+        result_ids = steps_generate(self.model, self.tokenizer, steps)
+        result = self.tokenizer.decode(result_ids.tolist()[0], skip_special_tokens=True)
+        # result = result[len(source[0]):]
+        # JSON Model will add some <br> and black string
+        while True:
+            if len(result.strip().strip("<br>")) == len(result):
+                break
+            result = result.strip().strip("<br>")
+        return result
+
+    @paddle.no_grad()
+    def _infer(self, inputs: dict[str, paddle.Tensor]):
+        from datetime import datetime
+
+        from tqdm import trange
+
+        count = 0
+        for i in trange(100):
+            if i == 20:
+                start_time = datetime.now()
+            result = self.model.generate(
+                **inputs,
+                max_new_tokens=self.config.max_length,
+                bos_token_id=self.tokenizer.bos_token_id,
+                eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
+                pad_token_id=self.tokenizer.pad_token_id,
+                decode_strategy=self.config.decode_strategy,
+                temperature=self.config.temperature,
+                top_k=self.config.top_k,
+                top_p=self.config.top_p,
+                repetition_penalty=self.config.repetition_penalty,
+                max_length=100,
+                # logits_processors=get_logits_processors(self.tokenizer)
+            )[0]
+            if i >= 20:
+                # print("result ->", result)
+                # sentence = self.tokenizer.decode(result.tolist()[0])
+                # print("sentence ->", sentence)
+                count += result.shape[1]
+        seconds = (datetime.now() - start_time).seconds
+        ips = count / seconds
+        print("final ips ->", ips)
+        return result
+
         result = result[0]
         return result
 
@@ -329,6 +418,7 @@ class DygraphPredictor(BasePredictor):
             top_p=self.config.top_p,
             repetition_penalty=self.config.repetition_penalty,
         )
+        print("eos-token-id ->", generation_kwargs["eos_token_id"])
         thread = Thread(target=self.model.generate, kwargs=generation_kwargs)
         thread.start()
 
@@ -712,9 +802,23 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
                 inputs[key] = paddle.to_tensor(inputs[key])
 
         inputs["cache_kvs"] = self.cache_kvs
-        self.model.generate(
-            **inputs,
-        )
+
+        from paddlenlp.experimental.transformers.generation_utils import Choices
+
+        steps = [
+            # JsonSchemaParser(schema=schema),
+            JsonSchemaParser(schema={}),
+            "\n\n\n\n对以上结果满意吗? 请回答:[满意, 不满意]\n 答案:",
+            Choices(["满意", "不满意"], tokenizer=self.tokenizer),
+        ]
+        from paddlenlp.experimental.transformers.generation_utils import steps_generate
+
+        result = steps_generate(self.model, self.tokenizer, steps, inputs)
+        return result
+        # self.model.generate(
+        #     **inputs,
+        #     logits_processors=get_logits_processors(self.tokenizer)
+        # )
         return None
 
 
@@ -977,9 +1081,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor
 
     @paddle.no_grad()
     def _infer(self, inputs: dict[str, paddle.Tensor]):
-        self.model.generate(
-            **inputs,
-        )
+        self.model.generate(**inputs, logits_processors=get_logits_processors(self.tokenizer))
 
     @paddle.no_grad()
     def predict(self, input_texts: str | list[str]):
@@ -1220,6 +1322,7 @@ def create_predictor(
         predictor_args.temperature = 1.0
 
     tensor_parallel_rank, tensor_parallel_degree = init_dist_env()
+    print("predictor_args ->", predictor_args)
     if not predictor_args.inference_model:
         tokenizer.padding_side = "left"
         if predictor_args.mode == "dynamic":
@@ -1538,13 +1641,51 @@ def predict():
         source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
         target_texts = ["", ""]
 
+    json_schema = """{
+    "properties": {
+        "start_location": {
+            "description": "出发地",
+            "title": "Start Location",
+            "type": "string"
+        },
+        "end_location": {
+            "description": "目的地",
+            "title": "End Location",
+            "type": "string"
+        },
+        "time": {
+            "description": "时间",
+            "title": "Time",
+            "type": "string"
+        }
+    },
+    "required": [
+        "start_location",
+        "end_location",
+        "time"
+    ],
+    "title": "AnswerFormat",
+    "type": "object"
+}"""
+    input_text = "我想预定一个今天从深圳到北京的飞机，请问我其中的时间、出发地和目的地信息分别是什么，以 JSON 的格式输出："
+    result = predictor.predict_json_result(input_text, json_schema)
+    return result
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
 
+    from datetime import datetime
+
+    start_time = datetime.now()
     with open(model_args.output_file, "w", encoding="utf-8") as f:
+        count = 0
         for bs, batch_source_text in enumerate(batch_source_texts):
+            count += 1
+            if count == 20:
+                start_time = datetime.now()
             logger.info("Start predict")
             outputs = predictor.predict(batch_source_text)
+
+            break
             logger.info("End predict")
 
             if predictor.tensor_parallel_rank > 0:
@@ -1559,6 +1700,8 @@ def predict():
                 out = {"src": source, "tgt": target, "output": output}
                 f.write(json.dumps(out, ensure_ascii=False) + "\n")
 
+    end_time = datetime.now()
+    print("seconds ->", (end_time - start_time).seconds)
     if predictor_args.benchmark:
         benchmark(predictor, predictor_args, model_args)
 

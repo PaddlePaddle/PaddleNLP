@@ -96,7 +96,9 @@ def launch(args, default_params: dict = {}):
         shown_context = get_shown_context(context)
         return utterance, shown_context, context, state
 
-    def infer(utterance, state, top_k, top_p, temperature, repetition_penalty, max_length, src_length):
+    def infer(
+        utterance, state, top_k, top_p, temperature, repetition_penalty, max_length, src_length, json_mode, json_schema
+    ):
         """Model inference."""
         utterance = utterance.strip().replace("<br>", "\n")
         context = state.setdefault("context", [])
@@ -116,6 +118,8 @@ def launch(args, default_params: dict = {}):
             "max_length": max_length,
             "src_length": src_length,
             "min_length": 1,
+            "json_mode": json_mode,
+            "json_schema": json_schema,
         }
         if len(context) > 2:
             data["history"] = json.dumps(context[:-2])
@@ -241,6 +245,53 @@ def launch(args, default_params: dict = {}):
                 src_length.change(src_length_change_event, inputs=[src_length, max_length], outputs=max_length)
                 max_length.change(max_length_change_event, inputs=[src_length, max_length], outputs=src_length)
 
+                json_mode = gr.Checkbox(label="JSON Mode", info=" 是否开启JSON Mode,让输出成为一个有效json 数据格式。", value=True)
+                default_json_schema = """{
+    "properties": {
+        "start_location": {
+            "description": "出发地",
+            "title": "Start Location",
+            "type": "string"
+        },
+        "end_location": {
+            "description": "目的地",
+            "title": "End Location",
+            "type": "string"
+        },
+        "time": {
+            "description": "时间",
+            "title": "Time",
+            "type": "string"
+        }
+    },
+    "required": [
+        "start_location",
+        "end_location",
+        "time"
+    ],
+    "title": "AnswerFormat",
+    "type": "object"
+}"""
+                json_schema = gr.Textbox(
+                    label="Schema of JSON Mode",
+                    info="用于解析JSON 结果的",
+                    lines=10,
+                    # value="{}",
+                    value=default_json_schema,
+                    visible=False,
+                )
+
+                def exchange_json_schema(json_mode_value, json_schema_value):
+                    return gr.Textbox(
+                        label="Schema of JSON Mode",
+                        info="用于解析JSON 结果的",
+                        lines=10,
+                        value=json_schema_value,
+                        visible=json_mode_value,
+                    )
+
+                json_mode.change(exchange_json_schema, inputs=[json_mode, json_schema], outputs=[json_schema])
+
             with gr.Column(scale=4):
                 state = gr.State({})
                 context_chatbot = gr.Chatbot(label="Context")
@@ -261,7 +312,18 @@ def launch(args, default_params: dict = {}):
                 api_name="chat",
             ).then(
                 infer,
-                inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_length, src_length],
+                inputs=[
+                    utt_text,
+                    state,
+                    top_k,
+                    top_p,
+                    temperature,
+                    repetition_penalty,
+                    max_length,
+                    src_length,
+                    json_mode,
+                    json_schema,
+                ],
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
             )
 
@@ -286,7 +348,18 @@ def launch(args, default_params: dict = {}):
                 api_name="chat",
             ).then(
                 infer,
-                inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_length, src_length],
+                inputs=[
+                    utt_text,
+                    state,
+                    top_k,
+                    top_p,
+                    temperature,
+                    repetition_penalty,
+                    max_length,
+                    src_length,
+                    json_mode,
+                    json_schema,
+                ],
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
             )
 
@@ -298,7 +371,18 @@ def launch(args, default_params: dict = {}):
                 api_name="chat",
             ).then(
                 infer,
-                inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_length, src_length],
+                inputs=[
+                    utt_text,
+                    state,
+                    top_k,
+                    top_p,
+                    temperature,
+                    repetition_penalty,
+                    max_length,
+                    src_length,
+                    json_mode,
+                    json_schema,
+                ],
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
             )
 

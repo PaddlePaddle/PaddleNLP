@@ -888,7 +888,7 @@ class QWenForCausalLM(QWenPretrainedModel):
         attention_mask = kwargs.get("attention_mask", None)
         position_ids = kwargs.get("position_ids", None)
 
-        if past_key_values:
+        if past_key_values is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
             if position_ids is not None:
                 position_ids = position_ids[:, -1].unsqueeze(-1)
