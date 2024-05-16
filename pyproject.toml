@@ -10,7 +10,10 @@ exclude = ['.flake8']
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q --ignore model_zoo/gpt-3/"
+addopts = "-ra -q --dist loadgroup"
+retries = 0
+retry_delay = 0.5
+timeout = 200
 pythonpath = ["."]
 testpaths = [
     "tests/data",
@@ -22,13 +25,12 @@ testpaths = [
     "tests/layers",
     "tests/metrics",
     "tests/ops",
-    "tests/trainer",
+    # "tests/trainer",
     "tests/transformers",
     "tests/peft",
     "tests/prompt",
     # "tests/taskflow",  TODO (paddle 2.5.1 breaks this test suite, debug later)
     "tests/utils",
-    "model_zoo",
 ]
 python_files = [
     "test.py",

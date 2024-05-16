@@ -12,10 +12,11 @@ hyperopt
 h5py
 deploy
 ray
-loguru
+loguru==0.6.0
 data
 wget
 huggingface_hub>=0.19.2
 protobuf==3.20.2
 pytest-retry
 gradio
+paddleslim

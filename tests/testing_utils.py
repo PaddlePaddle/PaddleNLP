@@ -223,6 +223,10 @@ def slow(test):
     if not _run_slow_test:
         return unittest.skip("test spends too much time")(test)
     else:
+        import paddle
+
+        if paddle.device.is_compiled_with_cuda() and paddle.device.cuda.device_count() > 0:
+            paddle.device.cuda.empty_cache()
         return test
 
 
