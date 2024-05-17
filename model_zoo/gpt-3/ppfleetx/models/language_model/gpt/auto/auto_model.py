@@ -933,7 +933,7 @@ class GPTForGenerationAuto(nn.Layer):
     def update_scores_for_generation(self, scores, next_scores, length, unfinished_flag):
         # update scores
 
-        unfinished_scores = (scores * length + next_scores) / (length + 1)
+        unfinished_scores = (scores * length.astype(scores.dtype) + next_scores) / (length.astype(scores.dtype) + 1)
         scores = paddle.where(unfinished_flag, unfinished_scores, scores)
         return scores
 
