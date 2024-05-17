@@ -55,9 +55,10 @@ python -u  -m paddle.distributed.launch \
     --evaluation_strategy "epoch" \
     --src_length 1024 \
     --max_length 4096 \
-    --fp16 true \
+    --bf16 true \
     --fp16_opt_level "O2" \
     --do_train true \
+    --tensor_parallel_output true \
     --disable_tqdm true \
     --eval_with_do_generation false \
     --metric_for_best_model "accuracy" \
