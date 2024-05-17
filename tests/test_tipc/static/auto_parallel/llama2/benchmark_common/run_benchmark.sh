@@ -36,7 +36,7 @@ function _set_params(){
     keyword="interval_tokens_per_second_per_device:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
     model_mode=5                   # 获取ips数据及单位，仅跳过skip_steps后计算均值，单位保持token/s不变
-
+    
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -92,7 +92,7 @@ function _train(){
     # else
     #     autoconfig_args=""
     # fi
-
+    
     if [ ${PADDLE_TRAINER_ID} ]; then
         PADDLE_RANK_OPTION=" --rank ${PADDLE_TRAINER_ID}"
     else
@@ -134,7 +134,7 @@ function _train(){
     # rm -rf ./auto_config_${MODEL_TYPE}/*csv
     # rm -rf ./auto_config_${MODEL_TYPE}/best_*
     rm -rf mylog && rm -rf checkpoints
-
+    
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     timeout 15m ${train_cmd} > ${log_file} 2>&1
 
@@ -162,4 +162,3 @@ source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合ben
 _set_params $@
 #_train       # 如果只产出训练log,不解析,可取消注释
 _run     # 该函数在run_model.sh中,执行时会调用_train; 如果不联调只产出训练log可以注掉本行,提交时需打开
-
