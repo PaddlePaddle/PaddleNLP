@@ -23,3 +23,4 @@ cd ./tests
 bash ./test_tipc/static/auto_parallel/llama2/benchmark_common/prepare.sh
 
 bash -c "${param} bash ./test_tipc/static/auto_parallel/llama2/benchmark_common/run_benchmark.sh"
+
