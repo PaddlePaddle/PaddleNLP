@@ -833,12 +833,12 @@ class KTOTrainer(Trainer):
         rejected_logits = completion_logits[rejected_idx, ...]
 
         if chosen_logps.shape[0] == 0:
-            chosen_logps = paddle.to_tensor([0.0], dtype=completion_logps.dtype)
-            chosen_logits = paddle.to_tensor([0.0], dtype=completion_logps.dtype)
+            chosen_logps = paddle.to_tensor([], dtype=completion_logps.dtype)
+            chosen_logits = paddle.to_tensor([], dtype=completion_logps.dtype)
 
         if rejected_logps.shape[0] == 0:
-            rejected_logits = paddle.to_tensor([0.0], dtype=completion_logps.dtype)
-            rejected_logps = paddle.to_tensor([0.0], dtype=completion_logps.dtype)
+            rejected_logits = paddle.to_tensor([], dtype=completion_logps.dtype)
+            rejected_logps = paddle.to_tensor([], dtype=completion_logps.dtype)
 
         return (chosen_logps, rejected_logps, chosen_logits, rejected_logits, KL_logps)
 
@@ -884,8 +884,8 @@ class KTOTrainer(Trainer):
             chosen_rewards = self.beta * chosen_logratios.detach()
         else:
             # lists can't be empty -- if they are, then accelerate.gather will hang
-            chosen_losses = paddle.to_tensor([0.0], dtype=kl.dtype)
-            chosen_rewards = paddle.to_tensor([0.0], dtype=kl.dtype)
+            chosen_losses = paddle.to_tensor([], dtype=kl.dtype)
+            chosen_rewards = paddle.to_tensor([], dtype=kl.dtype)
 
         if policy_rejected_logps.shape[0] != 0 or reference_rejected_logps.shape[0] != 0:
             rejected_logratios = policy_rejected_logps - reference_rejected_logps
@@ -893,8 +893,8 @@ class KTOTrainer(Trainer):
             rejected_rewards = self.beta * rejected_logratios.detach()
         else:
             # lists can't be empty -- if they are, then accelerate.gather will hang
-            rejected_losses = paddle.to_tensor([0.0], dtype=kl.dtype)
-            rejected_rewards = paddle.to_tensor([0.0], dtype=kl.dtype)
+            rejected_losses = paddle.to_tensor([], dtype=kl.dtype)
+            rejected_rewards = paddle.to_tensor([], dtype=kl.dtype)
 
         losses = paddle.concat(
             (self.desirable_weight * chosen_losses, self.undesirable_weight * rejected_losses),
@@ -950,8 +950,16 @@ class KTOTrainer(Trainer):
             reference_KL_logps,
         )
 
-        num_chosen = paddle.to_tensor([len(chosen_rewards)])
-        num_rejected = paddle.to_tensor([len(rejected_rewards)])
+        # handle empty chosen_rewards
+        if chosen_rewards.shape[0] == 0:
+            num_chosen = paddle.to_tensor([0])
+        else:
+            num_chosen = paddle.to_tensor([len(chosen_rewards)])
+        # handle empty rejected_rewards
+        if rejected_rewards.shape[0] == 0:
+            num_rejected = paddle.to_tensor([0])
+        else:
+            num_rejected = paddle.to_tensor([len(rejected_rewards)])
 
         if dist.is_initialized():
             # TODO test
@@ -963,8 +971,14 @@ class KTOTrainer(Trainer):
 
         if all_num_chosen > 0:
             if dist.is_initialized():
-                metrics["rewards/chosen_sum"] = distribute_gather(chosen_rewards.nansum()).nansum().item()
-                metrics["logps/chosen_sum"] = distribute_gather(policy_chosen_logps.nansum()).nansum().item()
+                if chosen_rewards.shape[0] == 0:
+                    metrics["rewards/chosen_sum"] = distribute_gather(paddle.to_tensor(0.0)).nansum().item()
+                else:
+                    metrics["rewards/chosen_sum"] = distribute_gather(chosen_rewards.nansum()).nansum().item()
+                if policy_chosen_logps.shape[0] == 0:
+                    metrics["logps/chosen_sum"] = distribute_gather(paddle.to_tensor(0.0)).nansum().item()
+                else:
+                    metrics["logps/chosen_sum"] = distribute_gather(policy_chosen_logps.nansum()).nansum().item()
                 metrics["count/chosen"] = all_num_chosen
             else:
                 metrics["rewards/chosen_sum"] = chosen_rewards.nansum().item()
@@ -973,8 +987,14 @@ class KTOTrainer(Trainer):
 
         if all_num_rejected > 0:
             if dist.is_initialized():
-                metrics["rewards/rejected_sum"] = distribute_gather(rejected_rewards.nansum()).nansum().item()
-                metrics["logps/rejected_sum"] = distribute_gather(policy_rejected_logps.nansum()).nansum().item()
+                if rejected_rewards.shape[0] == 0:
+                    metrics["rewards/rejected_sum"] = distribute_gather(paddle.to_tensor(0.0)).nansum().item()
+                else:
+                    metrics["rewards/rejected_sum"] = distribute_gather(rejected_rewards.nansum()).nansum().item()
+                if policy_rejected_logps.shape[0] == 0:
+                    metrics["logps/rejected_sum"] = distribute_gather(paddle.to_tensor(0.0)).nansum().item()
+                else:
+                    metrics["logps/rejected_sum"] = distribute_gather(policy_rejected_logps.nansum()).nansum().item()
                 metrics["count/rejected"] = all_num_rejected
             else:
                 metrics["rewards/rejected_sum"] = rejected_rewards.nansum().item()
@@ -982,7 +1002,6 @@ class KTOTrainer(Trainer):
                 metrics["count/rejected"] = all_num_rejected
 
         metrics["kl"] = kl.item()
-
         return losses.nanmean(), metrics
 
     def compute_loss(
