@@ -1,6 +1,6 @@
-paddleocr<2.7
+paddleocr
 pre-commit
-pytest
+pytest==8.1.1
 parameterized
 pytest-cov
 regex
