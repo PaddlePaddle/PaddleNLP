@@ -79,7 +79,7 @@ from .configuration import (
 )
 
 try:
-    if get_env_device() == "npu":
+    if get_env_device() in ["npu", "gcu"]:
 
         for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
             if lib.endswith(".so"):
@@ -410,6 +410,7 @@ class LlamaRotaryEmbedding(nn.Layer):
         # [1, seqlen, 1, dim]
         self.cos_cached = emb.cos()[None, :, None, :]
         self.sin_cached = emb.sin()[None, :, None, :]
+        self.cos_sin_table = None if get_env_device() != "gcu" else paddle.concat([freqs.cos(), freqs.sin()], axis=-1)
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
@@ -418,6 +419,9 @@ class LlamaRotaryEmbedding(nn.Layer):
         return (
             cos.cast(x.dtype) if cos.dtype != x.dtype else cos,
             sin.cast(x.dtype) if sin.dtype != x.dtype else sin,
+            self.cos_sin_table.cast(x.dtype)
+            if self.cos_sin_table is not None and self.cos_sin_table.dtype != x.dtype
+            else self.cos_sin_table,
         )
 
 
@@ -439,6 +443,7 @@ class LlamaLinearScalingRotaryEmbedding(LlamaRotaryEmbedding):
         # [1, seqlen, 1, dim]
         self.cos_cached = emb.cos()[None, :, None, :]
         self.sin_cached = emb.sin()[None, :, None, :]
+        self.cos_sin_table = None if get_env_device() != "gcu" else paddle.concat([freqs.cos(), freqs.sin()], axis=-1)
 
 
 class LlamaNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
@@ -471,19 +476,23 @@ class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
         # [1, seqlen, 1, dim]
         scale_cos = emb.cos()[None, :, None, :]
         scale_sin = emb.sin()[None, :, None, :]
-        return scale_cos, scale_sin
+        scale_cos_sin = None if get_env_device() != "gcu" else paddle.concat([freqs.cos(), freqs.sin()], axis=-1)
+        return scale_cos, scale_sin, scale_cos_sin
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
         if seq_len > self.max_position_embeddings:
-            scale_cos, scale_sin = self._scale_cos_sin(seq_len=seq_len)
+            scale_cos, scale_sin, scale_cos_sin = self._scale_cos_sin(seq_len=seq_len)
         else:
-            scale_cos, scale_sin = self.cos_cached, self.sin_cached
+            scale_cos, scale_sin, scale_cos_sin = self.cos_cached, self.sin_cached, self.cos_sin_table
         cos = scale_cos[:, :seq_len, :, ...]
         sin = scale_sin[:, :seq_len, :, ...]
         return (
             cos.cast(x.dtype) if cos.dtype != x.dtype else cos,
             sin.cast(x.dtype) if sin.dtype != x.dtype else sin,
+            scale_cos_sin.cast(x.dtype)
+            if scale_cos_sin is not None and scale_cos_sin.dtype != x.dtype
+            else scale_cos_sin,
         )
 
 
@@ -638,7 +647,7 @@ class LlamaAttention(nn.Layer):
                 )
 
         self.use_fused_rope = config.use_fused_rope
-        if self.use_fused_rope and get_env_device() not in ["npu", "xpu"]:
+        if self.use_fused_rope and get_env_device() not in ["npu", "xpu", "gcu"]:
             if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
@@ -934,7 +943,7 @@ class LlamaAttention(nn.Layer):
                         sin.cast(value_states.dtype) if sin.dtype != value_states.dtype else sin,
                     )
                 else:
-                    cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+                    cos, sin, _ = self.rotary_emb(value_states, seq_len=kv_seq_len)
 
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
@@ -1398,7 +1407,7 @@ class LlamaModel(LlamaPretrainedModel):
             y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float32")
             expanded_attn_mask = expanded_attn_mask.astype("float32")
             expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
-        elif get_env_device() == "xpu":
+        elif get_env_device() in ["xpu", "gcu"]:
             x = paddle.to_tensor(0.0, dtype=dtype)
             y = paddle.to_tensor(paddle.finfo(dtype).min, dtype=dtype)
             expanded_attn_mask = expanded_attn_mask.astype(dtype)
@@ -1528,7 +1537,7 @@ class LlamaModel(LlamaPretrainedModel):
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
         is_casual = False
-        if self.config.use_flash_attention:
+        if self.config.use_flash_attention and get_env_device() != "gcu":
             is_casual = is_casual_mask(attention_mask)
             if get_env_device() != "npu":
                 if is_casual and alibi is None:

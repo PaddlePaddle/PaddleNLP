@@ -17,12 +17,12 @@
 # Test training benchmark for a model.
 # Usage：bash benchmark/run_benchmark.sh ${model_name_or_path} ${per_device_train_batch_size} ${tensor_parallel_degree} ${pipeline_parallel_degree} ${virtual_pp_degree} ${sequence_parallel} ${sharding_parallel_degree} ${sharding} ${recompute} ${run_mode} ${device_num}
 function _set_params(){
-    model_item=${model_item:-"meta-llama-Llama-2-70b_pretrain"}
-    run_mode=${run_mode:-"MP4-PP8"}
-    device_num=${device_num:-"N4C32"}
-    global_batch_size=${global_batch_size:-32}
+    model_item=${model_item:-"meta-llama-Llama-2-7b_pretrain"}
+    run_mode=${run_mode:-"MP2-PP1"}
+    device_num=${device_num:-"N1C8"}
+    global_batch_size=${global_batch_size:-64}
     fp_item="bf16"
-    MODEL_TYPE=${model_type:-"llama2_70b"}
+    MODEL_TYPE=${model_type:-"llama2_7b"}
 
     ip_lists=($(echo $TRAINER_INSTANCES | tr ',' ' '))
     master_ip=${ip_lists[0]}
@@ -118,7 +118,7 @@ function _train(){
             ./pretrain_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}.json"
         ;;
     N4C32) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
-        train_cmd="unset CUDA_DEVICE_MAX_CONNECTIONS python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
+        train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --log_dir mylog run_pretrain_auto.py \
             ./pretrain_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}.json"
         ;;
@@ -162,3 +162,4 @@ source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合ben
 _set_params $@
 #_train       # 如果只产出训练log,不解析,可取消注释
 _run     # 该函数在run_model.sh中,执行时会调用_train; 如果不联调只产出训练log可以注掉本行,提交时需打开
+
