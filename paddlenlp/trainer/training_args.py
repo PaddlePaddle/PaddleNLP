@@ -1066,9 +1066,10 @@ class TrainingArguments:
                         sync_grad = "sync_grad" in mp_config
                         sync_moment = "sync_moment" in mp_config
 
+                        if sync_param or sync_grad or sync_moment:
+                            strategy.sync_param_name = [""]
                         if sync_param:
                             strategy.hybrid_configs["mp_configs"].sync_param = True
-                            strategy.hybrid_configs["mp_configs"].sync_param_name = [""]
                         if sync_grad:
                             strategy.hybrid_configs["mp_configs"].sync_grad = True
                         if sync_moment:
