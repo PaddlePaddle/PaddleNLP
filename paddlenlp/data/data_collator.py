@@ -39,6 +39,7 @@ __all__ = [
     "DataCollatorForSeq2Seq",
     "DataCollatorForLanguageModeling",
     "DataCollatorForWholeWordMask",
+    "DataCollatorForUnSupervisedDataset"
 ]
 
 InputDataClass = NewType("InputDataClass", Any)
@@ -315,6 +316,48 @@ class DataCollatorForTokenClassification(DataCollatorMixin):
 
         batch = {k: np.array(v, dtype=np.int64) for k, v in batch.items()}
         return batch
+
+
+IGNORE_INDEX = -100
+
+@dataclass
+class DataCollatorForSupervisedDataset(object):
+    """Collate examples for supervised fine-tuning."""
+    tokenizer: AutoTokenizer
+
+    def __call__(self, instances) :
+        input_ids, labels, position_ids = tuple([instance[key] for instance in instances] for key in ("input_ids", "labels", "position_ids"))
+        input_ids = [paddle.to_tensor(x) for x in input_ids]
+        input_ids = self.pad_sequence(
+            input_ids, padding_value=self.tokenizer.pad_token_id
+        )
+        labels = [paddle.to_tensor(x) for x in labels]
+        labels = self.pad_sequence(labels, padding_value=IGNORE_INDEX)
+        position_ids = [paddle.to_tensor(x) for x in position_ids]
+        position_ids = self.pad_sequence(position_ids, padding_value=0)
+        encoded = dict(
+            input_ids=input_ids,
+            labels=labels,
+            position_ids=position_ids,
+            attention_mask=input_ids != self.tokenizer.pad_token_id
+        )
+        return encoded
+
+    @classmethod
+    def pad_sequence(cls, sequences, padding_value=0, fix_len=None):
+        max_size = sequences[0].shape
+        trailing_dims = max_size[1:]
+        max_len = max([s.shape[0] for s in sequences])
+        if fix_len is not None:
+            assert fix_len >= max_len, "fix_len is too small."
+            max_len = fix_len
+        out_dims = [len(sequences), max_len] + trailing_dims
+        out_tensor = paddle.full(out_dims, padding_value, dtype=sequences[0].dtype)
+        for i, tensor in enumerate(sequences):
+            length = tensor.shape[0]
+            out_tensor[i, :length, ...] = tensor
+        return out_tensor
+
 
 
 @dataclass

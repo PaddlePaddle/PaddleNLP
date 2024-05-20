@@ -26,6 +26,7 @@ from argument import (
     QuantArgument,
     TrainingArguments,
 )
+from llama_attn_replace import replace_llama_attn
 from data import get_convert_example
 from utils import (
     CausalLMTrainer,
@@ -36,7 +37,7 @@ from utils import (
     init_chat_template,
 )
 
-from paddlenlp.data import DataCollatorForSeq2Seq
+from paddlenlp.data import DataCollatorForSeq2Seq, DataCollatorForSupervisedDataset
 from paddlenlp.datasets import InTokensIterableDataset, InTokensMapDataset, load_dataset
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
@@ -60,6 +61,33 @@ def add_start_docstrings(*docstr):
     return docstring_decorator
 
 
+def tokenizer_fn_dev_redpajama(example, tokenizer, inference_length):
+
+    inputs = example["text"]
+    tokenized_source = tokenizer(inputs, padding=False, truncation=True, max_length=8192, return_dict=False)
+    input_ids = tokenized_source["input_ids"]
+    input_ids, labels = input_ids[:-1], input_ids[1:]
+    position_ids = list(range(len(input_ids)))
+    model_input = {"input_ids": input_ids, "position_ids": position_ids, "labels": labels}
+
+    return model_input
+
+
+def tokenizer_fn_train_redpajama(example, tokenizer, scaled_max_position_embeddings, model_max_position_embeddings):
+    source = example['text']
+    tokenized_source = tokenizer(
+        source,
+        max_length=scaled_max_position_embeddings,
+        truncation=True,
+        truncation_side="left",
+        add_special_tokens=True,
+    )
+    ids = tokenized_source["input_ids"]
+    features = {"input_ids": ids, "labels": ids, "position_ids": list(range(len(ids)))}
+    return features
+
+
+
 @dataclass
 @add_start_docstrings(TrainingArguments.__doc__)
 class FinetuneArguments(TrainingArguments):
@@ -70,6 +98,14 @@ class FinetuneArguments(TrainingArguments):
     tensor_parallel_output: Optional[bool] = field(
         default=False,
         metadata={"help": "whether to output logits in distributed status"},
+    )
+    use_ssa: Optional[bool] = field(
+        default=True,
+        metadata={"help": "whether to use ssa"},
+    )
+    use_hybird_window_full_attention: Optional[bool] = field(
+        default=True,
+        metadata={"help": "whether to use hybird window full attention"},
     )
 
 
@@ -92,6 +128,13 @@ def main():
     training_args.print_config(data_args, "Data")
     training_args.print_config(quant_args, "Quant")
     training_args.print_config(gen_args, "Generation")
+
+    # save the origin full attention
+    origin_forward = paddlenlp.transformers.llama.modeling.LlamaAttention.forward
+
+    # replace llama attention with shift sparse attention
+    if "llama" in model_args.model_name_or_path and training_args.use_ssa:
+        replace_llama_attn()
 
     if sum([quant_args.do_ptq, quant_args.do_qat, quant_args.do_gptq, training_args.do_train]) > 1:
         raise ValueError(
@@ -149,6 +192,7 @@ def main():
     if hasattr(model_config, "use_flash_attention"):
         model_config.use_flash_attention = model_args.use_flash_attention
 
+
     model_config.use_fused_rms_norm = model_args.use_fused_rms_norm
     model_config.fuse_attention_qkv = model_args.fuse_attention_qkv
     model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
@@ -174,6 +218,23 @@ def main():
     model_config.tensor_parallel_output = training_args.tensor_parallel_output
     model_config.seq_length = data_args.max_length
 
+
+    # set the rope scaling factor for long context window size
+    orig_rope_scaling = getattr(model_config, "rope_scaling", None)
+        if orig_rope_scaling is None:
+            orig_rope_scaling = {"factor": 1}
+        
+        orig_rope_scaling_factor = orig_rope_scaling["factor"] if "factor" in orig_rope_scaling.keys() else 1
+
+    orig_ctx_len = getattr(model_config, "max_position_embeddings", None)
+        if orig_ctx_len:
+            orig_ctx_len *= orig_rope_scaling_factor
+
+            if data_args.max_length > orig_ctx_len:
+                scaling_factor = float(math.ceil(data_args.max_length / orig_ctx_len))
+                model_config.rope_scaling = {"type": "linear", "factor": scaling_factor}
+                model_config.max_position_embeddings = int(orig_ctx_len * scaling_factor)
+
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
             raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
@@ -198,6 +259,11 @@ def main():
         else:
             # NOTE(gongenlei): new add autotuner_benchmark
             model = AutoModelForCausalLM.from_config(model_config, dtype=dtype)
+
+        # set the last layer with full attention
+        if training_args.use_hybird_window_full_attention:
+            last_layer = model.llama.layers[-1].self_attn
+            last_layer.forward = origin_forward.__get__(last_layer, type(last_layer))
     if training_args.do_train and model_args.neftune:
         # Inspired by https://github.com/neelsjain/NEFTune
         if hasattr(model, "get_input_embeddings"):
@@ -366,11 +432,17 @@ def main():
             raise NotImplementedError(
                 "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM and QWen so far."
             )
-    train_ds = (
-        train_ds.map(partial(trans_func, is_test=False, intokens=data_args.zero_padding))
-        if train_ds is not None
-        else None
-    )
+    if training_args.use_hybird_window_full_attention:
+        train_ds = train_ds.map(
+            fn=partial(tokenizer_fn_train_redpajama, tokenizer=tokenizer, scaled_max_position_embeddings=8192, model_max_position_embeddings=4096), batched=False, num_workers=512,
+        )
+    
+    else:
+        train_ds = (
+            train_ds.map(partial(trans_func, is_test=False, intokens=data_args.zero_padding))
+            if train_ds is not None
+            else None
+        )
     ptq_ds = (
         ptq_ds.map(partial(trans_func, is_test=False, intokens=data_args.zero_padding)) if ptq_ds is not None else None
     )
@@ -380,11 +452,16 @@ def main():
             "`zero_padding` conflicts with `eval_with_do_generation`. Setting zero_padding to False for the eval_dataset."
         )
         eval_intokens = False
-    dev_ds = (
-        dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, intokens=eval_intokens))
-        if dev_ds is not None
-        else None
-    )
+    if training_args.use_hybird_window_full_attention:
+        dev_ds = dev_ds.map(
+            fn=partial(tokenizer_fn_dev_redpajama, tokenizer=tokenizer, inference_length=8192), batched=False, num_workers=256
+        )
+    else:
+        dev_ds = (
+            dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, intokens=eval_intokens))
+            if dev_ds is not None
+            else None
+        )
     if data_args.zero_padding:
         if data_args.lazy:
             intoken_dataset = InTokensIterableDataset
@@ -520,6 +597,17 @@ def main():
         metrics = compute_metrics_do_generation
     else:
         metrics = compute_metrics
+    if training_args.use_hybird_window_full_attention:
+        data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
+    else:
+        data_collator = DataCollatorForSeq2Seq(
+                tokenizer=tokenizer,
+                max_length=max_length,
+                padding=padding,
+                max_label_length=max_length,
+                return_tensors="np",
+                pad_to_multiple_of=data_args.pad_to_multiple_of,
+            )
 
     trainer = CausalLMTrainer(
         model=model,
@@ -528,14 +616,7 @@ def main():
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
         compute_metrics=metrics,
-        data_collator=DataCollatorForSeq2Seq(
-            tokenizer=tokenizer,
-            max_length=max_length,
-            padding=padding,
-            max_label_length=max_length,
-            return_tensors="np",
-            pad_to_multiple_of=data_args.pad_to_multiple_of,
-        ),
+        data_collator=data_collator,
         do_generation=data_args.eval_with_do_generation,
         callbacks=[InTokensIterDatasetCallback()] if isinstance(train_ds, InTokensIterableDataset) else None,
         gen_args=gen_args,
