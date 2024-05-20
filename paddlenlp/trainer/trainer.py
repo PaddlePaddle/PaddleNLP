@@ -945,7 +945,7 @@ class Trainer:
                     ((step_control + 1) % args.gradient_accumulation_steps != 0)
                     and availiable_no_sync
                     and args._no_sync_in_gradient_accumulation
-                ) or (args.recompute and availiable_no_sync)
+                ) or (args.recompute and availiable_no_sync) or (self.args.world_size > 1 and not self.args.use_hybrid_parallel)
                 # sharding
                 # stage1. the same as ddp
                 # stage2. manualy collect gradient on dp group
