@@ -61,19 +61,21 @@ def ssa_forward(
     value_states = repeat_kv(value_states, self.num_key_value_groups)
 
     # transpose   
-    # (bsz, q_len, self.num_heads, self.head_dim) -> (bsz, self.num_heads, q_len, self.head_dim)
+    # (bsz, q_len, self.num_heads, self.head_dim) -> (bsz, self.num_heads, q_len, self.head_dim) = [4, 32, 8192, 128]
     query_states = query_states.transpose([0, 2, 1, 3])
     key_states = key_states.transpose([0, 2, 1, 3])
     value_states = value_states.transpose([0, 2, 1, 3])
 
+    # hidden_states should be of size (bsz, num_hedas, q_len, head_dim)
     def shift(qkv, bsz, q_len, group_size, num_heads, head_dim):
-        qkv[:, num_heads // 2:] = qkv[:, num_heads // 2].roll(shifts=(-group_size // 2), axis=2)
+        qkv[:, num_heads // 2:] = qkv[:, num_heads // 2:].roll(shifts=(-group_size // 2), axis=2)
         qkv = qkv.transpose([0, 2, 1, 3]).reshape([bsz * (q_len // group_size), group_size, num_heads, head_dim]).transpose([0,2,1,3])
         return qkv
 
     query_states = shift(query_states, bsz, q_len, group_size, self.num_heads, self.head_dim)
     key_states = shift(key_states, bsz, q_len, group_size, self.num_key_value_heads, self.head_dim)
     value_states = shift(value_states, bsz, q_len, group_size, self.num_key_value_heads, self.head_dim)
+    
 
     attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) / math.sqrt(self.head_dim)
     if attn_weights.shape != [bsz * num_group, self.num_heads, group_size, group_size]:
@@ -81,8 +83,10 @@ def ssa_forward(
             f"Attention weights should be of size {(bsz * num_group, self.num_heads, group_size, group_size)}, but is"
             f" {attn_weights.shape}"
         )
-    attention_mask = attention_mask[:, :, :group_size, :group_size].repeat(num_group, 1, 1, 1)
 
+    # attention_mask = attention_mask[:, :, :group_size, :group_size].repeat(num_group, 1, 1, 1)
+    # attention_mask.shape = [4, 1, 8192, 8192]
+    attention_mask = attention_mask[:, :, :group_size, :group_size].repeat_interleave(num_group, axis=0)
     if attention_mask is not None:
         if attention_mask.shape != [bsz * num_group, 1, group_size, group_size]:
             raise ValueError(
@@ -92,7 +96,7 @@ def ssa_forward(
 
     attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
     attn_output = paddle.matmul(attn_weights, value_states)
-    if attn_output.shape != [bse * num_group, self.num_heads, group_size, self.head_dim]:
+    if attn_output.shape != [bsz * num_group, self.num_heads, group_size, self.head_dim]:
         raise ValueError(
             f"`attn_output` should be of size {(bsz * num_group, self.num_heads, group_size, self.head_dim)}, but is"
             f" {attn_output.size()}"
@@ -102,7 +106,7 @@ def ssa_forward(
     attn_output = attn_output.reshape([bsz, q_len, self.num_heads, self.head_dim])
 
     # shift back
-    attn_output[:, :, self.num_heads//2:] = attn_output[:, :, self.num_heads//2:].rool(shift=group_size//2, axis=1)
+    attn_output[:, :, self.num_heads//2:] = attn_output[:, :, self.num_heads//2:].roll(shifts=group_size//2, axis=1)
 
     attn_output = attn_output.reshape([bsz, q_len, self.hidden_size])
 
@@ -110,11 +114,11 @@ def ssa_forward(
 
     if not output_attentions:
         attn_weights = None
-    output = (attn_output,)
+    outputs = (attn_output,)
     if output_attentions:
-        output += (attn_weights,)
+        outputs += (attn_weights,)
     if use_cache:
-        output += (pask_key_value,)
+        outputs += (pask_key_value,)
     if type(outputs) is tuple and len(outputs) == 1:
         outputs = outputs[0]
     return outputs
