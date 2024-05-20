@@ -570,7 +570,7 @@ class FusedMultiTransformerBase(Layer):
         return ln_out
 
     def compute_qkv_linear(self, ln_out, i):
-        if float(paddle.version.cuda()) < 11.6:
+        if paddle.version.cuda() == "False" or float(paddle.version.cuda()) < 11.6:
             qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
             if self.qkv_biases[i] is not None:
                 qkv_out = paddle.add(qkv_out, self.qkv_biases[i])
