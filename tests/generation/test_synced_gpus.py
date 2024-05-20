@@ -13,7 +13,9 @@
 # limitations under the License.
 
 import os
+import sys
 import tempfile
+from pathlib import Path
 
 import paddle
 
@@ -21,17 +23,16 @@ from paddlenlp.generation import GenerationConfig
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 
-try:
-    from tests.parallel_launch import TestMultipleGpus
-    from tests.transformers.test_modeling_common import ids_tensor
+sys.path.append(str(Path(__file__).parent.parent.parent))
+from tests.parallel_launch import TestMultipleGpus
+from tests.transformers.test_modeling_common import ids_tensor
 
-    class ShardingStage3Tester(TestMultipleGpus):
-        def test_synced_gpus_greedy(self):
-            # test this file
-            self.run_2gpu(__file__)
 
-except:
-    pass
+class ShardingStage3Tester(TestMultipleGpus):
+    def test_synced_gpus_greedy(self):
+        # test this file
+        self.run_2gpu(__file__)
+
 
 if __name__ == "__main__":
     tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-llama")
