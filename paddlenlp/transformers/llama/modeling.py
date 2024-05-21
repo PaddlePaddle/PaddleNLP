@@ -99,6 +99,7 @@ __all__ = [
 ]
 
 
+
 def _get_interleave(n):
     def _get_interleave_power_of_2(n):
         start = 2 ** (-(2 ** -(math.log2(n) - 3)))
@@ -240,7 +241,10 @@ def scaled_dot_product_attention(
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
         # matmul and devide by sqrt(head_dim)
-        attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
+        attn_weights = paddle.matmul(
+            query_states / math.sqrt(math.sqrt(head_dim)),
+            (key_states.transpose([0, 1, 3, 2]) / math.sqrt(math.sqrt(head_dim))),
+        )
         # then add alibi bias
         if alibi is not None:
             alibi = alibi.reshape([bsz, num_heads, 1, -1])

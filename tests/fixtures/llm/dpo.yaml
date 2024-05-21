@@ -1,0 +1,42 @@
+dpo:
+  base:
+    dataset_name_or_path: "./data_dpo"  
+    per_device_train_batch_size: 4  
+    gradient_accumulation_steps: 4  
+    per_device_eval_batch_size: 8  
+    eval_accumulation_steps: 16  
+    num_train_epochs: 3  
+    learning_rate: 1e-06  
+    warmup_steps: 30  
+    logging_steps: 1  
+    evaluation_strategy: "steps"  
+    save_strategy: "steps"  
+    eval_steps: 5  
+    save_steps: 10  
+    max_steps: 10  
+    max_seq_length: 2048  
+    max_prompt_len: 1024  
+    fp16: true  
+    fp16_opt_level: "O2"  
+    do_train: true  
+    do_eval: true  
+    disable_tqdm: true  
+    load_best_model_at_end: true  
+    tensor_parallel_degree: 1  
+    use_flash_attention: true  
+    scale_loss: 1024  
+    metric_for_best_model: "eval_loss"
+
+  default:
+    llama:
+      model_name_or_path: __internal_testing__/tiny-random-llama
+    qwen:
+      model_name_or_path: __internal_testing__/tiny-fused-qwen
+
+inference-predict:
+  default:
+    mode: dynamic 
+    max_length: 20
+    batch_size: 2
+    decode_strategy: greedy_search
+    dtype: float16

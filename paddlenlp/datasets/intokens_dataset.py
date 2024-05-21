@@ -19,28 +19,48 @@ from scipy.linalg import block_diag
 
 class InTokens:
     required_input_keys = ["input_ids", "labels"]
+    dpo_required_input_keys = ["chosen_labels", "rejected_labels"]
     required_output_keys = ["input_ids", "labels", "attention_mask"]
     # Only supported the following keys for InTokens. Keys outside of the set will be ignored.
-    supported_input_keys = ["input_ids", "labels", "attention_mask", "position_ids"]
+    supported_input_keys = [
+        "input_ids",
+        "labels",
+        "attention_mask",
+        "position_ids",
+        "chosen_labels",
+        "rejected_labels",
+        "response_index",
+    ]
 
     @classmethod
     def _pad_batch_records(cls, batch_records):
         # Only consider supported input keys
         input_keys = [key for key in batch_records[0].keys() if key in cls.supported_input_keys]
 
-        # Check required_keys
-        for key in cls.required_input_keys:
-            if key not in input_keys:
-                raise ValueError(f"feature `{key}` is required for InTokensDataset")
         # Output features must include all required output keys
         for key in cls.required_output_keys:
             if key not in input_keys:
                 input_keys.append(key)
 
         batched_features = {key: [] for key in input_keys}
+        sequence_sum = 0
         for record in batch_records:
             batched_features["input_ids"].extend(record["input_ids"])
-            batched_features["labels"].extend(record["labels"])
+            if "labels" in record:
+                batched_features["labels"].extend(record["labels"])
+            elif "rejected_labels" in input_keys and "chosen_labels" in input_keys:
+                batched_features["rejected_labels"].extend(record["rejected_labels"])
+                batched_features["chosen_labels"].extend(record["chosen_labels"])
+                response_index = [
+                    record["response_index"][0] + sequence_sum,  # chosen_response_start_index
+                    record["response_index"][1] + sequence_sum,  # rejeted_response_start_index
+                    record["response_index"][2] + sequence_sum,  # rejeted_response_end_index + 1
+                ]
+                batched_features["response_index"].append(response_index)
+                sequence_sum += len(record["input_ids"])
+            else:
+                raise ValueError("labels is required for InTokensDataset")
+
             seq_length = len(record["input_ids"])
             # If attention_mask is not given, assume it's causal mask
             attention_mask = record.get("attention_mask", np.tril(np.ones([seq_length, seq_length], dtype=bool)))
