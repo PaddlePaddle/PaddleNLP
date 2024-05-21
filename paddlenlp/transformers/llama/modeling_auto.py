@@ -481,7 +481,7 @@ class LlamaAttentionAuto(nn.Layer):
                         use_neox_rotary_style=False,
                     )
             else:
-                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+                cos, sin, _ = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 # hack here, because elementwise infer spmd not support broadcast now
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
