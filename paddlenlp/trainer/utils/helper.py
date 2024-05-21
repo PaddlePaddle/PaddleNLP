@@ -16,8 +16,6 @@
 # This file is modified from
 #  https://github.com/huggingface/transformers/blob/main/src/transformers
 
-import collections
-import copy
 import os
 from typing import Any, Optional
 
@@ -27,6 +25,11 @@ import paddle.distributed as dist
 from paddle.distributed import fleet
 
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.nested import (
+    nested_broadcast_tensor,
+    nested_empty_tensor,
+    nested_reduce_tensor,
+)
 
 __all__ = [
     "distributed_concat",
@@ -178,52 +181,6 @@ def distributed_file(filename):
         paddle.distributed.barrier()
 
         return filename
-
-
-TensorHolder = collections.namedtuple("TensorHolder", ["shape", "dtype", "name"])
-
-
-def nested_reduce_tensor(tensor):
-    if isinstance(tensor, dict):
-        # copy tensor since it will be inplace modified dict
-        tensor = copy.copy(tensor)
-        for key in list(tensor.keys()):
-            tensor[key] = nested_reduce_tensor(tensor[key])
-    if isinstance(tensor, (tuple, list)):
-        return type(tensor)(nested_reduce_tensor(t) for t in tensor)
-
-    if isinstance(tensor, paddle.Tensor):
-        return TensorHolder(tensor.shape, tensor.dtype, tensor.name)
-
-    return tensor
-
-
-def nested_empty_tensor(tensor):
-    if isinstance(tensor, dict):
-        for key in list(tensor.keys()):
-            tensor[key] = nested_empty_tensor(tensor[key])
-    if isinstance(tensor, list):
-        return type(tensor)(nested_empty_tensor(t) for t in tensor)
-
-    # TensorHolder is tuple
-    if isinstance(tensor, TensorHolder):
-        t = paddle.empty(tensor.shape, dtype=tensor.dtype, name=tensor.name)
-        t.name = tensor.name
-        return t
-
-    return tensor
-
-
-def nested_broadcast_tensor(tensor, src=0, group=None):
-    if isinstance(tensor, dict):
-        for key in list(tensor.keys()):
-            tensor[key] = nested_broadcast_tensor(tensor[key], src=src, group=group)
-    if isinstance(tensor, list):
-        return type(tensor)(nested_broadcast_tensor(t, src=src, group=group) for t in tensor)
-
-    if isinstance(tensor, paddle.Tensor):
-        paddle.distributed.broadcast(tensor, src=src, group=group, sync_op=True)
-    return tensor
 
 
 def broadcast_dp_optimizer(state_dict):

@@ -63,6 +63,7 @@ from paddlenlp.utils.env import (
     SAFE_WEIGHTS_NAME,
 )
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.nested import nested_copy, nested_copy_place
 
 if is_safetensors_available():
     # from safetensors import safe_open
@@ -90,6 +91,11 @@ __all__ = [
 ]
 
 async_save_queue = []
+
+
+DEST_PLACE = paddle.CPUPlace()
+if paddle.device.is_compiled_with_cuda():
+    DEST_PLACE = paddle.CUDAPinnedPlace()
 
 
 class UnifiedCheckpointOption(ExplicitEnum):
@@ -228,6 +234,10 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
     expected_keys = set(list(model_state_dict.keys()))
     missing_keys = expected_keys - set(loaded_keys)
 
+    use_fast_set = True
+    if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
+        use_fast_set = False
+
     if len(missing_keys) > 0:
         raise ValueError(f"missing_keys: {missing_keys}")
 
@@ -280,8 +290,10 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
                 None, model.config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
             )
 
-        # error_msgs += _load_state_dict_into_model(model, state_dict, "")
-        error_msgs += faster_set_state_dict(model, state_dict, strict_dtype=False)
+        if use_fast_set:
+            error_msgs += faster_set_state_dict(model, state_dict, strict_dtype=False)
+        else:
+            error_msgs += _load_state_dict_into_model(model, state_dict, "")
 
         # force memory release
         del state_dict
@@ -1745,7 +1757,7 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
                 action = tp_actions.pop(key)
                 tensor = action(ret) if is_dst else None
             else:
-                tensor = tensor._copy_to(paddle.CUDAPinnedPlace(), False) if is_dst else None
+                tensor = tensor._copy_to(DEST_PLACE, False) if is_dst else None
 
             if is_dst:
                 state_dict_to_save[key] = tensor
@@ -1776,15 +1788,13 @@ def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys)
             if model_key in tp_actions:
                 # for example: beta1, beta2
                 if tensor.numel().item() == 1:
-                    tensor = (
-                        tensor._copy_to(paddle.CUDAPinnedPlace(), False) if is_dst else None
-                    )  # Need broadcast when loaded
+                    tensor = tensor._copy_to(DEST_PLACE, False) if is_dst else None  # Need broadcast when loaded
                 else:
                     ret = distributed_gather(tensor, dst=j, group=tp_group, offload=False)
                     action = tp_actions[model_key]
                     tensor = action(ret) if is_dst else None
             else:
-                tensor = tensor._copy_to(paddle.CUDAPinnedPlace(), False) if is_dst else None
+                tensor = tensor._copy_to(DEST_PLACE, False) if is_dst else None
 
             if is_dst:
                 state_dict_to_save[filter_keys[i]] = tensor
@@ -1878,29 +1888,6 @@ def mapping_optimizer_tp_actions(tp_actions, optimizer_loaded_keys):
         if typename in optimizer_non_scaler_name and key_base in tp_actions:
             new_actions[key] = tp_actions[key_base]
     return new_actions
-
-
-def nested_copy(inputs):
-    if isinstance(inputs, dict):
-        outputs = {}
-        for key in list(inputs.keys()):
-            outputs[key] = nested_copy(inputs[key])
-        return outputs
-    return inputs
-
-
-def nested_copy_place(inputs, place=None, blocking=False):
-    if isinstance(inputs, dict):
-        outputs = {}
-        for key in list(inputs.keys()):
-            outputs[key] = nested_copy_place(inputs[key], place, blocking)
-        return outputs
-    if isinstance(inputs, paddle.Tensor):
-        if inputs.place._equals(place):
-            return inputs
-        else:
-            return inputs._copy_to(place, blocking)
-    return inputs
 
 
 def flatten_list(nested_list):

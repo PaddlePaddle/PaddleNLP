@@ -1435,8 +1435,6 @@ class Trainer:
         if is_datasets_available() and eval_dataset is not None and isinstance(eval_dataset, datasets.Dataset):
             eval_dataset = self._remove_unused_columns(eval_dataset, description="evaluation")
 
-        _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
-
         if self._is_iterable_dataset(eval_dataset):
             if self.args.dataset_world_size > 1:
                 eval_dataset = IterableDatasetShard(
@@ -1447,24 +1445,41 @@ class Trainer:
                     process_index=self.args.dataset_rank,
                 )
 
-            return _DataLoader(
-                eval_dataset,
-                batch_size=self.args.per_device_eval_batch_size,
-                collate_fn=self.data_collator,
-                num_workers=self.args.dataloader_num_workers,
-            )
+            if self.args.distributed_dataloader:
+                return DistDataLoader(
+                    eval_dataset,
+                    batch_size=self.args.per_device_eval_batch_size,
+                    collate_fn=self.data_collator,
+                    num_workers=0,
+                    eval=True,
+                )
+            else:
+                return DataLoader(
+                    eval_dataset,
+                    batch_size=self.args.per_device_eval_batch_size,
+                    collate_fn=self.data_collator,
+                    num_workers=0,
+                )
 
         eval_sampler = self._get_eval_sampler(eval_dataset)
 
         if self.args.distributed_dataloader:
             logger.info("Eval using DistDataLoader.")
 
-        return _DataLoader(
-            eval_dataset,
-            batch_sampler=eval_sampler,
-            collate_fn=self.data_collator,
-            num_workers=self.args.dataloader_num_workers,
-        )
+            return DistDataLoader(
+                eval_dataset,
+                batch_sampler=eval_sampler,
+                collate_fn=self.data_collator,
+                num_workers=self.args.dataloader_num_workers,
+                eval=True,
+            )
+        else:
+            return DataLoader(
+                eval_dataset,
+                batch_sampler=eval_sampler,
+                collate_fn=self.data_collator,
+                num_workers=self.args.dataloader_num_workers,
+            )
 
     def get_test_dataloader(self, test_dataset: Dataset) -> DataLoader:
         """
@@ -1485,8 +1500,6 @@ class Trainer:
         if is_datasets_available() and test_dataset is not None and isinstance(test_dataset, datasets.Dataset):
             test_dataset = self._remove_unused_columns(test_dataset, description="test")
 
-        _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
-
         if self._is_iterable_dataset(test_dataset):
             if self.args.dataset_world_size > 1:
                 test_dataset = IterableDatasetShard(
@@ -1497,25 +1510,42 @@ class Trainer:
                     process_index=self.args.dataset_rank,
                 )
 
-            return _DataLoader(
-                test_dataset,
-                batch_size=self.args.per_device_eval_batch_size * self.world_size,
-                collate_fn=self.data_collator,  # _get_collator_with_removed_columns
-                num_workers=self.args.dataloader_num_workers,
-            )
+            if self.args.distributed_dataloader:
+                return DistDataLoader(
+                    test_dataset,
+                    batch_size=self.args.per_device_eval_batch_size * self.world_size,
+                    collate_fn=self.data_collator,  # _get_collator_with_removed_columns
+                    num_workers=self.args.dataloader_num_workers,
+                    eval=True,
+                )
+            else:
+                return DataLoader(
+                    test_dataset,
+                    batch_size=self.args.per_device_eval_batch_size * self.world_size,
+                    collate_fn=self.data_collator,  # _get_collator_with_removed_columns
+                    num_workers=self.args.dataloader_num_workers,
+                )
 
         test_sampler = self._get_eval_sampler(test_dataset)
 
         if self.args.distributed_dataloader:
             logger.info("Test using DistDataLoader.")
 
-        # We use the same batch_size as for eval.
-        return _DataLoader(
-            test_dataset,
-            batch_sampler=test_sampler,
-            collate_fn=self.data_collator,
-            drop_last=self.args.dataloader_drop_last,
-        )
+            # We use the same batch_size as for eval.
+            return DistDataLoader(
+                test_dataset,
+                batch_sampler=test_sampler,
+                collate_fn=self.data_collator,
+                drop_last=self.args.dataloader_drop_last,
+                eval=True,
+            )
+        else:
+            return DataLoader(
+                test_dataset,
+                batch_sampler=test_sampler,
+                collate_fn=self.data_collator,
+                drop_last=self.args.dataloader_drop_last,
+            )
 
     def create_optimizer_and_scheduler(self, num_training_steps: int):
         """
@@ -1577,16 +1607,13 @@ class Trainer:
                 if os.path.isfile(rng_file):
                     rng_file_list = paddle.load(rng_file, return_numpy=True)
             paddle.distributed.broadcast_object_list(rng_file_list, src=0)
-            # if rng_file_list still empty, then use old style rng_state
+            # if rng_file_list still empty, not log rng state.
             if rng_file_list[0] is None:
-                rng_file = os.path.join(checkpoint, f"rng_state_{process_index}.pth")
-                if not os.path.isfile(rng_file):
-                    logger.info(
-                        f"Didn't find an RNG file for process {process_index}, if you are resuming a training that "
-                        "wasn't launched in a distributed fashion, reproducibility is not guaranteed."
-                    )
-                    return
-                checkpoint_rng_state = paddle.load(rng_file, return_numpy=True)
+                logger.info(
+                    f"Didn't find an RNG file for process {process_index}, if you are resuming a training that "
+                    "wasn't launched in a distributed fashion, reproducibility is not guaranteed."
+                )
+                return
             else:
                 checkpoint_rng_state = rng_file_list[process_index]
         else:
@@ -2111,10 +2138,10 @@ class Trainer:
             if not self.is_in_train:
                 self.args.unified_checkpoint_config = unified_checkpoint_config_backup
         if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
-            # save checkpoint_done file to ensure checkpoint is complete
+            # save model_done file to ensure model is complete
             if self.args.should_save_model_state and self.args.should_save:
                 # For ckpt integrity
-                paddle.save(self.state.global_step, os.path.join(output_dir, ".checkpoint_done"))
+                paddle.save(self.state.global_step, os.path.join(output_dir, ".model_done"))
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
