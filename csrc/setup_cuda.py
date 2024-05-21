@@ -72,7 +72,6 @@ setup(
             "./generation/stop_generation_multi_ends_v2.cu",
             "./generation/update_inputs.cu",
             "./generation/get_output.cc",
-            "./generation/reset_need_stop_value.cc",
             "./generation/save_with_output_msg.cc",
             "./generation/write_int8_cache_kv.cu",
             "./generation/step.cu",

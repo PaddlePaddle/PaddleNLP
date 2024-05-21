@@ -48,6 +48,7 @@ environment_variables = {
     "Flags_skip_mp_c_identity": "1",
     "FLAGS_shard_norm_align_dp": "0",
     "FLAGS_shard_use_reduce": "1",
+    "FLAGS_eager_communication_connection": "1",  # no lazy init comm group
     "test_ci_no_save_model": "1",
 }
 
@@ -165,7 +166,9 @@ def move_checkpoint_N2C4_to_N1C8():
         os.system("mv -f %s/* %s" % (node1_ckpt_path, base_ckpt_path))
 
 
+# https://pytest-xdist.readthedocs.io/en/latest/distribution.html
 # Test Unified Checkpoint Hybrid Parallel Strategy on N1C8 and N2C4
+@pytest.mark.xdist_group(name="UC")
 class TestUnifiedCheckpointBase(TestMultipleGpus):
     @classmethod
     @property
@@ -229,6 +232,7 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
             np.testing.assert_allclose(res[0], res[1], self.rtol)
 
 
+@pytest.mark.xdist_group(name="UC")
 class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
     @skip_for_none_ce_case
     @require_paddle_at_least_8_gpu
@@ -1137,3 +1141,42 @@ class TestUnifiedCheckpointOnN1C8EnableAll(TestUnifiedCheckpointBase):
 
     def rerun(self, train_args):
         self.run_n1c8(self.run_pretrain_file, **train_args)
+
+
+@pytest.mark.skipif(True, reason="Skip for None CE")
+class TestUnifiedCheckpointOnN1C8SaveLoadSpeed(TestUnifiedCheckpointFull):
+    def setUp(self):
+        super().setUp()
+        for config_key in self.configs:
+            self.configs[config_key]["skip_profile_timer"] = 0
+            self.configs[config_key]["unified_checkpoint"] = 1
+            self.configs[config_key]["save_steps"] = 6
+            self.configs[config_key]["unified_checkpoint_config"] = "skip_save_model_weight master_weight_compatible"
+
+        self.need_allclose = False
+        self.rtol = 1e-7
+
+    def runfrist(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, log_dir="log_uc", **train_args)
+
+    def rerun(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, log_dir="log_uc", **train_args)
+
+
+@pytest.mark.skipif(True, reason="Skip for None CE")
+class TestPaddleCheckpointOnN1C8SaveLoadSpeed(TestUnifiedCheckpointFull):
+    def setUp(self):
+        super().setUp()
+        for config_key in self.configs:
+            self.configs[config_key]["skip_profile_timer"] = 0
+            self.configs[config_key]["unified_checkpoint"] = 0
+            self.configs[config_key]["save_steps"] = 6
+
+        self.need_allclose = False
+        self.rtol = 1e-7
+
+    def runfrist(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, log_dir="log_pd", **train_args)
+
+    def rerun(self, train_args):
+        self.run_n1c8(self.run_pretrain_file, log_dir="log_pd", **train_args)

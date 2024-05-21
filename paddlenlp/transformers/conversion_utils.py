@@ -285,8 +285,12 @@ def naive_fuse_merge_tp(weight_list, is_column=True, fuse_tensor_parts=2):
 
     if isinstance(weight_list[0], np.ndarray):
         return np.concatenate([reorder[i] for i in index], axis=axis)
+    else:
+        tensor = paddle.concat([reorder[i] for i in index], axis=axis)
 
-    return paddle.concat([reorder[i] for i in index], axis=axis)._copy_to(paddle.CPUPlace(), False)
+        if tensor.place.is_gpu_place():
+            tensor = tensor._copy_to(paddle.CUDAPinnedPlace(), False)
+        return tensor
 
 
 def naive_fuse_split_tp(
@@ -361,12 +365,18 @@ def normal_fuse_merge_tp(weight_list, is_column=True):
         if isinstance(weight_list[0], np.ndarray):
             return np.concatenate(weight_list, axis=-1)
         else:
-            return paddle.concat(weight_list, axis=-1)._copy_to(paddle.CPUPlace(), False)
+            tensor = paddle.concat(weight_list, axis=-1)
+            if tensor.place.is_gpu_place():
+                tensor = tensor._copy_to(paddle.CUDAPinnedPlace(), False)
+            return tensor
     else:
         if isinstance(weight_list[0], np.ndarray):
             return np.concatenate(weight_list, axis=0)
         else:
-            return paddle.concat(weight_list, axis=0)._copy_to(paddle.CPUPlace(), False)
+            tensor = paddle.concat(weight_list, axis=0)
+            if tensor.place.is_gpu_place():
+                tensor = tensor._copy_to(paddle.CUDAPinnedPlace(), False)
+            return tensor
 
 
 def normal_fuse_split_tp(weight, tensor_parallel_degree, tensor_parallel_rank=None, is_column=True):
@@ -1319,24 +1329,34 @@ class ConversionMixin:
         loaded_keys = state_dict.keys()
         # collect and convert fuse/split action
         fused_and_split_keys = []
+        convert_with_same_keys = []
         fuse_actions, resume_keys = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=True)
         for keys, action in fuse_actions.items():
+            if keys[-1] in keys[:-1]:
+                assert len(keys) == 2, "only 2 keys can be converted with the same name"
+                convert_with_same_keys.append(keys[-1])
             origin_states = [state_dict.pop(key) for key in keys[:-1]]
             state_dict[keys[-1]] = action(origin_states)
             fused_and_split_keys.append(keys[-1])
-            logger.info(f"Fusing parameter: {keys[:-1]} into {keys[-1]}")
+            logger.debug(f"Fusing parameter: {keys[:-1]} into {keys[-1]}")
 
         split_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=False)
         for keys, action in split_actions.items():
+            if keys[-1] in keys[:-1]:
+                assert len(keys) == 2, "only 2 keys can be converted with the same name"
+                convert_with_same_keys.append(keys[-1])
             origin_state = state_dict.pop(keys[-1])
             split_states = action(origin_state)
             for key_idx, key in enumerate(keys[:-1]):
                 state_dict[key] = split_states[key_idx]
                 fused_and_split_keys.append(key)
-            logger.info(f"Splitting parameter: {keys[-1]} into {keys[:-1]}")
+            logger.debug(f"Splitting parameter: {keys[-1]} into {keys[:-1]}")
 
         if tp_actions is not None:
             for key in fused_and_split_keys:
+                if key in convert_with_same_keys:
+                    continue
+
                 for name in tp_actions.keys():
                     if key.endswith(name):
                         with device_guard():

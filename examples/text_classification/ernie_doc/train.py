@@ -337,8 +337,8 @@ def do_train(args):
     )
     # Copy the memory
     memories = create_memory()
-    predict(model, test_dataloader, args.file_path, memories, test_ds.label_list)
-    logger.info("Done Predicting the results has been saved in file: {}".format(args.file_path))
+    predict(model, test_dataloader, args.test_results_file, memories, test_ds.label_list)
+    logger.info("Done Predicting the results has been saved in file: {}".format(args.test_results_file))
 
 
 if __name__ == "__main__":

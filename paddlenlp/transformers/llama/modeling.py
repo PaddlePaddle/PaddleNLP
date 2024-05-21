@@ -55,7 +55,6 @@ try:
     )
 except:
     pass
-from paddle.utils import try_import
 
 from paddlenlp.transformers.conversion_utils import (
     StateDictNameMapping,
@@ -80,8 +79,7 @@ from .configuration import (
 )
 
 try:
-    if get_env_device() == "npu":
-        from paddle.base import core
+    if get_env_device() in ["npu", "gcu"]:
 
         for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
             if lib.endswith(".so"):
@@ -89,6 +87,9 @@ try:
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
+from . import fusion_ops
+
+rms_norm_fused = fusion_ops.rms_norm_fused
 
 __all__ = [
     "LlamaModel",
@@ -209,72 +210,28 @@ def scaled_dot_product_attention(
     alibi=None,
     sequence_parallel=False,
     reshard_layer=None,
+    npu_is_casual=False,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention:
+        return fusion_ops.fusion_flash_attention(
+            query_states,
+            config,
+            key_states,
+            value_states,
+            attention_mask,
+            output_attentions,
+            alibi,
+            sequence_parallel,
+            reshard_layer,
+            npu_is_casual,
+        )
+
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
 
-        version = paddle.version.full_version
-        if version != "0.0.0" and version <= "2.5.2":
-            if alibi is not None:
-                raise ValueError("Flash Attention doesn't support alibi")
-            attn_output, attn_weights = flash_attention(
-                query_states,
-                key_states,
-                value_states,
-                causal=True,
-                return_softmax=output_attentions,
-            )
-        else:
-            if alibi is not None:
-                alibi = alibi.reshape([bsz, num_heads, 1, -1])
-                attention_mask = attention_mask.cast(alibi.dtype) + alibi
-            if get_env_device() == "npu":
-                attn_output = core.eager._run_custom_op(
-                    "flash_attention_npu",
-                    query_states,
-                    key_states,
-                    value_states,
-                    None,
-                    attention_mask,
-                    0.0,
-                    attention_mask is None,
-                    True,
-                    False,
-                    False,
-                )[0]
-            else:
-                attn_output = F.scaled_dot_product_attention(
-                    query_states,
-                    key_states,
-                    value_states,
-                    attn_mask=attention_mask,
-                    is_causal=attention_mask is None,
-                )
-            attn_weights = None
-
-        if reshard_layer is not None:
-            # attn_output shape: [bs, seqlen, num_head/sep, head_dim]
-            attn_output = reshard_layer(
-                attn_output,
-                split_axis=1,
-                concat_axis=2,
-            )
-            # attn_output shape: [bs, seqlen/sep, num_head, head_dim]
-            assert (
-                config.sep_parallel_degree > 1 and q_len % config.sep_parallel_degree == 0
-            ), f"q_len:{q_len}, config.sep_parallel_degree:{config.sep_parallel_degree}"
-            q_len = q_len // config.sep_parallel_degree
-            num_heads = num_heads * config.sep_parallel_degree
-
-        if sequence_parallel:
-            attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
-        else:
-            attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
-        return (attn_output, attn_weights) if output_attentions else attn_output
     else:
         #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
         query_states = paddle.transpose(query_states, [0, 2, 1, 3])
@@ -384,11 +341,6 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     return expanded_mask
 
 
-def rms_norm_fused(x_in, w, eps):
-    fused_ln = try_import("fused_ln")
-    return fused_ln.fused_rms_norm(x_in, w, eps)[0]
-
-
 class LlamaRMSNorm(nn.Layer):
     def __init__(self, config):
         super().__init__()
@@ -406,18 +358,7 @@ class LlamaRMSNorm(nn.Layer):
 
     def forward(self, hidden_states):
         if self.config.use_fused_rms_norm:
-            if get_env_device() == "npu":
-                return core.eager._run_custom_op("rms_norm_npu", hidden_states, self.weight, self.variance_epsilon)[0]
-            elif get_env_device() == "xpu":
-                try:
-                    import paddle_xpu_nn  # noqa: F821
-
-                    return paddle_xpu_nn.xpu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
-                except ImportError:
-                    raise NotImplementedError(
-                        f"Implementation of fused_rms_norm is not available on {get_env_device()}. Please install paddle_xpu to use this feature"
-                    )
-            return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
+            return fusion_ops.fusion_rms_norm(hidden_states, self.weight, self.variance_epsilon)
 
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
@@ -469,6 +410,7 @@ class LlamaRotaryEmbedding(nn.Layer):
         # [1, seqlen, 1, dim]
         self.cos_cached = emb.cos()[None, :, None, :]
         self.sin_cached = emb.sin()[None, :, None, :]
+        self.cos_sin_table = None if get_env_device() != "gcu" else paddle.concat([freqs.cos(), freqs.sin()], axis=-1)
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
@@ -477,6 +419,9 @@ class LlamaRotaryEmbedding(nn.Layer):
         return (
             cos.cast(x.dtype) if cos.dtype != x.dtype else cos,
             sin.cast(x.dtype) if sin.dtype != x.dtype else sin,
+            self.cos_sin_table.cast(x.dtype)
+            if self.cos_sin_table is not None and self.cos_sin_table.dtype != x.dtype
+            else self.cos_sin_table,
         )
 
 
@@ -498,6 +443,7 @@ class LlamaLinearScalingRotaryEmbedding(LlamaRotaryEmbedding):
         # [1, seqlen, 1, dim]
         self.cos_cached = emb.cos()[None, :, None, :]
         self.sin_cached = emb.sin()[None, :, None, :]
+        self.cos_sin_table = None if get_env_device() != "gcu" else paddle.concat([freqs.cos(), freqs.sin()], axis=-1)
 
 
 class LlamaNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
@@ -530,19 +476,23 @@ class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
         # [1, seqlen, 1, dim]
         scale_cos = emb.cos()[None, :, None, :]
         scale_sin = emb.sin()[None, :, None, :]
-        return scale_cos, scale_sin
+        scale_cos_sin = None if get_env_device() != "gcu" else paddle.concat([freqs.cos(), freqs.sin()], axis=-1)
+        return scale_cos, scale_sin, scale_cos_sin
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
         if seq_len > self.max_position_embeddings:
-            scale_cos, scale_sin = self._scale_cos_sin(seq_len=seq_len)
+            scale_cos, scale_sin, scale_cos_sin = self._scale_cos_sin(seq_len=seq_len)
         else:
-            scale_cos, scale_sin = self.cos_cached, self.sin_cached
+            scale_cos, scale_sin, scale_cos_sin = self.cos_cached, self.sin_cached, self.cos_sin_table
         cos = scale_cos[:, :seq_len, :, ...]
         sin = scale_sin[:, :seq_len, :, ...]
         return (
             cos.cast(x.dtype) if cos.dtype != x.dtype else cos,
             sin.cast(x.dtype) if sin.dtype != x.dtype else sin,
+            scale_cos_sin.cast(x.dtype)
+            if scale_cos_sin is not None and scale_cos_sin.dtype != x.dtype
+            else scale_cos_sin,
         )
 
 
@@ -697,7 +647,7 @@ class LlamaAttention(nn.Layer):
                 )
 
         self.use_fused_rope = config.use_fused_rope
-        if self.use_fused_rope and get_env_device() not in ["npu", "xpu"]:
+        if self.use_fused_rope and get_env_device() not in ["npu", "xpu", "gcu"]:
             if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
@@ -848,6 +798,7 @@ class LlamaAttention(nn.Layer):
         output_attentions: bool = False,
         use_cache: bool = False,
         alibi: Optional[paddle.Tensor] = None,
+        npu_is_casual: bool = False,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
@@ -972,45 +923,16 @@ class LlamaAttention(nn.Layer):
                 batch_size, seq_length, _, _ = query_states.shape
                 position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
             if self.use_fused_rope:
-                assert past_key_value is None, "fuse rotary not support cache kv for now"
-                batch_size, seq_length, num_heads, head_dim = query_states.shape
-                _, kv_seq_len, num_key_value_heads, _ = key_states.shape
-                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-                if get_env_device() == "npu":
-                    query_states = core.eager._run_custom_op("fused_rope", query_states, cos, sin)[0]
-                    key_states = core.eager._run_custom_op("fused_rope", key_states, cos, sin)[0]
-                else:
-                    # paddle version > 2.6 or develop support q and k/v with different num_heads
-                    paddle_version = float(paddle.__version__[:3])
-                    if ((paddle_version != 0.0) and (paddle_version <= 2.6)) and (num_heads != num_key_value_heads):
-                        query_states, _, _ = fused_rotary_position_embedding(
-                            query_states,
-                            None,
-                            None,
-                            sin=sin,
-                            cos=cos,
-                            position_ids=position_ids,
-                            use_neox_rotary_style=False,
-                        )
-                        key_states, _, _ = fused_rotary_position_embedding(
-                            key_states,
-                            None,
-                            None,
-                            sin=sin,
-                            cos=cos,
-                            position_ids=position_ids,
-                            use_neox_rotary_style=False,
-                        )
-                    else:
-                        query_states, key_states, _ = fused_rotary_position_embedding(
-                            query_states,
-                            key_states,
-                            v=None,
-                            sin=sin,
-                            cos=cos,
-                            position_ids=position_ids,
-                            use_neox_rotary_style=False,
-                        )
+                query_states, key_states = fusion_ops.fusion_rope(
+                    query_states,
+                    key_states,
+                    value_states,
+                    hidden_states,
+                    position_ids,
+                    past_key_value,
+                    self.rotary_emb,
+                )
+
             else:
                 if self.config.use_long_sequence_strategies:
                     cos, sin = self.rotary_emb(seq_len=kv_seq_len)
@@ -1021,7 +943,7 @@ class LlamaAttention(nn.Layer):
                         sin.cast(value_states.dtype) if sin.dtype != value_states.dtype else sin,
                     )
                 else:
-                    cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+                    cos, sin, _ = self.rotary_emb(value_states, seq_len=kv_seq_len)
 
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
@@ -1075,6 +997,7 @@ class LlamaAttention(nn.Layer):
                 alibi,
                 self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
+                npu_is_casual=npu_is_casual,
             )
         if output_attentions:
             attn_output, attn_weights = outputs
@@ -1127,6 +1050,7 @@ class LlamaDecoderLayer(nn.Layer):
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
         alibi: Optional[paddle.Tensor] = None,
+        npu_is_casual: bool = False,
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         """
         Args:
@@ -1174,6 +1098,7 @@ class LlamaDecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
+                npu_is_casual=npu_is_casual,
             )
 
         if type(outputs) is tuple:
@@ -1465,9 +1390,9 @@ class LlamaModel(LlamaPretrainedModel):
                         input_shape, past_key_values_length=past_key_values_length
                     )
                     if get_env_device() == "npu":
-                        expanded_attn_mask = expanded_attn_mask.astype("bool")
-                        combined_attention_mask = combined_attention_mask.astype("bool")
-                    expanded_attn_mask = expanded_attn_mask & combined_attention_mask
+                        expanded_attn_mask = expanded_attn_mask.astype("bool") & combined_attention_mask.astype("bool")
+                    else:
+                        expanded_attn_mask = expanded_attn_mask & combined_attention_mask
             # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
             elif len(attention_mask.shape) == 3:
                 expanded_attn_mask = attention_mask.unsqueeze(1).astype("bool")
@@ -1478,11 +1403,11 @@ class LlamaModel(LlamaPretrainedModel):
             expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
         # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
         if get_env_device() == "npu":
-            x = paddle.to_tensor(0.0, dtype="float16")
-            y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float16")
-            expanded_attn_mask = expanded_attn_mask.astype("float16")
+            x = paddle.to_tensor(0.0, dtype="float32")
+            y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float32")
+            expanded_attn_mask = expanded_attn_mask.astype("float32")
             expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
-        elif get_env_device() == "xpu":
+        elif get_env_device() in ["xpu", "gcu"]:
             x = paddle.to_tensor(0.0, dtype=dtype)
             y = paddle.to_tensor(paddle.finfo(dtype).min, dtype=dtype)
             expanded_attn_mask = expanded_attn_mask.astype(dtype)
@@ -1611,9 +1536,10 @@ class LlamaModel(LlamaPretrainedModel):
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
-        if self.config.use_flash_attention:
+        is_casual = False
+        if self.config.use_flash_attention and get_env_device() != "gcu":
+            is_casual = is_casual_mask(attention_mask)
             if get_env_device() != "npu":
-                is_casual = is_casual_mask(attention_mask)
                 if is_casual and alibi is None:
                     attention_mask = None
             else:
@@ -1655,6 +1581,7 @@ class LlamaModel(LlamaPretrainedModel):
                     past_key_value,
                     use_cache,
                     alibi=alibi,
+                    npu_is_casual=is_casual,
                 )
 
             # NOTE: clear outdate cache after it has been used for memory saving
@@ -1722,8 +1649,13 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
                 _hcg = fleet.get_hybrid_communicate_group()
                 masked_lm_loss = ConcatSePMaskedLoss.apply(masked_lm_loss, axis=1, group=_hcg.get_sep_parallel_group())
             # skip ignore_index which loss == 0
-            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
-            loss = paddle.mean(masked_lm_loss)
+            # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
+            # loss = paddle.mean(masked_lm_loss)
+            binary_sequence = paddle.where(
+                masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
+            )
+            sum_ = paddle.sum(binary_sequence)
+            loss = 0 if sum_ == 0 else paddle.sum(masked_lm_loss * binary_sequence) / sum_
 
         return loss
 

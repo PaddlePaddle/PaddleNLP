@@ -35,8 +35,6 @@ sys.path.append(
 import reader  # noqa: E402
 from tls.record import AverageStatistical  # noqa: E402
 
-paddle.set_default_dtype("float64")
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -349,6 +347,7 @@ def do_train(args):
 
 
 if __name__ == "__main__":
+    paddle.set_default_dtype("float64")
     ARGS = parse_args()
     yaml_file = ARGS.config
     with open(yaml_file, "rt") as f:
