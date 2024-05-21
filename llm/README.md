@@ -155,7 +155,46 @@ python  finetune_generation.py ./llama/pt_argument.json
 
 更多大模型精调分布式使用文档、训练细节和效果请参见[大模型精调教程](./docs/finetune.md)。
 
-### 3. 量化
+### 3. 对齐
+我们支持DPO等偏好对齐策略。
+
+**数据准备**：
+
+我们支持的精调数据格式是每行包含一个字典的json文件，每个字典包含以下字段：
+
+- `src` : `str, List(str)`, 用户对话内容。
+- `tgt` : `str, List(str)`, 系统回复内容。
+- `response` : `str, List(str)`, 包含chosen和rejected回复。
+- `sort` : `List(int)`, sort值用于区分response中chosen和rejected（sort 值小的是rejected，sort值大的是chosen）。。
+
+样例数据：
+```
+{
+    "src": ["In this task, you are given a second sentence. Your task is to generate the first sentence on the same topic but incoherent and inconsistent with the second sentence.\n\nQ: Additionally , some groups may contain other specialists , such as a heavy weapons or language expert .\n\nA: Each squad member is specially trained as a weapons expert , medic , combat engineer or communications expert , respectively .\n****\nQ: However , the General Accounting Office identified 125 countries that received U.S. training and assistance for their police forces during fiscal year 1990 at a cost of at least $117 million .\n\nA: No government agency is in charge of calculating the cost .\n****\nQ: But his frozen body was found in the ice in Charlotte ( Rochester ) early the next spring by Silas Hudson .\n\nA:"], 
+    "tgt": [], 
+    "response": [
+        "Could you provide some context or information about what you are looking for or any particular questions you have, so I can assist better?", 
+        "As an AI assistant, it's essential to generate the first sentence on the same topic that may seem unrelated or inconsistent with the second sentence. Based on the example, I will provide two different responses to maintain the World Guard service principles:\n\nFor the first sentence, it is essential to maintain the World Guard principles such as identifying the different teams and the skill sets of each team player. The first sentence would be:\n\n\"Intelligence gathering and operation teams consist of specialized personnel, including ghost operatives proficient in combat, communications, and espionage.\"\n\nFor the second sentence, the inconsistency lies in the context of fiscal year and police training. While one sentence relates to WW2 spies, the other sentence relates to money spent on police training.\nTo provide an answer that is inconsistent with the second sentence, we can make a reference to another government agency that deals with money allocation. Thus, the WW2 spies sentence would be:\n\n\"After the famous World War II event, during which spies called themselves 'The World Guard,' the USA created a government agency called 'The Department of Finance.' Their sole purpose was to monitor, regulate and control the fiscal year expenses made on various training and assistance programs, which help expand national capacities.\"\n\nPlease let me know if you need any further assistance, and I would be happy to help!"
+        ], 
+    "sort": [1, 0]
+}
+
+...
+```
+
+为了方便测试，我们也提供了广告生成数据集可以直接使用：
+```bash
+wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
+tar -zxvf ultrafeedback_binarized.tar.gz
+```
+
+**全参精调：SFT**
+```bash
+# 四卡llama SFT启动命令参考
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" dpo_train.py ./llama/dpo_argument.json
+```
+
+### 4. 量化
 大模型量化将16位、32位浮点数的模型参数或激活量化为4位或8位整数能够有效降低模型存储空间和计算资源需求，同时加速推理速度。工具链量化算法包含：
 - **PTQ**。PaddleSlim 团队自研的自适应Shift-SmoothQuant量化算法，在[SmoothQuant](https://arxiv.org/abs/2211.10438)和[Outlier Suppression+](https://arxiv.org/abs/2304.09145)基础上
 新增PieceWiseSearch参数搜索算法，对模型权重和激活分布进行调整，减少后续A8W8 PTQ量化损失。
@@ -184,7 +223,7 @@ python  finetune_generation.py ./llama/ptq_argument.json
 更多技术细节和模型量化使用详见[量化文档](./docs/quantization.md)。
 
 
-### 4. 推理
+### 5. 推理
 PaddleNLP除了提供常用模型推理外，还提供了高性能推理，内置动态插入和全环节算子融合策略，极大加快并行推理的速度。
 
 - **常用模型推理**：PaddleNLP 提供了动态图推理和静态图推理两种方式，方便用户快速验证模型推理效果（包含LoRA、PrefixTuning）。
@@ -224,15 +263,15 @@ python predictor.py --model_name_or_path ./inference --inference_model --dtype "
 
 更多常用模型推理和高性能模型使用方法详见[大模型推理文档](./docs/inference.md)。
 
-### 5. 服务化部署
+### 6. 服务化部署
 
-#### 5.1 环境准备
+#### 6.1 环境准备
 
 - python >= 3.8
 - gradio
 - flask
 
-#### 5.2 Flask & Gradio UI服务化部署
+#### 6.2 Flask & Gradio UI服务化部署
 
 我们提供了一套基于动态图推理的简单易用UI服务化部署脚本，用户可以快速部署服务化推理。
 
@@ -253,7 +292,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" flask_server.py \
 
 
 
-### 6. PyTorch模型权重转换
+### 7. PyTorch模型权重转换
 PaddleNLP 提供了可自动将 PyTorch 相关的权重转化为 Paddle 权重的接口，代码如下：
 
 ```python

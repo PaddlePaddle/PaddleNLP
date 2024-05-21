@@ -50,6 +50,7 @@ from . import (
     transformers,
     utils,
     version,
+    trl,
 )
 from .server import SimpleServer
 from .taskflow import Taskflow
