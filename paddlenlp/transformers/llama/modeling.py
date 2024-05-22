@@ -1845,13 +1845,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
 
         hidden_states = outputs[0]  # [bs, seq_len, dim]
 
-        # if labels is None，means we need full output, instead of tensor_parallel_output
-        # tensor_parallel_output is togather with ParallelCrossEntropy
-        tensor_parallel_output = (
-            self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
-        )
-
-        logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+        logits = self.lm_head(hidden_states)
 
         loss = None
         if labels is not None:
