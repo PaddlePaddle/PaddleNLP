@@ -421,7 +421,7 @@ class LlamaAttentionAuto(nn.Layer):
         if self.config.rope:
             if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
-                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+                cos, sin, _ = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states, _ = fused_rotary_position_embedding(
                     query_states,
                     key_states,
@@ -432,7 +432,7 @@ class LlamaAttentionAuto(nn.Layer):
                     use_neox_rotary_style=False,
                 )
             else:
-                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+                cos, sin, _ = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
         # [bs, seq_len, num_head, head_dim]
