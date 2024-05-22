@@ -34,7 +34,6 @@ def check_preference_data(data):
         )
     if len(data["response"][0]) == 0 or len(data["response"][1]) == 0:
         raise ValueError("The response should not be empty, buut got {data}.")
-
     if data["sort"][0] == data["sort"][1]:
         raise ValueError("The two sort should be different.")
 

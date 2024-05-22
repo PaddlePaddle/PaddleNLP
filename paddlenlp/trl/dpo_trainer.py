@@ -84,7 +84,6 @@ class DPOTrainer(Trainer):
         elif self.args.dpo_loss_type == "hinge":
             loss = F.relu(1 - self.args.dpo_beta * logits)
         elif self.args.dpo_loss_type == "ipo":
-            # eqn (17) of the paper where beta is the regularization
             # parameter for the IPO loss, denoted by tau in the paper.
             loss = (logits - 1 / (2 * self.args.dpo_beta)) ** 2
         elif self.args.dpo_loss_type == "kto_pair":
