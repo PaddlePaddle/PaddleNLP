@@ -107,6 +107,9 @@ class PreTrainingArguments(TrainingArguments):
     pipeline_schedule_mode: str = field(
         default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
     )
+    split_backward: Optional[bool] = field(
+        default="False", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
+    )
     sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
     refined_ops_patterns: Optional[List[str]] = field(
         default=None, metadata={"help": "The pattern of refined recompute."}
