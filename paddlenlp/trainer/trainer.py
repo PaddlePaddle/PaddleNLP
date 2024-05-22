@@ -2173,10 +2173,11 @@ class Trainer:
         merge_tensor_parallel: Optional[bool] = False,
     ):
         self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
-        self._save_ckpt_func(
-            self.optimizer.state_dict(),
-            os.path.join(output_dir, _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)),
-        )
+        if not self.args.ignore_save_lr_and_optim:
+            self._save_ckpt_func(
+                self.optimizer.state_dict(),
+                os.path.join(output_dir, _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)),
+            )
 
     def save_model(self, output_dir: Optional[str] = None, merge_tensor_parallel: Optional[bool] = False):
         """
@@ -2191,7 +2192,12 @@ class Trainer:
         if ShardingOption.FULL_SHARD in self.args.sharding:
             self.model_wrapped.get_all_parameters(convert2cpu=True)
 
-        if self.args.should_save_model_state:
+        if not self.is_in_train and self.args.use_moe:
+            should_save_model_state = self.args.sharding_parallel_rank == 0
+        else:
+            # only save on dataset rank 0
+            should_save_model_state = self.args.should_save_model_state
+        if should_save_model_state:
             unified_checkpoint_config_backup = self.args.unified_checkpoint_config
             # backup and remove unified_checkpoint_config for not trine stage
             if not self.is_in_train:
