@@ -448,7 +448,7 @@ class LlamaAttentionAuto(nn.Layer):
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
                 batch_size, seq_length, num_heads, head_dim = query_states.shape
                 _, kv_seq_len, num_key_value_heads, _ = key_states.shape
-                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+                cos, sin, _ = self.rotary_emb(value_states, seq_len=kv_seq_len)
 
                 paddle_version = float(paddle.__version__[:3])
                 if ((paddle_version != 0.0) and (paddle_version <= 2.6)) and (num_heads != num_key_value_heads):
