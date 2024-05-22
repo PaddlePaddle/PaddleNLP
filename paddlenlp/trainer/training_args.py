@@ -259,6 +259,7 @@ class TrainingArguments:
               enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation
               enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed
               enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap.
+              enable_release_grads, reduce peak memory usage by releasing gradients after each iteration. The creation of gradients will be postponed until backward propagation of the next iteration.
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -1139,6 +1140,7 @@ class TrainingArguments:
                                 "enable_stage1_overlap",
                                 "enable_stage2_overlap",
                                 "split_param",
+                                "enable_release_grads",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, "
@@ -1147,6 +1149,9 @@ class TrainingArguments:
                     try:
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
+
+                        if "enable_release_grads" in sharding_parallel_config:
+                            strategy.hybrid_configs["sharding_configs"].release_gradients = True
 
                         if self.pipeline_parallel_degree == 1:
                             strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
