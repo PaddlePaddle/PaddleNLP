@@ -1671,7 +1671,7 @@ class TrainingArguments:
             return 0
 
     def _format_name(self, prefix, rank, degree):
-        size = max(2, len(str(degree)))
+        size = 2
         return f"{prefix}{rank:0>{size}d}"
 
     @property
