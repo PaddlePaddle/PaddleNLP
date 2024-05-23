@@ -108,7 +108,10 @@ class PreTrainingArguments(TrainingArguments):
         default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
     )
     split_backward: Optional[bool] = field(
-        default="False", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
+        default="False",
+        metadata={
+            "help": "Split the `backward` program into `backward_b` and `backward_w` to decrease the bubble in VPP pipeline mode when `acc_step == pp_degree`. It increase the memory!"
+        },
     )
     sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
     refined_ops_patterns: Optional[List[str]] = field(
