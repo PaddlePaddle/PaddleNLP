@@ -2557,6 +2557,38 @@ class Trainer:
             dist.barrier()
         if not self.args.use_moe:
             opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
+        else:
+            # deal with moe optimizer.
+            state_dict = self.model.state_dict()
+            no_sync_vname = []
+            for k, v in state_dict.items():
+                if getattr(v, "no_sync", False):
+                    no_sync_vname.append(v.name)
+            new_opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
+            # 更新opt的时候会存在同名的参数，需通过no_sync来设置禁止broadcast。
+            # 1. 如果opt_state_dict.keys()和new_opt_state_dict.keys()完全一样，则不需要更新。
+            # 2. 如果不同，则需要根据no_sync_vname进行更新。
+            if len(opt_state_dict.keys()) != len(new_opt_state_dict.keys()):
+                for op_k, op_v in new_opt_state_dict.items():
+                    if op_k == "master_weights":
+                        for k, v in new_opt_state_dict["master_weights"].items():
+                            no_sync = False
+                            for no_sync_v in no_sync_vname:
+                                if k.startswith(no_sync_v):
+                                    no_sync = True
+                                    break
+                            if not no_sync:
+                                opt_state_dict["master_weights"][k] = v
+                    elif op_k == "LR_Scheduler":
+                        pass
+                    else:
+                        no_sync = False
+                        for no_sync_v in no_sync_vname:
+                            if op_k.startswith(no_sync_v):
+                                no_sync = True
+                                break
+                        if not no_sync:
+                            opt_state_dict[op_k] = op_v
 
         if opt_state_dict is not None:
             # Load in optimizer and scheduler states
