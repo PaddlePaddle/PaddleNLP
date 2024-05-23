@@ -585,6 +585,8 @@ class FusedMultiTransformerBase(Layer):
         return qkv_out, residual_input
 
     def compute_max_len(self, seq_lens_encoder, seq_lens_decoder, cum_offsets):
+        if seq_lens_encoder is None or seq_lens_decoder is None or cum_offsets is None:
+            return None, None
         return paddle.incubate.nn.functional.blha_get_max_len(
             seq_lens_encoder, seq_lens_decoder, cum_offsets  # cum_offsets.shape[0] used as bsz
         )
@@ -822,7 +824,7 @@ class FusedMultiTransformerBase(Layer):
         assert self.num_layers == len(self.qkv_weights)
 
         max_enc_len_this_time, max_dec_len_this_time = self.compute_max_len(
-            kwargs["seq_lens_encoder"], kwargs["seq_lens_decoder"], cum_offsets
+            kwargs.get("seq_lens_encoder", None), kwargs.get("seq_lens_decoder", None), cum_offsets
         )
         kwargs["max_enc_len_this_time"] = max_enc_len_this_time
         kwargs["max_dec_len_this_time"] = max_dec_len_this_time
