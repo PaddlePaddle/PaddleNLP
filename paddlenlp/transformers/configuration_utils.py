@@ -942,7 +942,7 @@ class PretrainedConfig:
     def __repr__(self):
         return f"{self.__class__.__name__} {self.to_json_string()}"
 
-    def to_diff_dict(self) -> Dict[str, Any]:
+    def to_diff_dict(self, saving_file=False) -> Dict[str, Any]:
         """
         Removes all attributes from config which correspond to the default config attributes for better readability and
         serializes to a Python dictionary.
@@ -950,13 +950,13 @@ class PretrainedConfig:
         Returns:
             `Dict[str, Any]`: Dictionary of all the attributes that make up this configuration instance,
         """
-        config_dict = self.to_dict()
+        config_dict = self.to_dict(saving_file=saving_file)
 
         # get the default config dict
-        default_config_dict = PretrainedConfig().to_dict()
+        default_config_dict = PretrainedConfig().to_dict(saving_file=saving_file)
 
         # get class specific config dict
-        class_config_dict = self.__class__().to_dict() if not self.is_composition else {}
+        class_config_dict = self.__class__().to_dict(saving_file=saving_file) if not self.is_composition else {}
 
         serializable_config_dict = {}
 
@@ -977,7 +977,7 @@ class PretrainedConfig:
 
         return serializable_config_dict
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self, saving_file=False) -> Dict[str, Any]:
         """
         Serializes this instance to a Python dictionary.
 
@@ -1001,10 +1001,11 @@ class PretrainedConfig:
 
             output[key] = value
 
-        nonsavable_keys = LlmMetaConfig._get_nonsavable_keys()
-        for key in list(output.keys()):
-            if key in nonsavable_keys:
-                output.pop(key)
+        if saving_file:
+            nonsavable_keys = LlmMetaConfig._get_nonsavable_keys()
+            for key in list(output.keys()):
+                if key in nonsavable_keys:
+                    output.pop(key)
 
         if hasattr(self, "quantization_config"):
             output["quantization_config"] = (
@@ -1018,7 +1019,7 @@ class PretrainedConfig:
 
         return output
 
-    def to_json_string(self, use_diff: bool = True) -> str:
+    def to_json_string(self, use_diff: bool = True, saving_file=False) -> str:
         """
         Serializes this instance to a JSON string.
 
@@ -1031,12 +1032,12 @@ class PretrainedConfig:
             `str`: String containing all the attributes that make up this configuration instance in JSON format.
         """
         if use_diff is True:
-            config_dict = self.to_diff_dict()
+            config_dict = self.to_diff_dict(saving_file=saving_file)
         else:
-            config_dict = self.to_dict()
+            config_dict = self.to_dict(saving_file=saving_file)
         return json.dumps(config_dict, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
 
-    def to_json_file(self, json_file_path: Union[str, os.PathLike], use_diff: bool = True):
+    def to_json_file(self, json_file_path: Union[str, os.PathLike], use_diff: bool = True, saving_file=True):
         """
         Save this instance to a JSON file.
 
@@ -1048,7 +1049,7 @@ class PretrainedConfig:
                 is serialized to JSON file.
         """
         with open(json_file_path, "w", encoding="utf-8") as writer:
-            writer.write(self.to_json_string(use_diff=use_diff))
+            writer.write(self.to_json_string(use_diff=use_diff, saving_file=saving_file))
 
     def update(self, config_dict: Dict[str, Any]):
         """
