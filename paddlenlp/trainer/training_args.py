@@ -787,6 +787,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "whether to run distributed training in auto parallel mode"},
     )
+    use_moe: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Use MoE training."},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -1594,9 +1598,13 @@ class TrainingArguments:
             if self.sharding_parallel_degree > 1:
                 assert self.sharding_parallel_degree < 100, "sharding parallel degree should be less than 100."
                 name.append(f"shard{self.sharding_parallel_rank:0>2d}")
+            if self.use_moe:
+                name.append(f"moe{self.data_parallel_rank:0>2d}")
 
             return "_".join(name)
         else:
+            if self.use_moe:
+                return f"moe{self.data_parallel_rank:0>2d}"
             return None
 
     @property
@@ -1609,9 +1617,13 @@ class TrainingArguments:
             if self.pipeline_parallel_degree > 1:
                 assert self.pipeline_parallel_degree < 100, "tensor parallel rank should be less than 100."
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
+            if self.use_moe:
+                name.append(f"moe{self.data_parallel_rank:0>2d}")
             return "_".join(name)
 
         else:
+            if self.use_moe:
+                return f"moe{self.data_parallel_rank:0>2d}"
             return None
 
     def sharded_name_suffix(self, shard_id=None, pp_id=None):
