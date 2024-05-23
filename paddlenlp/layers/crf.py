@@ -165,7 +165,7 @@ class LinearChainCrf(nn.Layer):
         flattened_inputs = inputs.reshape([-1])
         offsets = paddle.unsqueeze(self._get_batch_index(batch_size) * seq_len * n_labels, 1)
         offsets += paddle.unsqueeze(self._get_seq_index(seq_len) * n_labels, 0)
-        flattened_tag_indices = paddle.reshape(offsets + labels, [-1])
+        flattened_tag_indices = paddle.reshape(offsets + labels.astype(offsets.dtype), [-1])
 
         scores = paddle.gather(flattened_inputs, flattened_tag_indices).reshape([batch_size, seq_len])
 
