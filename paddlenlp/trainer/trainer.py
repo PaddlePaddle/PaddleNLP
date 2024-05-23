@@ -1607,16 +1607,13 @@ class Trainer:
                 if os.path.isfile(rng_file):
                     rng_file_list = paddle.load(rng_file, return_numpy=True)
             paddle.distributed.broadcast_object_list(rng_file_list, src=0)
-            # if rng_file_list still empty, then use old style rng_state
+            # if rng_file_list still empty, not log rng state.
             if rng_file_list[0] is None:
-                rng_file = os.path.join(checkpoint, f"rng_state_{process_index}.pth")
-                if not os.path.isfile(rng_file):
-                    logger.info(
-                        f"Didn't find an RNG file for process {process_index}, if you are resuming a training that "
-                        "wasn't launched in a distributed fashion, reproducibility is not guaranteed."
-                    )
-                    return
-                checkpoint_rng_state = paddle.load(rng_file, return_numpy=True)
+                logger.info(
+                    f"Didn't find an RNG file for process {process_index}, if you are resuming a training that "
+                    "wasn't launched in a distributed fashion, reproducibility is not guaranteed."
+                )
+                return
             else:
                 checkpoint_rng_state = rng_file_list[process_index]
         else:
@@ -2436,6 +2433,7 @@ class Trainer:
             self.runtime_timer.stop()
             return
 
+        logger.info("Loading optimizer and scheduler...")
         if (not self.args.should_load_sharding_stage1_model) and self.args.ignore_load_lr_and_optim:
             self.runtime_timer.stop()
             return

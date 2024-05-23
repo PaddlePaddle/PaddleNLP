@@ -1137,7 +1137,9 @@ class ConvBertForTotalPretraining(ConvBertPretrainedModel):
         N = positions.shape[1]
         assert N == L, "the dimension of inputs and mask should be same as [batch_size, sequence_length]"
 
-        updated_sequence = ((paddle.ones_like(sequence) - positions) * sequence) + (positions * updates)
+        updated_sequence = ((paddle.ones_like(sequence) - positions) * sequence) + (
+            positions * updates.astype(positions.dtype)
+        )
 
         return updated_sequence
 
