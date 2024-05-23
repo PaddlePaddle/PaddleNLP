@@ -432,10 +432,11 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         seq_lens = seq_len_decoder if is_decoder else seq_len_encoder
 
         position_offset = 0
+        theta = 10000.0
         if not is_decoder and pre_caches is not None:
             position_offset = 128
         new_rope = fused_get_rotary_embedding(
-            input_ids, position_ids, self.head_dim_shape_tensor, position_offset, True
+            input_ids, position_ids, self.head_dim_shape_tensor, position_offset, theta, True
         )
 
         with dy2st_nocheck_guard_context():
