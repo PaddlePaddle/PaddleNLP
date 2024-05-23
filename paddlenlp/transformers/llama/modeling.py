@@ -115,6 +115,11 @@ def _get_interleave(n):
         )
 
 
+def get_use_casual_mask():
+    """Get the value of the 'USE_CASUAL_MASK' environment variable."""
+    return os.getenv("USE_CASUAL_MASK", "False")
+
+
 def build_alibi_tensor(
     bool_attention_mask: Tensor, num_heads: int, dtype: paddle.dtype, tensor_parallel_degree=1
 ) -> Tensor:
@@ -1532,9 +1537,8 @@ class LlamaModel(LlamaPretrainedModel):
         if position_ids is None:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
 
-        use_casual_mask = (
-            True if hasattr(self.config, "use_casual_mask") and self.config.use_casual_mask is True else False
-        )
+        use_casual_mask = get_use_casual_mask()
+
         if use_casual_mask:
             attention_mask = None
         else:

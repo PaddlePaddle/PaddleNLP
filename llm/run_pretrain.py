@@ -223,10 +223,6 @@ class ModelArguments:
         default=None,
         metadata={"help": "num_hidden_layers."},
     )
-    use_casual_mask: Optional[bool] = field(
-        default=True,
-        metadata={"help": "whether to use casual mask"},
-    )
 
 
 def create_pretrained_dataset(
@@ -480,7 +476,6 @@ def main():
     config.pp_recompute_interval = model_args.pp_recompute_interval
     config.recompute_use_reentrant = model_args.recompute_use_reentrant
     config.use_recompute = training_args.recompute
-    config.use_casual_mask = model_args.use_casual_mask
 
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
