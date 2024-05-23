@@ -552,8 +552,7 @@ def main():
         pipeline.vpp_degree = config.virtual_pp_degree
         pipeline.vpp_seg_method = training_args.virtual_pipeline_seg_method
         pipeline.program_runtimes = training_args.program_runtimes
-        print("Pipeline strategy:", pipeline.program_runtimes)
-        exit(0)
+        pipeline.memory_limit_times = training_args.memory_limit_times
 
     print("Final pre-training config:", config)
 
