@@ -171,7 +171,7 @@ class MegatronBertSelfAttention(nn.Layer):
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
         if attention_mask is not None:
             # Apply the attention mask is (precomputed for all layers in MegatronBertModel forward() function)
-            attention_scores = attention_scores + attention_mask
+            attention_scores = attention_scores + attention_mask.astype(attention_scores.dtype)
 
         # Normalize the attention scores to probabilities.
         attention_probs = nn.functional.softmax(attention_scores, axis=-1)
@@ -313,7 +313,7 @@ class MegatronBertModel(MegatronBertPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:

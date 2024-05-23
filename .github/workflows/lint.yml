@@ -8,6 +8,8 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: checkout develop
         run: |
           if ! git show-ref --quiet refs/heads/develop; then \
@@ -19,7 +21,7 @@ jobs:
           fi
       - uses: actions/setup-python@v4
         with:
-          python-version: 3.8
+          python-version: '3.10'
           cache: 'pip' # caching pip dependencies
       - name: Install dependencies
         run: |

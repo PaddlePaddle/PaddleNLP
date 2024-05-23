@@ -304,7 +304,7 @@ class ImageFeatureExtractionMixin:
         self._ensure_format_supported(image)
 
         if is_paddle_tensor(image):
-            image = image.numpy()
+            image = image.cpu().numpy()
 
         if isinstance(image, np.ndarray):
             if rescale is None:
@@ -360,7 +360,7 @@ class ImageFeatureExtractionMixin:
             image = np.array(image)
 
         if is_paddle_tensor(image):
-            image = image.numpy()
+            image = image.cpu().numpy()
 
         rescale = isinstance(image.flat[0], np.integer) if rescale is None else rescale
 

@@ -131,7 +131,6 @@ class GAUAlphaConfig(PretrainedConfig):
         use_cache=False,
         use_task_id=True,
         use_bias=False,
-        enable_recompute=False,
         attention_scale=True,
         **kwargs
     ):
@@ -155,7 +154,6 @@ class GAUAlphaConfig(PretrainedConfig):
         self.norm_eps = norm_eps
         self.use_cache = use_cache
         self.use_task_id = use_task_id
-        self.enable_recompute = enable_recompute
         self.use_bias = use_bias
         self.activation = activation
         self.attention_key_size = attention_key_size

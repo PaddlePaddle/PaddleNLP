@@ -25,6 +25,9 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
+from paddle.utils import map_structure
+
+from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
 
 from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
@@ -38,7 +41,7 @@ from .configuration import CHATGLM_PRETRAINED_RESOURCE_FILES_MAP, ChatGLMConfig
 __all__ = [
     "ChatGLMModel",
     "ChatGLMPretrainedModel",
-    "ChatGLMForConditionalGeneration",
+    "ChatGLMForCausalLM",
 ]
 
 
@@ -94,53 +97,62 @@ class PrefixEncoder(nn.Layer):
 
 
 class RotaryEmbeddings(nn.Layer):
-    def __init__(self, hidden_size, base=10000.0, learnable=False):
+    def __init__(self, hidden_size, base=10000.0, position_encoding_2d=True):
         super().__init__()
-        self.dtype = paddle.get_default_dtype()
-        inv_freq = 1.0 / (base ** (paddle.arange(0, hidden_size, 2).astype("float32") / hidden_size))
-        inv_freq = inv_freq.astype(self.dtype)
-        self.learnable = learnable
-        if learnable:
-            self.inv_freq = nn.Parameter(inv_freq)
-            self.max_seq_len_cached = None
+        self.default_dtype = paddle.get_default_dtype()
+        self.inv_freq = 1.0 / (base ** (paddle.arange(0, hidden_size, 2).astype("float32") / hidden_size))
+        self.position_encoding_2d = position_encoding_2d
+        self.max_seq_len_cached = -1
+        self.cos_cached = None
+        self.sin_cached = None
+
+    def get_rotary_embeds(self, cos, sin, position_ids):
+        # [s, b, 1, h/n]
+        cos = cos.squeeze(1)[position_ids].unsqueeze(2)
+        sin = sin.squeeze(1)[position_ids].unsqueeze(2)
+        return paddle.stack([cos, sin], axis=0)
+
+    def forward(self, position_ids):
+
+        seq_len = position_ids.max() + 1
+        # seq_len = position_ids.shape[-1]
+
+        if self.max_seq_len_cached < 0 or seq_len > self.max_seq_len_cached:
+            self.max_seq_len_cached = seq_len
+
+            # x.shape = [b, s, n, h/n/2]
+            # TODO(duanyanhui): npu arange kernel don't support fp16, and
+            # it can't be fallbacked to cpu. It will be fixed in future.
+            t = paddle.arange(start=0, end=seq_len, dtype="float32")
+            # [s, h/n/2]
+            freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
+            # [s, h/n]
+            emb = paddle.concat([freqs, freqs], axis=-1)
+            # [s, 1, h/n]
+            cos_cached = emb.cos().unsqueeze(1).cast(self.default_dtype)
+            sin_cached = emb.sin().unsqueeze(1).cast(self.default_dtype)
+
+            if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+                # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
+                # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+                # removed after static graphs support inplace and stride.
+                with paddle.framework._no_check_dy2st_diff():
+                    self.cos_cached, self.sin_cached = cos_cached, sin_cached
+            else:
+                self.cos_cached, self.sin_cached = cos_cached, sin_cached
+
+        cos, sin = self.cos_cached[:seq_len, ...], self.sin_cached[:seq_len, ...]
+        if self.position_encoding_2d:
+            block_position_ids = position_ids[:, 1, :].transpose([1, 0])
+            position_ids = position_ids[:, 0, :].transpose([1, 0])
+            block_rotary_embeds = self.get_rotary_embeds(cos, sin, block_position_ids)
+            position_rotary_embeds = self.get_rotary_embeds(cos, sin, position_ids)
+            rotary_embeds = paddle.stack([position_rotary_embeds, block_rotary_embeds], axis=0)
         else:
-            self.register_buffer("inv_freq", inv_freq)
-            self.max_seq_len_cached = None
-            self.cos_cached = None
-            self.sin_cached = None
+            position_ids = position_ids.transpose([1, 0])
+            rotary_embeds = self.get_rotary_embeds(cos, sin, position_ids)
 
-    def forward(self, x, seq_dim=1, seq_len=None):
-        if seq_len is None:
-            seq_len = x.shape[seq_dim]
-
-        # x.shape = [b, s, n, h/n/2]
-        # TODO: Remove the condition for converting to static graph.
-        # if self.max_seq_len_cached is None or seq_len > self.max_seq_len_cached:
-        #    self.max_seq_len_cached = None if self.learnable else seq_len
-        # [s]
-        t = paddle.arange(seq_len).astype(self.dtype)
-        # [s, h/n/2]
-        # TODO: Failed for fp16 when converting to static graph.
-        freqs = paddle.einsum("i,j->ij", t.astype("float32"), self.inv_freq.astype("float32"))
-        freqs = freqs.astype(self.dtype)
-        # [s, h/n]
-        emb = paddle.concat([freqs, freqs], axis=-1)
-        if self.dtype == paddle.bfloat16:
-            emb = emb.astype("float32")
-        # [s, 1, h/n]
-        cos_cached = emb.cos().unsqueeze(1)
-        sin_cached = emb.sin().unsqueeze(1)
-
-        if self.dtype == paddle.bfloat16:
-            cos_cached = cos_cached.astype(self.dtype)
-            sin_cached = sin_cached.astype(self.dtype)
-
-        if self.learnable:
-            return cos_cached, sin_cached
-
-        self.cos_cached, self.sin_cached = cos_cached, sin_cached
-
-        return self.cos_cached[:seq_len, ...], self.sin_cached[:seq_len, ...]
+        return rotary_embeds
 
 
 class ChatGLMAttention(nn.Layer):
@@ -161,15 +173,8 @@ class ChatGLMAttention(nn.Layer):
         self.attention_head_size = config.hidden_size // config.num_attention_heads
         self.hidden_size = config.hidden_size
         self.position_encoding_2d = config.position_encoding_2d
-        self.rotary_embeddings = RotaryEmbeddings(
-            self.hidden_size // (self.num_attention_heads * 2)
-            if self.position_encoding_2d
-            else self.hidden_size // self.num_attention_heads,
-            base=10000.0,
-            learnable=False,
-        )
         self.scale_mask_softmax = False
-        self.dtype = paddle.get_default_dtype()
+        self.default_dtype = paddle.get_default_dtype()
 
         self.attention_scale = config.attention_scale
 
@@ -192,40 +197,32 @@ class ChatGLMAttention(nn.Layer):
         x1, x2 = paddle.chunk(x, 2, axis=-1)
         return paddle.concat([-x2, x1], axis=-1)
 
-    def _apply_rotary_position_embed_index(self, q, k, cos, sin, position_ids):
+    def _apply_rotary_position_embed_index(self, q, k, cos, sin):
         # q.shape = [s, b, n, h/n/2], cos.shape = [s, 1, h/n], position_ids.shape = [s, b]
-        # [s, b, 1, h/n]
-        cos = cos.squeeze(1)[position_ids].unsqueeze(2)
-        sin = sin.squeeze(1)[position_ids].unsqueeze(2)
         # [s, b, n, h/n]
         q = q * cos + self._rotate_half(q) * sin
         k = k * cos + self._rotate_half(k) * sin
         return q, k
 
-    def _core_attention(self, q_layer: Tensor, k_layer: Tensor, position_ids: Tensor):
+    def _core_attention(self, q_layer: Tensor, k_layer: Tensor, position_ids: Tensor, rotary_embeds: Tensor):
         # Set store_true, position_encoding_2d=False by default.
         if self.config.position_encoding_2d:
             # [s, b, n, h/n/2]
             q1, q2 = paddle.chunk(q_layer, 2, axis=-1)
             k1, k2 = paddle.chunk(k_layer, 2, axis=-1)
-            # [s, 1, h/n]
-            cos, sin = self.rotary_embeddings(q1, seq_len=position_ids.max() + 1)
-            # [s, b]
-            block_position_ids = position_ids[:, 1, :].transpose([1, 0])
-            position_ids = position_ids[:, 0, :].transpose([1, 0])
+
+            pcos, psin = rotary_embeds[0][0], rotary_embeds[0][1]
+            bcos, bsin = rotary_embeds[1][0], rotary_embeds[1][1]
 
             # [s, b, n, h/n]
-            q1, k1 = self._apply_rotary_position_embed_index(q1, k1, cos, sin, position_ids)
-            q2, k2 = self._apply_rotary_position_embed_index(q2, k2, cos, sin, block_position_ids)
+            q1, k1 = self._apply_rotary_position_embed_index(q1, k1, pcos, psin)
+            q2, k2 = self._apply_rotary_position_embed_index(q2, k2, bcos, bsin)
             q_layer = paddle.concat([q1, q2], axis=-1)
             k_layer = paddle.concat([k1, k2], axis=-1)
         else:
-            # [s, b]
-            position_ids = position_ids.transpose([1, 0])
-            # [s, 1, h/n]
-            cos, sin = self.rotary_embeddings(q_layer, seq_len=position_ids.max() + 1)
+            cos, sin = rotary_embeds[0], rotary_embeds[1]
             # [s, b, n, h/n]
-            q_layer, k_layer = self._apply_rotary_position_embed_index(q_layer, k_layer, cos, sin, position_ids)
+            q_layer, k_layer = self._apply_rotary_position_embed_index(q_layer, k_layer, cos, sin)
         return q_layer, k_layer
 
     def forward(
@@ -236,6 +233,7 @@ class ChatGLMAttention(nn.Layer):
         use_cache: bool = False,
         cache: Tensor = None,
         layer_id=0,
+        rotary_embeds=None,
     ):
         # [s, b, h]
         query_length, batch_size = hidden_states.shape[:2]
@@ -248,7 +246,7 @@ class ChatGLMAttention(nn.Layer):
         # [s, b, n, h//n]
         q_layer, k_layer, v_layer = paddle.split(mixed_layer, 3, axis=-1)
         # [s, b, n, h/n]
-        q_layer, k_layer = self._core_attention(q_layer, k_layer, position_ids)
+        q_layer, k_layer = self._core_attention(q_layer, k_layer, position_ids, rotary_embeds)
 
         if cache is not None:
             cache_k, cache_v = cache[0], cache[1]
@@ -256,66 +254,93 @@ class ChatGLMAttention(nn.Layer):
             k_layer = paddle.concat([cache_k, k_layer], axis=0)
             v_layer = paddle.concat([cache_v, v_layer], axis=0)
 
-        seq_length, batch_size, num_heads, hidden_size = k_layer.shape
-
         cache_kv = None
         if use_cache:
             cache_kv = (k_layer, v_layer)
+        version = paddle.version.full_version
+        version_check = True
+        if self.config.use_flash_attention and version != "0.0.0" and version <= "2.5.2":
+            logger.warning(
+                "PaddlePaddle version 2.5.3 or higher is required, please upgrade your PaddlePaddle to 2.5.3 or other higher version."
+            )
+            version_check = False
+        if self.config.use_flash_attention and version_check:
+            # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
+            # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
+            # [s, b, n, h/n] = > [batch_size, seq_len, num_heads, head_dim]
+            q_layer = paddle.transpose(q_layer, [1, 0, 2, 3])
+            k_layer = paddle.transpose(k_layer, [1, 0, 2, 3])
+            v_layer = paddle.transpose(v_layer, [1, 0, 2, 3])
+            query_states, key_states, value_states = q_layer, k_layer, v_layer
 
-        attention_scale_coeff = float(layer_id) + 1.0
-        if self.attention_scale:
-            # [s, b, n, h/n]
-            q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
-            q_layer = q_layer.astype(self.dtype)
+            attn_output = F.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=attention_mask,
+                is_causal=False,
+            )
+            attn_weights = None
+            # [batch_size, seq_len, num_heads, head_dim] => [ batch_size, seq_len, hidden_size]
+            attn_output = paddle.reshape(attn_output, [attn_output.shape[0], attn_output.shape[1], -1])
+            # [ batch_size, seq_len, hidden_size] = > [ seq_len, batch_size, hidden_size]
+            attn_output = paddle.transpose(attn_output, [1, 0, 2])
+            attn_output = self.dense(attn_output)
 
-        # [b, n, s, s]
-        output_shape = [q_layer.shape[1], q_layer.shape[2], q_layer.shape[0], k_layer.shape[0]]
-
-        # [s, b * n, h/n]
-        q_layer = q_layer.reshape([output_shape[2], output_shape[0] * output_shape[1], -1])
-        k_layer = k_layer.reshape([output_shape[3], output_shape[0] * output_shape[1], -1])
-
-        # [b * n , s, s] = matmul([b * n, s, h/n],  [b * n, h/n, s])
-        attention_scores = paddle.matmul(q_layer.transpose([1, 0, 2]), k_layer.transpose([1, 2, 0]))
-        # [b, n, s, s]
-        attention_scores = attention_scores.reshape(output_shape)
-
-        if self.scale_mask_softmax:
-            self.scale_mask_softmax.scale = attention_scale_coeff
-            attention_probs = self.scale_mask_softmax(attention_scores, attention_mask)
+            output, attention_probs = attn_output, attn_weights
         else:
-            if not (attention_mask == 0).all():
-                # attention_mask = attention_mask.astype(attention_scores.dtype)
-                # attention_scores = paddle.multiply(attention_scores, 1.0 - attention_mask)
-                # attention_scores = attention_scores + (-10000.0) * attention_mask
-                attention_scores = paddle.where(
-                    attention_mask > 0, paddle.full_like(attention_scores, -10000.0), attention_scores
-                )
-            attention_scores = attention_scores.astype("float32")
-            attention_scores = attention_scores * attention_scale_coeff
-            attention_probs = F.softmax(attention_scores, axis=-1)
-            attention_probs = attention_probs.astype(self.dtype)
-            v_layer = v_layer.astype(self.dtype)
 
-        # [b, n, s, h/n]
-        output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]
-        # [s, b * n, h/n]
-        v_layer = v_layer.reshape([v_layer.shape[0], output_shape[0] * output_shape[1], -1])
-        # [b * n, s, s]
-        attention_probs = attention_probs.reshape([output_shape[0] * output_shape[1], output_shape[2], -1])
+            seq_length, batch_size, num_heads, hidden_size = k_layer.shape
 
-        # [b * n, s, h/n]
-        context_layer = paddle.bmm(attention_probs, v_layer.transpose([1, 0, 2]))
-        context_layer = context_layer.reshape(output_shape)
+            attention_scale_coeff = float(layer_id) + 1.0
+            if self.attention_scale:
+                # [s, b, n, h/n]
+                q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
+                q_layer = q_layer.astype(self.default_dtype)
 
-        # [s, b, n, h/n]
-        context_layer = context_layer.transpose([2, 0, 1, 3])
+            # [b, n, s, s]
+            output_shape = [q_layer.shape[1], q_layer.shape[2], q_layer.shape[0], k_layer.shape[0]]
 
-        # [s, b, h]
-        new_context_shape = context_layer.shape[:-2] + [self.num_attention_heads * self.attention_head_size]
-        context_layer = context_layer.reshape(new_context_shape)
+            # [s, b * n, h/n]
+            q_layer = q_layer.reshape([output_shape[2], output_shape[0] * output_shape[1], -1])
+            k_layer = k_layer.reshape([output_shape[3], output_shape[0] * output_shape[1], -1])
 
-        output = self.dense(context_layer)
+            # [b * n , s, s] = matmul([b * n, s, h/n],  [b * n, h/n, s])
+            attention_scores = paddle.matmul(q_layer.transpose([1, 0, 2]), k_layer.transpose([1, 2, 0]))
+            # [b, n, s, s]
+            attention_scores = attention_scores.reshape(output_shape)
+
+            if self.scale_mask_softmax:
+                self.scale_mask_softmax.scale = attention_scale_coeff
+                attention_probs = self.scale_mask_softmax(attention_scores, attention_mask)
+            else:
+                attention_scores = attention_scores.astype("float32")
+                attention_scores = attention_scores * attention_scale_coeff
+                attention_scores = attention_scores + attention_mask
+
+                attention_probs = F.softmax(attention_scores, axis=-1)
+                attention_probs = attention_probs.astype(self.default_dtype)
+                v_layer = v_layer.astype(self.default_dtype)
+
+            # [b, n, s, h/n]
+            output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]
+            # [s, b * n, h/n]
+            v_layer = v_layer.reshape([v_layer.shape[0], output_shape[0] * output_shape[1], -1])
+            # [b * n, s, s]
+            attention_probs = attention_probs.reshape([output_shape[0] * output_shape[1], output_shape[2], -1])
+
+            # [b * n, s, h/n]
+            context_layer = paddle.bmm(attention_probs, v_layer.transpose([1, 0, 2]))
+            context_layer = context_layer.reshape(output_shape)
+
+            # [s, b, n, h/n]
+            context_layer = context_layer.transpose([2, 0, 1, 3])
+
+            # [s, b, h]
+            new_context_shape = context_layer.shape[:-2] + [self.num_attention_heads * self.attention_head_size]
+            context_layer = context_layer.reshape(new_context_shape)
+
+            output = self.dense(context_layer)
 
         return output, cache_kv, attention_probs
 
@@ -329,7 +354,7 @@ class ChatGLMBlock(nn.Layer):
         super(ChatGLMBlock, self).__init__()
         self.config = config
         self.layer_id = layer_id
-        self.dtype = paddle.get_default_dtype()
+        self.default_dtype = paddle.get_default_dtype()
         self.input_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
         self.attention = ChatGLMAttention(config)
         self.post_attention_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
@@ -342,6 +367,7 @@ class ChatGLMBlock(nn.Layer):
         position_ids: Tensor,
         use_cache: bool = False,
         cache: Tensor = None,
+        rotary_embeds: Tensor = None,
     ):
         # Layer norm before transformer layer
         attention_input = self.input_layernorm(hidden_states)
@@ -353,6 +379,7 @@ class ChatGLMBlock(nn.Layer):
             cache=cache,
             use_cache=use_cache,
             layer_id=self.layer_id,
+            rotary_embeds=rotary_embeds,
         )
         # Residual connection
         alpha = (2 * self.config.num_hidden_layers) ** 0.5
@@ -414,7 +441,24 @@ class ChatGLMStack(nn.Layer):
         self.config = config
         self.position_encoding_2d = config.position_encoding_2d
         self.hidden_size = config.hidden_size
-        self.enable_recompute = config.recompute
+        # Recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
+        self.num_attention_heads = config.num_attention_heads
+
+        if config.use_long_sequence_strategies:
+            self.rotary_embeddings = LongSequenceStrategies.build_long_sequence_strategy(
+                config.long_sequence_strategy_type,
+                config.long_sequence_strategy_name,
+                **config.long_sequence_init_args,
+            )
+
+        else:
+            self.rotary_embeddings = RotaryEmbeddings(
+                self.hidden_size // (self.num_attention_heads * 2)
+                if self.position_encoding_2d
+                else self.hidden_size // self.num_attention_heads,
+                base=10000.0,
+            )
         # self.embedding_dropout = nn.Dropout(config.embedding_dropout_prob)
 
         if self.config.tensor_parallel_degree > 1:
@@ -468,6 +512,7 @@ class ChatGLMStack(nn.Layer):
         position_ids: Tensor,
         use_cache: bool,
         cache: Tensor,
+        rotary_embeds: Tensor,
     ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
@@ -482,7 +527,8 @@ class ChatGLMStack(nn.Layer):
             position_ids,
             use_cache,
             cache,
-            use_reentrant=False,
+            rotary_embeds,
+            use_reentrant=self.config.recompute_use_reentrant,
         )
         return hidden_states
 
@@ -495,9 +541,9 @@ class ChatGLMStack(nn.Layer):
         cache: Optional[Tensor] = None,
         use_cache: bool = False,
     ):
-
         if input_ids is not None and inputs_embeds is not None:
-            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+            input_ids = None
+            logger.warning("Specify both input_ids and inputs_embeds at the same time, will use inputs_embeds")
         elif input_ids is not None:
             batch_size, seq_length = input_ids.shape[:2]
         elif inputs_embeds is not None:
@@ -508,6 +554,17 @@ class ChatGLMStack(nn.Layer):
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
         inputs_embeds = inputs_embeds.transpose([1, 0, 2])
+        if self.config.use_long_sequence_strategies:
+            cos, sin = self.rotary_embeddings(seq_len=seq_length)
+            block_position_ids = position_ids[:, 1, :].transpose([1, 0])
+            position_ids = position_ids[:, 0, :].transpose([1, 0])
+            block_rotary_embeds = paddle.stack(
+                [cos[block_position_ids].unsqueeze(2), sin[block_position_ids].unsqueeze(2)]
+            )
+            position_rotary_embeds = paddle.stack([cos[position_ids].unsqueeze(2), sin[position_ids].unsqueeze(2)])
+            rotary_embeds = paddle.stack([position_rotary_embeds, block_rotary_embeds], axis=0)
+        else:
+            rotary_embeds = self.rotary_embeddings(position_ids)
 
         if cache is None:
             if self.config.pre_seq_len is not None:
@@ -515,16 +572,19 @@ class ChatGLMStack(nn.Layer):
             else:
                 cache = tuple([None] * len(self.layers))
 
+        # this branch is deprecated
         if self.config.pre_seq_len is not None and attention_mask is not None:
             prefix_attention_mask = paddle.ones([batch_size, 1, input_ids.shape[-1], self.config.pre_seq_len])
             prefix_attention_mask = (prefix_attention_mask < 0.5).astype("int64")
             attention_mask = paddle.concat((prefix_attention_mask, attention_mask), axis=3)
 
+        zero = paddle.zeros(attention_mask.shape, dtype=inputs_embeds.dtype)
+        neg_inf = paddle.full_like(attention_mask, paddle.finfo(inputs_embeds.dtype).min, dtype=inputs_embeds.dtype)
+        attention_mask = paddle.where(attention_mask, zero, neg_inf)
+
         hidden_states = inputs_embeds
 
         current_caches = [] if use_cache else None
-        if attention_mask is None:
-            attention_mask = paddle.zeros([1, 1]).astype("int64")
 
         for i, layer in enumerate(self.layers):
             cache_i = cache[i]
@@ -537,6 +597,7 @@ class ChatGLMStack(nn.Layer):
                     position_ids=position_ids,
                     use_cache=use_cache,
                     cache=cache_i,
+                    rotary_embeds=rotary_embeds,
                 )
             else:
                 hidden_states, new_cache = layer(
@@ -545,6 +606,7 @@ class ChatGLMStack(nn.Layer):
                     position_ids=position_ids,
                     use_cache=use_cache,
                     cache=cache_i,
+                    rotary_embeds=rotary_embeds,
                 )
 
             if use_cache:
@@ -568,24 +630,12 @@ class ChatGLMPretrainedModel(PretrainedModel):
     model_config_file = CONFIG_NAME
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = CHATGLM_PRETRAINED_RESOURCE_FILES_MAP
-    _keys_to_ignore_on_load_missing = [r"transformer.layers.*.attention.rotary_embeddings.inv_freq"]
-    _keys_to_ignore_on_load_unexpected = [r"transformer.layers.*.attention.rotary_emb.inv_freq"]
+    _keys_to_ignore_on_load_missing = [r"transformer.rotary_embeddings.inv_freq", r"lm_head.decoder_weight"]
+    _keys_to_ignore_on_load_unexpected = [r"transformer.rotary_emb.inv_freq"]
 
     def init_weights(self, layer):
         """Initialization hook"""
         return None
-
-    def get_masks(self, input_ids):
-        batch_size, seq_length = input_ids.shape
-        context_lengths = []
-        for seq in input_ids:
-            context_lengths.append(paddle.where(seq == self.config.bos_token_id)[0][0])
-        attention_mask = paddle.tril(paddle.ones([batch_size, seq_length, seq_length]))
-        for i, context_length in enumerate(context_lengths):
-            attention_mask[i, :, :context_length] = 1
-        attention_mask = attention_mask.unsqueeze(1)
-        attention_mask = (attention_mask < 0.5).astype("int64")
-        return attention_mask
 
     def get_position_ids(self, input_ids, mask_positions, use_gmasks=None):
         batch_size, seq_length = input_ids.shape
@@ -595,6 +645,7 @@ class ChatGLMPretrainedModel(PretrainedModel):
         context_lengths = []
         for seq in input_ids:
             context_lengths.append(paddle.where(seq == self.config.bos_token_id)[0][0])
+
         if self.config.position_encoding_2d:
             position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
             for i, context_length in enumerate(context_lengths):
@@ -617,6 +668,13 @@ class ChatGLMPretrainedModel(PretrainedModel):
                     position_ids[context_length:] = mask_positions[i]
 
         return position_ids
+
+    def _get_model_inputs_spec(self, dtype: str):
+        return {
+            "input_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            "attention_mask": paddle.static.InputSpec(shape=[None, None, None, None], dtype="int64"),
+            "position_ids": paddle.static.InputSpec(shape=[None, 2, None], dtype="int64"),
+        }
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):
@@ -666,7 +724,7 @@ class ChatGLMModel(ChatGLMPretrainedModel):
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
     """
     _keys_to_ignore_on_load_unexpected = [r"transformer.layers.*.attention.rotary_emb.inv_freq", r"lm_head.weight"]
@@ -697,8 +755,10 @@ class ChatGLMModel(ChatGLMPretrainedModel):
             assert position_ids is not None, "`position_ids` must be explicitly specified when input_ids is None."
             assert attention_mask is not None, "`attention_mask` must be explicitly specified when input_ids is None."
 
-        if attention_mask is None:
-            attention_mask = self.get_masks(input_ids)
+        if attention_mask is None or len(attention_mask.shape) != 4:
+            raise ValueError(f"attention mask should'nt be None or has size other than 4Dim. Found {attention_mask}")
+
+        attention_mask = attention_mask.astype("bool")
 
         if position_ids is None:
             MASK, gMASK = self.config.mask_token_id, self.config.gmask_token_id
@@ -728,16 +788,37 @@ class ChatGLMModel(ChatGLMPretrainedModel):
         return BaseModelOutputWithPastAndCrossAttentions(last_hidden_state=logits, past_key_values=new_caches)
 
 
-class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
+class ChatGLMHead(nn.Layer):
+    def __init__(self, config, embedding_weights=None):
+        super(ChatGLMHead, self).__init__()
+        self.decoder_weight = (
+            self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype())
+            if embedding_weights is None
+            else embedding_weights
+        )
+        self.config = config
+
+    def forward(self, hidden_states):
+        if self.config.tensor_parallel_degree > 1:
+            logits = parallel_matmul(hidden_states, self.decoder_weight, self.config.tensor_parallel_output)
+        else:
+            logits = F.linear(hidden_states, self.decoder_weight.T)
+        return logits
+
+
+class ChatGLMForCausalLM(ChatGLMPretrainedModel):
+    _keys_to_ignore_on_save = [r"lm_head.decoder_weight"]
+    _tied_weights_keys = ["lm_head.decoder_weight"]
+
     def __init__(self, config: ChatGLMConfig):
-        super(ChatGLMForConditionalGeneration, self).__init__(config)
+        super(ChatGLMForCausalLM, self).__init__(config)
 
         self.config = config
         self.max_sequence_length = config.max_sequence_length
         self.position_encoding_2d = config.position_encoding_2d
         self.chatglm = ChatGLMModel(config)
 
-        self.lm_head = self.chatglm.get_input_embeddings()
+        self.lm_head = ChatGLMHead(config, self.chatglm.transformer.word_embeddings.weight)
         # from paddlenlp.transformers import ChatGLMTokenizer
         # self.tokenizer = ChatGLMTokenizer.from_pretrained("THUDM/chatglm-6b")
 
@@ -756,10 +837,9 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
 
         if cache is not None or past_key_values is not None:
             last_token = input_ids[:, -1].unsqueeze(-1)
-            if attention_mask is not None and attention_mask.dtype == paddle.int64:
-                attention_mask = attention_mask[:, :, -1:]
-            else:
-                attention_mask = self.get_masks(input_ids)[:, :, -1:]
+
+            attention_mask = attention_mask[:, :, -1:]
+
             if position_ids is not None:
                 position_ids = position_ids[..., -1:]
             else:
@@ -767,6 +847,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                     context_lengths = []
                     for seq in input_ids:
                         context_lengths.append(paddle.where(seq == self.config.bos_token_id)[0][0])
+
                     context_lengths = paddle.to_tensor(context_lengths, dtype="int64")
                     block_position_ids = seq_length - context_lengths
                     position_ids = paddle.concat(
@@ -785,11 +866,6 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                 "attention_mask": attention_mask,
             }
         else:
-            if attention_mask is not None and attention_mask.dtype != paddle.int64:
-                logger.warning(f"The dtype of attention mask ({attention_mask.dtype}) is not int64")
-                attention_mask = None
-            if attention_mask is None:
-                attention_mask = self.get_masks(input_ids)
             if position_ids is None:
                 position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, use_gmasks=use_gmasks)
 
@@ -800,6 +876,10 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                 "use_cache": True,
                 "attention_mask": attention_mask,
             }
+
+    def reorder_cache(self, cache: paddle.Tensor, beam_idx):
+        cache = map_structure(lambda x: paddle.index_select(x, beam_idx, axis=1), cache)
+        return cache
 
     def update_model_kwargs_for_generation(
         self,
@@ -814,12 +894,12 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
         # update attention mask
         if "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]
-            if attention_mask is not None and attention_mask.dtype == paddle.int64:
+            if attention_mask is not None:
                 attention_mask = paddle.concat(
-                    [attention_mask, paddle.ones([*attention_mask.shape[:3], 1], attention_mask.dtype)], axis=3
+                    [attention_mask, paddle.zeros([*attention_mask.shape[:3], 1], attention_mask.dtype)], axis=3
                 )
                 new_attention_mask = attention_mask[:, :, -1:].clone()
-                new_attention_mask[..., -1] = 0
+                new_attention_mask[..., -1] = 1
                 model_kwargs["attention_mask"] = paddle.concat([attention_mask, new_attention_mask], axis=2)
 
         # update position ids
@@ -854,33 +934,17 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
 
         hidden_states = transformer_outputs.last_hidden_state if return_dict else transformer_outputs[0]
 
-        if self.config.tensor_parallel_degree > 1:
-            lm_logits = parallel_matmul(hidden_states, self.lm_head.weight, self.config.tensor_parallel_output)
-        else:
-            lm_logits = F.linear(hidden_states, self.lm_head.weight.T)
-        lm_logits = lm_logits.transpose([1, 0, 2])
+        lm_logits = self.lm_head(hidden_states)
+        lm_logits = lm_logits.transpose([1, 0, 2]).astype("float32")
         loss = None
         if labels is not None:
-            """
-            for p, l in zip(lm_logits[..., :-1, :].argmax(axis=-1), labels[..., 1:]):
-                print("prediction")
-                print(self.tokenizer.decode(p[l != -100].tolist()))
-                print("labels")
-                print(self.tokenizer.decode(l[l != -100].tolist()))
-            """
-
-            shift_logits = lm_logits[..., :-1, :]
-            shift_logits = shift_logits.reshape([-1, shift_logits.shape[-1]])
-            shift_logits = shift_logits.astype("float32")
-            shift_labels = labels[..., 1:].reshape([-1])
-
             if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
                 self.parallel_loss_func = fleet.meta_parallel.ParallelCrossEntropy()
-                shift_logits = shift_logits[shift_labels != -100]
-                shift_labels = shift_labels[shift_labels != -100]
-                loss = self.parallel_loss_func(shift_logits, shift_labels).mean()
+                filtered_logits = lm_logits[labels != -100]
+                filtered_labels = labels[labels != -100]
+                loss = self.parallel_loss_func(filtered_logits, filtered_labels).mean()
             else:
-                loss = nn.functional.cross_entropy(shift_logits, shift_labels, ignore_index=-100)
+                loss = nn.functional.cross_entropy(lm_logits, labels, ignore_index=-100)
             loss = loss.astype(lm_logits.dtype)
 
         if not return_dict:

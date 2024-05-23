@@ -16,22 +16,13 @@ from __future__ import annotations
 
 import unittest
 
-import numpy as np
 import paddle
 
-from paddlenlp.transformers import (  # import gpt model
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    BartForConditionalGeneration,
-    BartTokenizer,
-    GPTLMHeadModel,
-    PretrainedConfig,
-    PretrainedTokenizer,
-)
-from paddlenlp.transformers.generation_utils import (
+from paddlenlp.generation import (
     BeamSearchScorer,
     ForcedBOSTokenLogitsProcessor,
     ForcedEOSTokenLogitsProcessor,
+    GenerationConfig,
     HammingDiversityLogitsProcessor,
     LogitsProcessorList,
     MinLengthLogitsProcessor,
@@ -39,6 +30,14 @@ from paddlenlp.transformers.generation_utils import (
     TopKProcess,
     TopPProcess,
     get_unfinished_flag,
+)
+from paddlenlp.transformers import (  # import gpt model
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BartForConditionalGeneration,
+    BartTokenizer,
+    PretrainedConfig,
+    PretrainedTokenizer,
 )
 from tests.testing_utils import slow
 
@@ -70,11 +69,15 @@ class GenerationTesterMixin:
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
 
         input_ids = inputs_dict[self.input_name]
-        attention_mask = paddle.zeros_like(input_ids, dtype=paddle.int64)
+        attention_mask = paddle.ones_like(input_ids, dtype=paddle.int64)
 
         max_batch_size = 2
         sequence_length = input_ids.shape[-1] // 2
         input_ids = input_ids[:max_batch_size, :sequence_length]
+        # For test_sample_generate such as: NVIDIA_TF32_OVERRIDE=0 FLAGS_cudnn_deterministic=1 python3.10 -m pytest -svv tests/transformers/bloom/test_modeling.py::BloomModelTest_0::test_sample_generate
+        # There are serious memory bug for this tensor slice. which use the original tensor mem ptr for cold start
+        # Here we just clone the tensor to avoid this problem.
+        input_ids = input_ids.clone()
         attention_mask = attention_mask[:max_batch_size, :sequence_length].unsqueeze([1, 2])
 
         attention_mask = attention_mask * attention_mask.transpose([0, 1, 3, 2])
@@ -232,10 +235,12 @@ class GenerationTesterMixin:
         with paddle.no_grad():
             output_generate = model.generate(
                 input_ids,
-                max_length=max_length,
-                decode_strategy="greedy_search",
                 attention_mask=attention_mask,
-                **logits_process_kwargs,
+                generation_config=GenerationConfig(
+                    max_new_tokens=max_length,
+                    decode_strategy="greedy_search",
+                    **logits_process_kwargs,
+                ),
             )
 
         if self.is_encoder_decoder:
@@ -269,15 +274,18 @@ class GenerationTesterMixin:
         logits_warper,
         process_kwargs,
     ):
+
         with paddle.no_grad():
             output_generate = model.generate(
                 input_ids,
-                max_length=max_length,
-                decode_strategy="sampling",
-                num_return_sequences=num_return_sequences,
                 attention_mask=attention_mask,
-                top_k=1,
-                **process_kwargs,
+                generation_config=GenerationConfig(
+                    max_new_tokens=max_length,
+                    decode_strategy="sampling",
+                    num_return_sequences=num_return_sequences,
+                    top_k=1,
+                    **process_kwargs,
+                ),
             )
 
         kwargs = {}
@@ -324,11 +332,13 @@ class GenerationTesterMixin:
         with paddle.no_grad():
             output_generate = model.generate(
                 input_ids,
-                decode_strategy="beam_search",
                 attention_mask=attention_mask,
-                max_length=max_length,
-                **beam_kwargs,
-                **logits_process_kwargs,
+                generation_config=GenerationConfig(
+                    decode_strategy="beam_search",
+                    max_new_tokens=max_length,
+                    **beam_kwargs,
+                    **logits_process_kwargs,
+                ),
             )
 
         # beam_search does not automatically interleave `batch_size` dim for `num_beams`
@@ -380,11 +390,13 @@ class GenerationTesterMixin:
         with paddle.no_grad():
             output_generate = model.generate(
                 input_ids,
-                decode_strategy="beam_search",
                 attention_mask=attention_mask,
-                max_length=max_length,
-                **beam_kwargs,
-                **logits_process_kwargs,
+                generation_config=GenerationConfig(
+                    decode_strategy="beam_search",
+                    max_new_tokens=max_length,
+                    **beam_kwargs,
+                    **logits_process_kwargs,
+                ),
             )
 
         # group_beam_search does not automatically interleave `batch_size` dim for `num_beams`
@@ -433,9 +445,9 @@ class GenerationTesterMixin:
             self.assertListEqual(output_greedy[0].tolist(), output_generate[0].tolist())
 
     def test_sample_generate(self):
-
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
+            input_ids = input_ids.clone()
             paddle.seed(124)
             model = self._make_model_instance(config, model_class)
             model.eval()
@@ -553,8 +565,10 @@ class GenerationTesterMixin:
                 model = model_class(pretrained_model)
             model.eval()
             output_ids_generate = model.generate(
-                decode_strategy="greedy_search",
-                max_length=max_length,
+                generation_config=GenerationConfig(
+                    decode_strategy="greedy_search",
+                    max_new_tokens=max_length,
+                )
             )
 
             self.assertIsNotNone(output_ids_generate)
@@ -755,11 +769,13 @@ class GenerationIntegrationTests:
 
         outputs = bart_model.generate(
             input_ids,
-            decode_strategy="beam_search",
-            num_beams=4,
-            num_return_sequences=3,
-            num_beam_groups=4,
-            diversity_rate=2.0,
+            generation_config=GenerationConfig(
+                decode_strategy="beam_search",
+                num_beams=4,
+                num_return_sequences=3,
+                num_beam_groups=4,
+                diversity_rate=2.0,
+            ),
         )
 
         # assigned but never used
@@ -979,10 +995,18 @@ class GenerationIntegrationTests:
         )
 
         bart_model.generate(
-            input_ids, decode_strategy="sampling", top_k=1, max_length=30, logits_processors=logits_processor
+            input_ids,
+            generation_config=GenerationConfig(
+                decode_strategy="sampling", top_k=1, max_new_tokens=30, logits_processors=logits_processor
+            ),
         )
 
-        bart_model.generate(input_ids, decode_strategy="sampling", top_k=1, max_length=30, min_length=25)
+        bart_model.generate(
+            input_ids,
+            generation_config=GenerationConfig(
+                decode_strategy="sampling", top_k=1, max_new_tokens=30, min_new_tokens=25
+            ),
+        )
 
     # BART supports inputs_embeds
     # def test_encoder_decoder_generate_with_inputs_embeds(self):
@@ -1008,8 +1032,12 @@ class GenerationIntegrationTests:
         input_ids = paddle.to_tensor(bart_tokenizer(articles[0])["input_ids"]).unsqueeze([0])
         input_ids_batched = paddle.to_tensor(bart_tokenizer(articles, padding=True)["input_ids"])
 
-        output_sequences_batched = bart_model.generate(input_ids=input_ids_batched, decode_strategy="greedy_search")
-        output_sequences = bart_model.generate(input_ids=input_ids, decode_strategy="greedy_search")
+        output_sequences_batched = bart_model.generate(
+            input_ids=input_ids_batched, generation_config=GenerationConfig(decode_strategy="greedy_search")
+        )
+        output_sequences = bart_model.generate(
+            input_ids=input_ids, generation_config=GenerationConfig(decode_strategy="greedy_search")
+        )
 
         batched_out = output_sequences_batched[1]
         out = output_sequences[1]
@@ -1035,41 +1063,30 @@ class GenerationUtilsTestCase(unittest.TestCase):
         self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, True])
 
         # 2. get tokens
-        eos_token_id = [6, 7]
+        eos_token_id = [12, 2]
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [True, True])
+
+        eos_token_id = [7, 12]
         unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
         unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
         self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, True])
 
-        eos_token_id = [10, 11]
-        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
-        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
-        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [True, False])
-
-        # 3. get multi tokens
-        eos_token_id = [[6, 7], [9, 10]]
-        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
-        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
-        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, True])
-
-        eos_token_id = [[6, 7], [10, 11]]
+        eos_token_id = [7, 11, 3]
         unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
         unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
         self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, False])
 
-        eos_token_id = [[7], [11]]
+        eos_token_id = [[7], [11], [3]]
         unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
         unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
         self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, False])
 
-        eos_token_id = [[7], [10, 11]]
+        eos_token_id = [7, [11], [3]]
         unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
         unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
         self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, False])
-
-        eos_token_id = [[7], [10, 12]]
-        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
-        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
-        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, True])
 
     @slow
     def test_gpt_multi_stop_tokens(self):
@@ -1081,41 +1098,193 @@ class GenerationUtilsTestCase(unittest.TestCase):
 
         # 1. generate with no special eos_token_id
         # [520, 8, 9, 59, 124, 635, 8, 12, 8, 10, 8, 10, 8, 10, 8, 10, 8, 10, 8, 10]
-        decoded_ids = model.generate(paddle.to_tensor([input_ids]), max_length=20)[0].tolist()[0]
+        decoded_ids = model.generate(
+            paddle.to_tensor([input_ids]), generation_config=GenerationConfig(max_new_tokens=20)
+        )[0].tolist()[0]
         self.assertEqual(len(decoded_ids), 20)
 
         # 2. generate with single special eos_token_id (12)
-        decoded_ids = model.generate(paddle.to_tensor([input_ids]), max_length=20, eos_token_id=12)[0].tolist()[0]
+        decoded_ids = model.generate(
+            paddle.to_tensor([input_ids]), generation_config=GenerationConfig(max_new_tokens=20, eos_token_id=12)
+        )[0].tolist()[0]
         self.assertEqual(decoded_ids, [520, 8, 9, 59, 124, 635, 8, 12])
 
-        decoded_ids = model.generate(paddle.to_tensor([input_ids]), max_length=20, eos_token_id=635)[0].tolist()[0]
+        decoded_ids = model.generate(
+            paddle.to_tensor([input_ids]), generation_config=GenerationConfig(max_new_tokens=20, eos_token_id=635)
+        )[0].tolist()[0]
         self.assertEqual(decoded_ids, [520, 8, 9, 59, 124, 635])
 
         # 3. generate with single tokens
-        decoded_ids = model.generate(paddle.to_tensor([input_ids]), max_length=20, eos_token_id=[124, 635])[
-            0
-        ].tolist()[0]
+        decoded_ids = model.generate(
+            paddle.to_tensor([input_ids]),
+            generation_config=GenerationConfig(max_new_tokens=20, eos_token_id=[635]),
+        )[0].tolist()[0]
         self.assertEqual(decoded_ids, [520, 8, 9, 59, 124, 635])
 
         # 4. generate with multi tokens
         decoded_ids = model.generate(
-            paddle.to_tensor([input_ids]), max_length=20, eos_token_id=[[59, 124], [124, 635]]
+            paddle.to_tensor([input_ids]),
+            generation_config=GenerationConfig(max_new_tokens=20, eos_token_id=[124, 635]),
         )[0].tolist()[0]
         self.assertEqual(decoded_ids, [520, 8, 9, 59, 124])
 
-    def test_gpt_generation(self):
-        # init the tiny-random-gpt
-        model = GPTLMHeadModel.from_pretrained("__internal_testing__/tiny-random-gpt")
-        model.eval()
 
-        input_ids = np.array([list(range(200, 300)), list(range(100, 200))])
+class TinyRandomGenerationTest(unittest.TestCase):
+    def test_generation_config_min_new_tokens_warning(self):
 
-        # 1. get the dygraph decoded_ids
-        expected_output_ids = [[15426, 15426, 15426, 15426, 15426, 15426], [18966, 18000, 23410, 23410, 23410, 23410]]
+        with self.assertLogs("PaddleNLP", level="WARNING") as log_info:
+            GenerationConfig(min_new_token=10)
+            self.assertTrue(any(["<min_new_token> field is deprecated." in item for item in log_info.output]))
 
-        decoded_ids = model.generate(paddle.to_tensor(input_ids), max_length=6)[0].tolist()
+    def test_min_new_tokens(self):
+        article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
 
-        self.assertEqual(expected_output_ids, decoded_ids)
+        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/micro-random-llama")
+        model = AutoModelForCausalLM.from_pretrained("__internal_testing__/micro-random-llama")
+        input_ids = paddle.to_tensor(tokenizer(article)["input_ids"]).unsqueeze([0])
+        attention_mask = paddle.ones_like(input_ids)
+        result = model.generate(input_ids, attention_mask=attention_mask, min_new_tokens=10)[0]
+        self.assertGreater(result.shape[1], 10)
 
-        decoded_ids = model.generate(paddle.to_tensor(input_ids), max_length=6, eos_token_id=[1800, 23410])[0].tolist()
-        self.assertEqual(expected_output_ids, decoded_ids)
+
+# TODO (wj-Mcat: enable the unit test after fix)
+# class GenerationD2STest(unittest.TestCase):
+#     def test_to_static_use_top_k(self):
+#         article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
+
+#         tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/micro-random-llama")
+#         model = AutoModelForCausalLM.from_pretrained("__internal_testing__/micro-random-llama")
+#         input_ids = paddle.to_tensor(tokenizer(article)["input_ids"]).unsqueeze([0])
+
+#         model.eval()
+
+#         # Llama model do not contians ``
+#         model.is_encoder_decoder = False
+
+#         max_length = 25
+#         input_ids = paddle.to_tensor([[i for i in range(100, 120)]])
+
+#         bos_token_id = getattr(model, "bos_token_id", None)
+#         eos_token_id = getattr(model, "eos_token_id", None)
+#         pad_token_id = getattr(model, "pad_token_id", None)
+
+#         model_kwargs = {}
+
+#         model_kwargs["attention_mask"] = paddle.ones_like(input_ids)
+#         model_kwargs["use_cache"] = True
+#         model_kwargs["max_length"] = max_length + input_ids.shape[-1]
+#         model_kwargs["input_ids"] = input_ids
+
+#         decoded_ids = model.greedy_search(
+#             bos_token_id=bos_token_id,
+#             pad_token_id=pad_token_id,
+#             eos_token_id=eos_token_id,
+#             logits_processors=None,
+#             **model_kwargs,
+#         )[0]
+
+#         dygraph_decoded_ids = decoded_ids.tolist()
+
+#         with tempfile.TemporaryDirectory() as tempdir:
+#             path = os.path.join(tempdir, "model")
+#             model.to_static(
+#                 path,
+#                 config=dict(
+#                     bos_token_id=bos_token_id, pad_token_id=pad_token_id, eos_token_id=eos_token_id, use_top_p=False
+#                 ),
+#             )
+
+#             model_path = os.path.join(tempdir, "model.pdmodel")
+#             params_path = os.path.join(tempdir, "model.pdiparams")
+#             config = paddle.inference.Config(model_path, params_path)
+
+#             config.disable_gpu()
+#             config.disable_glog_info()
+#             predictor = paddle.inference.create_predictor(config)
+
+#             model_kwargs["top_k"] = 1
+#             model_kwargs["max_length"] = 25
+#             # create input
+#             for key in model_kwargs.keys():
+#                 if paddle.is_tensor(model_kwargs[key]):
+#                     model_kwargs[key] = model_kwargs[key].numpy()
+#                 else:
+#                     model_kwargs[key] = np.array(model_kwargs[key])
+
+#             input_handles = {}
+#             for name in predictor.get_input_names():
+#                 input_handles[name] = predictor.get_input_handle(name)
+#                 input_handles[name].copy_from_cpu(model_kwargs[name])
+
+#             predictor.run()
+#             output_names = predictor.get_output_names()
+#             output_handle = predictor.get_output_handle(output_names[0])
+#             results = output_handle.copy_to_cpu()
+
+#             static_decoded_ids = results.tolist()
+
+#         self.assertEqual(dygraph_decoded_ids, static_decoded_ids)
+
+#     def test_to_static_use_top_p(self):
+#         article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
+
+#         tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/micro-random-llama")
+#         model = AutoModelForCausalLM.from_pretrained("__internal_testing__/micro-random-llama")
+#         input_ids = paddle.to_tensor(tokenizer(article)["input_ids"]).unsqueeze([0])
+
+#         model.eval()
+
+#         # Llama model do not contians ``
+#         model.is_encoder_decoder = False
+
+#         max_length = 25
+#         input_ids = paddle.to_tensor([[i for i in range(100, 120)]])
+
+#         bos_token_id = getattr(model, "bos_token_id", None)
+#         eos_token_id = getattr(model, "eos_token_id", None)
+#         pad_token_id = getattr(model, "pad_token_id", None)
+
+#         model_kwargs = {}
+
+#         model_kwargs["attention_mask"] = paddle.ones_like(input_ids)
+#         model_kwargs["use_cache"] = True
+#         model_kwargs["max_length"] = max_length + input_ids.shape[-1]
+#         model_kwargs["input_ids"] = input_ids
+
+#         with tempfile.TemporaryDirectory() as tempdir:
+#             path = os.path.join(tempdir, "model")
+#             model.to_static(
+#                 path,
+#                 config=dict(
+#                     bos_token_id=bos_token_id, pad_token_id=pad_token_id, eos_token_id=eos_token_id, use_top_p=False
+#                 ),
+#             )
+
+#             model_path = os.path.join(tempdir, "model.pdmodel")
+#             params_path = os.path.join(tempdir, "model.pdiparams")
+#             config = paddle.inference.Config(model_path, params_path)
+
+#             config.disable_gpu()
+#             config.disable_glog_info()
+#             predictor = paddle.inference.create_predictor(config)
+
+#             model_kwargs["top_k"] = 1
+#             model_kwargs["max_length"] = 25
+#             # create input
+#             for key in model_kwargs.keys():
+#                 if paddle.is_tensor(model_kwargs[key]):
+#                     model_kwargs[key] = model_kwargs[key].numpy()
+#                 else:
+#                     model_kwargs[key] = np.array(model_kwargs[key])
+
+#             input_handles = {}
+#             for name in predictor.get_input_names():
+#                 input_handles[name] = predictor.get_input_handle(name)
+#                 input_handles[name].copy_from_cpu(model_kwargs[name])
+
+#             predictor.run()
+#             output_names = predictor.get_output_names()
+#             output_handle = predictor.get_output_handle(output_names[0])
+#             results = output_handle.copy_to_cpu()
+
+#             self.assertIsNotNone(results)

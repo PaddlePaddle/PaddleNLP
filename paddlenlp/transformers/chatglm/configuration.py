@@ -21,7 +21,6 @@ __all__ = [
     "CHATGLM_PRETRAINED_RESOURCE_FILES_MAP",
 ]
 
-
 CHATGLM_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
         "THUDM/chatglm-6b": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/chatglm-6b/model_state.pdparams",
@@ -100,10 +99,14 @@ class ChatGLMConfig(PretrainedConfig):
         pre_seq_len=None,
         prefix_projection=False,
         output_predict=True,
-        recompute=False,
         attention_scale=True,
         activation="gelu",
         num_image_tokens=0,
+        use_flash_attention=False,
+        long_sequence_strategy_type=None,
+        long_sequence_strategy_name=None,
+        long_sequence_init_args=None,
+        use_long_sequence_strategies=False,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
@@ -125,7 +128,11 @@ class ChatGLMConfig(PretrainedConfig):
         self.pre_seq_len = pre_seq_len
         self.prefix_projection = prefix_projection
         self.output_predict = output_predict
-        self.recompute = recompute
         self.attention_scale = attention_scale
         self.activation = activation
         self.num_image_tokens = num_image_tokens
+        self.use_flash_attention = use_flash_attention
+        self.long_sequence_strategy_type = long_sequence_strategy_type
+        self.long_sequence_strategy_name = long_sequence_strategy_name
+        self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args
+        self.use_long_sequence_strategies = use_long_sequence_strategies

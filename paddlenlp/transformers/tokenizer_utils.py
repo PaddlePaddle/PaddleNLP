@@ -14,19 +14,29 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import bisect
 import io
 import itertools
 import json
+import os
 import re
 import unicodedata
 from collections import OrderedDict
-from typing import Dict, List, Optional, Tuple, Union
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, List, Optional, Tuple, Union
 
+import numpy
+import numpy as np
+import paddle
 import six
+from jinja2 import Template
+from jinja2.exceptions import TemplateError, TemplateSyntaxError
+from jinja2.sandbox import ImmutableSandboxedEnvironment
 from paddle.utils import try_import
 
+from paddlenlp.utils.env import CHAT_TEMPLATE_CONFIG_NAME
 from paddlenlp.utils.log import logger
 
 try:
@@ -49,7 +59,7 @@ from .tokenizer_utils_base import (
     TextInputPair,
     TruncationStrategy,
 )
-from .utils import InitTrackerMeta, fn_args_to_dict
+from .utils import InitTrackerMeta, convert_to_dict_message, fn_args_to_dict
 
 __all__ = [
     "PretrainedTokenizer",
@@ -499,8 +509,376 @@ def tokenize_chinese_chars(text):
     return output
 
 
+@dataclass
+class ChatTemplate:
+    conversation: list[str] | None = None
+    system: str | None = None
+    query: str = None
+
+    @staticmethod
+    @lru_cache()
+    def _compile_jinja_template(chat_template) -> Template:
+        def raise_exception(message):
+            raise TemplateError(message)
+
+        jinja_env = ImmutableSandboxedEnvironment(trim_blocks=True, lstrip_blocks=True, keep_trailing_newline=True)
+        jinja_env.globals["raise_exception"] = raise_exception
+        return jinja_env.from_string(chat_template)
+
+    def render_conversation(
+        self, conversation_data: list[str] | dict[str, str], index: int = 0, context_data: Dict[str, Any] = {}
+    ) -> list[str]:
+        """
+        Args:
+            conversation_data (list[str]): the conversation data which must be two parts
+            index (int): the index of current conversation
+
+        Returns:
+            list[str]: the rendered conversation data
+        """
+        if self.conversation is None:
+            raise ValueError(
+                "The template for multi-turns is invalid, please check `conversation` filed in your chat-template."
+            )
+
+        if isinstance(conversation_data, (list, tuple)):
+            assert (
+                len(conversation_data) == 2
+            ), "Each round/turn of conversation must be two participants, eg: [user-query, bot-query]"
+
+            conversation_data = {"user": conversation_data[0], "bot": conversation_data[1], "index": index}
+        conversation_data.update(context_data)
+
+        one_turn_conversation = []
+        for conversation in self.conversation:
+            template = self._compile_jinja_template(conversation)
+            result = template.render(conversation_data)
+            one_turn_conversation.append(result)
+        return one_turn_conversation
+
+    def render_query(self, query: str, index: int = 0, context_data: Dict[str, Union[int, str]] = {}):
+        if self.query is None:
+            return query
+
+        template = self._compile_jinja_template(self.query)
+        return template.render(query=query, index=index, **context_data)
+
+    def _init_context_data(self, context_data: Dict[str, Union[int, str]] = {}) -> Dict[str, Union[int, str]]:
+        """init the context data for chat-template"""
+        context_data["is_training"] = context_data.get("is_training", False)
+        return context_data
+
+    def render_system(self, context_data: Dict[str, Union[int, str]] = {}) -> str:
+        if self.system is None:
+            return ""
+
+        template = self._compile_jinja_template(self.system)
+        return template.render(**context_data)
+
+    def __call__(self, conversations: list[list[str]] | str, context_data: Dict[str, Union[int, str]] = {}) -> str:
+        """render the conversations by chat-template
+
+        Args:
+            conversations (list[list[str]]): the conversations of use and bot
+
+        Returns:
+            str: the result of conversation
+        """
+        if isinstance(conversations, str):
+            conversations = [[conversations]]
+
+        # [1 ... n-1] conversation
+        final_query = self.render_system(context_data=context_data)
+        context_data["length"] = len(conversations)
+        for index, conversation in enumerate(conversations[:-1]):
+            context_data["is_first"] = index == 0
+            context_data["is_last"] = False
+            final_query += "".join(self.render_conversation(conversation, index=index, context_data=context_data))
+
+        if not isinstance(conversations[-1], list) and not len(conversations[-1]) != 1:
+            raise ValueError(
+                "The length of last conversation must be one, eg: [[user-query, bot-answer], [user-query, bot-answer], ..., [user-query]]"
+            )
+        if len(conversations[-1]) > 1:
+            logger.warning(
+                f"The last conversation is not a single-round, chat-template will skip the conversation: {conversations[-1][1:]}"
+            )
+
+        final_query += self.render_query(conversations[-1][0], index=len(conversations) - 1, context_data=context_data)
+        return final_query
+
+    @classmethod
+    def from_dict(cls, config: dict):
+        return cls(**config)
+
+    @classmethod
+    def from_file(cls, file: str):
+        with open(file, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        return cls.from_dict(config)
+
+
+class ChatTemplateMixin:
+    chat_template: Optional[ChatTemplate] = None
+
+    def apply_chat_template(
+        self,
+        conversation: List[List[str, str] | Dict[str, str]] | str,
+        tokenize: bool = True,
+        context_data: Dict[str, Any] = {},
+        **tokenizer_kwargs
+    ) -> str | dict[str, numpy.ndarray | paddle.Tensor]:
+        """apply chat_template rules to conversation which should not be batched data
+
+        Args:
+            conversation (List[List[str, str]] | str): the conversation messages between user and bot
+            context_data (Dict[str, Any]): the context data for chat_template.json
+            tokenize (bool, optional): whether do tokenization. Defaults to True.
+
+        Returns:
+            str | dict[str, numpy.ndarray | paddle.Tensor]: return the result of applied data
+        """
+        if not self.chat_template:
+            raise ValueError("chat_template is not set, please set chat_template first.")
+        elif isinstance(self.chat_template, Template):
+            add_generation_prompt = tokenizer_kwargs.pop("add_generation_prompt", True)
+            query = self._apply_chat_template(conversation, add_generation_prompt=add_generation_prompt)
+        elif isinstance(self.chat_template, ChatTemplate):
+            query = self._apply_chat_template_paddle(conversation, context_data)
+
+        if not tokenize:
+            return query
+
+        # chat_template should not add special tokens
+        tokenizer_kwargs["add_special_tokens"] = False
+        return self(query, **tokenizer_kwargs)
+
+    def _apply_chat_template_paddle(
+        self,
+        conversation: List[List[str, str]] | str,
+        context_data: Dict[str, Any] = {},
+    ) -> str | dict[str, numpy.ndarray | paddle.Tensor]:
+        context_data = self.chat_template._init_context_data(context_data)
+
+        if isinstance(conversation, str):
+            conversation = [[conversation]]
+        elif isinstance(conversation, list) and isinstance(conversation[0], str):
+            raise ValueError(
+                "apply_chat_template do not support appling batch conversations, "
+                "so you should apply the conversation one by one."
+            )
+
+        query = self.chat_template(conversation, context_data=context_data)
+        return query
+
+    def _apply_chat_template(
+        self,
+        conversation: List[List[str, str] | Dict[str, str]] | str,
+        add_generation_prompt=True,
+    ) -> str | dict[str, numpy.ndarray | paddle.Tensor]:
+        if isinstance(conversation, str):
+            conversations = [{"role": "user", "content": conversation}]
+        elif isinstance(conversation, list):
+            assert len(conversation) > 0, "empty conversation is not allowed"
+            if isinstance(conversation[0], list):
+                conversations = convert_to_dict_message(conversation)
+            elif isinstance(conversation[0], dict):
+                conversations = conversation
+            else:
+                raise ValueError(
+                    "apply_chat_template do not support appling batch conversations, "
+                    "so you should apply the conversation one by one."
+                )
+        query = self.chat_template.render(
+            messages=conversations, **self.special_tokens_map, add_generation_prompt=add_generation_prompt
+        )
+        return query
+
+    def encode_chat_inputs(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}, **kwargs):
+        """Encodes conversation to pairs of token ids.
+        Turn 0: bos + system + sep + user     bot + eos
+        Turn t: sep + bot + query             bot + eos
+
+        Args:
+            conversation (List[List[str, str]]): the conversation of data
+            context_data (Dict[str, Any]): the context data of conversation
+
+        Returns:
+            List[list[int], list[int]]: the pair of input_ids and target_ids
+        """
+        if not self.chat_template:
+            raise ValueError("chat_template is not set, please set chat_template first.")
+        elif isinstance(self.chat_template, Template):
+            add_generation_prompt = kwargs.pop("add_generation_prompt", True)
+            query = self._encode_chat_inputs(conversations, context_data, add_generation_prompt=add_generation_prompt)
+        elif isinstance(self.chat_template, ChatTemplate):
+            query = self._encode_chat_inputs_paddle(conversations, context_data)
+        return query
+
+    def _encode_chat_inputs_paddle(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}):
+        context_data = self.chat_template._init_context_data(context_data)
+        # encode system
+        result = {}
+        if self.chat_template.system:
+            system = self.chat_template.render_system(context_data)
+            result["system"] = self.encode(system, add_special_tokens=False)["input_ids"]
+
+        # encode conversation
+        conversation_ids = []
+        for index, conversation in enumerate(conversations):
+            # give more control to chat_template
+            context_data["is_first"] = index == 0
+            context_data["is_last"] = index == len(conversations) - 1
+
+            user_input, bot_output = self.chat_template.render_conversation(
+                conversation, index=index, context_data=context_data
+            )
+            user_ids = self.encode(user_input, add_special_tokens=False)["input_ids"]
+            bot_ids = self.encode(bot_output, add_special_tokens=False)["input_ids"]
+            conversation_ids.append([user_ids, bot_ids])
+
+        result["conversations"] = conversation_ids
+        return result
+
+    def _encode_chat_inputs(
+        self,
+        conversations: List[List[str, str]],
+        context_data: Dict[str, Any] = {},
+        system: str = None,
+        add_generation_prompt=True,
+    ):
+        result = {}
+
+        # Some template do not support system msg, so we need to check it first.
+        if system:
+            try:
+                self.chat_template.render(messages={"role": "system", "content": system})
+            except Exception as e:
+                raise ValueError("System is not supported in this tokenizer.", e)
+
+        # convert list msg to role dict msg
+        conversation_dict = []
+        origin_msg = []
+        for round in conversations:
+            round_role = [
+                {"role": "user", "content": round[0]},
+                {"role": "assistant", "content": round[1]},
+            ]
+            origin_msg.extend(round_role)
+            conversation_dict.append(round_role)
+        ans = []
+
+        # get answer in single round, then compile the chat entirely and split by single round ans
+        # attention: answer should include end token!
+        for conv in conversation_dict:
+            roundi = [system] + conv if system else conv
+            roundi_str = self.chat_template.render(
+                messages=roundi, add_generation_prompt=False, **self.special_tokens_map
+            )
+            roundi_no_ans = [system] + [conv[0]] if system else [conv[0]]
+            roundi_no_ans_str = self.chat_template.render(
+                messages=roundi_no_ans, add_generation_prompt=add_generation_prompt, **self.special_tokens_map
+            )
+            ans_roundi = roundi_str[len(roundi_no_ans_str) :]
+            ans.append(ans_roundi)
+
+        non_learnable_parts = self._extract_non_learnable_parts(origin_msg, ans)
+        assert len(non_learnable_parts) == len(ans)
+
+        conversation_ids = []
+        for i in range(len(non_learnable_parts)):
+            conversation_ids.append(
+                self.batch_encode(
+                    [non_learnable_parts[i], ans[i]],
+                    add_special_tokens=False,
+                    padding=False,
+                )["input_ids"]
+            )
+
+        result["conversations"] = conversation_ids
+        return result
+
+    def _extract_non_learnable_parts(self, origin_msg: List[Dict[str, str]], split_s: List[str]):
+        """Split the entire chat by specified words. Extract the non-learnable parts."""
+        # distingish and replace the special words in original string to an uncompiled form: Like | -> \|
+        regex_pattern = "|".join(map(re.escape, split_s))
+        # splited by replaced specified words
+        non_learnable_parts = re.split(
+            r"(?:%s)" % regex_pattern,
+            self.chat_template.render(messages=origin_msg, add_generation_prompt=False, **self.special_tokens_map),
+        )
+        if non_learnable_parts[-1] == "":
+            non_learnable_parts.pop()
+        return non_learnable_parts
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+        cache_dir = kwargs.pop("cache_dir", None)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        from_aistudio = kwargs.pop("from_aistudio", False)
+        subfolder = kwargs.pop("subfolder", "")
+        if subfolder is None:
+            subfolder = ""
+
+        kwargs["subfolder"] = subfolder
+        kwargs["cache_dir"] = cache_dir
+        kwargs["from_hf_hub"] = from_hf_hub
+        kwargs["from_aistudio"] = from_aistudio
+        kwargs["return_tokenizer_file_dir"] = True
+        tokenizer, tokenizer_config_file_dir = super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
+
+        # load chat-template
+        chat_template_file = os.path.join(tokenizer_config_file_dir, CHAT_TEMPLATE_CONFIG_NAME)
+        if not os.path.exists(chat_template_file):
+            return tokenizer
+
+        if tokenizer.chat_template is not None:
+            logger.warning(
+                "Chat-template already exists in config file, it will be overwritten by chat_template.json file."
+            )
+            logger.warning(
+                "`chat_template.json` will be deprecated in the future! Please set it in `tokenizer_config.json`."
+            )
+        tokenizer.init_chat_template(chat_template_file)
+        return tokenizer
+
+    def init_chat_template(self, chat_template: str | dict):
+        """init chat_tempalte by file_path or template dict data
+
+        Args:
+            chat_template (str | dict): file_path or template dict data
+        """
+        if isinstance(chat_template, str):
+            if not os.path.exists(chat_template):
+                try:
+                    self.chat_template: Template = ChatTemplate._compile_jinja_template(chat_template)
+                except TemplateSyntaxError:
+                    # It is neither jinjia string nor path string
+                    raise TemplateSyntaxError(
+                        "The chat-template in json is not valid jinja string: {}".format(chat_template),
+                        lineno=0,  # fake lineno, useless required msg
+                    )
+            else:
+                self.chat_template = ChatTemplate.from_file(chat_template)
+        elif isinstance(chat_template, dict):
+            self.chat_template = ChatTemplate.from_dict(chat_template)
+        elif isinstance(chat_template, ChatTemplate):
+            self.chat_template = chat_template
+        else:
+            raise ValueError("Receive error chat_template data: ", chat_template)
+
+    def save_resources(self, save_directory):
+        super().save_resources(save_directory)
+
+        if isinstance(self.chat_template, ChatTemplate):  # Future remove if ChatTemplate is deprecated
+            chat_template_file = os.path.join(save_directory, CHAT_TEMPLATE_CONFIG_NAME)
+            with open(chat_template_file, "w", encoding="utf-8") as f:
+                json.dump(asdict(self.chat_template), f, ensure_ascii=False, indent=4)
+            logger.info("Chat-template config file saved in " + chat_template_file)
+
+
 @six.add_metaclass(InitTrackerMeta)
-class PretrainedTokenizer(PretrainedTokenizerBase):
+class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
     """
     Base class for all tokenizers.
 
@@ -1440,8 +1818,9 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         spaces_between_special_tokens: bool = True,
         **kwargs
     ) -> str:
+        if isinstance(token_ids, np.ndarray):
+            token_ids = token_ids.tolist()
         self._decode_use_source_tokenizer = kwargs.pop("use_source_tokenizer", False)
-
         filtered_tokens = self.convert_ids_to_tokens(token_ids, skip_special_tokens=skip_special_tokens)
 
         # To avoid mixing byte-level and unicode for byte-level BPT
@@ -1472,6 +1851,29 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             return clean_text
         else:
             return text
+
+    def decode_token(
+        self,
+        all_input_ids: List[int],
+        prefix_offset: int = 0,
+        read_offset: int = 0,
+    ) -> Tuple[str, int, int]:
+        """tokenizer decoding for the streaming generation use case. This method can be overrided for tokenizer that doesn't follow this API"""
+        # The prefix text is necessary only to defeat cleanup algorithms in the decode
+        # which decide to add a space or not depending on the surrounding ids.
+        prefix_text = self.decode(all_input_ids[prefix_offset:read_offset], skip_special_tokens=False)
+        new_text = self.decode(all_input_ids[prefix_offset:], skip_special_tokens=False)
+
+        if len(new_text) > len(prefix_text) and not new_text.endswith("�"):
+            # utf-8 char at the end means it's a potential unfinished byte sequence
+            # from byte fallback tokenization.
+            # If it's in the middle, it's probably a real invalid id generated
+            # by the model
+            prefix_index = new_text.index(prefix_text)
+            new_text = new_text[prefix_index + len(prefix_text) :]
+            return new_text, read_offset, len(all_input_ids)
+        else:
+            return "", prefix_offset, read_offset
 
 
 class BPETokenizer(PretrainedTokenizer):

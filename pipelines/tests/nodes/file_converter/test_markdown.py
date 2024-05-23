@@ -16,6 +16,7 @@ import os
 import unittest
 
 from pipelines.nodes.file_converter import MarkdownConverter
+from pipelines.nodes.file_converter.markdown import MarkdownRawTextConverter
 
 
 class TestMarkdownConverter(unittest.TestCase):
@@ -26,6 +27,22 @@ class TestMarkdownConverter(unittest.TestCase):
         expected_result = [
             {
                 "content": "Heading level 1\nHeading level 2\nI really like using Markdown.\n\nFirst item\nSecond item\nThird item\nFourth item\n",
+                "content_type": "text",
+                "meta": None,
+            }
+        ]
+        result = converter.convert(file_path)
+        self.assertEqual(expected_result, result)
+
+
+class TestMarkdownRawTextConverter(unittest.TestCase):
+    def test_conversion(self):
+        fixtures_path = "tests/fixtures"
+        file_path = os.path.join(fixtures_path, "example_markdown.md")
+        converter = MarkdownRawTextConverter()
+        expected_result = [
+            {
+                "content": "# Heading level 1\n## Heading level 2\nI really like using Markdown.\n\nFirst item\nSecond item\nThird item\nFourth item\n",
                 "content_type": "text",
                 "meta": None,
             }

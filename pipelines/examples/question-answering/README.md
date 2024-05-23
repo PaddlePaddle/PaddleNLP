@@ -111,7 +111,10 @@ curl http://localhost:9200/_aliases?pretty=true
 # 以百科城市数据为例建立 ANN 索引库
 python utils/offline_ann.py --index_name baike_cities \
                             --doc_dir data/baike \
-                            --delete_index
+                            --delete_index \
+                            --query_embedding_model rocketqa-zh-nano-query-encoder \
+                            --passage_embedding_model rocketqa-zh-nano-para-encoder \
+                            --embedding_dim 312
 ```
 参数含义说明
 * `index_name`: 索引的名称
@@ -138,6 +141,9 @@ curl -XGET http://localhost:9200/baike_cities/_count
 ```
 
 #### 3.4.3 启动 RestAPI 模型服务
+
+**注意** dense_qa.yaml里面的检索模型需要与前面使用offline_ann.py建库的时候使用的检索模型一致
+
 ```bash
 # 指定智能问答系统的Yaml配置文件
 export PIPELINE_YAML_PATH=rest_api/pipeline/dense_qa.yaml
@@ -158,6 +164,7 @@ curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' 
 
 #### 3.4.4 启动 WebUI
 ```bash
+pip install streamlit==1.11.1
 # 配置模型服务地址
 export API_ENDPOINT=http://127.0.0.1:8891
 # 在指定端口 8502 启动 WebUI

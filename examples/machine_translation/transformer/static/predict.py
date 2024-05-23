@@ -20,7 +20,7 @@ from pprint import pprint
 import numpy as np
 import paddle
 import yaml
-from attrdict import AttrDict
+from easydict import EasyDict as AttrDict
 
 from paddlenlp.transformers import InferTransformerModel
 

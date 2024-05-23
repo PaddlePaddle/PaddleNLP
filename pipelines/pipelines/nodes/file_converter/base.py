@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional, Dict, Any, Union
-
 from abc import abstractmethod
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
 import langdetect
 
 from pipelines.nodes.base import BaseComponent
@@ -108,7 +108,6 @@ class BaseConverter(BaseComponent):
         remove_numeric_tables: Optional[bool] = None,  # type: ignore
         valid_languages: Optional[List[str]] = None,  # type: ignore
     ):
-
         if isinstance(file_paths, Path):
             file_paths = [file_paths]
 
@@ -124,6 +123,5 @@ class BaseConverter(BaseComponent):
                 valid_languages=valid_languages,
             ):
                 documents.append(doc)
-
         result = {"documents": documents}
         return result, "output_1"

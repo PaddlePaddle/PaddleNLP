@@ -58,7 +58,7 @@ def attention_normalize(a, mask=None, axis=-1, method="softmax"):
         if mask is not None:
             l = mask.sum(-1, keepdim=True)
         else:
-            l = paddle.ones_like(a) * paddle.shape(a)[-2]
+            l = paddle.ones_like(a) * a.shape[-2]
         if method == "squared_relu":
             return F.relu(a) ** 2 / l
         elif method == "softmax_plus":
@@ -173,7 +173,7 @@ def initializer(tensor, num_hidden_layers=12, order=2, gain=1.0):
     """
     https://github.com/bojone/bert4keras/blob/5572ed481a14f5a62be7107e3846c88a5d6b617d/bert4keras/models.py#L1226-L1235
     """
-    shape = paddle.shape(tensor)
+    shape = tensor.shape
     if shape[0] > 10000 or shape[0] < 10:
         hidden_size = shape[1]
     else:
@@ -201,7 +201,7 @@ class RotaryPositionEmbedding(Layer):
 
     def forward(self, x, offset=0):
         # x shape [batch_size, seqlen, dim]
-        seqlen = paddle.shape(x)[-2]
+        seqlen = x.shape[-2]
         sin, cos = (
             self.sin[offset : offset + seqlen, :],
             self.cos[offset : offset + seqlen, :],
@@ -252,7 +252,7 @@ class GAUAlphaModel(GAUAlphaPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -706,13 +706,13 @@ class GAUAlphaForMultipleChoice(GAUAlphaPretrainedModel):
 
         """
         # input_ids: [bs, num_choice, seq_l]
-        input_ids = input_ids.reshape(shape=(-1, paddle.shape(input_ids)[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+        input_ids = input_ids.reshape(shape=(-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
 
         if token_type_ids is not None:
-            token_type_ids = token_type_ids.reshape(shape=(-1, paddle.shape(token_type_ids)[-1]))
+            token_type_ids = token_type_ids.reshape(shape=(-1, token_type_ids.shape[-1]))
 
         if attention_mask is not None:
-            attention_mask = attention_mask.reshape(shape=(-1, paddle.shape(attention_mask)[-1]))
+            attention_mask = attention_mask.reshape(shape=(-1, attention_mask.shape[-1]))
 
         sequence_output = self.gau_alpha(input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)
 

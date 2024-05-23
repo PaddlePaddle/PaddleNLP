@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import threading
-import warnings
 
 import paddle
 
@@ -37,13 +36,14 @@ from .sentiment_analysis import SentaTask, SkepTask, UIESentaTask
 from .text2text_generation import ChatGLMTask
 from .text_classification import TextClassificationTask
 from .text_correction import CSCTask
-from .text_feature_extraction import TextFeatureExtractionTask
+from .text_feature_extraction import (
+    SentenceFeatureExtractionTask,
+    TextFeatureExtractionTask,
+)
 from .text_similarity import TextSimilarityTask
 from .text_summarization import TextSummarizationTask
 from .word_segmentation import SegJiebaTask, SegLACTask, SegWordTagTask
 from .zero_shot_text_classification import ZeroShotTextClassificationTask
-
-warnings.simplefilter(action="ignore", category=Warning, lineno=0, append=False)
 
 TASKS = {
     "dependency_parsing": {
@@ -469,6 +469,10 @@ TASKS = {
                 "task_class": ChatGLMTask,
                 "task_flag": "text_generation-THUDM/chatglm-6b",
             },
+            "THUDM/chatglm2-6b": {
+                "task_class": ChatGLMTask,
+                "task_flag": "text_generation-THUDM/chatglm2-6b",
+            },
             "__internal_testing__/tiny-random-chatglm": {
                 "task_class": ChatGLMTask,
                 "task_flag": "text_generation-tiny-random-chatglm",
@@ -668,6 +672,21 @@ TASKS = {
                 "task_flag": "feature_extraction-tiny-random-ernievil2",
                 "task_priority_path": "__internal_testing__/tiny-random-ernievil2",
             },
+            "moka-ai/m3e-base": {
+                "task_class": SentenceFeatureExtractionTask,
+                "task_flag": "feature_extraction-moka-ai/m3e-base",
+                "task_priority_path": "moka-ai/m3e-base",
+            },
+            "BAAI/bge-small-zh-v1.5": {
+                "task_class": SentenceFeatureExtractionTask,
+                "task_flag": "feature_extraction-BAAI/bge-small-zh-v1.5",
+                "task_priority_path": "BAAI/bge-small-zh-v1.5",
+            },
+            "__internal_testing__/tiny-random-m3e": {
+                "task_class": SentenceFeatureExtractionTask,
+                "task_flag": "__internal_testing__/tiny-random-m3e",
+                "task_priority_path": "__internal_testing__/tiny-random-m3e",
+            },
         },
         "default": {"model": "PaddlePaddle/ernie_vil-2.0-base-zh"},
     },
@@ -731,6 +750,7 @@ support_argument_list = [
     "__internal_testing__/tiny-random-uie-m",
     "__internal_testing__/tiny-random-uie-x",
     "THUDM/chatglm-6b",
+    "THUDM/chatglm2-6b",
     "THUDM/chatglm-6b-v1.1",
 ]
 
@@ -795,11 +815,11 @@ class Taskflow(object):
         # Add the lock for the concurrency requests
         self._lock = threading.Lock()
 
-    def __call__(self, *inputs):
+    def __call__(self, *inputs, **kwargs):
         """
         The main work function in the taskflow.
         """
-        results = self.task_instance(inputs)
+        results = self.task_instance(inputs, **kwargs)
         return results
 
     def help(self):

@@ -24,7 +24,7 @@ import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.common_ops_import import convert_dtype
 from paddle.distributed.fleet.utils import recompute
-from paddle.fluid import layers
+from paddle.base import layers
 from paddle.incubate.nn import FusedLinear
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from ppfleetx.utils.log import logger
@@ -43,6 +43,10 @@ try:
 except:
     flash_attention = None
 
+try:
+    from paddle.jit.api import set_dynamic_shape
+except:
+    from paddle.jit.dy2static.utils_helper import set_dynamic_shape
 
 def get_attr(layer, name):
     if getattr(layer, name, None) is not None:
@@ -598,8 +602,8 @@ class GPTModel(nn.Layer):
         if position_ids is None:
             past_length = 0
             if cache is not None:
-                past_length = paddle.shape(attention_mask)[-1] - 1
-            position_ids = paddle.arange(past_length, paddle.shape(input_ids)[-1] + past_length, dtype=input_ids.dtype)
+                past_length = attention_mask.shape[-1] - 1
+            position_ids = paddle.arange(past_length, input_ids.shape[-1] + past_length, dtype=input_ids.dtype)
             position_ids = position_ids.unsqueeze(0)
             # .expand_as(input_ids)
             position_ids = paddle.expand_as(position_ids, input_ids)
@@ -611,7 +615,7 @@ class GPTModel(nn.Layer):
         if not self.fused_softmax_with_triangular or not paddle.is_compiled_with_cuda():
             # TODO, use registered buffer
             causal_mask = paddle.tensor.triu(
-                paddle.ones((paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1])) * -1e4, diagonal=1
+                paddle.ones((input_ids.shape[-1], input_ids.shape[-1])) * -1e4, diagonal=1
             )
             if attention_mask is not None:
                 if len(attention_mask.shape) == 2:
@@ -792,7 +796,7 @@ class GPTForGeneration(nn.Layer):
     def prepare_attention_mask_for_generation(self, input_ids, pad_token_id, eos_token_id):
         is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
             input_ids == pad_token_id
-        ).numpy().item()
+        ).item()
         is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
             (eos_token_id is not None) and (pad_token_id != eos_token_id)
         )
@@ -805,7 +809,7 @@ class GPTForGeneration(nn.Layer):
     def update_scores_for_generation(self, scores, next_scores, length, unfinished_flag):
         # update scores
 
-        unfinished_scores = (scores * length + next_scores) / (length + 1)
+        unfinished_scores = (scores * length.astype(scores.dtype) + next_scores) / (length.astype(scores.dtype) + 1)
         scores = paddle.where(unfinished_flag, unfinished_scores, scores)
         return scores
 
@@ -844,7 +848,7 @@ class GPTForGeneration(nn.Layer):
 
     def expand_inputs_for_generation(self, input_ids, expand_size, attention_mask=None, **model_kwargs):
 
-        index = paddle.tile(paddle.arange(paddle.shape(input_ids)[0]).unsqueeze(-1), [1, expand_size]).reshape([-1])
+        index = paddle.tile(paddle.arange(input_ids.shape[0]).unsqueeze(-1), [1, expand_size]).reshape([-1])
 
         input_ids = paddle.gather(input_ids, index)
 
@@ -1035,7 +1039,7 @@ class GPTForGeneration(nn.Layer):
                         raise ImportError(
                             "please install ppfleetx_ops by 'cd ppfleetx/ops && python setup_cuda.py install'!"
                         )
-                    top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0]], fill_value=top_p, dtype=probs.dtype)
+                    top_ps_tensor = paddle.full(shape=[probs.shape[0]], fill_value=top_p, dtype=probs.dtype)
                     _, next_tokens = topp_sampling(probs, top_ps_tensor, random_seed=100)
                 else:
                     probs = TopPProcess(probs, top_p, min_tokens_to_keep)
@@ -1077,30 +1081,58 @@ class GPTForGeneration(nn.Layer):
 
         attn_mask = model_kwargs["attention_mask"]
         # make the shape of attention_mask = (-1, -1, -1, -1) in dy2static.
-        model_kwargs["attention_mask"] = paddle.reshape(attn_mask, paddle.shape(attn_mask))
+        set_dynamic_shape(model_kwargs["attention_mask"], [-1, -1, -1, -1])
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
-        while cur_len < max_length:
-            # Note(GuoxiaWang): Remove outputs = _forward_(**model_kwargs)
-            # and change it to pass directly to _post_process_ to avoid
-            # closed-loop problem of dynamic-to-static model
-            input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
-                _forward_(**model_kwargs),
-                input_ids,
-                cur_len_gpu,
-                origin_len_gpu,
-                scores,
-                unfinished_flag,
-                model_kwargs,
-            )
-            if not self.inference:
-                cur_len += 1
-            else:
-                # Note(ZhenyuLi): Avoid the synchronization caused by scale in dy2static
-                paddle.increment(cur_len)
-            paddle.increment(cur_len_gpu)
+        if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+            # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior
+            # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+            # removed after static graphs support inplace and stride.
+            with paddle.framework._no_check_dy2st_diff():
+                while cur_len < max_length:
+                    # Note(GuoxiaWang): Remove outputs = _forward_(**model_kwargs)
+                    # and change it to pass directly to _post_process_ to avoid
+                    # closed-loop problem of dynamic-to-static model
+                    input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
+                        _forward_(**model_kwargs),
+                        input_ids,
+                        cur_len_gpu,
+                        origin_len_gpu,
+                        scores,
+                        unfinished_flag,
+                        model_kwargs,
+                    )
+                    if not self.inference:
+                        cur_len += 1
+                    else:
+                        # Note(ZhenyuLi): Avoid the synchronization caused by scale in dy2static
+                        paddle.increment(cur_len)
+                    paddle.increment(cur_len_gpu)
 
-            if not paddle.any(unfinished_flag):
-                break
+                    if not paddle.any(unfinished_flag):
+                        break
+        else:
+            while cur_len < max_length:
+                # Note(GuoxiaWang): Remove outputs = _forward_(**model_kwargs)
+                # and change it to pass directly to _post_process_ to avoid
+                # closed-loop problem of dynamic-to-static model
+                input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
+                    _forward_(**model_kwargs),
+                    input_ids,
+                    cur_len_gpu,
+                    origin_len_gpu,
+                    scores,
+                    unfinished_flag,
+                    model_kwargs,
+                )
+                if not self.inference:
+                    cur_len += 1
+                else:
+                    # Note(ZhenyuLi): Avoid the synchronization caused by scale in dy2static
+                    paddle.increment(cur_len)
+                paddle.increment(cur_len_gpu)
+
+                if not paddle.any(unfinished_flag):
+                    break
 
         return model_kwargs["res"][:, origin_len:], scores
 
@@ -1162,7 +1194,7 @@ class GPTForGeneration(nn.Layer):
 
         if model_kwargs.get("position_ids", None) is None:
             model_kwargs["position_ids"] = paddle.arange(
-                0, paddle.shape(model_kwargs["attention_mask"])[-1], dtype=input_ids.dtype
+                0, model_kwargs["attention_mask"].shape[-1], dtype=input_ids.dtype
             ).unsqueeze(0)
 
         self.is_encoder_decoder = False

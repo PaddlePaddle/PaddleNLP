@@ -77,7 +77,7 @@ class SkepEmbeddings(nn.Layer):
             inputs_embeds = self.word_embeddings(input_ids)
 
         if position_ids is None:
-            input_shape = paddle.shape(inputs_embeds)[:-1]
+            input_shape = inputs_embeds.shape[:-1]
             # maybe need use shape op to unify static graph and dynamic graph
             ones = paddle.ones(input_shape, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=1)
@@ -92,7 +92,7 @@ class SkepEmbeddings(nn.Layer):
         embeddings = inputs_embeds + position_embeddings
         if self.type_vocab_size != 0:
             if token_type_ids is None:
-                token_type_ids_shape = paddle.shape(inputs_embeds)[:-1]
+                token_type_ids_shape = inputs_embeds.shape[:-1]
                 token_type_ids = paddle.zeros(token_type_ids_shape, dtype="int64")
             token_type_embeddings = self.token_type_embeddings(token_type_ids)
             embeddings += token_type_embeddings
@@ -168,7 +168,7 @@ class SkepModel(SkepPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     More details refer to `SKEP <https://www.aclweb.org/anthology/2020.acl-main.374>`.
@@ -330,7 +330,7 @@ class SkepModel(SkepPretrainedModel):
                 axis=[1, 2],
             )
             if past_key_values is not None:
-                batch_size = paddle.shape(past_key_values[0][0])[0]
+                batch_size = past_key_values[0][0].shape[0]
 
                 past_mask = paddle.zeros([batch_size, 1, 1, past_key_values_length], dtype=attention_mask.dtype)
                 attention_mask = paddle.concat([past_mask, attention_mask], axis=-1)
@@ -737,7 +737,7 @@ class SkepCrfForTokenClassification(SkepPretrainedModel):
             if attention_mask is not None:
                 seq_lens = paddle.sum(attention_mask, axis=1, dtype="int64")
             else:
-                input_ids_shape = paddle.shape(input_ids)
+                input_ids_shape = input_ids.shape
                 seq_lens = paddle.ones(shape=[input_ids_shape[0]], dtype="int64") * input_ids_shape[1]
 
         loss, prediction = None, None

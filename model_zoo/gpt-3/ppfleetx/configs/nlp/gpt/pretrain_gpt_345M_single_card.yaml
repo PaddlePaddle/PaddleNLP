@@ -4,6 +4,7 @@ Global:
   global_batch_size: 
   local_batch_size: 8
   micro_batch_size: 8
+  to_static: False
 
 
 Model:

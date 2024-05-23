@@ -23,7 +23,7 @@ from pipelines.schema import Document, MultiLabel
 
 
 def instruction_following_models() -> List[str]:
-    return ["THUDM/chatglm-6b", "opt-iml", "gpt-3.5-turbo", "gpt-4", "gpt-35-turbo", "gpt-4-32k"]
+    return ["THUDM/chatglm-6b", "opt-iml", "gpt-3.5-turbo", "gpt-4", "gpt-35-turbo", "gpt-4-32k", "ernie-bot"]
 
 
 class PromptModel(BaseComponent):
@@ -48,6 +48,7 @@ class PromptModel(BaseComponent):
         model_name_or_path: str = "gpt-3.5-turbo",
         max_length: Optional[int] = 100,
         api_key: Optional[str] = None,
+        secret_key: Optional[str] = None,
         use_auth_token: Optional[Union[str, bool]] = None,
         use_gpu: Optional[bool] = None,
         devices: Optional[List[str]] = None,
@@ -75,6 +76,7 @@ class PromptModel(BaseComponent):
         self.model_name_or_path = model_name_or_path
         self.max_length = max_length
         self.api_key = api_key
+        self.secret_key = secret_key
         self.use_auth_token = use_auth_token
         self.use_gpu = use_gpu
         self.devices = devices
@@ -95,6 +97,7 @@ class PromptModel(BaseComponent):
     ) -> PromptModelInvocationLayer:
         kwargs = {
             "api_key": self.api_key,
+            "secret_key": self.secret_key,
             "use_auth_token": self.use_auth_token,
             "use_gpu": self.use_gpu,
             "devices": self.devices,

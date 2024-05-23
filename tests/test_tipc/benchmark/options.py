@@ -132,6 +132,7 @@ def get_parser():
     parser.add_argument("--use_amp", type=str2bool, nargs="?", const=False, help="Enable AMP. ")
     parser.add_argument("--scale_loss", type=float, default=128, help="Loss scale. ")
     parser.add_argument("--amp_level", type=str, default="O2", help="AMP LEVEL. O1 or O2. ")
+    parser.add_argument("--amp_use_promote", action="store_true", help="Enable kernel promotion for AMP training. ")
     parser.add_argument("--custom_black_list", type=str, nargs="+", default=None, help="Custom black list for AMP. ")
 
     parser.add_argument("--to_static", action="store_true", help="Enable to static. ")

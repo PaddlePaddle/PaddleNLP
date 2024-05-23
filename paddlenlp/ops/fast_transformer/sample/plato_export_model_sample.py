@@ -70,7 +70,7 @@ def do_predict(args):
         paddle.set_default_dtype("float16")
 
     model_name = "plato-xl"
-    model = UnifiedTransformerLMHeadModel.from_pretrained(model_name, load_state_as_np=True)
+    model = UnifiedTransformerLMHeadModel.from_pretrained(model_name)
     tokenizer = UnifiedTransformerTokenizer.from_pretrained(model_name)
 
     plato = FasterUnifiedTransformer(model=model, use_fp16_decoding=args.use_fp16_decoding)

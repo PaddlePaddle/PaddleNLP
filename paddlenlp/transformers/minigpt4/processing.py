@@ -77,6 +77,8 @@ class MiniGPT4Processor(ProcessorMixin):
         super().__init__(image_processor, tokenizer)
         self.current_processor = self.image_processor
         self.default_prompt = "###Human: <Img><ImageHere></Img> <TextHere>###Assistant: "
+        self.image_tag = "<ImageHere>"
+        self.text_tag = "<TextHere>"
 
     def process_images(
         self,
@@ -102,22 +104,73 @@ class MiniGPT4Processor(ProcessorMixin):
     def process_texts(
         self,
         texts: Union[TextInput, List[TextInput]],
+        prompts: Union[TextInput, List[TextInput]] = None,
         return_tensors: Optional[Union[str, TensorType]] = TensorType.PADDLE,
         **kwargs,
-    ) -> BatchEncoding:
-        if not texts:
-            raise ValueError("You have to input correct texts.")
+    ):
+        prompts = prompts if prompts is not None else [self.default_prompt]
 
-        if isinstance(texts, TextInput):
-            texts = [texts]
+        if (not isinstance(texts, TextInput)) and (not isinstance(texts, list)):
+            raise TypeError("Unsupported type for texts: {}, only str and list type supported.".format(type(texts)))
+        if prompts is not None and (not isinstance(prompts, TextInput)) and (not isinstance(prompts, list)):
+            raise TypeError(
+                "Unsupported type for prompts: {}, only str and list type supported.".format(type(prompts))
+            )
 
-        processed_texts = self.tokenizer(text=texts, return_tensors=return_tensors, **kwargs)
-        return BatchEncoding(processed_texts)
+        if isinstance(prompts, list):
+            if isinstance(texts, list) and len(prompts) != len(texts):
+                raise ValueError(
+                    "The length of prompts not is equal to texts' length: {} != {}".format(len(prompts), len(texts))
+                )
+            elif isinstance(texts, TextInput):
+                texts = [texts] * len(prompts)
+        else:
+            if isinstance(texts, TextInput):
+                texts = [texts]
+                prompts = [prompts]
+            else:
+                prompts = [prompts] * len(texts)
+
+        assemble_texts = []
+        for text, prompt in zip(texts, prompts):
+            if self.image_tag not in text:
+                if self.image_tag not in prompt:
+                    raise ValueError(
+                        "A prompt should contain a image tag `{}` to insert image embeddings. if you don't want to use prompt function, you have to input a text with the image tag `{}`.".format(
+                            self.image_tag, self.image_tag
+                        )
+                    )
+                if self.text_tag not in prompt:
+                    raise ValueError(
+                        "A prompt should contain a text tag `{}` to insert text information.".format(self.text_tag)
+                    )
+                assemble_texts.append(prompt.replace(self.text_tag, text))
+            else:
+                assemble_texts.append(text)
+
+        # processing with text tokenizer
+        first_texts, second_texts = zip(*[assemble_text.split(self.image_tag) for assemble_text in assemble_texts])
+        first_text_encoding = self.tokenizer(
+            text=first_texts, return_tensors=return_tensors, add_special_tokens=True, **kwargs
+        )
+        second_text_encoding = self.tokenizer(
+            text=second_texts, return_tensors=return_tensors, add_special_tokens=False, **kwargs
+        )
+
+        encoded_texts = BatchEncoding(
+            {
+                "first_input_ids": first_text_encoding["input_ids"],
+                "first_attention_mask": first_text_encoding["attention_mask"],
+                "second_input_ids": second_text_encoding["input_ids"],
+                "second_attention_mask": second_text_encoding["attention_mask"],
+            }
+        )
+        return encoded_texts
 
     def __call__(
         self,
-        images: ImageInput,
-        text: str,
+        images: ImageInput = None,
+        text: str = None,
         prompt: str = None,
         return_tensors: Optional[Union[str, TensorType]] = TensorType.PADDLE,
         **kwargs,
@@ -127,53 +180,46 @@ class MiniGPT4Processor(ProcessorMixin):
         [`LlamaTokenizer.__call__`] to prepare text for the model.
         Please refer to the docstring of the above two methods for more information.
         """
-        image_tag = "<ImageHere>"
-        text_tag = "<TextHere>"
         prompt = prompt if prompt is not None else self.default_prompt
 
-        if (not images) or (not text):
-            raise ValueError("You have to specify either images and texts.")
-        if not isinstance(text, str):
+        if images is None and text is None:
+            raise ValueError("Images and text are None, you have to specify either images or texts.")
+        if images is not None and not isinstance(images, (Image.Image, np.ndarray, paddle.Tensor, list)):
+            raise TypeError(
+                "A type in [Image.Image, np.ndarray, paddle.Tensor, list] for images is expected, but received {}.".format(
+                    type(images)
+                )
+            )
+        if text is not None and not isinstance(text, str):
             raise TypeError("A str type of text is expected, but received {}.".format(type(text)))
-        if not isinstance(prompt, str):
+        if prompt is not None and not isinstance(prompt, str):
             raise TypeError("A str type of prompt is expected, but received {}.".format(type(prompt)))
-        if isinstance(images, (Image.Image, np.ndarray, paddle.Tensor)):
+
+        if images is not None and not isinstance(images, list):
             images = [images]
+        if text is not None and images is not None:
+            texts = [text] * len(images)
+            prompts = [prompt] * len(images)
+        elif text is not None and images is None:
+            texts = [text]
+            prompts = [prompt]
 
-        texts = [text] * len(images)
-        prompts = [prompt] * len(images)
-        assemble_texts = []
-        for text, prompt in zip(texts, prompts):
-            if image_tag not in text:
-                if image_tag not in prompt:
-                    raise ValueError(
-                        "A prompt should contain a image tag `{}` to insert image embeddings. if you don't want to use prompt function, you have to input a text with the image tag `{}`.".format(
-                            image_tag, image_tag
-                        )
-                    )
-                if text_tag not in prompt:
-                    raise ValueError(
-                        "A prompt should contain a text tag `{}` to insert text information.".format(text_tag)
-                    )
-                assemble_texts.append(prompt.replace(text_tag, text))
-            else:
-                assemble_texts.append(text)
+        # image-only mode
+        if text is None:
+            # processing with image processor
+            processed_features = self.process_images(images, return_tensors=return_tensors, **kwargs)
+            return processed_features
 
-        # processing with image processor
+        # text-only mode
+        if images is None:
+            # processing with text tokenizer
+            encoded_texts = self.process_texts(texts, prompts, **kwargs)
+            return encoded_texts
+
+        # text-image mode
         processed_features = self.image_processor(images, return_tensors=return_tensors)
-
-        # processing with text tokenizer
-        first_texts, second_texts = zip(*[assemble_text.split(image_tag) for assemble_text in assemble_texts])
-        first_text_encoding = self.tokenizer(
-            text=first_texts, return_tensors=return_tensors, add_special_tokens=True, **kwargs
-        )
-        second_text_encoding = self.tokenizer(
-            text=second_texts, return_tensors=return_tensors, add_special_tokens=False, **kwargs
-        )
-        processed_features["first_input_ids"] = first_text_encoding["input_ids"]
-        processed_features["first_attention_mask"] = first_text_encoding["attention_mask"]
-        processed_features["second_input_ids"] = second_text_encoding["input_ids"]
-        processed_features["second_attention_mask"] = second_text_encoding["attention_mask"]
+        encoded_texts = self.process_texts(texts, prompts, **kwargs)
+        processed_features.update(encoded_texts)
 
         return processed_features
 

@@ -19,7 +19,7 @@ from pprint import pprint
 
 import paddle
 import yaml
-from attrdict import AttrDict
+from easydict import EasyDict as AttrDict
 
 from paddlenlp.ops import FasterTransformer
 from paddlenlp.utils.log import logger

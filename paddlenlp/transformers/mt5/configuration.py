@@ -74,8 +74,6 @@ class MT5Config(PretrainedConfig):
             The id of the `bos` token. Defaults to `0`.
         eos_token_id (int, optional):
             The id of the `eos` token. Defaults to `1`.
-        enable_recompute (bool, optional):
-            Whether to recompute cache.
 
     """
     model_type = "mt5"
@@ -107,7 +105,6 @@ class MT5Config(PretrainedConfig):
         bos_token_id: int = 0,
         pad_token_id: int = 0,
         eos_token_id: int = 1,
-        enable_recompute: bool = False,
         **kwargs
     ):
 
@@ -118,7 +115,6 @@ class MT5Config(PretrainedConfig):
             is_encoder_decoder=is_encoder_decoder,
             **kwargs,
         )
-        self.enable_recompute = enable_recompute
         self.vocab_size = vocab_size
         self.d_model = d_model
         self.d_kv = d_kv

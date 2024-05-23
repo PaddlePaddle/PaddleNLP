@@ -126,7 +126,7 @@ class MPNetTrainer(Trainer):
 
         if isinstance(dataloader, paddle.io.DataLoader):
             batch_size = dataloader.batch_sampler.batch_size
-        elif isinstance(dataloader, paddle.fluid.dataloader.dataloader_iter._DataLoaderIterBase):
+        elif isinstance(dataloader, paddle.io.dataloader.dataloader_iter._DataLoaderIterBase):
             # support for inner dataloader
             batch_size = dataloader._batch_sampler.batch_size
             # alias for inner dataloader
@@ -138,7 +138,7 @@ class MPNetTrainer(Trainer):
         if max_eval_iters > 0:
             # on eval limit steps
             num_samples = batch_size * self.args.world_size * max_eval_iters
-            if isinstance(dataloader, paddle.fluid.dataloader.dataloader_iter._DataLoaderIterBase) and isinstance(
+            if isinstance(dataloader, paddle.io.dataloader.dataloader_iter._DataLoaderIterBase) and isinstance(
                 dataloader._batch_sampler, NlpDistributedBatchSampler
             ):
                 consumed_samples = (

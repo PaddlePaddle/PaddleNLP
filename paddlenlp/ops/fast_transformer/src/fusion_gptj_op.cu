@@ -31,7 +31,7 @@ limitations under the License. */
 #ifdef HOST
 #undef HOST
 #endif
-#include "fastertransformer/cuda/cub/cub.cuh"
+
 #include "fastertransformer/utils/common.h"
 
 #ifdef BUILD_GPT  // consistent with FasterTransformer

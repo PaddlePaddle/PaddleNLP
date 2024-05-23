@@ -32,6 +32,7 @@
 
    安装 <get_started/installation>
    10分钟完成高精度中文情感分析 <get_started/quick_start>
+   对话模板 <get_started/chat_template>
 
 .. toctree::
    :maxdepth: 1
@@ -45,6 +46,18 @@
 
 .. toctree::
    :maxdepth: 1
+   :caption: 飞桨大模型
+
+   大模型预训练文档 <llm/pretraining/index.rst>
+   大模型精调文档 <llm/finetune.md>
+   大模型量化教程 <llm/quantization.md>
+   大模型推理教程 <llm/inference.md>
+   大模型统一存储文档 <llm/unified_checkpoint.md>
+   混合并行训练教程 <llm/llm_trainer.rst>
+   模型权重转换教程 <llm/torch2paddle.md>
+
+.. toctree::
+   :maxdepth: 1
    :caption: 模型库
 
    Transformer预训练模型 <model_zoo/index>
@@ -52,7 +65,7 @@
    使用Trainer API进行模型压缩 <compression.md>
    一键预测功能 <model_zoo/taskflow>
    预训练词向量 <model_zoo/embeddings>
-   
+
 
 .. toctree::
    :maxdepth: 1

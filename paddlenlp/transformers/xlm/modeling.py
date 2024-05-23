@@ -49,7 +49,7 @@ class SinusoidalPositionalEmbedding(nn.Embedding):
 
     @staticmethod
     def _init_weight(out):
-        n_pos, dim = paddle.shape(out)
+        n_pos, dim = out.shape
         out.stop_gradient = True
         position_ids = paddle.arange(0, n_pos, dtype=out.dtype).unsqueeze(1)
         indices = paddle.arange(0, dim // 2, dtype=out.dtype).unsqueeze(0)
@@ -75,7 +75,7 @@ def get_masks(seqlen, lengths, causal, padding_mask=None):
         mask = alen < lengths[:, None]
 
     # attention mask is the same as mask, or triangular inferior attention (causal)
-    bs = paddle.shape(lengths)[0]
+    bs = lengths.shape[0]
     if causal:
         attn_mask = paddle.tile(alen[None, None, :], (bs, seqlen, 1)) <= alen[None, :, None]
     else:
@@ -115,11 +115,11 @@ class MultiHeadAttention(nn.Layer):
         """
         # Input is (bs, qlen, dim)
         # Mask is (bs, klen) (non-causal) or (bs, klen, klen)
-        bs, qlen, dim = paddle.shape(input)
+        bs, qlen, dim = input.shape
         if kv is None:
             klen = qlen if cache is None else cache["seqlen"] + qlen
         else:
-            klen = paddle.shape(kv)[1]
+            klen = kv.shape[1]
 
         mask_reshape = (bs, 1, qlen, klen) if mask.ndim == 3 else (bs, 1, 1, klen)
 
@@ -229,7 +229,7 @@ class XLMModel(XLMPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -384,7 +384,7 @@ class XLMModel(XLMPretrainedModel):
                 last_hidden_state = model(**inputs)[0]
 
         """
-        bs, seqlen = paddle.shape(input_ids)
+        bs, seqlen = input_ids.shape
 
         if lengths is None:
             if input_ids is not None:
@@ -448,7 +448,7 @@ class XLMModel(XLMPretrainedModel):
 
         # update cache length
         if cache is not None:
-            cache["seqlen"] += paddle.shape(tensor)[1]
+            cache["seqlen"] += tensor.shape[1]
 
         return tuple(v for v in [tensor, hidden_states, attentions] if v is not None)
 
@@ -864,18 +864,16 @@ class XLMForMultipleChoice(XLMPretrainedModel):
         """
         num_choices = input_ids.shape[1]
         # input_ids: [bs, num_choice, seqlen]
-        input_ids = input_ids.reshape(
-            shape=(-1, paddle.shape(input_ids)[-1])
-        )  # flat_input_ids: [bs*num_choice, seqlen]
+        input_ids = input_ids.reshape(shape=(-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice, seqlen]
 
         if langs is not None:
-            langs = langs.reshape(shape=(-1, paddle.shape(langs)[-1]))
+            langs = langs.reshape(shape=(-1, langs.shape[-1]))
 
         if attention_mask is not None:
-            attention_mask = attention_mask.reshape(shape=(-1, paddle.shape(attention_mask)[-1]))
+            attention_mask = attention_mask.reshape(shape=(-1, attention_mask.shape[-1]))
 
         if position_ids is not None:
-            position_ids = position_ids.reshape(shape=(-1, paddle.shape(position_ids)[-1]))
+            position_ids = position_ids.reshape(shape=(-1, position_ids.shape[-1]))
 
         if lengths is not None:
             lengths = lengths.reshape(shape=(-1,))

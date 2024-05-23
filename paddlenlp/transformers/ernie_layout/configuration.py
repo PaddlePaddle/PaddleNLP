@@ -176,7 +176,6 @@ class ErnieLayoutConfig(PretrainedConfig):
         layer_norm_eps=1e-12,
         use_cache=False,
         use_task_id=True,
-        enable_recompute=False,
         classifier_dropout=None,
         has_visual_segment_embedding=False,
         **kwargs
@@ -204,4 +203,3 @@ class ErnieLayoutConfig(PretrainedConfig):
         self.use_task_id = use_task_id
         self.classifier_dropout = classifier_dropout
         self.has_visual_segment_embedding = has_visual_segment_embedding
-        self.enable_recompute = enable_recompute

@@ -20,17 +20,19 @@
 
 数据流是预训练的非常重要的，[预处理文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-1.0/preprocess/README.md)提供了整体的数据变动的流程示意，用户可以查看数据制作的细节文档。
 
-在数据ID化步骤中，我们需要配置tokenzer_name，选择t5模型对应的tokenizer；通过下面脚本转化，我们可以得到处理好的预训练数据，token ids:[`baike_sample_ids.npy`](https://paddlenlp.bj.bcebos.com/models/transformers/t5/data//baike_sample_ids.npy), 文章索引信息[`baike_sample_idx.npz`](https://paddlenlp.bj.bcebos.com/models/transformers/t5/data//baike_sample_idx.npz).（这里提供了一个处理好的预训练数据，可点击链接下载）
+在数据ID化步骤中，我们需要配置tokenzer_name，选择t5模型对应的tokenizer；通过下面脚本转化，我们可以得到处理好的预训练数据，token ids:[`t5_openwebtext.bin`](https://paddlenlp.bj.bcebos.com/models/transformers/t5/data/t5_openwebtext.bin), 文章索引信息[`t5_openwebtext.idx`](https://paddlenlp.bj.bcebos.com/models/transformers/t5/data/t5_openwebtext.idx).（这里提供了一个处理好的预训练数据，可点击链接下载）
 
 ```shell
 python -u  create_pretraining_data.py \
     --model_name t5-small \
     --tokenizer_name T5Tokenizer \
-    --input_path baike_sample.jsonl \
-    --split_sentences\
-    --output_prefix baike_sample  \
+    --data_format JSON \
+    --input_path openwebtext/2020-04.jsonl.zst \
+    --split_sentences \
+    --output_prefix t5_openwebtext  \
     --workers 1 \
-    --log_interval 5
+    --log_interval 5 \
+    --data_impl mmap
 ```
 
 #### 2. 开始训练
@@ -73,8 +75,9 @@ python -u  -m paddle.distributed.launch \
     --disable_tqdm true \
     --do_train \
     --do_eval \
-    --seed 1234\
-    --device "gpu"
+    --seed 1234 \
+    --device "gpu" \
+    --data_impl "mmap"
 ```
 
 其中参数释义如下：
@@ -95,6 +98,7 @@ python -u  -m paddle.distributed.launch \
 - `dataloader_num_workers` DataLoader采样进程，当数据输入为瓶颈时，可尝试提高采样进程数目。
 - `eval_steps` 模型评估间隔。
 - `device` 训练设备，默认为GPU。
+- `data_impl` 指定输入文件数据制作类型，默认为mmap，可指定mmap或lazy。mmap格式在读入数据时会建立内存映射，lazy格式在读入数据时直接从文件读取。
 
 ### GLUE任务
 

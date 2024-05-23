@@ -19,7 +19,9 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
-from paddle.fluid.dygraph.base import in_declarative_mode
+
+# TODO(guosheng): update this workaround import for in_declarative_mode
+from paddle.nn.layer.layers import in_declarative_mode
 
 from ...layers import Linear as TransposedLinear
 from ...utils.env import CONFIG_NAME
@@ -95,7 +97,7 @@ class ErnieEmbeddings(nn.Layer):
         if input_ids is not None:
             inputs_embeds = self.word_embeddings(input_ids)
 
-        input_shape = inputs_embeds.shape[:-1] if in_declarative_mode() else paddle.shape(inputs_embeds)[:-1]
+        input_shape = inputs_embeds.shape[:-1] if in_declarative_mode() else inputs_embeds.shape[:-1]
 
         if position_ids is None:
             # maybe need use shape op to unify static graph and dynamic graph
@@ -186,7 +188,7 @@ class ErnieModel(ErniePretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -213,9 +215,7 @@ class ErnieModel(ErniePretrainedModel):
             weight_attr=weight_attr,
             normalize_before=False,
         )
-        self.encoder = nn.TransformerEncoder(
-            encoder_layer, config.num_hidden_layers, enable_recompute=config.enable_recompute
-        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
         self.pooler = ErniePooler(config, weight_attr)
 
     def get_input_embeddings(self):
@@ -611,7 +611,7 @@ class ErnieForQuestionAnswering(ErniePretrainedModel):
             if start_positions.ndim > 1:
                 end_positions = end_positions.squeeze(-1)
             # sometimes the start/end positions are outside our model inputs, we ignore these terms
-            ignored_index = paddle.shape(start_logits)[1]
+            ignored_index = start_logits.shape[1]
             start_positions = start_positions.clip(0, ignored_index)
             end_positions = end_positions.clip(0, ignored_index)
 
@@ -911,7 +911,7 @@ class ErnieForPretraining(ErniePretrainedModel):
             if labels is not None and next_sentence_label is not None:
                 loss_fct = paddle.nn.CrossEntropyLoss()
                 masked_lm_loss = loss_fct(
-                    prediction_scores.reshape((-1, paddle.shape(prediction_scores)[-1])), labels.reshape((-1,))
+                    prediction_scores.reshape((-1, prediction_scores.shape[-1])), labels.reshape((-1,))
                 )
                 next_sentence_loss = loss_fct(
                     seq_relationship_score.reshape((-1, 2)), next_sentence_label.reshape((-1,))
@@ -1088,7 +1088,7 @@ class ErnieForMaskedLM(ErniePretrainedModel):
         if labels is not None:
             loss_fct = paddle.nn.CrossEntropyLoss()  # -100 index = padding token
             masked_lm_loss = loss_fct(
-                prediction_scores.reshape((-1, paddle.shape(prediction_scores)[-1])), labels.reshape((-1,))
+                prediction_scores.reshape((-1, prediction_scores.shape[-1])), labels.reshape((-1,))
             )
         if not return_dict:
             output = (prediction_scores,) + outputs[2:]
@@ -1353,9 +1353,17 @@ class UTC(ErniePretrainedModel):
 
         option_logits = paddle.matmul(q.unsqueeze(1), k, transpose_y=True).squeeze(1)
         option_logits = option_logits / self.predict_size**0.5
-        for index, logit in enumerate(option_logits):
-            option_logits[index] -= (1 - (omask_positions[index] > 0).astype("float32")) * 1e12
 
+        if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+            # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior
+            # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+            # removed after static graphs support inplace and stride.
+            with paddle.framework._no_check_dy2st_diff():
+                for index, logit in enumerate(option_logits):
+                    option_logits[index] -= (1 - (omask_positions[index] > 0).astype("float32")) * 1e12
+        else:
+            for index, logit in enumerate(option_logits):
+                option_logits[index] -= (1 - (omask_positions[index] > 0).astype("float32")) * 1e12
         loss = None
         if not return_dict:
             output = (option_logits,)

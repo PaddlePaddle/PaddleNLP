@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import collections
 import logging
 import math
@@ -34,7 +35,7 @@ from paddle.distributed.fleet.meta_parallel import (
     get_rng_state_tracker,
 )
 from paddle.distributed.fleet.utils import recompute
-from paddle.fluid import layers
+from paddle.base import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from ppfleetx.distributed.apis import env
 from ppfleetx.utils.log import logger
@@ -47,23 +48,33 @@ from .processor import (
     MinLengthLogitsProcessor,
     RepetitionPenaltyLogitsProcessor,
 )
-from .sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    GatherOp,
-    RowSequenceParallelLinear,
-    ScatterOp,
-    mark_as_sequence_parallel_parameter,
-)
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        ColumnSequenceParallelLinear,
+        GatherOp,
+        RowSequenceParallelLinear,
+        ScatterOp,
+        mark_as_sequence_parallel_parameter,
+    )
+except:
+    pass
+
+from paddlenlp.transformers.segment_parallel_utils  import ReshardLayer
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
+
 try:
     from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 except:
     FusedDropoutAdd = None
 
+try:
+    from paddle.jit.api import set_dynamic_shape
+except:
+    from paddle.jit.dy2static.utils_helper import set_dynamic_shape
 
 def get_attr(layer, name):
     if getattr(layer, name, None) is not None:
@@ -208,9 +219,20 @@ class MultiHeadAttention(nn.Layer):
             fuse_matmul_bias=fused_linear,
         )
 
+        self.reshard_layer = None
+        self.sep_parallel_degree = env.get_hcg().get_sep_parallel_world_size()
+        if self.sep_parallel_degree > 1:
+            self.reshard_layer = ReshardLayer()
+
     def _fuse_prepare_qkv(self, query, use_cache=False, cache=None):
         mix_layer = self.qkv_proj(query)
-        mix_layer = paddle.reshape_(mix_layer, [0, 0, -1, 3 * self.head_dim])
+        if self.reshard_layer is not None:
+            mix_layer = self.reshard_layer(mix_layer, split_axis=2, concat_axis=1)
+            assert self.num_heads % self.sep_parallel_degree == 0, f"num_heads:{self.num_heads} must be divisible by sep_parallel_degree:{self.sep_parallel_degree}"
+            mix_layer = paddle.reshape_(mix_layer, [0, -1, self.num_heads // self.sep_parallel_degree, 3 * self.head_dim])  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
+        else:
+            mix_layer = paddle.reshape_(mix_layer, [0, 0, -1, 3 * self.head_dim])
+
         q, k, v = paddle.split(mix_layer, num_or_sections=3, axis=-1)
 
         assert not isinstance(cache, self.StaticCache), "cache currently does not support the StaticCache type"
@@ -297,6 +319,9 @@ class MultiHeadAttention(nn.Layer):
         out, weights = flash_attention(
             q, k, v, self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
         )
+        if self.reshard_layer is not None:
+            out = self.reshard_layer(out, split_axis=1, concat_axis=2)
+
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
         if self.sequence_parallel:
             perm = [1, 0, 2]
@@ -304,6 +329,7 @@ class MultiHeadAttention(nn.Layer):
         return (out, weights) if self.need_weights else out
 
     def core_attn(self, q, k, v, attn_mask=None):
+        assert self.reshard_layer is None, f"core_attn is not supported with sep"
         perm = [1, 2, 0, 3] if self.sequence_parallel else [0, 2, 1, 3]
         q = tensor.transpose(x=q, perm=perm)
         k = tensor.transpose(x=k, perm=perm)
@@ -607,7 +633,7 @@ class TransformerDecoderLayer(nn.Layer):
             tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
         # If use sequence_parallel, different input partition in dropout
         # should use different seed.
-        if self.sequence_parallel:
+        if self.sequence_parallel or env.get_hcg().get_sep_parallel_world_size() > 1:
             current_seed = "local_seed"
         else:
             current_seed = "global_seed"
@@ -626,7 +652,7 @@ class TransformerDecoderLayer(nn.Layer):
 
         with get_rng_state_tracker().rng_state(current_seed):
             if not self.use_fused_dropout_add:
-                tgt = residual + self.linear2(F.gelu(self.linear1(tgt), approximate=True))
+                tgt = residual + self.dropout2(self.linear2(F.gelu(self.linear1(tgt), approximate=True)))
             else:
                 tgt = self.fused_dropout_add2(self.linear2(F.gelu(self.linear1(tgt), approximate=True)), residual)
 
@@ -811,8 +837,8 @@ class GPTModelHybrid(nn.Layer):
         if position_ids is None:
             past_length = 0
             if cache is not None:
-                past_length = paddle.shape(attention_mask)[-1] - 1
-            position_ids = paddle.arange(past_length, paddle.shape(input_ids)[-1] + past_length, dtype=input_ids.dtype)
+                past_length = attention_mask.shape[-1] - 1
+            position_ids = paddle.arange(past_length, input_ids.shape[-1] + past_length, dtype=input_ids.dtype)
             position_ids = position_ids.unsqueeze(0)
             # .expand_as(input_ids)
             position_ids = paddle.expand_as(position_ids, input_ids)
@@ -825,7 +851,7 @@ class GPTModelHybrid(nn.Layer):
         if not self.fused_softmax_with_triangular or not paddle.is_compiled_with_cuda():
             # TODO, use registered buffer
             causal_mask = paddle.tensor.triu(
-                paddle.ones((paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1])) * -1e4, diagonal=1
+                paddle.ones((input_ids.shape[-1], input_ids.shape[-1])) * -1e4, diagonal=1
             )
             if attention_mask is not None:
                 if len(attention_mask.shape) == 2:
@@ -931,16 +957,43 @@ class GPTPretrainingCriterionHybird(nn.Layer):
                 masked_lm_loss = self.parallel_loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
             else:
                 prediction_scores = ConcatSoftmaxInput.apply(
-                    prediction_scores, group=env.get_hcg().get_model_parallel_group()
+                    prediction_scores, group=hcg.get_model_parallel_group()
                 )
                 masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
         else:
             masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
+
+        if hcg.get_sep_parallel_world_size() > 1:
+            sep_axis = 0 if self.sequence_parallel else 1
+            masked_lm_loss = ConcatSePMaskedLoss.apply(
+                masked_lm_loss, axis=sep_axis, group=hcg.get_sep_parallel_group())
         loss_mask = loss_mask.reshape([-1])
         masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
         loss = masked_lm_loss / loss_mask.sum()
         return loss
 
+
+from paddle.autograd import PyLayer
+class ConcatSePMaskedLoss(PyLayer):
+    @staticmethod
+    def forward(ctx, inp, axis, group):
+        inputs = []
+        paddle.distributed.all_gather(inputs, inp, group=group)
+        with paddle.no_grad():
+            cat = paddle.concat(inputs, axis=axis)
+        ctx.args_axis = axis
+        ctx.args_group = group
+        return cat
+
+    @staticmethod
+    def backward(ctx, grad):
+        axis = ctx.args_axis
+        group = ctx.args_group
+        with paddle.no_grad():
+            grads = paddle.split(
+                grad, paddle.distributed.get_world_size(group), axis=axis)
+        grad = grads[paddle.distributed.get_rank(group)]
+        return grad
 
 # these Layers is just for PipelineParallel
 
@@ -1199,7 +1252,7 @@ class GPTForGenerationHybrid(nn.Layer):
     def prepare_attention_mask_for_generation(self, input_ids, pad_token_id, eos_token_id):
         is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
             input_ids == pad_token_id
-        ).numpy().item()
+        ).item()
         is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
             (eos_token_id is not None) and (pad_token_id != eos_token_id)
         )
@@ -1251,7 +1304,7 @@ class GPTForGenerationHybrid(nn.Layer):
 
     def expand_inputs_for_generation(self, input_ids, expand_size, attention_mask=None, **model_kwargs):
 
-        index = paddle.tile(paddle.arange(paddle.shape(input_ids)[0]).unsqueeze(-1), [1, expand_size]).reshape([-1])
+        index = paddle.tile(paddle.arange(input_ids.shape[0]).unsqueeze(-1), [1, expand_size]).reshape([-1])
 
         input_ids = paddle.gather(input_ids, index)
 
@@ -1457,7 +1510,7 @@ class GPTForGenerationHybrid(nn.Layer):
 
         attn_mask = model_kwargs["attention_mask"]
         # make the shape of attention_mask = (-1, -1, -1, -1) in dy2static.
-        model_kwargs["attention_mask"] = paddle.reshape(attn_mask, paddle.shape(attn_mask))
+        set_dynamic_shape(model_kwargs["attention_mask"], [-1, -1, -1, -1])
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
         while cur_len < max_length:
             # Note(GuoxiaWang): Remove outputs = _forward_(**model_kwargs)

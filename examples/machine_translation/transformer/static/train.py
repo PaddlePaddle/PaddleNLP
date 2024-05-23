@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
 import sys
 import time
@@ -24,18 +23,15 @@ import paddle
 import paddle.distributed as dist
 import paddle.distributed.fleet as fleet
 import yaml
-from attrdict import AttrDict
+from easydict import EasyDict as AttrDict
 
 from paddlenlp.transformers import CrossEntropyCriterion, TransformerModel
 from paddlenlp.utils import profiler
+from paddlenlp.utils.log import logger
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
 import reader  # noqa: E402
 from tls.record import AverageStatistical  # noqa: E402
-
-FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
-logging.basicConfig(level=logging.INFO, format=FORMAT)
-logger = logging.getLogger(__name__)
 
 
 def parse_args():
@@ -307,7 +303,7 @@ def do_train(args):
                 total_avg_cost = total_sum_cost / total_token_num
 
                 if step_idx == 0:
-                    logging.info(
+                    logger.info(
                         "step_idx: %d, epoch: %d, batch: %d, avg loss: %f, "
                         "normalized loss: %f, ppl: %f"
                         % (
@@ -321,11 +317,20 @@ def do_train(args):
                     )
                 else:
                     train_avg_batch_cost = args.print_step / batch_cost_avg.get_total_time()
-                    logging.info(
+                    max_mem_reserved_msg = ""
+                    max_mem_allocated_msg = ""
+                    if paddle.device.is_compiled_with_cuda():
+                        max_mem_reserved_msg = (
+                            f"max_mem_reserved: {paddle.device.cuda.max_memory_reserved() // (1024 ** 2)} MB,"
+                        )
+                        max_mem_allocated_msg = (
+                            f"max_mem_allocated: {paddle.device.cuda.max_memory_allocated() // (1024 ** 2)} MB"
+                        )
+                    logger.info(
                         "step_idx: %d, epoch: %d, batch: %d, avg loss: %f, "
                         "normalized loss: %f, ppl: %f, avg_speed: %.2f step/s, "
                         "batch_cost: %.5f sec, reader_cost: %.5f sec, tokens: %d, "
-                        "ips: %.5f words/sec"
+                        "ips: %.5f words/sec, %s %s"
                         % (
                             step_idx,
                             pass_id,
@@ -338,6 +343,8 @@ def do_train(args):
                             reader_cost_avg.get_average(),
                             batch_ips_avg.get_total_cnt(),
                             batch_ips_avg.get_average_per_sec(),
+                            max_mem_reserved_msg,
+                            max_mem_allocated_msg,
                         )
                     )
                 reader_cost_avg.reset()

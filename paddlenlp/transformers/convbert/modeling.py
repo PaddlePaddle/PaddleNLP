@@ -172,8 +172,8 @@ class MultiHeadAttentionWithConv(Layer):
         v = self.v_proj(value)
 
         if self.conv_type == "sdconv":
-            bs = paddle.shape(q)[0]
-            seqlen = paddle.shape(q)[1]
+            bs = q.shape[0]
+            seqlen = q.shape[1]
             mixed_key_conv_attn_layer = self.key_conv_attn_layer(query)
             conv_attn_layer = mixed_key_conv_attn_layer * q
 
@@ -290,7 +290,7 @@ class ConvBertEmbeddings(nn.Layer):
         if input_ids is not None:
             inputs_embeds = self.word_embeddings(input_ids)
 
-        input_shape = paddle.shape(inputs_embeds)[:-1]
+        input_shape = inputs_embeds.shape[:-1]
 
         ones = paddle.ones(input_shape, dtype="int64")
         seq_length = paddle.cumsum(ones, axis=1)
@@ -450,7 +450,7 @@ class ConvBertModel(ConvBertPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -1137,7 +1137,9 @@ class ConvBertForTotalPretraining(ConvBertPretrainedModel):
         N = positions.shape[1]
         assert N == L, "the dimension of inputs and mask should be same as [batch_size, sequence_length]"
 
-        updated_sequence = ((paddle.ones_like(sequence) - positions) * sequence) + (positions * updates)
+        updated_sequence = ((paddle.ones_like(sequence) - positions) * sequence) + (
+            positions * updates.astype(positions.dtype)
+        )
 
         return updated_sequence
 
@@ -1518,7 +1520,7 @@ class ConvBertForQuestionAnswering(ConvBertPretrainedModel):
             if start_positions.ndim > 1:
                 end_positions = end_positions.squeeze(-1)
             # sometimes the start/end positions are outside our model inputs, we ignore these terms
-            ignored_index = paddle.shape(start_logits)[1]
+            ignored_index = start_logits.shape[1]
             start_positions = start_positions.clip(0, ignored_index)
             end_positions = end_positions.clip(0, ignored_index)
 

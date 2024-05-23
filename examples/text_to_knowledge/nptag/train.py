@@ -163,7 +163,7 @@ def do_train(args):
                 speed = float(args.logging_steps) / (end_time - start_time)
                 logger.info(
                     "global step %d, epoch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, loss.numpy().item(), speed)
+                    % (global_step, epoch, loss.item(), speed)
                 )
                 start_time = time.time()
 

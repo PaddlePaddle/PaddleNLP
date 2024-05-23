@@ -52,6 +52,10 @@ def is_psutil_available():
     return importlib.util.find_spec("psutil") is not None
 
 
+def is_tiktoken_available():
+    return importlib.util.find_spec("tiktoken") is not None
+
+
 def is_torch_available() -> bool:
     """check if `torch` package is installed
     Returns:
@@ -77,6 +81,14 @@ def is_fast_tokenizer_available() -> bool:
         bool: if `fast_tokenizer` is avaliable
     """
     return is_package_available("fast_tokenizer")
+
+
+def is_paddlenlp_ops_available() -> bool:
+    """check if `paddlenlp_ops` ia avaliable
+    Returns:
+        bool: if `paddlenlp_ops` is avaliable
+    """
+    return is_package_available("paddlenlp_ops")
 
 
 def is_transformers_available() -> bool:
@@ -143,10 +155,11 @@ def uninstall_package(package_name: str, module_name: Optional[str] = None):
     """
     module_name = module_name or package_name
     for site_package_dir in site.getsitepackages():
-        for file in os.listdir(site_package_dir):
-            package_dir = os.path.join(site_package_dir, file)
-            if file.startswith(package_name) and os.path.isdir(package_dir):
-                shutil.rmtree(package_dir)
+        if os.path.exists(site_package_dir):
+            for file in os.listdir(site_package_dir):
+                package_dir = os.path.join(site_package_dir, file)
+                if file.startswith(package_name) and os.path.isdir(package_dir):
+                    shutil.rmtree(package_dir)
 
     for site_package_dir in site.getsitepackages():
         while sys.path[0] == site_package_dir:

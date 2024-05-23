@@ -398,6 +398,14 @@ def do_train(args):
                     next_sentence_labels,
                     masked_lm_scale,
                 ) = batch
+                input_ids = input_ids.cuda(blocking=False)
+                segment_ids = segment_ids.cuda(blocking=False)
+                input_mask = input_mask.cuda(blocking=False)
+                masked_lm_positions = masked_lm_positions.cuda(blocking=False)
+                masked_lm_labels = masked_lm_labels.cuda(blocking=False)
+                next_sentence_labels = next_sentence_labels.cuda(blocking=False)
+                masked_lm_scale = masked_lm_scale.cuda(blocking=False)
+
                 with paddle.amp.auto_cast(
                     args.use_amp,
                     custom_white_list=["layer_norm", "softmax", "gelu", "fused_attention", "fused_feedforward"],
@@ -424,6 +432,10 @@ def do_train(args):
                     optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
+
+                # NOTE: For accurate data statistics, please open the comments below，especially when args.logging_steps==1.
+                # if global_step % args.logging_steps == 0:
+                #     loss = loss.numpy()
                 total_samples += args.batch_size
                 train_run_cost = time.time() - batch_start
                 train_cost_avg.record(train_run_cost)
@@ -433,21 +445,32 @@ def do_train(args):
                     profiler.add_profiler_step(args.profiler_options)
 
                 if global_step % args.logging_steps == 0:
-                    if paddle.distributed.get_rank() == 0:
-                        logger.info(
-                            "global step: %d, epoch: %d, batch: %d, loss: %f, "
-                            "avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
-                            % (
-                                global_step,
-                                epoch,
-                                step,
-                                loss,
-                                reader_cost_avg.get_average(),
-                                train_cost_avg.get_average(),
-                                total_samples / args.logging_steps,
-                                total_samples / (args.logging_steps * train_cost_avg.get_average()),
-                            )
+                    max_mem_reserved_msg = ""
+                    max_mem_allocated_msg = ""
+                    if paddle.device.is_compiled_with_cuda():
+                        max_mem_reserved_msg = (
+                            f"max_mem_reserved: {paddle.device.cuda.max_memory_reserved() >> 20} MB,"
                         )
+                        max_mem_allocated_msg = (
+                            f"max_mem_allocated: {paddle.device.cuda.max_memory_allocated() >> 20} MB"
+                        )
+                    logger.info(
+                        "global step: %d, epoch: %d, batch: %d, loss: %f, "
+                        "avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, "
+                        "avg_samples: %.5f, ips: %.5f sequences/sec, %s %s"
+                        % (
+                            global_step,
+                            epoch,
+                            step,
+                            loss,
+                            reader_cost_avg.get_average(),
+                            train_cost_avg.get_average(),
+                            total_samples / args.logging_steps,
+                            total_samples / (args.logging_steps * train_cost_avg.get_average()),
+                            max_mem_reserved_msg,
+                            max_mem_allocated_msg,
+                        )
+                    )
                     total_samples = 0
                     train_cost_avg.reset()
                     reader_cost_avg.reset()

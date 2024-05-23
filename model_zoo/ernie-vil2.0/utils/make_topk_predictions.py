@@ -55,6 +55,7 @@ if __name__ == "__main__":
     print("Finished loading image features.")
 
     print("Begin to compute top-{} predictions for texts...".format(args.top_k))
+
     with open(args.output, "w") as fout:
         with open(args.text_feats, "r") as fin:
             for line in tqdm(fin):

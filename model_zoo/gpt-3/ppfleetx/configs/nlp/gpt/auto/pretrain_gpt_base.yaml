@@ -10,7 +10,9 @@ Global:
 Engine:
   max_steps: 500000
   num_train_epochs: 1
-  eval_freq: 1
+  accumulate_steps:
+  logging_freq: 1
+  eval_freq: 500
   eval_iters: 10
   test_iters:
   mix_precision:
@@ -20,7 +22,6 @@ Engine:
     scale_loss: 32768.0
     custom_black_list: ["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div"]
     custom_white_list: ["lookup_table", "lookup_table_v2"]
-    use_fp16_guard: False
   save_load:
     output_dir: ./output
     ckpt_dir:
@@ -29,8 +30,12 @@ Engine:
 Model:
   module: "GPTModuleAuto"
   name: "GPT"
-  fuse_attn_qkv: False
-
+  vocab_size_divisible_unit: 128
+  fuse_attn_qkv: True
+  scale_qk_by_layer_num: True
+  fused_softmax_with_triangular: True
+  use_flash_attn: False
+  sequence_parallel: False # TODO make sequence_parallel as an independent parallel and be set id Distributed
 
 Data:
   Train:
@@ -39,7 +44,7 @@ Data:
     dataset:
       name: GPTDataset
       input_dir: ./data/
-      split: [949, 50, 1]
+      split: [969, 30, 1]
       max_seq_len: 1024
 
   Eval:
@@ -48,7 +53,7 @@ Data:
     dataset:
       name: GPTDataset
       input_dir: ./data/
-      split: [949, 50, 1]
+      split: [969, 30, 1]
       max_seq_len: 1024
 
 
@@ -64,6 +69,12 @@ Optimizer:
     warmup_rate: 0.01
     max_lr: 5.0e-5
     min_lr: 1.0e-5
+    use_increments: True
   grad_clip:
     name: "ClipGradByGlobalNorm"
     clip_norm: 1.0
+
+
+FusedPasses:
+  fused_linear: False
+  fused_adamw: False

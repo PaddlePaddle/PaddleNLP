@@ -233,7 +233,7 @@ class LayoutXLMSelfOutput(nn.Layer):
     def forward(self, hidden_states, input_tensor):
         hidden_states = self.dense(hidden_states)
         hidden_states = self.dropout(hidden_states)
-        hidden_states = self.LayerNorm(hidden_states + input_tensor)
+        hidden_states = self.LayerNorm(hidden_states + input_tensor.astype(hidden_states.dtype))
         return hidden_states
 
 
@@ -319,7 +319,7 @@ class LayoutXLMSelfAttention(nn.Layer):
             attention_scores += rel_2d_pos
         bool_attention_mask = attention_mask.astype(paddle.bool)
         bool_attention_mask.stop_gradient = True
-        attention_scores_shape = paddle.shape(attention_scores)
+        attention_scores_shape = attention_scores.shape
         attention_scores = paddle.where(
             bool_attention_mask.expand(attention_scores_shape),
             paddle.ones(attention_scores_shape) * float("-1e10"),
@@ -603,7 +603,7 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -699,7 +699,7 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
                 visual_bbox_y[1:].expand(expand_shape[::-1]).transpose([1, 0]),
             ],
             axis=-1,
-        ).reshape([expand_shape[0] * expand_shape[1], paddle.shape(bbox)[-1]])
+        ).reshape([expand_shape[0] * expand_shape[1], bbox.shape[-1]])
 
         visual_bbox = visual_bbox.expand([visual_shape[0], visual_bbox.shape[0], visual_bbox.shape[1]])
         return visual_bbox
@@ -763,7 +763,7 @@ class LayoutXLMModel(LayoutXLMPretrainedModel):
         output_hidden_states=False,
         output_attentions=False,
     ):
-        input_shape = paddle.shape(input_ids)
+        input_shape = input_ids.shape
         visual_shape = list(input_shape)
         visual_shape[1] = self.config.image_feature_pool_shape[0] * self.config.image_feature_pool_shape[1]
         visual_bbox = self._calc_visual_bbox(self.config.image_feature_pool_shape, bbox, visual_shape)
@@ -963,7 +963,7 @@ class LayoutXLMForSequenceClassification(LayoutXLMPretrainedModel):
         head_mask=None,
         labels=None,
     ):
-        input_shape = paddle.shape(input_ids)
+        input_shape = input_ids.shape
         visual_shape = list(input_shape)
         visual_shape[1] = (
             self.layoutxlm.config.image_feature_pool_shape[0] * self.layoutxlm.config.image_feature_pool_shape[1]
@@ -1146,7 +1146,7 @@ class REDecoder(nn.Layer):
         self.loss_fct = CrossEntropyLoss()
 
     def build_relation(self, relations, entities):
-        batch_size, max_seq_len = paddle.shape(entities)[:2]
+        batch_size, max_seq_len = entities.shape[:2]
         new_relations = paddle.full(
             shape=[batch_size, max_seq_len * max_seq_len, 3], fill_value=-1, dtype=relations.dtype
         )
@@ -1195,7 +1195,7 @@ class REDecoder(nn.Layer):
             relation_per_doc_label[: len(positive_relations)] = 1
             relation_per_doc = paddle.concat([reordered_relations, relation_per_doc_label], axis=1)
             assert len(relation_per_doc[:, 0]) != 0
-            new_relations[b, 0] = paddle.shape(relation_per_doc)[0].astype(new_relations.dtype)
+            new_relations[b, 0] = relation_per_doc.shape[0].astype(new_relations.dtype)
             new_relations[b, 1 : len(relation_per_doc) + 1] = relation_per_doc
             # new_relations.append(relation_per_doc)
         return new_relations, entities
@@ -1219,7 +1219,7 @@ class REDecoder(nn.Layer):
         return pred_relations
 
     def forward(self, hidden_states, entities, relations):
-        batch_size, max_length, _ = paddle.shape(entities)
+        batch_size, max_length, _ = entities.shape
         relations, entities = self.build_relation(relations, entities)
         loss = 0
         all_pred_relations = paddle.full(
@@ -1257,7 +1257,7 @@ class REDecoder(nn.Layer):
             pred_relations = self.get_predicted_relations(logits, relation, entities[b])
             if len(pred_relations) > 0:
                 pred_relations = paddle.stack(pred_relations)
-                all_pred_relations[b, 0, :, :] = paddle.shape(pred_relations)[0].astype(all_pred_relations.dtype)
+                all_pred_relations[b, 0, :, :] = pred_relations.shape[0].astype(all_pred_relations.dtype)
                 all_pred_relations[b, 1 : len(pred_relations) + 1, :, :] = pred_relations
         return loss, all_pred_relations
 

@@ -212,9 +212,6 @@ class T5Config(PretrainedConfig):
             The id of the `bos` token. Defaults to `0`.
         eos_token_id (int, optional):
             The id of the `eos` token. Defaults to `1`.
-        enable_recompute (bool, optional):
-            Whether to recompute cache.
-
     """
     model_type = "t5"
     attribute_map: Dict[str, str] = {
@@ -244,7 +241,6 @@ class T5Config(PretrainedConfig):
         use_cache: bool = True,
         pad_token_id: int = 0,
         eos_token_id: int = 1,
-        enable_recompute: bool = False,
         **kwargs
     ):
 
@@ -254,7 +250,6 @@ class T5Config(PretrainedConfig):
             is_encoder_decoder=is_encoder_decoder,
             **kwargs,
         )
-        self.enable_recompute = enable_recompute
         self.vocab_size = vocab_size
         self.d_model = d_model
         self.d_kv = d_kv

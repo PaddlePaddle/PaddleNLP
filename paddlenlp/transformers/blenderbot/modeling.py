@@ -193,6 +193,8 @@ class BlenderbotDecoderLayer(nn.TransformerDecoderLayer):
         normalize_before=True,
         weight_attr=None,
         bias_attr=None,
+        *args,
+        **kwargs,
     ):
         super(BlenderbotDecoderLayer, self).__init__(
             d_model=d_model,
@@ -205,6 +207,8 @@ class BlenderbotDecoderLayer(nn.TransformerDecoderLayer):
             normalize_before=normalize_before,
             weight_attr=weight_attr,
             bias_attr=bias_attr,
+            *args,
+            **kwargs,
         )
 
     def forward(self, tgt, memory=None, tgt_mask=None, memory_mask=None, cache=None):
@@ -335,7 +339,7 @@ class BlenderbotDecoder(BlenderbotPretrainedModel):
         if decoder_input_ids is None:
             raise ValueError("Decoder_input_ids cannot be None.")
         if decoder_attention_mask is None:
-            decoder_length = paddle.shape(decoder_input_ids)[-1]
+            decoder_length = decoder_input_ids.shape[-1]
             decoder_attention_mask = paddle.tensor.triu(
                 (paddle.full((decoder_length, decoder_length), -np.inf, dtype=paddle.get_default_dtype())), 1
             )
@@ -377,7 +381,7 @@ class BlenderbotModel(BlenderbotPretrainedModel):
     Check the superclass documentation for the generic methods and the library implements for all its model.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     """

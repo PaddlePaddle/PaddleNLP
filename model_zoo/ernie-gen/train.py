@@ -27,6 +27,7 @@ from tqdm import tqdm
 from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import Rouge1, Rouge2
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import (
     BertTokenizer,
     ElectraTokenizer,
@@ -98,6 +99,7 @@ parser.add_argument(
     type=int,
     help="If > 0: set total number of training steps to perform. Override num_epochs.",
 )
+parser.add_argument("--to_static", type=strtobool, default=False, help="Enable training under @to_static.")
 
 args = parser.parse_args()
 
@@ -221,6 +223,11 @@ def train():
 
     label_num = model.word_emb.weight.shape[0]
     train_model = StackModel(model)
+
+    if args.to_static:
+        train_model = paddle.jit.to_static(train_model)
+        logger.info("Successfully to apply @to_static to the whole model.")
+
     if paddle.distributed.get_world_size() > 1:
         # All 'forward' outputs derived from the module parameters using in DataParallel
         # must participate in the calculation of losses and subsequent gradient calculations.

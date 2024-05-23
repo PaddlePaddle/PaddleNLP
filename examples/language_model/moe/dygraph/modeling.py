@@ -26,7 +26,6 @@ from paddle.distributed.fleet.meta_parallel import (
     SharedLayerDesc,
     get_rng_state_tracker,
 )
-from paddle.fluid import layers
 from paddle.incubate.distributed.models import moe
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
@@ -217,12 +216,8 @@ class MultiHeadAttention(nn.Layer):
             k, v = self.compute_kv(key, value)
             return self.StaticCache(k, v)
         elif value is None:  # incremental_state
-            k = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_heads, 0, self.head_dim], dtype=key.dtype, value=0
-            )
-            v = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_heads, 0, self.head_dim], dtype=key.dtype, value=0
-            )
+            k = paddle.full(shape=[key.shape[0], self.num_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0)
+            v = paddle.full(shape=[key.shape[0], self.num_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0)
             return self.Cache(k, v)
         else:
             # incremental_state with initial value, mainly for usage like UniLM
@@ -753,8 +748,8 @@ class GPTModel(GPTPretrainedModel):
         if position_ids is None:
             past_length = 0
             if cache is not None:
-                past_length = paddle.shape(cache[0].k)[-2]
-            position_ids = paddle.arange(past_length, paddle.shape(input_ids)[-1] + past_length, dtype="int64")
+                past_length = cache[0].k.shape[-2]
+            position_ids = paddle.arange(past_length, input_ids.shape[-1] + past_length, dtype="int64")
             position_ids = position_ids.unsqueeze(0)
             # .expand_as(input_ids)
             position_ids = paddle.expand_as(position_ids, input_ids)

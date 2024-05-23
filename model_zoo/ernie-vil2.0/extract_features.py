@@ -86,7 +86,10 @@ def main():
                     image_ids, images = batch
                     image_features = model.get_image_features(pixel_values=images)
                     image_features /= image_features.norm(axis=-1, keepdim=True)
-                    for image_id, image_feature in zip(image_ids.tolist(), image_features.tolist()):
+                    if type(image_ids) != list:
+                        image_ids = image_ids.tolist()
+
+                    for image_id, image_feature in zip(image_ids, image_features.tolist()):
                         fout.write("{}\n".format(json.dumps({"image_id": image_id, "feature": image_feature})))
                         write_cnt += 1
         print("{} image features are stored in {}".format(write_cnt, args.image_feat_output_path))

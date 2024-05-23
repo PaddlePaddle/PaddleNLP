@@ -75,5 +75,45 @@ class MarkdownConverter(BaseConverter):
         # extract text
         soup = BeautifulSoup(html, "html.parser")
         text = "".join(soup.findAll(text=True))
-
         return text
+
+
+class MarkdownRawTextConverter(BaseConverter):
+    def convert(
+        self,
+        file_path: Path,
+        meta: Optional[Dict[str, str]] = None,
+        remove_numeric_tables: Optional[bool] = None,
+        valid_languages: Optional[List[str]] = None,
+        encoding: Optional[str] = "utf-8",
+        **kwargs: Any,
+    ) -> List[Dict[str, Any]]:
+        """
+        Reads text from a txt file and executes optional preprocessing steps.
+
+        :param file_path: path of the file to convert
+        :param meta: dictionary of meta data key-value pairs to append in the returned document.
+        :param encoding: Select the file encoding (default is `utf-8`)
+        :param remove_numeric_tables: Not applicable
+        :param valid_languages: Not applicable
+
+        :return: Dict of format {"text": "The text from file", "meta": meta}}
+        """
+        with open(file_path, encoding=encoding, errors="ignore") as f:
+            markdown_text = f.read()
+        html = markdown(markdown_text)
+        # remove code snippets
+        html = re.sub(r"<pre>(.*?)</pre>", " ", html)
+        html = re.sub(r"<code>(.*?)</code >", " ", html)
+        # 保留标题
+        html = re.sub(r"<h1>(.*?)</h1>", "<h1>" + r"# \1" + "</h1>", html)
+        html = re.sub(r"<h2>(.*?)</h2>", "<h2>" + r"## \1" + "</h2>", html)
+        html = re.sub(r"<h3>(.*?)</h3>", "<h3>" + r"### \1" + "</h3>", html)
+        html = re.sub(r"<h4>(.*?)</h4>", "<h4>" + r"#### \1" + "</h4>", html)
+        html = re.sub(r"<h5>(.*?)</h5>", "<h5>" + r"##### \1" + "</h5>", html)
+        html = re.sub(r"<h6>(.*?)</h6>", "<h6>" + r"###### \1" + "</h6>", html)
+        # extract text
+        soup = BeautifulSoup(html, "html.parser")
+        markdown_text = "".join(soup.findAll(text=True))
+        document = {"content": markdown_text, "content_type": "text", "meta": meta}
+        return [document]

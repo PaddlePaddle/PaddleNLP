@@ -1,5 +1,0 @@
-paddlenlp>=2.5.2
-safetensors
-ftfy
-regex
-Pillow

@@ -27,4 +27,4 @@ fi
 python -m paddle.distributed.launch --log_dir $log_dir --devices "1" \
     ./tools/auto_export.py \
     -c ./ppfleetx/configs/nlp/gpt/auto/generation_gpt_345M_single_card.yaml \
-    -o Engine.save_load.ckpt_dir=./pretrained/auto
+    -o Engine.save_load.ckpt_dir=./pretrained/inference

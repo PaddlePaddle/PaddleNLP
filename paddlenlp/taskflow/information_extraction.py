@@ -467,6 +467,7 @@ class UIETask(Task):
     def __init__(self, task, model, schema=None, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
 
+        self._convert_from_torch = kwargs.get("convert_from_torch", None)
         self._max_seq_len = kwargs.get("max_seq_len", 512)
         self._dynamic_max_length = kwargs.get("dynamic_max_length", None)
         self._batch_size = kwargs.get("batch_size", 16)
@@ -581,7 +582,9 @@ class UIETask(Task):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = MODEL_MAP[self._init_class].from_pretrained(self._task_path, from_hf_hub=self.from_hf_hub)
+        model_instance = MODEL_MAP[self._init_class].from_pretrained(
+            self._task_path, from_hf_hub=self.from_hf_hub, convert_from_torch=self._convert_from_torch
+        )
         self._model = model_instance
         self._model.eval()
 
@@ -1536,7 +1539,7 @@ class GPTask(Task):
                                 "text": ent["text"],
                                 "start": ent["start_index"],
                                 "end": ent["start_index"] + len(ent["text"]),
-                                "probability": ent["probability"],
+                                "probability": ent["probability"].astype("float"),
                             }
                             result.setdefault(node.name, []).append(ent_res)
                             cnt += 1
@@ -1557,7 +1560,7 @@ class GPTask(Task):
                                         "text": rel["object"],
                                         "start": rel["object_start_index"],
                                         "end": rel["object_start_index"] + len(rel["object"]),
-                                        "probability": rel["probability"],
+                                        "probability": rel["probability"].astype("float"),
                                     }
                                     r["relations"].setdefault(node.name, []).append(rel_res)
                                     cnt += 1
@@ -1584,7 +1587,7 @@ class GPTask(Task):
                             "text": ent["text"],
                             "start": ent["start_index"],
                             "end": ent["start_index"] + len(ent["text"]),
-                            "probability": ent["probability"],
+                            "probability": ent["probability"].astype("float"),
                         }
                         result.setdefault(node.name, []).append(ent_res)
             results.append(result)

@@ -124,7 +124,7 @@ def evaluate(model, criterion, data_loader, file_path, mode):
         logits = model(input_ids=input_ids)
         mask = (input_ids != 0).logical_and((input_ids != 1)).logical_and((input_ids != 2))
         loss = criterion(logits, labels, mask)
-        loss_all += loss.numpy().item()
+        loss_all += loss.item()
         probs = F.sigmoid(logits)
         logits_batch = probs.numpy()
         seq_len_batch = seq_len.numpy()
@@ -231,7 +231,7 @@ def do_train():
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
-            loss_item = loss.numpy().item()
+            loss_item = loss.item()
             global_step += 1
 
             if global_step % logging_steps == 0 and rank == 0:

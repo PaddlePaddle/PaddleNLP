@@ -20,7 +20,7 @@ import tempfile
 import unittest
 
 from paddlenlp.transformers import AutoModel, BertModel
-from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHT_FILE_NAME
+from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHTS_NAME
 
 
 class AutoModelTest(unittest.TestCase):
@@ -63,6 +63,16 @@ class AutoModelTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             AutoModel.from_pretrained(model_name, cache_dir=tempdir)
             self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, CONFIG_NAME)))
-            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, PADDLE_WEIGHT_FILE_NAME)))
+            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, PADDLE_WEIGHTS_NAME)))
             # check against double appending model_name in cache_dir
             self.assertFalse(os.path.exists(os.path.join(tempdir, model_name, model_name)))
+
+    @unittest.skip("skipping due to connection error!")
+    def test_from_hf_hub(self):
+        model = AutoModel.from_pretrained("PaddleCI/tiny-random-bert", from_hf_hub=True, convert_from_torch=False)
+        self.assertIsInstance(model, BertModel)
+
+    @unittest.skip("skipping due to connection error!")
+    def test_from_aistudio(self):
+        model = AutoModel.from_pretrained("PaddleNLP/tiny-random-bert", from_aistudio=True)
+        self.assertIsInstance(model, BertModel)

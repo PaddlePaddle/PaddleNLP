@@ -1,3 +1,4 @@
+trainer.md
 # PaddleNLP Trainer API
 
 PaddleNLP提供了Trainer训练API，针对训练过程的通用训练配置做了封装，比如：
@@ -84,10 +85,37 @@ if training_args.do_train:
 预训练的使用方式可以参考[ERNIE-1.0 Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-1.0/run_pretrain_trainer.py)版本。
 
 
+## Trainer进阶分布式能力使用介绍
+
+**通用分布式能力**
+对于通用的分布式能力, PaddleNLP主要做了数据并行data_parallel, 分布式参数sharding功能的支持.
+这类功能无需用户修改组网, 直接多卡即可运行.
+
+用户使用 `paddle.distruted.launch --devices "0,1,2,3" train.py`即可将运行的程序切换为多卡数据并行.
+如果想要使用sharding功能, 减少模型显存占用, 指定参数`--sharding "stage2"`即可. 更多sharding功能配置见参数介绍部分.
+
+
+**混合并行分布式能力**
+
+飞桨4D并行, 即: data parallel +  sharding parallel + tensor parallel + pipeline parallel.
+
+混合并行这里, 主要添加了 tensor parallel (TP) 和 pipeline parallel(PP)支持.
+目前, PaddleNLP主要对一些大模型, 如 GPT, Llama等做了 TP PP支持, 用户可以使用这些策略.
+
+相关代码实现可以参考llama训练的[例子](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/language_model/llama/run_trainer_tp4pp2.sh)
+
+流水线并行的组网改造可以参见[modeling_pp.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/language_model/llama/modeling_pp.py)
+
+
+当组网适配好 张量并行(TP), 流水线并行(PP)之后, 用户使用 `--tensor_parallel_degree` `--pipeline_parallel_degree` 即可启用混合并行训练.
+
+
+
+
 ## Trainer 实例化参数介绍
 Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并针对 PaddleNLP 模型进行了优化。
 
-```python
+```text
 参数：
     model（[`PretrainedModel`] 或 `paddle.nn.Layer`，可选）：
         用于训练、评估或预测的模型。
@@ -182,7 +210,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
 
 
 ## TrainingArguments 参数介绍
-```python
+```text
   --output_dir
                         保存模型输出和中间checkpoints的输出目录。(`str`, 必须, 默认为 `None`)
 
@@ -293,9 +321,9 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
   --num_train_epochs
                         要执行的训练 epoch 总数（如果不是整数，将在停止训练
                         之前执行最后一个 epoch 的小数部分百分比）。
-                        (`float`, 可选, 默认为 3.0):
+                        (`float`, 可选, 默认为 1.0):
 
-                        Total number of training epochs to perform. (default:3.0)
+                        Total number of training epochs to perform. (default:1.0)
 
   --max_steps
                         如果设置为正数，则表示要执行的训练步骤总数。
@@ -422,6 +450,26 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         ['O0', 'O1', and 'O2']. See details at https://www.pad
                         dlepaddle.org.cn/documentation/docs/zh/develop/api/pad
                         dle/amp/auto_cast_cn.html (default: O1)
+  --amp_custom_black_list
+                       飞桨有默认的黑名单，可以根据模型特点设置自定义黑名单。自定义黑名单中的算子在计算时会被认为是数值危险的，它们的影响也可能会在下游算子中观察到。该名单中的算子不会转为 float16/bfloat16 计算。(可选，默认为None)
+
+                       The custom black_list. The set of ops that support fp16/bf16 calculation and are considered numerically-dangerous and whose effects may also be observed in downstream ops. These ops will not be converted to fp16/bf16. (default:None)
+
+  --amp_custom_white_list
+                       飞桨有默认的白名单，通常不需要设置自定义白名单。自定义白名单中的算子在计算时会被认为是数值安全的，并且对性能至关重要。如果设置了该名单，其中的算子会使用 float16/bfloat16 计算。(可选，默认为None)
+
+                       The custom white_list. It’s the set of ops that support fp16/bf16 calculation and are considered numerically-safe and performance-critical. These ops will be converted to fp16/bf16. (default:None)
+
+  --amp_master_grad
+                        当使用pure fp16/bf16的时候, 可能对梯度的数值精度有更高要求,
+                        例如梯度裁剪, weight decay, 权重更新的时候.
+                        打开此选项, 梯度的数值精度会变成float32类型.
+                        只在 --fp16_opt_level O2 生效, 默认为 False
+
+                        For amp opt level=’O2’, whether to use float32 weight gradients
+                        for calculations such as gradient clipping, weight decay, and weight updates.
+                        If master_grad is enabled, the weight gradients will be float32 dtype after the backpropagation.
+                        Note: only support model parallel and pipeline parallel for now !!! (default: False)
 
   --scale_loss
                         fp16/bf16训练时，scale_loss的初始值。
@@ -438,7 +486,6 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                             stage3 : parameter + gradient + optimizer  中的参数都切分到不同卡
                             offload ： offload parameters to cpu 部分参数存放到cpu中
                          (`str`,  可选, 默认为 `` 不使用sharding)
-                         注意：当前stage3暂时不可用
 
                         Whether or not to use Paddle Sharding Data Parallel training (in distributed training
                         only). The base option should be `stage1`, `stage2` or `stage3` and you can add
@@ -448,9 +495,8 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                             stage2 : optimizer state + gradient segmentation
                             stage3 : parameter + gradient + optimizer state segmentation
                             offload ： offload parameters to cpu
-                        NOTICE： stage3 is temporarily unavaliable.
 
-  --sharding_degree
+  --sharding_parallel_degree
                         设置sharding的通信组参数，表示通信组的大小。同一个sharding通信组内的参数，进行sharding，分布到不同卡上。
                         不同sharding通信组之间，相当于单纯的数据并行。此选项只在sharding选项开启时候生效。
                         默认值为-1，表示所有训练的卡在同一个通信组内。
@@ -459,6 +505,77 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         Sharding parameter in certain cards group. For example, aussume we use 2 machines each
                         with 8 cards, then set sharding_degree=8, sharding will only communication inside machine.
                         default -1 means sharding parameters between all workers. (`int`, *optional*, defaults to `-1`)
+
+  --tensor_parallel_degree
+                        张量并行是Megatron论文针对Transformer结构的张量切分方法.
+                        此方法将一层transformer的计算划分到了不同卡上.
+                        此参数tensor_parallel_degree表示将一层transformer结构的份数.
+                        默认值-1, 表示不启用张量并行,
+                        (`int`, 可选, 默认为 `-1`)
+                        (注: 该方法需要修改模型结构, 目前支持GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM)
+                        (注: 该方法对通信开销较大, 建议 tensor_parallel_degree<=8, 尽量使用机器内部通信)
+
+                        Tensor parallelism is a parallel technique which proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.3 Tensor Model Parallelism).
+                        This techique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts)
+                        tensor_parallel_degree means split the transformer layer to how many parts.
+                        default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better proformance.
+                        Note, this need model support in source code, currently GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM is supported.
+
+  --tensor_parallel_config
+                        对于张量并行,一些选项会影响训练性能,这里将一些选项配置集中管理,以str形式传入配置.
+                        支持如下选项:
+                            enable_delay_scale_loss : 在优化器阶段做梯度累加，将所有梯度除以累加次数，而不是直接对loss除以累加次数。
+                            sync_param : 在优化器阶段使用broadcast同步所有is_distributed=False的参数
+                            sync_grad : 在优化器阶段使用broadcast同步所有is_distributed=False的梯度
+                            sync_moment : 在优化器阶段使用broadcast同步所有is_distributed=False的momentum
+
+                        Some additional config it highly affect the usage of tensor parallel, we provide some option to config it.
+                        following config is support:
+                            enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.
+                            sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.
+                            sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.
+                            sync_moment, in optimizer step, use broadcast to sync momentums those attr 'is_distributed' is False.
+
+  --pipeline_parallel_degree
+                        流水线并行是Megatron论文针对多层Transformer结构提出的按层划分方法.
+                        该方法将多层的transformer结构,按照不同层,均匀划分到不同的卡上.
+                        然后数据流先后在不同的卡上传递, 形成流水线.
+                        参数pipeline_parallel_degree表示划分流水线的大小.(假设该参数为4, 模型12层, 则每一个pp stage 包含3层模型)
+                        默认值-1, 表示不启用流水线并行,
+                        (`int`, 可选, 默认为 `-1`)
+                        (注, 使用此功能需要修改源码,请参见language_model/llama/modeling_pp.py文件)
+
+                        Pipeline parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.2 Pipeline Model Parallelism).
+                        Pipeline parallelism assigns multi-transformer layers to different cards, the micro batch data stream passed between cards like pipelines.
+                        pipeline_parallel_degree means split all transformer layers to how many stages.
+                        default -1 for not use pipeline parallel.
+                        Note. this need model support in source code, see llama modeling_pp.py file
+
+  --pipeline_parallel_config
+                        对于流水线并行,一些选项会影响训练性能,这里将一些选项配置集中管理,以str形式传入配置.
+                        支持如下选项:
+                            disable_p2p_cache_shape : 关闭通信时候的tensor shape cache, 如果你的模型输入的tensor, shape 是不断变化的(如sequence length) 必须配置此选项
+                            disable_partial_send_recv : 关闭与张量并行合用时候的通信优化.
+                            enable_dp_comm_overlap : 开启PP+DP使用时候的通信优化.
+                            enable_delay_scale_loss : 开启, 使得梯度累积, 先累积最后除以累积次数. 而不是每次除以累积次数.
+
+                        Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it.
+                        following config is support:
+                          disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape.
+                          disable_partial_send_recv, optmize send speed for tensor parallel.
+                          enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
+                          enable_dp_comm_overlap, fuse data parallel gradient communication.
+
+  --data_parallel_config
+                        对于数据并行,一些选项会影响训练性能,这里将一些选项配置集中管理,以str形式传入配置.
+                        支持如下选项:
+                            enable_allreduce_avg_in_gradinent_scale : 在数据并行中, 替换`allreduce_sum + scale`模式为`allreduce_avg`, 以提高性能. 仅支持auto模式.
+                            gradient_sync_after_accumulate : 当梯度累积开启时, 将梯度同步操作从backward阶段移动到optimizer阶段, 以减少同步次数, 提高性能, 但会增加显存占用. 仅支持auto模式.
+
+                        Some additional configs which affect data parallel performance, we provide some option to config it.
+                        following config is support:
+                            enable_allreduce_avg_in_gradinent_scale, it replace `allreduce_sum + scale` pattern with `allreduce_avg` when scale gradient in data_parallel, which improve the performance. ONLY supported for auto mode now.
+                            gradient_sync_after_accumulate, move gradient sync operations from backward into optimizer step when gradient accumulate enabling, which reduce the sync times to improve performance, but will increase the memory usage. ONLY supported for auto mode now.
 
   --recompute
                         是否使用重计算训练。可以节省显存。
@@ -493,6 +610,12 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         （`int`，可选，默认为 None）
 
                         Run an evaluation every X steps. (default: None)
+
+  --max_evaluate_steps
+                        如果设置为正数，则表示要执行的评估步骤的总数。
+                        （`int`，可选，默认为 -1)
+
+                        If set to a positive number, the total number of evaluation steps to perform. (default: -1)
 
   --dataloader_num_workers
                         用于数据加载的子进程数。 0 表示数据将在主进程制造。
@@ -562,6 +685,29 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         是否从断点重启恢复训练，(可选，默认为 None)
                         The path to a folder with a valid checkpoint for your
                         model. (default: None)
+
+  --unified_checkpoint
+                       是否使用unified_checkpoint，开启后训练的checkpoint将存储为新格式。
+                       可以支持跨分布式策略重启、动态扩缩容重启。(可选，默认为False)
+                       Whether to use unified_checkpoint, enable it to store training checkpoint in a new format.
+                       Supporting restart with different distribution strategies and devices，(optional, defaults to False)
+
+  --unified_checkpoint_config
+                       与Unified Checkpoint相关的一些优化配置项，以str形式传入配置。
+                       支持如下选项:
+                           skip_save_model_weight: 当master_weights存在时，跳过保存模型权重。
+                           master_weight_compatible: 1. 仅当optimizer需要master_weights时，才进行加载;
+                                                     2. 如果checkpoint中不存在master_weights，则将model weight作为master_weights进行加载。
+                           async_save: 在保存Checkpoint至磁盘时做异步保存，不影响训练过程，提高训练效率。
+                           enable_all_options: 上述参数全部开启。
+
+                       Some additional config of Unified checkpoint, we provide some options to config.
+                       Following config is support:
+                           skip_save_model_weight, no need to save model weights when the master_weights exist.
+                           master_weight_compatible, 1. if the master_weights exist, only load when needed.
+                                                     2. if master_weights does not exist, convert model weights to master_weights when needed.
+                           async_save, enable asynchronous saving checkpoints to disk.
+                           enable_all_options, enable all unified checkpoint optimization configs.
 
   --skip_memory_metrics
                        是否跳过内存profiler检测。（可选，默认为True，跳过）

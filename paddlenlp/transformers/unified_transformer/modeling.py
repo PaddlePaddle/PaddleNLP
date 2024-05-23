@@ -97,9 +97,9 @@ class UnifiedTransformerEmbeddings(nn.Layer):
         if input_ids is None and input_embeddings is None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
-            inputs_shape = paddle.shape(input_ids)
+            inputs_shape = input_ids.shape
         elif input_embeddings is not None:
-            inputs_shape = paddle.shape(input_embeddings)[:-1]
+            inputs_shape = input_embeddings.shape[:-1]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
         if input_embeddings is None:
@@ -149,7 +149,7 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a `paddle.nn.Layer <https://www.paddlepaddle.org.cn
-    /documentation/docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__
+    /documentation/docs/zh/api/paddle/nn/Layer_cn.html>`__
     subclass. Use it as a regular Paddle Layer and refer to the Paddle
     documentation for all matter related to general usage and behavior.
 
@@ -524,17 +524,14 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
 
         if position_ids is None:
             if self.pad_token_id is None:
-                position_ids = paddle.expand_as(
-                    paddle.arange(end=paddle.shape(input_ids)[1], dtype="int64"), input_ids
-                )
+                position_ids = paddle.expand_as(paddle.arange(end=input_ids.shape[1], dtype="int64"), input_ids)
             else:
                 # NOTE: If there is a unk_token_id in input_ids, the following logic is wrong.
                 # In that case, the position_ids must be provided.
                 # And this is for left padding input_ids.
                 num_pad = paddle.sum((input_ids == self.pad_token_id).astype("float32"), axis=-1, keepdim=True)
                 position_ids = F.relu(
-                    paddle.expand_as(paddle.arange(end=paddle.shape(input_ids)[1], dtype="float32"), input_ids)
-                    - num_pad
+                    paddle.expand_as(paddle.arange(end=input_ids.shape[1], dtype="float32"), input_ids) - num_pad
                 ).astype("int64")
             position_ids.stop_gradient = True
 

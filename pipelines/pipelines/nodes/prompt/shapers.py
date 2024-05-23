@@ -17,7 +17,12 @@ import logging
 import re
 from functools import reduce
 from string import Template
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+try:
+    from typing import Literal
+except ImportError:
+    from typing_extensions import Literal
 
 from pipelines.nodes.base import BaseComponent
 from pipelines.schema import Answer, Document, MultiLabel
@@ -361,7 +366,10 @@ def join_documents_and_scores(documents: List[Document]) -> Tuple[List[Document]
     ) == ([Document(content="-[0.9] first\n -[0.7] second\n -[0.5] third")], )
     ```
     """
-    content = "\n".join([f"-[{round(float(doc.meta['score']),2)}] {doc.content}" for doc in documents])
+    if "score" in documents[0].meta:
+        content = "\n".join([f"-[{round(float(doc.meta['score']),2)}] {doc.content}" for doc in documents])
+    else:
+        content = "\n".join([f"-[{round(float(doc.score),2)}] {doc.content}" for doc in documents])
     return ([Document(content=content)],)
 
 

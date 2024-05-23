@@ -21,7 +21,6 @@ import numpy as np
 import paddle
 from paddle import ParamAttr, tensor
 from paddle.common_ops_import import convert_dtype
-from paddle.fluid import layers
 from paddle.nn import Layer, LayerList
 from paddle.nn import functional as F
 from paddle.nn.layer.common import Dropout, Linear
@@ -316,12 +315,8 @@ class MultiHeadAttention(Layer):
             k, v = self.compute_kv(key, value)
             return self.StaticCache(k, v)
         elif value is None:  # incremental_state
-            k = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_heads, 0, self.head_dim], dtype=key.dtype, value=0
-            )
-            v = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_heads, 0, self.head_dim], dtype=key.dtype, value=0
-            )
+            k = paddle.full(shape=[key.shape[0], self.num_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0)
+            v = paddle.full(shape=[key.shape[0], 2, self.num_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0)
             return self.Cache(k, v)
         else:
             # incremental_state with initial value, mainly for usage like UniLM
@@ -741,7 +736,7 @@ class TransformerDecoderLayer(Layer):
             for linear in FFN. Otherwise, the three sub-layers all uses it as
             `weight_attr` to create parameters. Default: None, which means the
             default weight parameter property is used. See usage for details
-            in :ref:`api_paddle_fluid_param_attr_ParamAttr` .
+            in :ref:`api_paddle_ParamAttr` .
         bias_attr (ParamAttr|list|tuple|bool, optional): To specify the bias parameter property.
             If it is a list/tuple, `bias_attr[0]` would be used as `bias_attr` for
             self attention, `bias_attr[1]` would be used as `bias_attr` for

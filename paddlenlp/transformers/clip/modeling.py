@@ -720,6 +720,9 @@ class CLIPTextTransformer(nn.Layer):
         self.transformer = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
         self.ln_final = nn.LayerNorm(embed_dim)
 
+        # For `pooled_output` computation
+        self.eos_token_id = config.eos_token_id
+
         self.register_buffer(
             "causal_mask",
             paddle.triu(
@@ -729,7 +732,9 @@ class CLIPTextTransformer(nn.Layer):
             persistable=False,
         )
         self.register_buffer(
-            "position_ids", paddle.arange(config.max_position_embeddings, dtype="int64").reshape((1, -1))
+            "position_ids",
+            paddle.arange(config.max_position_embeddings, dtype="int64").reshape((1, -1)),
+            persistable=False,
         )
 
     def forward(
@@ -802,9 +807,35 @@ class CLIPTextTransformer(nn.Layer):
 
         last_hidden_state = self.ln_final(last_hidden_state)
 
-        pooled_output = last_hidden_state.gather_nd(
-            paddle.stack([paddle.arange(bs, dtype="int32"), input_ids.argmax(-1, dtype="int32")], axis=-1)
-        )
+        if self.eos_token_id == 2:
+            # The `eos_token_id` was incorrect before PR #24773: Let's keep what have been done here.
+            # A CLIP model with such `eos_token_id` in the config can't work correctly with extra new tokens added
+            # ------------------------------------------------------------
+            # text_embeds.shape = [batch_size, sequence_length, transformer.width]
+            # take features from the eot embedding (eot_token is the highest number in each sequence)
+            # casting to paddle.int32 for onnx compatibility: argmax doesn't support int64 inputs with opset 14
+            pooled_output = last_hidden_state.gather_nd(
+                paddle.stack(
+                    [paddle.arange(last_hidden_state.shape[0], dtype="int32"), input_ids.argmax(-1, dtype="int32")],
+                    axis=-1,
+                )
+            )
+        else:
+            # The config gets updated `eos_token_id` from PR #24773 (so the use of exta new tokens is possible)
+            # We need to get the first position of `eos_token_id` value (`pad_token_ids` might equal to `eos_token_id`)
+            pooled_output = last_hidden_state.gather_nd(
+                paddle.stack(
+                    [
+                        paddle.arange(last_hidden_state.shape[0], dtype="int32"),
+                        # make sure we have 1D tensor, not 0D tensor
+                        (input_ids == paddle.to_tensor([self.eos_token_id], dtype=input_ids.dtype))
+                        .cast("int32")
+                        .argmax(axis=-1, dtype="int32"),
+                    ],
+                    axis=-1,
+                )
+            )
+
         if isinstance(encoder_outputs, type(embedding_output)):
             return (last_hidden_state, pooled_output)
 
@@ -826,7 +857,7 @@ class CLIPTextModel(CLIPPretrainedModel):
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -943,7 +974,11 @@ class CLIPVisionTransformer(nn.Layer):
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
         self.ln_post = nn.LayerNorm(embed_dim)
-        self.register_buffer("position_ids", paddle.arange(self.num_positions).reshape((1, -1)))
+        self.register_buffer(
+            "position_ids",
+            paddle.arange(self.num_positions).reshape((1, -1)),
+            persistable=False,
+        )
 
     def forward(
         self,
@@ -976,8 +1011,9 @@ class CLIPVisionTransformer(nn.Layer):
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        target_dtype = self.conv1.weight.dtype
+        pixel_values = self.conv1(pixel_values.cast(target_dtype))
 
-        pixel_values = self.conv1(pixel_values)
         pixel_values = pixel_values.reshape((pixel_values.shape[0], pixel_values.shape[1], -1))
         pixel_values = pixel_values.transpose((0, 2, 1))
         embedding_output = paddle.concat(
@@ -1038,7 +1074,7 @@ class CLIPVisionModel(CLIPPretrainedModel):
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -1118,7 +1154,7 @@ class CLIPModel(CLIPPretrainedModel):
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -1450,7 +1486,7 @@ class CLIPTextModelWithProjection(CLIPPretrainedModel):
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -1557,7 +1593,7 @@ class CLIPVisionModelWithProjection(CLIPPretrainedModel):
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:

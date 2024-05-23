@@ -31,9 +31,11 @@ API_ENDPOINT = os.getenv("API_ENDPOINT")
 STATUS = "initialized"
 HS_VERSION = "hs_version"
 DOC_REQUEST = "query"
+DOC_REQUEST_CHATFILE = "chatfile_query"
 FILE_REQUEST = "query_images"
 DOC_FEEDBACK = "feedback"
 DOC_UPLOAD = "file-upload"
+DOC_UPLOAD_SPLITTER = "file-upload-splitter"
 DOC_PARSE = "files"
 IMAGE_REQUEST = "query_text_to_images"
 QA_PAIR_REQUEST = "query_qa_pairs"
@@ -205,6 +207,47 @@ def semantic_search(
     return results, response
 
 
+def ChatFile(
+    query,
+    filters={},
+    top_k_reader=5,
+    top_k_retriever=5,
+    pooling_mode="mean_tokens",
+    api_key: Optional[str] = None,
+    secret_key: Optional[str] = None,
+):
+    url = f"{API_ENDPOINT}/{DOC_REQUEST_CHATFILE}"
+    if api_key is not None and api_key != " " and secret_key is not None and secret_key != " ":
+        params = {
+            "filters": filters,
+            "Retriever": {
+                "top_k": top_k_retriever,
+                "pooling_mode": pooling_mode,
+            },
+            "Ranker": {"top_k": top_k_reader},
+            "ErnieBot": {"api_key": api_key, "secret_key": secret_key},
+        }
+    else:
+        params = {
+            "filters": filters,
+            "Retriever": {
+                "top_k": top_k_retriever,
+                "pooling_mode": pooling_mode,
+            },
+            "Ranker": {"top_k": top_k_reader},
+        }
+    req = {"query": query, "params": params}
+    response_raw = requests.post(url, json=req)
+
+    if response_raw.status_code >= 400 and response_raw.status_code != 503:
+        raise Exception(f"{vars(response_raw)}")
+
+    response = response_raw.json()
+    if "errors" in response:
+        raise Exception(", ".join(response["errors"]))
+    return response
+
+
 def text_to_image_search(
     query, resolution="1024*1024", top_k_images=5, style="探索无限"
 ) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
@@ -324,6 +367,22 @@ def upload_doc(file):
     url = f"{API_ENDPOINT}/{DOC_UPLOAD}"
     files = [("files", file)]
     response = requests.post(url, files=files).json()
+    return response
+
+
+def upload_chatfile(file, chunk_size: int = 300, separator: str = "\n", filters: list = ["\n"]):
+    url = f"{API_ENDPOINT}/{DOC_UPLOAD_SPLITTER}"
+    params = {
+        "DocxSplitter": {"filters": filters, "chunk_size": chunk_size},
+        "MarkdownSplitter": {"filters": filters, "chunk_size": chunk_size},
+        "TextSplitter": {"filters": filters, "chunk_size": chunk_size, "separator": separator},
+        "PDFSplitter": {"filters": filters, "chunk_size": chunk_size, "separator": separator},
+        "ImageSplitter": {"filters": filters, "chunk_size": chunk_size, "separator": separator},
+    }
+
+    files = [("files", file)]
+    req = {"meta": json.dumps(params)}
+    response = requests.post(url, data=req, files=files, verify=False).json()
     return response
 
 

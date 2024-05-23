@@ -32,7 +32,7 @@ try:
         Urllib3HttpConnection,
     )
     from elasticsearch.exceptions import RequestError
-    from elasticsearch.helpers import bulk, scan
+    from elasticsearch.helpers import parallel_bulk, scan
 except (ImportError, ModuleNotFoundError) as ie:
     from pipelines.utils.import_utils import _optional_component_not_installed
 
@@ -44,6 +44,8 @@ from pipelines.document_stores.filter_utils import LogicalFilterClause
 from pipelines.schema import Document, Label
 
 logger = logging.getLogger(__name__)
+# disable elastic search debug log
+logging.getLogger("elasticsearch").setLevel(logging.INFO)
 
 
 class ElasticsearchDocumentStore(KeywordDocumentStore):
@@ -63,6 +65,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         name_field: str = "name",
         embedding_field: str = "embedding",
         embedding_dim: int = 768,
+        vector_type: str = "dense_vector",
         custom_mapping: Optional[dict] = None,
         excluded_meta_data: Optional[list] = None,
         analyzer: str = "standard",
@@ -82,6 +85,10 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         synonyms: Optional[List] = None,
         synonym_type: str = "synonym",
         use_system_proxy: bool = False,
+        chunk_size: int = 500,
+        thread_count: int = 32,
+        queue_size: int = 32,
+        **kwargs,
     ):
         """
         A DocumentStore using Elasticsearch to store and query the documents for our search.
@@ -154,7 +161,9 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                              Synonym or Synonym_graph to handle synonyms, including multi-word synonyms correctly during the analysis process.
                              More info at https://www.elastic.co/guide/en/elasticsearch/reference/current/analysis-synonym-graph-tokenfilter.html
         :param use_system_proxy: Whether to use system proxy.
-
+        :param queue_size: size of the task queue between the main thread (producing chunks to send) and the processing threads. for more info at https://elasticsearch-py.readthedocs.io/en/v8.8.2/helpers.html?highlight=bulk#bulk-helpers
+        :param chunk_size: number of docs in one chunk sent to es (default: 500)
+        :param thread_count: size of the threadpool to use for the bulk requests
         """
         # save init parameters to enable export of component config as YAML
         self.set_config(
@@ -185,6 +194,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
             timeout=timeout,
             return_embedding=return_embedding,
             index_type=index_type,
+            vector_type=vector_type,
             scroll=scroll,
             skip_missing_embeddings=skip_missing_embeddings,
             synonyms=synonyms,
@@ -229,12 +239,11 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         self.label_index: str = label_index
         self.scroll = scroll
         self.skip_missing_embeddings: bool = skip_missing_embeddings
-        if similarity in ["cosine", "dot_product", "l2"]:
-            self.similarity = similarity
-        else:
-            raise Exception(
-                f"Invalid value {similarity} for similarity in ElasticSearchDocumentStore constructor. Choose between 'cosine', 'l2' and 'dot_product'"
-            )
+        self.vector_type = vector_type
+        self.number_of_shards = kwargs.get("number_of_shards", 1)
+        self.number_of_replicas = kwargs.get("number_of_replicas", 2)
+
+        self.similarity_check(similarity)
         if index_type in ["flat", "hnsw"]:
             self.index_type = index_type
         else:
@@ -255,6 +264,17 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
 
         self.duplicate_documents = duplicate_documents
         self.refresh_type = refresh_type
+        self.chunk_size = chunk_size
+        self.thread_count = thread_count
+        self.queue_size = queue_size
+
+    def similarity_check(self, similarity):
+        if similarity in ["cosine", "dot_product", "l2"]:
+            self.similarity = similarity
+        else:
+            raise Exception(
+                f"Invalid value {similarity} for similarity in ElasticSearchDocumentStore constructor. Choose between 'cosine', 'l2' and 'dot_product'"
+            )
 
     @classmethod
     def _init_elastic_client(
@@ -292,6 +312,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                 verify_certs=verify_certs,
                 timeout=timeout,
                 connection_class=connection_class,
+                max_retries=5,
+                retry_on_timeout=True,
             )
         elif aws4auth:
             # aws elasticsearch with IAM
@@ -303,6 +325,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                 use_ssl=True,
                 verify_certs=True,
                 timeout=timeout,
+                max_retries=5,
+                retry_on_timeout=True,
             )
         elif username:
             # standard http_auth
@@ -314,6 +338,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                 verify_certs=verify_certs,
                 timeout=timeout,
                 connection_class=connection_class,
+                max_retries=5,
+                retry_on_timeout=True,
             )
         else:
             # there is no authentication for this elasticsearch instance
@@ -324,6 +350,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                 verify_certs=verify_certs,
                 timeout=timeout,
                 connection_class=connection_class,
+                max_retries=5,
+                retry_on_timeout=True,
             )
 
         # Test connection
@@ -378,14 +406,14 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
             if self.embedding_field:
                 if (
                     self.embedding_field in mapping["properties"]
-                    and mapping["properties"][self.embedding_field]["type"] != "dense_vector"
+                    and mapping["properties"][self.embedding_field]["type"] != self.vector_type
                 ):
                     raise Exception(
                         f"The '{index_name}' index in Elasticsearch already has a field called '{self.embedding_field}'"
                         f" with the type '{mapping['properties'][self.embedding_field]['type']}'. Please update the "
                         f"document_store to use a different name for the embedding_field parameter."
                     )
-                mapping["properties"][self.embedding_field] = {"type": "dense_vector", "dims": self.embedding_dim}
+                mapping["properties"][self.embedding_field] = {"type": self.vector_type, "dims": self.embedding_dim}
                 self.client.indices.put_mapping(index=index_name, body=mapping, headers=headers)
             return
 
@@ -434,8 +462,10 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                     mapping["mappings"]["properties"].update({field: {"type": "text"}})
 
             if self.embedding_field:
+                mapping["settings"]["number_of_shards"] = self.number_of_shards
+                mapping["settings"]["number_of_replicas"] = self.number_of_replicas
                 mapping["mappings"]["properties"][self.embedding_field] = {
-                    "type": "dense_vector",
+                    "type": self.vector_type,
                     "dims": self.embedding_dim,
                 }
 
@@ -468,7 +498,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                     "updated_at": {"type": "date", "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"}
                     # TODO add pipeline_hash and pipeline_name once we migrated the REST API to pipelines
                 }
-            }
+            },
+            "settings": {"number_of_shards": self.number_of_shards, "number_of_replicas": self.number_of_replicas},
         }
         try:
             self.client.indices.create(index=index_name, body=mapping, headers=headers)
@@ -507,9 +538,15 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         to performance issues. Note that Elasticsearch limits the number of results to 10,000 documents by default.
         """
         index = index or self.index
-        query = {"size": len(ids), "query": {"ids": {"values": ids}}}
-        result = self.client.search(index=index, body=query, headers=headers)["hits"]["hits"]
-        documents = [self._convert_es_hit_to_document(hit, return_embedding=self.return_embedding) for hit in result]
+        documents = []
+        for i in range(0, len(ids), batch_size):
+            ids_for_batch = ids[i : i + batch_size]
+            query = {"size": len(ids_for_batch), "query": {"ids": {"values": ids_for_batch}}}
+            result = self.client.search(index=index, body=query, request_timeout=600, headers=headers)["hits"]["hits"]
+            # documents = [self._convert_es_hit_to_document(hit, return_embedding=self.return_embedding) for hit in result]
+            documents.extend(
+                [self._convert_es_hit_to_document(hit, return_embedding=self.return_embedding) for hit in result]
+            )
         return documents
 
     def get_metadata_values_by_key(
@@ -639,6 +676,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
             documents=document_objects, index=index, duplicate_documents=duplicate_documents, headers=headers
         )
         documents_to_index = []
+
         for doc in document_objects:
             _doc = {
                 "_op_type": "index" if duplicate_documents == "overwrite" else "create",
@@ -668,11 +706,27 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
 
             # Pass batch_size number of documents to bulk
             if len(documents_to_index) % batch_size == 0:
-                bulk(self.client, documents_to_index, request_timeout=300, refresh=self.refresh_type, headers=headers)
+                for success, info in parallel_bulk(
+                    self.client,
+                    documents_to_index,
+                    chunk_size=self.chunk_size,
+                    thread_count=self.thread_count,
+                    queue_size=self.queue_size,
+                ):
+                    if not success:
+                        logger.error("A document failed:", info)
                 documents_to_index = []
 
         if documents_to_index:
-            bulk(self.client, documents_to_index, request_timeout=300, refresh=self.refresh_type, headers=headers)
+            for success, info in parallel_bulk(
+                self.client,
+                documents_to_index,
+                chunk_size=self.chunk_size,
+                thread_count=self.thread_count,
+                queue_size=self.queue_size,
+            ):
+                if not success:
+                    logger.error("A document failed:", info)
 
     def write_labels(
         self,
@@ -726,11 +780,27 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
 
             # Pass batch_size number of labels to bulk
             if len(labels_to_index) % batch_size == 0:
-                bulk(self.client, labels_to_index, request_timeout=300, refresh=self.refresh_type, headers=headers)
+                for success, info in parallel_bulk(
+                    self.client,
+                    labels_to_index,
+                    chunk_size=self.chunk_size,
+                    thread_count=self.thread_count,
+                    queue_size=self.queue_size,
+                ):
+                    if not success:
+                        logger.error("A document failed:", info)
                 labels_to_index = []
 
         if labels_to_index:
-            bulk(self.client, labels_to_index, request_timeout=300, refresh=self.refresh_type, headers=headers)
+            for success, info in parallel_bulk(
+                self.client,
+                labels_to_index,
+                chunk_size=self.chunk_size,
+                thread_count=self.thread_count,
+                queue_size=self.queue_size,
+            ):
+                if not success:
+                    logger.error("A document failed:", info)
 
     def update_document_meta(
         self, id: str, meta: Dict[str, str], headers: Optional[Dict[str, str]] = None, index: str = None
@@ -1150,7 +1220,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
             body["_source"] = {"excludes": self.excluded_meta_data}
 
         logger.debug(f"Retriever query: {body}")
-        result = self.client.search(index=index, body=body, headers=headers)["hits"]["hits"]
+        logging.getLogger("elasticsearch").setLevel(logging.CRITICAL)
+        result = self.client.search(index=index, body=body, request_timeout=600, headers=headers)["hits"]["hits"]
 
         documents = [self._convert_es_hit_to_document(hit, return_embedding=self.return_embedding) for hit in result]
         return documents
@@ -1250,14 +1321,17 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         # +1 in similarity to avoid negative numbers (for cosine sim)
         body = {"size": top_k, "query": self._get_vector_similarity_query(query_emb, top_k)}
         if filters:
-            filter_ = {"bool": {"filter": LogicalFilterClause.parse(filters).convert_to_elasticsearch()}}
-            if body["query"]["script_score"]["query"] == {"match_all": {}}:
-                body["query"]["script_score"]["query"] = filter_
+            if self.index_type == "hnsw":
+                filter_ = {"filter": LogicalFilterClause.parse(filters).convert_to_elasticsearch()}
+                body["query"]["knn"][self.embedding_field].update(filter_)
             else:
-                body["query"]["script_score"]["query"]["bool"]["filter"]["bool"]["must"].append(filter_)
+                filter_ = {"bool": {"filter": LogicalFilterClause.parse(filters).convert_to_elasticsearch()}}
+                if body["query"]["script_score"]["query"] == {"match_all": {}}:
+                    body["query"]["script_score"]["query"] = filter_
+                else:
+                    body["query"]["script_score"]["query"]["bool"]["filter"]["bool"]["must"].append(filter_)
 
         excluded_meta_data: Optional[list] = None
-
         if self.excluded_meta_data:
             excluded_meta_data = deepcopy(self.excluded_meta_data)
 
@@ -1271,9 +1345,9 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         if excluded_meta_data:
             body["_source"] = {"excludes": excluded_meta_data}
 
-        logger.debug(f"Retriever query: {body}")
+        # logger.debug(f"Retriever query: {body}")
         try:
-            result = self.client.search(index=index, body=body, request_timeout=300, headers=headers)["hits"]["hits"]
+            result = self.client.search(index=index, body=body, request_timeout=600, headers=headers)["hits"]["hits"]
             if len(result) == 0:
                 count_embeddings = self.get_embedding_count(index=index, headers=headers)
                 if count_embeddings == 0:
@@ -1471,7 +1545,6 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         )
 
         logging.getLogger("elasticsearch").setLevel(logging.CRITICAL)
-
         with tqdm(total=document_count, position=0, unit=" Docs", desc="Updating embeddings") as progress_bar:
             for result_batch in get_batches_from_generator(result, batch_size):
                 document_batch = [
@@ -1495,8 +1568,15 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                         "doc": {self.embedding_field: emb.tolist()},
                     }
                     doc_updates.append(update)
-
-                bulk(self.client, doc_updates, request_timeout=300, refresh=self.refresh_type, headers=headers)
+                for success, info in parallel_bulk(
+                    self.client,
+                    doc_updates,
+                    chunk_size=self.chunk_size,
+                    thread_count=self.thread_count,
+                    queue_size=self.queue_size,
+                ):
+                    if not success:
+                        logger.error("A document failed:", info)
                 progress_bar.update(batch_size)
 
     def delete_all_documents(
@@ -2014,7 +2094,7 @@ class OpenSearchDocumentStore(ElasticsearchDocumentStore):
             # use default parameters
             pass
         elif self.index_type == "hnsw":
-            method["parameters"] = {"ef_construction": 80, "m": 64}
+            method["parameters"] = {"ef_construction": self.ef_construction, "m": self.m}
         else:
             logger.error("Please set index_type to either 'flat' or 'hnsw'")
 
@@ -2131,8 +2211,15 @@ class OpenSearchDocumentStore(ElasticsearchDocumentStore):
                             "doc": {new_embedding_field: doc.embedding.tolist()},
                         }
                         doc_updates.append(update)
-
-                bulk(self.client, doc_updates, request_timeout=300, refresh=self.refresh_type, headers=headers)
+                for success, info in parallel_bulk(
+                    self.client,
+                    doc_updates,
+                    chunk_size=self.chunk_size,
+                    thread_count=self.thread_count,
+                    queue_size=self.queue_size,
+                ):
+                    if not success:
+                        logger.error("A document failed:", info)
                 progress_bar.update(batch_size)
 
 
@@ -2151,3 +2238,192 @@ class OpenDistroElasticsearchDocumentStore(OpenSearchDocumentStore):
 
     def _prepare_hosts(self, host, port):
         return host
+
+
+class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
+    ef_construction = 200
+    m = 32
+    space_type = "l2"
+
+    def similarity_check(self, similarity):
+        if similarity in ["cosine", "dot_prod", "l2", "l1"]:
+            self.similarity = similarity
+        else:
+            raise Exception(
+                f"Invalid value {similarity} for similarity in BaiduElasticSearchDocumentStore constructor. Choose between 'cosine', 'l1', 'l2' and 'dot_prod'"
+            )
+
+    def _get_vector_similarity_query(self, query_emb: np.ndarray, top_k: int):
+        """
+        Generate Elasticsearch query for vector similarity.
+        """
+        # To handle scenarios where embeddings may be missing
+        script_score_query: dict = {"match_all": {}}
+        if self.skip_missing_embeddings:
+            script_score_query = {
+                "bool": {"filter": {"bool": {"must": [{"exists": {"field": self.embedding_field}}]}}}
+            }
+        if self.index_type == "hnsw":
+            query = {
+                "knn": {
+                    self.embedding_field: {
+                        "vector": query_emb.tolist(),
+                        "k": 16,
+                        "ef": self.ef_construction,
+                    }
+                }
+            }
+        else:
+            query = {
+                "script_score": {
+                    "query": script_score_query,
+                    "script": {
+                        # offset score to ensure a positive range as required by Elasticsearch
+                        "source": "bpack_knn_script",
+                        "lang": "knn",
+                        "params": {"space": self.similarity, "field": "embedding", "vector": query_emb.tolist()},
+                    },
+                }
+            }
+
+        return query
+
+    def _create_label_index(self, index_name: str, headers: Optional[Dict[str, str]] = None):
+        if self.client.indices.exists(index=index_name, headers=headers):
+            return
+        mapping = {
+            "mappings": {
+                "properties": {
+                    "query": {"type": "text"},
+                    "answer": {"type": "text"},  # light-weight but less search options than full object
+                    "document": {"type": "text"},
+                    "is_correct_answer": {"type": "boolean"},
+                    "is_correct_document": {"type": "boolean"},
+                    "origin": {"type": "keyword"},  # e.g. user-feedback or gold-label
+                    "document_id": {"type": "keyword"},
+                    "no_answer": {"type": "boolean"},
+                    "pipeline_id": {"type": "keyword"},
+                    "created_at": {"type": "date", "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"},
+                    "updated_at": {"type": "date", "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"}
+                    # TODO add pipeline_hash and pipeline_name once we migrated the REST API to pipelines
+                }
+            }
+        }
+        try:
+            self.client.indices.create(index=index_name, body=mapping, headers=headers)
+        except RequestError as e:
+            # With multiple workers we need to avoid race conditions, where:
+            # - there's no index in the beginning
+            # - both want to create one
+            # - one fails as the other one already created it
+            if not self.client.indices.exists(index=index_name, headers=headers):
+                raise e
+
+    def _create_document_index(self, index_name: str, headers: Optional[Dict[str, str]] = None):
+        """
+        Create a new index for storing documents. In case if an index with the name already exists, it ensures that
+        the embedding_field is present.
+        """
+        # check if the existing index has the embedding field; if not create it
+        if self.client.indices.exists(index=index_name, headers=headers):
+            mapping = self.client.indices.get(index_name, headers=headers)[index_name]["mappings"]
+            if self.search_fields:
+                for search_field in self.search_fields:
+                    if search_field in mapping["properties"] and mapping["properties"][search_field]["type"] != "text":
+                        raise Exception(
+                            f"The search_field '{search_field}' of index '{index_name}' with type '{mapping['properties'][search_field]['type']}' "
+                            f"does not have the right type 'text' to be queried in fulltext search. Please use only 'text' type properties as search_fields. "
+                            f"This error might occur if you are trying to use pipelines 1.0 and above with an existing elasticsearch index created with a previous version of pipelines."
+                            f"In this case deleting the index with `curl -X DELETE \"{self.pipeline_config['params']['host']}:{self.pipeline_config['params']['port']}/{index_name}\"` will fix your environment. "
+                            f"Note, that all data stored in the index will be lost!"
+                        )
+            if self.embedding_field:
+                if (
+                    self.embedding_field in mapping["properties"]
+                    and mapping["properties"][self.embedding_field]["type"] != self.vector_type
+                ):
+                    raise Exception(
+                        f"The '{index_name}' index in Elasticsearch already has a field called '{self.embedding_field}'"
+                        f" with the type '{mapping['properties'][self.embedding_field]['type']}'. Please update the "
+                        f"document_store to use a different name for the embedding_field parameter."
+                    )
+                if self.index_type != "hnsw":
+                    mapping["properties"][self.embedding_field] = {
+                        "type": self.vector_type,
+                        "dims": self.embedding_dim,
+                    }
+                self.client.indices.put_mapping(index=index_name, body=mapping, headers=headers)
+            return
+
+        if self.custom_mapping:
+            mapping = self.custom_mapping
+        else:
+            mapping = {
+                "mappings": {
+                    "properties": {self.name_field: {"type": "keyword"}, self.content_field: {"type": "text"}},
+                    "dynamic_templates": [
+                        {
+                            "strings": {
+                                "path_match": "*",
+                                "match_mapping_type": "string",
+                                "mapping": {"type": "keyword"},
+                            }
+                        }
+                    ],
+                },
+                "settings": {
+                    "analysis": {
+                        "analyzer": {
+                            "default": {
+                                "type": self.analyzer,
+                            }
+                        }
+                    }
+                },
+            }
+
+            if self.synonyms:
+                for field in self.search_fields:
+                    mapping["mappings"]["properties"].update({field: {"type": "text", "analyzer": "synonym"}})
+                mapping["mappings"]["properties"][self.content_field] = {"type": "text", "analyzer": "synonym"}
+
+                mapping["settings"]["analysis"]["analyzer"]["synonym"] = {
+                    "tokenizer": "whitespace",
+                    "filter": ["lowercase", "synonym"],
+                }
+                mapping["settings"]["analysis"]["filter"] = {
+                    "synonym": {"type": self.synonym_type, "synonyms": self.synonyms}
+                }
+
+            else:
+                for field in self.search_fields:
+                    mapping["mappings"]["properties"].update({field: {"type": "text"}})
+
+            if self.embedding_field:
+                mapping["settings"]["number_of_shards"] = self.number_of_shards
+                mapping["settings"]["number_of_replicas"] = self.number_of_replicas
+                if self.index_type == "hnsw":
+                    mapping["mappings"]["properties"][self.embedding_field] = {
+                        "type": self.vector_type,
+                        "dims": self.embedding_dim,
+                        "index_type": "hnsw",
+                        "space_type": self.space_type,
+                        "parameters": {"ef_construction": self.ef_construction, "m": self.m},
+                    }
+                else:
+                    mapping["mappings"]["properties"][self.embedding_field] = {
+                        "type": self.vector_type,
+                        "dims": self.embedding_dim,
+                    }
+
+            if self.index_type == "hnsw":
+                mapping["settings"]["index"] = {"knn": True}
+        try:
+            self.client.indices.create(index=index_name, body=mapping, headers=headers)
+        except RequestError as e:
+            # With multiple workers we need to avoid race conditions, where:
+            # - there's no index in the beginning
+            # - both want to create one
+            # - one fails as the other one already created it
+            if not self.client.indices.exists(index=index_name, headers=headers):
+                raise e

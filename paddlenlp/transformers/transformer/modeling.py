@@ -16,17 +16,13 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-
-try:
-    from paddle.utils import map_structure
-except ImportError:
-    from paddle.fluid.layers.utils import map_structure
 from paddle.nn import (
     TransformerDecoder,
     TransformerDecoderLayer,
     TransformerEncoder,
     TransformerEncoderLayer,
 )
+from paddle.utils import map_structure
 
 __all__ = [
     "position_encoding_init",
@@ -302,7 +298,7 @@ def label_smoothed_nll_loss(lprobs, target, epsilon, ignore_index=None, reduce=T
     if target.dim() == lprobs.dim() - 1:
         target = target.unsqueeze(-1)
 
-    num_tokens = paddle.shape(lprobs)[0]
+    num_tokens = lprobs.shape[0]
     index = paddle.arange(0, num_tokens, dtype="int64").unsqueeze(-1)
     index = paddle.concat([index, target], axis=-1)
     index.stop_gradient = True
@@ -502,7 +498,7 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         return c
 
     def _split_batch_beams_with_var_dim(self, c):
-        var_dim_size = paddle.shape(c)[self.var_dim_in_state]
+        var_dim_size = c.shape[self.var_dim_in_state]
         c = paddle.reshape(
             c,
             [-1, self.beam_size]
@@ -590,14 +586,14 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
 
         if kwargs.get("trg_word", None) is not None:
             if paddle.in_dynamic_mode():
-                if paddle.shape(kwargs.get("trg_word"))[1] > time:
+                if kwargs.get("trg_word").shape[1] > time:
                     beam_search_output, beam_search_state = self.force_decoding(
                         beam_search_output, beam_search_state, kwargs.get("trg_word"), kwargs.get("trg_length"), time
                     )
             else:
 
                 def condition(trg_word, time):
-                    return paddle.shape(trg_word)[1] > time
+                    return trg_word.shape[1] > time
 
                 def default_fn(beam_search_output, beam_search_state):
                     return beam_search_output, beam_search_state
@@ -628,8 +624,8 @@ class TransformerBeamSearchDecoder(nn.decode.BeamSearchDecoder):
         return (beam_search_output, beam_search_state, next_inputs, finished)
 
     def force_decoding(self, beam_search_output, beam_search_state, trg_word, trg_length, time):
-        batch_size = paddle.shape(beam_search_output.predicted_ids)[0]
-        beam_size = paddle.shape(beam_search_output.predicted_ids)[1]
+        batch_size = beam_search_output.predicted_ids.shape[0]
+        beam_size = beam_search_output.predicted_ids.shape[1]
 
         ids_dtype = beam_search_output.predicted_ids.dtype
         scores_dtype = beam_search_output.scores.dtype
@@ -668,7 +664,7 @@ class TransformerModel(nn.Layer):
     The Transformer model.
 
     This model is a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -846,8 +842,8 @@ class TransformerModel(nn.Layer):
                     src_word=paddle.randint(low=3, high=30000, shape=[batch_size, seq_len]),
                     trg_word=paddle.randint(low=3, high=30000, shape=[batch_size, seq_len]))
         """
-        src_max_len = paddle.shape(src_word)[-1]
-        trg_max_len = paddle.shape(trg_word)[-1]
+        src_max_len = src_word.shape[-1]
+        trg_max_len = trg_word.shape[-1]
         src_slf_attn_bias = (
             paddle.cast(src_word == self.pad_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         )
@@ -1054,7 +1050,7 @@ class InferTransformerModel(TransformerModel):
             trg_length = None
 
         if self.beam_search_version == "v1":
-            src_max_len = paddle.shape(src_word)[-1]
+            src_max_len = src_word.shape[-1]
             src_slf_attn_bias = (
                 paddle.cast(src_word == self.pad_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
             )
@@ -1128,7 +1124,7 @@ class InferTransformerModel(TransformerModel):
             return paddle.reshape(tensor, [shape[0] * shape[1]] + list(shape[2:]))
 
         # run encoder
-        src_max_len = paddle.shape(src_word)[-1]
+        src_max_len = src_word.shape[-1]
         src_slf_attn_bias = (
             paddle.cast(src_word == self.pad_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         )
@@ -1256,7 +1252,7 @@ class InferTransformerModel(TransformerModel):
             topk_seq = gather_2d(alive_seq, topk_coordinates, beam_size, batch_size)
             topk_seq = paddle.concat([topk_seq, paddle.reshape(topk_ids, list(topk_ids.shape[:]) + [1])], axis=2)
             states = update_states(states, topk_coordinates, beam_size, batch_size)
-            eos = paddle.full(shape=paddle.shape(topk_ids), dtype=alive_seq.dtype, fill_value=self.eos_id)
+            eos = paddle.full(shape=topk_ids.shape, dtype=alive_seq.dtype, fill_value=self.eos_id)
             topk_finished = paddle.cast(paddle.equal(topk_ids, eos), "float32")
 
             # topk_seq: [batch_size, 2*beam_size, i+1]
@@ -1324,7 +1320,7 @@ class InferTransformerModel(TransformerModel):
             return topk_ids, topk_scores
 
         def inner_loop(i, pre_word, alive_seq, alive_log_probs, finished_seq, finished_scores, finished_flags, caches):
-            trg_pos = paddle.full(shape=paddle.shape(pre_word), dtype=alive_seq.dtype, fill_value=i)
+            trg_pos = paddle.full(shape=pre_word.shape, dtype=alive_seq.dtype, fill_value=i)
             trg_emb = self.trg_word_embedding(pre_word)
             trg_pos_emb = self.trg_pos_embedding(trg_pos)
             trg_emb = trg_emb + trg_pos_emb

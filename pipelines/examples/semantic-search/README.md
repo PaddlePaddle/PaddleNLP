@@ -122,7 +122,10 @@ python utils/offline_ann.py --index_name dureader_robust_query_encoder \
                             --doc_dir data/dureader_dev \
                             --search_engine elastic \
                             --embed_title True \
-                            --delete_index
+                            --delete_index \
+                            --query_embedding_model rocketqa-zh-base-query-encoder \
+                            --passage_embedding_model rocketqa-zh-base-para-encoder \
+                            --embedding_dim 768
 ```
 可以使用下面的命令来查看数据：
 
@@ -147,6 +150,9 @@ curl -XDELETE http://localhost:9200/dureader_robust_query_encoder
 ```
 
 #### 3.4.3 启动 RestAPI 模型服务
+
+**注意** semantic_search.yaml里面的检索模型需要与前面使用offline_ann.py建库的时候使用的检索模型一致
+
 ```bash
 # 指定语义检索系统的Yaml配置文件
 export PIPELINE_YAML_PATH=rest_api/pipeline/semantic_search.yaml
@@ -167,7 +173,11 @@ curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' 
 更多API接口文档及其调用方式请参考链接[http://127.0.0.1:8891/docs](http://127.0.0.1:8891/docs)
 
 #### 3.4.4 启动 WebUI
+
+
 ```bash
+pip install streamlit==1.11.1
+pip install markdown
 # 配置模型服务地址
 export API_ENDPOINT=http://127.0.0.1:8891
 # 在指定端口 8502 启动 WebUI

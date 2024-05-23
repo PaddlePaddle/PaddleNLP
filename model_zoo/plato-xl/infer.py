@@ -112,7 +112,7 @@ def main(args):
     if args.profile:
         UnifiedTransformerLMHeadModel.generate = profile(args.batch_size)(UnifiedTransformerLMHeadModel.generate)
     tokenizer = UnifiedTransformerTokenizer.from_pretrained("plato-xl")
-    model = UnifiedTransformerLMHeadModel.from_pretrained("plato-xl", load_state_as_np=True)
+    model = UnifiedTransformerLMHeadModel.from_pretrained("plato-xl")
     model.eval()
 
     history = [

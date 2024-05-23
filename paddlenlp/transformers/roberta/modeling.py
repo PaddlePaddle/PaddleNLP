@@ -101,7 +101,7 @@ class RobertaEmbeddings(nn.Layer):
             position_ids.stop_gradient = True
 
         if token_type_ids is None:
-            input_shape = paddle.shape(inputs_embeds)[:-1]
+            input_shape = inputs_embeds.shape[:-1]
             token_type_ids = paddle.zeros(input_shape, dtype="int64")
 
         position_embeddings = self.position_embeddings(position_ids)
@@ -119,7 +119,7 @@ class RobertaEmbeddings(nn.Layer):
             input_shape: paddle.Tensor
         Returns: paddle.Tensor
         """
-        input_shape = paddle.shape(inputs_embeds)[:-1]
+        input_shape = inputs_embeds.shape[:-1]
         sequence_length = input_shape[1]
 
         position_ids = paddle.arange(self.padding_idx + 1, sequence_length + self.padding_idx + 1, dtype="int64")
@@ -321,7 +321,7 @@ class RobertaModel(RobertaPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -643,7 +643,7 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
             if start_positions.ndim > 1:
                 end_positions = end_positions.squeeze(-1)
             # sometimes the start/end positions are outside our model inputs, we ignore these terms
-            ignored_index = paddle.shape(start_logits)[1]
+            ignored_index = start_logits.shape[1]
             start_positions = start_positions.clip(0, ignored_index)
             end_positions = end_positions.clip(0, ignored_index)
 
@@ -1049,9 +1049,9 @@ class RobertaForMultipleChoice(RobertaPretrainedModel):
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         if input_ids is not None:
-            num_choices = paddle.shape(input_ids)[1]
+            num_choices = input_ids.shape[1]
         elif inputs_embeds is not None:
-            num_choices = paddle.shape(inputs_embeds)[1]
+            num_choices = inputs_embeds.shape[1]
 
         input_ids = input_ids.reshape((-1, input_ids.shape[-1])) if input_ids is not None else None
         inputs_embeds = (

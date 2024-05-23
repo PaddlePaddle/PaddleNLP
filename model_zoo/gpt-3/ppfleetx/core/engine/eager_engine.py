@@ -31,7 +31,8 @@ from paddle.incubate.distributed.utils.io import save_for_auto_inference
 from paddle.profiler import SummaryView
 from ppfleetx.core.engine import BasicEngine, InferenceEngine, TensorRTConfig
 from ppfleetx.core.module import BasicModule
-from ppfleetx.distributed.apis import amp, env
+from ppfleetx.distributed.apis import env
+from paddle.distributed.fleet.utils import mix_precision_utils
 try:
     from ppfleetx.optims import build_lr_scheduler, build_optimizer
     from ppfleetx.utils.compression_helper import prune_model, quant_model
@@ -209,9 +210,9 @@ class EagerEngine(BasicEngine):
             and self._amp_level == "O2"
             and self._use_main_grad
         ):
-            self._module.model = amp.MixPrecisionLayer(self._module.model, dtype=self._amp_dtype)
-            self._optimizer = amp.MixPrecisionOptimizer(self._optimizer)
-            self._scaler = amp.MixPrecisionScaler(self._scaler)
+            self._module.model = mix_precision_utils.MixPrecisionLayer(self._module.model, dtype=self._amp_dtype)
+            self._optimizer = mix_precision_utils.MixPrecisionOptimizer(self._optimizer)
+            self._scaler = mix_precision_utils.MixPrecisionScaler(self._scaler)
 
         # distributed configs
         self._distributed = dist.get_world_size() > 1
@@ -255,6 +256,11 @@ class EagerEngine(BasicEngine):
             self.profiler.start()
             logger.warning("Profiler is enabled, do not enable it in production.")
 
+        # Profiler_pretrain configs
+        self.memory_stats = configs.get("Profiler_pretrain", {}).get("memory_stats", False)
+        self.nvprof_start = configs.get("Profiler_pretrain", {}).get("nvprof_start", -1)
+        self.nvprof_end = configs.get("Profiler_pretrain", {}).get("nvprof_end", -1)
+
     def _wrap_with_fleet(self):
         if self._sharding_stage in [2, 3]:
             assert self._pp_degree == 1, "sharding stage2/3 will support pipeline parallel later"
@@ -287,7 +293,7 @@ class EagerEngine(BasicEngine):
             self._optimizer._set_broadcast_overlap(self._broadcast_overlap, layers=origin_model, num_groups=2)
 
     def _wrap_3D_parallel(self):
-        if isinstance(self._module.model, amp.MixPrecisionLayer):
+        if isinstance(self._module.model, mix_precision_utils.MixPrecisionLayer):
             if dist.get_world_size() == self._dp_degree:
                 sync_params_buffers(self._module.model, comm_group=self._dp_group, src_rank=self._dp_group.ranks[0])
             elif self._pp_degree > 1:
@@ -316,8 +322,9 @@ class EagerEngine(BasicEngine):
             if epoch_index == self._load_recovery["epoch"]:
                 if step < self._load_recovery["step"]:
                     continue
-
-            loss = self._fit_impl(batch)
+            
+            with paddle.profiler.utils._nvprof_range(iter_id=step, start=self.nvprof_start, end=self.nvprof_end):
+                loss = self._fit_impl(batch)
             train_losses.append(loss)
 
             if self._lr_scheduler is not None and self._lr_scheduler_mode == "step":
@@ -340,6 +347,13 @@ class EagerEngine(BasicEngine):
                 }
                 if self._amp_enable:
                     log_dict["loss_scale"] = self._scaler._scale.numpy()[0]
+                if self.memory_stats:
+                    # convert from Byte to MB
+                    log_dict["max_memory_allocated"] = paddle.device.cuda.max_memory_allocated() / (1024**2)
+                    log_dict["max_memory_reserved"] = paddle.device.cuda.max_memory_reserved() / (1024**2)
+                    log_dict["memory_allocated"] = paddle.device.cuda.memory_allocated() / (1024**2)
+                    log_dict["memory_reserved"] = paddle.device.cuda.memory_reserved() / (1024**2)
+                    
                 self._module.training_step_end(log_dict)
 
                 train_step_start = get_timestamp()
@@ -356,7 +370,7 @@ class EagerEngine(BasicEngine):
                     for eval_step, batch in enumerate(valid_data_loader):
                         eval_finished_step += 1
                         loss = self._evaluate_impl(batch)
-                        eval_losses.append(loss)
+                        eval_losses.append(float(loss))
 
                         if eval_step >= self._eval_iters - 1:
                             break
@@ -458,7 +472,7 @@ class EagerEngine(BasicEngine):
                 else:
                     all_reduce_parameters(self._optimizer.all_fused_tensors, self._dp_group)
             elif (
-                isinstance(self._module.model, amp.MixPrecisionLayer)
+                isinstance(self._module.model, mix_precision_utils.MixPrecisionLayer)
                 and self._distributed
                 and dist.get_world_size() == self._dp_degree
             ):

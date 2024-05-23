@@ -453,10 +453,10 @@ class BartEncoder(BartPretrainedModel):
         if input_ids is None and inputs_embeds is None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
-            inputs_shape = paddle.shape(input_ids)
+            inputs_shape = input_ids.shape
             input_ids = input_ids.reshape((-1, inputs_shape[-1]))
         elif inputs_embeds is not None:
-            inputs_shape = paddle.shape(inputs_embeds)[:-1]
+            inputs_shape = inputs_embeds.shape[:-1]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
@@ -566,10 +566,10 @@ class BartDecoder(BartPretrainedModel):
         if decoder_input_ids is not None and decoder_inputs_embeds is not None:
             raise ValueError("You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time")
         elif decoder_input_ids is not None:
-            inputs_shape = paddle.shape(decoder_input_ids)
+            inputs_shape = decoder_input_ids.shape
             decoder_input_ids = decoder_input_ids.reshape((-1, inputs_shape[-1]))
         elif decoder_inputs_embeds is not None:
-            inputs_shape = paddle.shape(decoder_inputs_embeds)[:-1]
+            inputs_shape = decoder_inputs_embeds.shape[:-1]
         else:
             raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
 
@@ -582,7 +582,7 @@ class BartDecoder(BartPretrainedModel):
         if decoder_inputs_embeds is None:
             decoder_inputs_embeds = self.embed_tokens(decoder_input_ids) * self.embed_scale
 
-        past_key_values_length = paddle.shape(cache[0][0].k)[2] if cache is not None else 0
+        past_key_values_length = cache[0][0].k.shape[2] if cache is not None else 0
         decoder_inputs_embed_pos = self.decoder_embed_positions(inputs_shape, past_key_values_length)
         hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos
         hidden_states = self.decoder_layernorm_embedding(hidden_states)
@@ -610,7 +610,7 @@ class BartModel(BartPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -976,7 +976,7 @@ class BartForSequenceClassification(BartPretrainedModel):
             return_dict=return_dict,
         )
         output = outputs[0]
-        output_shape = paddle.shape(output)
+        output_shape = output.shape
 
         if input_ids is not None:
             eos_mask = paddle.cast(input_ids == self.bart.config["eos_token_id"], dtype="int64")
@@ -1168,7 +1168,7 @@ class BartForQuestionAnswering(BartPretrainedModel):
             if start_positions.ndim > 1:
                 end_positions = end_positions.squeeze(-1)
             # sometimes the start/end positions are outside our model inputs, we ignore these terms
-            ignored_index = paddle.shape(start_logits)[1]
+            ignored_index = start_logits.shape[1]
             start_positions = start_positions.clip(0, ignored_index)
             end_positions = end_positions.clip(0, ignored_index)
 

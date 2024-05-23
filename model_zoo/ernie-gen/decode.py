@@ -62,7 +62,7 @@ def greedy_search_infilling(
     _, logits, info = model(token_ids, token_type_ids)
     d_batch, d_seqlen = token_ids.shape
     seqlen = paddle.sum(paddle.cast(token_ids != 0, "int64"), 1, keepdim=True)
-    has_stopped = np.zeros([d_batch], dtype=np.bool)
+    has_stopped = np.zeros([d_batch], dtype=np.bool_)
     gen_seq_len = np.zeros([d_batch], dtype=np.int64)
     output_ids = []
 
@@ -97,7 +97,7 @@ def greedy_search_infilling(
         ids = paddle.stack([gen_ids, attn_ids], 1)
 
         gen_ids = gen_ids.numpy()
-        has_stopped |= (gen_ids == eos_id).astype(np.bool)
+        has_stopped |= (gen_ids == eos_id).astype(np.bool_)
         gen_seq_len += 1 - has_stopped.astype(np.int64)
         output_ids.append(gen_ids.tolist())
         if has_stopped.all():

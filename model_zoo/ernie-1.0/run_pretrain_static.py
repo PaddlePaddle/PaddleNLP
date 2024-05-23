@@ -673,10 +673,6 @@ def do_train(args):
                 output_dir = os.path.join(args.output_dir, "model_%d" % global_step)
                 logger.debug("saving models to {}".format(output_dir))
                 save_persistables(exe, os.path.join(output_dir, "static_vars"), main_program)
-                # if global_step == args.save_steps:
-                #     model.init_config["init_args"][0].init_config.pop(
-                #         "topo", None)
-                model.save_pretrained(output_dir)
                 tokenizer.save_pretrained(output_dir)
                 tic_train = time.time()
 

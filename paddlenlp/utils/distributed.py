@@ -56,7 +56,10 @@ def convert_file_size_to_int(size: Union[int, str]):
 
 
 def reduce_tensor(tensor, buffer_size="32MiB"):
-    numel = int(paddle.numel(tensor).item())
+    if tensor.dtype == paddle.int8:
+        numel = np.prod(tensor.shape)
+    else:
+        numel = int(paddle.numel(tensor).item())
     # dtype = str(tensor.dtype)
     # numel_bits = numel * dtype_byte_size(tensor.dtype)
     buffer_size = convert_file_size_to_int(buffer_size)
@@ -118,11 +121,18 @@ def distributed_gather(tensor: Any, dst: int = 0, group=None, offload=False) -> 
                     slice_output_tensors = [
                         paddle.empty_like(slice_tensor) for _ in range(distributed.get_world_size(group=group))
                     ]
-                dist_gather(slice_tensor, slice_output_tensors, dst=dst, group=group)
+                paddle.distributed.communication.stream.gather(
+                    slice_tensor,
+                    slice_output_tensors,
+                    dst=group.ranks[dst] if group else dst,
+                    group=group,
+                    sync_op=True,
+                    use_calc_stream=False,
+                )
 
                 if is_dst:
                     for i in range(len(output_tensors)):
-                        output_tensors[i].append(slice_output_tensors[i].numpy())
+                        output_tensors[i].append(slice_output_tensors[i].cpu().numpy())
 
             tensor.reshape_(origin_shape)
             if is_dst:
@@ -135,7 +145,14 @@ def distributed_gather(tensor: Any, dst: int = 0, group=None, offload=False) -> 
                     output_tensors = new_output_tensors
 
         else:
-            dist_gather(tensor, output_tensors, dst=dst)
+            paddle.distributed.communication.stream.gather(
+                tensor,
+                output_tensors,
+                dst=group.ranks[dst] if group else dst,
+                group=group,
+                sync_op=True,
+                use_calc_stream=False,
+            )
 
         return output_tensors
 
@@ -203,44 +220,3 @@ def distributed_allgather(tensor: Any, group=None, offload=False):
 
     except AssertionError:
         raise AssertionError("Not currently using distributed training")
-
-
-def dist_gather(tensor, gather_list=None, dst=0, group=None, async_op=False):
-    """_summary_
-
-    Args:
-        tensor (_type_): _description_
-        gather_list (_type_, optional): _description_. Defaults to None.
-        dst (int, optional): _description_. Defaults to 0.
-        group (_type_, optional): _description_. Defaults to None.
-        async_op (bool, optional): _description_. Defaults to False.
-
-    Returns:
-        _type_: _description_
-    """
-    from paddle.distributed.communication.batch_isend_irecv import _with_batch_p2p_guard
-
-    rank = distributed.get_rank(group=group)
-    nranks = distributed.get_world_size(group=group)
-    task_list = []
-    with _with_batch_p2p_guard("NCCL"):
-        if rank == dst:
-            for src in range(nranks):
-                wait = paddle.distributed.communication.stream.recv(
-                    gather_list[src],
-                    src=group.ranks[src] if group else src,
-                    group=group,
-                    sync_op=False,
-                    use_calc_stream=False,
-                )
-                task_list.append(wait)
-        wait = paddle.distributed.communication.stream.send(
-            tensor,
-            dst=group.ranks[dst] if group else dst,
-            group=group,
-            sync_op=False,
-            use_calc_stream=False,
-        )
-        task_list.append(wait)
-    for task in task_list:
-        task.wait()

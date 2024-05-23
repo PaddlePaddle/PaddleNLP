@@ -17,7 +17,7 @@
 
 import copy
 import os
-from typing import Optional, Union
+from typing import Union
 
 from ...utils.log import logger
 from ..configuration_utils import (
@@ -249,9 +249,11 @@ class CLIPTextConfig(Old2NewPretrainedConfig):
         attention_dropout=0.0,
         initializer_range=0.02,
         initializer_factor=1.0,
+        # This differs from `CLIPTokenizer`'s default and from openai/clip
+        # See https://github.com/huggingface/transformers/pull/24773#issuecomment-1632287538
         pad_token_id=1,
-        bos_token_id=0,
-        eos_token_id=2,
+        bos_token_id=49406,
+        eos_token_id=49407,
         **kwargs
     ):
         kwargs["return_dict"] = kwargs.pop("return_dict", True)
@@ -272,14 +274,7 @@ class CLIPTextConfig(Old2NewPretrainedConfig):
         self.attention_dropout = attention_dropout
 
     @classmethod
-    def from_pretrained(
-        cls,
-        pretrained_model_name_or_path: Union[str, os.PathLike],
-        from_hf_hub: bool = False,
-        cache_dir: Optional[str] = None,
-        **kwargs
-    ) -> PretrainedConfig:
-        kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
+    def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs) -> PretrainedConfig:
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         # get the text config dict if we are loading from CLIPConfig
@@ -390,14 +385,7 @@ class CLIPVisionConfig(Old2NewPretrainedConfig):
         self.hidden_act = hidden_act
 
     @classmethod
-    def from_pretrained(
-        cls,
-        pretrained_model_name_or_path: Union[str, os.PathLike],
-        from_hf_hub: bool = False,
-        cache_dir: Optional[str] = None,
-        **kwargs
-    ) -> PretrainedConfig:
-        kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
+    def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs) -> PretrainedConfig:
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         # get the vision config dict if we are loading from CLIPConfig

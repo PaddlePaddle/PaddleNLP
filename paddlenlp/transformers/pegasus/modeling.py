@@ -183,7 +183,7 @@ class PegasusEncoder(PegasusPretrainedModel):
         if input_ids is None:
             raise ValueError("Input_ids cannot be None.")
         inputs_embeds = self.embed_tokens(input_ids) * self.embed_scale
-        inputs_embed_pos = self.encoder_embed_positions(paddle.shape(input_ids))
+        inputs_embed_pos = self.encoder_embed_positions(input_ids.shape)
         hidden_states = inputs_embeds + inputs_embed_pos
         encoder_input = self.encoder_dropout(hidden_states)
 
@@ -274,7 +274,7 @@ class PegasusDecoder(PegasusPretrainedModel):
 
         """
         if decoder_attention_mask is None:
-            decoder_length = paddle.shape(decoder_input_ids)[-1]
+            decoder_length = decoder_input_ids.shape[-1]
             decoder_attention_mask = paddle.tensor.triu(
                 (paddle.full((decoder_length, decoder_length), -np.inf, dtype=paddle.get_default_dtype())), 1
             )
@@ -286,10 +286,8 @@ class PegasusDecoder(PegasusPretrainedModel):
                 decoder_input_ids
             ) * self.embed_scale * mix_ratio + self.embed_scale * x * (1 - mix_ratio)
 
-        past_key_values_length = paddle.shape(cache[0][0].k)[2] if cache is not None else 0
-        decoder_inputs_embed_pos = self.decoder_embed_positions(
-            paddle.shape(decoder_input_ids), past_key_values_length
-        )
+        past_key_values_length = cache[0][0].k.shape[2] if cache is not None else 0
+        decoder_inputs_embed_pos = self.decoder_embed_positions(decoder_input_ids.shape, past_key_values_length)
         hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos
         decoder_input = self.decoder_dropout(hidden_states)
 
@@ -318,7 +316,7 @@ class PegasusModel(PegasusPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:

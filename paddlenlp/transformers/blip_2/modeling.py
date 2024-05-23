@@ -852,7 +852,7 @@ class Blip2QFormerEncoder(nn.Layer):
 
             if getattr(self.config, "gradient_checkpointing", False) and self.training:
                 if use_cache:
-                    logger.warn(
+                    logger.warning(
                         "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
                     )
                     use_cache = False
@@ -1473,13 +1473,11 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
         self.qformer = Blip2QFormerModel(config.qformer_config)
         self.language_projection = nn.Linear(config.qformer_config.hidden_size, config.text_config.hidden_size)
         if config.use_decoder_only_language_model:
-            # language_model = AutoModelForCausalLM.from_config(config.text_config)
             if isinstance(config.text_config, OPTConfig):
                 language_model = OPTForCausalLM(config.text_config)
             else:
                 raise NotImplementedError
         else:
-            # language_model = AutoModelForSeq2SeqLM.from_config(config.text_config)
             if isinstance(config.text_config, T5Config):
                 language_model = T5ForConditionalGeneration(config.text_config)
             else:
@@ -1570,7 +1568,7 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
         # step 3: use the language model, conditioned on the query outputs and the prompt
         language_model_inputs = self.language_projection(query_output)
         language_model_attention_mask = paddle.ones(language_model_inputs.shape[:-1], dtype="int64")
-        inputs_embeds = self.language_model.get_input_embeddings()(input_ids)
+        inputs_embeds = self.language_model.get_input_embeddings()(input_ids).cast(dtype=language_model_inputs.dtype)
         inputs_embeds = paddle.concat([language_model_inputs, inputs_embeds], axis=1)
 
         if attention_mask is None:

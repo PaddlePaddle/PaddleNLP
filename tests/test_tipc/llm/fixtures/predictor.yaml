@@ -1,0 +1,29 @@
+llama:
+  model_name: linly-ai/chinese-llama-2-7b
+  fused_model: true
+  dtype: float16
+  data_file: tests/fixtures/llm/zh_query.json
+
+bloom:
+  model_name: bellegroup/belle-7b-2m
+  fused_model: true
+  dtype: float16
+  data_file: tests/fixtures/llm/zh_query.json
+
+chatglm:
+  model_name: THUDM/chatglm-6b-v1.1
+  fused_model: true
+  dtype: float16
+  data_file: tests/fixtures/llm/zh_query.json
+
+chatglm2:
+  model_name: THUDM/chatglm2-6b
+  fused_model: true
+  dtype: float16
+  data_file: tests/fixtures/llm/zh_query.json
+
+qwen:
+  model_name: qwen/qwen-7b-chat
+  fused_model: true
+  dtype: bfloat16
+  data_file: tests/fixtures/llm/zh_query.json

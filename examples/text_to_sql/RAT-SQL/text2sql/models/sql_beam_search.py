@@ -16,10 +16,9 @@ import operator
 
 import attr
 import networkx as nx
-
+from text2sql.dataproc.sql_preproc_v2 import get_field_presence_info
 from text2sql.models.beam_search import Hypothesis
 from text2sql.models.sql_decoder.decoder import TreeState
-from text2sql.dataproc.sql_preproc_v2 import get_field_presence_info
 
 
 @attr.s
@@ -57,7 +56,7 @@ def beam_search_with_heuristics(model, inputs, beam_size, max_steps, from_cond=T
                     prefixes2fill_from.append(hyp)
                 else:
                     candidates += [
-                        (hyp, choice, choice_score.numpy().item(), hyp.score + choice_score.numpy().item())
+                        (hyp, choice, choice_score.item(), hyp.score + choice_score.item())
                         for choice, choice_score in hyp.next_choices
                     ]
             candidates.sort(key=operator.itemgetter(3), reverse=True)
@@ -112,7 +111,7 @@ def beam_search_with_heuristics(model, inputs, beam_size, max_steps, from_cond=T
                     prefixes_unfinished.append(hyp)
                 else:
                     candidates += [
-                        (hyp, choice, choice_score.numpy().item(), hyp.score + choice_score.numpy().item())
+                        (hyp, choice, choice_score.item(), hyp.score + choice_score.item())
                         for choice, choice_score in hyp.next_choices
                     ]
             candidates.sort(key=operator.itemgetter(3), reverse=True)
@@ -318,7 +317,7 @@ def beam_search_with_oracle_column(model, inputs, preproc_item, beam_size, max_s
         candidates = []
         for hyp in beam:
             candidates += [
-                (hyp, choice, choice_score.numpy().item(), hyp.score + choice_score.numpy().item())
+                (hyp, choice, choice_score.item(), hyp.score + choice_score.item())
                 for choice, choice_score in hyp.next_choices
             ]
 

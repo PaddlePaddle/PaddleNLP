@@ -251,6 +251,15 @@ class TrainerCallback:
         """
         pass
 
+    def on_load_data_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        pass
+
+    def on_optimizer_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        pass
+
+    def on_optimizer_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        pass
+
     def on_substep_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
         """
         Event called at the end of an substep during gradient accumulation.
@@ -370,6 +379,15 @@ class CallbackHandler(TrainerCallback):
         control.should_save = False
         return self.call_event("on_step_begin", args, state, control)
 
+    def on_load_data_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, inputs: Dict):
+        return self.call_event("on_load_data_end", args, state, control, inputs=inputs)
+
+    def on_optimizer_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, scaler):
+        return self.call_event("on_optimizer_begin", args, state, control, scaler=scaler)
+
+    def on_optimizer_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, scaler):
+        return self.call_event("on_optimizer_end", args, state, control, scaler=scaler)
+
     def on_substep_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl):
         return self.call_event("on_substep_end", args, state, control)
 
@@ -438,17 +456,6 @@ class DefaultFlowCallback(TrainerCallback):
         # End training
         if state.global_step >= state.max_steps:
             control.should_training_stop = True
-            # Log and save on end
-            if args.logging_strategy == IntervalStrategy.STEPS and state.global_step >= args.logging_steps:
-                control.should_log = True
-            if args.evaluation_strategy == IntervalStrategy.STEPS and state.global_step >= args.eval_steps:
-                control.should_evaluate = True
-            if (
-                args.save_strategy == IntervalStrategy.STEPS
-                and args.save_steps > 0
-                and state.global_step >= args.save_steps
-            ):
-                control.should_save = True
 
         return control
 
@@ -479,7 +486,7 @@ class ProgressCallback(TrainerCallback):
 
     def on_train_begin(self, args, state, control, **kwargs):
         if state.is_local_process_zero:
-            self.training_bar = tqdm(total=state.max_steps)
+            self.training_bar = tqdm(total=state.max_steps, desc="TrainProcess")
         self.current_step = 0
 
     def on_step_end(self, args, state, control, **kwargs):
@@ -490,7 +497,9 @@ class ProgressCallback(TrainerCallback):
     def on_prediction_step(self, args, state, control, eval_dataloader=None, **kwargs):
         if state.is_local_process_zero and has_length(eval_dataloader.dataset):
             if self.prediction_bar is None:
-                self.prediction_bar = tqdm(total=len(eval_dataloader), leave=self.training_bar is None)
+                self.prediction_bar = tqdm(
+                    total=len(eval_dataloader), leave=self.training_bar is None, desc="PredictProcess"
+                )
             self.prediction_bar.update(1)
 
     def on_evaluate(self, args, state, control, **kwargs):
@@ -506,7 +515,7 @@ class ProgressCallback(TrainerCallback):
                 logs_str = ", ".join(f"{k}: {v}" for k, v in logs.items())
             else:
                 logs_str = str(logs)
-            self.training_bar.write(logs_str)
+            logger.info(logs_str)
 
     def on_train_end(self, args, state, control, **kwargs):
         if state.is_local_process_zero:

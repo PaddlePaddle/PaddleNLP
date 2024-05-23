@@ -61,14 +61,6 @@ def read_submission(submit_path, reference, k=5):
                         qid, k, len(image_ids)
                     )
                 )
-            # Check whether there exist an invalid prediction for any text
-            for rank, image_id in enumerate(image_ids):
-                if not isinstance(image_id, int):
-                    raise Exception(
-                        "Text_id {} has an invalid predicted image_id {} at rank {}, it should be an integer (not string), please check your schema".format(
-                            qid, image_id, rank + 1
-                        )
-                    )
             # Check whether there are duplicate predicted products for a single text
             if len(set(image_ids)) != k:
                 raise Exception(

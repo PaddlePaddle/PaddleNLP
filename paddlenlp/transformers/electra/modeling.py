@@ -319,7 +319,7 @@ class ElectraModel(ElectraPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -1051,7 +1051,9 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
         mask_positions = paddle.where(generator_labels == -100, umask_positions, mask_positions)
         updated_inputs = self.update_inputs(inputs, sampled_tokids, mask_positions)
         # use inputs and updated_input to get discriminator labels
-        labels = mask_positions * (paddle.ones_like(inputs) - paddle.equal(updated_inputs, raw_inputs).astype("int32"))
+        labels = mask_positions * (
+            paddle.ones_like(inputs) - paddle.equal(updated_inputs, raw_inputs).astype(raw_inputs.dtype)
+        )
         return updated_inputs, labels, sampled_tokids
 
     def sample_from_softmax(self, logits, use_softmax_sample=True):
@@ -1073,7 +1075,9 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
         N = positions.shape[1]
         assert N == L, "the dimension of inputs and mask should be same as [B, L]"
 
-        updated_sequence = ((paddle.ones_like(sequence) - positions) * sequence) + (positions * updates)
+        updated_sequence = ((paddle.ones_like(sequence) - positions) * sequence) + (
+            positions * updates.astype(positions.dtype)
+        )
 
         return updated_sequence
 
@@ -1783,7 +1787,7 @@ class ElectraForQuestionAnswering(ElectraPretrainedModel):
             if start_positions.ndim > 1:
                 end_positions = end_positions.squeeze(-1)
             # sometimes the start/end positions are outside our model inputs, we ignore these terms
-            ignored_index = paddle.shape(start_logits)[1]
+            ignored_index = start_logits.shape[1]
             start_positions = start_positions.clip(0, ignored_index)
             end_positions = end_positions.clip(0, ignored_index)
 

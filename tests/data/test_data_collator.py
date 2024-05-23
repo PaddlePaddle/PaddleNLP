@@ -70,7 +70,7 @@ class DataCollatorIntegrationTest(unittest.TestCase):
 
         batch = default_data_collator(features)
         self.assertEqual(batch["labels"].dtype, paddle.int64)
-        self.assertTrue(batch["labels"].equal_all(paddle.to_tensor(list(range(8))).reshape([-1, 1])))
+        self.assertTrue(batch["labels"].equal_all(paddle.to_tensor(list(range(8)))))
         self.assertEqual(batch["labels"].dtype, paddle.int64)
         self.assertEqual(batch["inputs"].shape, [8, 10])
 

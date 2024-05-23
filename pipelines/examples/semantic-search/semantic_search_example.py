@@ -39,6 +39,7 @@ parser.add_argument('--host', type=str, default="localhost", help='host ip of AN
 parser.add_argument('--port', type=str, default="8530", help='port of ANN search engine')
 parser.add_argument('--embed_title', default=False, type=bool, help="The title to be  embedded into embedding")
 parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search'], default="ernie", help="the ernie model types")
+parser.add_argument('--pooling_mode', choices=['max_tokens', 'mean_tokens', 'mean_sqrt_len_tokens', 'cls_token'], default='cls_token', help='the type of sentence embedding')
 args = parser.parse_args()
 # yapf: enable
 
@@ -59,6 +60,8 @@ def get_faiss_retriever(use_gpu):
             batch_size=args.retriever_batch_size,
             use_gpu=use_gpu,
             embed_title=args.embed_title,
+            pooling_mode=args.pooling_mode,
+            precision="fp16",
         )
     else:
         doc_dir = "data/dureader_dev"
@@ -86,6 +89,8 @@ def get_faiss_retriever(use_gpu):
             batch_size=args.retriever_batch_size,
             use_gpu=use_gpu,
             embed_title=args.embed_title,
+            pooling_mode=args.pooling_mode,
+            precision="fp16",
         )
 
         # update Embedding
@@ -120,6 +125,8 @@ def get_milvus_retriever(use_gpu):
             batch_size=args.retriever_batch_size,
             use_gpu=use_gpu,
             embed_title=args.embed_title,
+            pooling_mode=args.pooling_mode,
+            precision="fp16",
         )
     else:
         doc_dir = "data/dureader_dev"
@@ -146,6 +153,8 @@ def get_milvus_retriever(use_gpu):
             batch_size=args.retriever_batch_size,
             use_gpu=use_gpu,
             embed_title=args.embed_title,
+            pooling_mode=args.pooling_mode,
+            precision="fp16",
         )
 
         document_store.write_documents(dicts)
@@ -164,15 +173,17 @@ def semantic_search_tutorial():
     else:
         retriever = get_faiss_retriever(use_gpu)
 
-    # Ranker
-    ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
-
     # Pipeline
     from pipelines import SemanticSearchPipeline
 
-    pipe = SemanticSearchPipeline(retriever, ranker)
-
-    prediction = pipe.run(query="亚马逊河流的介绍", params={"Retriever": {"top_k": 50}, "Ranker": {"top_k": 5}})
+    if args.query_embedding_model == "moka-ai/m3e-base" or args.passage_embedding_model == "moka-ai/m3e-base":
+        pipe = SemanticSearchPipeline(retriever)
+        prediction = pipe.run(query="亚马逊河流的介绍", params={"Retriever": {"top_k": 50}})
+    else:
+        # Ranker
+        ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
+        pipe = SemanticSearchPipeline(retriever, ranker)
+        prediction = pipe.run(query="亚马逊河流的介绍", params={"Retriever": {"top_k": 50}, "Ranker": {"top_k": 5}})
 
     print_documents(prediction)
 

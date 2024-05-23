@@ -34,6 +34,7 @@ from rest_api.config import (
 )
 from rest_api.controller.utils import RequestLimiter
 from rest_api.schema import (
+    Chatfile_QueryResponse,
     DocumentRequest,
     DocumentResponse,
     QueryImageResponse,
@@ -91,6 +92,17 @@ def pipelines_version():
 
 @router.post("/query", response_model=QueryResponse, response_model_exclude_none=True)
 def query(request: QueryRequest):
+    """
+    This endpoint receives the question as a string and allows the requester to set
+    additional parameters that will be passed on to the pipelines pipeline.
+    """
+    with concurrency_limiter.run():
+        result = _process_request(PIPELINE, request)
+        return result
+
+
+@router.post("/chatfile_query", response_model=Chatfile_QueryResponse, response_model_exclude_none=True)
+def chatfile_query(request: QueryRequest):
     """
     This endpoint receives the question as a string and allows the requester to set
     additional parameters that will be passed on to the pipelines pipeline.
@@ -205,12 +217,14 @@ def _process_request(pipeline, request) -> Dict[str, Any]:
             params[key]["filters"] = _format_filters(params[key]["filters"])
 
     result = pipeline.run(query=request.query, params=params, debug=request.debug)
-
     # Ensure answers and documents exist, even if they're empty lists
     if "documents" not in result:
         result["documents"] = []
     if "answers" not in result:
         result["answers"] = []
+    if "result" not in result:
+        result["result"] = ""
+
     # if any of the documents contains an embedding as an ndarray the latter needs to be converted to list of float
     for document in result["documents"]:
         if isinstance(document.embedding, ndarray):

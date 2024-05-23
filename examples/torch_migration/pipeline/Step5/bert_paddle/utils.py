@@ -57,12 +57,12 @@ class SmoothedValue(object):
     @property
     def median(self):
         d = paddle.to_tensor(list(self.deque))
-        return d.median().numpy().item()
+        return d.median().item()
 
     @property
     def avg(self):
         d = paddle.to_tensor(list(self.deque), dtype="float32")
-        return d.mean().numpy().item()
+        return d.mean().item()
 
     @property
     def global_avg(self):

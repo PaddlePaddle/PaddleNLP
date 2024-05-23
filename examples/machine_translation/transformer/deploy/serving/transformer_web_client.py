@@ -18,7 +18,7 @@ from pprint import pprint
 
 import requests
 import yaml
-from attrdict import AttrDict
+from easydict import EasyDict as AttrDict
 from paddle_serving_client.utils import MultiThreadRunner
 
 from paddlenlp.datasets import load_dataset

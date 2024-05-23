@@ -17,7 +17,7 @@
 
 import copy
 import os
-from typing import Optional, Union
+from typing import Union
 
 from ...utils.log import logger
 from ..configuration_utils import PretrainedConfig
@@ -110,7 +110,6 @@ class ErnieViLTextConfig(PretrainedConfig):
         use_task_id: bool = False,
         fuse: bool = False,
         use_cache: bool = False,
-        enable_recompute: bool = False,
         **kwargs
     ):
         kwargs["return_dict"] = kwargs.pop("return_dict", True)
@@ -132,17 +131,9 @@ class ErnieViLTextConfig(PretrainedConfig):
         self.layer_norm_eps = layer_norm_eps
         self.use_cache = use_cache
         self.use_task_id = use_task_id
-        self.enable_recompute = enable_recompute
 
     @classmethod
-    def from_pretrained(
-        cls,
-        pretrained_model_name_or_path: Union[str, os.PathLike],
-        from_hf_hub: bool = False,
-        cache_dir: Optional[str] = None,
-        **kwargs
-    ) -> PretrainedConfig:
-        kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
+    def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs) -> PretrainedConfig:
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         # get the text config dict if we are loading from ErnieViLConfig
@@ -245,14 +236,7 @@ class ErnieViLVisionConfig(PretrainedConfig):
         self.hidden_act = hidden_act
 
     @classmethod
-    def from_pretrained(
-        cls,
-        pretrained_model_name_or_path: Union[str, os.PathLike],
-        from_hf_hub: bool = False,
-        cache_dir: Optional[str] = None,
-        **kwargs
-    ) -> PretrainedConfig:
-        kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
+    def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs) -> PretrainedConfig:
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         # get the vision config dict if we are loading from ErnieViLConfig

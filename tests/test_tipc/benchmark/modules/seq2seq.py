@@ -86,7 +86,23 @@ class Seq2SeqBenchmark(BenchmarkBase):
         ips=None,
         **kwargs
     ):
+        max_mem_reserved_msg = ""
+        max_mem_allocated_msg = ""
+        if paddle.device.is_compiled_with_cuda():
+            max_mem_reserved_msg = f"max_mem_reserved: {paddle.device.cuda.max_memory_reserved() // (1024 ** 2)} MB,"
+            max_mem_allocated_msg = f"max_mem_allocated: {paddle.device.cuda.max_memory_allocated() // (1024 ** 2)} MB"
         logger.info(
-            "global step %d / %d, loss: %.6f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f words/sec"
-            % (step_id, args.epoch * self.num_batch, loss, reader_cost, batch_cost, num_samples, ips)
+            "global step %d / %d, loss: %.6f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, "
+            "avg_samples: %.5f, ips: %.5f words/sec, %s %s"
+            % (
+                step_id,
+                args.epoch * self.num_batch,
+                loss,
+                reader_cost,
+                batch_cost,
+                num_samples,
+                ips,
+                max_mem_reserved_msg,
+                max_mem_allocated_msg,
+            )
         )

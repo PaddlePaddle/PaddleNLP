@@ -301,3 +301,36 @@ def reset_initialized_parameter(model, include_self=True):
             _no_grad_fill_(m.weight, 1.0)
             if hasattr(m, "bias") and getattr(m, "bias") is not None:
                 _no_grad_fill_(m.bias, 0)
+
+
+def to(
+    self,
+    device=None,
+    dtype=None,
+    blocking=None,
+    floating_only=True,
+):
+    """
+    Cast the parameters and buffers of Layer by the give device, dtype and blocking.
+
+    Parameters:
+        device(str|paddle.CPUPlace()|paddle.CUDAPlace()|paddle.CUDAPinnedPlace()|paddle.XPUPlace()|None, optional): The device of the Layer which want to be stored.
+        If None, the device is the same with the original Tensor. If device is string, it can be ``cpu``, ``gpu:x`` and ``xpu:x``, where ``x`` is the
+        index of the GPUs or XPUs. Default: None.
+
+        dtype(str|numpy.dtype|paddle.dtype|None, optional): The type of the data. If None, the dtype is the same with the original Tensor. Default: None.
+
+        blocking(bool|None, optional): If False and the source is in pinned memory, the copy will be
+            asynchronous with respect to the host. Otherwise, the argument has no effect. If None, the blocking is set True. Default: None.
+
+        floating_only(bool|False, optional): If True, only cast all floating point parameters and buffers of Layer by the give device, dtype and blocking.
+
+    Returns:
+        self
+
+    """
+
+    if floating_only and (not paddle.is_floating_point(self)):
+        return self
+    paddle.Tensor._to(self, device, dtype, blocking)
+    return self

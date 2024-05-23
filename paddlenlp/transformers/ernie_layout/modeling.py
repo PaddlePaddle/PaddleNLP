@@ -230,7 +230,7 @@ class ErnieLayoutSelfAttention(nn.Layer):
         self.dropout = nn.Dropout(config["attention_probs_dropout_prob"])
 
     def transpose_for_scores(self, x):
-        x = x.reshape([paddle.shape(x)[0], paddle.shape(x)[1], self.num_attention_heads, self.attention_head_size])
+        x = x.reshape([x.shape[0], x.shape[1], self.num_attention_heads, self.attention_head_size])
         return x.transpose([0, 2, 1, 3])
 
     def compute_qkv(self, hidden_states):
@@ -268,7 +268,7 @@ class ErnieLayoutSelfAttention(nn.Layer):
             attention_scores += rel_2d_pos
         bool_attention_mask = attention_mask.astype(paddle.bool)
         bool_attention_mask.stop_gradient = True
-        attention_scores_shape = paddle.shape(attention_scores)
+        attention_scores_shape = attention_scores.shape
         attention_scores = paddle.where(
             bool_attention_mask.expand(attention_scores_shape),
             paddle.ones(attention_scores_shape) * float("-1e10"),
@@ -280,9 +280,7 @@ class ErnieLayoutSelfAttention(nn.Layer):
         attention_probs = self.dropout(attention_probs)
         context_layer = paddle.matmul(attention_probs, value_layer)
         context_layer = context_layer.transpose([0, 2, 1, 3])
-        context_layer = context_layer.reshape(
-            [paddle.shape(context_layer)[0], paddle.shape(context_layer)[1], self.all_head_size]
-        )
+        context_layer = context_layer.reshape([context_layer.shape[0], context_layer.shape[1], self.all_head_size])
 
         if output_attentions:
             outputs = [context_layer, attention_probs]
@@ -336,6 +334,8 @@ class ErnieLayoutEncoder(nn.Layer):
     def __init__(self, config):
         super(ErnieLayoutEncoder, self).__init__()
         self.config = config
+        # Recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
         self.layer = nn.LayerList([ErnieLayoutLayer(config) for _ in range(config["num_hidden_layers"])])
 
         self.has_relative_attention_bias = config["has_relative_attention_bias"]
@@ -426,7 +426,7 @@ class ErnieLayoutEncoder(nn.Layer):
             hidden_save["input_attention_mask"] = attention_mask
             hidden_save["input_layer_head_mask"] = layer_head_mask
 
-            if self.config.enable_recompute and self.training:
+            if self.enable_recompute and self.training:
 
                 def create_custom_forward(module):
                     def custom_forward(*inputs):
@@ -573,7 +573,7 @@ class ErnieLayoutModel(ErnieLayoutPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -687,7 +687,7 @@ class ErnieLayoutModel(ErnieLayoutPretrainedModel):
                 visual_bbox_y[1:].expand(expand_shape[::-1]).transpose([1, 0]),
             ],
             axis=-1,
-        ).reshape([expand_shape[0] * expand_shape[1], paddle.shape(bbox)[-1]])
+        ).reshape([expand_shape[0] * expand_shape[1], bbox.shape[-1]])
 
         visual_bbox = visual_bbox.expand([visual_shape[0], visual_bbox.shape[0], visual_bbox.shape[1]])
         return visual_bbox
@@ -735,7 +735,7 @@ class ErnieLayoutModel(ErnieLayoutPretrainedModel):
         output_hidden_states=False,
         output_attentions=False,
     ):
-        input_shape = paddle.shape(input_ids)
+        input_shape = input_ids.shape
         visual_shape = list(input_shape)
         visual_shape[1] = self.config["image_feature_pool_shape"][0] * self.config["image_feature_pool_shape"][1]
         visual_bbox = self._calc_visual_bbox(self.config["image_feature_pool_shape"], bbox, visual_shape)
@@ -842,7 +842,7 @@ class ErnieLayoutForSequenceClassification(ErnieLayoutPretrainedModel):
         head_mask=None,
         labels=None,
     ):
-        input_shape = paddle.shape(input_ids)
+        input_shape = input_ids.shape
         visual_shape = list(input_shape)
         visual_shape[1] = (
             self.ernie_layout.config["image_feature_pool_shape"][0]
@@ -1038,7 +1038,7 @@ class ErnieLayoutForTokenClassification(ErnieLayoutPretrainedModel):
             position_ids=position_ids,
             head_mask=head_mask,
         )
-        seq_length = paddle.shape(input_ids)[1]
+        seq_length = input_ids.shape[1]
         sequence_output = outputs[0][:, :seq_length]
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
@@ -1115,7 +1115,7 @@ class ErnieLayoutForQuestionAnswering(ErnieLayoutPretrainedModel):
             position_ids=position_ids,
             head_mask=head_mask,
         )
-        seq_length = paddle.shape(input_ids)[1]
+        seq_length = input_ids.shape[1]
         sequence_output = outputs[0][:, :seq_length]
         sequence_output = self.dropout(sequence_output)
 
@@ -1172,7 +1172,7 @@ class UIEX(ErnieLayoutPretrainedModel):
             bbox=bbox,
             image=image,
         )
-        seq_length = paddle.shape(input_ids)[1]
+        seq_length = input_ids.shape[1]
         sequence_output = sequence_output[:, :seq_length]
         start_logits = self.linear_start(sequence_output)
         start_logits = paddle.squeeze(start_logits, -1)

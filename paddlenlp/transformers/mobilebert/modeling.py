@@ -674,7 +674,7 @@ class MobileBertForPreTraining(MobileBertPretrainedModel):
             if labels is not None:
                 loss_fct = paddle.nn.CrossEntropyLoss()
                 total_loss = loss_fct(
-                    prediction_scores.reshape((-1, paddle.shape(prediction_scores)[-1])), labels.reshape((-1,))
+                    prediction_scores.reshape((-1, prediction_scores.shape[-1])), labels.reshape((-1,))
                 )
 
             if not return_dict:
@@ -697,7 +697,7 @@ class MobileBertModel(MobileBertPretrainedModel):
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
     Refer to the superclass documentation for the generic methods.
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -1173,7 +1173,7 @@ class MobileBertForQuestionAnswering(MobileBertPretrainedModel):
             if start_positions.ndim > 1:
                 end_positions = end_positions.squeeze(-1)
             # sometimes the start/end positions are outside our model inputs, we ignore these terms
-            ignored_index = paddle.shape(start_logits)[1]
+            ignored_index = start_logits.shape[1]
             start_positions = start_positions.clip(0, ignored_index)
             end_positions = end_positions.clip(0, ignored_index)
 

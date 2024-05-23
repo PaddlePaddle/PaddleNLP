@@ -23,10 +23,10 @@ from typing import Any, Dict, Optional, Tuple, Union
 import numpy as np
 import paddle
 
-from ..utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
+from paddlenlp.utils.download import resolve_file_path
+
 from ..utils.log import logger
 from .tokenizer_utils_base import TensorType
-from .utils import resolve_cache_dir
 
 FEATURE_EXTRACTOR_NAME = "preprocessor_config.json"
 
@@ -131,6 +131,8 @@ class FeatureExtractionMixin(object):
     This is a feature extraction mixin used to provide saving/loading functionality for sequential and image feature
     extractors.
     """
+
+    pretrained_init_configuration = {}
 
     pretrained_feature_extractor_file = []
     _auto_class = None
@@ -241,37 +243,25 @@ class FeatureExtractionMixin(object):
         Returns:
             `Tuple[Dict, Dict]`: The dictionary(ies) that will be used to instantiate the feature extractor object.
         """
-        cache_dir = resolve_cache_dir(
-            pretrained_model_name_or_path=pretrained_model_name_or_path,
-            from_hf_hub=False,  # TODO: from_hf_hub not supported yet
-            cache_dir=kwargs.pop("cache_dir", None),
-        )
+        cache_dir = kwargs.pop("cache_dir", None)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        from_aistudio = kwargs.pop("from_aistudio", False)
+        subfolder = kwargs.pop("subfolder", "")
+        if subfolder is None:
+            subfolder = ""
+
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
-        is_local = os.path.isdir(pretrained_model_name_or_path)
-        if os.path.isdir(pretrained_model_name_or_path):
-            resolved_feature_extractor_file = os.path.join(pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME)
-        elif os.path.isfile(pretrained_model_name_or_path):
-            resolved_feature_extractor_file = pretrained_model_name_or_path
-            is_local = True
-        else:
-            # from pretrained_feature_extractor_file
-            if pretrained_model_name_or_path in cls.pretrained_feature_extractor_file:
-                feature_extractor_file = cls.pretrained_feature_extractor_file[pretrained_model_name_or_path]
-            else:
-                # Assuming from community-contributed pretrained models
-                feature_extractor_file = "/".join(
-                    [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME]
-                )
-            try:
-                resolved_feature_extractor_file = get_path_from_url_with_filelock(feature_extractor_file, cache_dir)
-            except Exception:
-                # For any other exception, we throw a generic error.
-                raise EnvironmentError(
-                    f"Can't load feature extractor for '{pretrained_model_name_or_path}'. If you were trying to load"
-                    " it from 'BOS', make sure you don't have a local directory with the"
-                    f" same name. Otherwise, make sure '{pretrained_model_name_or_path}' is the correct path to a"
-                    f" directory containing a {FEATURE_EXTRACTOR_NAME} file"
-                )
+        resolved_feature_extractor_file = resolve_file_path(
+            pretrained_model_name_or_path,
+            [FEATURE_EXTRACTOR_NAME],
+            subfolder,
+            cache_dir=cache_dir,
+            from_aistudio=from_aistudio,
+            from_hf_hub=from_hf_hub,
+        )
+        assert (
+            resolved_feature_extractor_file is not None
+        ), f"please make sure {FEATURE_EXTRACTOR_NAME} under {pretrained_model_name_or_path}"
         try:
             # Load feature_extractor dict
             with open(resolved_feature_extractor_file, "r", encoding="utf-8") as reader:
@@ -282,11 +272,6 @@ class FeatureExtractionMixin(object):
             raise EnvironmentError(
                 f"It looks like the config file at '{resolved_feature_extractor_file}' is not a valid JSON file."
             )
-
-        if is_local:
-            logger.info(f"loading configuration file {resolved_feature_extractor_file}")
-        else:
-            logger.info(f"loading configuration file from cache at {resolved_feature_extractor_file}")
 
         return feature_extractor_dict, kwargs
 
@@ -321,7 +306,6 @@ class FeatureExtractionMixin(object):
         for key in to_remove:
             kwargs.pop(key, None)
 
-        logger.info(f"Feature extractor {feature_extractor}")
         if return_unused_kwargs:
             return feature_extractor, kwargs
         else:

@@ -92,7 +92,7 @@ def batch_evaluate(
 
         loss = criterion(s_arc, s_rel, arcs, rels, mask)
 
-        losses.append(loss.numpy().item())
+        losses.append(loss.item())
 
         arc_preds, rel_preds = decode(s_arc, s_rel, mask)
         metric.update(arc_preds, rel_preds, arcs, rels, mask)
@@ -270,7 +270,7 @@ def do_train(args):
             if global_step % 10 == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, loss.numpy().item(), 10 / (time.time() - tic_train))
+                    % (global_step, epoch, loss.item(), 10 / (time.time() - tic_train))
                 )
                 tic_train = time.time()
 

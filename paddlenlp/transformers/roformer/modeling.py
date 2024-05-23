@@ -75,7 +75,7 @@ class RoFormerEmbeddings(nn.Layer):
             inputs_embeds = self.word_embeddings(input_ids)
 
         if token_type_ids is None:
-            token_type_ids_shape = paddle.shape(inputs_embeds)[:-1]
+            token_type_ids_shape = inputs_embeds.shape[:-1]
             token_type_ids = paddle.zeros(token_type_ids_shape, dtype="int64")
 
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
@@ -97,7 +97,7 @@ class RotaryPositionEmbedding(nn.Layer):
 
     def forward(self, x, offset=0):
         # x shape [batch_size, num_heads, seqlen, head_dim]
-        seqlen = paddle.shape(x)[-2]
+        seqlen = x.shape[-2]
         sin, cos = (
             self.sin[offset : offset + seqlen, :],
             self.cos[offset : offset + seqlen, :],
@@ -391,7 +391,7 @@ class RoFormerModel(RoFormerPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -683,7 +683,7 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
             if start_positions.ndim > 1:
                 end_positions = end_positions.squeeze(-1)
             # sometimes the start/end positions are outside our model inputs, we ignore these terms
-            ignored_index = paddle.shape(start_logits)[1]
+            ignored_index = start_logits.shape[1]
             start_positions = start_positions.clip(0, ignored_index)
             end_positions = end_positions.clip(0, ignored_index)
 

@@ -602,8 +602,9 @@ class SoftTemplate(Template):
             self.soft_embeddings = nn.Embedding(self.num_soft_token, self.embed_size)
             weight = self.soft_embeddings.weight.clone().detach()
             for soft_id, word_id in soft2word.items():
-                word_id = paddle.to_tensor(word_id)
-                weight[soft_id] = self.word_embeddings(word_id)[0]
+                # squeeze() is used here to be backward compatible with 0-D tensor introduced in paddle 2.5
+                word_id = paddle.to_tensor(word_id).squeeze()
+                weight[soft_id] = self.word_embeddings(word_id)
             self.soft_embeddings.weight.set_value(weight)
 
     def _create_soft_encoders(self, output_size: int = None, activation: nn.Layer = None):
@@ -853,7 +854,7 @@ class AutoTemplate(object):
         template_config_file = os.path.join(data_path, TEMPLATE_CONFIG_FILE)
         if not os.path.isfile(template_config_file):
             raise ValueError("{} not found under {}".format(TEMPLATE_CONFIG_FILE, data_path))
-        with open(template_config_file, "r") as fp:
+        with open(template_config_file, "r", encoding="utf-8") as fp:
             config = [x.strip() for x in fp]
             prompt = json.loads(config[0])
             if len(config) > 1:

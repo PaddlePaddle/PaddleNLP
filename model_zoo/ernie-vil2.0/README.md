@@ -124,22 +124,24 @@ Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
 - python >= 3.7
 - paddlepaddle >= 2.4.1
 - paddlenlp >= 2.5.1
-- lmdb==1.3.0
 
 ### 数据准备
 
-本项目使用了 [Flickr30k-CN](https://clip-cn-beijing.oss-cn-beijing.aliyuncs.com/datasets/Flickr30k-CN.zip) 中文场景下的图文数据集。
+本项目使用了 [Flickr30k-CN](https://paddlenlp.bj.bcebos.com/datasets/Flickr30k-CN.tar.gz) 中文场景下的图文数据集。
 
-为了训练的时候方便随机读取，我们将tsv和jsonl文件一起序列化，转换成内存索引的LMDB数据库文件。
+为了训练的时候方便随机读取，我们将tsv和图片数据序列化，转换为arrow文件。
+###
 
 ```shell
 mkdir -p data/datasets
-wget https://clip-cn-beijing.oss-cn-beijing.aliyuncs.com/datasets/Flickr30k-CN.zip
-unzip Flickr30k-CN.zip -d data/datasets/
+wget https://paddlenlp.bj.bcebos.com/datasets/Flickr30k-CN.tar.gz
+tar -xzvf Flickr30k-CN.tar.gz -d data/datasets/
 
-python preprocess/create_lmdb_dataset.py \
+python preprocess/create_arrow_dataset.py \
     --data_dir data/datasets/Flickr30k-CN \
-    --splits train,valid,test
+    --splits train,valid,test \
+    --image_dir data/datasets/Flickr30k-CN/image \
+    --t2i_type   jsonl
 ```
 执行完后，data 目录应是如下结构：
 
@@ -147,35 +149,16 @@ python preprocess/create_lmdb_dataset.py \
 ├── data
     └── datasets
         └── Flickr30k-CN
-            ├── lmdb # 文本图像数据
-            │   ├── test
-            │   │   ├── imgs
-            │   │   │   ├── data.mdb
-            │   │   │   └── lock.mdb
-            │   │   └── pairs
-            │   │       ├── data.mdb
-            │   │       └── lock.mdb
-            │   ├── train
-            │   │   ├── imgs
-            │   │   │   ├── data.mdb
-            │   │   │   └── lock.mdb
-            │   │   └── pairs
-            │   │       ├── data.mdb
-            │   │       └── lock.mdb
-            │   └── valid
-            │       ├── imgs
-            │       │   ├── data.mdb
-            │       │   └── lock.mdb
-            │       └── pairs
-            │           ├── data.mdb
-            │           └── lock.mdb
-            ├── test_imgs.tsv # 图像测试集， 图片id & 图片内容
+            |── image#图像数据
+            ├── arrow # 文本图像数据
+            |   ├── test_img.arrow
+            |   ├── valid_img.arrow
+            │   ├── test.arrow
+            │   ├── train.arrow
+            │   └── valid.arrow
             ├── test_texts.jsonl # 文本测试数据，文本id & 文本内容，连同匹配的图片id列表
-            ├── train_imgs.tsv # 图像训练集
             ├── train_texts.jsonl # 文本训练集
-            ├── valid_imgs.tsv # 图像验证集
-            ├── valid_texts.jsonl # 文本验证集，文到图
-            └── valid_texts.tr.jsonl # 文本验证集，图到文
+            └── valid_texts.jsonl # 文本验证集
 ```
 
 
@@ -190,8 +173,8 @@ python preprocess/create_lmdb_dataset.py \
 DATAPATH=./data
 
 # data options
-train_data=${DATAPATH}/datasets/Flickr30k-CN/lmdb/train
-val_data=${DATAPATH}/datasets/Flickr30k-CN/lmdb/valid
+train_data=${DATAPATH}/datasets/Flickr30k-CN/arrow
+val_data=${DATAPATH}/datasets/Flickr30k-CN/arrow
 
 # 启动方式
 log_dir=train_log
@@ -252,7 +235,7 @@ split=valid # 指定计算valid或test集特征
 python -u extract_features.py \
     --extract-image-feats \
     --extract-text-feats \
-    --image-data="${DATAPATH}/datasets/Flickr30k-CN/lmdb/${split}/imgs" \
+    --image-data="${DATAPATH}/datasets/Flickr30k-CN/arrow/${split}_img.arrow" \
     --text-data="${DATAPATH}/datasets/Flickr30k-CN/${split}_texts.jsonl" \
     --resume output_pd/checkpoint-600 \
     --img-batch-size=32 \
