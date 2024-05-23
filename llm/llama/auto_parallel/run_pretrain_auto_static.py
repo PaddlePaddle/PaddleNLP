@@ -123,6 +123,16 @@ class PreTrainingArguments(TrainingArguments):
     virtual_pipeline_seg_method: str = field(
         default="LlamaDecoderLayerAuto", metadata={"help": "The seg method of spliting pp layer for virtual pipeline."}
     )
+    program_runtimes: List[int] = field(
+        default_factory=lambda: [61, 72, 71, 34, 3],
+        metadata={
+            "help": "The program runtime of 5 types of jobs including default forward, backward_b, backward_w, loss, communication."
+        },
+    )
+    memory_limit_times: float = field(
+        default=5,
+        metadata={"help": "The memory limit times of the pipeline parallel. Only used for zbv pipeline parallel."},
+    )
 
     def __post_init__(self):
         super().__post_init__()
@@ -541,6 +551,9 @@ def main():
         pipeline = training_args.strategy.pipeline
         pipeline.vpp_degree = config.virtual_pp_degree
         pipeline.vpp_seg_method = training_args.virtual_pipeline_seg_method
+        pipeline.program_runtimes = training_args.program_runtimes
+        print("Pipeline strategy:", pipeline.program_runtimes)
+        exit(0)
 
     print("Final pre-training config:", config)
 
