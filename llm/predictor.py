@@ -1232,6 +1232,7 @@ def create_predictor(
                     dtype=predictor_args.dtype,
                     tensor_parallel_degree=tensor_parallel_degree,
                     tensor_parallel_rank=tensor_parallel_rank,
+                    tensor_parallel_output=False,
                 )
             elif model_args.model_type == "ernie-3.5-se":
                 sys.path.append("./ernie-3.5-se")
@@ -1244,6 +1245,7 @@ def create_predictor(
                     dtype=predictor_args.dtype,
                     tensor_parallel_degree=tensor_parallel_degree,
                     tensor_parallel_rank=tensor_parallel_rank,
+                    tensor_parallel_output=False,
                 )
             else:
                 model = AutoModelForCausalLM.from_pretrained(
@@ -1252,6 +1254,7 @@ def create_predictor(
                     use_flash_attention=predictor_args.use_flash_attention,
                     tensor_parallel_degree=tensor_parallel_degree,
                     tensor_parallel_rank=tensor_parallel_rank,
+                    tensor_parallel_output=False,
                 )
 
             predictor = DygraphPredictor(predictor_args, model=model, tokenizer=tokenizer)

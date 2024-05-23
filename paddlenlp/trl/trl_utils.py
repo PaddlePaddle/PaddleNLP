@@ -44,4 +44,6 @@ def calculate_effective_tokens(training_args, train_dataset, max_seq_len):
         for i, data in enumerate(train_dataset):
             total_effective_tokens += len(data["input_ids"])
         total_tokens = (i + 1) * max_seq_len
+        total_effective_tokens *= training_args.num_train_epochs
+        total_tokens *= training_args.num_train_epochs
     return total_effective_tokens, total_tokens
