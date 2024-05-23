@@ -795,7 +795,7 @@ class QWenLMHead(nn.Layer):
 
     def forward(self, hidden_states, tensor_parallel_output=None):
         if tensor_parallel_output is None:
-            tensor_parallel_output = self.config.tensor_parallel_output
+            tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
 
         logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         return logits
