@@ -218,6 +218,84 @@ def resolve_hf_config_path(repo_id: str, cache_dir: str, subfolder=None) -> str:
     )
 
 
+from collections import namedtuple
+
+Attr = namedtuple("Attr", ["name", "type", "default_value", "comment"])
+
+
+def set_expected_keys(config, llm_meta, kwargs):
+    for key, value in llm_meta.items():
+        if key in kwargs:
+            value = kwargs.pop(key)
+        setattr(config, key, value)
+
+    return kwargs
+
+
+class LlmMetaConfig:
+    op_fusion_attributes = [
+        # name, type, default_value, comment
+        ("use_flash_attention", bool, False, "Use flash attention to accelerate training."),
+        ("use_fused_rms_norm", bool, False, "use_fused_rms_norm"),
+        ("use_fused_rope", bool, False, "use_fused_rope"),
+        ("use_fused_linear", bool, False, "use_fused_linear"),
+        ("use_fused_dropout_add", bool, False, "use_fused_dropout_add"),
+    ]
+    hybrid_parallel_attributes = [
+        # tensor_parallel
+        ("tensor_parallel_degree", int, -1, "tensor_parallel_degree"),
+        ("tensor_parallel_rank", int, 0, "tensor_parallel_rank"),
+        ("tensor_parallel_output", bool, False, "tensor_parallel_output"),
+        # pipeline_parallel
+        ("pipeline_parallel_degree", int, -1, "pipeline_parallel_degree"),
+        ("virtual_pp_degree", int, 1, "virtual_pp_degree"),
+        # pp refine recompute
+        ("no_recompute_layers", Optional[List[int]], -1, "no_recompute_layers"),
+        ("pp_recompute_interval", int, 1, "pp_recompute_interval"),
+        # sep_parallel
+        ("sep_parallel_degree", int, -1, "sep_parallel_degree"),
+        ("sequence_parallel", bool, False, "sequence_parallel"),
+        ("use_sequence_parallel_allreduce", bool, False, "use_sequence_parallel_allreduce"),
+    ]
+    recompute_attributes = [
+        ("recompute", bool, False, "recompute"),
+        ("recompute_granularity", str, None, "recompute_granularity"),
+        ("recompute_use_reentrant", bool, False, "recompute_use_reentrant"),
+    ]
+
+    # parameters fuse
+    parameters_fuse_attributes = [
+        ("fuse_attention_qkv", bool, False, "fuse_attention_qkv"),
+        ("fuse_attention_ffn", bool, False, "fuse_attention_ffn"),
+    ]
+
+    @classmethod
+    def _get_defaults(cls):
+        ret = {}
+        for attrs in [
+            cls.parameters_fuse_attributes,
+            cls.op_fusion_attributes,
+            cls.hybrid_parallel_attributes,
+            cls.recompute_attributes,
+        ]:
+            for attr in attrs:
+                # return dict of key and default values
+                ret[attr[0]] = attr[2]
+        return ret
+
+    @classmethod
+    def _get_nonsavable_keys(cls):
+        ret = set()
+        for attrs in [
+            cls.op_fusion_attributes,
+            cls.hybrid_parallel_attributes,
+            cls.recompute_attributes,
+        ]:
+            for attr in attrs:
+                ret.add(attr[0])
+        return ret
+
+
 class PretrainedConfig:
     r"""
     Base class for all configuration classes. Handles a few parameters common to all models' configurations as well as
@@ -441,6 +519,8 @@ class PretrainedConfig:
         # Attributes with defaults
         # map the old attr to new atr, eg: num_classes -> num_labels
         kwargs = attribute_map(self, kwargs=kwargs)
+        llm_meta = LlmMetaConfig._get_defaults()
+        kwargs = set_expected_keys(self, llm_meta, kwargs)
 
         self.return_dict = kwargs.pop("return_dict", False)
         self.output_hidden_states = kwargs.pop("output_hidden_states", False)
@@ -449,7 +529,6 @@ class PretrainedConfig:
         if "quantization_config" in kwargs and isinstance(kwargs["quantization_config"], Dict):
             kwargs["quantization_config"] = QuantizationConfig.from_dict(kwargs["quantization_config"])
         self.quantization_config = kwargs.pop("quantization_config", QuantizationConfig())
-        self.use_flash_attention = kwargs.pop("use_flash_attention", False)
 
         self.pruned_heads = kwargs.pop("pruned_heads", {})
         self.tie_word_embeddings = kwargs.pop(
@@ -462,17 +541,6 @@ class PretrainedConfig:
         else:
             self.dtype = kwargs.pop("dtype", paddle.get_default_dtype())
 
-        # Parameters for tensor parallel
-        self.tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", -1)
-        self.tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
-        # Parameters for sep
-        self.sep_parallel_degree = kwargs.pop("sep_parallel_degree", -1)
-        # If set to True, this option is used with fleet.meta_parallel.ParallelCrossEntropy
-        # to calculate cross-entropy loss for parallel model.
-        self.tensor_parallel_output = kwargs.pop("tensor_parallel_output", False)
-        # Temporary switch to control hook vs. PyLayer implementation of recompute
-        self.recompute_use_reentrant = kwargs.pop("recompute_use_reentrant", False)
-
         # Is decoder is used in encoder-decoder models to differentiate encoder from decoder
         self.is_encoder_decoder = kwargs.pop("is_encoder_decoder", False)
         self.is_decoder = kwargs.pop("is_decoder", False)
@@ -480,31 +548,10 @@ class PretrainedConfig:
         self.add_cross_attention = kwargs.pop("add_cross_attention", False)
         self.tie_encoder_decoder = kwargs.pop("tie_encoder_decoder", False)
 
-        # Parameters for sequence generation
-        self.max_length = kwargs.pop("max_length", 20)
-        self.min_length = kwargs.pop("min_length", 0)
-        self.do_sample = kwargs.pop("do_sample", False)
-        self.early_stopping = kwargs.pop("early_stopping", False)
-        self.num_beams = kwargs.pop("num_beams", 1)
-        self.num_beam_groups = kwargs.pop("num_beam_groups", 1)
-        self.diversity_penalty = kwargs.pop("diversity_penalty", 0.0)
-        self.temperature = kwargs.pop("temperature", 1.0)
-        self.top_k = kwargs.pop("top_k", 50)
-        self.top_p = kwargs.pop("top_p", 1.0)
-        self.typical_p = kwargs.pop("typical_p", 1.0)
-        self.repetition_penalty = kwargs.pop("repetition_penalty", 1.0)
-        self.length_penalty = kwargs.pop("length_penalty", 1.0)
-        self.no_repeat_ngram_size = kwargs.pop("no_repeat_ngram_size", 0)
-        self.encoder_no_repeat_ngram_size = kwargs.pop("encoder_no_repeat_ngram_size", 0)
-        self.bad_words_ids = kwargs.pop("bad_words_ids", None)
-        self.num_return_sequences = kwargs.pop("num_return_sequences", 1)
-        self.chunk_size_feed_forward = kwargs.pop("chunk_size_feed_forward", 0)
-        self.output_scores = kwargs.pop("output_scores", False)
-        self.return_dict_in_generate = kwargs.pop("return_dict_in_generate", False)
-        self.forced_bos_token_id = kwargs.pop("forced_bos_token_id", None)
-        self.forced_eos_token_id = kwargs.pop("forced_eos_token_id", None)
-        self.remove_invalid_values = kwargs.pop("remove_invalid_values", False)
-        self.exponential_decay_length_penalty = kwargs.pop("exponential_decay_length_penalty", None)
+        # Retrocompatibility: Parameters for sequence generation. While we will keep the ability to load these
+        # parameters, saving them will be deprecated. In a distant future, we won't need to load them.
+        for parameter_name, default_value in self._get_generation_defaults().items():
+            setattr(self, parameter_name, kwargs.pop(parameter_name, default_value))
 
         # Fine-tuning task arguments
         self.architectures = kwargs.pop("architectures", None)
@@ -569,6 +616,45 @@ class PretrainedConfig:
             except AttributeError as err:
                 logger.error(f"Can't set {key} with value {value} for {self}")
                 raise err
+
+    @staticmethod
+    def _get_generation_defaults() -> Dict[str, Any]:
+        return {
+            "max_length": 20,
+            "min_length": 0,
+            "do_sample": False,
+            "early_stopping": False,
+            "num_beams": 1,
+            "num_beam_groups": 1,
+            "diversity_penalty": 0.0,
+            "temperature": 1.0,
+            "top_k": 50,
+            "top_p": 1.0,
+            "typical_p": 1.0,
+            "repetition_penalty": 1.0,
+            "length_penalty": 1.0,
+            "no_repeat_ngram_size": 0,
+            "encoder_no_repeat_ngram_size": 0,
+            "bad_words_ids": None,
+            "num_return_sequences": 1,
+            "output_scores": False,
+            "return_dict_in_generate": False,
+            "forced_bos_token_id": None,
+            "forced_eos_token_id": None,
+            "remove_invalid_values": False,
+            "exponential_decay_length_penalty": None,
+            "suppress_tokens": None,
+            "begin_suppress_tokens": None,
+        }
+
+    def _has_non_default_generation_parameters(self) -> bool:
+        """
+        Whether or not this instance holds non-default generation parameters.
+        """
+        for parameter_name, default_value in self._get_generation_defaults().items():
+            if hasattr(self, parameter_name) and getattr(self, parameter_name) != default_value:
+                return True
+        return False
 
     @property
     def name_or_path(self) -> str:
@@ -904,7 +990,31 @@ class PretrainedConfig:
         if "_auto_class" in output:
             del output["_auto_class"]
 
-        output["quantization_config"] = self.quantization_config.to_dict()
+        # PaddleNLP version when serializing the model
+        output["paddlenlp_version"] = __version__
+
+        for key, value in output.items():
+            # Deal with nested configs like CLIP
+            if isinstance(value, PretrainedConfig):
+                value = value.to_dict()
+                del value["paddlenlp_version"]
+
+            output[key] = value
+
+        nonsavable_keys = LlmMetaConfig._get_nonsavable_keys()
+        for key in list(output.keys()):
+            if key in nonsavable_keys:
+                output.pop(key)
+
+        if hasattr(self, "quantization_config"):
+            output["quantization_config"] = (
+                self.quantization_config.to_dict()
+                if not isinstance(self.quantization_config, dict)
+                else self.quantization_config
+            )
+
+            # pop the `_pre_quantization_dtype` as torch.dtypes are not serializable.
+            _ = output.pop("_pre_quantization_dtype", None)
 
         return output
 
