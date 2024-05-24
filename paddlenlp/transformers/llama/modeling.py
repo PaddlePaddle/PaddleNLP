@@ -117,7 +117,7 @@ def _get_interleave(n):
 
 def get_use_casual_mask():
     """Get the value of the 'USE_CASUAL_MASK' environment variable."""
-    return os.getenv("USE_CASUAL_MASK", "False")
+    return os.getenv("USE_CASUAL_MASK", False)
 
 
 def build_alibi_tensor(
