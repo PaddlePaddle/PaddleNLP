@@ -96,14 +96,6 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable eliminate_transpose pass, which should replace transpose with reshape when sequence parallel is enabled."
         },
     )
-    job_schedule_profiler_start: int = field(
-        default=-1,
-        metadata={"help": "The step to start job_schedule_profiler."},
-    )
-    job_schedule_profiler_end: int = field(
-        default=-1,
-        metadata={"help": "The step to end job_schedule_profiler."},
-    )
     pipeline_schedule_mode: str = field(
         default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
     )

@@ -803,6 +803,14 @@ class TrainingArguments:
         default=False,
         metadata={"help": "whether to run distributed training in auto parallel mode"},
     )
+    job_schedule_profiler_start: int = field(
+        default=-1,
+        metadata={"help": "The step to start job_schedule_profiler."},
+    )
+    job_schedule_profiler_end: int = field(
+        default=-1,
+        metadata={"help": "The step to end job_schedule_profiler."},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
