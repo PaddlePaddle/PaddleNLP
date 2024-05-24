@@ -24,6 +24,7 @@ import re
 import shutil
 import sys
 import warnings
+from dataclasses import field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -218,11 +219,6 @@ def resolve_hf_config_path(repo_id: str, cache_dir: str, subfolder=None) -> str:
     )
 
 
-from collections import namedtuple
-
-Attr = namedtuple("Attr", ["name", "type", "default_value", "comment"])
-
-
 def set_expected_keys(config, llm_meta, kwargs):
     for key, value in llm_meta.items():
         if key in kwargs:
@@ -232,14 +228,29 @@ def set_expected_keys(config, llm_meta, kwargs):
     return kwargs
 
 
+def llmmetaclass(cls):
+    # https://github.com/python/cpython/blob/2b091b9aa9a6ca5e2a34654dde909c5bdfc52fa8/Lib/dataclasses.py#L970C31-L970C46
+    llm_meta = LlmMetaConfig._get_all_meta()
+    for name, datatype, default_value, comment in llm_meta:
+        if not hasattr(cls, name):
+            value = field(
+                default=default_value,
+                metadata={"help": comment},
+            )
+            setattr(cls, name, value)
+            cls.__annotations__[name] = datatype
+
+    return cls
+
+
 class LlmMetaConfig:
     op_fusion_attributes = [
         # name, type, default_value, comment
-        ("use_flash_attention", bool, False, "Use flash attention to accelerate training."),
-        ("use_fused_rms_norm", bool, False, "use_fused_rms_norm"),
-        ("use_fused_rope", bool, False, "use_fused_rope"),
-        ("use_fused_linear", bool, False, "use_fused_linear"),
-        ("use_fused_dropout_add", bool, False, "use_fused_dropout_add"),
+        ("use_flash_attention", bool, False, "Whether to use flash attention to accelerate training."),
+        ("use_fused_rms_norm", bool, False, "llama or other model, use_fused_rms_norm"),
+        ("use_fused_rope", bool, False, "Enable rope fusion or not."),
+        ("use_fused_linear", bool, False, "GPT3 model, use fused linear layer"),
+        ("use_fused_dropout_add", bool, False, "GPT3 model, use fused `dropout + residual add` op."),
     ]
     hybrid_parallel_attributes = [
         # tensor_parallel
@@ -248,25 +259,30 @@ class LlmMetaConfig:
         ("tensor_parallel_output", bool, False, "tensor_parallel_output"),
         # pipeline_parallel
         ("pipeline_parallel_degree", int, -1, "pipeline_parallel_degree"),
-        ("virtual_pp_degree", int, 1, "virtual_pp_degree"),
+        ("virtual_pp_degree", int, 1, "Virtual pipeline degree"),
         # pp refine recompute
         ("no_recompute_layers", Optional[List[int]], -1, "no_recompute_layers"),
-        ("pp_recompute_interval", int, 1, "pp_recompute_interval"),
+        (
+            "pp_recompute_interval",
+            int,
+            1,
+            "The interval for the number of layers at which recomputation occurs. A value of 0 indicates no recomputation. Default is 0.",
+        ),
         # sep_parallel
         ("sep_parallel_degree", int, -1, "sep_parallel_degree"),
-        ("sequence_parallel", bool, False, "sequence_parallel"),
-        ("use_sequence_parallel_allreduce", bool, False, "use_sequence_parallel_allreduce"),
+        ("sequence_parallel", bool, False, "Whether to use sequence parallel"),
+        ("use_sequence_parallel_allreduce", bool, False, "Whether to use fuse sequence parallel allreduce"),
     ]
     recompute_attributes = [
         ("recompute", bool, False, "recompute"),
-        ("recompute_granularity", str, None, "recompute_granularity"),
+        ("recompute_granularity", str, None, "Recompute granularity, Choose among ['full', 'core_attn', 'full_attn']"),
         ("recompute_use_reentrant", bool, False, "recompute_use_reentrant"),
     ]
 
     # parameters fuse
     parameters_fuse_attributes = [
-        ("fuse_attention_qkv", bool, False, "fuse_attention_qkv"),
-        ("fuse_attention_ffn", bool, False, "fuse_attention_ffn"),
+        ("fuse_attention_qkv", bool, False, "Whether to fuse attention qkv"),
+        ("fuse_attention_ffn", bool, False, "Whether to fuse first up and gate proj in mlp block"),
     ]
 
     @classmethod
@@ -284,6 +300,20 @@ class LlmMetaConfig:
         return ret
 
     @classmethod
+    def _get_all_meta(cls):
+        ret = []
+        for attrs in [
+            cls.parameters_fuse_attributes,
+            cls.op_fusion_attributes,
+            cls.hybrid_parallel_attributes,
+            cls.recompute_attributes,
+        ]:
+            for attr in attrs:
+                # return dict of key and default values
+                ret.append(attr)
+        return ret
+
+    @classmethod
     def _get_nonsavable_keys(cls):
         ret = set()
         for attrs in [
@@ -294,6 +324,11 @@ class LlmMetaConfig:
             for attr in attrs:
                 ret.add(attr[0])
         return ret
+
+    @classmethod
+    def set_llm_config(cls, config, args):
+        for key, value in cls._get_defaults().items():
+            setattr(config, key, getattr(args, key, value))
 
 
 class PretrainedConfig:
