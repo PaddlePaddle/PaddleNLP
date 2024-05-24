@@ -52,5 +52,6 @@
   "save_total_limit": 2,
   "device": "gpu",
   "to_static": true,
-  "enable_auto_parallel": true
+  "enable_auto_parallel": true,
+  "split_backward": true
 }

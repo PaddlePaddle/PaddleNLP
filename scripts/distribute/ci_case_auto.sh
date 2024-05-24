@@ -1669,6 +1669,12 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2() {
     export FLAGS_call_stack_level=3
     export NVIDIA_TF32_OVERRIDE=0
 
+    export FLAGS_cudnn_deterministic=1
+    export FLAGS_embedding_deterministic=1 
+    
+    export CUDA_DEVICE_MAX_CONNECTIONS=1
+    export PARALLEL_CROSS_ENTROPY=true
+
     task_name="llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2"
     case_out_dir="output/$task_name"
     case_log_dir="output/$task_name""_log"
@@ -1725,7 +1731,7 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2() {
         --max_seq_length 4096 \
         --sep_parallel_degree 1 \
         --sequence_parallel false \
-        --pipeline_parallel_degree 2 \
+        --pipeline_parallel_degree 4 \
         --sharding_parallel_degree 2 \
         --tensor_parallel_degree 1 \
         --virtual_pp_degree 3 \
@@ -1742,12 +1748,12 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2() {
         --skip_memory_metrics 0 \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_samples_per_second: ' '{print $2}' | awk -F ',' '{print $1}'`
-    mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'current_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
+    ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
+    mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=7.52383575
-    ips_base=12.4135
-    mem_base=29.140248775482178
+    loss_base=7.5364624
+    ips_base=5442.5208
+    mem_base=22.387750148773193
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -1761,6 +1767,9 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
     export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=3
     export NVIDIA_TF32_OVERRIDE=0
+
+    export FLAGS_cudnn_deterministic=1
+    export FLAGS_embedding_deterministic=1 
 
     export CUDA_DEVICE_MAX_CONNECTIONS=1
     export PARALLEL_CROSS_ENTROPY=true
@@ -1826,7 +1835,7 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
         --tensor_parallel_degree 1 \
         --virtual_pp_degree 3 \
         --pipeline_schedule_mode "VPP" \
-        --split_bw true \
+        --split_backward true \
         --sharding "stage2" \
         --pipeline_parallel_config "enable_send_recv_overlap" \
         --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
@@ -1842,9 +1851,9 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
     ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
     mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=7.52383575
-    ips_base=12.4135
-    mem_base=29.140248775482178
+    loss_base=7.5364624
+    ips_base=5864.2898
+    mem_base=23.745134115219116
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
