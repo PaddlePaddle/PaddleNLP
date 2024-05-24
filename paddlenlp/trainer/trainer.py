@@ -1892,6 +1892,7 @@ class Trainer:
                     optimizer._set_broadcast_overlap(True, model)
 
                 self.optimizer = optimizer
+
         # pure tesnor parallel mode, no pipeline_parallel, no sharding.
         if (
             not in_pipeline_parallel_mode
@@ -1906,21 +1907,6 @@ class Trainer:
             if self.args.amp_master_grad:
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
-
-        # stage1 has v1 and v2 version
-        if in_sharding_parallel_mode and ShardingOption.SHARD_OP in self.args.sharding:
-            if "split_param" in self.args.sharding_parallel_config:
-                if (
-                    hasattr(self.optimizer, "_set_all_gather_overlap_forward")
-                    and "enable_stage1_allgather_overlap" in self.args.sharding_parallel_config
-                ):
-                    self.optimizer._set_all_gather_overlap_forward(True, model)
-            else:
-                if (
-                    hasattr(self.optimizer, "_set_broadcast_overlap")
-                    and "enable_stage1_broadcast_overlap" in self.args.sharding_parallel_config
-                ):
-                    self.optimizer._set_broadcast_overlap(True, model)
 
         return model
 
