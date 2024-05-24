@@ -1762,6 +1762,9 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
     export FLAGS_call_stack_level=3
     export NVIDIA_TF32_OVERRIDE=0
 
+    export CUDA_DEVICE_MAX_CONNECTIONS=1
+    export PARALLEL_CROSS_ENTROPY=true
+
     task_name="llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw"
     case_out_dir="output/$task_name"
     case_log_dir="output/$task_name""_log"
