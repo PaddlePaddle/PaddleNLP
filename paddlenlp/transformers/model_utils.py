@@ -108,11 +108,11 @@ def unwrap_optimizer(optimizer, optimizer_instances=()):
 
 
 if is_safetensors_available():
-    from safetensors import safe_open
-    from safetensors.numpy import load_file as safe_load_file
+    from safetensors.numpy import save_file as safe_save_file
+
     from paddlenlp.utils.safetensors import fast_load_file as safe_load_file
     from paddlenlp.utils.safetensors import fast_safe_open as safe_open
-    from safetensors.numpy import save_file as safe_save_file
+
 
 def prune_linear_layer(layer: nn.Linear, index: paddle.Tensor, dim: int = 0) -> nn.Linear:
     """
