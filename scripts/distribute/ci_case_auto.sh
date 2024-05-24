@@ -1836,9 +1836,9 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
         --virtual_pp_degree 3 \
         --pipeline_schedule_mode "VPP" \
         --sharding "stage2" \
-        --pipeline_parallel_config "enable_send_recv_overlap" \
+        --pipeline_parallel_config "enable_send_recv_overlap enable_split_backward" \
         --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
-        --sharding_parallel_config "enable_stage2_overlap enable_split_backward" \
+        --sharding_parallel_config "enable_stage2_overlap" \
         --tensor_parallel_config "enable_mp_async_allreduce" \
         --to_static 1 \
         --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
