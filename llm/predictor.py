@@ -733,6 +733,7 @@ class BlockInferencePredictorMixin:
         self.model_name_or_path = config.model_name_or_path
 
         self.architectures = self.model_config.architectures[0].lower()
+        self.alibi = self.model_config.alibi
 
         self.dtype = config.dtype or self.model_config
 
@@ -832,7 +833,7 @@ class BlockInferencePredictorMixin:
             np.array(eos_token_id * config.batch_size).reshape(-1, 1).astype("int64")
         )
         # bloom model needs src_mask and tgt_mask!
-        if "bloom" in self.architectures:
+        if "bloom" in self.architectures or self.alibi is True:
             lower_one_tril = paddle.tril(
                 paddle.ones(shape=(self.total_max_length, self.total_max_length), dtype=self.dtype)
             )

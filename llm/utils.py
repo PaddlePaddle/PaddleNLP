@@ -389,7 +389,7 @@ def get_alibi_slopes(num_heads):
         extra_base = 2 ** (-(2 ** -(math.log2(2 * closest_power_of_2) - 3)))
         num_remaining_heads = min(closest_power_of_2, num_heads - closest_power_of_2)
         extra_powers = np.arange(1, 1 + 2 * num_remaining_heads, 2)
-        slopes = np.concatante([slopes, np.power(extra_base, extra_powers)], axis=0)
+        slopes = np.concatenate([slopes, np.power(extra_base, extra_powers)], axis=0)
 
     return slopes.astype("float32")
 
