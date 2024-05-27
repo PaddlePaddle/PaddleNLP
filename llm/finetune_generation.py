@@ -52,6 +52,9 @@ from paddlenlp.transformers import (
 from paddlenlp.utils.log import logger
 
 
+# Fine-tune Environment Variables to support sharding stage1 overlap optimization.
+os.environ['USE_CASUAL_MASK'] = True
+
 def add_start_docstrings(*docstr):
     def docstring_decorator(fn):
         fn.__doc__ = "".join(docstr) + (fn.__doc__ if fn.__doc__ is not None else "")
