@@ -565,7 +565,7 @@ class Trainer:
             )
             self.model.set_state_dict(state_dict)
         else:
-            if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
+            if resume_from_checkpoint is not None and (self.args.dataset_rank == 0 or self.args.use_moe):
 
                 weights_file = os.path.join(
                     resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
@@ -874,7 +874,7 @@ class Trainer:
 
         self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
 
-        tr_loss = paddle.to_tensor(0.0)
+        tr_loss = None
         self._total_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
 

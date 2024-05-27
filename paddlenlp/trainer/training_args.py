@@ -804,6 +804,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "whether to run distributed training in auto parallel mode"},
     )
+    use_moe: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Use MoE training."},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -1150,6 +1154,8 @@ class TrainingArguments:
                         order = ["dp", "sharding", "pp", "sep", "mp"]
                     else:
                         order = ["dp", "sharding", "pp", "mp"]
+                if self.use_moe:
+                    order = order[1:-1] + ["dp", "mp"]
 
                 if is_segment_parallel_supported():
                     hybrid_configs = {
@@ -1643,8 +1649,12 @@ class TrainingArguments:
                 name.append(self._format_name("pp", self.pipeline_parallel_rank, self.pipeline_parallel_degree))
             if self.sharding_parallel_degree > 1:
                 name.append(self._format_name("shard", self.sharding_parallel_rank, self.sharding_parallel_degree))
+            if self.use_moe:
+                name.append(f"moe{self.data_parallel_rank:0>2d}")
             return "_".join(name)
         else:
+            if self.use_moe:
+                return f"moe{self.data_parallel_rank:0>2d}"
             return None
 
     @property
@@ -1655,9 +1665,13 @@ class TrainingArguments:
                 name.append(self._format_name("tp", self.tensor_parallel_rank, self.tensor_parallel_degree))
             if self.pipeline_parallel_degree > 1:
                 name.append(self._format_name("pp", self.pipeline_parallel_rank, self.pipeline_parallel_degree))
+            if self.use_moe:
+                name.append(f"moe{self.data_parallel_rank:0>2d}")
             return "_".join(name)
 
         else:
+            if self.use_moe:
+                return f"moe{self.data_parallel_rank:0>2d}"
             return None
 
     def sharded_name_suffix(self, shard_id=None, pp_id=None):
