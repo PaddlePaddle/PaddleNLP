@@ -634,6 +634,7 @@ class TrainingArguments:
                 "enable_overlap_p2p_comm, overlap p2p communication with computation. \n"
                 "enable_clear_every_step_cache, clear every step cache for pipeline parallel. \n"
                 "disable_batch_p2p_comm, disable batched send/recv in pipeline parallel mode. \n"
+                "enable_split_backward, only can be used in StaticGraph-AutoParallel! split the `backward` program into `backward_b` and `backward_w` to decrease the bubble in VPP pipeline mode when `acc_step == pp_degree`. it increase the memory! \n"
             )
         },
     )
@@ -1304,6 +1305,7 @@ class TrainingArguments:
                             # "enable_sharding_comm_overlap", # no implemenation for auto_parallel
                             # "enable_timer",                 # no implemenation for auto_parallel
                             # "disable_batch_p2p_comm",       # no implemenation for auto_parallel
+                            "enable_split_backward",
                         ]:
                             raise ValueError(
                                 f"Found unknown pipeline mode config {x}, accpet config is enable_send_recv_overlap."
@@ -1312,6 +1314,7 @@ class TrainingArguments:
                 pipeline = strategy.pipeline
                 pipeline.enable = True
                 pipeline.enable_send_recv_overlap = "enable_send_recv_overlap" in pipeline_parallel_config
+                pipeline.split_backward = "enable_split_backward" in pipeline_parallel_config
                 pipeline.accumulate_steps = self.gradient_accumulation_steps
                 pipeline.micro_batch_size = self.per_device_train_batch_size
                 pipeline.schedule_mode = self.pipeline_schedule_mode
