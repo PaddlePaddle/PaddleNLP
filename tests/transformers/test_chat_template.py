@@ -282,3 +282,118 @@ class TestChatTemplateTruncation(unittest.TestCase):
         final_query = tokenizer.apply_chat_template(query, context_data=context_data, tokenize=False)
         expected_query = "你是一个人工智能助手<<SYSTEM-MESSAGE>>-<<INSTRUCTION-MESSAGE>>\nHuman: 你好<sep> Bot:"
         self.assertEqual(final_query, expected_query)
+
+
+class TemplateIntegrationTest(unittest.TestCase):
+    class DataArg:
+        def __init__(self, max_length, src_length: Optional[int] = None):
+            self.max_length: int = max_length
+            if src_length is None:
+                src_length = self.max_length - 8
+
+            self.src_length: int = src_length
+
+    def setUp(self) -> None:
+        self.tokenizer = AutoTokenizer.from_pretrained("qwen/qwen-7b-chat")
+        qwen_jinja = "{% for message in messages %}{% if loop.first and messages[0]['role'] != 'system' %}{{ '<|im_start|>system\nYou are a helpful assistant<|im_end|>\n' }}{% endif %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}"
+        self.tokenizer.init_chat_template(qwen_jinja)
+        sys.path.insert(0, "./llm")
+        return super().setUp()
+
+    def tearDown(self):
+        sys.path.remove("./llm")
+
+    def test_chat_template(self):
+        # test single turn
+        query = "你好"
+        final_query = self.tokenizer.apply_chat_template(query, tokenize=False)
+        expected_query = f"<|im_start|>system\nYou are a helpful assistant<|im_end|>\n<|im_start|>user\n{query}<|im_end|>\n<|im_start|>assistant\n"
+        self.assertEqual(final_query, expected_query)
+
+        # test multi turns conversation
+        query = [["你好", "您好，我是个人人工智能助手"], ["今天吃啥"]]
+        final_query = self.tokenizer.apply_chat_template(query, tokenize=False)
+        expected_query = "<|im_start|>system\nYou are a helpful assistant<|im_end|>\n<|im_start|>user\n你好<|im_end|>\n<|im_start|>assistant\n您好，我是个人人工智能助手<|im_end|>\n<|im_start|>user\n今天吃啥<|im_end|>\n<|im_start|>assistant\n"
+        self.assertEqual(final_query, expected_query)
+
+    def test_system_error(self):
+        # test system messaage error
+        error_jinja = "{{ bos_token }}{% if messages[0]['role'] == 'system' %}{{ raise_exception('System role not supported') }}{% endif %}"
+        self.tokenizer.init_chat_template(error_jinja)
+        from jinja2.exceptions import TemplateError
+
+        with self.assertRaises(TemplateError):
+            self.tokenizer.apply_chat_template([{"role": "system", "content": ""}])
+
+    def test_round_error(self):
+        # error round, 1 is not a valid role.
+        query = [["你好", "您好，我是个人人工智能助手"], ["今天吃啥"], ["你好", "您好"]]
+        with self.assertRaises(ValueError):
+            self.tokenizer.apply_chat_template(query, tokenize=False)
+
+    def test_jinja_syntax_error(self):
+        # test system messaage error
+        error_jinja = (
+            "{ bos_token }{% if messages[0]['role'] == 'system' %}{ raise_exception('System role not supported')}"
+        )
+        from jinja2.exceptions import TemplateSyntaxError
+
+        with self.assertRaises(TemplateSyntaxError):
+            self.tokenizer.init_chat_template(error_jinja)
+
+    def test_train_format(self):
+        from data import tokenize_rounds_example
+
+        fake_data_args = self.DataArg(50, src_length=50)
+        example = {"src": ["你好"], "tgt": ["您好，我是个人人工智能助手"]}
+        result, tgt_id = tokenize_rounds_example(self.tokenizer, example, fake_data_args, add_generation_prompt=True)
+        sentence_result = self.tokenizer.decode(result["input_ids"])
+        expected_sentence = "<|im_start|>system\nYou are a helpful assistant<|im_end|>\n<|im_start|>user\n你好<|im_end|>\n<|im_start|>assistant\n您好，我是个人人工智能助手<|im_end|>\n"
+        self.assertEqual(expected_sentence, sentence_result)
+
+        tgt_idx = len(
+            self.tokenizer.encode(
+                "<|im_start|>system\nYou are a helpful assistant<|im_end|>\n<|im_start|>user\n你好<|im_end|>\n<|im_start|>assistant\n"
+            )["input_ids"]
+        )
+        self.assertEqual(tgt_id[tgt_idx - 1], -100)
+        self.assertNotEqual(tgt_id[tgt_idx], -100)
+
+    def test_train_format_multi(self):
+        from data import tokenize_rounds_example
+
+        fake_data_args = self.DataArg(50, src_length=50)
+        example = {"src": ["用户Round 1", "用户Round 2"], "tgt": ["回答Round 1", "回答Round 2"]}
+        result, tgt_id = tokenize_rounds_example(self.tokenizer, example, fake_data_args, add_generation_prompt=True)
+
+        tgt_idx_1 = len(
+            self.tokenizer.encode(
+                "<|im_start|>system\nYou are a helpful assistant<|im_end|>\n<|im_start|>user\n用户Round 1<|im_end|>\n<|im_start|>assistant\n"
+            )["input_ids"]
+        )
+        tgt_idx_2 = len(
+            self.tokenizer.encode(
+                "<|im_start|>system\nYou are a helpful assistant<|im_end|>\n<|im_start|>user\n用户Round 1<|im_end|>\n<|im_start|>assistant\n"
+                "回答Round 1<|im_end|>\n<|im_start|>user\n用户Round 2<|im_end|>\n<|im_start|>assistant\n"
+            )["input_ids"]
+        )
+
+        self.assertEqual(tgt_id[tgt_idx_1 - 1], -100)
+        self.assertNotEqual(tgt_id[tgt_idx_1], -100)
+        self.assertEqual(tgt_id[tgt_idx_2 - 1], -100)
+        self.assertNotEqual(tgt_id[tgt_idx_2], -100)
+
+    def test_split_answer(self):
+        original_msg = [
+            {"role": "user", "content": "用户Round 1"},
+            {"role": "assistant", "content": "|回答Round 1|"},
+            {"role": "user", "content": "用户Round 2"},
+            {"role": "assistant", "content": "_回答Round 2?"},
+        ]
+        answer = ["|回答Round 1|<|im_end|>\n", "_回答Round 2?<|im_end|>\n"]
+        split_part = self.tokenizer._extract_non_learnable_parts(original_msg, answer)
+        self.assertEqual(len(split_part), 2)
+        self.assertEqual(
+            split_part[0],
+            "<|im_start|>system\nYou are a helpful assistant<|im_end|>\n<|im_start|>user\n用户Round 1<|im_end|>\n<|im_start|>assistant\n",
+        )

@@ -218,6 +218,16 @@ GLOG_minloglevel=2 python -u -m paddle.distributed.launch ppo_main.py ./ppo_conf
 
 另外所有 [`TrainingArguments` 支持参数配置](https://paddlenlp.readthedocs.io/zh/latest/trainer.html#trainingarguments)将为 actor-model 和 critic-model 的训练复用（如`sharding_stage`），除单独提供了 `critic_learning_rate/critic_weight_decay/critic_lr_scheduler_type/critic_warmup_ratio/critic_recompute` 这些参数支持为 critic-model 训练单独指定相应配置。actor-model 和 critic-model 的 checkpoints 将分别保存在 `outpt_dir` 所指定目录的 policy 和 value 文件夹下。
 
+此外为了支持更高性、更大规模的 RLHF 训练提供了以下特殊参数配置，可以按需使用：
+- `use_fusemt`：安装 paddlenlp_ops 后将在 rollout 生成时开启生成加速（开启流水线并行时不支持生成加速），通过此设置可以禁用生成加速。
+- `eval_mode`：支持为空或者设置为 "single"、"tensor_parallel"；通常可以在使用流水线并行训练时设置为"tensor_parallel"，以此在 rollout 生成阶段使用非流水线并行模型并进行生成加速。
+- `offload_level`：支持设置为"reward"、"optimizer"或者同时使用(空格分隔），用于在不同阶段 model/optimizer 使用结束后及时 offload 并在下次使用时 reload 相应参数权重以节省显存。
+
+另外注意，在使用流水线并行时（pipeline_parallel_degree大于1）建议将 `dataloader_drop_last` 设置为 true, 以此避免不同batch size带来的问题。
+
+
+
+
 ### 推理
 
 训练完成后可以直接使用 `outpt_dir` 所指定目录中 policy 文件夹下的 checkpoints 按照[LLM 推理](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#4-%E6%8E%A8%E7%90%86)部分的介绍来进行推理，请参考相应部分内容。

@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: 3.8
+          python-version: '3.10'
           cache: 'pip' # caching pip dependencies
       - name: Install dependencies
         run: |
@@ -24,4 +24,6 @@ jobs:
       - name: run the command
         run: make test
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

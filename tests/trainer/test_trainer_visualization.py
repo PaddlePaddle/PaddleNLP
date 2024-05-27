@@ -60,6 +60,7 @@ class TestWandbCallback(unittest.TestCase):
                 self.assertEqual(wandbcallback._wandb.run.summary["train/learning_rate"], log["learning_rate"])
                 self.assertEqual(wandbcallback._wandb.run.summary["train/global_step"], log["global_step"])
         wandbcallback.on_train_end(args, state, control, model=model)
+        wandbcallback._wandb.finish()
         os.environ.pop("WANDB_LOG_MODEL", None)
         os.environ.pop("WANDB_MODE", None)
         shutil.rmtree(output_dir)
@@ -76,7 +77,11 @@ class TestTensorboardCallback(unittest.TestCase):
         tensorboard_callback = TensorBoardCallback()
         self.assertIsNone(tensorboard_callback.tb_writer)
         tensorboard_callback.on_train_begin(args, state, control)
-        self.assertEqual(tensorboard_callback.tb_writer.log_dir, output_dir)
+        try:
+            log_directory = tensorboard_callback.tb_writer.logdir
+        except AttributeError:
+            log_directory = tensorboard_callback.tb_writer.log_dir
+        self.assertEqual(log_directory, output_dir)
         for global_step in range(args.max_steps):
             state.global_step = global_step
             if global_step % args.logging_steps == 0:

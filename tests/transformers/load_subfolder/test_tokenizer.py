@@ -25,6 +25,7 @@ from paddlenlp.utils.log import logger
 from tests.testing_utils import slow
 
 
+@unittest.skip("skipping due to connection error!")
 class TokenizerLoadTester(unittest.TestCase):
     @slow
     def test_bert_load(self):

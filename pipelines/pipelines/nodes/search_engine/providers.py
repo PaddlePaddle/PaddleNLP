@@ -239,3 +239,110 @@ class SerperDev(SearchEngine):
         logger.debug("Serper.dev API returned %s documents for the query '%s'", len(documents), query)
         result_docs = documents[:top_k]
         return self.score_results(result_docs, len(answer_box) > 0)
+
+
+class SearchApi(SearchEngine):
+    """
+    SearchApi is a real-time search engine that provides an API to access search results from Google, Google Scholar, YouTube,
+    YouTube transcripts and more. See the [SearchApi website](https://www.searchapi.io/) for more details.
+    """
+
+    def __init__(
+        self,
+        api_key: str,
+        top_k: Optional[int] = 10,
+        engine: Optional[str] = "google",
+        search_engine_kwargs: Optional[Dict[str, Any]] = None,
+    ):
+        """
+        :param api_key: API key for SearchApi.
+        :param top_k: Number of results to return.
+        :param engine: Search engine to use, for example google, google_scholar, youtube, youtube_transcripts.
+        See the [SearchApi documentation](https://www.searchapi.io/docs/google) for the full list of supported engines.
+        :param search_engine_kwargs: Additional parameters passed to the SearchApi.
+        See the [SearchApi documentation](https://www.searchapi.io/docs/google) for the full list of supported parameters.
+        """
+        super().__init__()
+        self.params_dict: Dict[str, Union[str, int, float]] = {}
+        self.api_key = api_key
+        self.kwargs = search_engine_kwargs if search_engine_kwargs else {}
+        self.engine = engine
+        self.top_k = top_k
+
+    def search(self, query: str, **kwargs) -> List[Document]:
+        """
+        :param query: Query string.
+        :param kwargs: Additional parameters passed to the SearchApi. For example, you can set 'location' to 'New York,United States'
+        to localize search to the specific location.
+        :return: List[Document]
+        """
+        kwargs = {**self.kwargs, **kwargs}
+        top_k = kwargs.pop("top_k", self.top_k)
+        url = "https://www.searchapi.io/api/v1/search"
+
+        params = {"q": query, **kwargs}
+        headers = {"Authorization": f"Bearer {self.api_key}", "X-SearchApi-Source": "PaddleNLP"}
+
+        if self.engine:
+            params["engine"] = self.engine
+        response = requests.get(url, params=params, headers=headers, timeout=90)
+
+        if response.status_code != 200:
+            raise Exception(f"Error while querying {self.__class__.__name__}: {response.text}")
+
+        json_content = json.loads(response.text)
+        documents = []
+        has_answer_box = False
+
+        if json_content.get("answer_box"):
+            if json_content["answer_box"].get("organic_result"):
+                title = json_content["answer_box"].get("organic_result").get("title", "")
+                link = json_content["answer_box"].get("organic_result").get("link", "")
+            if json_content["answer_box"].get("type") == "population_graph":
+                title = json_content["answer_box"].get("place", "")
+                link = json_content["answer_box"].get("explore_more_link", "")
+
+            title = json_content["answer_box"].get("title", "")
+            link = json_content["answer_box"].get("link")
+            content = json_content["answer_box"].get("answer") or json_content["answer_box"].get("snippet")
+
+            if link and content:
+                has_answer_box = True
+                documents.append(Document.from_dict({"title": title, "content": content, "link": link}))
+
+        if json_content.get("knowledge_graph"):
+            if json_content["knowledge_graph"].get("source"):
+                link = json_content["knowledge_graph"].get("source").get("link", "")
+
+            link = json_content["knowledge_graph"].get("website", "")
+            content = json_content["knowledge_graph"].get("description")
+
+            if link and content:
+                documents.append(
+                    Document.from_dict(
+                        {"title": json_content["knowledge_graph"].get("title", ""), "content": content, "link": link}
+                    )
+                )
+
+        documents += [
+            Document.from_dict({"title": c["title"], "content": c.get("snippet", ""), "link": c["link"]})
+            for c in json_content["organic_results"]
+        ]
+
+        if json_content.get("related_questions"):
+            for question in json_content["related_questions"]:
+                if question.get("source"):
+                    link = question.get("source").get("link", "")
+                else:
+                    link = ""
+
+                content = question.get("answer", "")
+
+                if link and content:
+                    documents.append(
+                        Document.from_dict({"title": question.get("question", ""), "content": content, "link": link})
+                    )
+
+        logger.debug("SearchApi returned %s documents for the query '%s'", len(documents), query)
+        result_docs = documents[:top_k]
+        return self.score_results(result_docs, has_answer_box)

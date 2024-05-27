@@ -223,6 +223,10 @@ def slow(test):
     if not _run_slow_test:
         return unittest.skip("test spends too much time")(test)
     else:
+        import paddle
+
+        if paddle.device.is_compiled_with_cuda() and paddle.device.cuda.device_count() > 0:
+            paddle.device.cuda.empty_cache()
         return test
 
 
@@ -372,7 +376,7 @@ def argv_context_guard(config: dict):
     argv = construct_argv(config)
     sys.argv = argv
     yield
-    sys.argv = old_argv
+    sys.argv = old_argv[:1]
 
 
 def update_params(json_file: str, params: dict):
@@ -408,6 +412,21 @@ def run_command(command: list[str], return_stdout=False):
         raise SubprocessCallException(
             f"Command `{' '.join(command)}` failed with the following error:\n\n{e.output.decode()}"
         ) from e
+
+
+def skip_for_none_ce_case(test_case):
+    """
+    There are too many test case, we need skip for none CE envirmonet.
+    """
+    import os
+
+    ce_env = strtobool(os.getenv("CE_TEST_ENV", "0"))
+    if not ce_env:
+        return unittest.skip("test skip for NONE CE case. If you want run this ci, please export CE_TEST_ENV=1 ")(
+            test_case
+        )
+
+    return test_case
 
 
 def require_paddle_multi_gpu(test_case):

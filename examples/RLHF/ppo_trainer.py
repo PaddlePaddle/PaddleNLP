@@ -796,7 +796,7 @@ class PPOTrainer(Trainer):
             num_return_sequences=self.args.num_return_sequences,
             temperature=self.args.temperature,
             top_p=self.args.top_p,
-            # top_k=0,  # to disable top_k sampling, default is 50
+            top_k=0,  # to disable top_k sampling, default is 50
             repetition_penalty=self.args.repetition_penalty,
             do_sample=True,
             # allow generation output to contain input

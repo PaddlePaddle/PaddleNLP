@@ -86,6 +86,16 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
         },
     )
+    fuse_allreduce_split_to_reducescatter: bool = field(
+        default=False,
+        metadata={"help": "Enable fuse_allreduce_split_to_reducescatter pass."},
+    )
+    eliminate_transpose: bool = field(
+        default=False,
+        metadata={
+            "help": "Enable eliminate_transpose pass, which should replace transpose with reshape when sequence parallel is enabled."
+        },
+    )
     job_schedule_profiler_start: int = field(
         default=-1,
         metadata={"help": "The step to start job_schedule_profiler."},
@@ -131,6 +141,16 @@ class PreTrainingArguments(TrainingArguments):
             fused_passes = self.strategy.fused_passes
             fused_passes.enable = True
             fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
+
+        if self.fuse_allreduce_split_to_reducescatter:
+            fused_passes = self.strategy.fused_passes
+            fused_passes.enable = True
+            fused_passes.fused_passes_list.append("fuse_allreduce_split_to_reducescatter_pass")
+
+        if self.eliminate_transpose:
+            fused_passes = self.strategy.fused_passes
+            fused_passes.enable = True
+            fused_passes.fused_passes_list.append("eliminate_transpose")
 
         logger.info(self.strategy)
 
@@ -275,14 +295,14 @@ def create_pretrained_dataset(
 
     train_val_test_num_samples = [
         training_args.per_device_train_batch_size
-        * training_args.data_parallel_degree
+        * training_args.dataset_world_size
         * training_args.max_steps
         * training_args.gradient_accumulation_steps,
         training_args.per_device_eval_batch_size
-        * training_args.data_parallel_degree
+        * training_args.dataset_world_size
         * training_args.eval_iters
         * (training_args.max_steps // training_args.eval_steps + 1),
-        training_args.per_device_eval_batch_size * training_args.data_parallel_degree * training_args.test_iters,
+        training_args.per_device_eval_batch_size * training_args.dataset_world_size * training_args.test_iters,
     ]
 
     print_rank_0(" > datasets target sizes (minimum size):")
@@ -366,6 +386,7 @@ def get_train_data_file(args):
 class PretrainingTrainer(AutoTrainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.is_pretraining = True
 
     def _wrap_for_dist_loader(self, train_dataloader):
         dist_loader = super()._wrap_for_dist_loader(train_dataloader)
@@ -404,13 +425,18 @@ def init_seed(seed: int = 1234, args=None):
     else:
         assert not args.use_hybrid_parallel and args.enable_auto_parallel
         if dist.get_world_size() > 1:
+            if args.hybrid_parallel_topo_order is None or args.hybrid_parallel_topo_order == "pp_first":
+                order = ["pp", "dp", "sharding", "mp", "sep"]
+            elif args.hybrid_parallel_topo_order == "sharding_first":
+                order = ["dp", "sharding", "pp", "mp", "sep"]
             topo = Topology(
                 dist.get_rank(),
                 dist.get_world_size(),
-                dp_degree=args.data_parallel_degree,
+                dp_degree=args.dataset_world_size,
                 pp_degree=args.pipeline_parallel_degree,
                 mp_degree=args.tensor_parallel_degree,
                 sharding_degree=1,  # auto_parallel's sharding is not orthogonal with dp, mp and pp
+                order=order,
             )
 
             global_seed, local_seed, random_seed = _get_distributed_seeds(args.seed, topo)
@@ -542,16 +568,16 @@ def main():
 
     print("Final pre-training config:", config)
 
-    # Set the dtype for loading model
-    dtype = "float32"
-    if training_args.fp16_opt_level == "O2":
-        if training_args.fp16:
-            dtype = "float16"
-        if training_args.bf16:
-            dtype = "bfloat16"
+    # # Set the dtype for loading model
+    # dtype = "float32"
+    # if training_args.fp16_opt_level == "O2":
+    #     if training_args.fp16:
+    #         dtype = "float16"
+    #     if training_args.bf16:
+    #         dtype = "bfloat16"
 
     with paddle.LazyGuard():
-        model = model_class.from_config(config, dtype=dtype)
+        model = model_class.from_config(config, dtype="float32")
         criterion = criterion_class(config)
 
     for param in model.parameters():
@@ -569,7 +595,11 @@ def main():
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
-    warmup_steps = training_args.warmup_ratio * training_args.max_steps
+
+    if training_args.warmup_steps > 0:
+        warmup_steps = training_args.warmup_steps
+    else:
+        warmup_steps = training_args.warmup_ratio * training_args.max_steps
 
     lr_scheduler = None
     if training_args.lr_scheduler_type.value == "cosine":

@@ -275,7 +275,7 @@ class InferTransformerDecoder(nn.Layer):
                 [
                     self_cache_key,
                     paddle.zeros(
-                        shape=[len(self.weights), 1, paddle.shape(memory_tensor)[0], self.n_head * self.size_per_head],
+                        shape=[len(self.weights), 1, memory_tensor.shape[0], self.n_head * self.size_per_head],
                         dtype=self_cache_key.dtype,
                     ),
                 ],
@@ -285,7 +285,7 @@ class InferTransformerDecoder(nn.Layer):
                 [
                     self_cache_value,
                     paddle.zeros(
-                        shape=[len(self.weights), 1, paddle.shape(memory_tensor)[0], self.n_head * self.size_per_head],
+                        shape=[len(self.weights), 1, memory_tensor.shape[0], self.n_head * self.size_per_head],
                         dtype=self_cache_value.dtype,
                     ),
                 ],
@@ -458,7 +458,7 @@ class FasterDecoder(nn.Layer):
             self.linear = nn.Linear(in_features=d_model, out_features=trg_vocab_size, bias_attr=False)
 
     def forward(self, src_word):
-        src_max_len = paddle.shape(src_word)[-1]
+        src_max_len = src_word.shape[-1]
         mem_seq_lens = paddle.sum(
             paddle.cast(src_word != self.bos_id, dtype="int32"), axis=-1, keepdim=True, dtype="int32"
         )
