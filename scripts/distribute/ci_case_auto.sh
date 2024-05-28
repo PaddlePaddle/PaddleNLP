@@ -87,6 +87,13 @@ function llm_gpt_case_list_auto() {
     llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2
 }
 
+function llm_qwen_case_list_auto() {
+    llm_qwen_dygraph_auto_bs1_fp32_DP2
+    llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2
+    llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2-PP2
+    llm_qwen_dygraph_auto_bs1_bf16_DP2-MP2-PP2
+}
+
 ############ case start ############
 
 function gpt_auto_recompute_bs16_fp32_DP1-MP1-PP1() {
@@ -2144,6 +2151,382 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
         loss_base=10.58061218
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    echo "=========== $FUNCNAME run  end ==========="
+}
+
+function llm_qwen_dygraph_auto_bs1_fp32_DP2() {
+    set -x
+
+    config_json="pretrain_argument_for_ci_auto_dp2.json"
+
+    cat <<EOF >"$config_json"
+{
+    "model_name_or_path": "qwen/qwen-7b",
+    "tokenizer_name_or_path": "qwen/qwen-7b",
+    "input_dir": "./data",
+    "output_dir": "./checkpoints/qwen_pretrain_ckpts",
+    "per_device_train_batch_size": 1,
+    "gradient_accumulation_steps": 2,
+    "per_device_eval_batch_size": 16,
+    "tensor_parallel_degree": 1,
+    "pipeline_parallel_degree": 1,
+    "virtual_pp_degree": 1,
+    "sequence_parallel": 0,   
+    "use_flash_attention": false,
+    "use_fused_rms_norm": false,
+    "use_fused_rope": false,
+    "max_seq_length": 4096,
+    "learning_rate": 3e-05,
+    "num_hidden_layers": 8,
+    "min_learning_rate": 3e-06,
+    "scale_loss": 1024,
+    "warmup_steps": 30,
+    "logging_steps": 1,
+    "max_steps": 12,
+    "save_steps": 1000,
+    "eval_steps": 10000,
+    "weight_decay": 0.01,
+    "bf16": false,
+    "fp16_opt_level": "O0",
+    "warmup_ratio": 0.01,
+    "max_grad_norm": 1.0,
+    "dataloader_num_workers": 1,
+    "continue_training": 0,
+    "do_train": true,
+    "do_eval": false,
+    "do_predict": false,
+    "disable_tqdm": true,
+    "recompute": true,
+    "recompute_granularity": "core_attn",
+    "recompute_use_reentrant": true,
+    "distributed_dataloader": 0,
+    "save_total_limit": 2,
+    "enable_auto_parallel": 1,
+    "to_static": 0
+}
+EOF
+
+    unset CUDA_VISIBLE_DEVICES
+
+    export FLAGS_call_stack_level=3
+    export FLAGS_use_cuda_managed_memory=true
+
+    task_name="llama_auto_dp2"
+    case_log_dir="qwen_auto_3d_fp32_dp2"
+    rm -rf output/$task_name/
+    rm -rf "output/$task_name""_log"
+
+    export SOT_LOG_LEVEL=4
+    export PYTHONPATH=../../../:$PYTHONPATH
+
+
+    rm -rf $case_log_dir
+
+    export FLAGS_embedding_deterministic=1        
+    export FLAGS_cudnn_deterministic=1
+    export NVIDIA_TF32_OVERRIDE=0
+    export FLAGS_enable_pir_in_executor=0
+
+    python -u  -m paddle.distributed.launch \
+            --gpus "0,1" \
+            --log_dir "$case_log_dir" \
+        run_pretrain_3D_auto.py ./$config_json \
+        >>${log_path}/$FUNCNAME 2>&1
+    loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    ips=-1
+    mem=-1
+    echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
+    loss_base=9.83757591
+    ips_base=-1
+    mem_base=-1
+    if [ $IS_A100 -ne 0 ];then
+        check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    else
+        echo "qwen auto just compare loss in A100 machine."
+    fi
+    rm -f $config_json
+    echo "=========== $FUNCNAME run  end ==========="
+}
+
+function llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2() {
+    set -x
+
+    config_json="pretrain_argument_for_ci_auto_dp2_mp2.json"
+
+    cat <<EOF >"$config_json"
+{
+    "model_name_or_path": "qwen/qwen-7b",
+    "tokenizer_name_or_path": "qwen/qwen-7b",
+    "input_dir": "./data",
+    "output_dir": "./checkpoints/qwen_pretrain_ckpts",
+    "per_device_train_batch_size": 1,
+    "gradient_accumulation_steps": 2,
+    "per_device_eval_batch_size": 16,
+    "tensor_parallel_degree": 2,
+    "pipeline_parallel_degree": 1,
+    "virtual_pp_degree": 1,
+    "sequence_parallel": 0,   
+    "use_flash_attention": false,
+    "use_fused_rms_norm": false,
+    "use_fused_rope": false,
+    "max_seq_length": 4096,
+    "learning_rate": 3e-05,
+    "num_hidden_layers": 8,
+    "min_learning_rate": 3e-06,
+    "scale_loss": 1024,
+    "warmup_steps": 30,
+    "logging_steps": 1,
+    "max_steps": 12,
+    "save_steps": 1000,
+    "eval_steps": 10000,
+    "weight_decay": 0.01,
+    "bf16": false,
+    "fp16_opt_level": "O0",
+    "warmup_ratio": 0.01,
+    "max_grad_norm": 1.0,
+    "dataloader_num_workers": 1,
+    "continue_training": 0,
+    "do_train": true,
+    "do_eval": false,
+    "do_predict": false,
+    "disable_tqdm": true,
+    "recompute": true,
+    "recompute_granularity": "core_attn",
+    "recompute_use_reentrant": true,
+    "distributed_dataloader": 0,
+    "save_total_limit": 2,
+    "enable_auto_parallel": 1,
+    "to_static": 0
+}
+EOF
+
+    set -x
+    unset CUDA_VISIBLE_DEVICES
+
+    export FLAGS_call_stack_level=3
+    export FLAGS_use_cuda_managed_memory=true
+
+    task_name="llama_auto_dp2_mp2"
+    case_log_dir="qwen_auto_3d_fp32_dp2_mp2"
+    rm -rf output/$task_name/
+    rm -rf "output/$task_name""_log"
+
+    export SOT_LOG_LEVEL=4
+    export PYTHONPATH=../../../:$PYTHONPATH
+
+    rm -rf $case_log_dir
+
+    export FLAGS_embedding_deterministic=1        
+    export FLAGS_cudnn_deterministic=1
+    export NVIDIA_TF32_OVERRIDE=0
+    export FLAGS_enable_pir_in_executor=0
+
+    python -u  -m paddle.distributed.launch \
+            --gpus "0,1,2,3" \
+            --log_dir "$case_log_dir" \
+        run_pretrain_3D_auto.py $config_json \
+        >>${log_path}/$FUNCNAME 2>&1
+    loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    ips=-1
+    mem=-1
+    echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
+    loss_base=9.83757591
+    ips_base=-1
+    mem_base=-1
+    if [ $IS_A100 -ne 0 ];then
+        check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    else
+        echo "qwen auto just compare loss in A100 machine."
+    fi
+    rm -f $config_json
+    echo "=========== $FUNCNAME run  end ==========="
+}
+
+function llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2-PP2() {
+    set -x
+
+    config_json="pretrain_argument_for_ci_auto_dp2_mp2_pp2.json"
+
+    cat <<EOF >"$config_json"
+{
+    "model_name_or_path": "qwen/qwen-7b",
+    "tokenizer_name_or_path": "qwen/qwen-7b",
+    "input_dir": "./data",
+    "output_dir": "./checkpoints/qwen_pretrain_ckpts",
+    "per_device_train_batch_size": 1,
+    "gradient_accumulation_steps": 2,
+    "per_device_eval_batch_size": 16,
+    "tensor_parallel_degree": 2,
+    "pipeline_parallel_degree": 2,
+    "virtual_pp_degree": 1,
+    "sequence_parallel": 0,   
+    "use_flash_attention": false,
+    "use_fused_rms_norm": false,
+    "use_fused_rope": false,
+    "max_seq_length": 4096,
+    "learning_rate": 3e-05,
+    "num_hidden_layers": 8,
+    "min_learning_rate": 3e-06,
+    "scale_loss": 1024,
+    "warmup_steps": 30,
+    "logging_steps": 1,
+    "max_steps": 12,
+    "save_steps": 1000,
+    "eval_steps": 10000,
+    "weight_decay": 0.01,
+    "bf16": false,
+    "fp16_opt_level": "O0",
+    "warmup_ratio": 0.01,
+    "max_grad_norm": 1.0,
+    "dataloader_num_workers": 1,
+    "continue_training": 0,
+    "do_train": true,
+    "do_eval": false,
+    "do_predict": false,
+    "disable_tqdm": true,
+    "recompute": true,
+    "recompute_granularity": "core_attn",
+    "recompute_use_reentrant": true,
+    "distributed_dataloader": 0,
+    "save_total_limit": 2,
+    "enable_auto_parallel": 1,
+    "to_static": 0
+}
+EOF
+
+    unset CUDA_VISIBLE_DEVICES
+
+    export FLAGS_call_stack_level=3
+    export FLAGS_use_cuda_managed_memory=true
+
+    task_name="llama_auto_dp2_mp2_pp2"
+    case_log_dir="qwen_auto_3d_fp32_dp2_mp2_pp2"
+    rm -rf output/$task_name/
+    rm -rf "output/$task_name""_log"
+
+    export SOT_LOG_LEVEL=4
+    export PYTHONPATH=../../../:$PYTHONPATH
+
+
+    rm -rf $case_log_dir
+
+    export FLAGS_embedding_deterministic=1
+    export FLAGS_cudnn_deterministic=1
+    export NVIDIA_TF32_OVERRIDE=0
+    export FLAGS_enable_pir_in_executor=0
+
+    python -u  -m paddle.distributed.launch \
+            --gpus "0,1,2,3,4,5,6,7" \
+            --log_dir "$case_log_dir" \
+        run_pretrain_3D_auto.py $config_json \
+        >>${log_path}/$FUNCNAME 2>&1
+    loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    ips=-1
+    mem=-1
+    echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
+    loss_base=9.83757591
+    ips_base=-1
+    mem_base=-1
+    if [ $IS_A100 -ne 0 ];then
+        check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    else
+        echo "qwen auto just compare loss in A100 machine."
+    fi
+    rm -f $config_json
+    echo "=========== $FUNCNAME run  end ==========="
+}
+
+function llm_qwen_dygraph_auto_bs1_bf16_DP2-MP2-PP2() {
+    set -x
+
+    config_json="pretrain_argument_for_ci_auto_dp2_mp2_pp2.json"
+
+    cat <<EOF >"$config_json"
+{
+    "model_name_or_path": "qwen/qwen-7b",
+    "tokenizer_name_or_path": "qwen/qwen-7b",
+    "input_dir": "./data",
+    "output_dir": "./checkpoints/qwen_pretrain_ckpts",
+    "per_device_train_batch_size": 1,
+    "gradient_accumulation_steps": 2,
+    "per_device_eval_batch_size": 16,
+    "tensor_parallel_degree": 2,
+    "pipeline_parallel_degree": 2,
+    "virtual_pp_degree": 1,
+    "sequence_parallel": 0,   
+    "use_flash_attention": false,
+    "use_fused_rms_norm": false,
+    "use_fused_rope": false,
+    "max_seq_length": 4096,
+    "learning_rate": 3e-05,
+    "num_hidden_layers": 8,
+    "min_learning_rate": 3e-06,
+    "scale_loss": 1024,
+    "warmup_steps": 30,
+    "logging_steps": 1,
+    "max_steps": 12,
+    "save_steps": 1000,
+    "eval_steps": 10000,
+    "weight_decay": 0.01,
+    "bf16": true,
+    "fp16_opt_level": "O2",
+    "warmup_ratio": 0.01,
+    "max_grad_norm": 1.0,
+    "dataloader_num_workers": 1,
+    "continue_training": 0,
+    "do_train": true,
+    "do_eval": false,
+    "do_predict": false,
+    "disable_tqdm": true,
+    "recompute": true,
+    "recompute_granularity": "core_attn",
+    "recompute_use_reentrant": true,
+    "distributed_dataloader": 0,
+    "save_total_limit": 2,
+    "enable_auto_parallel": 1,
+    "to_static": 0
+}
+EOF
+
+    unset CUDA_VISIBLE_DEVICES
+
+    export FLAGS_call_stack_level=3
+    export FLAGS_use_cuda_managed_memory=true
+
+    task_name="llama_auto_dp2_mp2_pp2"
+    case_log_dir="qwen_auto_3d_bf16_dp2_mp2_pp2"
+    rm -rf output/$task_name/
+    rm -rf "output/$task_name""_log"
+
+    export SOT_LOG_LEVEL=4
+    export PYTHONPATH=../../../:$PYTHONPATH
+
+
+    rm -rf $case_log_dir
+
+    export FLAGS_embedding_deterministic=1
+    export FLAGS_cudnn_deterministic=1
+    export NVIDIA_TF32_OVERRIDE=0
+    export FLAGS_enable_pir_in_executor=0
+
+    python -u  -m paddle.distributed.launch \
+            --gpus "0,1,2,3,4,5,6,7" \
+            --log_dir "$case_log_dir" \
+        run_pretrain_3D_auto.py $config_json \
+        >>${log_path}/$FUNCNAME 2>&1
+    loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    ips=-1
+    mem=-1
+    echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
+    loss_base=9.88092232
+    ips_base=-1
+    mem_base=-1
+    if [ $IS_A100 -ne 0 ];then
+        check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    else
+        echo "qwen auto just compare loss in A100 machine."
+    fi
+    rm -f $config_json
     echo "=========== $FUNCNAME run  end ==========="
 }
 
