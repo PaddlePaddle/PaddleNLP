@@ -1450,7 +1450,7 @@ class Trainer:
                     eval_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
                     collate_fn=self.data_collator,
-                    num_workers=self.args.dataloader_num_workers,
+                    num_workers=0,
                     eval=True,
                 )
             else:
@@ -1458,7 +1458,7 @@ class Trainer:
                     eval_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
                     collate_fn=self.data_collator,
-                    num_workers=self.args.dataloader_num_workers,
+                    num_workers=0,
                 )
 
         eval_sampler = self._get_eval_sampler(eval_dataset)
@@ -1607,16 +1607,13 @@ class Trainer:
                 if os.path.isfile(rng_file):
                     rng_file_list = paddle.load(rng_file, return_numpy=True)
             paddle.distributed.broadcast_object_list(rng_file_list, src=0)
-            # if rng_file_list still empty, then use old style rng_state
+            # if rng_file_list still empty, not log rng state.
             if rng_file_list[0] is None:
-                rng_file = os.path.join(checkpoint, f"rng_state_{process_index}.pth")
-                if not os.path.isfile(rng_file):
-                    logger.info(
-                        f"Didn't find an RNG file for process {process_index}, if you are resuming a training that "
-                        "wasn't launched in a distributed fashion, reproducibility is not guaranteed."
-                    )
-                    return
-                checkpoint_rng_state = paddle.load(rng_file, return_numpy=True)
+                logger.info(
+                    f"Didn't find an RNG file for process {process_index}, if you are resuming a training that "
+                    "wasn't launched in a distributed fashion, reproducibility is not guaranteed."
+                )
+                return
             else:
                 checkpoint_rng_state = rng_file_list[process_index]
         else:
@@ -2141,10 +2138,10 @@ class Trainer:
             if not self.is_in_train:
                 self.args.unified_checkpoint_config = unified_checkpoint_config_backup
         if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
-            # save checkpoint_done file to ensure checkpoint is complete
+            # save model_done file to ensure model is complete
             if self.args.should_save_model_state and self.args.should_save:
                 # For ckpt integrity
-                paddle.save(self.state.global_step, os.path.join(output_dir, ".checkpoint_done"))
+                paddle.save(self.state.global_step, os.path.join(output_dir, ".model_done"))
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"

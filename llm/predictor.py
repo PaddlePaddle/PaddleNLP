@@ -49,24 +49,14 @@ from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
-    ChatGLMv2Tokenizer,
     ChatGLMTokenizer,
+    ChatGLMv2Tokenizer,
     LlamaTokenizer,
     PretrainedModel,
     PretrainedTokenizer,
 )
 from paddlenlp.utils.import_utils import import_module, is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
-
-try:
-    from paddlenlp_ops import reset_stop_value
-except (ImportError, ModuleNotFoundError):
-    logger.warning(
-        "if you run predictor.py with --inference_model argument, please ensure you install "
-        "the paddlenlp_ops by following the instructions "
-        "provided at https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
-    )
-
 
 # Note(@RochardWooSJTU): MAX_BSZ must be the same as definition in get_output / save_output
 MAX_BSZ = 512
@@ -242,7 +232,8 @@ class BasePredictor:
             padding=True,
             # when use chat_template, it should not add special tokens
             # chatglm2 prefix-tokens can not be tokenized into ids
-            add_special_tokens=self.tokenizer.chat_template is None or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
+            add_special_tokens=self.tokenizer.chat_template is None
+            or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
         )
         return tokenized_source
 
@@ -656,8 +647,12 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         if predictor_args.dtype == "bfloat16":
             config.delete_pass("gpu_cpu_map_matmul_v2_to_matmul_pass")
 
-        device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
-        config.enable_use_gpu(100, device_id)
+        if predictor_args.device in paddle.device.get_all_custom_device_type():
+            device_id = int(os.environ.get("FLAGS_selected_{}s".format(predictor_args.device), 0))
+            config.enable_custom_device(predictor_args.device, device_id)
+        else:
+            device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
+            config.enable_use_gpu(100, device_id)
         config.enable_new_executor()
 
         if self.tensor_parallel_degree > 1:
@@ -802,6 +797,8 @@ class BlockInferencePredictorMixin:
         self.free_list = [i for i in range(self.max_block_nums)][::-1]
         self.used_list = [[] for _ in range(config.batch_size)]
 
+        self.benchmark = config.benchmark
+
     def init_inputs(self, config: PredictorArgument):
         self.inputs = {}
 
@@ -877,7 +874,7 @@ class BlockInferencePredictorMixin:
         self.inputs["seq_lens_encoder"] = paddle.full(shape=[config.batch_size, 1], fill_value=0, dtype="int32")
         self.inputs["seq_lens_decoder"] = paddle.full(shape=[config.batch_size, 1], fill_value=0, dtype="int32")
         self.inputs["step_idx"] = paddle.full(shape=[config.batch_size, 1], fill_value=0, dtype="int64")
-        self.inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=False, dtype="bool").cpu()
+        self.inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=False, dtype="bool")
         self.inputs["stop_flags"] = paddle.full(shape=[config.batch_size, 1], fill_value=True, dtype="bool")
         self.inputs["next_tokens"] = paddle.full(shape=[config.batch_size, 1], fill_value=-1, dtype="int64")
         self.inputs["is_block_step"] = paddle.full(shape=[config.batch_size], fill_value=False, dtype="bool")
@@ -918,19 +915,20 @@ class BlockInferencePredictorMixin:
         return rot_emb
 
     def _preprocess(self, source):
-        if self.tokenizer.chat_template is not None:
+        if not self.benchmark and self.tokenizer.chat_template is not None:
             source = [source] if isinstance(source, str) else source
             source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
         for i, text in enumerate(source):
+            add_special_tokens = self.tokenizer.chat_template is None or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)) 
+            add_special_tokens = add_special_tokens if not self.benchmark else False
             tokens = self.tokenizer(
                 text,
                 return_tensors="np",
                 padding=True,
                 max_length=self.config.src_length,
                 # if use chat_template, it will not add special_tokens
-                add_special_tokens=self.tokenizer.chat_template is None
-                or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
+                add_special_tokens=add_special_tokens,
             )
             input_ids = tokens["input_ids"][0]
             length = len(input_ids)
@@ -945,7 +943,7 @@ class BlockInferencePredictorMixin:
             self.inputs["seq_lens_decoder"][i : i + 1] = 0
             self.inputs["step_idx"][i : i + 1] = 0
             self.inputs["stop_flags"][i : i + 1] = False
-            reset_stop_value(self.inputs["not_need_stop"])
+            self.inputs["not_need_stop"][0] = True
             need_block_nums = (
                 length + self.config.max_length + self.pre_cache_length + self.block_size - 1
             ) // self.block_size
@@ -1010,7 +1008,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor
         for i in range(self.config.batch_size):
             self.free_list.extend(self.used_list[i])
             self.used_list[i] = []
-        reset_stop_value(self.inputs["not_need_stop"])
 
         outputs = []
         while len(outputs) < self.batch_size:
@@ -1076,10 +1073,21 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
         config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
 
         config.switch_ir_optim(False)
-        device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
-        config.enable_use_gpu(100, device_id)
+        if predictor_args.device in paddle.device.get_all_custom_device_type():
+            device_id = int(os.environ.get("FLAGS_selected_{}s".format(predictor_args.device), 0))
+            config.enable_custom_device(predictor_args.device, device_id)
+        else:
+            device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
+            config.enable_use_gpu(100, device_id)
         # config.disable_glog_info()
         # config.enable_memory_optim()
+
+        if predictor_args.device == "npu":
+            import paddle_custom_device.npu.passes as passes
+
+            config.switch_ir_optim(True)
+            pass_builder = config.pass_builder()
+            passes.addPasses(pass_builder, self.model_config.model_type, self.model_config.quant_type)
 
         if self.tensor_parallel_degree > 1:
             trainer_endpoints = fleet.worker_endpoints()
@@ -1147,7 +1155,6 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
         for i in range(self.config.batch_size):
             self.free_list.extend(self.used_list[i])
             self.used_list[i] = []
-        reset_stop_value(self.inputs["not_need_stop"])
 
         outputs = []
         while len(outputs) < self.batch_size:
@@ -1527,6 +1534,11 @@ def predict():
         fleet.init(is_collective=True, strategy=strategy)
 
     predictor = create_predictor(predictor_args, model_args)
+
+    if predictor_args.benchmark:
+        benchmark(predictor, predictor_args, model_args)
+        return
+
     source_texts = []
     target_texts = []
     if model_args.data_file:
@@ -1570,14 +1582,10 @@ def predict():
                 out = {"src": source, "tgt": target, "output": output}
                 f.write(json.dumps(out, ensure_ascii=False) + "\n")
 
-    if predictor_args.benchmark:
-        benchmark(predictor, predictor_args, model_args)
-
 
 def benchmark(predictor, predictor_args, model_args):
     # Just construct a simple benchmark input. We pad input to the src_length.
-    test_texts = "hello world, how are you?"
-    benchmark_texts = [test_texts + "<pad>" * predictor_args.src_length for _ in range(predictor_args.batch_size)]
+    benchmark_texts = [predictor.tokenizer.pad_token * predictor_args.src_length for _ in range(predictor_args.batch_size)]
 
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
