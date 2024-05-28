@@ -392,6 +392,7 @@ def main():
     config = AutoConfig.from_pretrained(model_args.model_name_or_path)
     # set all llm config
     LlmMetaConfig.set_llm_config(config, training_args)
+    config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
