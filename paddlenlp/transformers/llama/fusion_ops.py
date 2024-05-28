@@ -57,11 +57,13 @@ def fusion_rope(query_states, key_states, value_states, hidden_states, position_
         assert past_key_value is None, "fuse rotary not support cache kv for now"
     batch_size, seq_length, num_heads, head_dim = query_states.shape
     _, kv_seq_len, num_key_value_heads, _ = key_states.shape
-    cos, sin, cos_sin = rotary_emb(value_states, seq_len=kv_seq_len)
+    if get_env_device() != "gcu":
+        cos, sin = rotary_emb(value_states, seq_len=kv_seq_len)
     if get_env_device() == "npu":
         query_states = core.eager._run_custom_op("fused_rope", query_states, cos, sin)[0]
         key_states = core.eager._run_custom_op("fused_rope", key_states, cos, sin)[0]
     elif get_env_device() == "gcu":
+        cos_sin = rotary_emb.get_fused_cos_sin(value_states, seq_len=kv_seq_len)
         query_states, key_states = core.eager._run_custom_op(
             "fused_rotary_embedding_gcu", query_states, key_states, cos_sin, position_ids, True
         )

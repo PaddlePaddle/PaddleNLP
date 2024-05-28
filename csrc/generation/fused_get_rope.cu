@@ -44,6 +44,7 @@ __global__ __launch_bounds__(kBlockSize) void fused_get_rotary_embedding_neox(co
                                                                               const int32_t prompt_num,
                                                                               const float inv_head_dim,
                                                                               const int32_t elem_cnt,
+                                                                              const float theta,
                                                                               float* rope_embedding) {
     /*
     In Naive implementation, it will stacks [freqs, freqs]
@@ -63,7 +64,7 @@ __global__ __launch_bounds__(kBlockSize) void fused_get_rotary_embedding_neox(co
         const int64_t position_offset = bsz_idx * max_position_seq_length + seq_idx + prompt_num;
         const int32_t half_head_idx = (idx % half_head_dim) * PackSize;
         const float exponent_factor = -static_cast<float>(half_head_idx) * inv_head_dim; // * inv_head_dim equals to / head_dim.
-        const float inv_freq_val = powf(10000.0f, exponent_factor);
+        const float inv_freq_val = powf(theta, exponent_factor);
         const float freqs_val = static_cast<float>(position_ids[position_offset]) * inv_freq_val;
         const float cos_embedding_val = cos(freqs_val);
         const float sin_embedding_val = sin(freqs_val);
@@ -100,6 +101,7 @@ __global__ __launch_bounds__(kBlockSize) void fused_get_rotary_embedding(const i
                                                                          const int32_t prompt_num,
                                                                          const float inv_head_dim, 
                                                                          const int32_t elem_cnt, 
+                                                                         const float theta,
                                                                          float* rope_embedding) {
     /*
     In Naive implementation, it will stacks [freqs, freqs]
@@ -119,7 +121,7 @@ __global__ __launch_bounds__(kBlockSize) void fused_get_rotary_embedding(const i
         const int64_t position_offset = bsz_idx * max_position_seq_length + seq_idx + prompt_num;
         const int32_t half_head_idx = (idx % half_head_dim) * PackSize; 
         const float exponent_factor = -static_cast<float>(half_head_idx) * inv_head_dim; // * inv_head_dim equals to / head_dim. 
-        const float inv_freq_val = powf(10000.0f, exponent_factor); 
+        const float inv_freq_val = powf(theta, exponent_factor); 
         const float freqs_val = static_cast<float>(position_ids[position_offset]) * inv_freq_val; 
         const float cos_embedding_val = cos(freqs_val); 
         const float sin_embedding_val = sin(freqs_val); 
@@ -145,6 +147,7 @@ std::vector<paddle::Tensor> GetRoPE(const paddle::Tensor& input_ids,
                                     const paddle::Tensor& position_ids, 
                                     const paddle::Tensor& head_dim_shape_tensor,
                                     int prompt_num,
+                                    float theta,
                                     bool use_neox) {
     const int64_t batch_size = input_ids.shape()[0]; 
     const int64_t max_seq_length = input_ids.shape()[1]; 
@@ -170,6 +173,7 @@ std::vector<paddle::Tensor> GetRoPE(const paddle::Tensor& input_ids,
           prompt_num,
           inv_head_dim,
           elem_cnt,
+          theta,
           reinterpret_cast<float*>(rotary_embedding.data<float>()));
     } else {
       fused_get_rotary_embedding<<<grid_size, kBlockSize, 0, cu_stream>>> (
@@ -181,6 +185,7 @@ std::vector<paddle::Tensor> GetRoPE(const paddle::Tensor& input_ids,
           prompt_num,
           inv_head_dim, 
           elem_cnt, 
+          theta,
           reinterpret_cast<float*>(rotary_embedding.data<float>()));
     }
     return {rotary_embedding};
@@ -209,6 +214,7 @@ PD_BUILD_OP(fused_get_rotary_embedding)
     .Inputs({"input_ids", "position_ids", "head_dim_shape_tensor"})
     .Outputs({"rotary_embedding"})
     .Attrs({"prompt_num: int",
+            "theta: float",
             "use_neox: bool"})
     .SetKernelFn(PD_KERNEL(GetRoPE))
     .SetInferShapeFn(PD_INFER_SHAPE(GetRoPEInferShape))
