@@ -66,8 +66,7 @@ function _train(){
     export FLAGS_disable_dyshape_in_train=True
     export FLAGS_enable_pir_in_executor=True
     export FLAGS_enable_prim_after_distribute=1
-    export FLAGS_enable_cinn_compile_cache=0
-    export PYTHONUNBUFFERED=1
+
 
     export ENABLE_FALL_BACK=True # 开启SOT
     # export FLAGS_use_cinn=True  # 是否开启cinn ,在benchmark中设置
