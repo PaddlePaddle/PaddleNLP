@@ -216,9 +216,10 @@ def scaled_dot_product_attention(
     _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention:
+        FA_cfg = {"sep_parallel_degree": config.sep_parallel_degree}
         return fusion_ops.fusion_flash_attention(
             query_states,
-            config,
+            FA_cfg,
             key_states,
             value_states,
             attention_mask,
@@ -1353,7 +1354,13 @@ class LlamaModel(LlamaPretrainedModel):
     """
 
     def __init__(self, config: LlamaConfig):
+        #####################################
+        from paddlenlp.PaddleAPEX import Acc
+        self.checker = Acc()
+        #####################################
         super().__init__(config)
+
+
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
         self.sequence_parallel = config.sequence_parallel
@@ -1471,6 +1478,10 @@ class LlamaModel(LlamaPretrainedModel):
         return_dict=False,
         **kwargs,
     ):
+        #####################################
+        self.checker.start()
+        #####################################
+
         if self.sequence_parallel and use_cache:
             raise ValueError("We currently only support sequence parallel without cache.")
 
@@ -1614,6 +1625,11 @@ class LlamaModel(LlamaPretrainedModel):
             all_hidden_states += (hidden_states,)
 
         next_cache = next_decoder_cache if use_cache else None
+
+
+        #####################################
+        self.checker.stop()
+        #####################################
 
         if not return_dict:
             return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None)
