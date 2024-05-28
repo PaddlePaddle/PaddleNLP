@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-
 import json
 import os
 import re
@@ -28,7 +27,7 @@ def analyze(model_item, log_file, res_log_file, device_num, bs, fp_item):
     ips_lines = []
     for eachline in data:
         if "train_samples_per_second:" in eachline:
-            ips = float(eachline.split("train_samples_per_second: ")[1].split()[0].replace(',', ''))
+            ips = float(eachline.split("train_samples_per_second: ")[1].split()[0].replace(",", ""))
             print("----ips: ", ips)
             ips_lines.append(ips)
     print("----ips_lines: ", ips_lines)
