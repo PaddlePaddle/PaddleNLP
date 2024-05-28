@@ -326,7 +326,6 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs["min_dec_len"],
                 eos_token_id,
             )
-
             logits = logits / temperature
             
             # sample
