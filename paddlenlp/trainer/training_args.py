@@ -803,6 +803,16 @@ class TrainingArguments:
         default=False,
         metadata={"help": "whether to run distributed training in auto parallel mode"},
     )
+    program_runtimes: List[int] = field(
+        default_factory=lambda: [61, 72, 71, 34, 3],
+        metadata={
+            "help": "The program runtime of 5 types of jobs including default forward, backward_b, backward_w, loss, communication."
+        },
+    )
+    memory_limit_times: float = field(
+        default=2,
+        metadata={"help": "The memory limit times of the pipeline parallel. Only used for zbv pipeline parallel."},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))

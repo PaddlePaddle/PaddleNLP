@@ -119,16 +119,6 @@ class PreTrainingArguments(TrainingArguments):
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
     )
-    program_runtimes: List[int] = field(
-        default_factory=lambda: [61, 72, 71, 34, 3],
-        metadata={
-            "help": "The program runtime of 5 types of jobs including default forward, backward_b, backward_w, loss, communication."
-        },
-    )
-    memory_limit_times: float = field(
-        default=5,
-        metadata={"help": "The memory limit times of the pipeline parallel. Only used for zbv pipeline parallel."},
-    )
 
     def __post_init__(self):
         super().__post_init__()
