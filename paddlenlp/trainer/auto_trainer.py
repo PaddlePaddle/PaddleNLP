@@ -97,8 +97,14 @@ class AutoTrainer(Trainer):
         # error may occurs here.
         meshes = []
         meshes.append(_get_mesh(0))
+
         if self.args.pipeline_parallel_degree > 1:
-            meshes.append(_get_mesh(self.args.pipeline_parallel_degree - 1))
+            label_stage = self.args.pipeline_parallel_degree - 1
+            if self.args.pipeline_schedule_mode == "ZBVPP":
+                if self.args.strategy.pipeline.vpp_degree % 2 == 0:
+                    label_stage = 0
+
+            meshes.append(_get_mesh(label_stage))
         return meshes
 
     def _wrap_for_dist_loader(self, train_dataloader):
