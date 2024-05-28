@@ -326,12 +326,13 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs["min_dec_len"],
                 eos_token_id,
             )
+
+            logits = logits / temperature
+            
             # sample
             probs = F.softmax(logits)
 
             # compute next_tokens, use paddle.tensor.top_p_sampling
-            logits = logits / temperature
-
             _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
             if self.config.tensor_parallel_degree > 1:
