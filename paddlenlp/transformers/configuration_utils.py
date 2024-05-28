@@ -261,7 +261,7 @@ class LlmMetaConfig:
         ("pipeline_parallel_degree", int, -1, "pipeline_parallel_degree"),
         ("virtual_pp_degree", int, 1, "Virtual pipeline degree"),
         # pp refine recompute
-        ("no_recompute_layers", Optional[List[int]], -1, "no_recompute_layers"),
+        ("no_recompute_layers", Optional[List[int]], None, "no_recompute_layers"),
         (
             "pp_recompute_interval",
             int,
@@ -275,7 +275,12 @@ class LlmMetaConfig:
     ]
     recompute_attributes = [
         ("recompute", bool, False, "recompute"),
-        ("recompute_granularity", str, None, "Recompute granularity, Choose among ['full', 'core_attn', 'full_attn']"),
+        (
+            "recompute_granularity",
+            str,
+            "full",
+            "Recompute granularity, Choose among ['full', 'core_attn', 'full_attn']",
+        ),
         ("recompute_use_reentrant", bool, False, "recompute_use_reentrant"),
     ]
 
@@ -556,6 +561,10 @@ class PretrainedConfig:
         kwargs = attribute_map(self, kwargs=kwargs)
         llm_meta = LlmMetaConfig._get_defaults()
         kwargs = set_expected_keys(self, llm_meta, kwargs)
+        if self.sequence_parallel:
+            assert (
+                self.tensor_parallel_degree > 1
+            ), f"senquence-parallel only works in tensor parallel, got tensor parallel degree={self.tensor_parallel_degree}"
 
         self.return_dict = kwargs.pop("return_dict", False)
         self.output_hidden_states = kwargs.pop("output_hidden_states", False)
@@ -1008,6 +1017,13 @@ class PretrainedConfig:
                 or value != default_config_dict[key]
                 or (key in class_config_dict and value != class_config_dict[key])
             ):
+                if key not in default_config_dict:
+                    print(key, value)
+                else:
+                    print(key, value, default_config_dict[key])
+                if key in class_config_dict and value != class_config_dict[key]:
+                    print("class_config_dict", class_config_dict[key])
+
                 serializable_config_dict[key] = value
 
         return serializable_config_dict
