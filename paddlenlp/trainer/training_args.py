@@ -803,6 +803,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "whether to run distributed training in auto parallel mode"},
     )
+    use_expert_parallel: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable MoE (Mixture of Experts) expert parallel training"},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -1149,6 +1153,8 @@ class TrainingArguments:
                         order = ["dp", "sharding", "pp", "sep", "mp"]
                     else:
                         order = ["dp", "sharding", "pp", "mp"]
+                if self.use_expert_parallel:
+                    order = order[1:-1] + ["dp", "mp"]
 
                 if is_segment_parallel_supported():
                     hybrid_configs = {
@@ -1640,8 +1646,12 @@ class TrainingArguments:
                 name.append(self._format_name("pp", self.pipeline_parallel_rank, self.pipeline_parallel_degree))
             if self.sharding_parallel_degree > 1:
                 name.append(self._format_name("shard", self.sharding_parallel_rank, self.sharding_parallel_degree))
+            if self.use_expert_parallel:
+                name.append(self._format_name("moe", self.data_parallel_rank, self.data_parallel_degree))
             return "_".join(name)
         else:
+            if self.use_expert_parallel:
+                return self._format_name("moe", self.data_parallel_rank, self.data_parallel_degree)
             return None
 
     @property
@@ -1652,12 +1662,16 @@ class TrainingArguments:
                 name.append(self._format_name("tp", self.tensor_parallel_rank, self.tensor_parallel_degree))
             if self.pipeline_parallel_degree > 1:
                 name.append(self._format_name("pp", self.pipeline_parallel_rank, self.pipeline_parallel_degree))
+            if self.use_expert_parallel:
+                name.append(self._format_name("moe", self.data_parallel_rank, self.data_parallel_degree))
             return "_".join(name)
 
         else:
+            if self.use_expert_parallel:
+                return self._format_name("moe", self.data_parallel_rank, self.data_parallel_degree)
             return None
 
-    def sharded_name_suffix(self, shard_id=None, pp_id=None):
+    def sharded_name_suffix(self, shard_id=None, pp_id=None, moe_id=None):
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
@@ -1672,8 +1686,17 @@ class TrainingArguments:
                     shard_id = self.sharding_parallel_rank
                 assert isinstance(shard_id, int)
                 name.append(self._format_name("shard", shard_id, self.sharding_parallel_degree))
+            if self.use_expert_parallel:
+                if moe_id is None:
+                    moe_id = self.data_parallel_rank
+                assert isinstance(moe_id, int)
+                name.append(self._format_name("moe", moe_id, self.data_parallel_degree))
             return "_".join(name)
         else:
+            if self.use_expert_parallel:
+                if moe_id is None:
+                    moe_id = self.data_parallel_rank
+                return self._format_name("moe", moe_id, self.data_parallel_degree)
             return None
 
     @property
@@ -1766,9 +1789,9 @@ class TrainingArguments:
                 return True
             elif self.use_hybrid_parallel:
                 # save on dataset rank 0
-                return self.sharding_parallel_rank == 0 and self.data_parallel_rank == 0
+                return self.sharding_parallel_rank == 0 and (self.data_parallel_rank == 0 or self.use_expert_parallel)
             else:
-                return self.process_index == 0
+                return self.process_index == 0 or self.use_expert_parallel
 
     @property
     def _no_sync_in_gradient_accumulation(self):
