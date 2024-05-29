@@ -127,7 +127,6 @@ class GemmaConfig(PretrainedConfig):
         rope_theta=10000.0,
         attention_bias=False,
         attention_dropout=0.0,
-        tensor_parallel_output=True,
         fuse_attention_qkv=False,
         fuse_attention_ffn=False,
         alibi=False,
@@ -153,7 +152,6 @@ class GemmaConfig(PretrainedConfig):
         self.attention_bias = attention_bias
         self.attention_dropout = attention_dropout
 
-        self.tensor_parallel_output = tensor_parallel_output
         self.fuse_attention_qkv = fuse_attention_qkv
         self.fuse_attention_ffn = fuse_attention_ffn
         self.alibi = alibi
@@ -165,7 +163,6 @@ class GemmaConfig(PretrainedConfig):
             bos_token_id=bos_token_id,
             eos_token_id=eos_token_id,
             tie_word_embeddings=tie_word_embeddings,
-            tensor_parallel_output=tensor_parallel_output,
             **kwargs,
         )
 

@@ -144,7 +144,6 @@ class LlamaConfig(PretrainedConfig):
         use_cache=True,
         fuse_attention_qkv=False,
         fuse_attention_ffn=False,
-        tensor_parallel_output=True,
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
@@ -177,7 +176,6 @@ class LlamaConfig(PretrainedConfig):
         self.use_cache = use_cache
         self.fuse_attention_qkv = fuse_attention_qkv
         self.fuse_attention_ffn = fuse_attention_ffn
-        self.tensor_parallel_output = tensor_parallel_output
 
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
@@ -197,7 +195,6 @@ class LlamaConfig(PretrainedConfig):
             bos_token_id=bos_token_id,
             eos_token_id=eos_token_id,
             tie_word_embeddings=tie_word_embeddings,
-            tensor_parallel_output=tensor_parallel_output,
             **kwargs,
         )
 

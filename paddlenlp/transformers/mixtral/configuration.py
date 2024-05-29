@@ -119,7 +119,6 @@ class MixtralConfig(PretrainedConfig):
         use_cache=True,
         attention_dropout=0.0,
         rope_theta=1e6,
-        tensor_parallel_output=True,
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
@@ -149,7 +148,6 @@ class MixtralConfig(PretrainedConfig):
         self.rms_norm_eps = rms_norm_eps
 
         self.use_cache = use_cache
-        self.tensor_parallel_output = tensor_parallel_output
 
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
@@ -170,6 +168,5 @@ class MixtralConfig(PretrainedConfig):
             bos_token_id=bos_token_id,
             eos_token_id=eos_token_id,
             tie_word_embeddings=tie_word_embeddings,
-            tensor_parallel_output=tensor_parallel_output,
             **kwargs,
         )

@@ -40,7 +40,6 @@ class QWenConfig(PretrainedConfig):
         use_dynamic_ntk=True,
         use_logn_attn=True,
         intermediate_size=22016,
-        tensor_parallel_output=True,
         no_bias=True,
         tie_word_embeddings=False,
         pad_token_id=0,

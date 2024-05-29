@@ -261,7 +261,6 @@ class GPTConfig(PretrainedConfig):
         num_partitions: int = 1,
         normalize_before: bool = True,
         scale_qk_coeff: float = 1.0,
-        tensor_parallel_output: bool = True,
         output_attentions: bool = False,
         ignore_index: int = 0,
         use_fast_layer_norm: bool = False,
@@ -297,7 +296,6 @@ class GPTConfig(PretrainedConfig):
         self.normalize_before = normalize_before
         self.scale_qk_coeff = scale_qk_coeff
 
-        self.tensor_parallel_output = tensor_parallel_output
         self.output_attentions = output_attentions
         self.ignore_index = ignore_index
 
