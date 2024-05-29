@@ -226,3 +226,36 @@ def broadcast_dp_optimizer(state_dict):
     state_dict = nested_broadcast_tensor(state_dict, src=src_rank, group=dp_group)
 
     return state_dict
+
+
+def broadcast_moe_optimizer(state_dict, opt_state_dict):
+    no_sync_vname = []
+    for k, v in state_dict.items():
+        if getattr(v, "no_sync", False):
+            no_sync_vname.append(v.name)
+    new_opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
+    # 1. when updating opt_state_dict, we should disable broading the parameters with the same name when `no_sync=True`.
+    # 2. if the keys of opt_state_dict and new_opt_state_dict are exactly the same, there is no need to update.
+    # 3. if they are different, the update should be based on the `no_sync_vname`.
+    if len(opt_state_dict.keys()) != len(new_opt_state_dict.keys()):
+        for op_k, op_v in new_opt_state_dict.items():
+            if op_k == "master_weights":
+                for k, v in new_opt_state_dict["master_weights"].items():
+                    no_sync = False
+                    for no_sync_v in no_sync_vname:
+                        if k.startswith(no_sync_v):
+                            no_sync = True
+                            break
+                    if not no_sync:
+                        opt_state_dict["master_weights"][k] = v
+            elif op_k == "LR_Scheduler":
+                pass
+            else:
+                no_sync = False
+                for no_sync_v in no_sync_vname:
+                    if op_k.startswith(no_sync_v):
+                        no_sync = True
+                        break
+                if not no_sync:
+                    opt_state_dict[op_k] = op_v
+    return opt_state_dict

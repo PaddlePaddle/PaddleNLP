@@ -804,7 +804,7 @@ class TrainingArguments:
         default=False,
         metadata={"help": "whether to run distributed training in auto parallel mode"},
     )
-    use_moe: Optional[bool] = field(
+    use_expert_parallel: Optional[bool] = field(
         default=False,
         metadata={"help": "Use MoE training."},
     )
@@ -1154,7 +1154,7 @@ class TrainingArguments:
                         order = ["dp", "sharding", "pp", "sep", "mp"]
                     else:
                         order = ["dp", "sharding", "pp", "mp"]
-                if self.use_moe:
+                if self.use_expert_parallel:
                     order = order[1:-1] + ["dp", "mp"]
 
                 if is_segment_parallel_supported():
@@ -1649,12 +1649,12 @@ class TrainingArguments:
                 name.append(self._format_name("pp", self.pipeline_parallel_rank, self.pipeline_parallel_degree))
             if self.sharding_parallel_degree > 1:
                 name.append(self._format_name("shard", self.sharding_parallel_rank, self.sharding_parallel_degree))
-            if self.use_moe:
-                name.append(f"moe{self.data_parallel_rank:0>2d}")
+            if self.use_expert_parallel:
+                name.append(self._format_name("moe", self.data_parallel_rank, self.data_parallel_degree))
             return "_".join(name)
         else:
-            if self.use_moe:
-                return f"moe{self.data_parallel_rank:0>2d}"
+            if self.use_expert_parallel:
+                return self._format_name("moe", self.data_parallel_rank, self.data_parallel_degree)
             return None
 
     @property
@@ -1665,13 +1665,13 @@ class TrainingArguments:
                 name.append(self._format_name("tp", self.tensor_parallel_rank, self.tensor_parallel_degree))
             if self.pipeline_parallel_degree > 1:
                 name.append(self._format_name("pp", self.pipeline_parallel_rank, self.pipeline_parallel_degree))
-            if self.use_moe:
-                name.append(f"moe{self.data_parallel_rank:0>2d}")
+            if self.use_expert_parallel:
+                name.append(self._format_name("moe", self.data_parallel_rank, self.data_parallel_degree))
             return "_".join(name)
 
         else:
-            if self.use_moe:
-                return f"moe{self.data_parallel_rank:0>2d}"
+            if self.use_expert_parallel:
+                return self._format_name("moe", self.data_parallel_rank, self.data_parallel_degree)
             return None
 
     def sharded_name_suffix(self, shard_id=None, pp_id=None):
@@ -1784,6 +1784,29 @@ class TrainingArguments:
             elif self.use_hybrid_parallel:
                 # save on dataset rank 0
                 return self.sharding_parallel_rank == 0 and self.data_parallel_rank == 0
+            else:
+                return self.process_index == 0
+
+    @property
+    def should_save_moe_model_state(self):
+        """
+        Whether or not the current process should write to disk, e.g., to save moe models and checkpoints.
+
+        For model state:
+            work for data parallel, tensor parallel, sharding
+        For optimizer state:
+            work for data parallel, tensor parallel
+            not work for sharding
+        """
+        if self.save_on_each_node:
+            return self.local_process_index == 0
+        else:
+            if self.should_save_sharding_stage1_model:
+                return True
+            elif self.enable_auto_parallel:
+                return True
+            elif self.use_hybrid_parallel:
+                return self.sharding_parallel_rank == 0
             else:
                 return self.process_index == 0
 
