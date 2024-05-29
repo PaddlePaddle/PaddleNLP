@@ -294,6 +294,9 @@ from .deberta.configuration import *
 from .deberta_v2.modeling import *
 from .deberta_v2.tokenizer import *
 from .deberta_v2.configuration import *
+from .mamba.configuration import *
+from .mamba.modeling import *
+from .mamba.tokenizer import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available
