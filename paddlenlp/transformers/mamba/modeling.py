@@ -216,9 +216,7 @@ class MambaMixer(nn.Layer):
                         (self.conv_kernel_size - hidden_states.shape[-1], 0),
                         data_format="NCL",
                     )
-                    cache.conv_states[self.layer_idx].copy_(
-                        conv_states.cast(cache.conv_states[self.layer_idx].dtype), False
-                    )
+                    cache.conv_states[self.layer_idx].copy_(conv_states.cast(cache.dtype), False)
                 hidden_states = causal_conv1d_fn(
                     hidden_states, conv_weights, self.conv1d.bias, activation=self.activation
                 )
@@ -261,9 +259,7 @@ class MambaMixer(nn.Layer):
                     return_last_state=True,
                 )
                 if ssm_state is not None and cache is not None:
-                    cache.ssm_states[self.layer_idx].copy_(
-                        ssm_state.cast(cache.ssm_states[self.layer_idx].dtype), False
-                    )
+                    cache.ssm_states[self.layer_idx].copy_(ssm_state.cast(cache.dtype), False)
 
             # 4. Final linear projection
             contextualized_states = self.out_proj(scan_outputs.transpose([0, 2, 1]))
@@ -284,7 +280,7 @@ class MambaMixer(nn.Layer):
                 conv_state = cache.conv_states[self.layer_idx]                   # [batch, intermediate_size, conv_kernel_size]
                 conv_state = paddle.roll(conv_state, shifts=-1, axis=-1)
                 conv_state[:, :, -1] = hidden_states[:, :, 0]
-                cache.conv_states[self.layer_idx].copy_(conv_state.cast(cache.conv_states[self.layer_idx].dtype), False)
+                cache.conv_states[self.layer_idx].copy_(conv_state.cast(cache.dtype), False)
                 hidden_states = paddle.sum(conv_state * self.conv1d.weight[:, 0, :], axis=-1)
                 if self.use_conv_bias:
                     hidden_states += self.conv1d.bias
@@ -295,7 +291,7 @@ class MambaMixer(nn.Layer):
                     (self.conv_kernel_size - hidden_states.shape[-1], 0),
                     data_format="NCL",
                 )
-                cache.conv_states[self.layer_idx].copy_(conv_state.cast(cache.conv_states[self.layer_idx].dtype), False)
+                cache.conv_states[self.layer_idx].copy_(conv_state.cast(cache.dtype), False)
                 hidden_states = self.act(self.conv1d(hidden_states)[..., :seq_len])     # [batch, intermediate_size, seq_len]
         else:
             ssm_state = paddle.zeros(
@@ -330,7 +326,7 @@ class MambaMixer(nn.Layer):
         scan_output = (scan_output * self.act(gate))
 
         if cache is not None:
-            cache.ssm_states[self.layer_idx].copy_(ssm_state.cast(cache.ssm_states[self.layer_idx].dtype), False)
+            cache.ssm_states[self.layer_idx].copy_(ssm_state.cast(cache.dtype), False)
 
         # 4. Final linear projection
         contextualized_states = self.out_proj(scan_output.transpose([0, 2, 1]))             # [batch, seq_len, hidden_size]

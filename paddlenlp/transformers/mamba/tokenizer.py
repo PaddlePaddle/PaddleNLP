@@ -223,9 +223,9 @@ class MambaTokenizer(PretrainedTokenizer):
         Example:
             .. code-block::
 
-                from paddlenlp.transformers import GPTTokenizer
-                tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
-                print(tokenizer.convert_ids_to_string(tokenizer.convert_ids_to_string([14618, 284, 779, 350, 37382, 47, 37382, 290, 350, 37382, 45, 19930]))
+                from paddlenlp.transformers import MambaTokenizer
+                tokenizer = MambaTokenizer.from_pretrained('state-spaces/mamba-2.8b-hf')
+                print(tokenizer.convert_ids_to_string([21096, 281, 897, 367, 17014, 49, 17014, 285, 367, 17014, 47, 13010]))
                 # 'Welcome to use PaddlePaddle and PaddleNLP'
 
         """
