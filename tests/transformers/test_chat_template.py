@@ -297,7 +297,11 @@ class TemplateIntegrationTest(unittest.TestCase):
         self.tokenizer = AutoTokenizer.from_pretrained("qwen/qwen-7b-chat")
         qwen_jinja = "{% for message in messages %}{% if loop.first and messages[0]['role'] != 'system' %}{{ '<|im_start|>system\nYou are a helpful assistant<|im_end|>\n' }}{% endif %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}"
         self.tokenizer.init_chat_template(qwen_jinja)
+        sys.path.insert(0, "./llm")
         return super().setUp()
+
+    def tearDown(self):
+        sys.path.remove("./llm")
 
     def test_chat_template(self):
         # test single turn

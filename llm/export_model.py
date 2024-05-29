@@ -40,9 +40,12 @@ def load_inference_model(model_path, model_name, param_name, exe):
         return paddle.static.io.load_inference_model(model_path, exe)
 
 
-def validate_pdmodel(model_path, model_prefix):
+def validate_pdmodel(model_path, model_prefix, device):
     paddle.enable_static()
-    place = paddle.CUDAPlace(0)
+    if device == "gpu":
+        place = paddle.CUDAPlace(0)
+    else:
+        place = paddle.CustomPlace(device, 0)
     exe = paddle.static.Executor(place)
     scope = paddle.static.Scope()
 
@@ -95,7 +98,12 @@ def main():
 
     if tensor_parallel_degree > 1:
         export_args.output_path = os.path.join(export_args.output_path, f"rank_{tensor_parallel_rank}")
-    validate_pdmodel(export_args.output_path, predictor_args.model_prefix)
+    validate_pdmodel(export_args.output_path, predictor_args.model_prefix, predictor_args.device)
+
+    if predictor_args.device == "npu":
+        from llama.npu.export_utils import process_params
+
+        process_params(os.path.join(export_args.output_path, predictor_args.model_prefix))
 
 
 if __name__ == "__main__":

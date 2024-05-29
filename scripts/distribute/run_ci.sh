@@ -30,6 +30,7 @@ target_lists_for_llama=(
     "paddlenlp/trainer/auto_trainer.py"
     "paddlenlp/transformers/llama/modeling_auto_static.py"
     "paddlenlp/transformers/llama/modeling_auto.py"
+    "paddlenlp/transformers/llama/modeling.py"
     "scripts/distribute"
 )
 

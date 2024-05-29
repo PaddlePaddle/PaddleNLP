@@ -13,13 +13,17 @@
 # limitations under the License.
 
 import os
+import sys
 import tempfile
+from pathlib import Path
 
 import paddle
 
 from paddlenlp.generation import GenerationConfig
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+
+sys.path.append(str(Path(__file__).parent.parent.parent))
 from tests.parallel_launch import TestMultipleGpus
 from tests.transformers.test_modeling_common import ids_tensor
 

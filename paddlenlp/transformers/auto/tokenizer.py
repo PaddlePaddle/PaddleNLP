@@ -194,10 +194,23 @@ class AutoTokenizer:
             if init_class in cls._name_mapping:
                 class_name = cls._name_mapping[init_class]
                 import_class = import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
-                tokenizer_class = getattr(import_class, init_class)
-                if use_fast:
-                    fast_tokenizer_class = cls._get_fast_tokenizer_class(init_class, class_name)
-                    tokenizer_class = fast_tokenizer_class if fast_tokenizer_class else tokenizer_class
+                tokenizer_class = None
+                try:
+                    if use_fast:
+                        tokenizer_class = cls._get_fast_tokenizer_class(init_class, class_name)
+                except:
+                    # use the non fast tokenizer as default
+                    logger.warning(
+                        "`use_fast` is set to `True` but the tokenizer class does not have a fast version. "
+                        " Falling back to the slow version."
+                    )
+                try:
+                    if tokenizer_class is None:
+                        tokenizer_class = getattr(import_class, init_class)
+                except:
+                    raise ValueError(
+                        f"Tokenizer class {init_class} is not currently imported, if you use fast tokenizer, please set use_fast to True."
+                    )
                 return tokenizer_class
             else:
                 import_class = import_module("paddlenlp.transformers")
