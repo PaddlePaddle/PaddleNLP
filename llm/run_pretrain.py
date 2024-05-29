@@ -34,7 +34,6 @@ from paddlenlp.trainer import (
     set_seed,
     speed_metrics,
 )
-from paddlenlp.trainer.trainer_utils import IntervalStrategy
 from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -87,6 +86,8 @@ class PreTrainingArguments(TrainingArguments):
     def __post_init__(self):
         super().__post_init__()
         # NOTE(gongenlei): new add autotuner_benchmark
+        from paddlenlp.trainer.trainer_utils import IntervalStrategy
+
         if self.autotuner_benchmark:
             self.max_steps = 5
             self.do_train = True

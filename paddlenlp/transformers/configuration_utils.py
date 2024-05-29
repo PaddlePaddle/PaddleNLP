@@ -252,13 +252,17 @@ class LlmMetaConfig:
         ("use_fused_linear", bool, False, "GPT3 model, use fused linear layer"),
         ("use_fused_dropout_add", bool, False, "GPT3 model, use fused `dropout + residual add` op."),
     ]
+    # 主要问题，无法支持修改 这些配置的默认值。
+    # 假设 一个模型  config.fuse_attention_qkv=True, 但是字典中 fuse_attention_qkv=False
+    # 导致默认的args参数也为args.fuse_attention_qkv=False, 如果用户没有手动配置则，config.fuse_attention_qkv 被重置为 False，不符合预期。
+
     hybrid_parallel_attributes = [
         # tensor_parallel
-        ("tensor_parallel_degree", int, -1, "tensor_parallel_degree"),
+        ("tensor_parallel_degree", int, 1, "tensor_parallel_degree"),
         ("tensor_parallel_rank", int, 0, "tensor_parallel_rank"),
         ("tensor_parallel_output", bool, False, "tensor_parallel_output"),
         # pipeline_parallel
-        ("pipeline_parallel_degree", int, -1, "pipeline_parallel_degree"),
+        ("pipeline_parallel_degree", int, 1, "pipeline_parallel_degree"),
         ("virtual_pp_degree", int, 1, "Virtual pipeline degree"),
         # pp refine recompute
         ("no_recompute_layers", Optional[List[int]], None, "no_recompute_layers"),
@@ -269,7 +273,7 @@ class LlmMetaConfig:
             "The interval for the number of layers at which recomputation occurs. A value of 0 indicates no recomputation. Default is 0.",
         ),
         # sep_parallel
-        ("sep_parallel_degree", int, -1, "sep_parallel_degree"),
+        ("sep_parallel_degree", int, 1, "sep_parallel_degree"),
         ("sequence_parallel", bool, False, "Whether to use sequence parallel"),
         ("fuse_sequence_parallel_allreduce", bool, False, "Whether to use fuse sequence parallel allreduce"),
     ]
@@ -559,6 +563,7 @@ class PretrainedConfig:
         # Attributes with defaults
         # map the old attr to new atr, eg: num_classes -> num_labels
         kwargs = attribute_map(self, kwargs=kwargs)
+        kwargs.pop("transformers_version", None)
         llm_meta = LlmMetaConfig._get_defaults()
         kwargs = set_expected_keys(self, llm_meta, kwargs)
         if self.sequence_parallel:
@@ -1027,6 +1032,19 @@ class PretrainedConfig:
                 serializable_config_dict[key] = value
 
         return serializable_config_dict
+
+    def register_nonsaveable_keys(self):
+        # Save: not save it in any case
+        # Print: show it if non defalut value
+        # if saving: pop(keys) else: pass
+        # nonsavable_keys = LlmMetaConfig._get_nonsavable_keys()
+        pass
+
+    def register_nonsaveable_default_keys(self):
+        # Save: not save it for defalut value
+        # Print: show it if non defalut value
+
+        pass
 
     def to_dict(self, saving_file=False) -> Dict[str, Any]:
         """
