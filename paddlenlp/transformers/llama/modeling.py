@@ -77,7 +77,7 @@ from .configuration import (
 )
 
 try:
-    if get_env_device() in ["npu", "gcu"]:
+    if get_env_device() in ["npu", "mlu", "gcu"]:
 
         for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
             if lib.endswith(".so"):
@@ -318,7 +318,7 @@ def _make_causal_mask(input_ids_shape, past_key_values_length):
     """
     batch_size, target_length = input_ids_shape  # target_length: seq_len
 
-    if get_env_device() == "npu":
+    if get_env_device() == "npu" or get_env_device() == "mlu":
         mask = paddle.tril(paddle.ones((target_length, target_length))).astype("int32")
     else:
         mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
@@ -338,7 +338,7 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     batch_size, src_length = mask.shape[0], mask.shape[-1]
     tgt_length = tgt_length if tgt_length is not None else src_length
 
-    if get_env_device() == "npu":
+    if get_env_device() == "npu" or get_env_device() == "mlu":
         mask = mask[:, None, None, :].astype(dtype)
     else:
         mask = mask[:, None, None, :].astype("bool")
@@ -704,7 +704,7 @@ class LlamaAttention(nn.Layer):
                 )
 
         self.use_fused_rope = config.use_fused_rope
-        if self.use_fused_rope and get_env_device() not in ["npu", "xpu", "gcu"]:
+        if self.use_fused_rope and get_env_device() not in ["npu", "mlu", "xpu", "gcu"]:
             if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
@@ -1483,7 +1483,7 @@ class LlamaModel(LlamaPretrainedModel):
                     combined_attention_mask = _make_causal_mask(
                         input_shape, past_key_values_length=past_key_values_length
                     )
-                    if get_env_device() == "npu":
+                    if get_env_device() == "npu" or get_env_device() == "mlu":
                         expanded_attn_mask = expanded_attn_mask.astype("bool") & combined_attention_mask.astype("bool")
                     else:
                         expanded_attn_mask = expanded_attn_mask & combined_attention_mask
@@ -1496,7 +1496,7 @@ class LlamaModel(LlamaPretrainedModel):
         else:
             expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
         # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
-        if get_env_device() == "npu":
+        if get_env_device() == "npu" or get_env_device() == "mlu":
             x = paddle.to_tensor(0.0, dtype="float32")
             y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float32")
             expanded_attn_mask = expanded_attn_mask.astype("float32")
@@ -1651,7 +1651,7 @@ class LlamaModel(LlamaPretrainedModel):
                 is_casual = True
             else:
                 is_casual = is_casual_mask(attention_mask)
-            if get_env_device() != "npu":
+            if get_env_device() != "npu" or get_env_device() != "mlu":
                 if is_casual and alibi is None:
                     attention_mask = None
             else:

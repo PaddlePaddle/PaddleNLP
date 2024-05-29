@@ -124,6 +124,8 @@ def get_env_device():
         return "gpu"
     elif "npu" in paddle.device.get_all_custom_device_type():
         return "npu"
+    elif "mlu" in paddle.device.get_all_custom_device_type():
+        return "mlu"
     elif "gcu" in paddle.device.get_all_custom_device_type():
         return "gcu"
     elif paddle.is_compiled_with_rocm():
