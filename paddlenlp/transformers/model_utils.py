@@ -1916,7 +1916,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 if (
                     shard_file.endswith(".safetensors")
                     and config.tensor_parallel_degree > 1
-                    and "tp" not in os.path.spilt(shard_file)[-1]
+                    and "tp" not in os.path.split(shard_file)[-1]
                 ):
                     pre_tensor_parallel_split = True
                     assert loaded_keys is not None, "loaded_keys is not None."
