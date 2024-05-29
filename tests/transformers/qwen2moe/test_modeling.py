@@ -18,7 +18,7 @@ import unittest
 
 import paddle
 
-from paddlenlp.transformers import QWen2MoeConfig, QWen2MoeForCausalLM, QWen2MoeModel
+from paddlenlp.transformers import QWen2MoEConfig, QWen2MoEForCausalLM, QWen2MoEModel
 from tests.transformers.test_configuration_common import ConfigTester
 from tests.transformers.test_generation_utils import GenerationTesterMixin
 from tests.transformers.test_modeling_common import (
@@ -28,7 +28,7 @@ from tests.transformers.test_modeling_common import (
 )
 
 
-class QWen2MoeModelTester:
+class QWen2MoEModelTester:
     def __init__(
         self,
         parent,
@@ -63,7 +63,7 @@ class QWen2MoeModelTester:
         use_labels: bool = False,
         return_dict=False,
     ):
-        self.parent: QWen2MoeModelTest = parent
+        self.parent: QWen2MoEModelTest = parent
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
@@ -115,8 +115,8 @@ class QWen2MoeModelTester:
         config = self.get_config()
         return config, input_ids, input_mask, sequence_labels, token_labels, choice_labels
 
-    def get_config(self) -> QWen2MoeConfig:
-        return QWen2MoeConfig(
+    def get_config(self) -> QWen2MoEConfig:
+        return QWen2MoEConfig(
             vocab_size=self.vocab_size,
             hidden_size=self.hidden_size,
             num_hidden_layers=self.num_hidden_layers,
@@ -139,17 +139,17 @@ class QWen2MoeModelTester:
         )
 
     def create_and_check_model(
-        self, config: QWen2MoeConfig, input_ids, input_mask, sequence_labels, token_labels, choice_labels
+        self, config: QWen2MoEConfig, input_ids, input_mask, sequence_labels, token_labels, choice_labels
     ):
-        model = QWen2MoeModel(config)
+        model = QWen2MoEModel(config)
         model.eval()
         result = model(input_ids)
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
 
     def create_and_check_model_attention_mask(
-        self, config: QWen2MoeConfig, input_ids, input_mask, sequence_labels, token_labels, choice_labels
+        self, config: QWen2MoEConfig, input_ids, input_mask, sequence_labels, token_labels, choice_labels
     ):
-        model = QWen2MoeModel(config)
+        model = QWen2MoEModel(config)
         model.eval()
         attn_mask_2d = random_attention_mask([self.batch_size, self.seq_length])
         result_2d = model(input_ids, attention_mask=attn_mask_2d)[0]
@@ -167,14 +167,14 @@ class QWen2MoeModelTester:
 
     def create_and_check_model_past_large_inputs(
         self,
-        config: QWen2MoeConfig,
+        config: QWen2MoEConfig,
         input_ids,
         input_mask,
         sequence_labels,
         token_labels,
         choice_labels,
     ):
-        model = QWen2MoeModel(config)
+        model = QWen2MoEModel(config)
         model.eval()
 
         # first forward pass
@@ -229,7 +229,7 @@ class QWen2MoeModelTester:
         return config, inputs_dict
 
     def create_and_check_lm_head_model(self, config, input_ids, input_mask, *args):
-        model = QWen2MoeForCausalLM(config)
+        model = QWen2MoEForCausalLM(config)
         model.eval()
 
         result = model(
@@ -245,7 +245,7 @@ class QWen2MoeModelTester:
             self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
     def check_model_position_ids(self, config, input_ids, input_mask, *args):
-        model = QWen2MoeForCausalLM(config)
+        model = QWen2MoEForCausalLM(config)
         model.eval()
 
         result_no_position_id = model(
@@ -267,20 +267,20 @@ class QWen2MoeModelTester:
             self.parent.assertTrue((result_position_id[0] == result_no_position_id[0]).all())
 
 
-class QWen2MoeModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
-    base_model_class = QWen2MoeModel
+class QWen2MoEModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
+    base_model_class = QWen2MoEModel
     return_dict = False
     use_labels = False
     use_test_model_name_list = False
 
-    all_model_classes = (QWen2MoeModel, QWen2MoeForCausalLM)
-    all_generative_model_classes = {QWen2MoeForCausalLM: (QWen2MoeModel, "qwen2moe")}
+    all_model_classes = (QWen2MoEModel, QWen2MoEForCausalLM)
+    all_generative_model_classes = {QWen2MoEForCausalLM: (QWen2MoEModel, "qwen2moe")}
 
     def setUp(self):
         super().setUp()
 
-        self.model_tester = QWen2MoeModelTester(self)
-        self.config_tester = ConfigTester(self, config_class=QWen2MoeConfig, vocab_size=256, hidden_size=24)
+        self.model_tester = QWen2MoEModelTester(self)
+        self.config_tester = ConfigTester(self, config_class=QWen2MoEConfig, vocab_size=256, hidden_size=24)
 
     def _get_input_ids_and_config(self):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
@@ -315,7 +315,3 @@ class QWen2MoeModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCa
     def test_qwen2moe_lm_head_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_lm_head_model(*config_and_inputs)
-
-
-if __name__ == "__main__":
-    unittest.main()

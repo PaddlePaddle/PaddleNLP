@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2024 The Qwen team, Alibaba Group and the HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Paddle QWen2Moe model."""
+""" Paddle QWen2MoE model."""
 from __future__ import annotations
 
 import math
@@ -52,7 +52,7 @@ from paddlenlp.transformers.model_utils import PretrainedModel, register_base_mo
 from paddlenlp.utils.log import logger
 
 from ..activations import ACT2FN
-from .configuration import QWen2MoeConfig
+from .configuration import QWen2MoEConfig
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
@@ -60,10 +60,10 @@ except:
     flash_attention = None
 
 __all__ = [
-    "QWen2MoeModel",
-    "QWen2MoePretrainedModel",
-    "QWen2MoeForCausalLM",
-    "QWen2MoePretrainingCriterion",
+    "QWen2MoEModel",
+    "QWen2MoEPretrainedModel",
+    "QWen2MoEForCausalLM",
+    "QWen2MoEPretrainingCriterion",
 ]
 
 
@@ -342,7 +342,7 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     return expanded_mask
 
 
-class QWen2MoeRMSNorm(nn.Layer):
+class QWen2MoERMSNorm(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.hidden_size = config.hidden_size
@@ -373,7 +373,7 @@ class QWen2MoeRMSNorm(nn.Layer):
         return hidden_states * self.weight
 
 
-class QWen2MoeRotaryEmbedding(nn.Layer):
+class QWen2MoERotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
         self.dim = dim
@@ -437,7 +437,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
         `tuple(torch.Tensor)` comprising of the query and key tensors rotated using the Rotary Position Embedding.
     """
     if position_ids is None:
-        # Note: Only for QWen2MoeForCausalLMPipe model pretraining
+        # Note: Only for QWen2MoEForCausalLMPipe model pretraining
         cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
         sin = sin[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
     else:
@@ -450,8 +450,8 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
     return q_embed, k_embed
 
 
-# Modified from transformers.models.mistral.modeling_mistral.MistralMLP with Mistral->QWen2Moe
-class QWen2MoeMLP(nn.Layer):
+# Modified from transformers.models.mistral.modeling_mistral.MistralMLP with Mistral->QWen2MoE
+class QWen2MoEMLP(nn.Layer):
     def __init__(self, config, is_shared=False):
         super().__init__()
         self.hidden_size = config.hidden_size
@@ -510,13 +510,13 @@ def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
     return hidden_states.reshape([batch, slen, num_key_value_heads * n_rep, head_dim])
 
 
-class QWen2MoeAttention(nn.Layer):
+class QWen2MoEAttention(nn.Layer):
     """
     Multi-headed attention from 'Attention Is All You Need' paper. Modified to use sliding window attention: Longformer
     and "Generating Long Sequences with Sparse Transformers".
     """
 
-    def __init__(self, config: QWen2MoeConfig, layerwise_recompute: bool = True):
+    def __init__(self, config: QWen2MoEConfig, layerwise_recompute: bool = True):
         super().__init__()
 
         self.config = config
@@ -584,7 +584,7 @@ class QWen2MoeAttention(nn.Layer):
             self.v_proj = nn.Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True)
             self.o_proj = nn.Linear(self.hidden_size, self.hidden_size, bias_attr=False)
 
-        self.rotary_emb = QWen2MoeRotaryEmbedding(
+        self.rotary_emb = QWen2MoERotaryEmbedding(
             self.head_dim,
             max_position_embeddings=self.max_position_embeddings,
             base=self.rope_theta,
@@ -707,17 +707,17 @@ class QWen2MoeAttention(nn.Layer):
         return outputs
 
 
-class QWen2MoeSparseMoeBlock(nn.Layer):
-    def __init__(self, config: QWen2MoeConfig):
+class QWen2MoESparseMoEBlock(nn.Layer):
+    def __init__(self, config: QWen2MoEConfig):
         super().__init__()
         self.num_experts = config.num_experts
         self.top_k = config.num_experts_per_tok
         self.norm_topk_prob = config.norm_topk_prob
 
         self.gate = nn.Linear(config.hidden_size, self.num_experts, bias_attr=False)
-        self.experts = nn.LayerList([QWen2MoeMLP(config) for _ in range(self.num_experts)])
+        self.experts = nn.LayerList([QWen2MoEMLP(config) for _ in range(self.num_experts)])
 
-        self.shared_expert = QWen2MoeMLP(config, is_shared=True)
+        self.shared_expert = QWen2MoEMLP(config, is_shared=True)
         self.shared_expert_gate = nn.Linear(config.hidden_size, 1, bias_attr=False)
 
     def forward(self, hidden_states):
@@ -771,21 +771,21 @@ class QWen2MoeSparseMoeBlock(nn.Layer):
         return final_hidden_states, router_logits
 
 
-class QWen2MoeDecoderLayer(nn.Layer):
-    def __init__(self, config: QWen2MoeConfig, layerwise_recompute: bool = False):
+class QWen2MoEDecoderLayer(nn.Layer):
+    def __init__(self, config: QWen2MoEConfig, layerwise_recompute: bool = False):
         super().__init__()
         self.config = config
 
-        self.self_attn = QWen2MoeAttention(config, layerwise_recompute)
+        self.self_attn = QWen2MoEAttention(config, layerwise_recompute)
 
         if config.num_experts > 0:
-            self.mlp = QWen2MoeSparseMoeBlock(config)
+            self.mlp = QWen2MoESparseMoEBlock(config)
         else:
             # num_experts == 0 or this layer is not sparse layer
-            self.mlp = QWen2MoeMLP(config)
+            self.mlp = QWen2MoEMLP(config)
 
-        self.input_layernorm = QWen2MoeRMSNorm(config)
-        self.post_attention_layernorm = QWen2MoeRMSNorm(config)
+        self.input_layernorm = QWen2MoERMSNorm(config)
+        self.post_attention_layernorm = QWen2MoERMSNorm(config)
 
         self.sequence_parallel = config.sequence_parallel
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
@@ -896,13 +896,13 @@ class QWen2MoeDecoderLayer(nn.Layer):
         return outputs
 
 
-class QWen2MoePretrainedModel(PretrainedModel):
-    config_class = QWen2MoeConfig
+class QWen2MoEPretrainedModel(PretrainedModel):
+    config_class = QWen2MoEConfig
     base_model_prefix = "qwen2moe"
     _keys_to_ignore_on_load_unexpected = [r"self_attn.rotary_emb.inv_freq"]
 
     @classmethod
-    def _get_name_mappings(cls, config: QWen2MoeConfig) -> list[StateDictNameMapping]:
+    def _get_name_mappings(cls, config: QWen2MoEConfig) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
             ["embed_tokens.weight"],
@@ -938,8 +938,8 @@ class QWen2MoePretrainedModel(PretrainedModel):
             model_mappings.append([f"layers.{layer_index}.mlp.shared_expert_gate.weight", None, "transpose"])
 
         init_name_mappings(mappings=model_mappings)
-        # base-model prefix "QWen2MoeModel"
-        if "QWen2MoeModel" not in config.architectures:
+        # base-model prefix "QWen2MoEModel"
+        if "QWen2MoEModel" not in config.architectures:
             for mapping in model_mappings:
                 mapping[0] = "model." + mapping[0]
                 mapping[1] = "qwen2moe." + mapping[1]
@@ -949,7 +949,7 @@ class QWen2MoePretrainedModel(PretrainedModel):
         return mappings
 
     @classmethod
-    def _get_tensor_parallel_mappings(cls, config: QWen2MoeConfig, is_split=True):
+    def _get_tensor_parallel_mappings(cls, config: QWen2MoEConfig, is_split=True):
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
         fn = split_or_merge_func(
@@ -1032,7 +1032,7 @@ class QWen2MoePretrainedModel(PretrainedModel):
                 mpu.VocabParallelEmbedding,
                 mpu.ColumnParallelLinear,
                 mpu.RowParallelLinear,
-                QWen2MoeLMHead,
+                QWen2MoELMHead,
                 ColumnSequenceParallelLinear,
                 RowSequenceParallelLinear,
             ),
@@ -1067,23 +1067,23 @@ class QWen2MoePretrainedModel(PretrainedModel):
         # sublayer is init first
         # scale RowParallelLinear weight
         with paddle.no_grad():
-            if isinstance(layer, QWen2MoeMLP):
+            if isinstance(layer, QWen2MoEMLP):
                 factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
                 layer.down_proj.weight.scale_(factor)
-            if isinstance(layer, QWen2MoeAttention):
+            if isinstance(layer, QWen2MoEAttention):
                 factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
                 layer.o_proj.weight.scale_(factor)
 
 
 @register_base_model
-class QWen2MoeModel(QWen2MoePretrainedModel):
+class QWen2MoEModel(QWen2MoEPretrainedModel):
     """
-    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`QWen2MoeDecoderLayer`]
+    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`QWen2MoEDecoderLayer`]
     Args:
-        config: QWen2MoeConfig
+        config: QWen2MoEConfig
     """
 
-    def __init__(self, config: QWen2MoeConfig):
+    def __init__(self, config: QWen2MoEConfig):
         super().__init__(config)
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
@@ -1108,11 +1108,11 @@ class QWen2MoeModel(QWen2MoePretrainedModel):
 
         self.layers = nn.LayerList(
             [
-                QWen2MoeDecoderLayer(config, layerwise_recompute=layer_idx not in self.no_recompute_layers)
+                QWen2MoEDecoderLayer(config, layerwise_recompute=layer_idx not in self.no_recompute_layers)
                 for layer_idx in range(config.num_hidden_layers)
             ]
         )
-        self.norm = QWen2MoeRMSNorm(config)
+        self.norm = QWen2MoERMSNorm(config)
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1334,14 +1334,14 @@ class QWen2MoeModel(QWen2MoePretrainedModel):
         )
 
 
-class QWen2MoePretrainingCriterion(nn.Layer):
+class QWen2MoEPretrainingCriterion(nn.Layer):
     """
     Criterion for Mixtral.
     It calculates the final loss.
     """
 
     def __init__(self, config):
-        super(QWen2MoePretrainingCriterion, self).__init__()
+        super(QWen2MoEPretrainingCriterion, self).__init__()
         self.ignore_index = getattr(config, "ignore_index", -100)
         self.config = config
         self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
@@ -1369,9 +1369,9 @@ class QWen2MoePretrainingCriterion(nn.Layer):
         return loss
 
 
-class QWen2MoeLMHead(nn.Layer):
-    def __init__(self, config: QWen2MoeConfig):
-        super(QWen2MoeLMHead, self).__init__()
+class QWen2MoELMHead(nn.Layer):
+    def __init__(self, config: QWen2MoEConfig):
+        super(QWen2MoELMHead, self).__init__()
         self.config = config
         if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
             vocab_size = config.vocab_size // config.tensor_parallel_degree
@@ -1400,7 +1400,7 @@ class QWen2MoeLMHead(nn.Layer):
         return logits
 
 
-class QWen2MoeForCausalLM(QWen2MoePretrainedModel):
+class QWen2MoEForCausalLM(QWen2MoEPretrainedModel):
     enable_to_static_method = True
     _tied_weights_keys = ["lm_head.weight"]
 
@@ -1408,9 +1408,9 @@ class QWen2MoeForCausalLM(QWen2MoePretrainedModel):
         super().__init__(config)
         self.config = config
 
-        self.qwen2moe = QWen2MoeModel(config)
-        self.lm_head = QWen2MoeLMHead(config)
-        self.criterion = QWen2MoePretrainingCriterion(config)
+        self.qwen2moe = QWen2MoEModel(config)
+        self.lm_head = QWen2MoELMHead(config)
+        self.criterion = QWen2MoEPretrainingCriterion(config)
         self.router_aux_loss_coef = config.router_aux_loss_coef
         self.num_experts = config.num_experts
         self.num_experts_per_tok = config.num_experts_per_tok

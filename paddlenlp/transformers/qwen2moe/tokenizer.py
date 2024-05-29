@@ -29,7 +29,7 @@ VOCAB_FILES_NAMES = {
     "merges_file": "merges.txt",
 }
 
-__all__ = ["QWen2MoeTokenizer"]
+__all__ = ["QWen2MoETokenizer"]
 
 MAX_MODEL_INPUT_SIZES = {"qwen/qwen-tokenizer": 32768}
 
@@ -75,7 +75,7 @@ def get_pairs(word):
     return pairs
 
 
-class QWen2MoeTokenizer(PretrainedTokenizer):
+class QWen2MoETokenizer(PretrainedTokenizer):
     """
     Construct a Qwen2 tokenizer. Based on byte-level Byte-Pair-Encoding.
 
