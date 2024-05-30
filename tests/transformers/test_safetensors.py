@@ -60,6 +60,7 @@ class FastSafetensors(unittest.TestCase):
             with fast_safe_open(path, framework="np") as f:
                 for key in f.keys():
                     safe_slice = f.get_slice(key)
+                    # np.testing.assert_equal(self.weigth_map[key][2:1, ...], safe_slice[2:1, ...])
                     np.testing.assert_equal(self.weigth_map[key][0, ...], safe_slice[0, ...])
                     np.testing.assert_equal(self.weigth_map[key][0:1, ...], safe_slice[0:1, ...])
                     np.testing.assert_equal(self.weigth_map[key][..., 2:], safe_slice[..., 2:])
