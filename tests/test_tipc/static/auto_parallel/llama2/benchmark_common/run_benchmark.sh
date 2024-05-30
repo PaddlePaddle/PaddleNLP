@@ -74,7 +74,11 @@ function _train(){
         add_options=""
         log_file=${train_log_file}
     fi
-
+    
+    # 70b需要关闭这个开关，否则会hang
+    if [[ "${MODEL_TYPE}" =~ "70b" ]]; then
+        unset CUDA_DEVICE_MAX_CONNECTIONS
+    fi
     # Disable for hanging bug
     # if [ "${tensor_parallel_degree}" != "1" ]; then
     #     export CUDA_DEVICE_MAX_CONNECTIONS=1
@@ -136,7 +140,7 @@ function _train(){
     rm -rf mylog && rm -rf checkpoints
     
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
-    timeout 15m ${train_cmd} > ${log_file} 2>&1
+    timeout 40m ${train_cmd} > ${log_file} 2>&1
 
     if [ $? -ne 0 ];then
         echo -e "${model_name}, FAIL"
