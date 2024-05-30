@@ -1,6 +1,6 @@
 {
-    "model_name_or_path": "meta-llama/Llama-2-7b-chat",
-    "tokenizer_name_or_path": "meta-llama/Llama-2-7b-chat",
+    "model_name_or_path": "meta-llama/Llama-2-7b",
+    "tokenizer_name_or_path": "meta-llama/Llama-2-7b",
     "input_dir": "./data",
     "output_dir": "./checkpoints/llama2_pretrain_ckpts",
     "per_device_train_batch_size": 2,
@@ -28,7 +28,7 @@
     "warmup_ratio": 0.01,
     "max_grad_norm": 1.0,
     "dataloader_num_workers": 1,
-    "continue_training": 0,
+    "continue_training": 1,
     "do_train": true,
     "do_eval": true,
     "do_predict": true,

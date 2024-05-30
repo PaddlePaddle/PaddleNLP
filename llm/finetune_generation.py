@@ -161,6 +161,8 @@ def main():
 
     model_config.seq_length = data_args.max_length
 
+    print("Final model config:", model_config)
+
     model_class = AutoModelForCausalLM
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
