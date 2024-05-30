@@ -257,7 +257,7 @@ class LlmMetaConfig:
         # tensor_parallel
         ("tensor_parallel_degree", int, 1, "tensor_parallel_degree"),
         ("tensor_parallel_rank", int, 0, "tensor_parallel_rank"),
-        ("tensor_parallel_output", bool, False, "tensor_parallel_output"),
+        ("tensor_parallel_output", bool, True, "tensor_parallel_output"),
         # pipeline_parallel
         ("pipeline_parallel_degree", int, 1, "pipeline_parallel_degree"),
         ("virtual_pp_degree", int, 1, "Virtual pipeline degree"),
