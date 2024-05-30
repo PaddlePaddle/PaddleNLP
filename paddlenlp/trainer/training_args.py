@@ -811,7 +811,7 @@ class TrainingArguments:
         },
     )
     memory_limit_times: float = field(
-        default=2,
+        default=-1,
         metadata={"help": "The memory limit times of the pipeline parallel. Only used for zbv pipeline parallel."},
     )
 
