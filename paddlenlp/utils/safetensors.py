@@ -165,7 +165,7 @@ class PySafeSlice:
         target_shape = []
         for x, y, z, sli in zip(out_start, out_stop, out_step, index):
             assert z == 1, "only support step = 1"
-            if y - x > 1 or sli.start is None:
+            if y - x > 1 or sli.step is None:
                 target_shape.append(int(y - x))
 
         if len(target_shape) == 0:
