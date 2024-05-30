@@ -252,9 +252,6 @@ class LlmMetaConfig:
         ("use_fused_linear", bool, False, "GPT3 model, use fused linear layer"),
         ("use_fused_dropout_add", bool, False, "GPT3 model, use fused `dropout + residual add` op."),
     ]
-    # 主要问题，无法支持修改 这些配置的默认值。
-    # 假设 一个模型  config.fuse_attention_qkv=True, 但是字典中 fuse_attention_qkv=False
-    # 导致默认的args参数也为args.fuse_attention_qkv=False, 如果用户没有手动配置则，config.fuse_attention_qkv 被重置为 False，不符合预期。
 
     hybrid_parallel_attributes = [
         # tensor_parallel
@@ -288,17 +285,10 @@ class LlmMetaConfig:
         ("recompute_use_reentrant", bool, False, "recompute_use_reentrant"),
     ]
 
-    # parameters fuse
-    parameters_fuse_attributes = [
-        ("fuse_attention_qkv", bool, False, "Whether to fuse attention qkv"),
-        ("fuse_attention_ffn", bool, False, "Whether to fuse first up and gate proj in mlp block"),
-    ]
-
     @classmethod
     def _get_defaults(cls):
         ret = {}
         for attrs in [
-            cls.parameters_fuse_attributes,
             cls.op_fusion_attributes,
             cls.hybrid_parallel_attributes,
             cls.recompute_attributes,
@@ -312,7 +302,6 @@ class LlmMetaConfig:
     def _get_all_meta(cls):
         ret = []
         for attrs in [
-            cls.parameters_fuse_attributes,
             cls.op_fusion_attributes,
             cls.hybrid_parallel_attributes,
             cls.recompute_attributes,
@@ -575,6 +564,11 @@ class PretrainedConfig:
         self.output_hidden_states = kwargs.pop("output_hidden_states", False)
         self.output_attentions = kwargs.pop("output_attentions", False)
         self.use_cache = kwargs.pop("use_cache", False)
+
+        # for transformers fuse
+        self.fuse_attention_qkv = kwargs.pop("fuse_attention_qkv", False)
+        self.fuse_attention_ffn = kwargs.pop("fuse_attention_ffn", False)
+
         if "quantization_config" in kwargs and isinstance(kwargs["quantization_config"], Dict):
             kwargs["quantization_config"] = QuantizationConfig.from_dict(kwargs["quantization_config"])
         self.quantization_config = kwargs.pop("quantization_config", QuantizationConfig())
