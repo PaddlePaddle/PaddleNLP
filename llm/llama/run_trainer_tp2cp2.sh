@@ -33,17 +33,13 @@ unset PADDLE_ELASTIC_TIMEOUT
 
 max_seq_length=1024
 
-master=127.0.0.1
-port=36677
-
-max_steps=10000
+max_steps=1000
 log_dir=seq_${max_seq_length}_log
 echo "log_dir:${log_dir}"
 rm -rf $log_dir
 
 export PYTHONPATH=../../:$PYTHONPATH
 python -u  -m paddle.distributed.launch \
-    --master $master:$port \
     --gpus "3,4,5,7" \
     --log_dir "./$log_dir" \
     run_pretrain.py \
@@ -78,7 +74,7 @@ python -u  -m paddle.distributed.launch \
     --recompute_use_reentrant true \
     --data_cache "./data_cache" \
     --pipeline_parallel_degree 1 \
-    --cp_parallel_degree 2 \
+    --context_parallel_degree 2 \
     --tensor_parallel_degree 2 \
     --sequence_parallel false \
     --skip_profile_timer true \

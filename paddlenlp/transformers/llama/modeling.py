@@ -233,7 +233,7 @@ def scaled_dot_product_attention(
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
 
     else:
-        if config.cp_parallel_degree > 1:
+        if config.context_parallel_degree > 1:
             raise ValueError("Context parallel requires `use_flash_attention=True`")
 
         #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
@@ -935,7 +935,7 @@ class LlamaAttention(nn.Layer):
             if self.reshard_layer is not None:
                 batch_size, seq_length, _, _ = query_states.shape
                 position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
-            if self.config.cp_parallel_degree > 1:
+            if self.config.context_parallel_degree > 1:
                 batch_size, seq_length, _, _ = query_states.shape
                 group = fleet.get_hybrid_communicate_group().get_sep_parallel_group()
                 chunk_size = seq_length // 2
@@ -955,12 +955,12 @@ class LlamaAttention(nn.Layer):
                     position_ids,
                     past_key_value,
                     self.rotary_emb,
-                    self.config.cp_parallel_degree,
+                    self.config.context_parallel_degree,
                 )
 
             else:
-                if self.config.cp_parallel_degree > 1:
-                    kv_seq_len *= self.config.cp_parallel_degree
+                if self.config.context_parallel_degree > 1:
+                    kv_seq_len *= self.config.context_parallel_degree
                 if self.config.use_long_sequence_strategies:
                     cos, sin = self.rotary_emb(seq_len=kv_seq_len)
                     cos = cos[None, :, None, :]
@@ -1529,7 +1529,7 @@ class LlamaModel(LlamaPretrainedModel):
             # [seq_len * bs / n, num_head * head_dim] (n is mp parallelism)
             inputs_embeds = ScatterOp.apply(inputs_embeds)
 
-        if self.config.cp_parallel_degree > 1 and (attention_mask is not None or self.config.alibi):
+        if self.config.context_parallel_degree > 1 and (attention_mask is not None or self.config.alibi):
             raise NotImplementedError("Ring FlashAttention dosen't support attention_mask or alibi")
         # embed positions
         if attention_mask is None:
@@ -1674,7 +1674,7 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
 
-            if self.config.sep_parallel_degree > 1 or self.config.cp_parallel_degree > 1:
+            if self.config.sep_parallel_degree > 1 or self.config.context_parallel_degree > 1:
                 _hcg = fleet.get_hybrid_communicate_group()
                 masked_lm_loss = ConcatMaskedLoss.apply(masked_lm_loss, axis=1, group=_hcg.get_sep_parallel_group())
             # skip ignore_index which loss == 0
@@ -1747,9 +1747,9 @@ class LlamaLMHead(nn.Layer):
             if self.config.sep_parallel_degree > 1:
                 assert seq_length % self.config.sep_parallel_degree == 0
                 seq_length = seq_length // self.config.sep_parallel_degree
-            if self.config.cp_parallel_degree > 1:
-                assert seq_length % self.config.cp_parallel_degree == 0
-                seq_length = seq_length // self.config.cp_parallel_degree
+            if self.config.context_parallel_degree > 1:
+                assert seq_length % self.config.context_parallel_degree == 0
+                seq_length = seq_length // self.config.context_parallel_degree
             hidden_states = paddle.reshape_(hidden_states, [-1, seq_length, self.config.hidden_size])
 
         if tensor_parallel_output is None:

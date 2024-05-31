@@ -230,9 +230,9 @@ class TrainingArguments:
             The paddle sequence parallel strategy. It can reduce the GPU memory of activation to 1/sep, and it is orthogonal to
             data parallel, sharding stage1, tensor parallel and pipeline parallel strategy.
         )
-        cp_parallel_degree (`int`, *optional*, defaults to `-1`)(
-            The paddle context parallel strategy. It can reduce the GPU memory of activation to 1/cp, and it is orthogonal to
-            data parallel, sharding stage1, tensor parallel and pipeline parallel strategy.
+        context_parallel_degree (`int`, *optional*, defaults to `-1`)(
+            Context parallelism is a parallel method that segments training data in the sequence dimension.
+            This method uses Ring FlashAttention to ensure the correctness of the Attention result after segmentation. The complete attention score is obtained through ring communication and iterative updates.
         )
         data_parallel_config (`str`, *optional*)(
             Some additional configs which affect data parallel performance, we provide some option to config it.
@@ -587,7 +587,7 @@ class TrainingArguments:
             )
         },
     )
-    cp_parallel_degree: int = field(
+    context_parallel_degree: int = field(
         default=-1,
         metadata={
             "help": (
@@ -931,7 +931,7 @@ class TrainingArguments:
         if world_size > 1:
             tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
             sep_parallel_degree = max(self.sep_parallel_degree, 1)
-            cp_parallel_degree = max(self.cp_parallel_degree, 1)
+            context_parallel_degree = max(self.context_parallel_degree, 1)
             pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
 
             assert (
@@ -941,7 +941,10 @@ class TrainingArguments:
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
                     self.sharding_parallel_degree = world_size // (
-                        tensor_parallel_degree * sep_parallel_degree * cp_parallel_degree * pipeline_parallel_degree
+                        tensor_parallel_degree
+                        * sep_parallel_degree
+                        * context_parallel_degree
+                        * pipeline_parallel_degree
                     )
 
             sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
@@ -953,7 +956,7 @@ class TrainingArguments:
                 sharding_parallel_degree
                 * tensor_parallel_degree
                 * sep_parallel_degree
-                * cp_parallel_degree
+                * context_parallel_degree
                 * pipeline_parallel_degree
             )
 
@@ -962,14 +965,14 @@ class TrainingArguments:
                 or tensor_parallel_degree > 1
                 or pipeline_parallel_degree > 1
                 or self.sep_parallel_degree > 1
-                or self.cp_parallel_degree > 1
+                or self.context_parallel_degree > 1
             ):
                 self.use_hybrid_parallel = True
                 self.sharding_parallel_degree = sharding_parallel_degree
                 self.tensor_parallel_degree = tensor_parallel_degree
                 self.pipeline_parallel_degree = pipeline_parallel_degree
                 self.sep_parallel_degree = sep_parallel_degree
-                self.cp_parallel_degree = cp_parallel_degree
+                self.context_parallel_degree = context_parallel_degree
 
             if not self.use_hybrid_parallel:
                 self.sharding = []
@@ -977,7 +980,7 @@ class TrainingArguments:
                 self.tensor_parallel_degree = -1
                 self.pipeline_parallel_degree = -1
                 self.sep_parallel_degree = -1
-                self.cp_parallel_degree = -1
+                self.context_parallel_degree = -1
 
         if self.hybrid_parallel_topo_order is None:
             self.hybrid_parallel_topo_order = "pp_first"
@@ -1180,7 +1183,7 @@ class TrainingArguments:
                         "sharding_degree": self.sharding_parallel_degree,
                         "sep_degree": self.sep_parallel_degree
                         if self.sep_parallel_degree > 1
-                        else self.cp_parallel_degree,
+                        else self.context_parallel_degree,
                         "order": order,
                     }
                 else:
@@ -1264,7 +1267,7 @@ class TrainingArguments:
         elif self.enable_auto_parallel:
             self.tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
             self.sep_parallel_degree = max(self.sep_parallel_degree, 1)
-            self.cp_parallel_degree = max(self.cp_parallel_degree, 1)
+            self.context_parallel_degree = max(self.context_parallel_degree, 1)
             self.pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
 
             assert (
@@ -1276,7 +1279,7 @@ class TrainingArguments:
                     self.sharding_parallel_degree = world_size // (
                         self.tensor_parallel_degree
                         * self.sep_parallel_degree
-                        * self.cp_parallel_degree
+                        * self.context_parallel_degree
                         * self.pipeline_parallel_degree
                     )
 
@@ -1289,7 +1292,7 @@ class TrainingArguments:
                 self.sharding_parallel_degree
                 * self.tensor_parallel_degree
                 * self.sep_parallel_degree
-                * self.cp_parallel_degree
+                * self.context_parallel_degree
                 * self.pipeline_parallel_degree
             )
 
