@@ -937,7 +937,7 @@ class LlamaAttention(nn.Layer):
                 position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
             if self.context_parallel:
                 batch_size, seq_length, _, _ = query_states.shape
-                group = fleet.get_hybrid_communicate_group().get_cp_parallel_group()
+                group = fleet.get_hybrid_communicate_group().get_sep_parallel_group()
                 chunk_size = seq_length // 2
                 chunk_num = group.nranks * 2
                 rank = group.rank
@@ -1673,12 +1673,9 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
 
-            if self.config.sep_parallel_degree > 1:
+            if self.config.sep_parallel_degree > 1 or self.config.cp_parallel_degree > 1:
                 _hcg = fleet.get_hybrid_communicate_group()
                 masked_lm_loss = ConcatMaskedLoss.apply(masked_lm_loss, axis=1, group=_hcg.get_sep_parallel_group())
-            if self.config.cp_parallel_degree > 1:
-                _hcg = fleet.get_hybrid_communicate_group()
-                masked_lm_loss = ConcatMaskedLoss.apply(masked_lm_loss, axis=1, group=_hcg.get_cp_parallel_group())
             # skip ignore_index which loss == 0
             # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
             # loss = paddle.mean(masked_lm_loss)

@@ -32,8 +32,8 @@ from paddle.distributed.fleet import fleet
 def split_inputs_sequence_dim_load_balance(inputs, rank=None, degree=None):
     if degree is None and rank is None:
         _hcg = fleet.get_hybrid_communicate_group()
-        degree = _hcg.get_cp_parallel_world_size()
-        rank = _hcg.get_cp_parallel_rank()
+        degree = _hcg.get_sep_parallel_world_size()
+        rank = _hcg.get_sep_parallel_rank()
     assert isinstance(degree, int) and isinstance(
         rank, int
     ), f"degree:{type(degree)} and rank:{type(rank)} must be int"
@@ -70,8 +70,8 @@ def split_inputs_sequence_dim(inputs, rank=None, degree=None):
         degree = _hcg.get_sep_parallel_world_size()
         rank = _hcg.get_sep_parallel_rank()
         if degree == 1:
-            degree = _hcg.get_cp_parallel_world_size()
-            rank = _hcg.get_cp_parallel_rank()
+            degree = _hcg.get_sep_parallel_world_size()
+            rank = _hcg.get_sep_parallel_rank()
     assert isinstance(degree, int) and isinstance(
         rank, int
     ), f"degree:{type(degree)} and rank:{type(rank)} must be int"

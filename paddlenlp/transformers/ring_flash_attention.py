@@ -340,7 +340,7 @@ class RingFlashAttention(PyLayer):
         if dropout > 0.0:
             raise NotImplementedError("Dropout is not supported in ring attention yet.")
         if group is None:
-            group = dist.fleet.get_hybrid_communicate_group().get_cp_parallel_group()
+            group = dist.fleet.get_hybrid_communicate_group().get_sep_parallel_group()
         if attn_mask is not None:
             is_causal = False
 

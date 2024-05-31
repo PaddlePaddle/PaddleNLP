@@ -1161,41 +1161,18 @@ class TrainingArguments:
                         logger.warning("segment parallel is not supported!!!, Ignore it.")
                     return support_sep
 
-                def is_context_parallel_supported():
-                    import inspect
-
-                    members = [name for (name, date) in inspect.getmembers(fleet.HybridCommunicateGroup)]
-                    support_cp = "get_cp_parallel_world_size" in members
-                    if not support_cp:
-                        logger.warning("context parallel is not supported!!!, Ignore it.")
-                    return support_cp
-
                 if self.hybrid_parallel_topo_order == "pp_first":
-                    if is_context_parallel_supported():
-                        order = ["dp", "pp", "sharding", "sep", "cp", "mp"]
-                    elif is_segment_parallel_supported():
+                    if is_segment_parallel_supported():
                         order = ["dp", "pp", "sharding", "sep", "mp"]
                     else:
                         order = ["dp", "pp", "sharding", "mp"]
                 if self.hybrid_parallel_topo_order == "sharding_first":
-                    if is_context_parallel_supported():
-                        order = ["dp", "sharding", "pp", "sep", "cp", "mp"]
-                    elif is_segment_parallel_supported():
+                    if is_segment_parallel_supported():
                         order = ["dp", "sharding", "pp", "sep", "mp"]
                     else:
                         order = ["dp", "sharding", "pp", "mp"]
 
-                if is_context_parallel_supported():
-                    hybrid_configs = {
-                        "dp_degree": self.data_parallel_degree,
-                        "mp_degree": self.tensor_parallel_degree,
-                        "pp_degree": self.pipeline_parallel_degree,
-                        "sharding_degree": self.sharding_parallel_degree,
-                        "sep_degree": self.sep_parallel_degree,
-                        "cp_degree": self.cp_parallel_degree,
-                        "order": order,
-                    }
-                elif is_segment_parallel_supported():
+                if is_segment_parallel_supported():
                     hybrid_configs = {
                         "dp_degree": self.data_parallel_degree,
                         "mp_degree": self.tensor_parallel_degree,

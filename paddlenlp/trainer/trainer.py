@@ -1011,11 +1011,7 @@ class Trainer:
                                 assert reshard_util.is_sharding_opt(self.optimizer)
                                 self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
-                            if (
-                                self.optimizer._dp_enable
-                                or getattr(self.optimizer, "_sep_enable", False)
-                                or getattr(self.optimizer, "_cp_enable", False)
-                            ):
+                            if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
                                 fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
 
                     self.timers and self.timers("all-reduce").stop()
