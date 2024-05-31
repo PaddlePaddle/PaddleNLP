@@ -1181,10 +1181,10 @@ class REDecoder(nn.Layer):
             )
             positive_relations_repeat = positive_relations.unsqueeze(axis=0).tile([len(all_possible_relations), 1, 1])
             mask = paddle.all(all_possible_relations_repeat == positive_relations_repeat, axis=2)
-            negative_mask = paddle.any(mask, axis=1) is False
+            negative_mask = paddle.any(mask == False, axis=1)
             negative_relations = all_possible_relations[negative_mask]
 
-            positive_mask = paddle.any(mask, axis=0) is True
+            positive_mask = paddle.any(mask == True, axis=0)
             positive_relations = positive_relations[positive_mask]
             if negative_mask.sum() > 0:
                 reordered_relations = paddle.concat([positive_relations, negative_relations])
