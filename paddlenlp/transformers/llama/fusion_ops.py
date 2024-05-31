@@ -52,9 +52,18 @@ except:
     flash_attention = None
 
 from paddlenlp.transformers.ring_flash_attention import RingFlashAttention
-from paddlenlp.transformers.context_parallel_utils import split_inputs_sequence_dim_load_balance
 
-def fusion_rope(query_states, key_states, value_states, hidden_states, position_ids, past_key_value, rotary_emb, cp_parallel_degree=-1):
+
+def fusion_rope(
+    query_states,
+    key_states,
+    value_states,
+    hidden_states,
+    position_ids,
+    past_key_value,
+    rotary_emb,
+    cp_parallel_degree=-1,
+):
     if get_env_device() != "gcu":
         assert past_key_value is None, "fuse rotary not support cache kv for now"
     batch_size, seq_length, num_heads, head_dim = query_states.shape
@@ -64,9 +73,6 @@ def fusion_rope(query_states, key_states, value_states, hidden_states, position_
         kv_seq_len *= cp_parallel_degree
     if get_env_device() != "gcu":
         cos, sin = rotary_emb(value_states, seq_len=kv_seq_len)
-    if cp_parallel_degree > 1:
-        cos = split_inputs_sequence_dim_load_balance(cos)
-        sin = split_inputs_sequence_dim_load_balance(sin)
     if get_env_device() == "npu":
         query_states = core.eager._run_custom_op("fused_rope", query_states, cos, sin)[0]
         key_states = core.eager._run_custom_op("fused_rope", key_states, cos, sin)[0]
@@ -165,7 +171,7 @@ def fusion_flash_attention(
             attention_mask = attention_mask.cast(alibi.dtype) + alibi
         if get_env_device() == "npu":
             if config.cp_parallel_degree > 1:
-                raise ValueError(f"Context parallel is not implemented for npu")
+                raise ValueError("Context parallel is not implemented for npu")
             attn_output = core.eager._run_custom_op(
                 "flash_attention_npu",
                 query_states,
@@ -181,7 +187,7 @@ def fusion_flash_attention(
             )[0]
         elif get_env_device() == "gcu":
             if config.cp_parallel_degree > 1:
-                raise ValueError(f"Context parallel is not implemented for gcu")
+                raise ValueError("Context parallel is not implemented for gcu")
             attn_output = core.eager._run_custom_op(
                 "fused_sdp_flash_attention_gcu",
                 query_states,

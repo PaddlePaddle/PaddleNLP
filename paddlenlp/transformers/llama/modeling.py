@@ -99,7 +99,6 @@ __all__ = [
 ]
 
 
-
 def _get_interleave(n):
     def _get_interleave_power_of_2(n):
         start = 2 ** (-(2 ** -(math.log2(n) - 3)))
@@ -956,7 +955,7 @@ class LlamaAttention(nn.Layer):
                     position_ids,
                     past_key_value,
                     self.rotary_emb,
-                    self.cp_parallel_degree
+                    self.config.cp_parallel_degree,
                 )
 
             else:
@@ -972,7 +971,6 @@ class LlamaAttention(nn.Layer):
                     )
                 else:
                     cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
         # [bs, seq_len, num_head, head_dim]
