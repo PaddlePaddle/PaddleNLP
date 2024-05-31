@@ -104,6 +104,7 @@ def remove_ckpt(ckpt_dir):
         shutil.rmtree(ckpt_dir)
 
 
+@pytest.mark.xdist_group(name="UC")
 class TestUnifiedCheckpointSingle(TestMultipleGpus):
     def setUp(self):
         self.config = lora_arguments
@@ -141,6 +142,7 @@ class TestUnifiedCheckpointSingle(TestMultipleGpus):
 
 
 # Test Unified Checkpoint Hybrid Parallel Strategy on N1C8 and N2C4
+@pytest.mark.xdist_group(name="UC")
 class TestUnifiedCheckpointBase(TestMultipleGpus):
     @classmethod
     @property
@@ -205,6 +207,7 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
             np.testing.assert_allclose(res[0], res[1], self.rtol)
 
 
+@pytest.mark.xdist_group(name="UC")
 class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
     @skip_for_none_ce_case
     @require_paddle_at_least_8_gpu
