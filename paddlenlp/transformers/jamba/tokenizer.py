@@ -14,11 +14,11 @@
 
 from ..llama import LlamaTokenizer
 
-__all__ = ["JamaTokenizer"]
+__all__ = ["JambaTokenizer"]
 
 
-class JamaTokenizer(LlamaTokenizer):
+class JambaTokenizer(LlamaTokenizer):
     model_input_names = ["input_ids", "attention_mask"]
     resource_files_names = {
-        "vocab_file": "tokenizer.model",
+        "vocab_file": "sentencepiece.bpe.model",
     }
