@@ -44,6 +44,7 @@ from ...transformers.utils import get_checkpoint_shard_files, weight_name_suffix
 from ...utils.distributed import distributed_gather
 from ...utils.env import LORA_WEIGHTS_NAME, SAFE_PEFT_WEIGHTS_INDEX_NAME
 from ...utils.log import logger
+from ...utils.tools import get_env_device
 from .lora_config import LoRAConfig
 
 try:
@@ -51,19 +52,41 @@ try:
         ColumnSequenceParallelLinear,
         RowSequenceParallelLinear,
     )
-
-    from .lora_layers import (
-        ColumnParallelLoRALinear,
-        ColumnParallelLoRAMergedLinear,
-        ColumnSequenceParallelLoRALinear,
-        LoRAConv2D,
-        LoRALinear,
-        LoRAMergedLinear,
-        RowParallelLoRALinear,
-        RowSequenceParallelLoRALinear,
-    )
 except:
     pass
+
+if get_env_device() == "xpu":
+    try:
+        from paddle_xpu.layers.nn.lora_layers import (
+            XPUColumnParallelLoRALinear,
+            XPUColumnSequenceParallelLoRALinear,
+            XPULoRALinear,
+            XPURowParallelLoRALinear,
+            XPURowSequenceParallelLoRALinear,
+        )
+
+        LoRALinear = XPULoRALinear
+        RowParallelLoRALinear = XPURowParallelLoRALinear
+        RowSequenceParallelLoRALinear = XPURowSequenceParallelLoRALinear
+        ColumnParallelLoRALinear = XPUColumnParallelLoRALinear
+        ColumnSequenceParallelLoRALinear = XPUColumnSequenceParallelLoRALinear
+    except:
+        # If paddle_xpu is not installed, just use PaddleNLP's native lora layers
+        pass
+else:
+    try:
+        from .lora_layers import (
+            ColumnParallelLoRALinear,
+            ColumnParallelLoRAMergedLinear,
+            ColumnSequenceParallelLoRALinear,
+            LoRAConv2D,
+            LoRALinear,
+            LoRAMergedLinear,
+            RowParallelLoRALinear,
+            RowSequenceParallelLoRALinear,
+        )
+    except:
+        pass
 
 try:
     from ...quantization.quantization_linear import (
