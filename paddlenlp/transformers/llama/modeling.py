@@ -768,7 +768,7 @@ class LlamaAttention(nn.Layer):
             assert self.num_key_value_heads % config.sep_parallel_degree == 0
             assert self.num_heads % config.sep_parallel_degree == 0
             self.reshard_layer = ReshardLayer()
-        self.context_parallel = config.cp_parallel_degree > 1
+
         self.config = config
 
     def _init_rope(self):
@@ -935,7 +935,7 @@ class LlamaAttention(nn.Layer):
             if self.reshard_layer is not None:
                 batch_size, seq_length, _, _ = query_states.shape
                 position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
-            if self.context_parallel:
+            if self.config.cp_parallel_degree > 1:
                 batch_size, seq_length, _, _ = query_states.shape
                 group = fleet.get_hybrid_communicate_group().get_sep_parallel_group()
                 chunk_size = seq_length // 2
@@ -959,7 +959,7 @@ class LlamaAttention(nn.Layer):
                 )
 
             else:
-                if self.context_parallel:
+                if self.config.cp_parallel_degree > 1:
                     kv_seq_len *= self.config.cp_parallel_degree
                 if self.config.use_long_sequence_strategies:
                     cos, sin = self.rotary_emb(seq_len=kv_seq_len)
@@ -971,6 +971,7 @@ class LlamaAttention(nn.Layer):
                     )
                 else:
                     cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
         # [bs, seq_len, num_head, head_dim]
