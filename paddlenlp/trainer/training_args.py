@@ -791,6 +791,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "whether to output logits in distributed status"},
     )
+    use_expert_parallel: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable MoE (Mixture of Experts) expert parallel training"},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -1117,6 +1121,8 @@ class TrainingArguments:
                         order = ["dp", "sharding", "pp", "sep", "mp"]
                     else:
                         order = ["dp", "sharding", "pp", "mp"]
+                if self.use_expert_parallel:
+                    order = order[1:-1] + ["dp", "mp"]
 
                 if is_segment_parallel_supported():
                     hybrid_configs = {
@@ -1598,9 +1604,12 @@ class TrainingArguments:
             if self.sharding_parallel_degree > 1:
                 assert self.sharding_parallel_degree < 100, "sharding parallel degree should be less than 100."
                 name.append(f"shard{self.sharding_parallel_rank:0>2d}")
-
+            if self.use_expert_parallel:
+                name.append(f"moe{self.data_parallel_rank:0>2d}")
             return "_".join(name)
         else:
+            if self.use_expert_parallel:
+                return f"moe{self.data_parallel_rank:0>2d}"
             return None
 
     @property
@@ -1613,12 +1622,16 @@ class TrainingArguments:
             if self.pipeline_parallel_degree > 1:
                 assert self.pipeline_parallel_degree < 100, "tensor parallel rank should be less than 100."
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
+            if self.use_expert_parallel:
+                name.append(f"moe{self.data_parallel_rank:0>2d}")
             return "_".join(name)
 
         else:
+            if self.use_expert_parallel:
+                return f"moe{self.data_parallel_rank:0>2d}"
             return None
 
-    def sharded_name_suffix(self, shard_id=None, pp_id=None):
+    def sharded_name_suffix(self, shard_id=None, pp_id=None, moe_id=None):
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
@@ -1636,8 +1649,17 @@ class TrainingArguments:
                 assert isinstance(shard_id, int)
                 assert shard_id < 100, "shard_id should be less than 100."
                 name.append(f"shard{shard_id:0>2d}")
+            if self.use_expert_parallel:
+                if moe_id is None:
+                    moe_id = self.data_parallel_rank
+                assert isinstance(moe_id, int)
+                name.append(f"moe{moe_id:0>2d}")
             return "_".join(name)
         else:
+            if self.use_expert_parallel:
+                if moe_id is None:
+                    moe_id = self.data_parallel_rank
+                return self._format_name("moe", moe_id, self.data_parallel_degree)
             return None
 
     @property
@@ -1730,9 +1752,9 @@ class TrainingArguments:
                 return True
             elif self.use_hybrid_parallel:
                 # save on dataset rank 0
-                return self.sharding_parallel_rank == 0 and self.data_parallel_rank == 0
+                return self.sharding_parallel_rank == 0 and (self.data_parallel_rank == 0 or self.use_expert_parallel)
             else:
-                return self.process_index == 0
+                return self.process_index == 0 or self.use_expert_parallel
 
     @property
     def _no_sync_in_gradient_accumulation(self):
