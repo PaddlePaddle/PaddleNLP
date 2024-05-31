@@ -263,6 +263,8 @@ class TrainingArguments:
               enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation
               enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed
               enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap.
+              enable_stage1_broadcast_overlap, overlap stage1 V1 broadcast with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap forward compute and no other sync could be called during the training for broadcast overlap.
+              enable_stage1_allgather_overlap, overlap stage1 V2 allgather with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for allgather overlap forward compute and no other sync could be called during the training for allgather overlap.
               disable_stage1_reduce_avg, replace reduce_avg with original reduce_sum+scale in stage1, which can be used for accuracy verification.
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
@@ -647,7 +649,9 @@ class TrainingArguments:
                 "enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation\n"
                 "enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed\n"
                 "disable_stage1_reduce_avg, replace reduce_avg with original reduce_sum+scale in stage1, which can be used for accuracy verification.\n"
-                "enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap"
+                "enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap\n"
+                "enable_stage1_broadcast_overlap, overlap stage1 V1 broadcast with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap forward compute and no other sync could be called during the training for broadcast overlap.\n"
+                "enable_stage1_allgather_overlap, overlap stage1 V2 allgather with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for allgather overlap forward compute and no other sync could be called during the training for allgather overlap."
             )
         },
     )
@@ -1192,10 +1196,12 @@ class TrainingArguments:
                                 "enable_stage2_overlap",
                                 "split_param",
                                 "disable_stage1_reduce_avg",
+                                "enable_stage1_broadcast_overlap",
+                                "enable_stage1_allgather_overlap",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, "
-                                    f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap."
+                                    f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap, split_param, disable_stage1_reduce_avg, enable_stage1_broadcast_overlap, enable_stage1_allgather_overlap."
                                 )
                     if "disable_stage1_reduce_avg" in sharding_parallel_config:
                         assert self.sharding == [
@@ -1241,6 +1247,35 @@ class TrainingArguments:
                             "The logging_steps should be greater than 1 for stage2 overlap, "
                             f"but got logging_steps={self.logging_steps}."
                         )
+                    if "enable_stage1_broadcast_overlap" in sharding_parallel_config:
+                        assert (
+                            ShardingOption.SHARD_OP in self.sharding
+                        ), f"enable_stage1_broadcast_overlap expects sharding=stage1, but got {self.sharding}."
+
+                        assert (
+                            "split_param" not in sharding_parallel_config
+                        ), "split_param should not be set when enable_stage1_broadcast_overlap."
+                        use_casual_mask = os.getenv("USE_CASUAL_MASK", "False")
+                        assert use_casual_mask, "enable_stage1_broadcast_overlap requires USE_CASUAL_MASK=True."
+                        assert self.logging_steps > 1, (
+                            "The logging_steps should be greater than 1 for stage1_broadcast_overlap, "
+                            f"but got logging_steps={self.logging_steps}."
+                        )
+                    if "enable_stage1_allgather_overlap" in sharding_parallel_config:
+                        assert (
+                            ShardingOption.SHARD_OP in self.sharding
+                        ), f"enable_stage1_allgather_overlap expects sharding=stage1, but got {self.sharding}."
+
+                        assert (
+                            "split_param" in sharding_parallel_config
+                        ), "split_param should be set when enable_stage1_allgather_overlap."
+                        use_casual_mask = os.getenv("USE_CASUAL_MASK", "False")
+                        assert use_casual_mask, "enable_stage1_allgather_overlap requires USE_CASUAL_MASK=True."
+                        assert self.logging_steps > 1, (
+                            "The logging_steps should be greater than 1 for enable_stage1_allgather_overlap, "
+                            f"but got logging_steps={self.logging_steps}."
+                        )
+
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
 
