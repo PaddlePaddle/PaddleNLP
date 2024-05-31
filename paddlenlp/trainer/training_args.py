@@ -1178,7 +1178,9 @@ class TrainingArguments:
                         "mp_degree": self.tensor_parallel_degree,
                         "pp_degree": self.pipeline_parallel_degree,
                         "sharding_degree": self.sharding_parallel_degree,
-                        "sep_degree": self.sep_parallel_degree,
+                        "sep_degree": self.sep_parallel_degree
+                        if self.sep_parallel_degree > 1
+                        else self.cp_parallel_degree,
                         "order": order,
                     }
                 else:
