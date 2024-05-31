@@ -61,7 +61,7 @@ function _train(){
     export FLAGS_cinn_bucket_compile=1
     export FLAGS_cinn_new_cluster_op_method=1
     export FLAGS_deny_cinn_ops="gather"
-    export FLAGS_prim_forward_blacklist="pd_op.embedding"
+    export FLAGS_prim_forward_blacklist="pd_op.embedding;pd_op.squared_l2_norm"
     export FLAGS_enable_prim_after_distribute=True
     export FLAGS_disable_dyshape_in_train=True
     export FLAGS_enable_pir_in_executor=True
